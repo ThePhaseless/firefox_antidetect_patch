@@ -276,32 +276,40 @@ test("a profile with the previous session's TRR prefs and a first setBrowserProx
   assert.equal(prefs.user.get('network.trr.bootstrapAddr'), BOOTSTRAP);
 });
 
-test('a context that ends is recomputed out of the set', async () => {
+test('a context that ends stays in the set: what it left in flight still resolves through its proxy', async () => {
   const { registry, prefs, newContext } = session();
   registry.setBrowserProxy(proxy('gw.example'));
   const one = newContext('ctx-1');
   one.setProxy(proxy('one.example'));
-  newContext('ctx-2').setProxy(proxy('two.example'));
+  const two = newContext('ctx-2');
+  two.setProxy(proxy('two.example'));
+  const before = trr(prefs);
   assert.equal(prefs.user.get('network.trr.excluded-domains'), 'gw.example,one.example,two.example');
   await one.destroy();
-  assert.equal(prefs.user.get('network.trr.excluded-domains'), 'gw.example,two.example');
-  assert.equal(prefs.user.get('network.trr.stealth.contexts'), '*,' + [...registry._browserContextIdToBrowserContext.values()]
-      .filter(c => c._proxy).map(c => c.userContextId).join(','));
+  // A beacon sent as the context closed, an OCSP request, a retry: their lookups come after the destroy, and the resolver decides
+  // from this list alone. Dropped from it, the context's names went to the host's resolver (hunt 43733181674, 10/10 on Linux and
+  // Windows). Its proxy name stays excluded from DoH, since its requests still leave by that proxy (GoneContexts).
+  assert.deepEqual(trr(prefs), before);
+  assert.equal(prefs.user.get('network.trr.stealth.contexts'), `*,${one.userContextId},${two.userContextId}`);
 });
 
-test('the last proxy removed clears the three prefs (retail without proxy is the default)', async () => {
+test('no proxy ever: the three prefs are absent; a context that had one keeps them for the life of the browser', async () => {
+  const fresh = session();
+  fresh.registry.setNoBrowserProxy();
+  assert.deepEqual(trr(fresh.prefs), {}, 'retail without proxy is the default');
+  fresh.registry.setBrowserProxy(proxy('gw.example'));
+  assert.equal(fresh.prefs.user.get('network.trr.stealth.contexts'), '*');
+  fresh.registry.setNoBrowserProxy();
+  assert.deepEqual(trr(fresh.prefs), {}, 'the browser proxy removed, and no context ever had one: cleared');
+
   const { registry, prefs, newContext } = session();
   registry.setNoBrowserProxy();
   const context = newContext('ctx-1');
   context.setProxy(proxy('ctx.example'));
   assert.equal(prefs.user.get('network.trr.stealth.contexts'), String(context.userContextId));
   await context.destroy();
-  assert.deepEqual(trr(prefs), {});
-  // And through the browser proxy.
-  registry.setBrowserProxy(proxy('gw.example'));
-  assert.equal(prefs.user.get('network.trr.stealth.contexts'), '*');
-  registry.setNoBrowserProxy();
-  assert.deepEqual(trr(prefs), {});
+  assert.equal(prefs.user.get('network.trr.stealth.contexts'), String(context.userContextId), 'the ended context is still proxied');
+  assert.equal(prefs.user.get('network.trr.excluded-domains'), 'ctx.example');
 });
 
 test('setNoBrowserProxy with a context proxy still present leaves DoH on', () => {
