@@ -284,10 +284,11 @@ def test_the_ledger_of_the_series_is_valid_against_its_series():
     assert births.ledger_problems(births.load_ledger(), set(births.series_folder_list())) == []
 
 
-def test_the_ledger_carries_the_open_hash_completer_and_nothing_hides_it():
-    open_items = [e for e in births.load_ledger()["entries"] if e["verdict"] == "fix"]
-    assert [e["file"] for e in open_items] == ["toolkit/components/url-classifier/UrlClassifierHashCompleter.sys.mjs"]
-    assert open_items[0]["open"]["since"] == "2026-11-13"
+def test_the_hash_completer_and_the_profile_lock_are_hooked_not_open_nor_accepted():
+    by_file = {e["file"]: e for e in births.load_ledger()["entries"]}
+    for name in ("toolkit/components/url-classifier/UrlClassifierHashCompleter.sys.mjs", "toolkit/profile/nsProfileLock.cpp"):
+        assert by_file[name]["verdict"] == "hooked" and by_file[name]["hook"] == "network/doh"
+    assert [e for e in births.load_ledger()["entries"] if e["verdict"] == "fix"] == []
 
 
 # ------------------------------------------------------------------------------------------------------- a repository, and a commit of it
@@ -332,7 +333,7 @@ def test_the_scan_is_a_step_of_the_series_workflow_right_after_the_materialize_s
     text = (Path(__file__).resolve().parents[2] / ".github" / "workflows" / "series.yml").read_text(encoding="utf-8")
     materialize = text.index("engine.py materialize --into source")
     step = text.index("python .series/tools/births.py --tree source")
-    assert materialize < step < text.index("repository: feder-cr/invisible_core")
+    assert materialize < step < text.index("repository: oss-invisible/core")
     assert text[:step].count("- name:") - text[:materialize].count("- name:") == 1       # the step that follows the materialize step
 
 
