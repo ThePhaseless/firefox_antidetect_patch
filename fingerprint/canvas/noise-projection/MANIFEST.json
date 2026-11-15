@@ -27,7 +27,8 @@
   "gfx/2d/StealthCanvasProjection.cpp": "100644",
   "gfx/2d/StealthCanvasProjection.h": "100644",
   "gfx/2d/StealthRecordedProjection.h": "100644",
-  "gfx/tests/gtest/TestStealthCanvasProjection.cpp": "100644"
+  "gfx/tests/gtest/TestStealthCanvasProjection.cpp": "100644",
+  "gfx/tests/gtest/TestStealthCanvasProjectionEquivalence.cpp": "100644"
  },
  "inventory": [
   {

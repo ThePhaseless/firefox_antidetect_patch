@@ -100,11 +100,14 @@ struct StealthWebGLReadback final {
   // The canvas noise for a readPixels into a PIXEL_PACK_BUFFER, after the host
   // wrote it: reads the same pixels into memory with the buffer unbound,
   // applies the noise as readPixels into an array applies it, and writes them
-  // back over the buffer row by row with BufferSubData, so the buffer holds
-  // what a page's readPixels into an array would have given. Only RGBA/
-  // UNSIGNED_BYTE, only with a seed, only with the bound PBO big enough for the
-  // read (otherwise the host refused the read and wrote nothing). It costs two
-  // more reads: a tight one, then the 1px-larger one inside ProjectReadPixels.
+  // back over the buffer, so the buffer holds what a page's readPixels into an
+  // array would have given. Only RGBA/UNSIGNED_BYTE, only with a seed, only
+  // with the bound PBO big enough for the read (otherwise the host refused the
+  // read and wrote nothing). It costs one more read, a tight one, and the small
+  // reads of the pixels around it inside ProjectReadPixels. The write back is
+  // ONE BufferSubData when the buffer's rows lie as the tight ones do (full
+  // rows, no skipped pixels, the same stride: the usual read), else one per
+  // row.
   static void ProjectReadPixelsPbo(const ClientWebGLContext& aCtx,
                                    const webgl::ReadPixelsDesc& aDesc,
                                    const WebGLsizeiptr aOffset) {
@@ -155,9 +158,23 @@ struct StealthWebGLReadback final {
     if (!read || written.subrect.IsEmpty()) {
       return;
     }
+    const auto& sub = written.subrect;
+    // Full rows laid as the buffer lays them: no gap between two rows to keep,
+    // so the whole block goes in one command (a command per row was 1024 of
+    // them for a 1024-row read).
+    if (!packing.skipPixels && !sub.X() &&
+        uint64_t(sub.Width()) * 4 == stride && written.byteStride == stride) {
+      const uint64_t dst =
+          offset + (packing.skipRows + uint64_t(sub.Y())) * stride;
+      const uint8_t* src = bytes.data() + size_t(sub.Y()) * written.byteStride;
+      aCtx.Run<STEALTH_WEBGL_RPROC(BufferSubData)>(
+          LOCAL_GL_PIXEL_PACK_BUFFER, dst,
+          Span<const uint8_t>(src, size_t(sub.Height()) * stride),
+          /* unsynchronized */ false);
+      return;
+    }
     // Over the bytes the host wrote, row by row, so the gaps a packing leaves
     // between rows stay what they were.
-    const auto& sub = written.subrect;
     for (int32_t y = sub.Y(); y < sub.YMost(); ++y) {
       const uint64_t dst = offset + (packing.skipRows + uint64_t(y)) * stride +
                            (packing.skipPixels + uint64_t(sub.X())) * 4;
@@ -172,9 +189,9 @@ struct StealthWebGLReadback final {
 
  private:
   // The canvas noise on what a page's readPixels wrote into aDest
-  // (gfx::StealthProjectPixels on the framebuffer's stored pixels).
-  // aWritten is what the read wrote: the part of the requested rectangle
-  // inside the framebuffer, and the row stride.
+  // (gfx::StealthProjectBlockInCanvas on the bytes the page received, in
+  // place). aWritten is what the read wrote: the part of the requested
+  // rectangle inside the framebuffer, and the row stride.
   static void ProjectReadPixels(const ClientWebGLContext& aCtx,
                                 const webgl::ReadPixelsDesc& aDesc,
                                 const Span<uint8_t> aDest,
@@ -192,61 +209,64 @@ struct StealthWebGLReadback final {
     if (!noise || aWritten.subrect.IsEmpty() || !aWritten.byteStride) {
       return;
     }
-    // The same rectangle one pixel larger on every side, tightly packed: the
-    // function needs each pixel's neighbours, and a pixel at the edge of the
-    // request has neighbours outside it. The part of it the framebuffer holds
-    // is `fb`; beyond the framebuffer the function repeats the edge pixel, as
-    // it does at the edge of every canvas.
-    webgl::ReadPixelsDesc wide = aDesc;
-    wide.srcOffset = {aDesc.srcOffset.x - 1, aDesc.srcOffset.y - 1};
-    wide.size = {aDesc.size.x + 2, aDesc.size.y + 2};
-    wide.packState = {};
-    const size_t wideStride = size_t(wide.size.x) * 4;
-    std::vector<uint8_t> wideBytes(wideStride * wide.size.y);
-    webgl::ReadPixelsResult wideRead;
-    if (!aCtx.DoReadPixels(wide, Span<uint8_t>(wideBytes), &wideRead) ||
-        wideRead.subrect.IsEmpty() || wideRead.byteStride != wideStride) {
+    // The pixels the page's read wrote, where it wrote them: row by row, from
+    // the first of them, with the page's own packing. They ARE the framebuffer's
+    // pixels, so the projection runs on them where they lie.
+    const gfx::IntRect sub = aWritten.subrect;
+    const auto& packing = aDesc.packState;
+    const size_t firstByte =
+        size_t(packing.skipRows + sub.Y()) * aWritten.byteStride +
+        size_t(packing.skipPixels + sub.X()) * 4;
+    const size_t lastByte = firstByte +
+                            size_t(sub.Height() - 1) * aWritten.byteStride +
+                            size_t(sub.Width()) * 4;
+    if (lastByte > aDest.size()) {
       return;
     }
-    const gfx::IntRect fb = wideRead.subrect;
-    uint8_t* const fbBase =
-        wideBytes.data() + size_t(fb.Y()) * wideStride + size_t(fb.X()) * 4;
-    // The page's pixels inside the framebuffer, in `fb` coordinates.
-    const gfx::IntRect asked =
-        (aWritten.subrect + gfx::IntPoint(1, 1) - fb.TopLeft())
-            .Intersect(gfx::IntRect(gfx::IntPoint(), fb.Size()));
-    if (asked.IsEmpty()) {
-      return;
-    }
+    // Its neighbours outside the block are the ones a read of the block grown
+    // by a pixel returned: the pixels of the framebuffer around it, and, where
+    // the framebuffer has none (the block is at its edge), the block's own edge
+    // pixel. Which sides may have pixels: the read left a side out of the block
+    // only because the framebuffer ended there, so a block that does not reach
+    // the request's own edge has none beside it; one that does may have, and the
+    // host says (a read of nothing answers false, and raises no error).
+    const gfx::StealthBlockEdges mayHave = {
+        !sub.Y(), uint64_t(sub.YMost()) == aDesc.size.y, !sub.X(),
+        uint64_t(sub.XMost()) == aDesc.size.x};
     // The default framebuffer of a premultipliedAlpha context stores
     // premultiplied pixels; a user framebuffer stores whatever was drawn.
     const auto& options = aCtx.mNotLost->info.options;
     const bool premultiplied = !aCtx.State().mBoundReadFb && options.alpha &&
                                options.premultipliedAlpha;
-    uint8_t* const askedBase =
-        fbBase + size_t(asked.Y()) * wideStride + size_t(asked.X()) * 4;
-    if (!gfx::StealthProjectPixels(fbBase, int32_t(wideStride), fb.Size(),
-                                   gfx::SurfaceFormat::R8G8B8A8, asked,
-                                   askedBase, int32_t(wideStride),
-                                   premultiplied, noise)) {
-      return;
-    }
-    // Back where the page's read put them, with the page's own packing.
-    const auto& packing = aDesc.packState;
-    const size_t bytes = size_t(asked.Width()) * 4;
-    for (int32_t row = 0; row < asked.Height(); ++row) {
-      // Request coordinates of this row's first pixel.
-      const int32_t rx = asked.X() + fb.X() - 1;
-      const int32_t ry = asked.Y() + fb.Y() - 1 + row;
-      const size_t destOffset =
-          size_t(packing.skipRows + ry) * aWritten.byteStride +
-          size_t(packing.skipPixels + rx) * 4;
-      if (destOffset + bytes > aDest.size()) {
-        return;
-      }
-      memcpy(aDest.data() + destOffset, askedBase + size_t(row) * wideStride,
-             bytes);
-    }
+    const auto read = [&](int32_t aX, int32_t aY, int32_t aW, int32_t aH,
+                          uint8_t* aOut) {
+      return ReadStrip(aCtx, aDesc, aX, aY, aW, aH, aOut);
+    };
+    gfx::StealthProjectBlockInCanvas(
+        aDest.data() + firstByte, int32_t(aWritten.byteStride),
+        gfx::IntSize(sub.Width(), sub.Height()), gfx::SurfaceFormat::R8G8B8A8,
+        premultiplied,
+        gfx::IntPoint(aDesc.srcOffset.x + sub.X(), aDesc.srcOffset.y + sub.Y()),
+        mayHave, read, noise);
+  }
+
+  // A read of the framebuffer, aW x aH pixels at (aX, aY), into aOut, tightly
+  // packed, with what aDesc says of the format (RGBA/UNSIGNED_BYTE). False when
+  // the framebuffer has no pixel of the rectangle, or not all of it.
+  static bool ReadStrip(const ClientWebGLContext& aCtx,
+                        const webgl::ReadPixelsDesc& aDesc, int32_t aX,
+                        int32_t aY, int32_t aW, int32_t aH, uint8_t* aOut) {
+    webgl::ReadPixelsDesc strip = aDesc;
+    strip.srcOffset = {aX, aY};
+    strip.size = {uint32_t(aW), uint32_t(aH)};
+    strip.packState = {};
+    const size_t stride = size_t(aW) * 4;
+    webgl::ReadPixelsResult res;
+    return aCtx.DoReadPixels(strip, Span<uint8_t>(aOut, stride * size_t(aH)),
+                             &res) &&
+           res.byteStride == stride && res.subrect.X() == 0 &&
+           res.subrect.Y() == 0 && res.subrect.Width() == aW &&
+           res.subrect.Height() == aH;
   }
 
   // The same IPC read as ClientWebGLContext::GetBufferParameter, for the

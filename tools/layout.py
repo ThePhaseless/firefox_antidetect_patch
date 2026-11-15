@@ -274,7 +274,7 @@ OWN_FILES = [
     (r"^gfx/thebes/StealthGfxFeatureStatus\.", "platform/declaration-gate"),
     (r"^gfx/thebes/gtest/(moz\.build|TestStealthGfxFeatureStatus\.cpp|TestStealthScaleDeclaration\.cpp)$", "platform/declaration-gate"),
     (r"^gfx/2d/StealthCanvasProjection\.", "fingerprint/canvas/noise-projection"),
-    (r"^gfx/tests/gtest/TestStealthCanvasProjection\.cpp$", "fingerprint/canvas/noise-projection"),
+    (r"^gfx/tests/gtest/TestStealthCanvasProjection(Equivalence)?\.cpp$", "fingerprint/canvas/noise-projection"),
     (r"^gfx/2d/StealthGlyphCoverage\.", "fingerprint/fonts/metrics"),
     (r"^gfx/tests/gtest/TestStealthTextQuality\.cpp$", "fingerprint/fonts/metrics"),
     (r"^gfx/tests/gtest/TestStealthBundledCollection\.cpp$", "fingerprint/fonts/font-list"),

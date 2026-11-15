@@ -9,6 +9,7 @@
 #include <stdint.h>
 
 #include "mozilla/AlreadyAddRefed.h"
+#include "mozilla/FunctionRef.h"
 #include "mozilla/RefPtr.h"
 #include "mozilla/gfx/Point.h"
 #include "mozilla/gfx/Rect.h"
@@ -133,6 +134,69 @@ bool StealthProjectPixels(const uint8_t* aSrc, int32_t aSrcStride,
                           const IntRect& aRect, uint8_t* aDst,
                           int32_t aDstStride, bool aPremultiplied,
                           const StealthCanvasNoise& aNoise);
+
+/**
+ * The pixels around a block of a canvas that is projected in place, which the
+ * projection needs for the block's own edge pixels: a row above, a row below,
+ * a column to the left and one to the right, as the canvas holds them, in the
+ * block's own format (4 bytes each). A side the canvas holds no pixels on (the
+ * block touches the edge of the canvas there) is null, and the nearest pixel of
+ * the block is the neighbour, as at the edge of every canvas.
+ *   top, bottom: the block's width in pixels, left to right;
+ *   left, right: the block's height in pixels, top to bottom;
+ *   corners: four pixels, top-left, top-right, bottom-left, bottom-right; each
+ *   one is read only when the two sides that meet there are both present.
+ */
+struct StealthBlockFrame {
+  const uint8_t* top = nullptr;
+  const uint8_t* bottom = nullptr;
+  const uint8_t* left = nullptr;
+  const uint8_t* right = nullptr;
+  const uint8_t* corners = nullptr;
+};
+
+/**
+ * The projection of a whole block, in place: the result is what
+ * StealthProjectPixels gives on the pixels of the block grown by one pixel on
+ * every side where the canvas has them (the frame), cropped to the block, but
+ * without that larger copy: the block is read where it lies. aStride is the
+ * distance between its rows in bytes. Formats and refusals as
+ * StealthProjectPixels; false, writing nothing, for a zero seed, another
+ * format or an empty block.
+ */
+bool StealthProjectBlock(uint8_t* aPixels, int32_t aStride,
+                         const IntSize& aSize, SurfaceFormat aFormat,
+                         bool aPremultiplied, const StealthBlockFrame& aFrame,
+                         const StealthCanvasNoise& aNoise);
+
+// Reads aW x aH pixels of the canvas at (aX, aY), tightly packed, 4 bytes each,
+// in the format of the block; false when the canvas holds no pixel of the
+// rectangle.
+using StealthPixelReader =
+    FunctionRef<bool(int32_t aX, int32_t aY, int32_t aW, int32_t aH,
+                     uint8_t* aOut)>;
+
+// On which sides the canvas MAY hold pixels beside a block: a false side is
+// one the caller knows to be outside the canvas, so it is not asked for.
+struct StealthBlockEdges {
+  bool top;
+  bool bottom;
+  bool left;
+  bool right;
+};
+
+/**
+ * StealthProjectBlock for a block read out of a canvas that cannot be mapped
+ * (a WebGL framebuffer in another process): the pixels beside the block come
+ * from aRead, one small read per side (the block is at aOrigin, in the
+ * coordinates aRead takes), instead of one read of the whole block grown by a
+ * pixel. A read that answers false means no pixels there.
+ */
+bool StealthProjectBlockInCanvas(
+    uint8_t* aPixels, int32_t aStride, const IntSize& aSize,
+    SurfaceFormat aFormat, bool aPremultiplied, const IntPoint& aOrigin,
+    const StealthBlockEdges& aMayHave, const StealthPixelReader& aRead,
+    const StealthCanvasNoise& aNoise);
 
 /**
  * A new surface of aRect's size holding aRect of aSource with the projection
