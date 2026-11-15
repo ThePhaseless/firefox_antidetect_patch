@@ -369,7 +369,9 @@ jobs:
           # software compositing declared by the core: the compositor read from a privileged context, the CPU of the GPU process
           # (Windows) or of the parent (Linux, no GPU process) on a fixed scene, and the page bytes against the wrapper's reference
           - { suite: wrapper.e2e.compositing, leg: linux-x86_64, runner: ubuntu-24.04, kind: linux, os: linux }
-          - { suite: wrapper.e2e.compositing, leg: win-x86_64, runner: windows-latest, kind: win, os: windows }
+          # the reference bytes of the compositing suite were recorded on windows-2022; the same image here, so the leg asks whether
+          # compositing changed a byte, not whether two Windows builds rasterize text alike (that is the text suite, with idwr)
+          - { suite: wrapper.e2e.compositing, leg: win-x86_64, runner: windows-2022, kind: win, os: windows }
           - { suite: wrapper.unit.compositing, leg: linux-x86_64, runner: ubuntu-24.04, kind: linux, os: linux }
           - { suite: wrapper.unit.compositing, leg: win-x86_64, runner: windows-latest, kind: win, os: windows }
     steps:
