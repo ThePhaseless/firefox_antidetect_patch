@@ -829,7 +829,7 @@ void NewProjectReadPixels(const Image& aF, const Request& aReq, PageRead* aPage,
   const IntRect sub = aPage->sub;
   const StealthBlockEdges mayHave = {!sub.Y(), sub.YMost() == aReq.rh, !sub.X(),
                                      sub.XMost() == aReq.rw};
-  const auto read = [&](int32_t aX, int32_t aY, int32_t aW, int32_t aH, uint8_t* aOut) {
+  auto read = [&](int32_t aX, int32_t aY, int32_t aW, int32_t aH, uint8_t* aOut) {
     ++*aReads;
     const bool ok = ReadFramebuffer(aF, aX, aY, aW, aH, aOut);
     *aHits += ok;

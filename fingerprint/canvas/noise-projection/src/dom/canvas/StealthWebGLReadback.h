@@ -238,8 +238,8 @@ struct StealthWebGLReadback final {
     const auto& options = aCtx.mNotLost->info.options;
     const bool premultiplied = !aCtx.State().mBoundReadFb && options.alpha &&
                                options.premultipliedAlpha;
-    const auto read = [&](int32_t aX, int32_t aY, int32_t aW, int32_t aH,
-                          uint8_t* aOut) {
+    auto read = [&](int32_t aX, int32_t aY, int32_t aW, int32_t aH,
+                    uint8_t* aOut) {
       return ReadStrip(aCtx, aDesc, aX, aY, aW, aH, aOut);
     };
     gfx::StealthProjectBlockInCanvas(
