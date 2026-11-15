@@ -50,7 +50,7 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           repository: oss-invisible/core
-          ref: dc801c298185e45e4081bf9d2fabad642d5f80f7
+          ref: eb58daf8121f9766cef40d9765aff9742a86de8a
           path: core
           persist-credentials: false
       - run: pip install -e "./core[dev]"
