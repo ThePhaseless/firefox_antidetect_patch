@@ -12,6 +12,7 @@
 #include <stdint.h>
 
 #include "StealthDeclarationGate.h"
+#include "StealthSyntheticBold.h"
 #include "StealthTextMeasuring.h"
 #include "gfxFT2FontBase.h"
 #include "gfxFont.h"
@@ -22,10 +23,42 @@
 #include "harfbuzz/hb.h"
 #include "mozilla/Assertions.h"
 #include "mozilla/StaticPrefs_zoom.h"
+#include "mozilla/gfx/StealthIdwrBold.h"
 #include "nsMathUtils.h"
 
 namespace mozilla {
 namespace gfx {
+
+/**
+ * Does the rasteriser simulate the bold of this font (StealthSyntheticBold.h)?
+ * aEmbolden is gfxFT2FontBase::mEmbolden: the font was asked for a bold it lacks
+ * (FC_EMBOLDEN). Then the advance and the box of a glyph are the ones DirectWrite
+ * gives a face made with DWRITE_FONT_SIMULATIONS_BOLD, from idwr, and not the
+ * strength FreeType's embolden adds. A font that Gecko multi-strikes (a webfont, a
+ * COLR font) has plain metrics here: the bold is Gecko's.
+ */
+inline bool StealthSimulatesBold(gfxFT2FontBase& aFont, bool aEmbolden) {
+  return aEmbolden &&
+         StealthBoldSimulated(aFont.GetFontEntry(), aFont.GetStyle());
+}
+
+/**
+ * The design advance of glyph aGID in font units, as gfxDWriteFont measures it:
+ * the simulated bold face's (idwr) or the font's own (HarfBuzz). False when the
+ * font cannot be read.
+ */
+inline bool StealthDesignAdvanceUnits(gfxFT2FontBase& aFont, uint16_t aGID,
+                                      bool aSimulateBold, int32_t* aUnits) {
+  if (aSimulateBold) {
+    StealthIdwrGlyphMetrics m;
+    if (StealthIdwrBoldDesignMetrics(aFont.GetUnscaledFont().get(), aGID, &m)) {
+      *aUnits = int32_t(m.mAdvanceWidth);
+      return true;
+    }
+  }
+  gfxHarfBuzzShaper* shaper = aFont.GetHarfBuzzShaper();
+  return shaper && shaper->GetDesignAdvance(aGID, *aUnits);
+}
 
 /**
  * The advance of glyph aGID the way DirectWrite scales it: the DESIGN advance
@@ -38,8 +71,11 @@ namespace gfx {
  * size). Returns false, writing nothing, when the engine is off or the design
  * advance cannot be read; the caller then runs stock code.
  *
- * aBoldX is the synthetic-bold strength in 26.6 (bold.x in the caller); it is
- * added after the scaling exactly as the stock FreeType path adds it.
+ * aEmbolden is gfxFT2FontBase::mEmbolden. With a simulated bold
+ * (StealthSimulatesBold) the design advance is the bold face's: idwr adds
+ * (unitsPerEm + 25) / 50 to the advance of a glyph with ink, as DirectWrite's
+ * GetDesignGlyphAdvances does for DWRITE_FONT_SIMULATIONS_BOLD, before the scaling
+ * and not the strength FreeType's embolden adds after it (to the space too).
  *
  * Why. FreeType scales the design advance by an INTEGER ppem.
  * FT_Request_Metrics computes x_ppem = (scaled + 32) >> 6 and then derives
@@ -70,24 +106,22 @@ namespace gfx {
  * font the engine can shape.
  */
 inline bool StealthDesignAdvance(gfxFT2FontBase& aFont, uint16_t aGID,
-                                 FT_Pos aBoldX, int32_t* aAdvance) {
+                                 bool aEmbolden, int32_t* aAdvance) {
   MOZ_ASSERT(aAdvance);
   if (!StealthEngineActive() || !(aFont.GetAdjustedSize() > 0.0)) {
     return false;
   }
-  gfxHarfBuzzShaper* shaper = aFont.GetHarfBuzzShaper();
   const uint16_t upem = aFont.GetFontEntry()->UnitsPerEm();
   int32_t designAdvance = 0;
-  if (!shaper || !upem || !shaper->GetDesignAdvance(aGID, designAdvance)) {
+  if (!upem || !StealthDesignAdvanceUnits(aFont, aGID,
+                                          StealthSimulatesBold(aFont, aEmbolden),
+                                          &designAdvance)) {
     return false;
   }
   // The design advance arrives in FONT UNITS, so this is the only place the
   // unrounded size enters, and 65536 puts it in the 16.16 the caller speaks.
   FT_Fixed advance = NS_lround(double(designAdvance) * aFont.GetAdjustedSize() *
                                65536.0 / double(upem));
-  if (advance) {
-    advance += aBoldX << 10;  // convert 26.6 to 16.16
-  }
   // Already at the desired size, so it must not go through GetAdjustedSize() /
   // mFTSize a second time.
   *aAdvance = NS_lround(advance);
@@ -144,13 +178,27 @@ inline bool StealthDesignAdvance(gfxFT2FontBase& aFont, uint16_t aGID,
  * negated here to reach gfxRect's y-down box.
  */
 inline bool StealthDesignGlyphBounds(gfxFT2FontBase& aFont, uint16_t aGID,
-                                     gfxRect* aBounds) {
+                                     bool aEmbolden, gfxRect* aBounds) {
   MOZ_ASSERT(aBounds);
   if (!StealthEngineActive()) {
     return false;
   }
-  gfxHarfBuzzShaper* shaper = aFont.GetHarfBuzzShaper();
   const uint16_t upem = aFont.GetFontEntry()->UnitsPerEm();
+  StealthIdwrGlyphMetrics m;
+  if (upem && StealthSimulatesBold(aFont, aEmbolden) &&
+      StealthIdwrBoldDesignMetrics(aFont.GetUnscaledFont().get(), aGID, &m)) {
+    // The simulated bold face: gfxDWriteFont::GetGlyphBounds' own expression over
+    // the metrics DirectWrite gives it, unsigned arithmetic included (the box
+    // grows by (unitsPerEm + 25) / 50 to the right and to the top).
+    const float conv = float(aFont.GetAdjustedSize() / gfxFloat(upem));
+    gfxRect bounds(m.mLeftSideBearing, m.mTopSideBearing - m.mVerticalOriginY,
+                   m.mAdvanceWidth - m.mLeftSideBearing - m.mRightSideBearing,
+                   m.mAdvanceHeight - m.mTopSideBearing - m.mBottomSideBearing);
+    bounds.Scale(conv);
+    *aBounds = bounds;
+    return true;
+  }
+  gfxHarfBuzzShaper* shaper = aFont.GetHarfBuzzShaper();
   int32_t xb, yb, w, h;
   if (!shaper || !upem || !shaper->GetDesignGlyphExtents(aGID, xb, yb, w, h)) {
     return false;
@@ -211,11 +259,12 @@ inline bool StealthDWriteSubpixelPositions() {
  */
 inline gfxFloat StealthDWriteCharAdvance(gfxFT2FontBase& aFont,
                                          uint32_t aChar, float aConv,
-                                         bool aSubpixel) {
+                                         bool aSubpixel, bool aSimulateBold) {
   gfxHarfBuzzShaper* shaper = aFont.GetHarfBuzzShaper();
   const hb_codepoint_t gid = shaper ? shaper->GetNominalGlyph(aChar) : 0;
   int32_t design = 0;
-  if (!gid || !shaper->GetDesignAdvance(uint16_t(gid), design)) {
+  if (!gid ||
+      !StealthDesignAdvanceUnits(aFont, uint16_t(gid), aSimulateBold, &design)) {
     return -1.0;
   }
   const float scaled = design * aConv;
@@ -256,7 +305,8 @@ inline gfxFloat StealthDWriteCharAdvance(gfxFT2FontBase& aFont,
  * leaves design space (gfxDWriteFontEntry::HasBitmapStrikeForSize).
  */
 inline void StealthDWriteAveCharWidth(gfxFT2FontBase& aFont,
-                                      gfxFont::Metrics& aMetrics) {
+                                      gfxFont::Metrics& aMetrics,
+                                      bool aEmbolden) {
   if (!StealthEngineActive() || !(aFont.GetAdjustedSize() > 0.0)) {
     return;
   }
@@ -281,7 +331,8 @@ inline void StealthDWriteAveCharWidth(gfxFT2FontBase& aFont,
     ave = int16_t(os2->xAvgCharWidth) * conv;
   }
   if (ave < 1) {
-    ave = StealthDWriteCharAdvance(aFont, 'x', conv, subpixel);
+    ave = StealthDWriteCharAdvance(aFont, 'x', conv, subpixel,
+                                   StealthSimulatesBold(aFont, aEmbolden));
   }
   if (ave < 1) {
     int32_t xHeight = 0;
@@ -299,6 +350,25 @@ inline void StealthDWriteAveCharWidth(gfxFT2FontBase& aFont,
     ave = xHeight > 0 ? gfxFloat(uint16_t(xHeight) * conv) : 0.0;
   }
   aMetrics.aveCharWidth = ave;
+}
+
+/**
+ * The metrics hook of gfxFT2FontBase::InitExtraMetrics: the average character
+ * width, then the synthetic bold a font Gecko multi-strikes
+ * (StealthSyntheticBold.h) gets: mApplySyntheticBold (the caller's own member, which
+ * only a member can name, by reference) and the widening of
+ * gfxDWriteFont::ComputeMetrics. Done here, before the caller takes the widest
+ * advance from the average, so that both carry it once. A simulated bold needs
+ * nothing more: its advances came from idwr already.
+ */
+inline void StealthDWriteMetrics(gfxFT2FontBase& aFont,
+                                 gfxFont::Metrics& aMetrics,
+                                 bool& aApplySyntheticBold, bool aEmbolden) {
+  StealthDWriteAveCharWidth(aFont, aMetrics, aEmbolden);
+  if (StealthApplySyntheticBold(aFont.GetFontEntry(), aFont.GetStyle())) {
+    aApplySyntheticBold = true;
+    StealthSyntheticBoldMetrics(aFont.GetSyntheticBoldOffset(), aMetrics);
+  }
 }
 
 }  // namespace gfx

@@ -43,7 +43,8 @@ WORKFLOW = ROOT / ".github" / "workflows" / "release.yml"
 GREEN_FILTER = ("StealthGfxFeatureStatus.*:StealthWebGPUAdapter.*:StealthWebGPUDeclaration.*:StealthWebGPUBundledVulkan.*:"
                 "StealthWebGPUInstanceEnv.*:StealthFullscreen.*:StealthScaleDeclaration.*:StealthWindowGeometry.*:StealthGLMultisample.*:"
                 "StealthFrameCrash.*:StealthJugglerEventId.*:StealthSessionUdpProxy.*:StealthDeclaredNetwork.*:StealthSocksUdpPool.*:TestStealthTRRContext.*:TestStealthSocksCredentials.*:TestStealthSessionResolver.*:StealthIceResolverContext.*:StealthUdpProxyBirth.*:"
-                "StealthNrSocketBirth.*:StealthPcUdpProxyKinds.*:StealthTcpProxyRoad.*:StealthPcProxyConfig.*")
+                "StealthNrSocketBirth.*:StealthPcUdpProxyKinds.*:StealthTcpProxyRoad.*:StealthPcProxyConfig.*:StealthCanvasProjection.*:"
+                "StealthSkiaIdwr.*:StealthSkiaIdwrWin.*:StealthSkiaIdwrThreads.*:StealthSkiaStrokeLevels.*:StealthIdwrTextVars.*:StealthIdwrFontconfig.*:Idwr.*:IdwrLibm.*:StealthSyntheticBoldRule.*:StealthSyntheticBold.*")
 GTEST_JOBS = ("gtest-linux", "gtest-cross")
 # configure's files, for which options exist; the ones the tree has at the plan's stage too.
 CONFIGURE_FILES = ("moz.configure", "toolkit/moz.configure", "js/moz.configure", "browser/moz.configure", "build/moz.configure/*.configure")
@@ -158,6 +159,15 @@ def group_gtest(doc) -> list:
     missing = sorted(x for x in suites if x + ".*" not in default)
     out.append(("gtests: every suite of a gtest of ours under netwerk/ and dom/media/webrtc/ is in the default filter (%s)" % ", ".join(missing),
                 len(suites) >= 8 and not missing))
+    # The same for the idwr text of Skia and idwr itself (gfx/idwr's gtests, and the gfx/tests/gtest ones that
+    # name idwr or the declared text): a suite that is built and not named is a test no candidate runs.
+    idwr_suites = set()
+    for pattern in ("gfx/tests/gtest/Test*Idwr*.cpp", "gfx/tests/gtest/TestStealthSkiaStrokeLevels.cpp", "gfx/idwr/tests/gtest/Test*.cpp"):
+        for path in ROOT.glob(pattern):
+            idwr_suites |= set(_re.findall(r"^TEST(?:_F|_P)?\(\s*(\w+)\s*,", path.read_text(encoding="utf-8", errors="replace"), _re.M))
+    missing_idwr = sorted(x for x in idwr_suites if x + ".*" not in default)
+    out.append(("gtests: every suite of the idwr gtests (gfx/idwr, gfx/tests/gtest/*Idwr*, the stroke levels) is in the default filter (%s)" % ", ".join(missing_idwr),
+                len(idwr_suites) >= 8 and not missing_idwr))
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     import release_plan
     out.append(("gtests: the plan's default filter (release_plan.py) is the workflow's",

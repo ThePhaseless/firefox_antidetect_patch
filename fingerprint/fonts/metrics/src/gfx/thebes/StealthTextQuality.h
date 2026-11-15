@@ -18,6 +18,7 @@
 #include <dwrite.h>
 
 #include "StealthDeclarationGate.h"
+#include "StealthSyntheticBold.h"
 #include "mozilla/Maybe.h"
 #include "mozilla/RefPtr.h"
 #include "mozilla/StaticPrefs_zoom.h"

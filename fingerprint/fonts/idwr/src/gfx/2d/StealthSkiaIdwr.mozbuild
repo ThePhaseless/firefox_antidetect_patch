@@ -1,0 +1,18 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+# Read by gfx/2d/moz.build (one include line). The idwr text of Skia: the
+# platform-neutral half, and the half that hands Skia the typeface of each
+# platform's ScaledFont.
+
+SOURCES += ["StealthSkiaIdwr.cpp"]
+
+if CONFIG["MOZ_WIDGET_TOOLKIT"] == "windows":
+    SOURCES += ["StealthSkiaIdwrWin.cpp"]
+
+if CONFIG["MOZ_WIDGET_TOOLKIT"] == "gtk":
+    SOURCES += ["StealthSkiaIdwrFontconfig.cpp"]
+
+# The bold simulated metrics of a face, read by gfx/thebes (Linux).
+EXPORTS.mozilla.gfx += ["StealthIdwrBold.h"]

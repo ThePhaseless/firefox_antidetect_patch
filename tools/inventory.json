@@ -2334,7 +2334,7 @@
   "prefs": [],
   "added": 8,
   "removed": 0,
-  "hunks": 1,
+  "hunks": 3,
   "inline_logic_lines": 5,
   "hookable": "already-hook",
   "anchor": "UnscaledFontDWrite::GetFontDescriptor",
@@ -2347,6 +2347,22 @@
    "changed": [],
    "why": "Checked category, feature, prefs, anchor, evidence and notes against the diff; no correction needed."
   }
+ },
+ {
+  "file": "gfx/2d/ScaledFontFontconfig.cpp",
+  "category": "other",
+  "feature": "idwr-text-engine",
+  "prefs": [],
+  "added": 5,
+  "removed": 0,
+  "hunks": 4,
+  "inline_logic_lines": 4,
+  "hookable": "already-hook",
+  "anchor": "ScaledFontFontconfig::UseSubpixelPosition, CreateSkTypeface, SetupSkFontDrawOptions and GetDefaultAAMode",
+  "evidence": [
+   "+  if (StealthIdwrAAModeDeclared()) return StealthIdwrSkTypeface(this, mInstanceData.mFlags & InstanceData::EMBOLDEN);  // STEALTH-HOOK(fingerprint/fonts/idwr) null: refused, never FreeType"
+  ],
+  "notes": "One include and four one-line calls at the top of the functions that choose how Skia draws a Fontconfig font on Linux: with the idwr text engine declared they return the idwr typeface (or null for a font idwr refuses, never FreeType), subpixel positioning on, the idwr Skia font options and the declared antialias mode. Without the declaration they fall through to Mozilla's own lines, unchanged. The logic lives in StealthSkiaIdwrFontconfig.cpp."
  },
  {
   "file": "gfx/2d/UnscaledFontDWrite.h",
@@ -2374,7 +2390,7 @@
   "category": "build",
   "feature": "canvas-noise-projection",
   "prefs": [],
-  "added": 5,
+  "added": 4,
   "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 0,
@@ -2382,39 +2398,14 @@
   "anchor": "EXPORTS.mozilla.gfx and UNIFIED_SOURCES of gfx/2d",
   "evidence": [
    "+    \"StealthCanvasProjection.h\",",
-   "+    \"StealthGlyphCoverage.h\",",
    "+    \"StealthRefuse.h\","
   ],
-  "notes": "Registers StealthCanvasProjection.h/.cpp (canvas-noise-projection), StealthGlyphCoverage.h/.cpp (glyph-coverage-quantise) and exports StealthRefuse.h. StealthRefuse.h is header-only (gfx/2d has no StealthRefuse.cpp) and is the startup refusal helper included by gfx/thebes/StealthDeclarationGate.cpp, StealthBundleFontList.cpp and gfxDWriteFonts.cpp, i.e. a different feature than the one named here. Build registration only.",
+  "notes": "Registers StealthCanvasProjection.h/.cpp (canvas-noise-projection), includes StealthSkiaIdwr.mozbuild (fingerprint/fonts/idwr) and exports StealthRefuse.h. StealthRefuse.h is header-only (gfx/2d has no StealthRefuse.cpp) and is the startup refusal helper included by gfx/thebes/StealthDeclarationGate.cpp, StealthBundleFontList.cpp and gfxDWriteFonts.cpp, i.e. a different feature than the one named here. Build registration only.",
   "verifier": {
    "changed": [
     "notes"
    ],
    "why": "Checked the StealthRefuse.h question: no StealthRefuse.cpp exists, so it is header-only; the three Stealth* entries belong to three features."
-  }
- },
- {
-  "file": "gfx/skia/skia/src/core/SkScalerContext.cpp",
-  "category": "spoof",
-  "feature": "glyph-coverage-quantise",
-  "prefs": [],
-  "added": 10,
-  "removed": 0,
-  "hunks": 2,
-  "inline_logic_lines": 4,
-  "hookable": "already-hook",
-  "anchor": "SkScalerContext::getImage",
-  "evidence": [
-   "+#include \"mozilla/gfx/StealthGlyphCoverage.h\"",
-   "+    if (unfilteredGlyph->maskFormat() == SkMask::kA8_Format) {",
-   "+        mozilla::gfx::StealthQuantiseGlyphCoverage("
-  ],
-  "notes": "This file is in the vendored Skia tree, so every Skia update conflicts with this block. The call sits before the mask filter on purpose: a blur must act on the already quantised mask, as the comment explains. The include is the only Mozilla header in this file (other Skia files do include mozilla/ headers, e.g. gfx/skia/skia/src/ports/SkMemory_mozalloc.cpp:12). The comment says this replaces the readback-time coverage ladder that was removed from CanvasRenderingContext2D.",
-  "verifier": {
-   "changed": [
-    "notes"
-   ],
-   "why": "The claim that this is the only Mozilla header in Skia is false (SkMemory_mozalloc.cpp, SkASAN.h, SkMacros.h, SkTypeface_win_dw.h include mozilla headers); it holds only for this file."
   }
  },
  {
@@ -2466,9 +2457,9 @@
   "category": "spoof",
   "feature": "font-list-bundle-only",
   "prefs": [],
-  "added": 55,
+  "added": 53,
   "removed": 12,
-  "hunks": 13,
+  "hunks": 14,
   "inline_logic_lines": 75,
   "hookable": "movable",
   "anchor": "gfxDWriteFontEntry::ReadCMAP; gfxDWriteFontEntry::CreateFontInstance; gfxDWriteFontEntry::CreateFontFace; gfxDWriteFontList::CreateFontEntry; gfxDWriteFontList::GetFacesInitDataForFamily; gfxDWriteFontList::ReadFaceNames; gfxDWriteFontList::ReadFaceNamesForFamily; gfxDWriteFontList::InitSharedFontListForPlatform; gfxDWriteFontList::InitFontListForPlatform; gfxDWriteFontList::CreateBundledFontsCollection",
@@ -2513,9 +2504,9 @@
   "prefs": [
    "zoom.stealth.text.system_quality"
   ],
-  "added": 11,
+  "added": 9,
   "removed": 3,
-  "hunks": 4,
+  "hunks": 5,
   "inline_logic_lines": 14,
   "hookable": "movable",
   "anchor": "GetSystemTextQuality; GetSystemGDIGamma (comment only); gfxDWriteFont::UpdateClearTypeVars",
@@ -2834,7 +2825,7 @@
   "prefs": [],
   "added": 3,
   "removed": 0,
-  "hunks": 2,
+  "hunks": 3,
   "inline_logic_lines": 6,
   "hookable": "movable",
   "anchor": "gfxPlatformGtk::GetCommonFallbackFonts",
@@ -5189,6 +5180,38 @@
    "+DIRS += [\"idwr\"]  # STEALTH-HOOK(fingerprint/fonts/idwr)"
   ],
   "notes": "Builds gfx/idwr (invisible_DWriteCore's DirectWrite rasterizer) into libxul, on a line of its own outside Mozilla's DIRS list."
+ },
+ {
+  "file": "gfx/skia/generate_mozbuild.py",
+  "category": "build",
+  "feature": "idwr-text-engine",
+  "prefs": [],
+  "added": 4,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "footer (after FINAL_LIBRARY)",
+  "evidence": [
+   "+SOURCES += ['skia/src/ports/SkIdwrPathSink.cpp', ...]  # STEALTH-HOOK(fingerprint/fonts/idwr)"
+  ],
+  "notes": "gfx/skia/moz.build is generated from this file, so the SOURCES line for the three idwr Skia sources (SkIdwrPathSink, SkScalerContext_idwr, SkTypeface_idwr) is part of the footer: regenerating Skia keeps it. Three comment lines say why the line is ours. The line in gfx/skia/moz.build is its generated copy."
+ },
+ {
+  "file": "gfx/skia/moz.build",
+  "category": "build",
+  "feature": "idwr-text-engine",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "after FINAL_LIBRARY = 'xul'",
+  "evidence": [
+   "+SOURCES += ['skia/src/ports/SkIdwrPathSink.cpp', 'skia/src/ports/SkScalerContext_idwr.cpp', 'skia/src/ports/SkTypeface_idwr.cpp']  # STEALTH-HOOK(fingerprint/fonts/idwr)"
+  ],
+  "notes": "Generated from gfx/skia/generate_mozbuild.py (the footer there carries the same line): builds the three idwr Skia sources into libxul on a line of its own, outside Mozilla's generated lists."
  },
  {
   "file": "gfx/thebes/gfxPlatform.cpp",

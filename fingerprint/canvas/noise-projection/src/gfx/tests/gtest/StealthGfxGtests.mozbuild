@@ -1,0 +1,10 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+# Read by gfx/tests/gtest/moz.build (one include line for the Stealth gtests of this
+# directory): the canvas projection gtest, and the idwr text gtests (StealthIdwr.mozbuild).
+
+UNIFIED_SOURCES += ["TestStealthCanvasProjection.cpp"]
+
+include("StealthIdwr.mozbuild")

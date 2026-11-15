@@ -27,6 +27,7 @@
   "gfx/2d/StealthCanvasProjection.cpp": "100644",
   "gfx/2d/StealthCanvasProjection.h": "100644",
   "gfx/2d/StealthRecordedProjection.h": "100644",
+  "gfx/tests/gtest/StealthGfxGtests.mozbuild": "100644",
   "gfx/tests/gtest/TestStealthCanvasProjection.cpp": "100644"
  },
  "inventory": [
@@ -337,7 +338,7 @@
    "category": "build",
    "feature": "canvas-noise-projection",
    "prefs": [],
-   "added": 5,
+   "added": 4,
    "removed": 0,
    "hunks": 2,
    "inline_logic_lines": 0,
@@ -345,10 +346,9 @@
    "anchor": "EXPORTS.mozilla.gfx and UNIFIED_SOURCES of gfx/2d",
    "evidence": [
     "+    \"StealthCanvasProjection.h\",",
-    "+    \"StealthGlyphCoverage.h\",",
     "+    \"StealthRefuse.h\","
    ],
-   "notes": "Registers StealthCanvasProjection.h/.cpp (canvas-noise-projection), StealthGlyphCoverage.h/.cpp (glyph-coverage-quantise) and exports StealthRefuse.h. StealthRefuse.h is header-only (gfx/2d has no StealthRefuse.cpp) and is the startup refusal helper included by gfx/thebes/StealthDeclarationGate.cpp, StealthBundleFontList.cpp and gfxDWriteFonts.cpp, i.e. a different feature than the one named here. Build registration only.",
+   "notes": "Registers StealthCanvasProjection.h/.cpp (canvas-noise-projection), includes StealthSkiaIdwr.mozbuild (fingerprint/fonts/idwr) and exports StealthRefuse.h. StealthRefuse.h is header-only (gfx/2d has no StealthRefuse.cpp) and is the startup refusal helper included by gfx/thebes/StealthDeclarationGate.cpp, StealthBundleFontList.cpp and gfxDWriteFonts.cpp, i.e. a different feature than the one named here. Build registration only.",
    "verifier": {
     "changed": [
      "notes"

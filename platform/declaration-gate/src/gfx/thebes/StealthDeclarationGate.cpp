@@ -147,10 +147,6 @@ void StealthAssertDeclarationsComplete() {
          auto lock = StaticPrefs::zoom_stealth_webgpu_limits();
          return lock->IsEmpty();
        }},
-      {"zoom.stealth.text.coverage_ladder", []() -> bool {
-         auto lock = StaticPrefs::zoom_stealth_text_coverage_ladder();
-         return lock->IsEmpty();
-       }},
       // The speech-synthesis voice list, added 2026-08-09 with the six ints
       // below. When it is empty SpeechSynthesis::GetVoices falls through to
       // nsSynthVoiceRegistry, i.e. the OS TTS registry - which names the real

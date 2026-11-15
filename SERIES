@@ -39,6 +39,7 @@ fingerprint/audio/sample-rate
 fingerprint/canvas/as-drawn
 fingerprint/canvas/noise-projection
 fingerprint/canvas/text-metrics
+fingerprint/fonts/bold
 fingerprint/fonts/bundle
 fingerprint/fonts/font-list
 fingerprint/fonts/idwr

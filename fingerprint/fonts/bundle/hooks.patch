@@ -22,18 +22,32 @@ index 04bd23515eb4505cee3d9752db6388c4961ec315..401b25b57af4c88827e111bf3042084d
  #endif
  @RESPATH@/hyphenation/*
 diff --git a/gfx/2d/ScaledFontDWrite.cpp b/gfx/2d/ScaledFontDWrite.cpp
-index 9c934ea5e7593b4595c79d27fafdb6f404699798..764fbd0dbbcc60863388858018167fc138bda942 100644
+index 9c934ea5e7593b4595c79d27fafdb6f404699798..59e40b4cd085d7fc35a5eff05ae59e5a9b489174 100644
 --- a/gfx/2d/ScaledFontDWrite.cpp
 +++ b/gfx/2d/ScaledFontDWrite.cpp
-@@ -272,6 +272,14 @@ bool UnscaledFontDWrite::GetFontDescriptor(FontDescriptorOutput aCb,
+@@ -10,6 +10,7 @@
+ #include "Logging.h"
+ #include "PathSkia.h"
+ #include "StackArray.h"
++#include "StealthSkiaIdwr.h"  // STEALTH-HOOK(fingerprint/fonts/idwr)
+ #include "UnscaledFontDWrite.h"
+ #include "cairo-dwrite.h"
+ #include "dwrite_3.h"
+@@ -89,6 +90,7 @@ ScaledFontDWrite::ScaledFontDWrite(IDWriteFontFace* aFontFace,
+ }
+ 
+ SkTypeface* ScaledFontDWrite::CreateSkTypeface() {
++  if (StealthIdwrAAModeDeclared()) return StealthIdwrSkTypeface(this);  // STEALTH-HOOK(fingerprint/fonts/idwr) null: refused, never DirectWrite
+   RefPtr<IDWriteFactory> factory = Factory::GetDWriteFactory();
+   if (!factory) {
+     return nullptr;
+@@ -272,6 +274,12 @@ bool UnscaledFontDWrite::GetFontDescriptor(FontDescriptorOutput aCb,
                                             void* aBaton) {
    MOZ_ASSERT(NS_IsMainThread());
  
-+  // STEALTH-HOOK(fingerprint/fonts/bundle)
-+  if (!mPercorsoDichiarato.empty()) {
++  if (!mPercorsoDichiarato.empty()) {  // STEALTH-HOOK(fingerprint/fonts/bundle)
 +    aCb(reinterpret_cast<const uint8_t*>(mPercorsoDichiarato.c_str()),
-+        (mPercorsoDichiarato.size() + 1) * sizeof(WCHAR), mFontFace->GetIndex(),
-+        aBaton);
++        (mPercorsoDichiarato.size() + 1) * sizeof(WCHAR), mFontFace->GetIndex(), aBaton);
 +    return true;
 +  }
 +
@@ -76,21 +90,24 @@ index 14fea8ac8725e33901e18ac1b714df2a3ca56f8a..61fba8a3b7ce0f7d263d7e6465f18a92
  
  }  // namespace mozilla::gfx
 diff --git a/gfx/thebes/FontData.h b/gfx/thebes/FontData.h
-index d1a4d801b5ceb70defd1df9dea8a939306ddb703..c38bbedf1f3031db56d2fbb85c05170dc32f52cf 100644
+index d1a4d801b5ceb70defd1df9dea8a939306ddb703..d2f4bccbabf98b21d7bef43bc6ae2f0430e4976f 100644
 --- a/gfx/thebes/FontData.h
 +++ b/gfx/thebes/FontData.h
-@@ -14,6 +14,10 @@ class FontData final {
+@@ -14,6 +14,9 @@ class FontData final {
    // caller MUST NOT delete it or assume anything further about its lifetime.
    FontData(const uint8_t*&& aData, uint32_t aLength)
        : mData(aData), mLength(aLength) {}
-+  // STEALTH-HOOK(fingerprint/fonts/bundle): bytes lent by the bundle cache.
-+  enum class Borrowed { Yes };
++  enum class Borrowed { Yes };  // STEALTH-HOOK(fingerprint/fonts/bundle): bytes lent by the bundle cache.
 +  FontData(const uint8_t* aData, uint32_t aLength, Borrowed)
 +      : mData(aData), mLength(aLength), mBorrowed(true) {}
  
    FontData() = delete;
    FontData(const FontData& aOther) = delete;
-@@ -25,10 +29,15 @@ class FontData final {
+@@ -22,13 +25,19 @@ class FontData final {
+ 
+   const uint8_t* Data() const { return mData; }
+   uint32_t Length() const { return mLength; }
++  bool IsBorrowed() const { return mBorrowed; }  // STEALTH-HOOK(fingerprint/fonts/bundle): a bundle face, not a webfont
  
   private:
    // Private destructor: this should only be destroyed by Release().
@@ -267,7 +284,7 @@ index ea64ad7a4cb46338a14d8df4312a603840174b5f..e0e8c9fea85ad493bf63fa00d59232c6
    // create a new name table and build a new font with that name table
    // appended on the end, returns true on success
 diff --git a/gfx/thebes/gfxPlatformGtk.cpp b/gfx/thebes/gfxPlatformGtk.cpp
-index de866d03d3a2be630a2bdab1e83963bf3740779c..343339268c3b90a9af904f305767acc1658e1c29 100644
+index de866d03d3a2be630a2bdab1e83963bf3740779c..3330e5e3741499962faae7667643dfe328319a5c 100644
 --- a/gfx/thebes/gfxPlatformGtk.cpp
 +++ b/gfx/thebes/gfxPlatformGtk.cpp
 @@ -11,6 +11,7 @@
@@ -278,12 +295,19 @@ index de866d03d3a2be630a2bdab1e83963bf3740779c..343339268c3b90a9af904f305767acc1
  #include "VsyncSource.h"
  #include "base/message_loop.h"
  #include "base/task.h"
-@@ -428,6 +429,8 @@ static const char kFontNotoSansSymbols2[] = "Noto Sans Symbols2";
+@@ -116,6 +117,7 @@ gfxPlatformGtk::gfxPlatformGtk() {
+     }
+   }
+ 
++  mozilla::gfx::StealthIdwrUpdateTextVars();  // STEALTH-HOOK(fingerprint/fonts/idwr)
+   InitBackendPrefs(GetBackendPrefs());
+ 
+   gPlatformFTLibrary = Factory::NewFTLibrary();
+@@ -428,6 +430,7 @@ static const char kFontNotoSansSymbols2[] = "Noto Sans Symbols2";
  void gfxPlatformGtk::GetCommonFallbackFonts(uint32_t aCh, Script aRunScript,
                                              FontPresentation aPresentation,
                                              nsTArray<const char*>& aFontList) {
-+  // STEALTH-HOOK(fingerprint/fonts/bundle)
-+  StealthAppendWindowsFallbackNames(PrefersColor(aPresentation), aFontList);
++  StealthAppendWindowsFallbackNames(PrefersColor(aPresentation), aFontList);  // STEALTH-HOOK(fingerprint/fonts/bundle)
    if (PrefersColor(aPresentation)) {
      aFontList.AppendElement(kFontTwemojiMozilla);
    }

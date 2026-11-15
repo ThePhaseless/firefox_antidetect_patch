@@ -7,6 +7,8 @@
 #define StealthBundleFontList_h_
 
 #include "SharedFontList.h"
+#include "StealthIdwrTextVars.h"  // gfxPlatformGtk.cpp calls StealthIdwrUpdateTextVars through its one Stealth include
+#include "StealthSyntheticBold.h"  // the Windows bold hooks call StealthBoldSimulated through their one Stealth include
 #include "gfxFont.h"
 #include "mozilla/AlreadyAddRefed.h"
 #include "mozilla/FunctionRef.h"

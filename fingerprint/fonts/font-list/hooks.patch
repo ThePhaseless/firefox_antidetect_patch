@@ -85,7 +85,7 @@ index b6696c70c4b9065dd04683020010cb8f61e36791..d7fb0423acd95fce1b8536bf367e81c2
        kCTFontUIFontUser, 0.0, nullptr));  // TODO: language
    AutoCFTypeRef<CFStringRef> name(CTFontCopyFamilyName(font));
 diff --git a/gfx/thebes/gfxDWriteFontList.cpp b/gfx/thebes/gfxDWriteFontList.cpp
-index a804e7154b7182fe73a37a94b186b50275971f5e..6d7667be34b4c8362f4de426a230c608235122d7 100644
+index a804e7154b7182fe73a37a94b186b50275971f5e..c5a3a8d8a918c8a0a0ce230daefd798a6a5b7b72 100644
 --- a/gfx/thebes/gfxDWriteFontList.cpp
 +++ b/gfx/thebes/gfxDWriteFontList.cpp
 @@ -6,6 +6,7 @@
@@ -96,16 +96,23 @@ index a804e7154b7182fe73a37a94b186b50275971f5e..6d7667be34b4c8362f4de426a230c608
  #include "gfxDWriteCommon.h"
  #include "gfxDWriteFonts.h"
  #include "gfxRect.h"
-@@ -536,7 +537,8 @@ nsresult gfxDWriteFontEntry::ReadCMAP(FontInfoData* aFontInfoData) {
+@@ -536,7 +537,7 @@ nsresult gfxDWriteFontEntry::ReadCMAP(FontInfoData* aFontInfoData) {
      }
      gfxPlatformFontList* pfl = gfxPlatformFontList::PlatformFontList();
      fontlist::FontList* sharedFontList = pfl->SharedFontList();
 -    if (!IsUserFont() && mShmemFace) {
-+    // STEALTH-HOOK(fingerprint/fonts/font-list)
-+    if (ShouldPublishCharacterMap()) {
++    if (ShouldPublishCharacterMap()) {  // STEALTH-HOOK(fingerprint/fonts/font-list)
        mShmemFace->SetCharacterMap(sharedFontList, charmap, mShmemFamily);
        if (TrySetShmemCharacterMap()) {
          setCharMap = false;
+@@ -765,6 +766,7 @@ gfxFont* gfxDWriteFontEntry::CreateFontInstance(
+         break;
+     }
+   }
++  useBoldSim = useBoldSim || StealthBoldSimulated(this, aFontStyle);  // STEALTH-HOOK(fingerprint/fonts/bold) a bundle face stands for an installed font
+   DWRITE_FONT_SIMULATIONS sims =
+       useBoldSim ? DWRITE_FONT_SIMULATIONS_BOLD : DWRITE_FONT_SIMULATIONS_NONE;
+   RefPtr<UnscaledFontDWrite> unscaledFont;
 @@ -784,8 +786,10 @@ gfxFont* gfxDWriteFontEntry::CreateFontInstance(
      // Only pass in the underlying IDWriteFont if the unscaled font doesn't
      // reflect a data font. This signals whether or not we can safely query
@@ -206,22 +213,20 @@ index a804e7154b7182fe73a37a94b186b50275971f5e..6d7667be34b4c8362f4de426a230c608
  }
  
  nsresult gfxDWriteFontList::InitFontListForPlatform() {
-@@ -1768,8 +1797,12 @@ nsresult gfxDWriteFontList::InitFontListForPlatform() {
+@@ -1768,8 +1797,10 @@ nsresult gfxDWriteFontList::InitFontListForPlatform() {
  
    const uint32_t kBundledCount = mFontFamilies.Count();
  
 -  GetFontsFromCollection(mSystemFonts);
 -  if (mFontFamilies.Count() == kBundledCount) {
-+  // STEALTH-HOOK(fingerprint/fonts/font-list)
-+  if (!mStealthBundleOnly) {
++  if (!mStealthBundleOnly) {  // STEALTH-HOOK(fingerprint/fonts/font-list)
 +    GetFontsFromCollection(mSystemFonts);
 +  }
-+  // STEALTH-HOOK(fingerprint/fonts/font-list)
-+  if (!mStealthBundleOnly && mFontFamilies.Count() == kBundledCount) {
++  if (!mStealthBundleOnly && mFontFamilies.Count() == kBundledCount) {  // STEALTH-HOOK(fingerprint/fonts/font-list)
      // If no fonts are found, something is out of whack, so bail.
      NS_ERROR("no fonts found in the system fontlist -- holy crap batman!");
      glean::fontlist::dwritefont_init_problem.AccumulateSingleSample(
-@@ -1780,14 +1813,20 @@ nsresult gfxDWriteFontList::InitFontListForPlatform() {
+@@ -1780,14 +1811,20 @@ nsresult gfxDWriteFontList::InitFontListForPlatform() {
    QueryPerformanceCounter(&t3);  // iterate over system fonts
  
    mOtherFamilyNamesInitialized = true;
@@ -244,7 +249,7 @@ index a804e7154b7182fe73a37a94b186b50275971f5e..6d7667be34b4c8362f4de426a230c608
  
    // bug 551313 - DirectWrite creates a Gill Sans family out of
    // poorly named members of the Gill Sans MT family containing
-@@ -2716,6 +2755,10 @@ BundledFontLoader::CreateEnumeratorFromKey(
+@@ -2716,6 +2753,10 @@ BundledFontLoader::CreateEnumeratorFromKey(
  
  already_AddRefed<IDWriteFontCollection>
  gfxDWriteFontList::CreateBundledFontsCollection(IDWriteFactory* aFactory) {
