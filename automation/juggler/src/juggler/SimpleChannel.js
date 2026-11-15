@@ -122,6 +122,19 @@ var SimpleChannel = class SimpleChannel {
       return;
     this._ready = false;
     this._detached = true;
+    // What was said to the peer of before is not said again to the peer of
+    // after: the READY that comes replays only what waited while detached
+    // (`sent` false). A "worker ended" said before the cache, whose answer
+    // never came back, was replayed after the restore and ended the worker
+    // the restore had just announced again with the same id. The caller of a
+    // request that waited for an answer is told the peer went away; an answer
+    // that arrives late finds no request and is ignored.
+    for (const [messageId, callback] of this._pendingMessages) {
+      if (!callback.sent)
+        continue;
+      this._pendingMessages.delete(messageId);
+      callback.reject(new Error(`Failed "${callback.methodName}": the other end of channel "${this._name}" went away before it answered.`));
+    }
   }
 
   // Attached to a peer and sending: what a document that goes into the cache can still say.
@@ -151,8 +164,10 @@ var SimpleChannel = class SimpleChannel {
       if (this._onReattached)
         this._onReattached();
     }
-    for (const { message } of queued)
-      this.transport.sendMessage(message);
+    for (const callback of queued) {
+      callback.sent = true;
+      this.transport.sendMessage(callback.message);
+    }
   }
 
   dispose() {
@@ -216,10 +231,12 @@ var SimpleChannel = class SimpleChannel {
       throw new Error(`ERROR: channel ${this._name} is already disposed! Cannot send "${methodName}" to "${namespace}"`);
     const id = ++this._messageId;
     const message = {requestId: id, uid: this._uid, methodName, params, namespace};
+    // `sent`: it has gone out to the peer this end is attached to (see detachFromPeer).
+    const sent = this._ready;
     const promise = new Promise((resolve, reject) => {
-      this._pendingMessages.set(id, {connectorId, resolve, reject, methodName, namespace, message});
+      this._pendingMessages.set(id, {connectorId, resolve, reject, methodName, namespace, message, sent});
     });
-    if (this._ready)
+    if (sent)
       this.transport.sendMessage(message);
     return promise;
   }

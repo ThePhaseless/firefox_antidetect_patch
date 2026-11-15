@@ -1,5 +1,5 @@
 diff --git a/dom/base/TextInputProcessor.cpp b/dom/base/TextInputProcessor.cpp
-index 929e614023a6c1c84fc2899425083180830b4727..4961903771c73bd31f5e3ff2ff6eeec096db92ce 100644
+index 929e614023a6c1c84fc2899425083180830b4727..f6f2e4ebd0c65509858951a374652ce89787b8ec 100644
 --- a/dom/base/TextInputProcessor.cpp
 +++ b/dom/base/TextInputProcessor.cpp
 @@ -4,6 +4,7 @@
@@ -14,7 +14,7 @@ index 929e614023a6c1c84fc2899425083180830b4727..4961903771c73bd31f5e3ff2ff6eeec0
                                            bool* aSucceeded) {
    MOZ_RELEASE_ASSERT(aSucceeded, "aSucceeded must not be nullptr");
    MOZ_RELEASE_ASSERT(nsContentUtils::IsCallerChrome());
-+  StealthKeyBirthScope stealthBirth(mStealthNextKeyLatencyMs);  // STEALTH-HOOK(fingerprint/input/event-birth)
++  StealthKeyBirthScope stealthBirth(mStealthKeyBirth);  // STEALTH-HOOK(fingerprint/input/event-birth)
  
    RefPtr<KeyboardEvent> keyEvent;
    if (aDOMKeyEvent) {
@@ -22,13 +22,13 @@ index 929e614023a6c1c84fc2899425083180830b4727..4961903771c73bd31f5e3ff2ff6eeec0
    return NS_OK;
  }
  
-+NS_IMETHODIMP TextInputProcessor::SetNextKeyLatency(double aLatencyMs) { return StealthSetNextKeyLatency(mStealthNextKeyLatencyMs, aLatencyMs, nsContentUtils::IsCallerChrome()); }  // STEALTH-HOOK(fingerprint/input/event-birth)
++NS_IMETHODIMP TextInputProcessor::SetNextKeyLatency(double aLatencyMs, uint64_t aPageId) { return StealthSetNextKeyLatency(mStealthKeyBirth, aLatencyMs, aPageId, nsContentUtils::IsCallerChrome()); }  // STEALTH-HOOK(fingerprint/input/event-birth)
  NS_IMETHODIMP
  TextInputProcessor::Keydown(Event* aDOMKeyEvent, uint32_t aKeyFlags,
                              uint8_t aOptionalArgc, uint32_t* aConsumedFlags) {
    MOZ_RELEASE_ASSERT(aConsumedFlags, "aConsumedFlags must not be nullptr");
    MOZ_RELEASE_ASSERT(nsContentUtils::IsCallerChrome());
-+  StealthKeyBirthScope stealthBirth(mStealthNextKeyLatencyMs);  // STEALTH-HOOK(fingerprint/input/event-birth)
++  StealthKeyBirthScope stealthBirth(mStealthKeyBirth);  // STEALTH-HOOK(fingerprint/input/event-birth)
    if (!aOptionalArgc) {
      aKeyFlags = 0;
    }
@@ -44,7 +44,7 @@ index 929e614023a6c1c84fc2899425083180830b4727..4961903771c73bd31f5e3ff2ff6eeec0
                            uint8_t aOptionalArgc, bool* aDoDefault) {
    MOZ_RELEASE_ASSERT(aDoDefault, "aDoDefault must not be nullptr");
    MOZ_RELEASE_ASSERT(nsContentUtils::IsCallerChrome());
-+  StealthKeyBirthScope stealthBirth(mStealthNextKeyLatencyMs);  // STEALTH-HOOK(fingerprint/input/event-birth)
++  StealthKeyBirthScope stealthBirth(mStealthKeyBirth);  // STEALTH-HOOK(fingerprint/input/event-birth)
    if (!aOptionalArgc) {
      aKeyFlags = 0;
    }
@@ -57,19 +57,19 @@ index 929e614023a6c1c84fc2899425083180830b4727..4961903771c73bd31f5e3ff2ff6eeec0
    if (NS_WARN_IF(NS_FAILED(rv))) {
      return rv;
 diff --git a/dom/base/TextInputProcessor.h b/dom/base/TextInputProcessor.h
-index 60bb55efedebd29c2944cbce2b44e5aed5d7fdbd..f1f1fffa60a1b7c3cf79358c42cd79d2125cff0f 100644
+index 60bb55efedebd29c2944cbce2b44e5aed5d7fdbd..011a5e04b15b30c732d59f501fbef154e10aca92 100644
 --- a/dom/base/TextInputProcessor.h
 +++ b/dom/base/TextInputProcessor.h
 @@ -243,6 +243,7 @@ class TextInputProcessor final : public nsITextInputProcessor,
    RefPtr<ModifierKeyDataArray> mModifierKeyDataArray;
  
    bool mForTests;
-+  double mStealthNextKeyLatencyMs = 0;  // STEALTH-HOOK(fingerprint/input/event-birth)
++  struct { double mLatencyMs = 0; uint64_t mPageId = 0; } mStealthKeyBirth;  // STEALTH-HOOK(fingerprint/input/event-birth) shape of StealthKeyBirth
  };
  
  // See nsITextInputProcessorListener documentation in
 diff --git a/dom/base/nsContentUtils.cpp b/dom/base/nsContentUtils.cpp
-index 7929fcdeb59c47dbd2bee9e8d8bfd7ef2e8db87b..c61be68e5dcde4eff74a6e57d14199c779540ace 100644
+index 7929fcdeb59c47dbd2bee9e8d8bfd7ef2e8db87b..6270a0c385190bff8404a34383b9cd898ca9c664 100644
 --- a/dom/base/nsContentUtils.cpp
 +++ b/dom/base/nsContentUtils.cpp
 @@ -28,6 +28,8 @@
@@ -94,7 +94,7 @@ index 7929fcdeb59c47dbd2bee9e8d8bfd7ef2e8db87b..c61be68e5dcde4eff74a6e57d14199c7
    }
  
 +  // STEALTH-HOOK(fingerprint/input/event-birth)
-+  StealthSetInputEventBirth(mouseOrPointerEvent, aMouseEventData.mLatency);
++  StealthSetInputEventBirth(mouseOrPointerEvent, aMouseEventData.mLatency, aPresShell);
    nsEventStatus status = nsEventStatus_eIgnore;
    if (aOptions.mToWindow) {
      nsresult rv = aPresShell->HandleEvent(aPresShell->GetRootFrame(),
@@ -119,14 +119,14 @@ index aaf31169b44149bd6042cea4eb2e08c87c1378e7..54bfdfdd9e428489e8eab19e11eee8b5
  LOCAL_INCLUDES += ["/dom/base"]
  
 diff --git a/dom/interfaces/base/nsITextInputProcessor.idl b/dom/interfaces/base/nsITextInputProcessor.idl
-index 3ca850fa757d21e31d7a2addb1983ec2c6d3323a..a5b23e06c41f6b88639f49e0c45ecc648dc6aa60 100644
+index 3ca850fa757d21e31d7a2addb1983ec2c6d3323a..d755dfcc15240810323b9e7f08731ad601cd53b9 100644
 --- a/dom/interfaces/base/nsITextInputProcessor.idl
 +++ b/dom/interfaces/base/nsITextInputProcessor.idl
 @@ -583,6 +583,7 @@ interface nsITextInputProcessor : nsISupports
    [optional_argc]
      boolean keyup(in Event aKeyboardEvent,
                    [optional] in unsigned long aKeyFlags);
-+  void setNextKeyLatency(in double aLatencyMs);  // STEALTH-HOOK(fingerprint/input/event-birth)
++  void setNextKeyLatency(in double aLatencyMs, [optional] in unsigned long long aPageId);  // STEALTH-HOOK(fingerprint/input/event-birth)
  
    /**
     * insertTextWithKeyPress() is designed for automated tests.  This dispatches

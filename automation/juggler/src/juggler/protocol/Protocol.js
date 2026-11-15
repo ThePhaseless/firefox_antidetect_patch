@@ -975,6 +975,13 @@ const Page = {
         // dispatch, as an input event is born in the system before a page's
         // handler runs. Absent is born at the dispatch.
         latency: t.Optional(t.Number),
+        // Stealthfox [B299] [B301]: the stroke this event belongs to (one type(), one mouse
+        // path, one click) and the offset, in ms, of this event from the start of the stroke
+        // in the CLIENT's own plan. With both the engine is told where the plan puts the
+        // event, not only how late it was sent: the event is born at the plan's instant
+        // however late it is delivered. Offsets only: there is no clock shared with the client.
+        stroke: t.Optional(t.String),
+        at: t.Optional(t.Number),
       }
     },
     'dispatchTapEvent': {
@@ -998,6 +1005,13 @@ const Page = {
         landsOn: t.Optional(pageTypes.LandingTarget),
         // Stealthfox [B299]: as for dispatchKeyEvent.
         latency: t.Optional(t.Number),
+        // Stealthfox [B299] [B301]: the stroke this event belongs to (one type(), one mouse
+        // path, one click) and the offset, in ms, of this event from the start of the stroke
+        // in the CLIENT's own plan. With both the engine is told where the plan puts the
+        // event, not only how late it was sent: the event is born at the plan's instant
+        // however late it is delivered. Offsets only: there is no clock shared with the client.
+        stroke: t.Optional(t.String),
+        at: t.Optional(t.Number),
       },
       // The command answers once the page has HANDLED the event (or a dialog
       // it opened is showing), so a caller's next command runs after it.
@@ -1015,6 +1029,13 @@ const Page = {
         y: t.Number,
         // [B301] born this many ms before the dispatch, decided by the client.
         latency: t.Optional(t.Number),
+        // Stealthfox [B299] [B301]: the stroke this event belongs to (one type(), one mouse
+        // path, one click) and the offset, in ms, of this event from the start of the stroke
+        // in the CLIENT's own plan. With both the engine is told where the plan puts the
+        // event, not only how late it was sent: the event is born at the plan's instant
+        // however late it is delivered. Offsets only: there is no clock shared with the client.
+        stroke: t.Optional(t.String),
+        at: t.Optional(t.Number),
         deltaX: t.Number,
         deltaY: t.Number,
         deltaZ: t.Number,

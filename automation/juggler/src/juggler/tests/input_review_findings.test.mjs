@@ -140,7 +140,7 @@ test('the mux keeps no armed landing of a command that ended on its bound, on a 
 
   // the command takes the landing it armed however it ends, also when nothing was sent
   const command = strip(methodText(handlerSource, "async ['Page.dispatchMouseEvent']"));
-  assert.match(command, /try \{\s*return await this\._dispatchMouseEvent\(options, armed\);\s*\} finally \{\s*if \(armed\)\s*this\._contentChannel\.takeArmed\(armed\.token\);/);
+  assert.match(command, /try \{\s*return await this\._dispatchMouseEvent\(options, armed, ticket\);\s*\} finally \{\s*if \(armed\)\s*this\._contentChannel\.takeArmed\(armed\.token\);/);
 });
 
 // ---- #5 ---------------------------------------------------------------------------------------------------------------

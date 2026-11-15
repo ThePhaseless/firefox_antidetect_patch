@@ -68,8 +68,7 @@ TEST(StealthInputEventBirth, KeyNoLatencyIsNoBirth)
   EXPECT_TRUE(StealthInputEventBirthOrNull(0).IsNull());
   EXPECT_TRUE(StealthInputEventBirthOrNull(-5).IsNull());
   EXPECT_TRUE(StealthInputEventBirthOrNull(std::numeric_limits<double>::quiet_NaN()).IsNull());
-  // a latency no system has (past an hour, infinite) is no birth either, and does not reach the tick conversion
-  EXPECT_TRUE(StealthInputEventBirthOrNull(3600000).IsNull());
+  // an infinite latency is no birth (it is not a number of milliseconds); an hour or a day is one, there is no cap
   EXPECT_TRUE(StealthInputEventBirthOrNull(std::numeric_limits<double>::infinity()).IsNull());
 }
 
@@ -175,7 +174,7 @@ TEST(StealthFrameCrash, TheIdIsTheDigits)
 // declared with setNextKeyLatency() is taken once, and the key events stamped inside the scope are born in the past.
 TEST(StealthKeyBirthScope, NothingDeclaredStampsNothing)
 {
-  double declared = 0;
+  StealthKeyBirth declared;
   StealthKeyBirthScope scope(declared);
   WidgetKeyboardEvent event(true, eKeyDown, nullptr);
   const TimeStamp before = event.mTimeStamp;
@@ -193,13 +192,13 @@ TEST(StealthKeyBirthScope, OutsideAScopeStampsNothing)
 
 TEST(StealthKeyBirthScope, ADeclaredLatencyIsTakenOnceAndStampsTheEventsInside)
 {
-  double declared = 60;
+  StealthKeyBirth declared{60, 0};
   WidgetKeyboardEvent down(true, eKeyDown, nullptr);
   WidgetKeyboardEvent up(true, eKeyUp, nullptr);
   const TimeStamp now = down.mTimeStamp;
   {
     StealthKeyBirthScope scope(declared);
-    EXPECT_EQ(declared, 0.0);  // used once: the next key declares its own
+    EXPECT_EQ(declared.mLatencyMs, 0.0);  // used once: the next key declares its own
     StealthKeyBirthScope::Stamp(down);
     StealthKeyBirthScope::Stamp(up);
   }
@@ -220,7 +219,7 @@ TEST(StealthKeyBirthScope, ADeclaredLatencyIsTakenOnceAndStampsTheEventsInside)
 
 TEST(StealthKeyBirthScope, AScopeThatEndsRestoresTheOneAround)
 {
-  double outer = 80, inner = 0;
+  StealthKeyBirth outer{80, 0}, inner;
   StealthKeyBirthScope scope(outer);
   WidgetKeyboardEvent first(true, eKeyDown, nullptr);
   StealthKeyBirthScope::Stamp(first);
@@ -236,14 +235,96 @@ TEST(StealthKeyBirthScope, AScopeThatEndsRestoresTheOneAround)
   EXPECT_TRUE(second.mTimeStamp == first.mTimeStamp);
 }
 
-TEST(StealthKeyBirthScope, ALatencyPastTheCapIsNoBirth)
+// The cap on a key's latency is gone ([B299]): a client that sends a key at its planned instant and reaches the engine
+// seconds late declares those seconds, and the key is born that far back.
+TEST(StealthKeyBirthScope, ALatencyOfSecondsIsHonouredWithNoCap)
 {
-  double declared = 3600000;
-  StealthKeyBirthScope scope(declared);
+  const TimeStamp before = TimeStamp::Now();
+  StealthKeyBirth declared{1728, 201};
   WidgetKeyboardEvent event(true, eKeyDown, nullptr);
-  const TimeStamp before = event.mTimeStamp;
-  StealthKeyBirthScope::Stamp(event);
-  EXPECT_TRUE(event.mTimeStamp == before);
+  {
+    StealthKeyBirthScope scope(declared);
+    StealthKeyBirthScope::Stamp(event);
+  }
+  EXPECT_TRUE(event.mTimeStamp <= TimeStamp::Now() - TimeDuration::FromMilliseconds(1728));
+  EXPECT_TRUE(event.mTimeStamp >= before - TimeDuration::FromMilliseconds(1728));
+
+  // what used to be past the cap (an hour) is a birth too, never null and never in the future
+  const TimeStamp long_ago = StealthInputEventBirthOrNull(7200000, 202);
+  ASSERT_FALSE(long_ago.IsNull());
+  EXPECT_TRUE(long_ago <= TimeStamp::Now());
+}
+
+// One page is one stream: a birth of a page does not move the births of another page of the same process.
+TEST(StealthBirthOrder, TwoPagesAreTwoIndependentStreams)
+{
+  const TimeStamp first = StealthInputEventBirth(10, 301);
+  // another page, a latency of two seconds: on the old process-wide order it was held back to `first`
+  const TimeStamp other = StealthInputEventBirth(2000, 302);
+  EXPECT_TRUE(other < first);
+  EXPECT_TRUE(other <= TimeStamp::Now() - TimeDuration::FromMilliseconds(1999));
+  // the first page is not moved by the second, and the second keeps its own order
+  const TimeStamp again = StealthInputEventBirth(3000, 301);
+  EXPECT_TRUE(again == first);
+  const TimeStamp otherAgain = StealthInputEventBirth(1990, 302);
+  EXPECT_TRUE(otherAgain >= other);
+  EXPECT_TRUE(otherAgain < first);
+}
+
+// Keys, mouse and wheel of one page are one stream: in whatever order they come and with whatever latencies, the
+// births of the page never go back.
+TEST(StealthBirthOrder, KeysMouseAndWheelOfOnePageNeverGoBack)
+{
+  TimeStamp last;
+  for (double latency : {40.0, 900.0, 5.0, 1700.0, 3.0, 250.0, 60.0, 2500.0}) {
+    TimeStamp born;
+    if (static_cast<int>(latency) % 3 == 0) {
+      WidgetEventTime mouse;
+      StealthSetInputEventBirth(mouse, latency, 311);
+      born = mouse.mTimeStamp;
+    } else {
+      StealthKeyBirth declared{latency, 311};
+      WidgetKeyboardEvent key(true, eKeyDown, nullptr);
+      {
+        StealthKeyBirthScope scope(declared);
+        StealthKeyBirthScope::Stamp(key);
+      }
+      born = key.mTimeStamp;
+    }
+    if (!last.IsNull()) {
+      EXPECT_TRUE(born >= last);
+    }
+    last = born;
+  }
+}
+
+// A key of one page does not hold back the mouse of another page (on the old order a key shared the birth of the
+// mouse of every page of the process).
+TEST(StealthBirthOrder, AKeyOfOnePageDoesNotMoveTheMouseOfAnother)
+{
+  StealthKeyBirth declared{5, 321};
+  WidgetKeyboardEvent key(true, eKeyDown, nullptr);
+  {
+    StealthKeyBirthScope scope(declared);
+    StealthKeyBirthScope::Stamp(key);
+  }
+  WidgetEventTime mouse;
+  StealthSetInputEventBirth(mouse, 2500, 322);
+  EXPECT_TRUE(mouse.mTimeStamp < key.mTimeStamp);
+  EXPECT_TRUE(mouse.mTimeStamp <= TimeStamp::Now() - TimeDuration::FromMilliseconds(2499));
+}
+
+// The memory is bounded by a few slots: many pages that came and went leave a birth in the past for each, and the one
+// that is used again keeps its order.
+TEST(StealthBirthOrder, ManyPagesStayBoundedAndInThePast)
+{
+  for (uint64_t page = 400; page < 600; ++page) {
+    const TimeStamp born = StealthInputEventBirth(15, page);
+    EXPECT_TRUE(born <= TimeStamp::Now());
+  }
+  const TimeStamp a = StealthInputEventBirth(8, 700);
+  const TimeStamp b = StealthInputEventBirth(900, 700);
+  EXPECT_TRUE(b == a);
 }
 
 // A latency declared with setNextKeyLatency() and never followed by a key (the caller threw) is taken back by
@@ -251,12 +332,12 @@ TEST(StealthKeyBirthScope, ALatencyPastTheCapIsNoBirth)
 // here (it needs a window and a widget), so this is the field and the scope it feeds.
 TEST(StealthKeyBirthScope, ALatencyWithNoKeyThenZeroGivesNoBirthToTheNextKey)
 {
-  double field = 0;
-  ASSERT_EQ(StealthSetNextKeyLatency(field, 60, true), NS_OK);
-  EXPECT_EQ(field, 60.0);
+  StealthKeyBirth field;
+  ASSERT_EQ(StealthSetNextKeyLatency(field, 60, 0, true), NS_OK);
+  EXPECT_EQ(field.mLatencyMs, 60.0);
   // no key call follows; the caller takes the latency back
-  ASSERT_EQ(StealthSetNextKeyLatency(field, 0, true), NS_OK);
-  EXPECT_EQ(field, 0.0);
+  ASSERT_EQ(StealthSetNextKeyLatency(field, 0, 0, true), NS_OK);
+  EXPECT_EQ(field.mLatencyMs, 0.0);
 
   WidgetKeyboardEvent event(true, eKeyDown, nullptr);
   const TimeStamp before = event.mTimeStamp;
@@ -270,7 +351,64 @@ TEST(StealthKeyBirthScope, ALatencyWithNoKeyThenZeroGivesNoBirthToTheNextKey)
 TEST(StealthKeyBirthScope, TheScopeTakesTheLatencyEvenWhenTheCallEndsEarly)
 {
   // the scope zeroes the field when it opens, before anything of the call can fail
-  double field = 45;
+  StealthKeyBirth field{45, 9};
   { StealthKeyBirthScope scope(field); }
-  EXPECT_EQ(field, 0.0);
+  EXPECT_EQ(field.mLatencyMs, 0.0);
+  EXPECT_EQ(field.mPageId, 0u);
+}
+
+// The key path with two pages: what setNextKeyLatency() declares (the latency and the page Juggler names) is one
+// stream per page, as the mouse and the wheel are.
+TEST(StealthKeyBirthScope, TwoPagesAreTwoStreamsThroughTheKeyPath)
+{
+  WidgetKeyboardEvent first(true, eKeyDown, nullptr), other(true, eKeyDown, nullptr), again(true, eKeyDown, nullptr);
+  StealthKeyBirth a{10, 331};
+  {
+    StealthKeyBirthScope scope(a);
+    StealthKeyBirthScope::Stamp(first);
+  }
+  EXPECT_EQ(a.mPageId, 0u);  // taken once, the page with it
+  StealthKeyBirth b{2000, 332};
+  {
+    StealthKeyBirthScope scope(b);
+    StealthKeyBirthScope::Stamp(other);
+  }
+  // on one stream the 2 s birth would have been held back to the 10 ms one
+  EXPECT_TRUE(other.mTimeStamp < first.mTimeStamp);
+  EXPECT_TRUE(other.mTimeStamp <= TimeStamp::Now() - TimeDuration::FromMilliseconds(1999));
+  // and within a page the births never go back
+  StealthKeyBirth c{3000, 331};
+  {
+    StealthKeyBirthScope scope(c);
+    StealthKeyBirthScope::Stamp(again);
+  }
+  EXPECT_TRUE(again.mTimeStamp == first.mTimeStamp);
+}
+
+// The page of a mouse or a wheel event is found from the document or the PresShell the hook has at hand: its browsing
+// context, none known is the stream of no page.
+namespace {
+struct FakeDocument {
+  dom::BrowsingContext* GetBrowsingContext() { return nullptr; }
+};
+struct FakePresShell {
+  FakeDocument* GetDocument() { return mDocument; }
+  FakeDocument* mDocument = nullptr;
+};
+}  // namespace
+
+TEST(StealthInputEventBirth, ThePageIsFoundFromTheDocumentOrThePresShellAtHand)
+{
+  FakeDocument document;
+  FakePresShell shell;
+  shell.mDocument = &document;
+  EXPECT_EQ(StealthPageOfSource(&document, 0), 0u);
+  EXPECT_EQ(StealthPageOfSource(&shell, 0), 0u);
+  FakePresShell none;
+  EXPECT_EQ(StealthPageOfSource(&none, 0), 0u);
+  // the overloads of the hooks run, and the births of the stream of no page do not go back
+  WidgetEventTime fromDocument, fromShell;
+  StealthSetInputEventBirth(fromDocument, 5, &document);
+  StealthSetInputEventBirth(fromShell, 4000, &shell);
+  EXPECT_TRUE(fromShell.mTimeStamp >= fromDocument.mTimeStamp);
 }
