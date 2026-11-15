@@ -366,6 +366,12 @@ jobs:
           - { suite: wrapper.e2e.context.egress, leg: win-x86_64, runner: windows-latest, kind: win, os: windows }
           - { suite: wrapper.e2e.context.sink, leg: linux-x86_64, runner: ubuntu-24.04, kind: linux, os: linux, root: true }
           - { suite: wrapper.e2e.context.sink, leg: win-x86_64, runner: windows-latest, kind: win, os: windows }
+          # software compositing declared by the core: the compositor read from a privileged context, the CPU of the GPU process
+          # (Windows) or of the parent (Linux, no GPU process) on a fixed scene, and the page bytes against the wrapper's reference
+          - { suite: wrapper.e2e.compositing, leg: linux-x86_64, runner: ubuntu-24.04, kind: linux, os: linux }
+          - { suite: wrapper.e2e.compositing, leg: win-x86_64, runner: windows-latest, kind: win, os: windows }
+          - { suite: wrapper.unit.compositing, leg: linux-x86_64, runner: ubuntu-24.04, kind: linux, os: linux }
+          - { suite: wrapper.unit.compositing, leg: win-x86_64, runner: windows-latest, kind: win, os: windows }
     steps:
       - name: Checkout wrapper (its tests, ci/required-suites.json and scripts/ci_verdict.py)
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
