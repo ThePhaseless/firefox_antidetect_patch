@@ -8,6 +8,7 @@ const {Helper, EventWatcher} = ChromeUtils.importESModule('resource://gre/module
 const {NetUtil} = ChromeUtils.importESModule('resource://gre/modules/NetUtil.sys.mjs');
 const {NetworkObserver, PageNetwork} = ChromeUtils.importESModule('resource://gre/modules/juggler/NetworkObserver.js');
 const {PageTarget} = ChromeUtils.importESModule('resource://gre/modules/juggler/TargetRegistry.js');
+const {StrokeBirth} = ChromeUtils.importESModule('resource://gre/modules/juggler/StrokeBirth.js');
 const {FrameLifecycle} = ChromeUtils.importESModule('resource://gre/modules/juggler/FrameLifecycle.js');
 const {FrameNavigations} = ChromeUtils.importESModule('resource://gre/modules/juggler/FrameNavigations.js');
 const {setTimeout, clearTimeout} = ChromeUtils.importESModule('resource://gre/modules/Timer.sys.mjs');
@@ -204,6 +205,9 @@ export class PageHandler {
     this._workers = new Map();
 
     this._pageTarget = target;
+    // The order and the births of the input of this page that this process delivers ([B299] [B301]): the mouse and
+    // the wheel; the keys have theirs in the content process, which delivers them. Made at the first command.
+    this._inputGateOfPage = null;
     this._pageNetwork = PageNetwork.forPageTarget(target);
 
     const emitProtocolEvent = eventName => {
@@ -436,6 +440,15 @@ export class PageHandler {
     // A document request tells the navigation it belongs to before the request itself is told.
     if (protocolEventName === 'Network.requestWillBeSent' && eventDetails.navigationId)
       this._frameNavigations.onDocumentRequest(frameId, eventDetails.navigationId, eventDetails.url);
+    if (protocolEventName === 'Network.requestFailed') {
+      // The last request of a document's navigation failed: the request is told as it is, then the navigation ends with
+      // it. `navigationId` is the registry's, not the client's.
+      const {navigationId, ...failure} = eventDetails;
+      this._emitFrameKeyed(protocolEventName, failure, frameId);
+      if (navigationId)
+        this._frameNavigations.onDocumentRequestFailed(frameId, navigationId, failure.errorCode);
+      return;
+    }
     this._emitFrameKeyed(protocolEventName, eventDetails, frameId);
   }
 
@@ -1317,7 +1330,7 @@ export class PageHandler {
   // It holds for all direct input - keys, inserted text, touch - not only for
   // the measured case: the defect belongs to the class, and fixing one member
   // would leave the others to diverge on their own (rule 16).
-  async ['Page.dispatchKeyEvent']({type, keyCode, code, key, repeat, location, text, latency}) {
+  async ['Page.dispatchKeyEvent']({type, keyCode, code, key, repeat, location, text, latency, stroke, at}) {
     // key events don't fire if we are dragging.
     if (this._isDragging) {
       if (type === 'keydown' && key === 'Escape') {
@@ -1336,12 +1349,15 @@ export class PageHandler {
       }
       return;
     }
+    // [B299] After the mouse and the wheel of the page that wait (the key itself is ordered and born in the content
+    // process, which delivers it).
+    await this._passInputGate();
     // Inside activateAndRun: the window is focused and the tab chosen, so the focused context is read after the
     // activation. The root is decided once, before the key's own latency, as the key is already on its way to the
     // frame that had the focus when it was sent.
     return await this._pageTarget.activateAndRun(() =>
       this._contentChannel.sendTo(this._focusedRootId(), 'page', 'dispatchKeyEvent',
-          {type, keyCode, code, key, repeat, location, text, latency}));
+          {type, keyCode, code, key, repeat, location, text, latency, stroke, at}));
   }
 
   /**
@@ -1732,21 +1748,60 @@ export class PageHandler {
   }
 
   async ['Page.dispatchMouseEvent'](options) {
-    // The element this event is meant for, held by the content process BEFORE
-    // anything is sent: the event's handler may take it away. [B230]
-    const armed = options.landsOn ? await this._contentPage.send('armLanding', options.landsOn) : null;
+    // [B299] The command takes its place in the order of the page's input on arrival, before any await, and its birth
+    // if it carries a stroke. _dispatchMouseEvent passes the gate and releases the ticket; the finally is for a command
+    // that never gets there (an error before it), so the ones after it are never held.
+    const ticket = this._inputGate().enter(options);
     try {
-      return await this._dispatchMouseEvent(options, armed);
+      // The element this event is meant for, held by the content process BEFORE
+      // anything is sent: the event's handler may take it away. [B230]
+      const armed = options.landsOn ? await this._contentPage.send('armLanding', options.landsOn) : null;
+      try {
+        return await this._dispatchMouseEvent(options, armed, ticket);
+      } finally {
+        // However the command ended (an early return, an error, a dialog, the bound): the mux keeps no landing of it.
+        if (armed)
+          this._contentChannel.takeArmed(armed.token);
+      }
     } finally {
-      // However the command ended (an early return, an error, a dialog, the bound): the mux keeps no landing of it.
-      if (armed)
-        this._contentChannel.takeArmed(armed.token);
+      ticket.release();
     }
   }
 
-  async _dispatchMouseEvent({type, x, y, button, clickCount, modifiers, buttons, latency}, armed) {
+  _inputGate() {
+    if (!this._inputGateOfPage) {
+      this._inputGateOfPage = new StrokeBirth({
+        now: () => ChromeUtils.now(),
+        sleep: ms => new Promise(resolve => setTimeout(resolve, ms)),
+      });
+    }
+    return this._inputGateOfPage;
+  }
+
+  // A command that is not delivered here (a key, insertText: the content process does) still takes its place after the
+  // mouse and the wheel of the page that wait. Nothing waits for it.
+  async _passInputGate() {
+    const ticket = this._inputGate().enter();
+    try {
+      if (ticket.mustWait())
+        await ticket.due();
+    } finally {
+      ticket.release();
+    }
+  }
+
+  async _dispatchMouseEvent({type, x, y, button, clickCount, modifiers, buttons, latency}, armed, ticket) {
     const win = this._pageTarget._window;
     const page = await this._pagePixels();
+    // [B299] An event of a stroke is born where the client's plan puts it, however late it is delivered. It passes the
+    // gate of the page here: after the commands before it, and, if early, after its instant (outside the activation,
+    // which must not be held for it). Released before the event is handed over and before any wait for an answer.
+    try {
+      if (ticket.mustWait())
+        await ticket.due();
+    } finally {
+      ticket.release();
+    }
     // The id of the last mouse event handed to the widget, which the renderer
     // acks once it has handled it: the command answers after that ack. [B230]
     let lastEventId = 0;
@@ -1784,7 +1839,7 @@ export class PageHandler {
           false /* isWidgetEventSynthesized */,
           buttons,
           win.windowUtils.DEFAULT_MOUSE_POINTER_ID /* pointerIdentifier */,
-          latency || 0 /* [B299] born this many ms before the dispatch */
+          ticket.tagged ? ticket.latency() : (latency || 0) /* [B299] born this many ms before the dispatch */
         );
       }
     };
@@ -1936,12 +1991,29 @@ export class PageHandler {
     return landing ? { landing } : {};
   }
 
-  async ['Page.dispatchWheelEvent']({x, y, button, deltaX, deltaY, deltaZ, modifiers, latency }) {
+  async ['Page.dispatchWheelEvent']({x, y, button, deltaX, deltaY, deltaZ, modifiers, latency, stroke, at}) {
+    // [B301] as for the mouse: the place in the order on arrival, before any await.
+    const ticket = this._inputGate().enter({stroke, at, latency});
+    try {
+      return await this._dispatchWheelEvent({x, y, deltaX, deltaY, deltaZ, modifiers, latency}, ticket);
+    } finally {
+      ticket.release();
+    }
+  }
+
+  async _dispatchWheelEvent({x, y, deltaX, deltaY, deltaZ, modifiers, latency}, ticket) {
     const deltaMode = 0; // WheelEvent.DOM_DELTA_PIXEL
     const lineOrPageDeltaX = deltaX > 0 ? Math.floor(deltaX) : Math.ceil(deltaX);
     const lineOrPageDeltaY = deltaY > 0 ? Math.floor(deltaY) : Math.ceil(deltaY);
 
     const page = await this._pagePixels();
+    // [B301] as for the mouse: after the commands before it, and, if early, after its instant, outside the activation.
+    try {
+      if (ticket.mustWait())
+        await ticket.due();
+    } finally {
+      ticket.release();
+    }
     let delivered;
     const deliveredP = new Promise(resolve => { delivered = resolve; });
     await this._pageTarget.activateAndRun(async () => {
@@ -1965,7 +2037,7 @@ export class PageHandler {
         lineOrPageDeltaY,
         win.windowUtils.WHEEL_EVENT_ASYNC_ENABLED /* the APZ hit test: an iframe of another process gets the wheel */,
         delivered /* called once the process the event went to has dispatched it */,
-        latency || 0 /* [B301] born this many ms before the dispatch */);
+        ticket.tagged ? ticket.latency() : (latency || 0) /* [B301] born this many ms before the dispatch */);
     }, { muteNotificationsPopup: true });
     // Outside the activation, as the ack of a mouse event: the chain of inputs is not held while the page scrolls.
     await this._awaitBounded(deliveredP, 'the wheel event');
@@ -1974,6 +2046,7 @@ export class PageHandler {
   // Same class as `Page.dispatchKeyEvent` above, and the same reason: it is
   // input reaching the page, so it must find the window focused.
   async ['Page.insertText'](options) {
+    await this._passInputGate();
     return await this._pageTarget.activateAndRun(() =>
       this._contentChannel.sendTo(this._focusedRootId(), 'page', 'insertText', options));
   }

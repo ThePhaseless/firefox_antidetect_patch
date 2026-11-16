@@ -16,6 +16,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 
 const JUGGLER = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -38,6 +39,11 @@ function bodyOf(source, header) {
   throw new Error('unbalanced ' + header);
 }
 
+// The gate of the page's input (juggler/StrokeBirth.js), on a clock that never moves: no stroke is sent here.
+const gateScope = {};
+vm.createContext(gateScope);
+vm.runInContext(read('StrokeBirth.js').replace(/^export /gm, '') + '\n;globalThis.__StrokeBirth = StrokeBirth;', gateScope);
+
 const agentSource = read('content/PageAgent.js');
 const methodSource = bodyOf(agentSource, 'async _dispatchKeyEvent(');
 const methodCode = strip(methodSource);
@@ -53,17 +59,24 @@ function agent() {
     commitCompositionWith: (...args) => calls.push(['commitCompositionWith', ...args]),
   };
   class KeyboardEvent { constructor(type, init) { this.type = type; this.init = init; } }
-  const frame = {textInputProcessor: () => tip, domWindow: () => ({KeyboardEvent})};
+  const frame = {textInputProcessor: () => tip, domWindow: () => ({KeyboardEvent, browsingContext: {top: {id: PAGE}}})};
   const make = new Function('setTimeout', 'return {\n' + methodSource + '\n};');
   const object = make((...args) => { timers.push(args); });
   object._frameTree = {mainFrame: () => frame};
+  const gate = new gateScope.__StrokeBirth({now: () => 0, sleep: () => new Promise(() => {})});
+  object._inputGate = () => gate;
   return {object, timers, calls};
 }
 
+// the id of the top-level browsing context of the page, which the key is declared for
+const PAGE = 7;
 const base = {keyCode: 65, code: 'KeyA', key: 'a', repeat: false, location: 0};
 
-test('no timer on the key path of _dispatchKeyEvent', () => {
-  assert.doesNotMatch(methodCode, /setTimeout|setInterval|requestAnimationFrame|new Promise|\bawait\b/);
+test('no timer on the key path of _dispatchKeyEvent; the one await is the wait of an event of a stroke that is early', () => {
+  assert.doesNotMatch(methodCode, /setTimeout|setInterval|requestAnimationFrame|new Promise/);
+  const awaits = methodCode.match(/\bawait\b/g) || [];
+  assert.equal(awaits.length, 1, 'one await, in the branch of a command that must wait');
+  assert.match(methodCode, /if \(ticket\.mustWait\(\)\)\s*await ticket\.due\(\);/);
 });
 
 test('a keydown with a latency: declared, then delivered, in the same turn', () => {
@@ -72,7 +85,7 @@ test('a keydown with a latency: declared, then delivered, in the same turn', () 
   // not awaited: the processor was already called, no timer was asked for
   assert.deepEqual(calls.map(c => c[0]), ['setNextKeyLatency', 'keydown', 'setNextKeyLatency']);
   assert.deepEqual(calls[2].slice(1), [0], 'taken back after the key');
-  assert.deepEqual(calls[0].slice(1), [40], 'the latency the key is born with');
+  assert.deepEqual(calls[0].slice(1), [40, PAGE], 'the latency the key is born with');
   assert.equal(calls[1].length, 3, 'keydown(event, flags): its own signature is untouched');
   assert.equal(timers.length, 0);
   return promise;
@@ -83,7 +96,7 @@ test('a keyup with a latency: declared, then delivered, in the same turn', () =>
   const promise = object._dispatchKeyEvent({...base, type: 'keyup', latency: 12.5});
   assert.deepEqual(calls.map(c => c[0]), ['setNextKeyLatency', 'keyup', 'setNextKeyLatency']);
   assert.deepEqual(calls[2].slice(1), [0]);
-  assert.deepEqual(calls[0].slice(1), [12.5]);
+  assert.deepEqual(calls[0].slice(1), [12.5, PAGE]);
   assert.equal(calls[1].length, 3, 'keyup(event, flags)');
   assert.equal(timers.length, 0);
   return promise;
@@ -94,7 +107,7 @@ test('a keydown with text goes through commitCompositionWith, born in the past t
   const promise = object._dispatchKeyEvent({...base, type: 'keydown', text: 'é', latency: 25});
   assert.deepEqual(calls.map(c => c[0]), ['setNextKeyLatency', 'commitCompositionWith', 'setNextKeyLatency']);
   assert.deepEqual(calls[2].slice(1), [0]);
-  assert.deepEqual(calls[0].slice(1), [25]);
+  assert.deepEqual(calls[0].slice(1), [25, PAGE]);
   assert.equal(calls[1][1], 'é');
   assert.equal(calls[1].length, 3, 'commitCompositionWith(text, event)');
   assert.equal(timers.length, 0);
@@ -105,7 +118,7 @@ test('no latency (absent, 0, negative): 0 is declared, the key keeps its constru
   for (const latency of [undefined, 0, -3]) {
     const {object, calls} = agent();
     await object._dispatchKeyEvent({...base, type: 'keydown', latency});
-    assert.deepEqual(calls[0], ['setNextKeyLatency', 0]);
+    assert.deepEqual(calls[0], ['setNextKeyLatency', 0, PAGE]);
     assert.equal(calls[1][0], 'keydown');
   }
 });
@@ -125,9 +138,10 @@ test('the declared latency is taken back whatever happens: try/finally, setNextK
     setNextKeyLatency: (...args) => calls.push(['setNextKeyLatency', ...args]),
     keydown: () => { throw new Error('boom'); },
   };
-  object._frameTree = {mainFrame: () => ({textInputProcessor: () => failing, domWindow: () => ({KeyboardEvent: class {}})})};
+  object._frameTree = {mainFrame: () => ({textInputProcessor: () => failing, domWindow: () => ({KeyboardEvent: class {}, browsingContext: {top: {id: PAGE}}})})};
+  object._inputGate = () => new gateScope.__StrokeBirth({now: () => 0, sleep: () => new Promise(() => {})});
   await assert.rejects(object._dispatchKeyEvent({...base, type: 'keydown', latency: 30}), /boom/);
-  assert.deepEqual(calls, [['setNextKeyLatency', 30], ['setNextKeyLatency', 0]]);
+  assert.deepEqual(calls, [['setNextKeyLatency', 30, PAGE], ['setNextKeyLatency', 0]]);
 });
 
 test('the scope opens right after the chrome assert, before any early return, and zeroes the declared latency', () => {
@@ -135,7 +149,7 @@ test('the scope opens right after the chrome assert, before any early return, an
   for (const header of ['TextInputProcessor::Keydown(Event* aDOMKeyEvent', 'TextInputProcessor::Keyup(Event* aDOMKeyEvent',
                         'TextInputProcessor::CommitCompositionWith(const nsAString& aCommitString']) {
     const body = bodyOf(code, header);
-    const scope = body.indexOf('StealthKeyBirthScope stealthBirth(mStealthNextKeyLatencyMs);');
+    const scope = body.indexOf('StealthKeyBirthScope stealthBirth(mStealthKeyBirth);');
     const assertAt = body.indexOf('MOZ_RELEASE_ASSERT(nsContentUtils::IsCallerChrome());');
     assert.ok(assertAt >= 0 && scope > assertAt, header + ': the scope follows the chrome assert');
     assert.equal(body.slice(assertAt, scope).replace(/MOZ_RELEASE_ASSERT\(nsContentUtils::IsCallerChrome\(\)\);/, '').trim(), '',
@@ -155,7 +169,7 @@ test('the latency stays the optional protocol field of the three key commands', 
 
 test('the interface gets one method; keydown, keyup and commitCompositionWith keep Mozilla\'s signatures', () => {
   const raw = readTree('dom/interfaces/base/nsITextInputProcessor.idl');
-  assert.match(raw, /^ *void setNextKeyLatency\(in double aLatencyMs\);  \/\/ STEALTH-HOOK\(fingerprint\/input\/event-birth\)$/m);
+  assert.match(raw, /^ *void setNextKeyLatency\(in double aLatencyMs, \[optional\] in unsigned long long aPageId\);  \/\/ STEALTH-HOOK\(fingerprint\/input\/event-birth\)$/m);
   const flat = strip(raw).replace(/\s+/g, ' ');
   assert.match(flat, /unsigned long keydown\(in Event aKeyboardEvent, \[optional\] in unsigned long aKeyFlags\);/);
   assert.match(flat, /boolean keyup\(in Event aKeyboardEvent, \[optional\] in unsigned long aKeyFlags\);/);
@@ -169,7 +183,7 @@ test('the processor opens a birth scope in the three key methods and stamps the 
   for (const header of ['TextInputProcessor::Keydown(Event* aDOMKeyEvent', 'TextInputProcessor::Keyup(Event* aDOMKeyEvent',
                         'TextInputProcessor::CommitCompositionWith(const nsAString& aCommitString']) {
     const body = bodyOf(code, header);
-    assert.match(body, /StealthKeyBirthScope stealthBirth\(mStealthNextKeyLatencyMs\);/, header + ' opens the scope');
+    assert.match(body, /StealthKeyBirthScope stealthBirth\(mStealthKeyBirth\);/, header + ' opens the scope');
     assert.ok(body.indexOf('StealthKeyBirthScope') < body.indexOf('Internal('), header + ': the scope is open before the key is delivered');
   }
   for (const [header, dispatch] of [['nsresult TextInputProcessor::KeydownInternal(', 'DispatchKeyboardEvent(eKeyDown'],
@@ -180,18 +194,19 @@ test('the processor opens a birth scope in the three key methods and stamps the 
     assert.ok(stamp < body.indexOf(dispatch), header + ' stamps before the dispatch');
     assert.ok(stamp > body.indexOf('WidgetKeyboardEvent keyEvent(aKeyboardEvent);'), header + ' stamps the copy, never the event it was given');
   }
-  assert.match(code, /StealthSetNextKeyLatency\(mStealthNextKeyLatencyMs, aLatencyMs, nsContentUtils::IsCallerChrome\(\)\)/);
+  assert.match(code, /StealthSetNextKeyLatency\(mStealthKeyBirth, aLatencyMs, aPageId, nsContentUtils::IsCallerChrome\(\)\)/);
   assert.doesNotMatch(code, /setTimeout|NS_NewTimer|NS_DelayedDispatch/);
   // every line of ours in this Mozilla file is tagged
   for (const line of cpp.split('\n').filter(l => /Stealth/.test(l)))
     assert.match(line, /STEALTH-HOOK\(fingerprint\/input\/event-birth\)/, line);
-  assert.match(readTree('dom/base/TextInputProcessor.h'), /double mStealthNextKeyLatencyMs = 0;  \/\/ STEALTH-HOOK\(fingerprint\/input\/event-birth\)/);
+  assert.match(readTree('dom/base/TextInputProcessor.h'), /double mLatencyMs = 0; uint64_t mPageId = 0; \} mStealthKeyBirth;  \/\/ STEALTH-HOOK\(fingerprint\/input\/event-birth\)/);
 });
 
-test('the birth lives in our header: one use, the cap of an hour, nothing for a latency of 0', () => {
+test('the birth lives in our header: one use, no cap on the latency, nothing for a latency of 0', () => {
   const header = strip(readTree('dom/base/StealthInputEventBirth.h'));
-  assert.match(header, /aLatencyMs > 0 && aLatencyMs < 3600000/);
-  assert.match(header, /aNextLatencyMs = 0;/, 'the declared latency is used once');
+  assert.match(header, /aLatencyMs > 0 && std::isfinite\(aLatencyMs\)/);
+  assert.doesNotMatch(header, /3600000/, 'a latency of seconds (or an hour) is a birth: no cap');
+  assert.match(header, /aBirth.mLatencyMs = 0;/, 'the declared latency is used once');
   assert.match(header, /static void Stamp\(WidgetEventTime& aEvent\)/);
   assert.match(header, /MOZ_RELEASE_ASSERT\(aIsCallerChrome\)/);
 });
@@ -200,5 +215,19 @@ test('the web-exposed KeyboardEventInit and KeyboardEvent get nothing', () => {
   for (const rel of ['dom/webidl/KeyboardEvent.webidl', 'dom/webidl/UIEvent.webidl']) {
     const webidl = strip(readTree(rel));
     assert.doesNotMatch(webidl, /latency|born|birth/i, rel + ' stays as upstream');
+  }
+});
+
+test('the latency is declared for the page: the id of the top-level browsing context of the frame\'s window', async () => {
+  assert.match(methodCode, /const pageId = frame\.domWindow\(\)\.browsingContext\.top\.id;/);
+  // two pages of one process: each key is declared for its own page, the take-back declares no page
+  for (const id of [7, 4294967297]) {
+    const {object, calls} = agent();
+    object._frameTree = {mainFrame: () => ({
+      textInputProcessor: () => ({setNextKeyLatency: (...args) => calls.push(args), keydown: () => {}}),
+      domWindow: () => ({KeyboardEvent: class {}, browsingContext: {id: 99, top: {id}}}),
+    })};
+    await object._dispatchKeyEvent({...base, type: 'keydown', latency: 30});
+    assert.deepEqual(calls, [[30, id], [0]]);
   }
 });

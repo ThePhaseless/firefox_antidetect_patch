@@ -11,6 +11,7 @@ const Cu = Components.utils;
 const {Helper} = ChromeUtils.importESModule('resource://gre/modules/juggler/Helper.js');
 const {NetUtil} = ChromeUtils.importESModule('resource://gre/modules/NetUtil.sys.mjs');
 const {setTimeout} = ChromeUtils.importESModule('resource://gre/modules/Timer.sys.mjs');
+const {StrokeBirth} = ChromeUtils.importESModule('resource://gre/modules/juggler/StrokeBirth.js');
 
 const dragService = Cc["@mozilla.org/widget/dragservice;1"].getService(
   Ci.nsIDragService
@@ -64,6 +65,9 @@ export class PageAgent {
     this._framesChannel = browserChannel.connect('frames');
     this._frameTree = frameTree;
     this._runtime = frameTree.runtime();
+    // The order and the births of the input of this page that this process delivers ([B299]): the keys and
+    // insertText. Made at the first command.
+    this._inputGateOfPage = null;
 
     this._workerData = new Map();
     // The document of this root is in the back-forward cache: its workers were said ended (enterCache) and are said
@@ -919,9 +923,22 @@ export class PageAgent {
     });
   }
 
-  async _dispatchKeyEvent({type, keyCode, code, key, repeat, location, text, latency}) {
+  _inputGate() {
+    if (!this._inputGateOfPage) {
+      this._inputGateOfPage = new StrokeBirth({
+        now: () => ChromeUtils.now(),
+        sleep: ms => new Promise(resolve => setTimeout(resolve, ms)),
+      });
+    }
+    return this._inputGateOfPage;
+  }
+
+  async _dispatchKeyEvent({type, keyCode, code, key, repeat, location, text, latency, stroke, at}) {
     const frame = this._frameTree.mainFrame();
     const tip = frame.textInputProcessor();
+    // The page the key is for: its top-level browsing context. The engine keeps one order of births per page, and
+    // this process cannot tell two pages of it apart by itself (setNextKeyLatency, chrome only).
+    const pageId = frame.domWindow().browsingContext.top.id;
     let keyEvent = new (frame.domWindow().KeyboardEvent)("", {
       key,
       code,
@@ -939,7 +956,20 @@ export class PageAgent {
     // by a timer: a timer in this process moved the delivery itself, and
     // under load the page saw gaps and dwells of the timer, not of the
     // declared timing.
-    const born = latency > 0 ? latency : 0;
+    let born = latency > 0 ? latency : 0;
+    // The key takes its place in the order of the page's input, and an event of a stroke is born where the client's
+    // plan puts it, however late it reaches here; early, or behind a command that waits, it waits (the one await of
+    // this method: otherwise the key goes out in the turn it arrived). The ticket is released before the key is
+    // handed over, whatever happens.
+    const ticket = this._inputGate().enter({stroke, at, latency});
+    try {
+      if (ticket.mustWait())
+        await ticket.due();
+      if (ticket.tagged)
+        born = ticket.latency();
+    } finally {
+      ticket.release();
+    }
     // The latency is declared for the one key below; the finally takes it
     // back in every case (a throw before the key reaches the processor, an
     // unknown type), so no later key is born in the past by a latency it was
@@ -947,18 +977,18 @@ export class PageAgent {
     try {
       if (type === 'keydown') {
         if (text && text !== key) {
-          tip.setNextKeyLatency(born);
+          tip.setNextKeyLatency(born, pageId);
           tip.commitCompositionWith(text, keyEvent);
         } else {
           const flags = 0;
-          tip.setNextKeyLatency(born);
+          tip.setNextKeyLatency(born, pageId);
           tip.keydown(keyEvent, flags);
         }
       } else if (type === 'keyup') {
         if (text)
           throw new Error(`keyup does not support text option`);
         const flags = 0;
-        tip.setNextKeyLatency(born);
+        tip.setNextKeyLatency(born, pageId);
         tip.keyup(keyEvent, flags);
       } else {
         throw new Error(`Unknown type ${type}`);
@@ -1154,6 +1184,14 @@ export class PageAgent {
   }
 
   async _insertText({text}) {
+    // No stroke and no plan, but the text comes in its place among the keys: never before a key that waits.
+    const ticket = this._inputGate().enter();
+    try {
+      if (ticket.mustWait())
+        await ticket.due();
+    } finally {
+      ticket.release();
+    }
     const frame = this._frameTree.mainFrame();
     frame.textInputProcessor().commitCompositionWith(text);
   }

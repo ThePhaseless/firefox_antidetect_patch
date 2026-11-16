@@ -169,3 +169,39 @@ test('a frame the content process says attached while its parent navigates is he
     ['Page.frameAttached', widgetId],
   ]);
 });
+
+// The failure of the last document request of a navigation ends it, in the parent (FrameNavigations.onDocumentRequestFailed): the
+// request is told as the client knows it, with no `navigationId` (a field of the registry's, not of the protocol), and the
+// navigation is aborted under its own id.
+test('a document request that fails ends its navigation, and the client is told the request without the navigation id', () => {
+  const top = context();
+  const { handler, events } = construct(top);
+  const frameId = 'mainframe-9';
+  handler._handleNetworkEvent('Network.requestWillBeSent', { requestId: '21', navigationId: 'nav-26', url: 'http://c.test/second' }, frameId);
+  events.length = 0;
+  handler._handleNetworkEvent('Network.requestFailed', { requestId: '21', errorCode: 'NS_BINDING_ABORTED', navigationId: 'nav-26' }, frameId);
+  assert.deepEqual(events.map(([name, payload]) => [name, payload.navigationId, payload.errorCode || payload.errorText]), [
+    ['Network.requestFailed', undefined, 'NS_BINDING_ABORTED'],
+    ['Page.navigationAborted', 'nav-26', 'NS_BINDING_ABORTED'],
+  ]);
+});
+
+test('a request that is not a document\'s fails without ending any navigation', () => {
+  const top = context();
+  const { handler, events } = construct(top);
+  events.length = 0;
+  handler._handleNetworkEvent('Network.requestFailed', { requestId: '22', errorCode: 'NS_ERROR_NET_RESET', navigationId: undefined }, 'mainframe-9');
+  assert.deepEqual(events.map(([name]) => name), ['Network.requestFailed']);
+});
+
+test('a document request that failed with another error than a cut ends no navigation: the content tells it', () => {
+  const top = context();
+  const { handler, events } = construct(top);
+  const frameId = 'mainframe-9';
+  handler._handleNetworkEvent('Network.requestWillBeSent', { requestId: '23', navigationId: 'nav-27', url: 'http://c.test/body' }, frameId);
+  events.length = 0;
+  // What NetworkRequest emits for NS_ERROR_NET_RESET: no navigation id (NetworkObserver), so nothing for the registry.
+  handler._handleNetworkEvent('Network.requestFailed', { requestId: '23', errorCode: 'NS_ERROR_NET_RESET', navigationId: undefined }, frameId);
+  assert.deepEqual(events.map(([name]) => name), ['Network.requestFailed']);
+  assert.equal(handler._frameNavigations.pendingNavigationId(frameId), 'nav-27');
+});
