@@ -347,6 +347,10 @@ jobs:
           # the unit tests of the line, on both OSes, with the same core and wrapper as the e2e
           - { suite: wrapper.unit.udp, leg: linux-x86_64, runner: ubuntu-24.04, kind: linux, os: linux }
           - { suite: wrapper.unit.udp, leg: win-x86_64, runner: windows-latest, kind: win, os: windows }
+          # the WHOLE unit suite of the wrapper (what its tests.yml runs) with the candidate's core: tests.yml uses the core of the
+          # pin, so without this no round runs the wrapper's unit tests against a core that has not been published yet
+          - { suite: wrapper.unit.all.linux, leg: linux-x86_64, runner: ubuntu-24.04, kind: linux, os: linux }
+          - { suite: wrapper.unit.all.windows, leg: win-x86_64, runner: windows-latest, kind: win, os: windows }
           # the DoH suite: Linux (root: its resolver trap points /etc/resolv.conf at a counting resolver) and Windows, the system
           # of reference (there the trap does not run: the one assertion it makes is the only one not made)
           - { suite: wrapper.e2e.doh, leg: linux-x86_64, runner: ubuntu-24.04, kind: linux, os: linux, root: true }
