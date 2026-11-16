@@ -45,12 +45,12 @@ jobs:
       # step: it means a check did not read the tree.
       # The core is pinned by commit, like the actions: a core change cannot turn
       # this check red with no engine change. A port moves it to the core commit
-      # made for that Firefox (today release/64.69.0 before its seal: firefox-64 no longer reads the counter pref; it carries
-      # STEALTH_FIREFOX_COMMIT and the WebGL lists of 159).
+      # made for that Firefox (today 65.74.0, the core of firefox-65 with its seal: the input strokes born where the client's
+      # plan puts them and the declared state read when a channel is ready).
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           repository: oss-invisible/core
-          ref: eb58daf8121f9766cef40d9765aff9742a86de8a
+          ref: 8dc14e7586fc943e9f52b9813259035341019f9e
           path: core
           persist-credentials: false
       - run: pip install -e "./core[dev]"
