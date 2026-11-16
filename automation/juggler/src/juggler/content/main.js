@@ -60,9 +60,6 @@ export function initialize(browsingContext, docShell) {
     // the parent (PageTarget.updateJavaScriptDisabled), the one process that can write it for every document.
   };
 
-  const contextCrossProcessCookie = Services.cpmm.sharedData.get(helper.contextCookieKey(browsingContext.originAttributes.userContextId)) || { initScripts: [], bindings: [], settings: {} };
-  const pageCrossProcessCookie = Services.cpmm.sharedData.get(helper.pageCookieKey(browsingContext.browserId)) || { initScripts: [], bindings: [], interceptFileChooserDialog: false };
-
   // STEALTHFOX: qui c'erano docShell.overrideHasFocus e forceActiveState,
   // messi su OGNI documento di primo livello. Sono codice morto: verificato in
   // tutto l'albero che l'unico lettore e' la coppia getter/setter in
@@ -78,16 +75,45 @@ export function initialize(browsingContext, docShell) {
   // (zoom.stealth.juggler.disallow_bfcache) set an attribute nothing read, so
   // it never did anything, and it is gone with the attribute.
   data.frameTree = new FrameTree(browsingContext);
-  // Every root of a page runs this for its own part. The cookie holds the settings of the context, among them
-  // some that are not applied here (javaScriptDisabled is the parent's): a name this process does not apply is
-  // skipped, not an error that would stop the root from coming up.
-  for (const [name, value] of Object.entries(contextCrossProcessCookie.settings)) {
-    if (value !== undefined && Object.hasOwn(applySetting, name))
+  // The state the client declared (the settings of the context, the init scripts with their worlds, the bindings, the
+  // file chooser) is in the shared data, written by the parent before it tells the roots that have an actor. Every
+  // root of a page applies it for its own part, when its agents are born AND each time its channel becomes ready: the
+  // parent binds a root only after its agents were born, and what it declared meanwhile reached no one (a root with
+  // no actor is sent nothing). It is read again, never remembered, and what is applied is idempotent: the same state
+  // makes no second world, binding or script. The cookie holds settings that are not applied here (javaScriptDisabled
+  // is the parent's): a name this process does not apply is skipped, not an error that would stop the root from
+  // coming up.
+  // What this root applied last, by name, as JSON: the same value is not applied again. The channel becomes ready at each
+  // new document of the root (every navigation binds the actor again), and writing the geolocation override again
+  // may reach the page that watches the position. The parent's messages are remembered the same way.
+  const lastApplied = new Map();
+  const remember = (key, value) => void lastApplied.set(key, String(JSON.stringify(value)));
+  const isApplied = (key, value) => lastApplied.get(key) === String(JSON.stringify(value));
+  const applySharedState = () => {
+    const contextCrossProcessCookie = Services.cpmm.sharedData.get(helper.contextCookieKey(browsingContext.originAttributes.userContextId)) || { initScripts: [], bindings: [], settings: {} };
+    const pageCrossProcessCookie = Services.cpmm.sharedData.get(helper.pageCookieKey(browsingContext.browserId)) || { initScripts: [], bindings: [], interceptFileChooserDialog: false };
+    // A setting this root applied and the shared state no longer has (the client took it off between two documents,
+    // and the broadcast skipped the root) is taken off here too: `undefined` is skipped only for a name never applied.
+    const names = new Set([...Object.keys(contextCrossProcessCookie.settings), ...lastApplied.keys()]);
+    for (const name of names) {
+      const value = contextCrossProcessCookie.settings[name];
+      if (!Object.hasOwn(applySetting, name) || isApplied(name, value))
+        continue;
+      if (value === undefined && !lastApplied.has(name))
+        continue;
       applySetting[name](value);
-  }
-  data.frameTree.applyCrossProcessState(
-      [...contextCrossProcessCookie.initScripts, ...pageCrossProcessCookie.initScripts],
-      [...contextCrossProcessCookie.bindings, ...pageCrossProcessCookie.bindings]);
+      remember(name, value);
+    }
+    data.frameTree.applyCrossProcessState(
+        [...contextCrossProcessCookie.initScripts, ...pageCrossProcessCookie.initScripts],
+        [...contextCrossProcessCookie.bindings, ...pageCrossProcessCookie.bindings]);
+    const interceptFileChooser = !!pageCrossProcessCookie.interceptFileChooserDialog;
+    if (!isApplied('interceptFileChooser', interceptFileChooser)) {
+      data.frameTree.setDocShellSettings({ interceptFileChooser });
+      remember('interceptFileChooser', interceptFileChooser);
+    }
+  };
+  applySharedState();
   data.channel = new SimpleChannel('', 'process-' + Services.appinfo.processID);
   data.pageAgent = new PageAgent(data.channel, data.frameTree);
   // A document restored from the back-forward cache announces itself when
@@ -99,7 +125,8 @@ export function initialize(browsingContext, docShell) {
     // The workers of the document are said again once it is the current one (a no-op if the restore did).
     data.pageAgent.leaveCache();
   });
-  data.frameTree.setDocShellSettings({ interceptFileChooser: !!pageCrossProcessCookie.interceptFileChooserDialog });
+  // Before any command, and before what waited in the queue goes out: see applySharedState.
+  data.channel.onReady(applySharedState);
 
   data.channel.register('', {
     setInitScripts(scripts) {
@@ -111,12 +138,15 @@ export function initialize(browsingContext, docShell) {
     },
 
     applyContextSetting({name, value}) {
-      if (Object.hasOwn(applySetting, name))
-        applySetting[name](value);
+      if (!Object.hasOwn(applySetting, name))
+        return;
+      applySetting[name](value);
+      remember(name, value);
     },
 
     setInterceptFileChooserDialog(enabled) {
       data.frameTree.setDocShellSettings({ interceptFileChooser: !!enabled });
+      remember('interceptFileChooser', !!enabled);
     },
 
     ensurePermissions() {

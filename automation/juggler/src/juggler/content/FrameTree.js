@@ -335,6 +335,10 @@ export class FrameTree {
   addBinding(worldName, name, script) {
     worldName = worldName || '';
     const world = this._ensureWorld(worldName);
+    // The same binding again (the shared state is read at every ready of the channel, and the parent's message may
+    // have come before): the contexts that have it keep it, the ones born later get it from the world.
+    if (world._bindings.has(name) && world._bindings.get(name) === script)
+      return;
     world._bindings.set(name, script);
     // Same as setInitScripts: a frame with no window gets the binding with its window.
     for (const frame of this.frames()) {

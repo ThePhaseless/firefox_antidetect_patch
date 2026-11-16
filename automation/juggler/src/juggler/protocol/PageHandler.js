@@ -440,6 +440,15 @@ export class PageHandler {
     // A document request tells the navigation it belongs to before the request itself is told.
     if (protocolEventName === 'Network.requestWillBeSent' && eventDetails.navigationId)
       this._frameNavigations.onDocumentRequest(frameId, eventDetails.navigationId, eventDetails.url);
+    if (protocolEventName === 'Network.requestFailed') {
+      // The last request of a document's navigation failed: the request is told as it is, then the navigation ends with
+      // it. `navigationId` is the registry's, not the client's.
+      const {navigationId, ...failure} = eventDetails;
+      this._emitFrameKeyed(protocolEventName, failure, frameId);
+      if (navigationId)
+        this._frameNavigations.onDocumentRequestFailed(frameId, navigationId, failure.errorCode);
+      return;
+    }
     this._emitFrameKeyed(protocolEventName, eventDetails, frameId);
   }
 

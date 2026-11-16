@@ -51,6 +51,7 @@ function runInitialize(settings) {
     constructor() {}
     register(_ns, h) { handlers = h; }
     onReattached() {}
+    onReady() {}
   }
   const cookies = new Map([
     [helper.contextCookieKey(0), { initScripts: [], bindings: [], settings }],

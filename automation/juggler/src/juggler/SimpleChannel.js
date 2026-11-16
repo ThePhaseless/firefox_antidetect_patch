@@ -29,6 +29,7 @@ var SimpleChannel = class SimpleChannel {
     // Set by detachFromPeer, cleared by the READY that attaches this end again.
     this._detached = false;
     this._onReattached = null;
+    this._onReady = null;
     this._paused = false;
     this._disposed = false;
 
@@ -152,11 +153,37 @@ var SimpleChannel = class SimpleChannel {
     this._onReattached = callback;
   }
 
+  /**
+   * `callback` runs at every passage of this end to ready: when it meets its
+   * first peer, and again at each READY of another peer (a second actor, a
+   * document restored from the cache), just before the end is ready: what it
+   * says waits in the queue behind what waited already, and goes out after it.
+   * The content end reads there the state the client
+   * declared: it is written into the shared data, and a message to a root with
+   * no actor is never sent (the parent binds a root one hop after its agents
+   * were born), so an end born before the declaration has to ask. The callback
+   * must be idempotent: it runs once per peer.
+   */
+  onReady(callback) {
+    this._onReady = callback;
+  }
+
   _markAsReady() {
     if (this._ready)
       return;
+    // The ready hook runs BEFORE the end is ready: what it says is queued behind what already waited (the agents
+    // said their start at birth: the contexts cleared, the main one), and goes out after it, in order. Said after
+    // the passage to ready it would go out first, and the "cleared" that follows would make the client forget it.
+    if (this._onReady) {
+      // A hook that fails must not keep the queue from going out.
+      try {
+        this._onReady();
+      } catch (e) {
+        dump(`WARNING: the onReady hook of channel "${this._name}" failed: ${e && e.message}\n`);
+      }
+    }
     this._ready = true;
-    // Snapshot first: what the hook sends goes out as it is sent, and must not
+    // Snapshot first: what the reattachment hook sends goes out as it is sent, and must not
     // be sent a second time by the replay below.
     const queued = [...this._pendingMessages.values()];
     if (this._detached) {
