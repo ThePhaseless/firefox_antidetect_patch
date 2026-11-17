@@ -103,7 +103,7 @@ fetch() { # url sha256 file [second-url]
 apt_install() {
   local log rc=0 names
   log="$(mktemp)"
-  apt-get install -y -q --no-install-recommends "$@" > "$log" 2>&1 || rc=$?
+  apt-get install -y -q --no-install-recommends --allow-downgrades "$@" > "$log" 2>&1 || rc=$?
   if [ "$rc" = 0 ]; then
     rm -f "$log"
     return 0
@@ -113,7 +113,9 @@ apt_install() {
     echo "node_bootstrap: apt-get install exited $rc; its whole answer:"
     cat "$log"
     echo "node_bootstrap: the solver on the same request (apt-get -s, Debug::pkgProblemResolver):"
-    apt-get install -s -q --no-install-recommends -o Debug::pkgProblemResolver=yes "$@" 2>&1 | tail -n 200
+    apt-get install -s -q --no-install-recommends --allow-downgrades -o Debug::pkgProblemResolver=yes "$@" 2>&1 | tail -n 200
+    echo "node_bootstrap: the pins of glibc (${GLIBC_PREFS:-none}):"
+    cat "${GLIBC_PREFS:-/dev/null}" 2>&1
     names="$( { grep -oE '^ +[a-z0-9][a-z0-9.+:-]* :' "$log" | sed -E 's/^ +//; s/ :$//'
                 grep -oE '(Pre-?Depends|Depends|Breaks|Conflicts): [a-z0-9][a-z0-9.+:-]*' "$log" | sed -E 's/^[^:]+: //'; } | sort -u | tr '\n' ' ')"
     echo "node_bootstrap: the packages apt named, installed on the node (dpkg) and in the archive (apt-cache policy): ${names:-none}"
@@ -132,6 +134,27 @@ apt_install() {
     grep -E '^(E|W): ' "$log"
   } >&2
   exit "$rc"
+}
+
+# glibc at the archive's version, and only glibc. It is the one family our packages ask for at the EXACT version of the image's
+# runtime: build-essential needs libc6-dev, which needs libc6 (= its own version), and Mozilla's wine needs libc6-i386, which needs
+# libc6 (= its own version). An image renewed by the provider can hold a newer libc6 than the archive (run 44157672212: libc6
+# 2.39-0ubuntu8.12 against the archive's 8.9), and apt does not go back to the archive's on its own. So every package of the archive
+# whose source is glibc is pinned to the archive's version, from the index apt reads (debs/Packages, epoch included), at 1001, and the
+# install may go down to it. libc-bin and locales of the image stay where they are: they ask libc6 for a range inside 2.39, not for a
+# version. Nothing else is pinned: the rest of the image stays the image's. Should another family conflict one day, the install fails
+# with apt's account above, and the answer is a fixed image, not a wider pin.
+GLIBC_PREFS=/etc/apt/preferences.d/80-node-deps-glibc
+glibc_pins() { # debs/Packages -> an apt preferences file on stdout
+  awk 'BEGIN { RS = ""; FS = "\n" }
+       { pkg = src = ver = ""
+         for (i = 1; i <= NF; i++) {
+           if ($i ~ /^Package: /) pkg = substr($i, 10)
+           else if ($i ~ /^Source: /) { src = substr($i, 9); sub(/ .*/, "", src) }
+           else if ($i ~ /^Version: /) ver = substr($i, 10)
+         }
+         if (src == "") src = pkg
+         if (src == "glibc" && pkg != "" && ver != "") printf "Package: %s\nPin: version %s\nPin-Priority: 1001\n\n", pkg, ver }' "$1"
 }
 
 DEPS=/opt/node-deps
@@ -155,6 +178,8 @@ rm -f /tmp/node-deps.tar
 echo "deb [trusted=yes] file:$DEPS/debs ./" > /etc/apt/sources.list
 rm -f /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources
 apt-get update -qq -o APT::Update::Error-Mode=any
+glibc_pins "$DEPS/debs/Packages" > "$GLIBC_PREFS"
+[ -s "$GLIBC_PREFS" ] || die "the archive's index names no package of glibc: nothing to pin libc6-dev and libc6-i386 to"
 apt_install "${PACKAGES[@]}"
 
 echo "== the user"

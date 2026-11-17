@@ -748,6 +748,13 @@ def group_bootstrap():
                 "install whose output goes to /dev/null (runs 44137637832 and 44139666991 said only 'held broken packages')",
                 'apt_install "${PACKAGES[@]}"' in bootstrap and '"${PACKAGES[@]}" >/dev/null' not in bootstrap
                 and bootstrap.index("apt_install() {") < bootstrap.index('apt_install "${PACKAGES[@]}"')))
+    out.append(("bootstrap: glibc is pinned to the archive's versions, from the archive's own index, before the install, and a missing pin "
+                "stops it (run 44157672212: the renewed image had libc6 8.12, the archive's libc6-dev and libc6-i386 ask for 8.9)",
+                "GLIBC_PREFS=/etc/apt/preferences.d/" in bootstrap
+                and 'glibc_pins "$DEPS/debs/Packages" > "$GLIBC_PREFS"' in bootstrap
+                and '[ -s "$GLIBC_PREFS" ] || die' in bootstrap
+                and bootstrap.index("> /etc/apt/sources.list") < bootstrap.index('glibc_pins "$DEPS/debs/Packages"')
+                < bootstrap.index('apt_install "${PACKAGES[@]}"')))
     out.append(("bootstrap: a failed index stops it, by name",
                 bootstrap.count("apt-get update -qq -o APT::Update::Error-Mode=any") == 2 and "apt-get update -qq\n" not in bootstrap))
     out.append(("bootstrap: every download by version and sha256, nothing else fetched, the runner's version pinned",
@@ -1353,6 +1360,7 @@ def group_node_deps():
                "E: Unable to correct problems, you have held broken packages."]
     fakes = [
         "apt-get() {",
+        '  echo "$*" >> "$APT_CALLS"',
         '  case " $* " in *" -s "*) echo "Investigating (0) libc6-dev:amd64 < none -> 2.39-0ubuntu8.3 @un puN Ib >"; return 100;; esac',
         '  if [ "$APT_ANSWER" = 0 ]; then return 0; fi',
         "  printf '%s\\n' " + " ".join(shlex.quote(line) for line in refusal) + "; return 100",
@@ -1361,11 +1369,41 @@ def group_node_deps():
         'apt-cache() { echo "apt-cache $*"; }',
         "apt-mark() { :; }",
         "systemctl() { echo inactive; }"]
-    said = {}
-    for answer in ("100", "0"):
-        script = "\n".join(["set -euo pipefail", "APT_ANSWER=%s" % answer] + fakes + [apt_install, "apt_install sudo git", "echo went-on"])
-        said[answer] = subprocess.run(["bash", "-c", script], capture_output=True, text=True, timeout=30)
+    said, calls = {}, {}
+    with tempfile.TemporaryDirectory() as tmp:
+        for answer in ("100", "0"):
+            log = Path(tmp) / ("calls-%s" % answer)
+            script = "\n".join(["set -euo pipefail", "APT_ANSWER=%s" % answer, "APT_CALLS=%s" % shlex.quote(log.as_posix())]
+                               + fakes + [apt_install, "apt_install sudo git", "echo went-on"])
+            said[answer] = subprocess.run(["bash", "-c", script], capture_output=True, text=True, timeout=30)
+            calls[answer] = log.read_text().splitlines() if log.exists() else []
     refused, fine = said["100"], said["0"]
+    out.append(("node deps: the install of the archive may go down to the pinned versions (--allow-downgrades): %s" % calls["0"],
+                len(calls["0"]) == 1 and calls["0"][0].startswith("install ") and "--allow-downgrades" in calls["0"][0].split()
+                and calls["0"][0].endswith(" sudo git")))
+    # glibc_pins on an index as dpkg-scanpackages writes it: every package of the archive whose source is glibc, at its version (an
+    # epoch, a Source with its own version, a package that is its own source), and nothing else (systemd, a package with an epoch).
+    begin = bootstrap.index("glibc_pins() {")
+    glibc_pins = bootstrap[begin:bootstrap.index("\n}\n", begin) + 3]
+    index = "\n\n".join([
+        "Package: bison\nVersion: 2:3.8.2+dfsg-1ubuntu0.24.04.1\nArchitecture: amd64\nFilename: ./bison_2%3a3.8.2+dfsg-1ubuntu0.24.04.1_amd64.deb",
+        "Package: libc-dev-bin\nSource: glibc (2.39-0ubuntu8.9)\nVersion: 1:2.39-0ubuntu8.9\nArchitecture: amd64",
+        "Package: libc6\nSource: glibc\nVersion: 2.39-0ubuntu8.9\nArchitecture: amd64\nDepends: libgcc-s1",
+        "Package: libc6-dev\nSource: glibc\nVersion: 2.39-0ubuntu8.9\nArchitecture: amd64\nDepends: libc6 (= 2.39-0ubuntu8.9)",
+        "Package: libsystemd0\nSource: systemd\nVersion: 255.4-1ubuntu8.18\nArchitecture: amd64",
+        "Package: glibc\nVersion: 2.39-0ubuntu8.9\nArchitecture: all",
+        "Package: glibc-tools-not\nSource: glibcx\nVersion: 1.0\nArchitecture: amd64",
+        "Package: systemd\nVersion: 255.4-1ubuntu8.18\nArchitecture: amd64\nDepends: libsystemd0 (= 255.4-1ubuntu8.18)"]) + "\n"
+    want = "".join("Package: %s\nPin: version %s\nPin-Priority: 1001\n\n" % pv for pv in [
+        ("libc-dev-bin", "1:2.39-0ubuntu8.9"), ("libc6", "2.39-0ubuntu8.9"), ("libc6-dev", "2.39-0ubuntu8.9"), ("glibc", "2.39-0ubuntu8.9")])
+    with tempfile.TemporaryDirectory() as tmp:
+        packages = Path(tmp) / "Packages"
+        packages.write_bytes(index.encode())
+        pinned = subprocess.run(["bash", "-c", "set -euo pipefail\n%s\nglibc_pins %s" % (glibc_pins, shlex.quote(packages.as_posix()))],
+                                capture_output=True, text=True, timeout=30)
+    out.append(("node deps: the pins are every package of the archive whose source is glibc, at the archive's version with its epoch, "
+                "and nothing else, not systemd (%r)" % pinned.stdout[:400],
+                pinned.returncode == 0 and pinned.stdout == want))
     out.append(("node deps: apt refuses the archive: the bootstrap says the unmet dependency, the solver's account, the version of each "
                 "package apt named installed and in the archive, and exits with apt's code, its E: line last (%d: %s)"
                 % (refused.returncode, refused.stderr.strip()[-300:]),
