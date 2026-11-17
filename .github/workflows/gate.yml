@@ -378,6 +378,9 @@ jobs:
           - { suite: wrapper.e2e.compositing, leg: win-x86_64, runner: windows-2022, kind: win, os: windows }
           - { suite: wrapper.unit.compositing, leg: linux-x86_64, runner: ubuntu-24.04, kind: linux, os: linux }
           - { suite: wrapper.unit.compositing, leg: win-x86_64, runner: windows-latest, kind: win, os: windows }
+          # the parent shows the bundle to fontconfig: a warm start reads fontconfig's cache of <GRE>/fonts and does not scan the
+          # folder again (two launches under strace). Linux only: Windows has no fontconfig, DirectWrite opens a font by its path
+          - { suite: wrapper.e2e.fontconfig, leg: linux-x86_64, runner: ubuntu-24.04, kind: linux, os: linux }
     steps:
       - name: Checkout wrapper (its tests, ci/required-suites.json and scripts/ci_verdict.py)
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -416,6 +419,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y xvfb
+          # the fontconfig suite traces the opens of the browser: strace is not in the runner image (setsid is, util-linux)
+          if [ "${{ matrix.suite }}" = "wrapper.e2e.fontconfig" ]; then sudo apt-get install -y strace; fi
           python -m pip install --quiet "playwright==$(cat scripts/playwright_pin.txt)"
           sudo "$(which python)" -m playwright install-deps firefox
       - name: Extract + locate firefox binary
@@ -590,6 +595,14 @@ jobs:
         with:
           name: result-${{ matrix.suite }}-${{ matrix.os }}
           path: result
+          retention-days: 14
+      - name: Keep what the tests saved
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: evidence-${{ matrix.suite }}-${{ matrix.os }}
+          path: ${{ runner.temp }}/invpw-evidence
+          if-no-files-found: ignore
           retention-days: 14
 
   # Every row of the list, on every OS it names, has a verdict in this run, and it is green. The matrix above is written by hand;

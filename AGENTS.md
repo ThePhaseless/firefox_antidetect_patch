@@ -118,6 +118,8 @@ di rete e difetti noti con il lavoro che li chiude.
   vendorizza un'altra fallisce, e al port si prende il file di Mozilla tenendo solo ciò
   che a monte manca ancora. Solo dentro `third_party/rust/` e `Cargo.lock`; le
   `.cargo-checksum.json` delle crate toccate si aggiornano con i nuovi hash.
+- **Backport di un commit di Mozilla** (un file fuori da `third_party/rust/`): solo come il diff di un commit del repo di Mozilla, in `platform/backports/<nome>/`, non dentro una nostra funzione.
+  `BACKPORT.json` ha upstream `mozilla-firefox/firefox`, lo sha intero, il bug, la data, il sha256 del diff e `drop_when`; il diff sta nella cartella e `hooks.patch` lo porta byte per byte, e `check` rifiuta un diff ritoccato; `port` e `check --against <tag>` falliscono se il tag lo contiene già.
 - **Un test di comportamento per ogni gancio**: si imposta la pref e si controlla il
   valore che la pagina vede. Il nome del test va in `FEATURE.md` (riga `Test:`).
 - **Ogni falsificazione passa da una pref** `zoom.stealth.*` / `stealthfox.*`; non si

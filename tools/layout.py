@@ -39,6 +39,8 @@ FEATURES = {
     "stealth-pref-defaults": "platform/prefs",
     "vsdownload-download-watchdog": "platform/build-tools",
     "win-long-build-paths": "platform/build-tools",
+    # platform: commits of Mozilla's repository carried before the tag has them
+    "fontconfig-face-index": "platform/backports/fontconfig-face-index",
     # stillborn
     "updater-refuses": "stillborn/updater",
     "pingsender-session-route": "stillborn/telemetry",

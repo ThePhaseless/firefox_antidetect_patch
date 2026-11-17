@@ -662,6 +662,13 @@ def bootstrap(ssh, clock=time.monotonic, sleep=time.sleep, deadline=None):
             if attempts > 1:
                 say("node_bootstrap.sh succeeded at attempt %d, %.0f s in" % (attempts, clock() - start))
             return out
+        # What the script said, whole, in the log: the error below keeps 600 characters, and apt's account of a failure (which package,
+        # which version installed against the archive's) is longer than that (runs 44137637832 and 44139666991 kept only its last line).
+        # Not on 255: that is ssh's own failure, the script did not speak, and the error carries all of it.
+        if code != 255:
+            say("::group::node_bootstrap.sh exited %d at attempt %d: its whole stderr" % (code, attempts))
+            say((err or out).rstrip())
+            say("::endgroup::")
         text = (err or out)[-600:]
         transient = code == 255 or TRANSIENT.search(text) is not None
         if not transient or clock() + BOOTSTRAP_RETRY_PAUSE_S >= stop_at:

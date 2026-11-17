@@ -1,3 +1,4 @@
+platform/backports/fontconfig-face-index
 platform/build-config
 platform/build-tools
 platform/ci

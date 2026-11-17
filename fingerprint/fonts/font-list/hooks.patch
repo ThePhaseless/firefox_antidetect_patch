@@ -256,7 +256,7 @@ index a804e7154b7182fe73a37a94b186b50275971f5e..6d7667be34b4c8362f4de426a230c608
    nsresult rv = NS_GetSpecialDirectory(NS_GRE_DIR, getter_AddRefs(localDir));
    if (NS_FAILED(rv)) {
 diff --git a/gfx/thebes/gfxFcPlatformFontList.cpp b/gfx/thebes/gfxFcPlatformFontList.cpp
-index 3fbad92c0dbcb8f65fb58e052fe798a1dbe58aad..4eb60bb0ef4a97e2a0fb3b186f88f493c5055c4e 100644
+index 3fbad92c0dbcb8f65fb58e052fe798a1dbe58aad..70fd6f2d4fa941a3c3cb37e1e6be73b8e85eee57 100644
 --- a/gfx/thebes/gfxFcPlatformFontList.cpp
 +++ b/gfx/thebes/gfxFcPlatformFontList.cpp
 @@ -5,6 +5,7 @@
@@ -368,17 +368,17 @@ index 3fbad92c0dbcb8f65fb58e052fe798a1dbe58aad..4eb60bb0ef4a97e2a0fb3b186f88f493
    // iterate over available fonts
    FcFontSet* systemFonts = FcConfigGetFonts(nullptr, FcSetSystem);
    AddFontSetFamilies(systemFonts, policy.get(), /* aAppFonts = */ false);
-@@ -1934,6 +1956,10 @@ void gfxFcPlatformFontList::InitSharedFontListForPlatform() {
-   UpdateSystemFontOptions();
+@@ -1942,6 +1964,10 @@ void gfxFcPlatformFontList::InitSharedFontListForPlatform() {
+         std::move(timerId));
+   }
  #endif
- 
-+  // STEALTH-HOOK(fingerprint/fonts/font-list)
++  // STEALTH-HOOK(fingerprint/fonts/font-list): the parent shows the bundle to fontconfig first, a screenshot remakes its fonts from the path
 +  if (mStealthBundleOnly && StealthPopulateSharedList(SharedFontList())) {
 +    return;
 +  }
- #ifdef MOZ_BUNDLED_FONTS
-   if (StaticPrefs::gfx_bundled_fonts_activate_AtStartup() != 0) {
-     auto timerId = glean::fontlist::bundledfonts_activate.Start();
+ 
+   UniquePtr<SandboxPolicy> policy;
+ 
 @@ -2289,6 +2315,10 @@ gfxFcPlatformFontList::GetFilteredPlatformFontLists() {
  
  already_AddRefed<gfxFontEntry> gfxFcPlatformFontList::CreateFontEntry(

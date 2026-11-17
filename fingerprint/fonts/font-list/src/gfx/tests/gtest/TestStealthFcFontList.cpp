@@ -12,11 +12,18 @@
 
 #include <fontconfig/fontconfig.h>
 
+#include <map>
 #include <string>
 #include <utility>
 
+#include "StealthBundleFontList.h"
 #include "StealthFcFontList.h"
+#include "gfxPlatform.h"
+#include "gfxPlatformFontList.h"
 #include "mozilla/Preferences.h"
+#include "nsString.h"
+#include "nsTArray.h"
+#include "nsXULAppAPI.h"
 
 using mozilla::Preferences;
 
@@ -221,4 +228,173 @@ TEST(StealthFcFontList, PreferFileUnscaledFont)
     // Moved from in this case only.
     EXPECT_TRUE(file.empty());
   }
+}
+
+// The parent process brings the bundle to fontconfig before it builds the
+// shared font list (InitSharedFontListForPlatform).
+//
+// A page's screenshot goes to the parent as a font file and an index, and the
+// parent makes the font again from them with
+// UnscaledFontFontconfig::CreateFromFontDescriptor, which asks fontconfig
+// whether the file is a font it knows and, when it is not, uses the file of the
+// best match instead. The bundle is <GRE>/fonts and fontconfig learns of a
+// directory only from ActivateBundledFonts (FcConfigAppFontAddDir). Under
+// bundle-only the parent returned from InitSharedFontListForPlatform with the
+// shared list built from the manifest before it got there, so on a host that
+// does not have the bundle installed (a CI runner) every bundled face came back
+// as some other file of the host.
+//
+// This suite runs in the process of the gtests, which is the parent
+// (XRE_IsParentProcess, asserted below), and bundle-only is not a mode to enter:
+// gfxPlatformFontList sets it in its constructor, in every process of this
+// build. What the test needs is the font list built, and
+// gfxPlatform::GetPlatform() builds it through the same InitFontList the
+// product runs.
+namespace {
+
+struct BundleFace {
+  nsCString mFile;  // the name in the manifest
+  nsCString mPath;  // where the bundle puts it: <GRE>/fonts/<name>
+  uint32_t mIndex;
+};
+
+class StealthFcBundleFonts : public ::testing::Test {
+ protected:
+  static void SetUpTestSuite() {
+    gfxPlatform::GetPlatform();
+    // Waits for the font list, if it is built on its own thread.
+    gfxPlatformFontList::PlatformFontList();
+  }
+
+  static nsTArray<BundleFace> BundleFaces(nsCString& aUnresolved) {
+    nsTArray<BundleFace> out;
+    StealthBundleFontList* bundle = StealthBundleFontList::Get();
+    for (const auto& family : bundle->Families()) {
+      nsTArray<mozilla::fontlist::Face::InitData> faces;
+      bundle->GetFaces(family.mName, faces);
+      for (const auto& face : faces) {
+        BundleFace f;
+        f.mFile = face.mDescriptor;
+        f.mIndex = face.mIndex;
+        if (!StealthBundleFontList::GetFacePath(f.mFile, f.mPath)) {
+          aUnresolved.AppendPrintf(" %s", f.mFile.get());
+          continue;
+        }
+        out.AppendElement(std::move(f));
+      }
+    }
+    return out;
+  }
+};
+
+}  // namespace
+
+TEST_F(StealthFcBundleFonts, TheFontOfAFileOfTheBundleIsMadeFromThatFile)
+{
+  using mozilla::gfx::UnscaledFontFontconfig;
+
+  ASSERT_TRUE(XRE_IsParentProcess());
+  gfxPlatformFontList* list = gfxPlatformFontList::PlatformFontList();
+  ASSERT_TRUE(list);
+  ASSERT_TRUE(list->StealthBundleOnly());
+
+  nsCString unresolved;
+  nsTArray<BundleFace> faces = BundleFaces(unresolved);
+  ASSERT_TRUE(unresolved.IsEmpty()) << "no path in <GRE>/fonts for:"
+                                    << unresolved.get();
+  ASSERT_FALSE(faces.IsEmpty());
+
+  // A file with one face in the manifest has no other index to be taken for.
+  // A collection (.ttc) names several faces, and which of them fontconfig
+  // answers with is not this test's question; its file is.
+  std::map<std::string, int> facesOfFile;
+  for (const auto& f : faces) {
+    ++facesOfFile[f.mPath.get()];
+  }
+
+  size_t wrongFile = 0, wrongIndex = 0, none = 0;
+  nsCString firstWrong;
+  for (const auto& f : faces) {
+    RefPtr<mozilla::gfx::UnscaledFont> font =
+        UnscaledFontFontconfig::CreateFromFontDescriptor(
+            reinterpret_cast<const uint8_t*>(f.mPath.get()), f.mPath.Length(),
+            f.mIndex);
+    if (!font) {
+      ++none;
+      continue;
+    }
+    ASSERT_TRUE(font->GetType() == mozilla::gfx::FontType::FONTCONFIG);
+    auto* fc = static_cast<UnscaledFontFontconfig*>(font.get());
+    if (fc->GetFile() != f.mPath.get()) {
+      if (!wrongFile++) {
+        firstWrong.AppendPrintf("%s became %s", f.mPath.get(),
+                                fc->GetFile().c_str());
+      }
+    } else if (facesOfFile[f.mPath.get()] == 1 && fc->GetIndex() != f.mIndex) {
+      ++wrongIndex;
+    }
+  }
+  EXPECT_EQ(0u, none) << "faces fontconfig did not answer for";
+  EXPECT_EQ(0u, wrongFile) << "of " << faces.Length()
+                           << " faces of the bundle the parent made from "
+                              "another file; the first: "
+                           << firstWrong.get();
+  EXPECT_EQ(0u, wrongIndex);
+}
+
+// The other question, apart from the file: a collection (.ttc) holds several
+// faces, and the descriptor of one is the path and the index of that face. The
+// parent has to make the face it was told (Cambria Math is index 1 of
+// cambria6_99.ttc, not Cambria), or WebRender draws another face of the file.
+TEST_F(StealthFcBundleFonts, EachFaceOfACollectionIsMadeWithItsOwnIndex)
+{
+  using mozilla::gfx::UnscaledFontFontconfig;
+
+  ASSERT_TRUE(XRE_IsParentProcess());
+  ASSERT_TRUE(gfxPlatformFontList::PlatformFontList());
+
+  nsCString unresolved;
+  nsTArray<BundleFace> faces = BundleFaces(unresolved);
+  ASSERT_TRUE(unresolved.IsEmpty()) << "no path in <GRE>/fonts for:"
+                                    << unresolved.get();
+
+  std::map<std::string, int> facesOfFile;
+  for (const auto& f : faces) {
+    ++facesOfFile[f.mPath.get()];
+  }
+
+  size_t collectionFaces = 0, wrong = 0;
+  nsCString report;
+  for (const auto& f : faces) {
+    if (facesOfFile[f.mPath.get()] < 2) {
+      continue;
+    }
+    ++collectionFaces;
+    RefPtr<mozilla::gfx::UnscaledFont> font =
+        UnscaledFontFontconfig::CreateFromFontDescriptor(
+            reinterpret_cast<const uint8_t*>(f.mPath.get()), f.mPath.Length(),
+            f.mIndex);
+    if (!font) {
+      ++wrong;
+      report.AppendPrintf("\n  %s index %u: no font", f.mFile.get(), f.mIndex);
+      continue;
+    }
+    ASSERT_TRUE(font->GetType() == mozilla::gfx::FontType::FONTCONFIG);
+    auto* fc = static_cast<UnscaledFontFontconfig*>(font.get());
+    if (fc->GetFile() != f.mPath.get()) {
+      ++wrong;
+      report.AppendPrintf("\n  %s index %u: came back from the file %s",
+                          f.mFile.get(), f.mIndex, fc->GetFile().c_str());
+    } else if (fc->GetIndex() != f.mIndex) {
+      ++wrong;
+      report.AppendPrintf("\n  %s: expected index %u, got index %u",
+                          f.mFile.get(), f.mIndex, fc->GetIndex());
+    }
+  }
+  // The bundle has collections (cambria6_99.ttc, msgothic5_32.ttc, ...): none
+  // would make the loop above prove nothing.
+  ASSERT_GT(collectionFaces, 0u);
+  EXPECT_EQ(0u, wrong) << wrong << " of " << collectionFaces
+                       << " faces of collections were not made as asked:"
+                       << report.get();
 }
