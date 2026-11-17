@@ -744,6 +744,10 @@ def group_bootstrap():
                 'echo "deb [trusted=yes] file:$DEPS/debs ./" > /etc/apt/sources.list' in bootstrap
                 and "/etc/apt/sources.list.d/*.sources" in bootstrap and "ubuntu.com" not in bootstrap
                 and download < bootstrap.index("> /etc/apt/sources.list") < bootstrap.index('"${PACKAGES[@]}"')))
+    out.append(("bootstrap: the archive's packages go through apt_install, which keeps apt's whole answer for a failure, not through an "
+                "install whose output goes to /dev/null (runs 44137637832 and 44139666991 said only 'held broken packages')",
+                'apt_install "${PACKAGES[@]}"' in bootstrap and '"${PACKAGES[@]}" >/dev/null' not in bootstrap
+                and bootstrap.index("apt_install() {") < bootstrap.index('apt_install "${PACKAGES[@]}"')))
     out.append(("bootstrap: a failed index stops it, by name",
                 bootstrap.count("apt-get update -qq -o APT::Update::Error-Mode=any") == 2 and "apt-get update -qq\n" not in bootstrap))
     out.append(("bootstrap: every download by version and sha256, nothing else fetched, the runner's version pinned",
@@ -1340,6 +1344,39 @@ def group_node_deps():
     words = done.stdout.splitlines()
     out.append(("node deps: the runner's call gives fetch four words, the direct address the fourth (%s)" % words,
                 words[:1] == ["4"] and done.stdout.endswith("https://github.com/actions/runner/releases/download/v9/actions-runner-linux-x64-9.tar.gz")))
+    # apt_install as bash runs it, with apt, dpkg and the rest faked: a refusal of apt says which package, which dependency, which version
+    # is installed against the archive's, and exits with apt's code; an install that works says nothing.
+    begin = bootstrap.index("apt_install() {")
+    apt_install = bootstrap[begin:bootstrap.index("\n}\n", begin) + 3]
+    refusal = ["Reading package lists...", "Some packages could not be installed.", "The following packages have unmet dependencies:",
+               " libc6-dev : Depends: libc6 (= 2.39-0ubuntu8.3) but 2.39-0ubuntu8.6 is to be installed",
+               "E: Unable to correct problems, you have held broken packages."]
+    fakes = [
+        "apt-get() {",
+        '  case " $* " in *" -s "*) echo "Investigating (0) libc6-dev:amd64 < none -> 2.39-0ubuntu8.3 @un puN Ib >"; return 100;; esac',
+        '  if [ "$APT_ANSWER" = 0 ]; then return 0; fi',
+        "  printf '%s\\n' " + " ".join(shlex.quote(line) for line in refusal) + "; return 100",
+        "}",
+        'dpkg-query() { echo "dpkg-query $*"; }',
+        'apt-cache() { echo "apt-cache $*"; }',
+        "apt-mark() { :; }",
+        "systemctl() { echo inactive; }"]
+    said = {}
+    for answer in ("100", "0"):
+        script = "\n".join(["set -euo pipefail", "APT_ANSWER=%s" % answer] + fakes + [apt_install, "apt_install sudo git", "echo went-on"])
+        said[answer] = subprocess.run(["bash", "-c", script], capture_output=True, text=True, timeout=30)
+    refused, fine = said["100"], said["0"]
+    out.append(("node deps: apt refuses the archive: the bootstrap says the unmet dependency, the solver's account, the version of each "
+                "package apt named installed and in the archive, and exits with apt's code, its E: line last (%d: %s)"
+                % (refused.returncode, refused.stderr.strip()[-300:]),
+                refused.returncode == 100 and "went-on" not in refused.stdout
+                and " libc6-dev : Depends: libc6 (= 2.39-0ubuntu8.3) but 2.39-0ubuntu8.6 is to be installed" in refused.stderr
+                and "Investigating (0) libc6-dev" in refused.stderr
+                and re.search(r"^dpkg-query -W .* libc6 libc6-dev$", refused.stderr, re.M) is not None
+                and re.search(r"^apt-cache policy libc6 libc6-dev$", refused.stderr, re.M) is not None
+                and refused.stderr.rstrip().endswith("E: Unable to correct problems, you have held broken packages.")))
+    out.append(("node deps: an install that works says nothing and the bootstrap goes on (%d)" % fine.returncode,
+                fine.returncode == 0 and fine.stdout == "went-on\n" and fine.stderr == ""))
     return out
 
 
@@ -2167,6 +2204,23 @@ def provisioned_timed(api, gh, ssh):
             return str(exc), clock.now - before
 
 
+def provisioned_saying(api, gh, ssh):
+    """provision() of the run's node: (error text or '', what it said to stderr, also when it failed)."""
+    clock = Clock()
+    latitude = t.Latitude(PROJECT, KEY, api, clock.sleep)
+    github = t.GitHub("o/r", "TOKEN", "ADMIN", gh, clock.sleep)
+    sink = io.StringIO()
+    with tempfile.TemporaryDirectory() as tmp, contextlib.redirect_stderr(sink):
+        key = Path(tmp) / "node_key"
+        key.write_text("private", encoding="utf-8")
+        Path(str(key) + ".pub").write_text("ssh-ed25519 AAAA ci-node\n", encoding="utf-8")
+        try:
+            t.provision(latitude, github, 5, 1, lambda host, port: ssh, lambda: key, clock, clock.sleep)
+            return "", sink.getvalue()
+        except t.NodeError as exc:
+            return str(exc), sink.getvalue()
+
+
 def group_bootstrap_retry():
     """A bootstrap that fails for the network is asked again on the SAME server (the hour is paid), up to BOOTSTRAP_RETRY_CAP_S; any other
     failure is final at once. Runs of 2026-11-04 and 2026-11-08 deleted a server and paid a new hour for each 502 or 504."""
@@ -2184,6 +2238,16 @@ def group_bootstrap_retry():
     out.append(("retry: it waits between attempts, one pause each", seconds >= 3 * t.BOOTSTRAP_RETRY_PAUSE_S))
     out.append(("retry: the host key is read from the attempt that went through",
                 any(call == ("pin", HOST_KEY) for call in ssh.calls)))
+
+    api, gh = FakeLatitude(), FakeGitHub()
+    answer = ("".join("line %03d of apt's account\n" % i for i in range(80))
+              + "node_bootstrap: ERROR: apt-get install exited 100:\nE: Unable to correct problems, you have held broken packages.\n")
+    ssh = BootstrapSsh([(100, "", answer)])
+    error, said = provisioned_saying(api, gh, ssh)
+    out.append(("retry: a failed bootstrap's whole stderr reaches the log, the error keeps its tail (runs 44137637832 and 44139666991 kept "
+                "only apt's last line)",
+                "line 000 of apt's account" in said and "line 079 of apt's account" in said and "held broken packages" in error
+                and "line 000" not in error and ssh.bootstraps == 1 and api.deleted == ["dpl_x"]))
 
     api, gh = FakeLatitude(), FakeGitHub()
     ssh = BootstrapSsh([(1, "", "node_bootstrap: ERROR: missing: git")])
