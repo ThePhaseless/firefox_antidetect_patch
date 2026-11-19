@@ -56,6 +56,7 @@
   "scripts/ci/test_cache_rules.py": "100644",
   "scripts/ci/test_ci.py": "100644",
   "scripts/ci/test_gate_geoip.py": "100644",
+  "scripts/ci/test_gate_intermediates.py": "100644",
   "scripts/ci/test_gate_protocol_mirror.py": "100644",
   "scripts/ci/test_latitude_node.py": "100644",
   "scripts/ci/test_link_pin.py": "100644",

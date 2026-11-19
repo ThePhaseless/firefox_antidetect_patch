@@ -276,6 +276,8 @@
  "python/mozbuild/mozbuild/frontend/data.py": 3,
  "python/mozbuild/mozbuild/jar.py": 3,
  "remote/marionette/atom.sys.mjs": 5,
+ "security/manager/ssl/RemoteSecuritySettings.sys.mjs": 3,
+ "security/manager/ssl/moz.build": 1,
  "security/manager/ssl/nsCertOverrideService.cpp": 6,
  "security/manager/ssl/nsNSSCallbacks.cpp": 2,
  "security/sandbox/linux/broker/SandboxBrokerPolicyFactory.cpp": 10,
