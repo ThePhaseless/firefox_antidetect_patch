@@ -45,12 +45,12 @@ jobs:
       # step: it means a check did not read the tree.
       # The core is pinned by commit, like the actions: a core change cannot turn
       # this check red with no engine change. A port moves it to the core commit
-      # made for that Firefox (today 66.75.0, the core of firefox-66 with its seal: the screenshot draws the bundled fonts
-      # with their own outlines on Linux).
+      # made for that Firefox (today 67.77.0, the core of firefox-67 with its seal: the intermediate certificates are
+      # declared by the core).
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           repository: oss-invisible/core
-          ref: dcf0dc3cc9fed1ee9ecbf60e9b35c3b3ef0b4a0d
+          ref: b64d9e4eacd060f6ba3a072e700a515a2bca3590
           path: core
           persist-credentials: false
       - run: pip install -e "./core[dev]"
