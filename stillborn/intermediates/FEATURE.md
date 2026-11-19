@@ -2,7 +2,7 @@
 
 Category: build, stillborn
 Prefs: zoom.stealth.intermediates.file
-Test: security/manager/ssl/stealth/test/run_stealth_intermediates_gate.py (cases with, without, poller, category; a step of the gate job of gate.yml, on linux-x86_64 and win-x86_64, with `$FF_EXE -xpcshell`)
+Test: security/manager/ssl/stealth/test/run_stealth_intermediates_gate.py (cases with, without, poller, category, settles; a step of the gate job of gate.yml, on linux-x86_64 and win-x86_64, with `$FF_EXE -xpcshell`); juggler/tests/the_client_gets_nothing_before_the_intermediates_are_written.test.mjs (node, in the candidate's node step); scripts/ci/test_gate_intermediates.py (the jobs of gate.yml set the list from the wrapper's pin; run by scripts/ci/test_ci.py)
 
 ## What it does
 
@@ -35,7 +35,48 @@ list into cert_storage before any window.
 - `addCerts` dispatches the write to cert_storage's own serial queue and returns:
   a verification asked in the same turn finds the intermediate only if the write
   task has taken the lock first (`cert_storage/src/lib.rs`: `AddCerts`,
-  `SecurityStateTask::run`, `FindCertsBySubject`). Nothing orders the two.
+  `SecurityStateTask::run`, `FindCertsBySubject`). Nothing in Mozilla's code orders
+  the two, and the engine adds nothing there (no wait on the main thread, no hook
+  in the Rust of cert_storage).
+
+## whenLoaded and the wait of Juggler
+
+`StealthIntermediates.whenLoaded` is a promise that resolves when the list of the
+last `load()` is in cert_storage: at `addCerts`' callback; at once when there is
+nothing to write (no pref, a file that does not read, a format that is not ours,
+anything that threw); after 30 s (`WRITE_TIMEOUT_MS`) if the callback never comes.
+It is never rejected and never left pending. Before the first `load()` it is
+already resolved (nothing is being written, so a module that is loaded but never
+started, as in a build without the component, does not hang whoever waits).
+`load()` runs at `profile-after-change`, before the command line handlers, so the
+waiter below always sees the promise of the real load. `lastLoad` stays as the
+evidence of the times.
+
+The waiter is Juggler (`juggler/components/Juggler.js`, the `final-ui-startup`
+branch of `observe`), the only way a client reaches the browser: it reads
+`whenLoaded` after the pipe and the dispatcher exist and before it writes the
+line the client waits for (`Juggler listening to the pipe`, the readiness
+Playwright reads on stdout), and until the promise has settled `receiveMessage`
+of the pipe keeps every message in order and hands it to the dispatcher after
+it. So a client that waits for the line, and one that does not, can send no
+command (no `Browser.enable`, no `Browser.newPage`, no navigation) before the
+list is written. The write runs in parallel to the start of the browser (it
+takes a few milliseconds against a start of seconds), so a normal start pays
+nothing. If the module cannot be imported Juggler says so (`say`) and does not
+wait. Test (node): `juggler/tests/the_client_gets_nothing_before_the_intermediates_are_written.test.mjs`;
+with the `await whenIntermediatesLoaded` line removed its tests on the readiness
+line and on the held messages are red.
+
+## Mozilla's test_intermediate_preloads.js
+
+`security/manager/ssl/tests/unit/test_intermediate_preloads.js` is not valid in
+this tree and does not run in our CI. Its `IntermediatePreloads` is the class whose
+constructor now returns first thing, so `IntermediatePreloadsClient.client` is
+never created, and the test's `syncAndDownload` (and every helper that calls it)
+uses `IntermediatePreloadsClient.client.db`: the client it needs does not exist.
+Nothing in the engine replaces it; what it checked (that the downloaded list lets
+a chain verify) is checked by the cases `with` and `without` below against the
+list the core declares.
 
 The pref is read at `profile-after-change`, so it must be in the profile
 (`user.js` or the command line) at launch: a value that arrives later by the
@@ -54,15 +95,19 @@ format (the intermediate among filler certificates of the same root) and runs on
 `firefox -xpcshell stealth_intermediates_case.js` per case, each with its own empty
 profile:
 
-- `with`: the component is called the way the category calls it and the
-  verification of the leaf is asked at once, without waiting for the callback of
-  `addCerts`: it must succeed.
+- `with`: the component is called the way the category calls it, then
+  `StealthIntermediates.whenLoaded` is awaited (the promise Juggler awaits) and the
+  verification of the leaf is asked: it must succeed, every time, and the write
+  must have ended with NS_OK.
 - `without`: same verification with no pref: `SEC_ERROR_UNKNOWN_ISSUER`.
 - `poller`: `RemoteSecuritySettings.init()` and one poll of a local server whose
   feed lists `security-state/intermediates` and `security-state/onecrl`: no request
   whose path contains `intermediates`, and a request for onecrl carrying the feed's
   own timestamp (the poller is alive).
 - `category`: `profile-after-change` has the entry `StealthIntermediates`.
+- `settles`: `whenLoaded` is resolved before any load and after a load with no
+  pref, with a file that does not exist and with a format that is not ours (and
+  after the list): within 10 s each, never rejected, never pending.
 
 The package has the xpcshell shell but not the harness, so the script sets the
 profile directory provider up by hand. The gate step checks the series out at the

@@ -113,6 +113,12 @@ jobs:
       - name: The GeoIP database (made by the repository, same bytes every run)
         shell: bash
         run: python scripts/ci_lab_geoip.py build --pin ci/geoip.json
+      # The list of intermediate certificates comes from the wrapper's pin (scripts/ci_lab_intermediates.py, ci/intermediates.pin.json), never from
+      # Mozilla's servers: the script writes STEALTHFOX_INTERMEDIATES into the environment of every later step of the job, so the launches of the
+      # wrapper's tests carry the same list every run.
+      - name: The intermediates list (set by the repository, same bytes every run)
+        shell: bash
+        run: python scripts/ci_lab_intermediates.py set --pin ci/intermediates.pin.json
       - name: Install Playwright driver (no bundled browser — we override executable_path)
         # Pin from a SINGLE source (scripts/playwright_pin.txt) so release.yml and
         # verify-assets.yml can't drift to different versions. The drive gate then
@@ -436,6 +442,12 @@ jobs:
       - name: The GeoIP database (made by the repository, same bytes every run)
         shell: bash
         run: python scripts/ci_lab_geoip.py build --pin ci/geoip.json
+      # The list of intermediate certificates comes from the wrapper's pin (scripts/ci_lab_intermediates.py, ci/intermediates.pin.json), never from
+      # Mozilla's servers: the script writes STEALTHFOX_INTERMEDIATES into the environment of every later step of the job, so the launches of the
+      # wrapper's tests carry the same list every run.
+      - name: The intermediates list (set by the repository, same bytes every run)
+        shell: bash
+        run: python scripts/ci_lab_intermediates.py set --pin ci/intermediates.pin.json
       - name: Linux system deps (Firefox runtime libs, a virtual display)
         if: matrix.kind == 'linux'
         run: |

@@ -12,9 +12,12 @@
 //
 // Cases (ST_CASE):
 //   with      the pref names the list; the component is called the way the
-//             profile-after-change category calls it; the verification of a
-//             leaf that only the preloaded intermediate completes is asked at
-//             once, in the same turn, without waiting for addCerts' callback.
+//             profile-after-change category calls it; then StealthIntermediates
+//             .whenLoaded is awaited, the very promise Juggler awaits before it
+//             tells the client the browser is ready, and the verification of a
+//             leaf that only the preloaded intermediate completes must succeed.
+//             (Asked in the same turn, with no wait, the verification can
+//             precede cert_storage's write: nothing orders the two.)
 //   without   the same verification with no pref: the intermediate comes from
 //             the list or from nowhere, so it must fail with UNKNOWN_ISSUER.
 //   poller    RemoteSecuritySettings.init() and one poll of the changes feed of
@@ -22,6 +25,9 @@
 //             security-state/onecrl: no request may touch the intermediates,
 //             and the poller must have asked for onecrl (it is alive).
 //   category  profile-after-change names the component.
+//   settles   whenLoaded is resolved before any load, and after a load with no
+//             pref, with a file that does not exist and with a file in a format
+//             that is not ours: it is never left pending, never rejected.
 //
 // Environment: ST_CASE, ST_OUT (result file), ST_PROFILE (empty directory),
 // ST_FIXTURE (JSON: root, leaf, hostname, listFile), ST_MODULE_DIR (optional,
@@ -135,7 +141,14 @@ async function caseWithOrWithout(fixture, withPref) {
       componentProblem = " (" + e.message + ")";
     }
   }
-  // The same turn: nothing waits for the callback of addCerts.
+  let waited = null;
+  if (withPref) {
+    // What Juggler does before the client can send a command.
+    const { StealthIntermediates } = ChromeUtils.importESModule(moduleUrl());
+    const t0 = ChromeUtils.now();
+    await StealthIntermediates.whenLoaded;
+    waited = ChromeUtils.now() - t0;
+  }
   const prErrorCode = await verifyLeaf(certdb, leaf, fixture.hostname);
   let last = null;
   try {
@@ -152,12 +165,17 @@ async function caseWithOrWithout(fixture, withPref) {
         count: last.count,
         load_result: last.result,
         done_ms: last.doneMs,
+        when_loaded_wait_ms: waited,
       }
     : null;
   if (withPref) {
     return {
-      ok: prErrorCode === 0,
-      detail: "verification asked at once after the load ended with " + prErrorCode,
+      ok: prErrorCode === 0 && !!last && last.result === Cr.NS_OK,
+      detail:
+        "verification after whenLoaded ended with " +
+        prErrorCode +
+        ", the write ended with " +
+        (last ? last.result : "no record"),
       prErrorCode,
       evidence,
     };
@@ -207,6 +225,69 @@ async function casePoller() {
   };
 }
 
+// A promise that is not settled within ms is a hang, said as such.
+function settlesWithin(promise, ms) {
+  const { setTimeout, clearTimeout } = ChromeUtils.importESModule(
+    "resource://gre/modules/Timer.sys.mjs"
+  );
+  return new Promise(resolve => {
+    const timer = setTimeout(() => resolve("pending"), ms);
+    promise.then(
+      () => {
+        clearTimeout(timer);
+        resolve("resolved");
+      },
+      () => {
+        clearTimeout(timer);
+        resolve("rejected");
+      }
+    );
+  });
+}
+
+async function caseSettles(fixture) {
+  const { StealthIntermediates } = ChromeUtils.importESModule(moduleUrl());
+  const steps = [];
+  const record = async (label, expectedResult) => {
+    const state = await settlesWithin(StealthIntermediates.whenLoaded, 10000);
+    const result = StealthIntermediates.lastLoad?.result;
+    steps.push({
+      label,
+      state,
+      result: String(result),
+      ok:
+        state === "resolved" &&
+        (expectedResult === undefined ||
+          String(result).startsWith(expectedResult)),
+    });
+  };
+  // Before any load of this process. (A module the component has already
+  // started has a record; the check is then the one of the next steps.)
+  if (!StealthIntermediates.lastLoad) {
+    await record("before any load");
+  }
+  Services.prefs.clearUserPref(PREF_FILE);
+  StealthIntermediates.load();
+  await record("no pref", "skipped");
+  StealthIntermediates.load(
+    PathUtils.join(env("ST_PROFILE"), "there-is-no-such-file.json")
+  );
+  await record("a file that does not exist", "error");
+  const wrong = PathUtils.join(env("ST_PROFILE"), "wrong-format.json");
+  await IOUtils.writeUTF8(wrong, JSON.stringify({ format: 99, certs: [] }));
+  StealthIntermediates.load(wrong);
+  await record("a format that is not ours", "error");
+  StealthIntermediates.load(fixture.listFile);
+  await record("the list", String(Cr.NS_OK));
+  return {
+    ok: steps.every(step => step.ok),
+    detail: steps
+      .map(step => step.label + ": " + step.state + " (" + step.result + ")")
+      .join("; "),
+    steps,
+  };
+}
+
 function caseCategory() {
   const entries = [];
   for (const entry of Services.catMan.enumerateCategory(
@@ -237,6 +318,8 @@ async function main() {
       return casePoller();
     case "category":
       return caseCategory();
+    case "settles":
+      return caseSettles(fixture);
     default:
       throw new Error("unknown case " + which);
   }

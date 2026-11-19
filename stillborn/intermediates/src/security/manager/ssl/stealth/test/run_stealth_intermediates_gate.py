@@ -5,7 +5,7 @@
 """The test of the intermediates the core declares, against a built engine.
 
     python run_stealth_intermediates_gate.py <firefox binary> [--module-dir DIR]
-                                             [--cases with,without,poller,category]
+                                             [--cases with,without,poller,category,settles]
 
 Each case is one `firefox -xpcshell stealth_intermediates_case.js` process with
 its own empty profile (stealth_intermediates_case.js says what each case asks).
@@ -40,7 +40,7 @@ import urllib.parse
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CASE_SCRIPT = os.path.join(HERE, "stealth_intermediates_case.js")
-ALL_CASES = ["with", "without", "poller", "category"]
+ALL_CASES = ["with", "without", "poller", "category", "settles"]
 HOSTNAME = "intermediates.example.test"
 TIMEOUT_S = 180
 # The timestamps the fake feed gives the two collections: far from anything a

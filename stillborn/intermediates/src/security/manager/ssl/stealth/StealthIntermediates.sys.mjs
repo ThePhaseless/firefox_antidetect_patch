@@ -23,13 +23,26 @@
 // downloaded certificates (same nsICertInfo shape, TRUST_INHERIT). Any error
 // is one line in the console and nothing else: a browser that starts without
 // the list is a browser that verifies like a fresh profile, not a broken one.
+//
+// addCerts returns before the write: cert_storage does it on its own thread, and
+// a verification asked in between may not see the list. Nothing here waits for
+// it on the main thread; whenLoaded says when it is done, and Juggler
+// (components/Juggler.js) does not tell the client the browser is ready, and does
+// not hand it a command, before that promise has settled. The write runs in
+// parallel to the start of the browser, so the wait costs nothing in a normal
+// start.
 
 const PREF_FILE = "zoom.stealth.intermediates.file";
 const FORMAT = 1;
+// A write that has not called back by now is a broken cert_storage; whoever
+// waits for whenLoaded goes on rather than hang for ever.
+const WRITE_TIMEOUT_MS = 30000;
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
   NetUtil: "resource://gre/modules/NetUtil.sys.mjs",
+  clearTimeout: "resource://gre/modules/Timer.sys.mjs",
+  setTimeout: "resource://gre/modules/Timer.sys.mjs",
 });
 
 class CertInfo {
@@ -65,6 +78,19 @@ export const StealthIntermediates = {
   // done is a promise that settles when the write to cert_storage has ended.
   lastLoad: null,
 
+  // Resolves when the list of the last load() is in cert_storage: at addCerts'
+  // callback, at once when there is nothing to write (no pref, a file that does
+  // not read, a format that is not ours, anything that threw) and after
+  // WRITE_TIMEOUT_MS if the callback never comes. Never rejected, never left
+  // pending. Before the first load() it is already resolved: nothing is being
+  // written, so whoever asks has nothing to wait for (a module that is loaded
+  // but never started, as in a build without the component, must not hang its
+  // waiters). The component calls load() at profile-after-change, before any
+  // command line handler, so a waiter that asks later sees the real promise.
+  get whenLoaded() {
+    return this.lastLoad ? this.lastLoad.done : Promise.resolve();
+  },
+
   // The engine never creates the Remote Settings collection of intermediates,
   // with or without the pref: the list is declared, not downloaded.
   ownsPreloads() {
@@ -74,7 +100,7 @@ export const StealthIntermediates = {
   /**
    * Reads the declared list and writes it to cert_storage. Synchronous up to
    * the call to addCerts, which dispatches the write to cert_storage's own
-   * thread and returns; the callback settles lastLoad.done.
+   * thread and returns; the callback settles lastLoad.done (whenLoaded).
    *
    * @param {string} [path] a file to read instead of the one the pref names
    * @returns {object} the record that is also stored in lastLoad
@@ -122,14 +148,35 @@ export const StealthIntermediates = {
         Ci.nsICertStorage
       );
       record.done = new Promise(resolve => {
-        certStorage.addCerts(infos, rv => {
-          record.result = rv;
-          record.doneMs = ChromeUtils.now() - t2;
-          if (rv != Cr.NS_OK) {
-            console.error("StealthIntermediates: addCerts failed: " + rv);
+        let timer = null;
+        const settle = (rv, why) => {
+          if (timer) {
+            lazy.clearTimeout(timer);
+            timer = null;
           }
-          resolve(rv);
-        });
+          if (record.result === "") {
+            record.result = rv;
+            record.doneMs = ChromeUtils.now() - t2;
+            if (why) {
+              console.error("StealthIntermediates: " + why);
+            }
+          }
+          resolve(record.result);
+        };
+        timer = lazy.setTimeout(
+          () => settle("error: timeout", "addCerts did not call back"),
+          WRITE_TIMEOUT_MS
+        );
+        try {
+          certStorage.addCerts(infos, rv => {
+            settle(
+              rv,
+              rv != Cr.NS_OK ? "addCerts failed: " + rv : ""
+            );
+          });
+        } catch (e) {
+          settle("error: " + e, "" + e);
+        }
       });
       record.addCertsMs = ChromeUtils.now() - t2;
     } catch (e) {
