@@ -1,0 +1,53 @@
+{
+ "modified": [
+  "security/manager/ssl/RemoteSecuritySettings.sys.mjs",
+  "security/manager/ssl/moz.build"
+ ],
+ "added": {
+  "security/manager/ssl/stealth/StealthIntermediates.sys.mjs": "100644",
+  "security/manager/ssl/stealth/components.conf": "100644",
+  "security/manager/ssl/stealth/moz.build": "100644",
+  "security/manager/ssl/stealth/test/run_stealth_intermediates_gate.py": "100644",
+  "security/manager/ssl/stealth/test/stealth_intermediates_case.js": "100644"
+ },
+ "inventory": [
+  {
+   "file": "security/manager/ssl/RemoteSecuritySettings.sys.mjs",
+   "category": "stillborn",
+   "feature": "intermediates-declared",
+   "prefs": [
+    "zoom.stealth.intermediates.file"
+   ],
+   "added": 3,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "IntermediatePreloads constructor (first statement)",
+   "evidence": [],
+   "notes": "Early return at the top of the constructor, with or without the pref: the engine never creates the security-state/intermediates client, so it registers no poller client, no sync observer and no poll-end observer, and no request is made for the collection. Mozilla's lines are untouched; the logic is in security/manager/ssl/stealth/StealthIntermediates.sys.mjs. The list comes from a file the core declares, written to cert_storage on profile-after-change by the component of that folder.",
+   "verifier": {
+    "changed": [],
+    "why": "Added 2026-11-19 with the declared intermediates."
+   }
+  },
+  {
+   "file": "security/manager/ssl/moz.build",
+   "category": "build",
+   "feature": "intermediates-declared",
+   "prefs": [],
+   "added": 1,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "after the DIRS list",
+   "evidence": [],
+   "notes": "Hook building security/manager/ssl/stealth, which registers our profile-after-change component and installs StealthIntermediates.sys.mjs.",
+   "verifier": {
+    "changed": [],
+    "why": "Added 2026-11-19 with the declared intermediates."
+   }
+  }
+ ]
+}

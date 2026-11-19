@@ -142,6 +142,28 @@ jobs:
           chmod +x "$EXE" 2>/dev/null || true
           echo "FF_EXE=$EXE" >> "$GITHUB_ENV"
           echo "located: $EXE"
+      # THE INTERMEDIATES THE CORE DECLARES COME FROM ITS FILE AND FROM NOWHERE ELSE, ON THIS BINARY. A retail Firefox downloads the
+      # collection of intermediate certificates from Remote Settings once the browser is idle; the engine never creates that
+      # collection and writes the same list into cert_storage at profile-after-change from the file the pref
+      # zoom.stealth.intermediates.file names. The test is `firefox -xpcshell` (the package has the shell, not the xpcshell harness),
+      # driven by a script that makes a root, an intermediate and a leaf on every run, and asks four things: a leaf only the declared
+      # intermediate completes verifies when the verification is asked right after the component loads the list; the same
+      # verification with no pref fails with SEC_ERROR_UNKNOWN_ISSUER; a poll of a local settings server that lists the intermediates
+      # makes no request that touches them (and does ask for onecrl, so the poller is alive); the component is registered under
+      # profile-after-change. It lives in the series (stillborn/intermediates), so the series is checked out at the commit under test.
+      - name: Checkout the series (the test of the declared intermediates lives in it)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ github.sha }}
+          path: engine-series
+          sparse-checkout: stillborn/intermediates/src/security/manager/ssl/stealth/test
+          fetch-depth: 1
+      - name: THE DECLARED INTERMEDIATES - the engine reads its file, makes no request for the collection
+        shell: bash
+        run: |
+          python -m pip install --quiet "cryptography==44.0.3"
+          python engine-series/stillborn/intermediates/src/security/manager/ssl/stealth/test/run_stealth_intermediates_gate.py "$FF_EXE"
       # THE CORE UNDER TEST AND THE SEAL OF THE BINARY, BEFORE ANYTHING DRIVES IT. The drive gate launches through the
       # wrapper and the core, not through bare Playwright: since firefox-63 the engine holds every channel that asks the
       # proxy service until the client says how the session leaves the host, and only the core's launch says it first
