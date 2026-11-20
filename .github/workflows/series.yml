@@ -52,12 +52,12 @@ jobs:
       # step: it means a check did not read the tree.
       # The core is pinned by commit, like the actions: a core change cannot turn
       # this check red with no engine change. A port moves it to the core commit
-      # made for that Firefox (today release/64.69.0 before its seal: firefox-64 no longer reads the counter pref; it carries
-      # STEALTH_FIREFOX_COMMIT and the WebGL lists of 159).
+      # made for that Firefox (today 67.77.0, the core of firefox-67 with its seal: the intermediate certificates are
+      # declared by the core).
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           repository: oss-invisible/core
-          ref: dc801c298185e45e4081bf9d2fabad642d5f80f7
+          ref: b64d9e4eacd060f6ba3a072e700a515a2bca3590
           path: core
           persist-credentials: false
       - run: pip install -e "./core[dev]"
@@ -83,3 +83,77 @@ jobs:
               print("::error::a core check skipped or none ran: it did not read this tree")
               sys.exit(1)
           EOF
+
+  # Every commit, annotated tag and tagger this event makes public must carry a GitHub
+  # noreply address. Inline, not `uses:`: no job of a workflow a pull request starts may
+  # call another repository's workflow (test_node_jobs_find_their_scripts.py). The steps
+  # are those of oss-invisible/core's reusable workflow; the judge is read from main of
+  # the core, never from the judged branch, and its absence there is an error.
+  noreply-identity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # The repository being judged, with all its history: the range of commits is
+      # computed against its refs. Commits and tags only (`tree:0`) and no file but
+      # .github: with its trees this repository is about 5 GB and the clone did not
+      # finish in 5 minutes (run 44708578369); without them about 300 MB.
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+          filter: tree:0
+          sparse-checkout: /.github/
+          sparse-checkout-cone-mode: false
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          repository: oss-invisible/core
+          ref: main
+          path: .noreply-judge
+          sparse-checkout: scripts/ci_noreply_identity.py
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - name: every address is a GitHub noreply one
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          REF: ${{ github.ref }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.event.after }}
+          SHA: ${{ github.sha }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch || 'main' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          script=.noreply-judge/scripts/ci_noreply_identity.py
+          if [ ! -f "$script" ]; then
+            echo "the judge $script is missing from main of oss-invisible/core" >&2
+            exit 1
+          fi
+          case "$EVENT" in
+            pull_request|pull_request_target)
+              python3 "$script" --event pull_request --base "$BASE_SHA" --head "$HEAD_SHA" --base-ref "$BASE_REF"
+              ;;
+            push)
+              python3 "$script" --event push --ref "$REF" --before "$BEFORE" --after "$AFTER"
+              ;;
+            *)
+              python3 "$script" --event other --head "$SHA" --default-ref "$DEFAULT_BRANCH"
+              ;;
+          esac
+
+  # The verdict of the workflow: the one check to require. It runs when a job failed or
+  # was skipped, and refuses anything but success.
+  gate:
+    needs: [rules, rebuilds, noreply-identity]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: refuse unless every job succeeded
+        run: |
+          echo "rules: ${{ needs.rules.result }}"
+          echo "rebuilds: ${{ needs.rebuilds.result }}"
+          echo "noreply-identity: ${{ needs.noreply-identity.result }}"
+          test "${{ needs.rules.result }}" = "success"
+          test "${{ needs.rebuilds.result }}" = "success"
+          test "${{ needs.noreply-identity.result }}" = "success"

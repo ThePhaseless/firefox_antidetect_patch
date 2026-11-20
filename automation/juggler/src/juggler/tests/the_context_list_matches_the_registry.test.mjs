@@ -146,15 +146,17 @@ function covered(prefs, userContextId) {
 // know (the filter takes the browser proxy for it), the list agrees with the
 // channel filter's view, and its text is the canonical form of the registry's
 // state.
-function assertMatches(registry, prefs, label) {
+// `ended` are the ids of the contexts that closed with a proxy of their own: the filter still answers them with it (GoneContexts) and
+// the list keeps them, for the life of the browser.
+function assertMatches(registry, prefs, label, ended = []) {
   const contexts = [...registry._browserContextIdToBrowserContext.values()];
-  for (const id of [...contexts.map(c => c.userContextId), 4242]) {
+  for (const id of [...contexts.map(c => c.userContextId), ...ended, 4242]) {
     const proxied = registry.proxyFor('site.example', id) !== null;
     assert.equal(covered(prefs, id), proxied,
         `${label}: context ${id}, the filter says ${proxied}, the list is '${prefs.user.get(LIST)}'`);
     assert.equal(registry.proxyRecordFor(id) !== null, proxied, label);
   }
-  const ids = [...new Set(contexts.filter(c => c._proxy).map(c => c.userContextId))].sort((a, b) => a - b);
+  const ids = [...new Set(contexts.filter(c => c._proxy).map(c => c.userContextId).concat(ended))].sort((a, b) => a - b);
   const expected = (registry._browserProxy ? ['*'] : []).concat(ids.map(String)).join(',');
   assert.equal(prefs.user.get(LIST) ?? '', expected, `${label}: canonical form`);
   assert.equal(prefs.user.has(LIST), expected !== '', `${label}: absent when no proxy`);
@@ -210,17 +212,19 @@ test('after every event the list is what the channel filter says', async () => {
   assertMatches(registry, prefs, 'launch proxy replaced');
 
   await a.destroy();
-  assertMatches(registry, prefs, 'a destroyed');
+  const ended = [a.userContextId];
+  assertMatches(registry, prefs, 'a destroyed', ended);
   registry.setNoBrowserProxy();
-  assertMatches(registry, prefs, 'launch proxy removed, b still has one');
-  assert.equal(prefs.user.get(LIST), String(b.userContextId));
+  assertMatches(registry, prefs, 'launch proxy removed, b still has one, a ended with one', ended);
+  assert.equal(prefs.user.get(LIST), `${a.userContextId},${b.userContextId}`);
   assert.equal(covered(prefs, c.userContextId), false, 'c is native again');
 
   await c.destroy();
-  assertMatches(registry, prefs, 'c destroyed (no proxy of its own)');
+  assertMatches(registry, prefs, 'c destroyed (no proxy of its own: not kept)', ended);
   await b.destroy();
-  assertMatches(registry, prefs, 'last proxy gone');
-  assert.equal(prefs.user.has(LIST), false);
+  ended.push(b.userContextId);
+  assertMatches(registry, prefs, 'every context gone: the two that had a proxy stay proxied', ended);
+  assert.equal(prefs.user.get(LIST), `${a.userContextId},${b.userContextId}`);
 });
 
 test('the default context (userContextId 0) is a token like any other', () => {

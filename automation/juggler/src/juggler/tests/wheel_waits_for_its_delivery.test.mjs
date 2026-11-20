@@ -92,7 +92,7 @@ test('the wheel is sent through the APZ route with the delivery callback, and aw
   const wheel = code.slice(code.indexOf("['Page.dispatchWheelEvent']"));
   const body = wheel.slice(0, wheel.indexOf("['Page.insertText']"));
   assert.match(body, /win\.windowUtils\.WHEEL_EVENT_ASYNC_ENABLED/);
-  assert.match(body, /WHEEL_EVENT_ASYNC_ENABLED\s*,\s*delivered\s*,\s*latency/);
+  assert.match(body, /WHEEL_EVENT_ASYNC_ENABLED\s*,\s*delivered\s*,\s*ticket\.tagged \? ticket\.latency\(\) : \(latency \|\| 0\)/);
   const activation = body.indexOf('activateAndRun');
   const closing = body.indexOf('{ muteNotificationsPopup: true }');
   const wait = body.indexOf("this._awaitBounded(deliveredP, 'the wheel event')");

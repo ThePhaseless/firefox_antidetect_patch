@@ -45,7 +45,7 @@ SUITE = re.compile(r"(\S+)\.(  # .*)?")
 # on one platform whose cause the sources do not say.
 LOGGED = {"StealthSessionUdpProxy": "sync,SOCKS-UDP:5,nsHostResolver:5"}
 # Named by the default filter and compiled for one platform only, from run 41402916724's logs.
-NOT_ON = {"linux": {"StealthWebGPUAdapter", "StealthWebGPUInstanceEnv"}, "win": {"StealthWebGPUBundledVulkan"}}
+NOT_ON = {"linux": {"StealthWebGPUAdapter", "StealthWebGPUInstanceEnv"}, "win": {"StealthWebGPUBundledVulkan", "StealthFcBundleFonts"}}
 
 
 def suite_names(listing: str) -> list:

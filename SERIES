@@ -1,3 +1,4 @@
+platform/backports/fontconfig-face-index
 platform/build-config
 platform/build-tools
 platform/ci
@@ -12,6 +13,7 @@ platform/startup-cache
 platform/untrusted-modules
 platform/webrender-memory
 stillborn/api-keys
+stillborn/intermediates
 stillborn/telemetry
 stillborn/updater
 network/doh

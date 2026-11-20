@@ -29,6 +29,7 @@ var SimpleChannel = class SimpleChannel {
     // Set by detachFromPeer, cleared by the READY that attaches this end again.
     this._detached = false;
     this._onReattached = null;
+    this._onReady = null;
     this._paused = false;
     this._disposed = false;
 
@@ -122,6 +123,19 @@ var SimpleChannel = class SimpleChannel {
       return;
     this._ready = false;
     this._detached = true;
+    // What was said to the peer of before is not said again to the peer of
+    // after: the READY that comes replays only what waited while detached
+    // (`sent` false). A "worker ended" said before the cache, whose answer
+    // never came back, was replayed after the restore and ended the worker
+    // the restore had just announced again with the same id. The caller of a
+    // request that waited for an answer is told the peer went away; an answer
+    // that arrives late finds no request and is ignored.
+    for (const [messageId, callback] of this._pendingMessages) {
+      if (!callback.sent)
+        continue;
+      this._pendingMessages.delete(messageId);
+      callback.reject(new Error(`Failed "${callback.methodName}": the other end of channel "${this._name}" went away before it answered.`));
+    }
   }
 
   // Attached to a peer and sending: what a document that goes into the cache can still say.
@@ -139,11 +153,37 @@ var SimpleChannel = class SimpleChannel {
     this._onReattached = callback;
   }
 
+  /**
+   * `callback` runs at every passage of this end to ready: when it meets its
+   * first peer, and again at each READY of another peer (a second actor, a
+   * document restored from the cache), just before the end is ready: what it
+   * says waits in the queue behind what waited already, and goes out after it.
+   * The content end reads there the state the client
+   * declared: it is written into the shared data, and a message to a root with
+   * no actor is never sent (the parent binds a root one hop after its agents
+   * were born), so an end born before the declaration has to ask. The callback
+   * must be idempotent: it runs once per peer.
+   */
+  onReady(callback) {
+    this._onReady = callback;
+  }
+
   _markAsReady() {
     if (this._ready)
       return;
+    // The ready hook runs BEFORE the end is ready: what it says is queued behind what already waited (the agents
+    // said their start at birth: the contexts cleared, the main one), and goes out after it, in order. Said after
+    // the passage to ready it would go out first, and the "cleared" that follows would make the client forget it.
+    if (this._onReady) {
+      // A hook that fails must not keep the queue from going out.
+      try {
+        this._onReady();
+      } catch (e) {
+        dump(`WARNING: the onReady hook of channel "${this._name}" failed: ${e && e.message}\n`);
+      }
+    }
     this._ready = true;
-    // Snapshot first: what the hook sends goes out as it is sent, and must not
+    // Snapshot first: what the reattachment hook sends goes out as it is sent, and must not
     // be sent a second time by the replay below.
     const queued = [...this._pendingMessages.values()];
     if (this._detached) {
@@ -151,8 +191,10 @@ var SimpleChannel = class SimpleChannel {
       if (this._onReattached)
         this._onReattached();
     }
-    for (const { message } of queued)
-      this.transport.sendMessage(message);
+    for (const callback of queued) {
+      callback.sent = true;
+      this.transport.sendMessage(callback.message);
+    }
   }
 
   dispose() {
@@ -216,10 +258,12 @@ var SimpleChannel = class SimpleChannel {
       throw new Error(`ERROR: channel ${this._name} is already disposed! Cannot send "${methodName}" to "${namespace}"`);
     const id = ++this._messageId;
     const message = {requestId: id, uid: this._uid, methodName, params, namespace};
+    // `sent`: it has gone out to the peer this end is attached to (see detachFromPeer).
+    const sent = this._ready;
     const promise = new Promise((resolve, reject) => {
-      this._pendingMessages.set(id, {connectorId, resolve, reject, methodName, namespace, message});
+      this._pendingMessages.set(id, {connectorId, resolve, reject, methodName, namespace, message, sent});
     });
-    if (this._ready)
+    if (sent)
       this.transport.sendMessage(message);
     return promise;
   }

@@ -39,10 +39,13 @@ FEATURES = {
     "stealth-pref-defaults": "platform/prefs",
     "vsdownload-download-watchdog": "platform/build-tools",
     "win-long-build-paths": "platform/build-tools",
+    # platform: commits of Mozilla's repository carried before the tag has them
+    "fontconfig-face-index": "platform/backports/fontconfig-face-index",
     # stillborn
     "updater-refuses": "stillborn/updater",
     "pingsender-session-route": "stillborn/telemetry",
     "api-keys-declared": "stillborn/api-keys",
+    "intermediates-declared": "stillborn/intermediates",
     # network
     "ipv6-literal-connect": "network/ipv6-literal",
     "proxy-udp-egress": "network/proxy-udp",
@@ -169,6 +172,7 @@ OWN_FILES = [
     (r"^js/xpconnect/loader/StealthScriptCache\-inl\.", "platform/script-cache"),
     (r"^toolkit/components/urlformatter/tests/unit/test_stealth_apikeys\.", "stillborn/api-keys"),
     (r"^toolkit/components/urlformatter/StealthApiKeys\.sys\.", "stillborn/api-keys"),
+    (r"^security/manager/ssl/stealth/", "stillborn/intermediates"),
     (r"^juggler/tests/pingsender_route_lives_in_our_file\.test\.", "stillborn/telemetry"),
     (r"^toolkit/components/telemetry/app/StealthPingsender\.sys\.", "stillborn/telemetry"),
     (r"^toolkit/mozapps/update/StealthUpdate\.sys\.", "stillborn/updater"),

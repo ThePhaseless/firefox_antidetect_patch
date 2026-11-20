@@ -9,10 +9,12 @@
 // The navigations of a frame were reported by the content process that held it, from its own state. A navigation
 // that changes the process (a frame going to another site, once sites are isolated) starts in one process and
 // commits in another, and the process that commits cannot know the id the navigation was started with. The parent
-// sees both ends: the load identifier of every document request (NetworkObserver, `navigationId` of the request),
-// the document appearing in whichever process holds the frame and the load ending with an error (both relayed
-// by the content process that holds the frame, over the 'frames' namespace, in the order they happen). One registry per
-// PageHandler, a frame at a time: started, then committed or aborted, each id once.
+// sees both ends: the load identifier of every document request, and the cut of the last one (NetworkObserver,
+// `navigationId` of the request, only for NS_BINDING_ABORTED), the document appearing in whichever process holds the frame
+// and the load ending with an error (both relayed by the content process that holds the frame, over the 'frames'
+// namespace, in the order they happen: it tells every end that is not a cut, and the cuts too, with the filter of the
+// process swap's own). Two voices for one end are one. One registry per PageHandler, a frame at a time: started, then
+// committed or aborted, each id once.
 //
 // `emit(name, payload, frameId)`: 'navigationstarted' {frameId, navigationId}, 'navigationcommitted'
 // {frameId, navigationId, url, name}, 'navigationaborted' {frameId, navigationId, errorText},
@@ -194,12 +196,27 @@ export class FrameNavigations {
   }
 
 
-  // A navigation of the frame ended in an error, as its content process saw it end: window.stop(), document.open(),
-  // a refused port, a failed load. The process says it, not this side: it sees the end of the load in order with the
-  // documents it inserts, so a navigation whose document came before the load was cut is already committed and is
-  // not aborted (a page that navigates from its first script), and it filters the abort it makes itself when a
-  // navigation changes process (FrameTree.onStateChange). `errorText` is already the protocol's text.
+  // The last document request of a navigation was cut (NS_BINDING_ABORTED), as the parent sees it (the NetworkObserver, where
+  // the request lives, whichever process the document was being born in and whatever the docShell it left does meanwhile).
+  // It is the end of the navigation, told with its own id: in flight, or replaced by a newer one before it was heard from,
+  // and not committed. A navigation that already ended (committed, aborted) says nothing more. A redirect is no failure:
+  // only the end of the LAST request of the navigation comes here. Another error of the request does not: the content
+  // process tells it, in order with the documents it inserts.
+  onDocumentRequestFailed(frameId, navigationId, errorText) {
+    this._abort(frameId, navigationId, errorText);
+  }
+
+  // A navigation of the frame ended in an error, as its content process saw it end: window.stop(), document.open(), a refused
+  // port, a failed load. The process sees the end of the load in order with the documents it inserts, so a navigation whose
+  // document came before the load was cut is already committed and is not aborted (a page that navigates from its first
+  // script), and it filters the cut it makes itself when a navigation changes process (FrameTree.onStateChange). The cut of
+  // a document request may also be told by the parent (onDocumentRequestFailed): whoever says an end first, the registry
+  // takes it once. `errorText` is already the protocol's text.
   onNavigationAborted(frameId, navigationId, errorText) {
+    this._abort(frameId, navigationId, errorText);
+  }
+
+  _abort(frameId, navigationId, errorText) {
     const pending = this._pending.get(frameId);
     if (!pending || pending.navigationId !== navigationId) {
       // A navigation a newer one replaced before its abort was heard: the client still waits for the end of it.

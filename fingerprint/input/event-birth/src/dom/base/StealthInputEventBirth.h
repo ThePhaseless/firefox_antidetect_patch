@@ -6,39 +6,116 @@
 #ifndef mozilla_StealthInputEventBirth_h
 #define mozilla_StealthInputEventBirth_h
 
+#include <cmath>
+
 #include "mozilla/Assertions.h"
 #include "mozilla/BasicEvents.h"  // WidgetEventTime
 #include "mozilla/TimeStamp.h"
+#include "mozilla/dom/BrowsingContext.h"
 #include "nsError.h"
 
 namespace mozilla {
 
 /**
+ * Stealthfox [B299] [B301]: the id of the page (the top-level browsing context)
+ * an input event is for. Two pages of one content process are two independent
+ * event streams, each with its own order of births. 0 when the caller does not
+ * know the page: those events share one stream.
+ */
+inline uint64_t StealthPageIdOf(dom::BrowsingContext* aBrowsingContext) {
+  if (!aBrowsingContext) {
+    return 0;
+  }
+  dom::BrowsingContext* top = aBrowsingContext->Top();
+  return top ? top->Id() : aBrowsingContext->Id();
+}
+
+/**
+ * Stealthfox [B299] [B301]: the order of the births of ONE page, keys, mouse and
+ * wheel together: a birth never goes before the previous one of the same page.
+ * A birth of another page does not move it. The state is a few slots kept by
+ * page id (the least recently used one is reused, so the memory is bounded
+ * whatever the number of pages that came and went; a page that lost its slot
+ * starts a new order, which only loosens the guard for a page that was idle).
+ * The main thread only, as the births themselves.
+ */
+class StealthBirthOrder {
+ public:
+  // The birth for aPageId at aBorn, held back to the previous birth of that
+  // page when it would go before it.
+  static TimeStamp Keep(uint64_t aPageId, TimeStamp aBorn) {
+    Slot& slot = SlotFor(aPageId);
+    if (!slot.mLast.IsNull() && aBorn < slot.mLast) {
+      aBorn = slot.mLast;
+    }
+    slot.mLast = aBorn;
+    return aBorn;
+  }
+
+ private:
+  struct Slot {
+    uint64_t mPage = 0;
+    uint64_t mUsed = 0;  // 0: never used
+    TimeStamp mLast;
+  };
+  static constexpr size_t kSlots = 16;
+
+  static Slot& SlotFor(uint64_t aPageId) {
+    // An inline function's static: ONE instance in the whole binary, so the
+    // mouse path (nsContentUtils), the wheel path (nsDOMWindowUtils) and the
+    // key path (TextInputProcessor) share it.
+    static Slot sSlots[kSlots];
+    static uint64_t sClock = 0;
+    Slot* oldest = &sSlots[0];
+    for (Slot& slot : sSlots) {
+      if (slot.mUsed && slot.mPage == aPageId) {
+        slot.mUsed = ++sClock;
+        return slot;
+      }
+      if (slot.mUsed < oldest->mUsed) {
+        oldest = &slot;
+      }
+    }
+    *oldest = Slot();
+    oldest->mPage = aPageId;
+    oldest->mUsed = ++sClock;
+    return *oldest;
+  }
+};
+
+/**
  * Stealthfox [B299] [B301]: the birth of a synthesized input event that
  * reaches the page aLatencyMs after it was born, as a system's does; never
- * before the previous such birth, mouse or wheel.
+ * before the previous such birth of the same page (aPageId), key, mouse or
+ * wheel.
  *
- * An inline function: the C++17 rule gives its function-local static ONE
- * instance in the whole binary, so the mouse path (nsContentUtils) and the
- * wheel path (nsDOMWindowUtils) share the same previous birth. No lock, as
- * before.
+ * An inline function: the C++17 rule gives the state of StealthBirthOrder ONE
+ * instance in the whole binary. No lock, as before.
+ *
+ * There is no upper limit on the latency: a client that sent a key at its
+ * planned instant and reaches the engine seconds late declares those seconds.
+ * The conversion to ticks saturates; a birth that would fall before the clock
+ * starts (null) is taken as the delivery instant, and a non-finite latency is
+ * no latency.
  */
-inline TimeStamp StealthInputEventBirth(double aLatencyMs) {
+inline TimeStamp StealthInputEventBirth(double aLatencyMs,
+                                        uint64_t aPageId = 0) {
   // Stealthfox [B299] [B301]: an input event is born in the system a few
   // milliseconds before a page's handler runs, and a page can tell: its
   // `timeStamp` is below `performance.now()` there. A synthesized one was born
   // at its dispatch, so a tracker that keeps only events from the past dropped
   // them. The caller's latency is taken off the birth, and never past the
-  // birth of the previous one, mouse or wheel alike, so the times stay in
-  // order as a system's do.
-  static TimeStamp sLastBorn;
-  TimeStamp born =
-      TimeStamp::Now() - TimeDuration::FromMilliseconds(aLatencyMs);
-  if (!sLastBorn.IsNull() && born < sLastBorn) {
-    born = sLastBorn;
+  // birth of the previous one of the page, mouse, wheel or key alike, so the
+  // times stay in order as a system's do.
+  const TimeStamp now = TimeStamp::Now();
+  TimeStamp born = now;
+  if (std::isfinite(aLatencyMs) && aLatencyMs > 0) {
+    born = now - TimeDuration::FromMilliseconds(aLatencyMs);
+    if (born.IsNull()) {
+      born = now;
+    }
   }
-  sLastBorn = born;
-  return born;
+  return StealthBirthOrder::Keep(aPageId, born);
 }
 
 /**
@@ -49,26 +126,51 @@ inline TimeStamp StealthInputEventBirth(double aLatencyMs) {
  * event got at its construction.
  */
 inline void StealthSetInputEventBirth(WidgetEventTime& aEvent,
-                                      double aLatencyMs) {
+                                      double aLatencyMs,
+                                      uint64_t aPageId = 0) {
   if (aLatencyMs > 0) {
-    aEvent.mTimeStamp = StealthInputEventBirth(aLatencyMs);
+    aEvent.mTimeStamp = StealthInputEventBirth(aLatencyMs, aPageId);
   }
+}
+
+/**
+ * Stealthfox [B299] [B301]: the page of an event is found here, from what the
+ * call site has at hand, so that the hook in Mozilla's file stays one line:
+ * a Document (its browsing context), or a PresShell (its Document). Templates
+ * on the pointer, so this header needs neither Document.h nor PresShell.h:
+ * the type is complete where the hook is written.
+ */
+template <class Source>
+inline auto StealthPageOfSource(Source* aSource, int)
+    -> decltype(StealthPageIdOf(aSource->GetBrowsingContext())) {
+  return aSource ? StealthPageIdOf(aSource->GetBrowsingContext()) : 0;
+}
+
+template <class Source>
+inline auto StealthPageOfSource(Source* aSource, long)
+    -> decltype(StealthPageOfSource(aSource->GetDocument(), 0)) {
+  return aSource ? StealthPageOfSource(aSource->GetDocument(), 0) : 0;
+}
+
+template <class Source>
+inline auto StealthSetInputEventBirth(WidgetEventTime& aEvent,
+                                      double aLatencyMs, Source* aSource)
+    -> decltype(StealthPageOfSource(aSource, 0), void()) {
+  StealthSetInputEventBirth(aEvent, aLatencyMs,
+                            StealthPageOfSource(aSource, 0));
 }
 
 /**
  * Stealthfox [B299]: the birth of a key event the caller sent with a latency,
  * for nsITextInputProcessor (chrome only; nothing is added to the web-exposed
- * KeyboardEventInit). A null stamp when no latency was declared (0, less, or
- * NaN): the event then keeps the stamp it got at its construction.
- *
- * The cap of an hour is not a latency a system has: past it the number is a
- * mistake of the caller, not a birth. It also keeps the conversion of the
- * milliseconds to the ticks of a TimeDuration (a 64-bit count) far from an
- * overflow, which an infinite or huge value would reach.
+ * KeyboardEventInit). A null stamp when no latency was declared (0, less, NaN
+ * or infinite): the event then keeps the stamp it got at its construction.
+ * There is no cap: a latency of seconds is a birth.
  */
-inline TimeStamp StealthInputEventBirthOrNull(double aLatencyMs) {
-  return aLatencyMs > 0 && aLatencyMs < 3600000
-             ? StealthInputEventBirth(aLatencyMs)
+inline TimeStamp StealthInputEventBirthOrNull(double aLatencyMs,
+                                              uint64_t aPageId = 0) {
+  return aLatencyMs > 0 && std::isfinite(aLatencyMs)
+             ? StealthInputEventBirth(aLatencyMs, aPageId)
              : TimeStamp();
 }
 
@@ -94,9 +196,14 @@ inline TimeStamp StealthInputEventBirthOrNull(double aLatencyMs) {
  */
 class StealthKeyBirthScope {
  public:
-  explicit StealthKeyBirthScope(double& aNextLatencyMs) : mPrevious(Current()) {
-    Current() = StealthInputEventBirthOrNull(aNextLatencyMs);
-    aNextLatencyMs = 0;
+  // aBirth: what setNextKeyLatency() declared for the next key, any struct
+  // with mLatencyMs and mPageId (the page the key is for, whose order of
+  // births the key joins; Juggler gives it). It is taken once: cleared here.
+  template <class Birth>
+  explicit StealthKeyBirthScope(Birth& aBirth) : mPrevious(Current()) {
+    Current() = StealthInputEventBirthOrNull(aBirth.mLatencyMs, aBirth.mPageId);
+    aBirth.mLatencyMs = 0;
+    aBirth.mPageId = 0;
   }
   ~StealthKeyBirthScope() { Current() = mPrevious; }
   StealthKeyBirthScope(const StealthKeyBirthScope&) = delete;
@@ -121,12 +228,25 @@ class StealthKeyBirthScope {
  * (as the rest of the interface); stores the latency of the next key in the
  * processor's field, to be taken by the scope above.
  */
-inline nsresult StealthSetNextKeyLatency(double& aField, double aLatencyMs,
+template <class Birth>
+inline nsresult StealthSetNextKeyLatency(Birth& aField, double aLatencyMs,
+                                         uint64_t aPageId,
                                          bool aIsCallerChrome) {
   MOZ_RELEASE_ASSERT(aIsCallerChrome);
-  aField = aLatencyMs;
+  aField.mLatencyMs = aLatencyMs;
+  aField.mPageId = aPageId;
   return NS_OK;
 }
+
+/**
+ * Stealthfox [B299]: what setNextKeyLatency() declares for the next key. The
+ * processor's header (a Mozilla file with a budget of one line) holds a struct
+ * of this shape, declared where its member is, without an include.
+ */
+struct StealthKeyBirth {
+  double mLatencyMs = 0;
+  uint64_t mPageId = 0;
+};
 
 }  // namespace mozilla
 

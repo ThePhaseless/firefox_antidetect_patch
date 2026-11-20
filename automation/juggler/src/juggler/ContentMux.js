@@ -443,7 +443,11 @@ export class ContentMux {
     return this._connectorOn(this._endpointToSend(rootId), {namespace, disposed: false, owns: new Map()}).send(method, params);
   }
 
-  // To every root that has an actor; the roots without one read the shared data when their process starts.
+  // To every root that has an actor. A root without one is sent nothing, and is not left behind: what a broadcast
+  // declares (init scripts, bindings, the settings of the context, the file chooser) is in the shared data before it
+  // is sent, and the agents of a root read the shared data when they are born AND each time their channel becomes
+  // ready (SimpleChannel.onReady, content/main.js), before any command. The parent binds a root after its agents were
+  // born, so what was declared in between reaches them at the bind.
   // Settled when all answered; it fails only if every root refused.
   async broadcast(namespace, method, params) {
     const endpoints = [...this._endpoints.values()].filter(endpoint => endpoint.actor);

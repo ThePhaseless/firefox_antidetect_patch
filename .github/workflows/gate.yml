@@ -113,6 +113,12 @@ jobs:
       - name: The GeoIP database (made by the repository, same bytes every run)
         shell: bash
         run: python scripts/ci_lab_geoip.py build --pin ci/geoip.json
+      # The list of intermediate certificates comes from the wrapper's pin (scripts/ci_lab_intermediates.py, ci/intermediates.pin.json), never from
+      # Mozilla's servers: the script writes STEALTHFOX_INTERMEDIATES into the environment of every later step of the job, so the launches of the
+      # wrapper's tests carry the same list every run.
+      - name: The intermediates list (set by the repository, same bytes every run)
+        shell: bash
+        run: python scripts/ci_lab_intermediates.py set --pin ci/intermediates.pin.json
       - name: Install Playwright driver (no bundled browser — we override executable_path)
         # Pin from a SINGLE source (scripts/playwright_pin.txt) so release.yml and
         # verify-assets.yml can't drift to different versions. The drive gate then
@@ -142,6 +148,28 @@ jobs:
           chmod +x "$EXE" 2>/dev/null || true
           echo "FF_EXE=$EXE" >> "$GITHUB_ENV"
           echo "located: $EXE"
+      # THE INTERMEDIATES THE CORE DECLARES COME FROM ITS FILE AND FROM NOWHERE ELSE, ON THIS BINARY. A retail Firefox downloads the
+      # collection of intermediate certificates from Remote Settings once the browser is idle; the engine never creates that
+      # collection and writes the same list into cert_storage at profile-after-change from the file the pref
+      # zoom.stealth.intermediates.file names. The test is `firefox -xpcshell` (the package has the shell, not the xpcshell harness),
+      # driven by a script that makes a root, an intermediate and a leaf on every run, and asks four things: a leaf only the declared
+      # intermediate completes verifies when the verification is asked right after the component loads the list; the same
+      # verification with no pref fails with SEC_ERROR_UNKNOWN_ISSUER; a poll of a local settings server that lists the intermediates
+      # makes no request that touches them (and does ask for onecrl, so the poller is alive); the component is registered under
+      # profile-after-change. It lives in the series (stillborn/intermediates), so the series is checked out at the commit under test.
+      - name: Checkout the series (the test of the declared intermediates lives in it)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ github.sha }}
+          path: engine-series
+          sparse-checkout: stillborn/intermediates/src/security/manager/ssl/stealth/test
+          fetch-depth: 1
+      - name: THE DECLARED INTERMEDIATES - the engine reads its file, makes no request for the collection
+        shell: bash
+        run: |
+          python -m pip install --quiet "cryptography==44.0.3"
+          python engine-series/stillborn/intermediates/src/security/manager/ssl/stealth/test/run_stealth_intermediates_gate.py "$FF_EXE"
       # THE CORE UNDER TEST AND THE SEAL OF THE BINARY, BEFORE ANYTHING DRIVES IT. The drive gate launches through the
       # wrapper and the core, not through bare Playwright: since firefox-63 the engine holds every channel that asks the
       # proxy service until the client says how the session leaves the host, and only the core's launch says it first
@@ -347,6 +375,10 @@ jobs:
           # the unit tests of the line, on both OSes, with the same core and wrapper as the e2e
           - { suite: wrapper.unit.udp, leg: linux-x86_64, runner: ubuntu-24.04, kind: linux, os: linux }
           - { suite: wrapper.unit.udp, leg: win-x86_64, runner: windows-latest, kind: win, os: windows }
+          # the WHOLE unit suite of the wrapper (what its tests.yml runs) with the candidate's core: tests.yml uses the core of the
+          # pin, so without this no round runs the wrapper's unit tests against a core that has not been published yet
+          - { suite: wrapper.unit.all.linux, leg: linux-x86_64, runner: ubuntu-24.04, kind: linux, os: linux }
+          - { suite: wrapper.unit.all.windows, leg: win-x86_64, runner: windows-latest, kind: win, os: windows }
           # the DoH suite: Linux (root: its resolver trap points /etc/resolv.conf at a counting resolver) and Windows, the system
           # of reference (there the trap does not run: the one assertion it makes is the only one not made)
           - { suite: wrapper.e2e.doh, leg: linux-x86_64, runner: ubuntu-24.04, kind: linux, os: linux, root: true }
@@ -366,6 +398,17 @@ jobs:
           - { suite: wrapper.e2e.context.egress, leg: win-x86_64, runner: windows-latest, kind: win, os: windows }
           - { suite: wrapper.e2e.context.sink, leg: linux-x86_64, runner: ubuntu-24.04, kind: linux, os: linux, root: true }
           - { suite: wrapper.e2e.context.sink, leg: win-x86_64, runner: windows-latest, kind: win, os: windows }
+          # software compositing declared by the core: the compositor read from a privileged context, the CPU of the GPU process
+          # (Windows) or of the parent (Linux, no GPU process) on a fixed scene, and the page bytes against the wrapper's reference
+          - { suite: wrapper.e2e.compositing, leg: linux-x86_64, runner: ubuntu-24.04, kind: linux, os: linux }
+          # the reference bytes of the compositing suite were recorded on windows-2022; the same image here, so the leg asks whether
+          # compositing changed a byte, not whether two Windows builds rasterize text alike (that is the text suite, with idwr)
+          - { suite: wrapper.e2e.compositing, leg: win-x86_64, runner: windows-2022, kind: win, os: windows }
+          - { suite: wrapper.unit.compositing, leg: linux-x86_64, runner: ubuntu-24.04, kind: linux, os: linux }
+          - { suite: wrapper.unit.compositing, leg: win-x86_64, runner: windows-latest, kind: win, os: windows }
+          # the parent shows the bundle to fontconfig: a warm start reads fontconfig's cache of <GRE>/fonts and does not scan the
+          # folder again (two launches under strace). Linux only: Windows has no fontconfig, DirectWrite opens a font by its path
+          - { suite: wrapper.e2e.fontconfig, leg: linux-x86_64, runner: ubuntu-24.04, kind: linux, os: linux }
     steps:
       - name: Checkout wrapper (its tests, ci/required-suites.json and scripts/ci_verdict.py)
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -399,11 +442,19 @@ jobs:
       - name: The GeoIP database (made by the repository, same bytes every run)
         shell: bash
         run: python scripts/ci_lab_geoip.py build --pin ci/geoip.json
+      # The list of intermediate certificates comes from the wrapper's pin (scripts/ci_lab_intermediates.py, ci/intermediates.pin.json), never from
+      # Mozilla's servers: the script writes STEALTHFOX_INTERMEDIATES into the environment of every later step of the job, so the launches of the
+      # wrapper's tests carry the same list every run.
+      - name: The intermediates list (set by the repository, same bytes every run)
+        shell: bash
+        run: python scripts/ci_lab_intermediates.py set --pin ci/intermediates.pin.json
       - name: Linux system deps (Firefox runtime libs, a virtual display)
         if: matrix.kind == 'linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y xvfb
+          # the fontconfig suite traces the opens of the browser: strace is not in the runner image (setsid is, util-linux)
+          if [ "${{ matrix.suite }}" = "wrapper.e2e.fontconfig" ]; then sudo apt-get install -y strace; fi
           python -m pip install --quiet "playwright==$(cat scripts/playwright_pin.txt)"
           sudo "$(which python)" -m playwright install-deps firefox
       - name: Extract + locate firefox binary
@@ -578,6 +629,14 @@ jobs:
         with:
           name: result-${{ matrix.suite }}-${{ matrix.os }}
           path: result
+          retention-days: 14
+      - name: Keep what the tests saved
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: evidence-${{ matrix.suite }}-${{ matrix.os }}
+          path: ${{ runner.temp }}/invpw-evidence
+          if-no-files-found: ignore
           retention-days: 14
 
   # Every row of the list, on every OS it names, has a verdict in this run, and it is green. The matrix above is written by hand;

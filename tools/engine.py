@@ -37,7 +37,11 @@ check    needs no Firefox: SERIES lists exactly the folders that exist, every fo
          budgets only go down: logic belongs in our own files, Mozilla's files get hooks,
          and Mozilla's lines stay as Mozilla wrote them (a removed or rewritten line
          conflicts at a port like an added one, and a copy of it in a file of ours
-         stops following Mozilla). Every STEALTH-HOOK(<folder>) tag, in a hooks.patch and in the
+         stops following Mozilla). A Mozilla file outside vendored code can be a backport (category
+         backport, no budget) only as the diff of one commit of Mozilla's own repository, in a folder of
+         platform/backports/ of its own: its BACKPORT.json names the commit and the sha256 of the diff, the diff is in the folder, and
+         hooks.patch carries it byte for byte; with --against <tag> (and in a port) a tag that
+         already holds the change fails. Every STEALTH-HOOK(<folder>) tag, in a hooks.patch and in the
          evidence of an inventory record, names a folder of SERIES, and the added, removed and hunk
          counts of each inventory record are those of its file in the hooks.patch. A C++ file of ours has no control character (a carriage return inside a
          string literal ended the literal and broke the build of a test) and no byte outside ASCII inside a
@@ -46,6 +50,7 @@ check    needs no Firefox: SERIES lists exactly the folders that exist, every fo
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -68,10 +73,10 @@ BUDGET = ROOT / "tools" / "hook-budget.json"
 REMOVED_BUDGET = ROOT / "tools" / "removed-budget.json"
 # The workflows live in the series (the tree's tests read them beside scripts/), and
 # GitHub runs them from this repository's root: export copies them there and check
-# requires the two identical. series.yml is the root's own.
+# requires the two identical. series.yml and noreply-identity.yml are the root's own.
 WORKFLOWS_SERIES = ROOT / "platform" / "ci" / "src" / ".github" / "workflows"
 WORKFLOWS_ROOT = ROOT / ".github" / "workflows"
-ROOT_ONLY_WORKFLOWS = {"series.yml"}
+ROOT_ONLY_WORKFLOWS = {"series.yml", "noreply-identity.yml"}
 
 
 def git(source: Path, *args: str, env=None, input_bytes=None) -> bytes:
@@ -305,6 +310,9 @@ def port(source: Path, old: str, new: str, branch: str, force: bool, check_birth
     bad = [(f, c) for f, c in report if c]
     for folder, conflicts in bad:
         print("CONFLICT %s: %s" % (folder, ", ".join(conflicts)))
+    already = backport_in_tag_problems(source, new)
+    for problem in already:
+        print("FAIL %s" % problem)
     print("%s: %d folders moved from %s to %s, %d clean, %d with conflicts (%d files)"
           % (branch, len(report), old, new, len(report) - len(bad), len(bad), sum(len(c) for _, c in bad)))
     status = 0
@@ -317,7 +325,7 @@ def port(source: Path, old: str, new: str, branch: str, force: bool, check_birth
                                 tsv=Path(tempfile.gettempdir()) / ("births-port-%s.tsv" % new))
         else:
             print("birth points not scanned: %s is not a Firefox tree" % branch)
-    return 1 if bad or status == 1 else 0
+    return 1 if bad or already or status == 1 else 0
 
 
 def drift(source: Path, old: str, new: str) -> int:
@@ -639,28 +647,152 @@ BACKPORT = "BACKPORT.json"
 # Where upstream code lives in Firefox's tree: its vendored copies, and the lock and
 # checksums Cargo checks them against.
 VENDORED = ("third_party/rust/", "Cargo.lock")
+# The other kind of backport: a commit of Mozilla's own repository carried before the
+# tag has it, in the file it changes (not vendored code).
+MOZILLA_REPO = "mozilla-firefox/firefox"
+# Its folder: one per commit, beside no logic of ours.
+MOZILLA_BACKPORTS = "platform/backports/"
+
+
+def is_mozilla_upstream(url) -> bool:
+    if not isinstance(url, str):
+        return False
+    url = url.strip().rstrip("/")
+    url = url[:-4] if url.endswith(".git") else url
+    return url == MOZILLA_REPO or url.endswith("github.com/" + MOZILLA_REPO)
+
+
+def file_section(patch: bytes, path: str) -> bytes:
+    """The diff of one file inside a patch: from its `diff --git` line to the next one
+    (or the end), without a mail trailer (`-- ` and the version line) after the last."""
+    out, inside = [], False
+    for line in patch.split(b"\n"):
+        if line.startswith(b"diff --git "):
+            inside = line.startswith(b"diff --git a/" + path.encode() + b" b/")
+        if inside:
+            out.append(line)
+    while out and (out[-1] == b"" or out[-1] == b"-- " or re.fullmatch(rb"\d+(\.\d+)+", out[-1])):
+        out.pop()
+    return b"\n".join(out) + b"\n" if out else b""
+
+
+def normalized_diff(section: bytes) -> bytes:
+    """What a diff says, apart from where it was made: the lines of its hunks, each hunk
+    opened by a bare `@@`. Not the `index` line (the blobs of another tree), not the
+    numbers of the hunk headers (the offset of another tree)."""
+    out, in_hunk = [], False
+    for line in section.split(b"\n"):
+        if line.startswith(b"@@"):
+            in_hunk = True
+            out.append(b"@@")
+        elif in_hunk:
+            out.append(line)
+    while out and out[-1] == b"":
+        out.pop()
+    return b"\n".join(out) + b"\n" if out else b""
+
+
+def mozilla_backport_problems(folder: str, files: list, data: dict, patch: Path) -> list:
+    """A Mozilla file carried ahead as the diff of one commit of Mozilla's repository. It
+    is not ours, so it has no budget; what keeps it honest is that its diff here is the
+    diff of the declared commit, byte for byte (BACKPORT.json: the sha256 of the commit's
+    diff of the file, and the diff itself beside it to read again)."""
+    found = []
+    missing = [k for k in ("commit", "bug", "date", "files", "drop_when") if not data.get(k)]
+    if missing:
+        return ["%s/%s lacks %s" % (folder, BACKPORT, ", ".join(missing))]
+    if not re.fullmatch(r"[0-9a-f]{40}", str(data["commit"])):
+        found.append("%s/%s: commit %r is not a full sha: name the commit of %s the diff comes from"
+                     % (folder, BACKPORT, data["commit"], MOZILLA_REPO))
+    ours = patch.read_bytes() if patch.exists() else b""
+    for path in files:
+        entry = (data["files"] if isinstance(data["files"], dict) else {}).get(path)
+        if not isinstance(entry, dict) or not entry.get("diff") or not entry.get("sha256"):
+            found.append("%s/%s: files has no diff and sha256 for %s" % (folder, BACKPORT, path))
+            continue
+        stored = ROOT / folder / entry["diff"]
+        if not stored.is_file():
+            found.append("%s/%s: the diff %s of %s is not in the folder" % (folder, BACKPORT, entry["diff"], path))
+            continue
+        theirs = normalized_diff(file_section(stored.read_bytes(), path))
+        if not theirs:
+            found.append("%s/%s does not hold a diff of %s" % (folder, entry["diff"], path))
+        elif hashlib.sha256(theirs).hexdigest() != entry["sha256"]:
+            found.append("%s/%s is not the diff that BACKPORT.json declares for %s (sha256 differs): "
+                         "the diff of the commit is not edited" % (folder, entry["diff"], path))
+        elif normalized_diff(file_section(ours, path)) != theirs:
+            found.append("%s/hooks.patch changes %s differently from commit %s: a backport is that diff "
+                         "byte for byte, not a diff touched by hand" % (folder, path, str(data["commit"])[:12]))
+    return found
 
 
 def backport_problems(folder: str, upstream_code: set, patch: Path) -> list:
     """Upstream code carried ahead of Mozilla (category backport) is not ours, so it has
-    no budget; what keeps it honest is its BACKPORT.json: the upstream, the revision
-    Mozilla vendors (the patch must apply on it), and the commits, ours last."""
+    no budget; what keeps it honest is its BACKPORT.json. Vendored code (third_party/rust):
+    the upstream, the revision Mozilla vendors (the patch must apply on it), and the
+    commits, ours last. Any other file: the commit of Mozilla's repository whose diff it is."""
     if not upstream_code:
         return []
-    found = ["%s: %s is category backport outside vendored code (%s)" % (folder, p, ", ".join(VENDORED))
-             for p in sorted(upstream_code) if not p.startswith(VENDORED)]
+    vendored = {p for p in upstream_code if p.startswith(VENDORED)}
+    foreign = sorted(upstream_code - vendored)
+    outside = ["%s: %s is category backport outside vendored code (%s)" % (folder, p, ", ".join(VENDORED))
+               for p in foreign]
     record = ROOT / folder / BACKPORT
     if not record.exists():
-        return found + ["%s carries upstream code (%s) with no %s: name the upstream, the "
-                        "vendored revision and the commits" % (folder, sorted(upstream_code)[0], BACKPORT)]
+        return outside + ["%s carries upstream code (%s) with no %s: name the upstream, the "
+                          "vendored revision and the commits" % (folder, sorted(upstream_code)[0], BACKPORT)]
     data = json.loads(record.read_text(encoding="utf-8"))
-    missing = [k for k in ("upstream", "vendored", "commits", "drop_when") if not data.get(k)]
-    if missing:
-        return found + ["%s/%s lacks %s" % (folder, BACKPORT, ", ".join(missing))]
-    if data["vendored"] not in patch.read_text(encoding="utf-8", errors="replace"):
-        found.append("%s/%s says the vendored revision is %s, which its hooks.patch does not "
-                     "patch: Mozilla vendors another one now, so drop what upstream has and "
-                     "pick the rest again" % (folder, BACKPORT, data["vendored"]))
+    found = []
+    if foreign:
+        if not folder.startswith(MOZILLA_BACKPORTS):
+            found += outside + ["%s carries %s as the diff of a commit of %s outside %s<name>: a backport "
+                                "of a Mozilla commit has its own folder there, beside no logic of ours"
+                                % (folder, foreign[0], MOZILLA_REPO, MOZILLA_BACKPORTS)]
+        elif is_mozilla_upstream(data.get("upstream")):
+            found += mozilla_backport_problems(folder, foreign, data, patch)
+        else:
+            found += outside + ["%s/%s: upstream %r is not %s, the only upstream a file outside vendored "
+                                "code can be carried from" % (folder, BACKPORT, data.get("upstream"), MOZILLA_REPO)]
+    if vendored:
+        missing = [k for k in ("upstream", "vendored", "commits", "drop_when") if not data.get(k)]
+        if missing:
+            return found + ["%s/%s lacks %s" % (folder, BACKPORT, ", ".join(missing))]
+        if data["vendored"] not in patch.read_text(encoding="utf-8", errors="replace"):
+            found.append("%s/%s says the vendored revision is %s, which its hooks.patch does not "
+                         "patch: Mozilla vendors another one now, so drop what upstream has and "
+                         "pick the rest again" % (folder, BACKPORT, data["vendored"]))
+    return found
+
+
+def backport_in_tag_problems(source: Path, tag: str) -> list:
+    """A commit carried ahead stops being ours the day the tag has it. Each file of a
+    Mozilla-commit backport is tried against the tag: the patch applies backwards
+    exactly when the tag already holds the change. (Needs the tag in `source`; a port, or
+    `check --against`, runs it.)"""
+    found = []
+    for folder in existing_folders():
+        record = ROOT / folder / BACKPORT
+        if not record.exists():
+            continue
+        data = json.loads(record.read_text(encoding="utf-8"))
+        if not is_mozilla_upstream(data.get("upstream")) or not isinstance(data.get("files"), dict):
+            continue
+        ours = (ROOT / folder / "hooks.patch").read_bytes()
+        for path in sorted(data["files"]):
+            blob = subprocess.run(["git", "-C", str(source), "show", "%s:%s" % (tag, path)], capture_output=True)
+            section = file_section(ours, path)
+            if blob.returncode or not section:
+                continue
+            with tempfile.TemporaryDirectory() as tmp:
+                target = Path(tmp) / path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(blob.stdout)
+                (Path(tmp) / "backport.patch").write_bytes(section)
+                done = subprocess.run(["git", "apply", "--reverse", "--check", "backport.patch"],
+                                      cwd=tmp, capture_output=True)
+            if done.returncode == 0:
+                found.append("%s: the tag %s already contains the backport of %s (commit %s): take the "
+                             "backport out of the series" % (folder, tag, path, str(data.get("commit"))[:12]))
     return found
 
 
@@ -836,8 +968,10 @@ def problems() -> list:
     return found
 
 
-def check() -> int:
+def check(source: Path | None = None, tag: str | None = None) -> int:
     found = problems()
+    if source is not None and tag:
+        found += backport_in_tag_problems(source, tag)
     for p in found:
         print("FAIL", p)
     if not found:
@@ -891,6 +1025,8 @@ def main() -> int:
                     help="materialize: a directory every leg of this machine reaches; the tag is fetched "
                          "and the series applied there once, and each leg borrows the objects")
     ap.add_argument("--source", type=Path, default=Path(os.environ.get("ENGINE_SOURCE", "C:/ff/source")))
+    ap.add_argument("--against", help="check: also try the backports of Mozilla commits against this tag, "
+                                      "found in --source (a port does it by itself)")
     ap.add_argument("--base")
     ap.add_argument("--head", help="the source branch (apply: the branch it creates)")
     ap.add_argument("--force", action="store_true", help="apply: rebuild an existing branch")
@@ -910,7 +1046,7 @@ def main() -> int:
         apply(a.source, base, head, a.force)
         return 0
     if a.command == "check":
-        return check()
+        return check(a.source, a.against) if a.against else check()
     if a.command == "shrink-budget":
         shrink_budget()
         return 0

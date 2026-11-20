@@ -1,0 +1,14 @@
+{
+ "upstream": "https://github.com/mozilla-firefox/firefox",
+ "commit": "53aca1462bf3b9965d1eae9a2bf3b74767e6c6da",
+ "bug": 2077661,
+ "title": "Don't trust fontconfig to prioritize face index within a collection",
+ "date": "2026-10-13",
+ "files": {
+  "gfx/2d/ScaledFontFontconfig.cpp": {
+   "diff": "upstream-53aca1462bf3.diff",
+   "sha256": "1a2281094596e86e9eed8c912179d9ad98449ef084b179ccf0dbc5713b1518b7"
+  }
+ },
+ "drop_when": "the Mozilla tag of the series has commit 53aca1462bf3 (bug 2077661): the port (engine.py port, check --against <tag>) says so; then take this folder out"
+}

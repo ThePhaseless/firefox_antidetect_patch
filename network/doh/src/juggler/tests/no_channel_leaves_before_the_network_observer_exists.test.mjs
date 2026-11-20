@@ -119,7 +119,7 @@ function browser({ flag = true, failFirstRegistration = false } = {}) {
 
   const { TargetRegistry: RealRegistry } = load('TargetRegistry.js', {
     Ci, Cc: {}, Components: { results: Cr },
-    ChromeUtils: { importESModule: () => ({ Helper, newProxyInfoFor, proxyForHost, syncTrrPrefs() {}, GoneContexts: { recordFor: () => null } }) },
+    ChromeUtils: { importESModule: () => ({ Helper, newProxyInfoFor, proxyForHost, syncTrrPrefs() {}, GoneContexts: { recordFor: () => null, entries: () => [] } }) },
     Services: {}, NetUtil: {}, dump: noDump,
   }, ['TargetRegistry']);
   // The registry as the constructor leaves it (the constructor is checked in
@@ -166,6 +166,7 @@ function browser({ flag = true, failFirstRegistration = false } = {}) {
     'EarlyProxyHold.js': { EarlyProxyHold },
     'Helper.js': { Helper },
     'Say.js': { say },
+    'psm/StealthIntermediates.sys.mjs': { StealthIntermediates: { whenLoaded: Promise.resolve() } },
     'ActorManagerParent.sys.mjs': { ActorManagerParent: { addJSWindowActors() {} } },
   };
   const { Juggler } = load('components/Juggler.js', {

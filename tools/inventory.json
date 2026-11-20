@@ -2349,6 +2349,28 @@
   }
  },
  {
+  "file": "gfx/2d/ScaledFontFontconfig.cpp",
+  "category": "backport",
+  "feature": "fontconfig-face-index",
+  "prefs": [],
+  "added": 10,
+  "removed": 12,
+  "hunks": 2,
+  "inline_logic_lines": 0,
+  "hookable": "hard",
+  "anchor": "UnscaledFontFontconfig::CreateFromFontDescriptor, the block after FcFontMatch",
+  "evidence": [
+   "+  // Get the file that fontconfig returned.",
+   "+    result = FcPatternGetInteger(match, FC_INDEX, 0, &index);",
+   "+      aIndex = index & 0xffff;"
+  ],
+  "notes": "Mozilla bug 2077661 (mozilla-central 53aca1462bf3, 2026-10-13), carried as its diff before the tag has it: the face index asked for is kept, and the one of FcFontMatch is read only when it answers with another path. Not ours: no budget; BACKPORT.json of its folder binds it to the commit.",
+  "verifier": {
+   "changed": [],
+   "why": "The diff of the commit as it is, 2026-11-17."
+  }
+ },
+ {
   "file": "gfx/2d/UnscaledFontDWrite.h",
   "category": "other",
   "feature": "font-bundle-file-path",
@@ -4241,6 +4263,44 @@
     "notes"
    ],
    "why": "Confirmed the consumer exists: juggler/content/PageAgent.js:445 imports ATOM_SOURCES (elementAtom)."
+  }
+ },
+ {
+  "file": "security/manager/ssl/RemoteSecuritySettings.sys.mjs",
+  "category": "stillborn",
+  "feature": "intermediates-declared",
+  "prefs": [
+   "zoom.stealth.intermediates.file"
+  ],
+  "added": 3,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "IntermediatePreloads constructor (first statement)",
+  "evidence": [],
+  "notes": "Early return at the top of the constructor, with or without the pref: the engine never creates the security-state/intermediates client, so it registers no poller client, no sync observer and no poll-end observer, and no request is made for the collection. Mozilla's lines are untouched; the logic is in security/manager/ssl/stealth/StealthIntermediates.sys.mjs. The list comes from a file the core declares, written to cert_storage on profile-after-change by the component of that folder.",
+  "verifier": {
+   "changed": [],
+   "why": "Added 2026-11-19 with the declared intermediates."
+  }
+ },
+ {
+  "file": "security/manager/ssl/moz.build",
+  "category": "build",
+  "feature": "intermediates-declared",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "after the DIRS list",
+  "evidence": [],
+  "notes": "Hook building security/manager/ssl/stealth, which registers our profile-after-change component and installs StealthIntermediates.sys.mjs.",
+  "verifier": {
+   "changed": [],
+   "why": "Added 2026-11-19 with the declared intermediates."
   }
  },
  {

@@ -52,6 +52,7 @@ export function initializeRoot({ browsingContext, docShell = {}, settings = {}, 
     }
     register(namespace, handlers) { this.handlers[namespace] = handlers; }
     onReattached() {}
+    onReady() {}
   }
   const modules = {
     'resource://gre/modules/juggler/Helper.js': { Helper },

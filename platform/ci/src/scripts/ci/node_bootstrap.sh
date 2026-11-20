@@ -96,6 +96,67 @@ fetch() { # url sha256 file [second-url]
   die "$1 does not match its sha256, from any address, in 3 rounds"
 }
 
+# apt from the archive, silent while it works and whole when it does not. Its last line alone ("E: Unable to correct problems, you have
+# held broken packages", runs 44137637832 and 44139666991) names no package and no version. On a failure: apt's whole answer, the
+# solver's own account of the same request, and for every package apt named the version installed on the node against the one the
+# archive holds; then what apt did on this node before this script, and apt's exit code, with its E: lines last.
+apt_install() {
+  local log rc=0 names
+  log="$(mktemp)"
+  apt-get install -y -q --no-install-recommends --allow-downgrades "$@" > "$log" 2>&1 || rc=$?
+  if [ "$rc" = 0 ]; then
+    rm -f "$log"
+    return 0
+  fi
+  set +e +o pipefail
+  {
+    echo "node_bootstrap: apt-get install exited $rc; its whole answer:"
+    cat "$log"
+    echo "node_bootstrap: the solver on the same request (apt-get -s, Debug::pkgProblemResolver):"
+    apt-get install -s -q --no-install-recommends --allow-downgrades -o Debug::pkgProblemResolver=yes "$@" 2>&1 | tail -n 200
+    echo "node_bootstrap: the pins of glibc (${GLIBC_PREFS:-none}):"
+    cat "${GLIBC_PREFS:-/dev/null}" 2>&1
+    names="$( { grep -oE '^ +[a-z0-9][a-z0-9.+:-]* :' "$log" | sed -E 's/^ +//; s/ :$//'
+                grep -oE '(Pre-?Depends|Depends|Breaks|Conflicts): [a-z0-9][a-z0-9.+:-]*' "$log" | sed -E 's/^[^:]+: //'; } | sort -u | tr '\n' ' ')"
+    echo "node_bootstrap: the packages apt named, installed on the node (dpkg) and in the archive (apt-cache policy): ${names:-none}"
+    if [ -n "$names" ]; then
+      # shellcheck disable=SC2086 # one word per package
+      dpkg-query -W -f='${binary:Package} ${Version} ${db:Status-Abbrev}\n' $names 2>&1
+      # shellcheck disable=SC2086
+      apt-cache policy $names 2>&1
+    fi
+    echo "node_bootstrap: held: $(apt-mark showhold 2>&1 | tr '\n' ' ')"
+    echo "node_bootstrap: the image: ${PRETTY_NAME:-?}, kernel $(uname -r), $(cat /etc/cloud/build.info 2>/dev/null | tr '\n' ' ')"
+    echo "node_bootstrap: apt on this node before this script (unattended-upgrades $(systemctl is-active unattended-upgrades.service 2>&1)," \
+         "apt-daily-upgrade $(systemctl is-active apt-daily-upgrade.service 2>&1)), the end of /var/log/apt/history.log:"
+    tail -n 40 /var/log/apt/history.log 2>&1
+    echo "node_bootstrap: ERROR: apt-get install exited $rc:"
+    grep -E '^(E|W): ' "$log"
+  } >&2
+  exit "$rc"
+}
+
+# glibc at the archive's version, and only glibc. It is the one family our packages ask for at the EXACT version of the image's
+# runtime: build-essential needs libc6-dev, which needs libc6 (= its own version), and Mozilla's wine needs libc6-i386, which needs
+# libc6 (= its own version). An image renewed by the provider can hold a newer libc6 than the archive (run 44157672212: libc6
+# 2.39-0ubuntu8.12 against the archive's 8.9), and apt does not go back to the archive's on its own. So every package of the archive
+# whose source is glibc is pinned to the archive's version, from the index apt reads (debs/Packages, epoch included), at 1001, and the
+# install may go down to it. libc-bin and locales of the image stay where they are: they ask libc6 for a range inside 2.39, not for a
+# version. Nothing else is pinned: the rest of the image stays the image's. Should another family conflict one day, the install fails
+# with apt's account above, and the answer is a fixed image, not a wider pin.
+GLIBC_PREFS=/etc/apt/preferences.d/80-node-deps-glibc
+glibc_pins() { # debs/Packages -> an apt preferences file on stdout
+  awk 'BEGIN { RS = ""; FS = "\n" }
+       { pkg = src = ver = ""
+         for (i = 1; i <= NF; i++) {
+           if ($i ~ /^Package: /) pkg = substr($i, 10)
+           else if ($i ~ /^Source: /) { src = substr($i, 9); sub(/ .*/, "", src) }
+           else if ($i ~ /^Version: /) ver = substr($i, 10)
+         }
+         if (src == "") src = pkg
+         if (src == "glibc" && pkg != "" && ver != "") printf "Package: %s\nPin: version %s\nPin-Priority: 1001\n\n", pkg, ver }' "$1"
+}
+
 DEPS=/opt/node-deps
 echo "== apt, from $NODE_DEPS"
 # apt has no network timeout of its own (run 41248997155 waited 5h40 on a mirror).
@@ -117,7 +178,9 @@ rm -f /tmp/node-deps.tar
 echo "deb [trusted=yes] file:$DEPS/debs ./" > /etc/apt/sources.list
 rm -f /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources
 apt-get update -qq -o APT::Update::Error-Mode=any
-apt-get install -y -qq --no-install-recommends "${PACKAGES[@]}" >/dev/null
+glibc_pins "$DEPS/debs/Packages" > "$GLIBC_PREFS"
+[ -s "$GLIBC_PREFS" ] || die "the archive's index names no package of glibc: nothing to pin libc6-dev and libc6-i386 to"
+apt_install "${PACKAGES[@]}"
 
 echo "== the user"
 id runner >/dev/null 2>&1 || useradd --create-home --home-dir /home/runner --uid 1001 --shell /bin/bash runner

@@ -483,10 +483,17 @@ export class TargetRegistry {
   // contexts that have a proxy, follow this set (see TrrPrefs.js). It is the
   // same registry that proxyRecordFor() answers the channel filter from.
   _proxiesPresent() {
+    const live = [...this._browserContextIdToBrowserContext.values()]
+        .map(bc => ({ userContextId: bc.userContextId, proxy: bc._proxy }));
+    // A context that ended with a proxy stays proxied for the resolver for the life of the browser: its lookups in flight (a beacon
+    // sent as it closed, an OCSP request, a retry) resolve after it is gone, and the resolver decides from this list alone
+    // (StealthSessionResolver). Dropped from it, they went to the host's resolver. The ids are never reused, so no live context
+    // inherits the entry; nothing is dropped on a timer.
+    const liveIds = new Set(live.map(context => context.userContextId));
+    const ended = GoneContexts.entries().filter(context => !liveIds.has(context.userContextId));
     return {
       browserProxy: this._browserProxy,
-      contexts: [...this._browserContextIdToBrowserContext.values()]
-          .map(bc => ({ userContextId: bc.userContextId, proxy: bc._proxy })),
+      contexts: live.concat(ended),
     };
   }
 
@@ -1452,7 +1459,7 @@ class BrowserContext {
       Services.ppmm.sharedData.flush();
     }
     this._registry._updateProxiesWithSameAuthCacheAndDifferentCredentials();
-    // The proxy of this context leaves the set; the last one out turns DoH off.
+    // The context leaves the registry but not the resolver's list: GoneContexts keeps its proxy, and _proxiesPresent lists it.
     this._registry._syncTrrPrefs();
     await this.setServiceWorkersBlocked(false);
   }
