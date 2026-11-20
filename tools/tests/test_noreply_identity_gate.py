@@ -48,9 +48,13 @@ def test_series_yml_gate_waits_for_the_identity_check_and_always_runs():
 def test_the_identity_job_of_series_yml_is_inline_and_reads_the_judge_from_main_of_the_core():
     job = _load("series.yml")["jobs"]["noreply-identity"]
     assert "uses" not in job
-    assert job["runs-on"] == "ubuntu-latest" and job["timeout-minutes"] == 5
+    assert job["runs-on"] == "ubuntu-latest" and job["timeout-minutes"] == 10
     checkouts = [s["with"] for s in job["steps"] if s.get("uses", "").startswith("actions/checkout@")]
     assert checkouts[0]["fetch-depth"] == 0
+    # Commits and tags only: the full clone of this repository did not fit the job.
+    assert checkouts[0]["filter"] == "tree:0"
+    assert checkouts[0]["sparse-checkout"].split() == ["/.github/"]
+    assert checkouts[0]["sparse-checkout-cone-mode"] is False
     judge = [c for c in checkouts if c.get("repository") == "oss-invisible/core"]
     assert len(judge) == 1 and judge[0]["ref"] == "main"
     assert judge[0]["path"] == ".noreply-judge" and judge[0]["persist-credentials"] is False

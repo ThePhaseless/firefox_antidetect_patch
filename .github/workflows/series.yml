@@ -84,13 +84,18 @@ jobs:
   # the core, never from the judged branch, and its absence there is an error.
   noreply-identity:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       # The repository being judged, with all its history: the range of commits is
-      # computed against its refs.
+      # computed against its refs. Commits and tags only (`tree:0`) and no file but
+      # .github: with its trees this repository is about 5 GB and the clone did not
+      # finish in 5 minutes (run 44708578369); without them about 300 MB.
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
+          filter: tree:0
+          sparse-checkout: /.github/
+          sparse-checkout-cone-mode: false
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           repository: oss-invisible/core
