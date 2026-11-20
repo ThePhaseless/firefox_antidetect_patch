@@ -45,7 +45,7 @@ FEATURES = {
     "updater-refuses": "stillborn/updater",
     "pingsender-session-route": "stillborn/telemetry",
     "api-keys-declared": "stillborn/api-keys",
-    "intermediates-declared": "stillborn/intermediates",
+    "security-state-declared": "stillborn/security-state",
     # network
     "ipv6-literal-connect": "network/ipv6-literal",
     "proxy-udp-egress": "network/proxy-udp",
@@ -172,7 +172,7 @@ OWN_FILES = [
     (r"^js/xpconnect/loader/StealthScriptCache\-inl\.", "platform/script-cache"),
     (r"^toolkit/components/urlformatter/tests/unit/test_stealth_apikeys\.", "stillborn/api-keys"),
     (r"^toolkit/components/urlformatter/StealthApiKeys\.sys\.", "stillborn/api-keys"),
-    (r"^security/manager/ssl/stealth/", "stillborn/intermediates"),
+    (r"^security/manager/ssl/stealth/", "stillborn/security-state"),
     (r"^juggler/tests/pingsender_route_lives_in_our_file\.test\.", "stillborn/telemetry"),
     (r"^toolkit/components/telemetry/app/StealthPingsender\.sys\.", "stillborn/telemetry"),
     (r"^toolkit/mozapps/update/StealthUpdate\.sys\.", "stillborn/updater"),

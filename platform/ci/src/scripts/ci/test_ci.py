@@ -714,19 +714,19 @@ def main() -> int:
     import test_latitude_node
     import test_release_checks
     import test_gate_geoip
-    import test_gate_intermediates
+    import test_gate_security_state
     import test_gate_protocol_mirror
     import test_workflow_steps_bind
     parts = {"test_latitude_node": test_latitude_node.cases(), "test_link_pin": test_link_pin.cases(), "test_cache_rules": test_cache_rules.cases(),
              "test_release_builder": test_release_builder.cases(), "test_release_path": test_release_path.cases(),
              "test_release_checks": test_release_checks.cases(), "test_gate_geoip": test_gate_geoip.cases(),
-             "test_gate_intermediates": test_gate_intermediates.cases(),
+             "test_gate_security_state": test_gate_security_state.cases(),
              "test_gate_protocol_mirror": test_gate_protocol_mirror.cases(), "test_workflow_steps_bind": test_workflow_steps_bind.cases()}
     for found in parts.values():
         cases += found
     # A floor per module: one that returns fewer cases than it had (an emptied list, a stopped import) is red, not a shorter green. Raise a floor by
     # hand when a case is added; lower it never.
-    floors = {"test_release_checks": 65, "test_gate_geoip": 5, "test_gate_intermediates": 3, "test_gate_protocol_mirror": 4, "test_workflow_steps_bind": 18, "test_latitude_node": 294}
+    floors = {"test_release_checks": 65, "test_gate_geoip": 5, "test_gate_security_state": 4, "test_gate_protocol_mirror": 4, "test_workflow_steps_bind": 18, "test_latitude_node": 294}
     short = {name: (len(parts[name]), floor) for name, floor in floors.items() if len(parts[name]) < floor}
     cases.append(("the modules this file runs still bring their cases (a floor each)%s" % ("" if not short else ": fewer than the floor: %s" % short), not short))
 

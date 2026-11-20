@@ -113,12 +113,12 @@ jobs:
       - name: The GeoIP database (made by the repository, same bytes every run)
         shell: bash
         run: python scripts/ci_lab_geoip.py build --pin ci/geoip.json
-      # The list of intermediate certificates comes from the wrapper's pin (scripts/ci_lab_intermediates.py, ci/intermediates.pin.json), never from
-      # Mozilla's servers: the script writes STEALTHFOX_INTERMEDIATES into the environment of every later step of the job, so the launches of the
-      # wrapper's tests carry the same list every run.
-      - name: The intermediates list (set by the repository, same bytes every run)
+      # The security state (the intermediate certificates, the OneCRL revocations and the CRLite filters) comes from the wrapper's pin
+      # (scripts/ci_lab_security_state.py, ci/security-state.pin.json), never from Mozilla's servers: the script writes STEALTHFOX_SECURITY_STATE
+      # into the environment of every later step of the job, so the launches of the wrapper's tests carry the same state every run.
+      - name: The security state (set by the repository, same bytes every run)
         shell: bash
-        run: python scripts/ci_lab_intermediates.py set --pin ci/intermediates.pin.json
+        run: python scripts/ci_lab_security_state.py set --pin ci/security-state.pin.json
       - name: Install Playwright driver (no bundled browser — we override executable_path)
         # Pin from a SINGLE source (scripts/playwright_pin.txt) so release.yml and
         # verify-assets.yml can't drift to different versions. The drive gate then
@@ -148,28 +148,38 @@ jobs:
           chmod +x "$EXE" 2>/dev/null || true
           echo "FF_EXE=$EXE" >> "$GITHUB_ENV"
           echo "located: $EXE"
-      # THE INTERMEDIATES THE CORE DECLARES COME FROM ITS FILE AND FROM NOWHERE ELSE, ON THIS BINARY. A retail Firefox downloads the
-      # collection of intermediate certificates from Remote Settings once the browser is idle; the engine never creates that
-      # collection and writes the same list into cert_storage at profile-after-change from the file the pref
-      # zoom.stealth.intermediates.file names. The test is `firefox -xpcshell` (the package has the shell, not the xpcshell harness),
-      # driven by a script that makes a root, an intermediate and a leaf on every run, and asks four things: a leaf only the declared
-      # intermediate completes verifies when the verification is asked right after the component loads the list; the same
-      # verification with no pref fails with SEC_ERROR_UNKNOWN_ISSUER; a poll of a local settings server that lists the intermediates
-      # makes no request that touches them (and does ask for onecrl, so the poller is alive); the component is registered under
-      # profile-after-change. It lives in the series (stillborn/intermediates), so the series is checked out at the commit under test.
-      - name: Checkout the series (the test of the declared intermediates lives in it)
+      # THE SECURITY STATE THE CORE DECLARES COMES FROM ITS FILES AND FROM NOWHERE ELSE, ON THIS BINARY. A retail Firefox syncs three collections of
+      # the Remote Settings bucket security-state (the intermediate certificates, the CRLite filters and OneCRL) into <profile>/security_state/. The
+      # engine is a full Firefox, but RemoteSecuritySettings.init() creates none of the three clients (the hook asks ownsSync()), so it never syncs
+      # them: the core fetches the data once, and the engine, launched headless and offline on a work profile with
+      # zoom.stealth.securitystate.generate and the three file prefs, writes them into cert_storage, writes securitystate-result.json and quits; a normal
+      # launch imports nothing and finds the copied folder. Two tests, both on this binary, both written in the series (stillborn/security-state), so the
+      # series is checked out at the commit under test. The first is `firefox -xpcshell` (the package has the shell, not the xpcshell harness), driven by a
+      # script that makes a root and its intermediates and leaves on every run and reads Mozilla's CRLite test data from a file of the test folder: it
+      # asks that generating from the declared files gives the same filter and delta bytes and the same answers (OneCRL, CRLite in the full filter and in a
+      # delta, a preloaded intermediate), that a copied folder is used without a rewrite, that a failure says which collection and exits 1, that a
+      # generation asks the network for nothing, that whenStorageReady() settles, that a poll of a local settings server that lists the three collections
+      # makes no request that touches them (and does ask for a collection of another bucket, so the poller is alive), and that the component is registered
+      # under profile-after-change. The second launches the real thing, `firefox -headless -no-remote -profile <p>` as the core does, with the folders
+      # of the process redirected: exit 0 and ok, the engine's version and BuildID, the hashes, the bytes of security_state/, no window, nothing printed,
+      # no connection, no file outside the profile, and 66 deltas (the real list size) with the quit after the end.
+      - name: Checkout the series (the tests of the declared security state live in it)
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           repository: ${{ github.repository }}
           ref: ${{ github.sha }}
           path: engine-series
-          sparse-checkout: stillborn/intermediates/src/security/manager/ssl/stealth/test
+          sparse-checkout: stillborn/security-state/src/security/manager/ssl/stealth/test
           fetch-depth: 1
-      - name: THE DECLARED INTERMEDIATES - the engine reads its file, makes no request for the collection
+      - name: THE DECLARED SECURITY STATE - the engine generates it from the files, makes no request for the collections
         shell: bash
         run: |
           python -m pip install --quiet "cryptography==44.0.3"
-          python engine-series/stillborn/intermediates/src/security/manager/ssl/stealth/test/run_stealth_intermediates_gate.py "$FF_EXE"
+          python engine-series/stillborn/security-state/src/security/manager/ssl/stealth/test/run_stealth_security_state_gate.py "$FF_EXE"
+      - name: THE DECLARED SECURITY STATE - the launch of the full engine, as the core makes it
+        shell: bash
+        run: |
+          python engine-series/stillborn/security-state/src/security/manager/ssl/stealth/test/run_stealth_generate_launch_gate.py "$FF_EXE"
       # THE CORE UNDER TEST AND THE SEAL OF THE BINARY, BEFORE ANYTHING DRIVES IT. The drive gate launches through the
       # wrapper and the core, not through bare Playwright: since firefox-63 the engine holds every channel that asks the
       # proxy service until the client says how the session leaves the host, and only the core's launch says it first
@@ -409,6 +419,9 @@ jobs:
           # the parent shows the bundle to fontconfig: a warm start reads fontconfig's cache of <GRE>/fonts and does not scan the
           # folder again (two launches under strace). Linux only: Windows has no fontconfig, DirectWrite opens a font by its path
           - { suite: wrapper.e2e.fontconfig, leg: linux-x86_64, runner: ubuntu-24.04, kind: linux, os: linux }
+          # the engine's security state: generation, a normal launch, a certificate revoked in a CRLite delta refused at the first navigation, a launch with no state
+          - { suite: wrapper.e2e.securitystate, leg: linux-x86_64, runner: ubuntu-24.04, kind: linux, os: linux }
+          - { suite: wrapper.e2e.securitystate, leg: win-x86_64, runner: windows-latest, kind: win, os: windows }
     steps:
       - name: Checkout wrapper (its tests, ci/required-suites.json and scripts/ci_verdict.py)
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -442,12 +455,12 @@ jobs:
       - name: The GeoIP database (made by the repository, same bytes every run)
         shell: bash
         run: python scripts/ci_lab_geoip.py build --pin ci/geoip.json
-      # The list of intermediate certificates comes from the wrapper's pin (scripts/ci_lab_intermediates.py, ci/intermediates.pin.json), never from
-      # Mozilla's servers: the script writes STEALTHFOX_INTERMEDIATES into the environment of every later step of the job, so the launches of the
-      # wrapper's tests carry the same list every run.
-      - name: The intermediates list (set by the repository, same bytes every run)
+      # The security state (the intermediate certificates, the OneCRL revocations and the CRLite filters) comes from the wrapper's pin
+      # (scripts/ci_lab_security_state.py, ci/security-state.pin.json), never from Mozilla's servers: the script writes STEALTHFOX_SECURITY_STATE
+      # into the environment of every later step of the job, so the launches of the wrapper's tests carry the same state every run.
+      - name: The security state (set by the repository, same bytes every run)
         shell: bash
-        run: python scripts/ci_lab_intermediates.py set --pin ci/intermediates.pin.json
+        run: python scripts/ci_lab_security_state.py set --pin ci/security-state.pin.json
       - name: Linux system deps (Firefox runtime libs, a virtual display)
         if: matrix.kind == 'linux'
         run: |

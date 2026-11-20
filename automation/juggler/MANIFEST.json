@@ -131,7 +131,7 @@
   "juggler/tests/shared_cookies_leave_with_their_owner.test.mjs": "100644",
   "juggler/tests/simple_channel.test.mjs": "100644",
   "juggler/tests/stroke_events_are_born_where_the_plan_puts_them.test.mjs": "100644",
-  "juggler/tests/the_client_gets_nothing_before_the_intermediates_are_written.test.mjs": "100644",
+  "juggler/tests/the_client_gets_nothing_before_cert_storage_has_read_the_security_state.test.mjs": "100644",
   "juggler/tests/the_context_list_matches_the_registry.test.mjs": "100644",
   "juggler/tests/the_flag_of_the_coherent_udp_has_a_bit_of_its_own.test.mjs": "100644",
   "juggler/tests/the_hosts_file_is_never_read_at_start_up.test.mjs": "100644",
