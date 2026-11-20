@@ -552,6 +552,14 @@ jobs:
               export MOZ_LOG="timestamp,sync,SOCKS-UDP:5" MOZ_LOG_FILE="$LOGDIR/moz-%PID.log"
               # the HTTP/3 e2e: what the browser says of the QUIC it starts (a visit that reads h2 where h3 was due)
               if [ "${{ matrix.suite }}" = "wrapper.e2e.web" ]; then export MOZ_LOG="$MOZ_LOG,nsHttp:5,neqo_http3:5"; fi
+              # the page suite (gate-only 44746170375: a first goto told started and then neither committed nor aborted, and the
+              # SOCKS-UDP log alone wrote nothing for it): the document channel, the process isolation and the docshell of every
+              # navigation, and the Juggler's own trace of its channels and navigations, a file per browser session
+              if [ "${{ matrix.suite }}" = "wrapper.e2e.page" ]; then
+                export MOZ_LOG="$MOZ_LOG,DocumentChannel:5,ProcessIsolation:5,nsDocShell:4,DocLoader:4"
+                mkdir -p result/juggler-trace
+                export INVISIBLE_JUGGLER_TRACE_DIR="$(python -c "import os; print(os.path.abspath('result/juggler-trace'))")"
+              fi
               # the root legs (run 43188313516: the socket process of every one wrote nothing, the gather had no candidate): the
               # transport and the sandbox that starts that process
               if [ "${{ matrix.root }}" = "true" ] || [ "${{ matrix.sandbox }}" = "true" ]; then export MOZ_LOG="$MOZ_LOG,mtransport:5,SandboxBroker:5,SandboxTarget:5"; fi;;
