@@ -677,3 +677,19 @@ test('the document with no id of a navigation replaced before it was heard from 
     committed(MAIN, 'nav-52', 'http://127.0.0.1/landed?n=1', ''),
   ]);
 });
+
+test('two cuts held on the same frame are each ended by their own barrier', () => {
+  // Two gotos cut in a row after their responses began, two barriers in flight: the answer of the first must not take the
+  // second cut with it, or that navigation is never ended.
+  const { registry, events } = setup();
+  registry.onDocumentRequest(MAIN, 'nav-61', 'http://b.test/one');
+  registry.onDocumentRequest(MAIN, 'nav-62', 'http://b.test/two');
+  registry.onDocumentRequestFailed(MAIN, 'nav-61', 'NS_BINDING_ABORTED', true);
+  registry.onDocumentRequestFailed(MAIN, 'nav-62', 'NS_BINDING_ABORTED', true);
+  assert.deepEqual(events, [started(MAIN, 'nav-61'), started(MAIN, 'nav-62')]);
+  registry.onCutConfirmed(MAIN, 'nav-61');
+  registry.onCutConfirmed(MAIN, 'nav-62');
+  assert.deepEqual(events, [started(MAIN, 'nav-61'), started(MAIN, 'nav-62'),
+                            aborted(MAIN, 'nav-61', 'NS_BINDING_ABORTED'), aborted(MAIN, 'nav-62', 'NS_BINDING_ABORTED')]);
+  assert.equal(registry.pendingNavigationId(MAIN), undefined);
+});

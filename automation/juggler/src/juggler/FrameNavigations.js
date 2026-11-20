@@ -274,6 +274,9 @@ export class FrameNavigations {
       return;
     const errorText = cuts.get(navigationId);
     cuts.delete(navigationId);
+    // The frame's entry goes with its last held cut, not before: another cut of the frame may still wait for its barrier.
+    if (!cuts.size)
+      this._cuts.delete(frameId);
     this._abort(frameId, navigationId, errorText);
   }
 
