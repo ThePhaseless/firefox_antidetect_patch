@@ -590,3 +590,33 @@ test('a navigation that is already committed is not committed again by a second 
   registry.onDocumentInserted(MAIN, 'http://x/a', '', 'nav-1');
   assert.deepEqual(events, [started(MAIN, 'nav-2')]);
 });
+
+// The known-bad input, from the wrapper's e2e `test_networkidle_is_reached_only_on_the_page_that_replaced_a_document_still_arriving
+// [/hdr]` (PR #534, run 44655615997, Linux, round 0): goto to a document that commits in another process and moves itself
+// from an inline script while it is still arriving. The process that holds the new document starts its channel to the
+// parent again (JugglerFrameChild.actorCreated -> SimpleChannel.bindToActor), and what it says waits for the READY of the
+// parent (SimpleChannel._pendingMessages); the parent's NetworkObserver says what it sees at once. So the parent sees the
+// request of the page's own navigation, then the cut of the document request it leaves (NS_BINDING_ABORTED, with the id
+// of ours), and only then the document of ours, inserted with no id (the process that commits a navigation that changed
+// process does not know its id), and the same document said again as a frame no navigation made (PageAgent
+// ._onInitialDocumentCommitted). The cut came after the document on the wire (NetworkObserver._sendOnRequestFailed), but
+// not in what the parent hears. The client was told our navigation aborted - goto raised NS_BINDING_ABORTED for a page
+// that loaded - and our document under no navigation.
+for (const cutFirst of [false, true]) {
+  test(`a navigation whose document committed in a process still waiting for its channel is not cut by the parent (${cutFirst ? 'cut before' : 'cut after'} the page's own request)`, () => {
+    const { registry, events } = setup();
+    registry.onDocumentRequest(MAIN, 'nav-31', 'http://127.0.0.1/hdr?n=0');      // our goto
+    if (cutFirst)
+      registry.onDocumentRequestFailed(MAIN, 'nav-31', 'NS_BINDING_ABORTED');
+    registry.onDocumentRequest(MAIN, 'nav-32', 'http://127.0.0.1/landed');       // the page's location.replace
+    if (!cutFirst)
+      registry.onDocumentRequestFailed(MAIN, 'nav-31', 'NS_BINDING_ABORTED');
+    // what the process that holds the frame said before the parent's READY reached it
+    registry.onDocumentInserted(MAIN, 'http://127.0.0.1/hdr?n=0', '');
+    registry.onFrameKnown(MAIN, {url: 'http://127.0.0.1/hdr?n=0', name: ''});
+    registry.onDocumentInserted(MAIN, 'http://127.0.0.1/landed', '', 'nav-32');
+    const ours = events.filter(([, payload]) => payload.navigationId === 'nav-31');
+    assert.deepEqual(ours, [started(MAIN, 'nav-31'), committed(MAIN, 'nav-31', 'http://127.0.0.1/hdr?n=0', '')]);
+    assert.deepEqual(events.at(-1), committed(MAIN, 'nav-32', 'http://127.0.0.1/landed', ''));
+  });
+}
