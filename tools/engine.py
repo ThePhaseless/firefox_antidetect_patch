@@ -69,10 +69,10 @@ BUDGET = ROOT / "tools" / "hook-budget.json"
 REMOVED_BUDGET = ROOT / "tools" / "removed-budget.json"
 # The workflows live in the series (the tree's tests read them beside scripts/), and
 # GitHub runs them from this repository's root: export copies them there and check
-# requires the two identical. series.yml is the root's own.
+# requires the two identical. series.yml and noreply-identity.yml are the root's own.
 WORKFLOWS_SERIES = ROOT / "platform" / "ci" / "src" / ".github" / "workflows"
 WORKFLOWS_ROOT = ROOT / ".github" / "workflows"
-ROOT_ONLY_WORKFLOWS = {"series.yml"}
+ROOT_ONLY_WORKFLOWS = {"series.yml", "noreply-identity.yml"}
 
 
 def git(source: Path, *args: str, env=None, input_bytes=None) -> bytes:
