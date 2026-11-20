@@ -8,7 +8,10 @@
     python tools/engine.py materialize --into <dir> CI: fetch the tag, apply, check out the tree
     python tools/engine.py drift --to <tag>   our patched Mozilla files that Mozilla changed
     python tools/engine.py port --to <tag>    every folder merged three-way onto the new tag,
-                                              all conflicts in one run, branch port/<tag>
+                                              all conflicts in one run, branch port/<tag>, then the
+                                              birth points of the new tag against the ledger
+    python tools/engine.py births --tree <dir>   every place the tree makes a network request, against
+                                              tools/birth-ledger.json (tools/births.py says how)
 
 The Mozilla tag, the source branch and the commit last exported are in UPSTREAM.json;
 --source / --base / --head override them (the source repository defaults to
@@ -60,6 +63,7 @@ from collections import defaultdict
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import births  # noqa: E402
 import layout  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -266,7 +270,7 @@ def build_stack(source: Path, base: str) -> list:
     return layers
 
 
-def port(source: Path, old: str, new: str, branch: str, force: bool) -> int:
+def port(source: Path, old: str, new: str, branch: str, force: bool, check_births: bool = False) -> int:
     """Moves the series from Mozilla tag `old` to tag `new` in one run, every folder
     merged three-way, and reports every conflict instead of stopping at the first.
 
@@ -311,7 +315,17 @@ def port(source: Path, old: str, new: str, branch: str, force: bool) -> int:
         print("FAIL %s" % problem)
     print("%s: %d folders moved from %s to %s, %d clean, %d with conflicts (%d files)"
           % (branch, len(report), old, new, len(report) - len(bad), len(bad), sum(len(c) for _, c in bad)))
-    return 1 if bad or already else 0
+    status = 0
+    if check_births:
+        # The birth points of the new tag: a call that Mozilla added, or whose arguments or context handling it changed, is red until it is in
+        # the ledger. Read from the commit just made (no checkout). The rows of every site go to a file in the temporary directory, for the review.
+        reader = births.Source(source, ref)
+        if reader.is_firefox_tree():
+            status = births.run(reader, series_folders(), title="birth points of %s:" % new,
+                                tsv=Path(tempfile.gettempdir()) / ("births-port-%s.tsv" % new))
+        else:
+            print("birth points not scanned: %s is not a Firefox tree" % branch)
+    return 1 if bad or already or status == 1 else 0
 
 
 def drift(source: Path, old: str, new: str) -> int:
@@ -944,6 +958,7 @@ def problems() -> list:
             counts.update({path: (added[path], removed.get(path, 0), hunks.get(path, 0)) for path in added})
     found += record_count_problems(records, counts)
     found += own_cxx_problems()
+    found += births.ledger_problems(births.load_ledger(), set(listed))
     series_wf = {p.name: p.read_bytes() for p in WORKFLOWS_SERIES.glob("*.yml")}
     root_wf = {p.name: p.read_bytes() for p in WORKFLOWS_ROOT.glob("*.yml")}
     for name in sorted(set(series_wf) | set(root_wf) - ROOT_ONLY_WORKFLOWS):
@@ -999,9 +1014,11 @@ def status(source: Path, head: str) -> int:
 
 
 def main() -> int:
+    if len(sys.argv) > 1 and sys.argv[1] == "births":
+        return births.main(sys.argv[2:])      # its own options: --tree, --repo/--rev, --skeleton, --accept-changed, --prune, --tsv
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("command", choices=["status", "apply", "materialize", "export", "verify", "check",
-                                        "shrink-budget", "drift", "port"])
+                                        "shrink-budget", "drift", "port", "births"])
     ap.add_argument("--to", help="drift/port: the Mozilla tag to move to (a stable release, never a beta)")
     ap.add_argument("--into", type=Path, default=Path("."), help="materialize: the directory to make the tree")
     ap.add_argument("--shared", type=Path, default=None,
@@ -1021,7 +1038,7 @@ def main() -> int:
             raise SystemExit("%s needs --to <Mozilla tag>" % a.command)
         if a.command == "drift":
             return drift(a.source, base, a.to)
-        return port(a.source, base, a.to, a.head if a.head else "port/%s" % a.to, a.force)
+        return port(a.source, base, a.to, a.head if a.head else "port/%s" % a.to, a.force, check_births=True)
     if a.command == "materialize":
         materialize(a.into, shared=a.shared)
         return 0

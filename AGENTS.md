@@ -36,6 +36,7 @@ python tools/engine.py apply --head <ramo>   # nel sorgente: il tag + un commit 
 python tools/engine.py export   # riscrive la serie dal sorgente
 python tools/engine.py verify   # la ricostruisce sul tag e la confronta: "identical" o rosso
 python tools/engine.py check    # regole della serie, senza Firefox (gira anche in CI)
+python tools/births.py --tree <albero>   # ogni punto in cui l'albero crea una richiesta di rete, contro tools/birth-ledger.json (CI: dopo materialize; `port` lo esegue alla fine)
 python tools/engine.py shrink-budget   # abbassa i tetti dopo aver spostato logica
 python tools/engine.py drift --to <tag>  # quali nostri file Mozilla ha cambiato fino al tag nuovo
 python tools/engine.py port --to <tag>   # tutte le cartelle a tre vie sul tag nuovo, tutti i conflitti in una corsa

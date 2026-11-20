@@ -37,6 +37,13 @@ jobs:
           python-version: "3.12"
       - name: The Mozilla tag from Mozilla, the series applied, the declared tree
         run: python .series/tools/engine.py materialize --into source
+      # Every place the tree makes a network request (a channel, a socket transport, a UDP or TCP socket, a lookup, a speculative
+      # connection) against tools/birth-ledger.json: a site the ledger does not have, a statement or a context signature that changed,
+      # a lost hook, or a site that carries no context and a page can reach is red. Exit 2 is the dated open items alone (red by design:
+      # a known hole nobody has decided yet). No build: the scan reads the tree this commit materializes. A port to a new tag runs the same
+      # scan at the end of `engine.py port`.
+      - name: The birth points of a request, against the ledger
+        run: python .series/tools/births.py --tree source
       # The core's checks that read the engine's source: pref types and readers,
       # prefs the binary reads, the Juggler contract and protocol, the WebGL
       # extension order, the font manifest. In the core's own CI they skip, as no
