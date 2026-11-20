@@ -162,7 +162,16 @@ test('the failure of a document request carries the navigation it belongs to', (
   const events = [];
   documentRequest(events, 'nav-26')._sendOnRequestFailed(Cr.NS_BINDING_ABORTED);
   assert.deepEqual(events, [[PageNetwork.Events.RequestFailed,
-                             { requestId: '21', errorCode: 'NS_BINDING_ABORTED', navigationId: 'nav-26' }, MAIN]]);
+                             { requestId: '21', errorCode: 'NS_BINDING_ABORTED', navigationId: 'nav-26', documentResponded: false }, MAIN]]);
+});
+
+test('the cut of a document request says whether its response had begun: then a document may be on its way from its process', () => {
+  const events = [];
+  const request = documentRequest(events, 'nav-27');
+  request._sentOnResponse = true;
+  request._sendOnRequestFailed(Cr.NS_BINDING_ABORTED);
+  assert.equal(events[0][1].navigationId, 'nav-27');
+  assert.equal(events[0][1].documentResponded, true);
 });
 
 test('any other failure of a document request does not carry the navigation: the content tells it, in order with its documents', () => {
