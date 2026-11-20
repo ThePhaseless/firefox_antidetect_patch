@@ -31,6 +31,15 @@
 // {frameId, navigationId, url, name}, 'navigationaborted' {frameId, navigationId, errorText},
 // 'initialloadfailed' {frameId}: a frame that never committed a document of its own was refused its first load.
 
+// A diagnostic trace, off unless the parent's environment asks for it (Trace.js). Tolerant: a file loaded
+// where there is no Gecko (a node test) traces nothing.
+let traceNavigations = () => {};
+try {
+  const traceNavigationsModule = ChromeUtils.importESModule('resource://gre/modules/juggler/Trace.js');
+  if (traceNavigationsModule && typeof traceNavigationsModule.trace === 'function')
+    traceNavigations = (...args) => { try { traceNavigationsModule.trace(...args); } catch (e) {} };
+} catch (e) {}
+
 // An address without its fragment: the one a request goes by, whatever the document's location adds.
 function withoutFragment(url) {
   const hash = url.indexOf('#');
@@ -42,7 +51,11 @@ const ENDED_REMEMBERED = 8;
 
 export class FrameNavigations {
   constructor(emit) {
-    this._emit = emit;
+    // What the registry tells is traced as it goes out.
+    this._emit = (name, payload, frameId) => {
+      traceNavigations('navigations', 'emit ' + name, payload);
+      return emit(name, payload, frameId);
+    };
     this._pending = new Map();      // frameId -> {navigationId, url}
     this._committed = new Map();    // frameId -> navigationId
     this._ended = new Map();        // frameId -> [navigationId] (committed, aborted or replaced), the last few
@@ -71,18 +84,22 @@ export class FrameNavigations {
   // A document request of the navigation, seen in the parent. Before the request itself is forwarded, so
   // the navigation starts before its first request.
   onDocumentRequest(frameId, navigationId, url) {
+    traceNavigations('navigations', 'onDocumentRequest', {frameId, navigationId, url});
     this._start(frameId, navigationId, url);
   }
 
   // The load was begun in the content process of the frame, whether or not a request follows (about:blank,
   // data:, a navigation the network never sees).
   onContentNavigationStarted(frameId, navigationId) {
+    traceNavigations('navigations', 'onContentNavigationStarted', {frameId, navigationId});
     this._start(frameId, navigationId, undefined);
   }
 
   _start(frameId, navigationId, url) {
-    if (!navigationId)
+    if (!navigationId) {
+      traceNavigations('navigations', 'start dropped: no navigation id', {frameId, url});
       return;
+    }
     const pending = this._pending.get(frameId);
     if (pending && pending.navigationId === navigationId) {
       if (url) {
@@ -91,8 +108,10 @@ export class FrameNavigations {
       }
       return;
     }
-    if (this._committed.get(frameId) === navigationId || this._hasEnded(frameId, navigationId))
+    if (this._committed.get(frameId) === navigationId || this._hasEnded(frameId, navigationId)) {
+      traceNavigations('navigations', 'start dropped: the navigation already ended', {frameId, navigationId, committed: this._committed.get(frameId) === navigationId});
       return;
+    }
     // A navigation replaces the one in flight without ending it, as it always did: its document or its abort can
     // still come, and is told under its own id.
     if (pending) {
@@ -123,6 +142,7 @@ export class FrameNavigations {
   // committed under its own id and the navigation in flight stays.
   onDocumentInserted(frameId, url, name, navigationId) {
     const pending = this._pending.get(frameId);
+    traceNavigations('navigations', 'onDocumentInserted', {frameId, url, name, navigationId, pendingNavigationId: pending ? pending.navigationId : null});
     if (navigationId && (!pending || pending.navigationId !== navigationId)) {
       const replaced = this._replaced.get(frameId);
       // A navigation that was told aborted and whose document appeared all the same (the page's own location.replace,
@@ -133,6 +153,8 @@ export class FrameNavigations {
         this._committed.set(frameId, navigationId);
         this._initialDone.add(frameId);
         this._tellCommit(frameId, navigationId, url, name);
+      } else {
+        traceNavigations('navigations', 'document dropped: its navigation is not pending, replaced or returned', {frameId, url, navigationId});
       }
       return;
     }
@@ -149,13 +171,17 @@ export class FrameNavigations {
         return;
       }
     }
-    if (!pending)
+    if (!pending) {
+      traceNavigations('navigations', 'document dropped: no navigation in flight', {frameId, url, navigationId});
       return;
+    }
     // No navigation of the process's own to go by: the document is the pending navigation's if it is at an address
     // that navigation went by. A document.open() writes a root element into the document that stays, which is not
     // the one the navigation in flight is loading.
-    if (!navigationId && pending.urls.size && url && !pending.urls.has(withoutFragment(url)))
+    if (!navigationId && pending.urls.size && url && !pending.urls.has(withoutFragment(url))) {
+      traceNavigations('navigations', 'document dropped: not an address of the navigation in flight', {frameId, url, pendingNavigationId: pending.navigationId, urls: [...pending.urls]});
       return;
+    }
     this._pending.delete(frameId);
     this._committed.set(frameId, pending.navigationId);
     this._remember(frameId, pending.navigationId);
@@ -210,6 +236,7 @@ export class FrameNavigations {
   // document already committed is committed again, with the id the process knows; a navigation
   // in flight is started.
   onFrameKnown(frameId, {url, name, navigationId, pendingNavigationId}) {
+    traceNavigations('navigations', 'onFrameKnown', {frameId, url, name, navigationId, pendingNavigationId});
     if (url) {
       // The id the process gives, and none otherwise: a document that no navigation of ours made (the about:blank of
       // a tree that is born, the one a script navigates to) must not borrow the id of the one it replaces.
@@ -248,14 +275,17 @@ export class FrameNavigations {
   // true, for the caller to send the barrier and call `onCutConfirmed` when it comes back, or when it cannot be delivered.
   // Before any response no process can have a document of the request: the cut ends the navigation at once.
   onDocumentRequestFailed(frameId, navigationId, errorText, responded = false) {
+    traceNavigations('navigations', 'onDocumentRequestFailed', {frameId, navigationId, errorText, responded});
     if (!responded) {
       this._abort(frameId, navigationId, errorText);
       return false;
     }
     const pending = this._pending.get(frameId);
     const replaced = this._replaced.get(frameId);
-    if (!(pending && pending.navigationId === navigationId) && !(replaced && replaced.has(navigationId)))
+    if (!(pending && pending.navigationId === navigationId) && !(replaced && replaced.has(navigationId))) {
+      traceNavigations('navigations', 'cut not held: the navigation is not pending or replaced', {frameId, navigationId});
       return false;   // committed or ended already: nothing to hold
+    }
     let cuts = this._cuts.get(frameId);
     if (!cuts) {
       cuts = new Map();
@@ -270,6 +300,7 @@ export class FrameNavigations {
   // with the cut.
   onCutConfirmed(frameId, navigationId) {
     const cuts = this._cuts.get(frameId);
+    traceNavigations('navigations', 'onCutConfirmed', {frameId, navigationId, held: !!(cuts && cuts.has(navigationId))});
     if (!cuts || !cuts.has(navigationId))
       return;
     const errorText = cuts.get(navigationId);
@@ -287,6 +318,7 @@ export class FrameNavigations {
   // a document request may also be told by the parent (onDocumentRequestFailed): whoever says an end first, the registry
   // takes it once. `errorText` is already the protocol's text.
   onNavigationAborted(frameId, navigationId, errorText) {
+    traceNavigations('navigations', 'onNavigationAborted', {frameId, navigationId, errorText});
     this._abort(frameId, navigationId, errorText);
   }
 
@@ -297,6 +329,8 @@ export class FrameNavigations {
       const replaced = this._replaced.get(frameId);
       if (replaced && replaced.delete(navigationId))
         this._emit('navigationaborted', {frameId, navigationId, errorText}, frameId);
+      else
+        traceNavigations('navigations', 'abort dropped: the navigation is not pending or replaced', {frameId, navigationId, errorText, pendingNavigationId: pending ? pending.navigationId : null});
       return;
     }
     this._end(frameId, pending, errorText);
@@ -333,6 +367,7 @@ export class FrameNavigations {
 
   // A frame that is gone keeps nothing.
   forget(frameId) {
+    traceNavigations('navigations', 'forget', {frameId, pendingNavigationId: this.pendingNavigationId(frameId)});
     this._pending.delete(frameId);
     this._committed.delete(frameId);
     this._ended.delete(frameId);
