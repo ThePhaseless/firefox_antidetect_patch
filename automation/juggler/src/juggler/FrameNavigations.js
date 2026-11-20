@@ -16,6 +16,17 @@
 // process swap's own). Two voices for one end are one. One registry per PageHandler, a frame at a time: started, then
 // committed or aborted, each id once.
 //
+// ⛔ THE PARENT HEARS ITS OWN NETWORK AT ONCE, AND THE CONTENT PROCESS LATE. A process that takes a new document starts its
+// channel to the parent again (SimpleChannel.bindToActor) and keeps what it says until the parent's READY, while the
+// NetworkObserver tells what it sees as it sees it. So the cut of a document request whose response had begun can come
+// before the document that response made: measured on the wrapper's e2e (PR #534, run 44655615997), a goto whose document
+// committed in another process and moved itself from an inline script was told aborted (NS_BINDING_ABORTED), and its
+// document, which came after with no id, was told as a document no navigation made. Such a cut is held
+// (`onDocumentRequestFailed` answers true) until a barrier sent through the channel of the process that holds the frame
+// comes back (`onCutConfirmed`): what that process had to say before has arrived by then. And a document with no id is
+// known by its address as the one of a navigation that was replaced before it was heard from, not only of the one in
+// flight.
+//
 // `emit(name, payload, frameId)`: 'navigationstarted' {frameId, navigationId}, 'navigationcommitted'
 // {frameId, navigationId, url, name}, 'navigationaborted' {frameId, navigationId, errorText},
 // 'initialloadfailed' {frameId}: a frame that never committed a document of its own was refused its first load.
@@ -35,7 +46,8 @@ export class FrameNavigations {
     this._pending = new Map();      // frameId -> {navigationId, url}
     this._committed = new Map();    // frameId -> navigationId
     this._ended = new Map();        // frameId -> [navigationId] (committed, aborted or replaced), the last few
-    this._replaced = new Map();     // frameId -> Set(navigationId): replaced by a newer navigation before they were heard from
+    this._replaced = new Map();     // frameId -> Map(navigationId -> its addresses): replaced by a newer navigation before they were heard from
+    this._cuts = new Map();         // frameId -> Map(navigationId -> errorText): cuts held until their barrier comes back
     this._initialDone = new Set();  // frameIds that have had a navigation end
     this._restoredDocuments = 0;
     this._documents = new Map();    // frameId -> {navigationId, url, name}: the last document told committed
@@ -87,14 +99,16 @@ export class FrameNavigations {
       this._remember(frameId, pending.navigationId);
       let replaced = this._replaced.get(frameId);
       if (!replaced) {
-        replaced = new Set();
+        replaced = new Map();
         this._replaced.set(frameId, replaced);
       }
-      replaced.add(pending.navigationId);
+      // With its addresses: its document may still come with no id (the process that commits a navigation that changed
+      // process does not know it), and is known by them.
+      replaced.set(pending.navigationId, pending.urls);
       // Bounded like the list of ended navigations: a frame that never hears from the ones it replaced (the main
       // frame is never forgotten) does not keep them for ever.
       while (replaced.size > ENDED_REMEMBERED)
-        replaced.delete(replaced.values().next().value);
+        replaced.delete(replaced.keys().next().value);
     }
     this._pending.set(frameId, {navigationId, url, urls: new Set(url ? [withoutFragment(url)] : [])});
     this._emit('navigationstarted', {frameId, navigationId}, frameId);
@@ -122,6 +136,19 @@ export class FrameNavigations {
       }
       return;
     }
+    // No navigation of the process's own to go by, and an address the navigation in flight did not go by (or none in
+    // flight): the document is the one of a navigation replaced before it was heard from, if it went by that address.
+    // Its commit had waited in the channel of the process that holds the frame while the parent saw the newer request.
+    if (!navigationId && url && (!pending || (pending.urls.size && !pending.urls.has(withoutFragment(url))))) {
+      const theirs = this._replacedAt(frameId, url);
+      if (theirs !== undefined) {
+        this._replaced.get(frameId).delete(theirs);
+        this._committed.set(frameId, theirs);
+        this._initialDone.add(frameId);
+        this._tellCommit(frameId, theirs, url, name);
+        return;
+      }
+    }
     if (!pending)
       return;
     // No navigation of the process's own to go by: the document is the pending navigation's if it is at an address
@@ -134,6 +161,19 @@ export class FrameNavigations {
     this._remember(frameId, pending.navigationId);
     this._initialDone.add(frameId);
     this._tellCommit(frameId, pending.navigationId, url, name);
+  }
+
+  // The newest navigation of the frame replaced before it was heard from that went by `url`, or undefined.
+  _replacedAt(frameId, url) {
+    const replaced = this._replaced.get(frameId);
+    if (!replaced)
+      return undefined;
+    let theirs;
+    for (const [navigationId, urls] of replaced) {
+      if (urls.has(withoutFragment(url)))
+        theirs = navigationId;
+    }
+    return theirs;
   }
 
   _tellCommit(frameId, navigationId, url, name) {
@@ -202,7 +242,38 @@ export class FrameNavigations {
   // and not committed. A navigation that already ended (committed, aborted) says nothing more. A redirect is no failure:
   // only the end of the LAST request of the navigation comes here. Another error of the request does not: the content
   // process tells it, in order with the documents it inserts.
-  onDocumentRequestFailed(frameId, navigationId, errorText) {
+  //
+  // `responded`: the response of the request had begun. Then a document may already exist in the process that holds the
+  // frame, its commit still waiting in that process's channel (the head of this file): the cut is held, and the answer is
+  // true, for the caller to send the barrier and call `onCutConfirmed` when it comes back, or when it cannot be delivered.
+  // Before any response no process can have a document of the request: the cut ends the navigation at once.
+  onDocumentRequestFailed(frameId, navigationId, errorText, responded = false) {
+    if (!responded) {
+      this._abort(frameId, navigationId, errorText);
+      return false;
+    }
+    const pending = this._pending.get(frameId);
+    const replaced = this._replaced.get(frameId);
+    if (!(pending && pending.navigationId === navigationId) && !(replaced && replaced.has(navigationId)))
+      return false;   // committed or ended already: nothing to hold
+    let cuts = this._cuts.get(frameId);
+    if (!cuts) {
+      cuts = new Map();
+      this._cuts.set(frameId, cuts);
+    }
+    cuts.set(navigationId, errorText);
+    return true;
+  }
+
+  // The barrier of a held cut came back, or could not be delivered: what the process that holds the frame had to say
+  // before it has arrived. A navigation whose document came meanwhile has committed and is not ended; any other ends
+  // with the cut.
+  onCutConfirmed(frameId, navigationId) {
+    const cuts = this._cuts.get(frameId);
+    if (!cuts || !cuts.has(navigationId))
+      return;
+    const errorText = cuts.get(navigationId);
+    cuts.delete(navigationId);
     this._abort(frameId, navigationId, errorText);
   }
 
@@ -263,6 +334,7 @@ export class FrameNavigations {
     this._committed.delete(frameId);
     this._ended.delete(frameId);
     this._replaced.delete(frameId);
+    this._cuts.delete(frameId);
     this._documents.delete(frameId);
     this._initialDone.delete(frameId);
   }

@@ -355,6 +355,7 @@ export class PageHandler {
   }
 
   async dispose() {
+    this._disposed = true;
     this._frameLifecycle.dispose();
     this._frameEventsBeforeFrame.clear();
     // Each worker has a fan-in registered on the page's mux and a connector: the session that goes leaves none of
@@ -442,14 +443,28 @@ export class PageHandler {
       this._frameNavigations.onDocumentRequest(frameId, eventDetails.navigationId, eventDetails.url);
     if (protocolEventName === 'Network.requestFailed') {
       // The last request of a document's navigation failed: the request is told as it is, then the navigation ends with
-      // it. `navigationId` is the registry's, not the client's.
-      const {navigationId, ...failure} = eventDetails;
+      // it, or, cut after its response had begun, once the barrier says nothing of its document is still on its way.
+      // `navigationId` and `documentResponded` are the registry's, not the client's.
+      const {navigationId, documentResponded, ...failure} = eventDetails;
       this._emitFrameKeyed(protocolEventName, failure, frameId);
-      if (navigationId)
-        this._frameNavigations.onDocumentRequestFailed(frameId, navigationId, failure.errorCode);
+      if (navigationId && this._frameNavigations.onDocumentRequestFailed(frameId, navigationId, failure.errorCode, !!documentResponded))
+        this._confirmCut(frameId, navigationId);
       return;
     }
     this._emitFrameKeyed(protocolEventName, eventDetails, frameId);
+  }
+
+  // A held cut (FrameNavigations.onDocumentRequestFailed): a request and its answer through the channel of the process
+  // that holds the frame now, the same channel its documents come by, so what that process said before is in when the
+  // answer is. The mux sends it to the root of the frame and again to the next one when that root goes; a channel that
+  // is not ready keeps it and sends it at its READY, after what the process queued. Refused (no root, the page closing),
+  // nothing is on its way either: the cut is confirmed all the same.
+  _confirmCut(frameId, navigationId) {
+    const confirm = () => {
+      if (!this._disposed)
+        this._frameNavigations.onCutConfirmed(frameId, navigationId);
+    };
+    this._contentPage.send('barrier', {frameId}).then(confirm, confirm);
   }
 
   // An event of a frame leaves once the client knows the frame; until then it waits, in the order it came.

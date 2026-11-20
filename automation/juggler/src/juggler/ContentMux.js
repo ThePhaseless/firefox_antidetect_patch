@@ -56,6 +56,8 @@ export const ROUTES = {
   setUserInput: byFrame,
   selectOptions: byFrame,
   armLanding: byFrame,
+  // nothing but its answer, which leaves after what the root had queued: a held cut waits for it (PageHandler._confirmCut)
+  barrier: retryingOnRootGone(byFrame),
   // the frame's parent: the box of a child frame is measured where its element is
   frameBoxTransform: retryingOnRootGone(p => ({kind: 'parentOf', id: p.childFrameId})),
   // the name of a child frame is read where its <iframe> is

@@ -646,13 +646,18 @@ class NetworkRequest {
       // navigation of a document request that was CUT (NS_BINDING_ABORTED), and of no other failure. Any other error
       // (a connection that drops half way through the body, a partial transfer) can come after the document appeared in
       // its process, whose message is still on its way: the parent would end a navigation that committed. The content
-      // process sees those ends in order with the documents it inserts and tells them. A cut after the document leaves
-      // the process that holds it on the channel of that message, so it comes after it. A redirect hop does not come
-      // here, it finishes (_sendOnRequestFinished): what fails is the last request of the navigation.
+      // process sees those ends in order with the documents it inserts and tells them. A cut can come before the
+      // document too: the process that took it holds what it says until its channel to the parent is ready again, and
+      // this observer says what it sees at once. So the cut carries whether the response had begun
+      // (`documentResponded`, taken off with the id): then the registry holds it behind a barrier through the channel of
+      // that process (FrameNavigations.onDocumentRequestFailed). A redirect hop does not come here, it finishes
+      // (_sendOnRequestFinished): what fails is the last request of the navigation.
+      const cut = error === Cr.NS_BINDING_ABORTED;
       pageNetwork.emit(PageNetwork.Events.RequestFailed, {
         requestId: this.requestId,
         errorCode: helper.getNetworkErrorStatusText(error),
-        navigationId: error === Cr.NS_BINDING_ABORTED ? this.navigationId : undefined,
+        navigationId: cut ? this.navigationId : undefined,
+        documentResponded: cut && this.navigationId ? !!this._sentOnResponse : undefined,
       }, this._frameId);
     }
     this._ended();

@@ -186,6 +186,8 @@ export class PageAgent {
       this._runtime.events.onExecutionContextDestroyed(this._onExecutionContextDestroyed.bind(this)),
       this._runtime.events.onBindingCalled(this._onBindingCalled.bind(this)),
       browserChannel.register('page', {
+        // Answered at once, with nothing: the answer leaves after what this end had queued (PageHandler._confirmCut).
+        barrier: () => undefined,
         adoptNode: this._adoptNode.bind(this),
         describeNode: this._describeNode.bind(this),
         frameName: this._frameName.bind(this),

@@ -599,24 +599,78 @@ test('a navigation that is already committed is not committed again by a second 
 // request of the page's own navigation, then the cut of the document request it leaves (NS_BINDING_ABORTED, with the id
 // of ours), and only then the document of ours, inserted with no id (the process that commits a navigation that changed
 // process does not know its id), and the same document said again as a frame no navigation made (PageAgent
-// ._onInitialDocumentCommitted). The cut came after the document on the wire (NetworkObserver._sendOnRequestFailed), but
-// not in what the parent hears. The client was told our navigation aborted - goto raised NS_BINDING_ABORTED for a page
-// that loaded - and our document under no navigation.
+// ._onInitialDocumentCommitted). The cut came after the document on the wire, but not in what the parent hears. The
+// client was told our navigation aborted - goto raised NS_BINDING_ABORTED for a page that loaded - and our document under
+// no navigation. The cut came after the response had begun (`responded`), so it is held until the barrier through the
+// channel of that process comes back (`onCutConfirmed`), after what the process had queued.
 for (const cutFirst of [false, true]) {
   test(`a navigation whose document committed in a process still waiting for its channel is not cut by the parent (${cutFirst ? 'cut before' : 'cut after'} the page's own request)`, () => {
     const { registry, events } = setup();
     registry.onDocumentRequest(MAIN, 'nav-31', 'http://127.0.0.1/hdr?n=0');      // our goto
     if (cutFirst)
-      registry.onDocumentRequestFailed(MAIN, 'nav-31', 'NS_BINDING_ABORTED');
+      assert.equal(registry.onDocumentRequestFailed(MAIN, 'nav-31', 'NS_BINDING_ABORTED', true), true);
     registry.onDocumentRequest(MAIN, 'nav-32', 'http://127.0.0.1/landed');       // the page's location.replace
     if (!cutFirst)
-      registry.onDocumentRequestFailed(MAIN, 'nav-31', 'NS_BINDING_ABORTED');
-    // what the process that holds the frame said before the parent's READY reached it
+      assert.equal(registry.onDocumentRequestFailed(MAIN, 'nav-31', 'NS_BINDING_ABORTED', true), true);
+    // what the process that holds the frame said before the parent's READY reached it, then the barrier's answer
     registry.onDocumentInserted(MAIN, 'http://127.0.0.1/hdr?n=0', '');
     registry.onFrameKnown(MAIN, {url: 'http://127.0.0.1/hdr?n=0', name: ''});
+    registry.onCutConfirmed(MAIN, 'nav-31');
     registry.onDocumentInserted(MAIN, 'http://127.0.0.1/landed', '', 'nav-32');
     const ours = events.filter(([, payload]) => payload.navigationId === 'nav-31');
     assert.deepEqual(ours, [started(MAIN, 'nav-31'), committed(MAIN, 'nav-31', 'http://127.0.0.1/hdr?n=0', '')]);
     assert.deepEqual(events.at(-1), committed(MAIN, 'nav-32', 'http://127.0.0.1/landed', ''));
   });
 }
+
+test('a cut after the response began is held until its barrier comes back, then ends a navigation whose document never came', () => {
+  const { registry, events } = setup();
+  registry.onDocumentRequest(MAIN, 'nav-41', 'http://b.test/held');
+  assert.equal(registry.onDocumentRequestFailed(MAIN, 'nav-41', 'NS_BINDING_ABORTED', true), true);
+  assert.deepEqual(events, [started(MAIN, 'nav-41')], 'nothing is ended before the barrier');
+  assert.equal(registry.pendingNavigationId(MAIN), 'nav-41');
+  registry.onCutConfirmed(MAIN, 'nav-41');
+  assert.deepEqual(events, [started(MAIN, 'nav-41'), aborted(MAIN, 'nav-41', 'NS_BINDING_ABORTED')]);
+  assert.equal(registry.pendingNavigationId(MAIN), undefined);
+  // a second answer of the barrier (sent again to the next root) says nothing more
+  registry.onCutConfirmed(MAIN, 'nav-41');
+  assert.equal(events.length, 2);
+});
+
+test('a cut before any response ends the navigation at once: no process can have its document', () => {
+  const { registry, events } = setup();
+  registry.onDocumentRequest(MAIN, 'nav-42', 'http://b.test/never');
+  assert.equal(registry.onDocumentRequestFailed(MAIN, 'nav-42', 'NS_BINDING_ABORTED', false), false);
+  assert.deepEqual(events, [started(MAIN, 'nav-42'), aborted(MAIN, 'nav-42', 'NS_BINDING_ABORTED')]);
+});
+
+test('a held cut of a navigation that committed meanwhile, or of one already ended, ends nothing', () => {
+  const { registry, events } = setup();
+  registry.onDocumentRequest(MAIN, 'nav-43', 'http://b.test/a');
+  assert.equal(registry.onDocumentRequestFailed(MAIN, 'nav-43', 'NS_BINDING_ABORTED', true), true);
+  registry.onDocumentInserted(MAIN, 'http://b.test/a', '');
+  registry.onCutConfirmed(MAIN, 'nav-43');
+  assert.deepEqual(events, [started(MAIN, 'nav-43'), committed(MAIN, 'nav-43', 'http://b.test/a', '')]);
+  // committed already: the cut is not even held
+  assert.equal(registry.onDocumentRequestFailed(MAIN, 'nav-43', 'NS_BINDING_ABORTED', true), false);
+  assert.equal(events.length, 2);
+});
+
+test('the document with no id of a navigation replaced before it was heard from is committed under its id, with no cut at all', () => {
+  // The same input with the document before the cut: the parent saw the page's own request first, then the document of
+  // ours came from the process that changed, with no id, at an address the navigation in flight never went by. It was
+  // dropped, and the cut that followed told ours aborted.
+  const { registry, events } = setup();
+  registry.onDocumentRequest(MAIN, 'nav-51', 'http://127.0.0.1/hdr?n=1');
+  registry.onDocumentRequest(MAIN, 'nav-52', 'http://127.0.0.1/landed?n=1');
+  registry.onDocumentInserted(MAIN, 'http://127.0.0.1/hdr?n=1', '');
+  assert.deepEqual(events.at(-1), committed(MAIN, 'nav-51', 'http://127.0.0.1/hdr?n=1', ''));
+  assert.equal(registry.pendingNavigationId(MAIN), 'nav-52', 'the newer navigation stays in flight');
+  assert.equal(registry.onDocumentRequestFailed(MAIN, 'nav-51', 'NS_BINDING_ABORTED', false), false);
+  registry.onDocumentInserted(MAIN, 'http://127.0.0.1/landed?n=1', '', 'nav-52');
+  assert.deepEqual(events, [
+    started(MAIN, 'nav-51'), started(MAIN, 'nav-52'),
+    committed(MAIN, 'nav-51', 'http://127.0.0.1/hdr?n=1', ''),
+    committed(MAIN, 'nav-52', 'http://127.0.0.1/landed?n=1', ''),
+  ]);
+});
