@@ -45,7 +45,9 @@ check    needs no Firefox: SERIES lists exactly the folders that exist, every fo
          evidence of an inventory record, names a folder of SERIES, and the added, removed and hunk
          counts of each inventory record are those of its file in the hooks.patch. A C++ file of ours has no control character (a carriage return inside a
          string literal ended the literal and broke the build of a test) and no byte outside ASCII inside a
-         string or character literal: write them as escapes.
+         string or character literal: write them as escapes. No file of ours has a carriage return: not under
+         <folder>/src/ (a binary file, with a NUL byte, apart) and not in a line a hooks.patch adds to a Mozilla
+         file (Mozilla's own lines may carry one; ours may only where the context of their hunk does).
 """
 from __future__ import annotations
 
@@ -887,6 +889,67 @@ def own_cxx_problems() -> list:
     return found
 
 
+def _cr_line(data: bytes) -> int:
+    return data.count(b"\n", 0, data.index(b"\r")) + 1
+
+
+def own_cr_problems() -> list:
+    """A carriage return in a file of ours: every file under <folder>/src/, whatever its extension. Not judged: a
+    binary file (it holds a NUL byte) and a file the folder's MANIFEST lists as category backport (upstream code
+    carried as it is keeps the line endings of its origin)."""
+    found = []
+    for folder in existing_folders():
+        src = ROOT / folder / "src"
+        if not src.is_dir():
+            continue
+        manifest = json.loads((ROOT / folder / "MANIFEST.json").read_text(encoding="utf-8"))
+        upstream_code = {r["file"] for r in manifest.get("inventory", []) if r["category"] == "backport"}
+        for p in sorted(src.rglob("*")):
+            rel = p.relative_to(src).as_posix()
+            if not p.is_file() or rel in upstream_code:
+                continue
+            data = p.read_bytes()
+            if b"\r" not in data or b"\0" in data:
+                continue
+            name = "%s/src/%s" % (folder, rel)
+            found.append("%s has %d carriage return(s), the first on line %d: a file of ours ends its lines with LF only; "
+                         "write it with LF (open(path, \"w\", newline=\"\") and \"\\n\"), never through a text-mode "
+                         "stdout on Windows" % (name, data.count(b"\r"), _cr_line(data)))
+    return found
+
+
+def patch_cr_problems(folder: str, data: bytes) -> list:
+    """A carriage return in a line a hooks.patch adds to a Mozilla file (`data`: the bytes of the patch). The lines
+    around ours are Mozilla's and may carry one if Mozilla's file does; a line of ours may end in CR only when every
+    context line of its hunk does (the file is CRLF and the line keeps its ending)."""
+    found, target, hunk, in_hunk = [], None, [], False
+
+    def close():
+        context = [text for _, kind, text in hunk if kind == b" "]
+        crlf = bool(context) and all(text.endswith(b"\r") for text in context)
+        for no, kind, text in hunk:
+            if kind == b"+" and b"\r" in text and not (crlf and text.endswith(b"\r") and text.count(b"\r") == 1):
+                found.append("%s/hooks.patch:%d (adds to %s): the line has a carriage return, and %s: a line of ours "
+                             "ends with LF, with CRLF only in a hunk whose context lines are CRLF (the file's own "
+                             "ending); write the patch with LF (open(path, \"w\", newline=\"\") and \"\\n\"), never "
+                             "through a text-mode stdout on Windows"
+                             % (folder, no, target, "it is not a plain CRLF line" if crlf else "the context of its hunk is not CRLF"))
+        hunk.clear()
+
+    for no, line in enumerate(data.split(b"\n"), 1):
+        m = PATCH_FILE.match(line.decode("utf-8", errors="replace"))
+        if m:
+            close()
+            target, in_hunk = m.group(1), False
+        elif line.startswith(b"@@"):
+            close()
+            in_hunk = True
+        elif in_hunk and line[:1] in (b"+", b" ", b"-"):
+            hunk.append((no, line[:1], line[1:]))
+    close()
+    return found
+
+
 def problems() -> list:
     """Every rule of the series that is broken now, as sentences."""
     found = []
@@ -958,6 +1021,10 @@ def problems() -> list:
             counts.update({path: (added[path], removed.get(path, 0), hunks.get(path, 0)) for path in added})
     found += record_count_problems(records, counts)
     found += own_cxx_problems()
+    found += own_cr_problems()
+    for f in present:
+        if (ROOT / f / "hooks.patch").exists():
+            found += patch_cr_problems(f, (ROOT / f / "hooks.patch").read_bytes())
     found += births.ledger_problems(births.load_ledger(), set(listed))
     series_wf = {p.name: p.read_bytes() for p in WORKFLOWS_SERIES.glob("*.yml")}
     root_wf = {p.name: p.read_bytes() for p in WORKFLOWS_ROOT.glob("*.yml")}
