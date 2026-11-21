@@ -432,6 +432,9 @@ jobs:
           # the engine's security state: generation, a normal launch, a certificate revoked in a CRLite delta refused at the first navigation, a launch with no state
           - { suite: wrapper.e2e.securitystate, leg: linux-x86_64, runner: ubuntu-24.04, kind: linux, os: linux }
           - { suite: wrapper.e2e.securitystate, leg: win-x86_64, runner: windows-latest, kind: win, os: windows }
+          # the fake web (two local sites, no request leaves the runner): the four e2e tests of its profiles P2 and P4, with the stock Firefox control below
+          - { suite: wrapper.e2e.fakeweb, leg: linux-x86_64, runner: ubuntu-24.04, kind: linux, os: linux }
+          - { suite: wrapper.e2e.fakeweb, leg: win-x86_64, runner: windows-latest, kind: win, os: windows }
     steps:
       - name: Checkout wrapper (its tests, ci/required-suites.json and scripts/ci_verdict.py)
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -558,6 +561,14 @@ jobs:
           sudo chmod -R go+rX /opt/ff
           ls -ld /opt /opt/ff /opt/ff/firefox
           echo "FF_EXE=/opt/ff/$(basename "$FF_EXE")" >> "$GITHUB_ENV"
+      # The fake web's control is Playwright's own Firefox (the same pin as the wrapper's fakeweb.yml); the other suites do not need it. On Linux the
+      # libraries Firefox loads are already installed by the system deps step above.
+      - name: Playwright's own Firefox (the control, the fake web only)
+        if: matrix.suite == 'wrapper.e2e.fakeweb'
+        shell: bash
+        run: |
+          python -m pip install --quiet "playwright==$(cat scripts/playwright_pin.txt)"
+          python -m playwright install firefox
       - name: The suite - every listed test runs and passes
         shell: bash
         run: |
@@ -654,6 +665,64 @@ jobs:
           python "$JUDGE" judge --required ci/required-suites.json --suite "${{ matrix.suite }}" --os "${{ matrix.os }}" \
             --junit "result/${{ matrix.suite }}.${{ matrix.os }}.xml" --binary "$FF_EXE" --seal gate.seal.json \
             --commit "$(git rev-parse HEAD)" "${MAIN[@]}" "${GEOIP[@]}" --out "result/${{ matrix.suite }}.${{ matrix.os }}.json"
+      # THE FAKE WEB has two judgements. The verdict above is the four pytest tests, judged against the registry like every suite. The steps below are the
+      # other one: the entry the wrapper's own fakeweb.yml runs (scripts/run_fakeweb.py), now on the binary of this candidate. Stock Firefox of Playwright goes
+      # first and ours second, one browser at a time, and the verdict is "the same outcome as stock", never a time. A stock Firefox that is not what the
+      # fake web declares is a BROKEN CONTROL: red as such, not a finding about ours. They come after the verdict so that its file is always written first,
+      # and they run even when the suite was red, so that one run shows both. A red step here is a red leg (the exit code), as in fakeweb.yml.
+      - name: Fake web profile P2, stock first and ours second, on a reused routed page
+        if: always() && matrix.suite == 'wrapper.e2e.fakeweb'
+        shell: bash
+        run: |
+          export INVISIBLE_CORE_AUTOFIX=off INVISIBLE_CORE_PIN=allow
+          export INVISIBLE_SEAL_FILE="$PWD/gate.seal.json" INVPW_BINARY_PATH="$FF_EXE" STEALTHFOX_E2E_BINARY="$FF_EXE"
+          mkdir -p result
+          PREFIX=""; [ "$RUNNER_OS" = Linux ] && PREFIX="xvfb-run -a"
+          $PREFIX python -u scripts/run_fakeweb.py --profile p2 --binary "$FF_EXE" --repetitions 10 --out result/fakeweb-p2.json
+      - name: Fake web profile P4, stock first and ours second, three walks of the journey
+        if: always() && matrix.suite == 'wrapper.e2e.fakeweb'
+        shell: bash
+        run: |
+          export INVISIBLE_CORE_AUTOFIX=off INVISIBLE_CORE_PIN=allow
+          export INVISIBLE_SEAL_FILE="$PWD/gate.seal.json" INVPW_BINARY_PATH="$FF_EXE" STEALTHFOX_E2E_BINARY="$FF_EXE"
+          mkdir -p result
+          PREFIX=""; [ "$RUNNER_OS" = Linux ] && PREFIX="xvfb-run -a"
+          set +e
+          $PREFIX python -u scripts/run_fakeweb.py --profile p4 --binary "$FF_EXE" --repetitions 3 --out result/fakeweb-p4.json 2>&1 | tee result/fakeweb-p4.log
+          python scripts/fakeweb_p4_report.py journey result/fakeweb-p4.json > result/fakeweb-p4-summary.md
+          rc=$?
+          cat result/fakeweb-p4-summary.md >> "$GITHUB_STEP_SUMMARY"
+          cat result/fakeweb-p4-summary.md
+          case "$rc" in
+            0) echo "journey: green, ours equals stock on every step";;
+            1) echo "journey: RED, ours differs from stock on a step of a walk whose control is sound";;
+            2) echo "journey: RED, BROKEN CONTROL: stock Firefox is not as tests/fakeweb/pages.json declares (not a finding about ours)";;
+            3) echo "journey: RED, ours differs from stock, and a control is broken";;
+            4) echo "journey: RED, the runner wrote no report";;
+            *) echo "journey: RED, the report did not finish ($rc)";;
+          esac
+          exit "$rc"
+      - name: Fake web profile P4, the types of the requests of stock and of ours (one traced walk each)
+        if: always() && matrix.suite == 'wrapper.e2e.fakeweb'
+        shell: bash
+        run: |
+          export INVISIBLE_CORE_AUTOFIX=off INVISIBLE_CORE_PIN=allow
+          export INVISIBLE_SEAL_FILE="$PWD/gate.seal.json" INVPW_BINARY_PATH="$FF_EXE" STEALTHFOX_E2E_BINARY="$FF_EXE"
+          mkdir -p result
+          PREFIX=""; [ "$RUNNER_OS" = Linux ] && PREFIX="xvfb-run -a"
+          set +e
+          $PREFIX python -u scripts/run_fakeweb.py --profile p4 --binary "$FF_EXE" --repetitions 1 --trace --out result/fakeweb-p4-trace.json 2>&1 | tee result/fakeweb-p4-trace.log
+          python scripts/fakeweb_p4_report.py trace result/fakeweb-p4-trace.json > result/fakeweb-p4-trace-summary.md
+          rc=$?
+          cat result/fakeweb-p4-trace-summary.md >> "$GITHUB_STEP_SUMMARY"
+          cat result/fakeweb-p4-trace-summary.md
+          case "$rc" in
+            0) echo "request types: green, ours does what stock does";;
+            1) echo "request types: RED, ours differs from stock, see the summary";;
+            2) echo "request types: RED, BROKEN CONTROL: stock reported no sendBeacon (not a finding about ours)";;
+            *) echo "request types: RED ($rc), see the summary";;
+          esac
+          exit "$rc"
       - name: Keep the result
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
