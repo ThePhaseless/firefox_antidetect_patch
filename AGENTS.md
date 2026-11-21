@@ -127,11 +127,11 @@ Per un gancio a metà funzione si prende la forma più portabile che dà lo stes
 
 **Il contratto** (vale per ogni gancio fuori dalle cartelle `backport`; lo fa rispettare `tools/hook_contract.py`, regole C1-C11)
 
-1. Una riga, senza logica: la chiamata e, nella guardia, il `return`. Niente `&&`, `||`, ternari, calcoli.
+1. Una riga, senza logica: la chiamata e, nella guardia, il `return`. Niente `&&`, `||`, ternari, calcoli. Due righe adiacenti sono due ganci se ognuna ha il suo marcatore ed è un'istruzione o una dichiarazione completa (C1 scatta per una riga nostra senza marcatore dentro una serie di righe, o per un'istruzione spezzata su più righe).
 2. Il marcatore `// STEALTH-HOOK(<cartella della funzione>)` sulla stessa riga (o il commento del linguaggio del file).
 3. Argomenti: `this`, i parametri della funzione o l'espressione avvolta. Se la funzione nostra deve leggere o scrivere uno stato privato senza accessore pubblico, si passa quel campo (per riferimento o puntatore) e `HOOKS.json` lo nomina: se Mozilla lo rinomina, l'errore esce alla compilazione. Mai variabili locali, tranne l'àncora. `friend` (forma Membro) solo quando i campi sono più d'uno.
 4. Nessuna riga di Mozilla tolta o cambiata, tranne la riga unica delle tre forme che riscrivono.
-5. Guardia e avviso sono la prima istruzione del corpo. Mai dentro un elenco di Mozilla né ultima riga di un blocco: fra noi e ciò che Mozilla aggiunge a ogni release deve restare una riga intatta.
+5. Guardia e avviso sono la prima istruzione del corpo (più ganci di una riga uno dopo l'altro in testa sono ammessi). Mai dentro un elenco di Mozilla né ultima riga di un blocco: fra noi e ciò che Mozilla aggiunge a ogni release deve restare una riga intatta.
 6. Nessun commento nei file di Mozilla oltre il marcatore.
 7. Nome `Stealth<Cosa>`, definita in un file nostro della stessa cartella.
 8. Mai file interi di Mozilla cancellati o sostituiti. Mai valori nostri negli spazi numerati di Mozilla (bit di flag, enum, costanti IDL): Mozilla li assegna alla release dopo e la fusione non lo segnala (in 159 il bit 25 di `nsIWebBrowserChrome`, nostro flag, diventa `CHROME_MEDIA_PIP`). Le nostre costanti stanno nei nostri file, su valori che Mozilla lascia liberi, con un test che lo controlla (`juggler/tests/explicit_size_flag_is_free.test.mjs`).

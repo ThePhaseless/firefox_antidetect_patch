@@ -451,3 +451,32 @@ def test_a_qualified_callee_is_stealth_named_in_every_form_g7():
     for text, form in ((guard, "guard"), (notice, "notice"), (mid, "anchor"), (expr, "wrap-expression"), (sub, "wrap-expression"),
                        (call, "wrap-call"), (arg, "wrap-call"), (shadow, "shadow"), (decl, "registration")):
         assert rules(text) == [] and forms_of(text) == [form], (form, rules(text), forms_of(text))
+
+
+# --------------------------------------------------------------------------- third pass: adjacent one-line hooks (C1)
+def test_c1_two_adjacent_complete_marked_lines_are_two_hooks():
+    one = "  StealthNote(this, aArg);" + MARK
+    two = "  if (StealthOwns(this)) return NS_OK;" + MARK
+    good = top(one, two)
+    assert rules(good) == [] and forms_of(good) == ["notice", "guard"]
+    assert [h.run for h in hc.analyse_patch(FOLDER, good)[0]] == [2, 2]
+    # a statement of ours split over two lines (marker on both, or on one): one hook of two lines
+    split_both = top("  StealthNote(this," + MARK, "                aArg);" + MARK)
+    split_first = top("  StealthNote(this," + MARK, "                aArg);")
+    for bad in (split_both, split_first):
+        assert "C1" in rules(bad), rules(bad)
+    # a line of ours without a marker that is part of a run
+    assert "C1" in rules(top(one, "  StealthMore(this);"))
+    assert "C1" in rules(top("  StealthMore(this);", one))
+    assert "C1" in rules(top("  if (StealthOwns(this)) {" + MARK, "    return NS_OK;", "  }"))
+    assert "C1" in rules(top("  if (StealthOwns(this))" + MARK, "    return NS_OK;" + MARK))     # a bare `if`: not complete
+    # the rest of the contract is judged line by line in the run
+    assert "C5" in rules(top(one, "  StealthNote(this, aArg + 1);" + MARK))
+    assert "C10" in rules(top(one, "  NoteIt(this);" + MARK))
+    assert "C3" in rules(top(one, "  StealthMore(this);  // STEALTH-HOOK(fingerprint/x) why"))
+
+
+def test_c1_includes_and_build_additions_in_a_run_stay_fine():
+    inc = patch("dom/Foo.cpp", [" #include \"a.h\"", " ", "+#include \"StealthX.h\"", "+#include \"StealthY.h\"", " ", " using namespace mozilla;", " ",
+                                " namespace x {"], section="")
+    assert "C1" not in rules(inc)

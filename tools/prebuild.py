@@ -110,6 +110,19 @@ class Tree:
     def all_paths(self) -> list:
         raise NotImplementedError
 
+    def contains_names(self, names) -> set:
+        """The names of `names` that some source file of this tree contains as a whole word."""
+        names = set(names)
+        if not names:
+            return set()
+        rx = re.compile(r"\b(?:%s)\b" % "|".join(re.escape(n) for n in sorted(names, key=len, reverse=True)))
+        found: set = set()
+        for q in self.all_paths():
+            if ext_of(q) in C_EXT | JS_EXT | RS_EXT | {"idl", "webidl", "ipdl", "ipdlh"} and found != names:
+                found.update(rx.findall(self.read(q) or ""))
+        return found
+
+
 class GitTree(Tree):
     """A ref of a git repository, read from its objects through one `git cat-file --batch`."""
 
@@ -153,6 +166,19 @@ class GitTree(Tree):
         if "all" not in self._cache:
             self._cache["all"] = self.git("ls-tree", "-r", "--name-only", "-z", self.ref).decode("utf-8", "replace").split("\0")
         return self._cache["all"]
+
+    def contains_names(self, names) -> set:
+        """One `git grep -q` per name (it stops at the first file that has the name), a few at a time."""
+        from concurrent.futures import ThreadPoolExecutor
+        specs = ["*.%s" % e for e in sorted(C_EXT | JS_EXT | RS_EXT | {"idl", "webidl", "ipdl", "ipdlh"})]
+
+        def has(n):
+            r = subprocess.run(["git", "-C", self.source, "grep", "-q", "-w", "-F", "-e", n, self.ref, "--", *specs],
+                               capture_output=True)
+            return r.returncode == 0
+        names = sorted(set(names))
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            return {n for n, ok in zip(names, pool.map(has, names)) if ok}
 
     def close(self):
         if self._proc is not None:
@@ -1431,6 +1457,9 @@ def check_equivalence(proj: Project) -> list:
 _IDENT = re.compile(r"[A-Za-z_]\w{3,}")
 
 
+OURS_NAME = re.compile(r"^(?:Stealth|stealth_|nr_stealth_)")
+
+
 def check_restored(proj: Project) -> list:
     """A Mozilla file the base changed and the head leaves alone is the tag's, byte for byte; and nothing in the
     head uses a name only the old hunk of that file introduced."""
@@ -1464,6 +1493,11 @@ def check_restored(proj: Project) -> list:
     for q, t in texts.items():
         for n in set(_IDENT.findall(t)) & names:
             uses.setdefault(n, []).append(q)
+    # Only names of ours: Stealth-named, or in no line of Mozilla's tag (a name the tag already contains, such as
+    # nsPresContext or CanvasUtils, is Mozilla's whatever the old hunk of the restored file did with it).
+    maybe = {n for n in uses if not OURS_NAME.match(n)}
+    for n in proj.tag.contains_names(maybe):
+        del uses[n]
     own = set(proj.own)
     for n, files in sorted(uses.items()):
         pat = re.compile(r"\b(?:class|struct|enum|union|namespace|using|typedef)\s+(?:\w+\s+)*%(n)s\b|#\s*define\s+%(n)s\b|"

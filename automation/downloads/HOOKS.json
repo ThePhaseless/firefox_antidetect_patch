@@ -151,7 +151,7 @@
   "file": "uriloader/exthandler/nsExternalHelperAppService.h",
   "function": "class nsExternalAppHandler final : public nsIStreamListener,",
   "kind": "add",
-  "form": "unknown",
+  "form": "member",
   "line": "  friend class StealthDownloadIntercept;  // STEALTH-HOOK(automation/downloads)",
   "test": ""
  },
@@ -159,7 +159,7 @@
   "file": "uriloader/exthandler/nsExternalHelperAppService.h",
   "function": "class nsExternalAppHandler final : public nsIStreamListener,",
   "kind": "add",
-  "form": "unknown",
+  "form": "member",
   "line": "  bool mStealthIntercepted = false;       // STEALTH-HOOK(automation/downloads)",
   "test": ""
  },

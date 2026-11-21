@@ -63,13 +63,6 @@
   "text": "// STEALTH-HOOK(automation/downloads) NS_IMETHODIMP nsExternalHelperAppService::SetDownloadInterceptor( nsIDownloadInter"
  },
  {
-  "key": "C1|automation/downloads|uriloader/exthandler/nsExternalHelperAppService.h|class nsExternalAppHandler final : public nsIStreamListener,|2fdf79d9281e",
-  "rule": "C1",
-  "folder": "automation/downloads",
-  "file": "uriloader/exthandler/nsExternalHelperAppService.h",
-  "text": "friend class StealthDownloadIntercept; // STEALTH-HOOK(automation/downloads) bool mStealthIntercepted = false; // STEALT"
- },
- {
   "key": "C1|automation/downloads|uriloader/exthandler/nsExternalHelperAppService.h|class nsExternalHelperAppService : public nsIExternalHelperAppService,|7cab927341a1",
   "rule": "C1",
   "folder": "automation/downloads",
@@ -369,13 +362,6 @@
   "folder": "automation/navigation",
   "file": "netwerk/base/TRRLoadInfo.cpp",
   "text": "NS_IMETHODIMP TRRLoadInfo::GetJugglerLoadIdentifier(uint64_t* aResult) { return NS_ERROR_NOT_IMPLEMENTED; }"
- },
- {
-  "key": "C1|automation/navigation|netwerk/base/TRRLoadInfo.cpp|nsresult TRRLoadInfo::GetOriginAttributes(|370991ede2fe",
-  "rule": "C1",
-  "folder": "automation/navigation",
-  "file": "netwerk/base/TRRLoadInfo.cpp",
-  "text": "mOriginAttributes = aOriginAttributes; // STEALTH-HOOK(network/doh) return NS_OK; // STEALTH-HOOK(network/doh)"
  },
  {
   "key": "C1|automation/network-interception|netwerk/base/nsINetworkInterceptController.idl|interface nsIInterceptedChannel : nsISupports|393e56081099",
@@ -810,13 +796,6 @@
   "folder": "fingerprint/fonts/bundle",
   "file": "gfx/thebes/gfxTextRun.cpp",
   "text": "// STEALTH-HOOK(fingerprint/fonts/bundle) if (!aFamily->IsFullyInitialized() && pfl->MayDeferCmapLoading()) {"
- },
- {
-  "key": "C1|fingerprint/fonts/bundle|gfx/thebes/moz.build|USE_LIBS += [|6954ab716570",
-  "rule": "C1",
-  "folder": "fingerprint/fonts/bundle",
-  "file": "gfx/thebes/moz.build",
-  "text": "include(\"StealthDeclarationGate.mozbuild\") # STEALTH-HOOK(platform/declaration-gate) include(\"StealthBundleFontList.mozb"
  },
  {
   "key": "C1|fingerprint/fonts/font-list|gfx/thebes/CoreTextFontList.cpp|CoreTextFontList::~CoreTextFontList() {|8b79d0138221",
@@ -2191,20 +2170,6 @@
   "text": "// STEALTH-HOOK(fingerprint/webrtc/declared-network): the declared adapter, never the host's. _status = nr_stealth_decla"
  },
  {
-  "key": "C1|network/doh|dom/media/webrtc/transport/nriceresolver.h|class NrIceResolver {|3a1bda3a093e",
-  "rule": "C1",
-  "folder": "network/doh",
-  "file": "dom/media/webrtc/transport/nriceresolver.h",
-  "text": "void SetOriginAttributes(const OriginAttributes& aAttrs) { mAttrs = aAttrs; } // STEALTH-HOOK(network/doh) const OriginA"
- },
- {
-  "key": "C1|network/doh|netwerk/dns/TRR.cpp|nsresult TRR::SendHTTPRequest() {|4387a6e60d26",
-  "rule": "C1",
-  "folder": "network/doh",
-  "file": "netwerk/dns/TRR.cpp",
-  "text": "rv = StealthApplyTRRContextToChannel(channel, StealthTRRContextOfSuffix(mOriginSuffix)); // STEALTH-HOOK(network/doh) NS"
- },
- {
   "key": "C1|network/doh|netwerk/dns/nsHostResolver.cpp|nsresult nsHostResolver::ResolveHost(const nsACString& aHost,|bed127b4a41f",
   "rule": "C1",
   "folder": "network/doh",
@@ -2359,13 +2324,6 @@
   "text": "std::shared_ptr<NrSocketProxyConfig> mProxyConfig; // STEALTH-HOOK(network/proxy-udp) // STEALTH-HOOK(fingerprint/webrtc"
  },
  {
-  "key": "C1|network/proxy-udp|dom/media/webrtc/transport/nr_socket_prsock.h|class NrSocketBase {|ed59e5892853",
-  "rule": "C1",
-  "folder": "network/proxy-udp",
-  "file": "dom/media/webrtc/transport/nr_socket_prsock.h",
-  "text": "explicit NrSocket(const std::shared_ptr<NrSocketProxyConfig>& aProxyConfig = nullptr) // STEALTH-HOOK(network/proxy-udp)"
- },
- {
   "key": "C1|network/proxy-udp|netwerk/base/nsIProxyInfo.idl|interface nsIProxyInfo : nsISupports|eb02b8e61deb",
   "rule": "C1",
   "folder": "network/proxy-udp",
@@ -2443,13 +2401,6 @@
   "text": "nsICancelable** aLookupCancellable, const Maybe<LoadInfoArgs>& aLoadInfo, // STEALTH-HOOK(network/proxy-udp) const Maybe"
  },
  {
-  "key": "C1|network/proxy-udp|netwerk/ipc/ProxyConfigLookup.cpp|nsresult ProxyConfigLookup::DoProxyResolve(nsICancelable** aLookupCancellable) {|4f2ee53e9302",
-  "rule": "C1",
-  "folder": "network/proxy-udp",
-  "file": "netwerk/ipc/ProxyConfigLookup.cpp",
-  "text": "rv = StealthApplyTRRContextToChannel(channel, mOriginAttributes); // STEALTH-HOOK(network/doh) NS_ENSURE_SUCCESS(rv, rv)"
- },
- {
   "key": "C1|network/proxy-udp|netwerk/ipc/ProxyConfigLookup.cpp|nsresult ProxyConfigLookup::DoProxyResolve(nsICancelable** aLookupCancellable) {|73d36cb53176",
   "rule": "C1",
   "folder": "network/proxy-udp",
@@ -2462,13 +2413,6 @@
   "folder": "network/proxy-udp",
   "file": "netwerk/ipc/ProxyConfigLookup.cpp",
   "text": "rv = mLoadInfo ? StealthNewChannelOfLoadInfo(mURI, mProxyResolveFlags, mLoadInfo.ref(), getter_AddRefs(channel)) // STEA"
- },
- {
-  "key": "C1|network/proxy-udp|netwerk/ipc/ProxyConfigLookup.h|class ProxyConfigLookup final : public nsIProtocolProxyCallback {|4a6bfaf35252",
-  "rule": "C1",
-  "folder": "network/proxy-udp",
-  "file": "netwerk/ipc/ProxyConfigLookup.h",
-  "text": "Maybe<LoadInfoArgs> mLoadInfo; // STEALTH-HOOK(network/proxy-udp) Maybe<OriginAttributes> mOriginAttributes; // STEALTH-"
  },
  {
   "key": "C1|network/proxy-udp|netwerk/ipc/ProxyConfigLookup.h|class ProxyConfigLookup final : public nsIProtocolProxyCallback {|833c17c6f0af",
@@ -2525,13 +2469,6 @@
   "folder": "network/proxy-udp",
   "file": "netwerk/ipc/ProxyConfigLookupParent.cpp",
   "text": "mIsTRRServiceChannel(aIsTRRServiceChannel), mLoadInfo(aLoadInfo), // STEALTH-HOOK(network/proxy-udp) mOriginAttributes(a"
- },
- {
-  "key": "C1|network/proxy-udp|netwerk/ipc/ProxyConfigLookupParent.h|class ProxyConfigLookupParent final : public PProxyConfigLookupParent {|4a6bfaf35252",
-  "rule": "C1",
-  "folder": "network/proxy-udp",
-  "file": "netwerk/ipc/ProxyConfigLookupParent.h",
-  "text": "Maybe<LoadInfoArgs> mLoadInfo; // STEALTH-HOOK(network/proxy-udp) Maybe<OriginAttributes> mOriginAttributes; // STEALTH-"
  },
  {
   "key": "C1|network/proxy-udp|netwerk/ipc/ProxyConfigLookupParent.h|class ProxyConfigLookupParent final : public PProxyConfigLookupParent {|8a38b4ca4a06",
@@ -3225,13 +3162,6 @@
   "folder": "stillborn/telemetry",
   "file": "toolkit/components/telemetry/app/TelemetrySend.sys.mjs",
   "text": "export function sendStandalonePing( endpoint, payload, extraHeaders = {}, notificationCallbacks = null // STEALTH-HOOK(s"
- },
- {
-  "key": "C1|stillborn/telemetry|toolkit/components/telemetry/app/TelemetrySend.sys.mjs|import { ServiceRequest } from \"resource://gre/modules/ServiceRequest.sys.mjs\";|942da57438b0",
-  "rule": "C1",
-  "folder": "stillborn/telemetry",
-  "file": "toolkit/components/telemetry/app/TelemetrySend.sys.mjs",
-  "text": "import * as StealthPingsender from \"resource://gre/modules/StealthPingsender.sys.mjs\"; // STEALTH-HOOK(stillborn/telemet"
  },
  {
   "key": "C1|stillborn/updater|toolkit/mozapps/update/BackgroundUpdate.sys.mjs|export var BackgroundUpdate = {|61ecac5c3fae",
@@ -7896,32 +7826,11 @@
   "text": "// STEALTH-HOOK(stillborn/updater)"
  },
  {
-  "key": "C5|fingerprint/fonts/metrics|gfx/thebes/gfxFT2FontBase.cpp|bool gfxFT2FontBase::GetFTGlyphExtents(uint16_t aGID, int32_t* aAdvance,|3c02f6c324ce",
-  "rule": "C5",
-  "folder": "fingerprint/fonts/metrics",
-  "file": "gfx/thebes/gfxFT2FontBase.cpp",
-  "text": "if (aAdvance && !StealthDesignAdvance(*this, aGID, bold.x, aAdvance)) { // STEALTH-HOOK(fingerprint/fonts/metrics)"
- },
- {
-  "key": "C5|fingerprint/js-surface/eval-name|js/src/debugger/Frame.cpp|static bool EvaluateInEnv(|a54b718e3dfe",
-  "rule": "C5",
-  "folder": "fingerprint/js-surface/eval-name",
-  "file": "js/src/debugger/Frame.cpp",
-  "text": "evalOptions.filename() ? evalOptions.filename() : \"eval code\";"
- },
- {
   "key": "C5|fingerprint/screen-window/occlusion|widget/gtk/nsWindow.cpp|static bool IsFullscreenSupported(GtkWidget* aShell) {|c10e7ae107c9",
   "rule": "C5",
   "folder": "fingerprint/screen-window/occlusion",
   "file": "widget/gtk/nsWindow.cpp",
   "text": "if (GdkIsX11Display() && !IsFullscreenSupported(mShell) && StealthMakeFullScreenWithoutWM(aFullScreen)) return NS_OK; //"
- },
- {
-  "key": "C5|network/doh|netwerk/dns/TRR.cpp|nsresult TRR::SendHTTPRequest() {|13a4d1bda32b",
-  "rule": "C5",
-  "folder": "network/doh",
-  "file": "netwerk/dns/TRR.cpp",
-  "text": "StaticPrefs::network_trr_async_connInfo() && StealthTRRContextOfSuffix(mOriginSuffix).isNothing()) { // STEALTH-HOOK(net"
  },
  {
   "key": "C5|network/ipv6-literal|netwerk/base/nsSocketTransport2.cpp|nsresult nsSocketTransport::InitiateSocket() {|c9fb6535df12",
@@ -25438,6 +25347,13 @@
   "text": "mDNSResolver->SetOriginAttributes(StealthIceResolverAttributes(aProxyConfig)); // STEALTH-HOOK(network/doh)"
  },
  {
+  "key": "T2|network/doh|netwerk/dns/TRR.cpp|nsresult TRR::SendHTTPRequest() {|fad616a14a25",
+  "rule": "T2",
+  "folder": "network/doh",
+  "file": "netwerk/dns/TRR.cpp",
+  "text": "NS_ENSURE_SUCCESS(rv, rv); // STEALTH-HOOK(network/doh)"
+ },
+ {
   "key": "T2|network/doh|security/manager/ssl/nsNSSCallbacks.cpp|OCSPRequest::Run() {|8a95bc1eb6c1",
   "rule": "T2",
   "folder": "network/doh",
@@ -25471,6 +25387,13 @@
   "folder": "network/proxy-udp",
   "file": "netwerk/base/nsUDPSocket.cpp",
   "text": "nsSOCKSUDPIOLayerSocketBorn(mFD); // STEALTH-HOOK(network/proxy-udp): only a bound socket takes an association"
+ },
+ {
+  "key": "T2|network/proxy-udp|netwerk/ipc/ProxyConfigLookup.cpp|nsresult ProxyConfigLookup::DoProxyResolve(nsICancelable** aLookupCancellable) {|fad616a14a25",
+  "rule": "T2",
+  "folder": "network/proxy-udp",
+  "file": "netwerk/ipc/ProxyConfigLookup.cpp",
+  "text": "NS_ENSURE_SUCCESS(rv, rv); // STEALTH-HOOK(network/doh)"
  },
  {
   "key": "T2|network/proxy-udp|netwerk/socket/nsSOCKSIOLayer.cpp|nsresult nsSOCKSIOLayerAddToSocket(int32_t family, const char* host,|7748b9710fdd",

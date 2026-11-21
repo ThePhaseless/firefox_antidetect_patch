@@ -30,7 +30,8 @@ Public API (stable: the HOOKS.json generator reads it):
     load_debt(path) / write_debt(path, violations) / debt_problems(violations, debt, main_debt)
     debt_summary(entries)      -> text
 
-Rules (the id is in the key): C1 a hook of more than one line; C2 marker missing; C3 the marker
+Rules (the id is in the key): C1 a hook of more than one line (two adjacent lines are two hooks when each is a complete statement or declaration
+with its own marker: C1 is a line of ours without a marker in a run, or one statement over several lines); C2 marker missing; C3 the marker
 comment carries more than the marker; C4 a comment line added; C5 logic in the hook (&&, ||,
 ternary, arithmetic); C6 Mozilla lines removed or changed outside the three rewriting forms;
 C7 a whole Mozilla file deleted or replaced; C8 an include of ours inside Mozilla's include block;
@@ -639,6 +640,35 @@ def _is_multi_ok(ft: str, code: str) -> bool:
     return is_include(code) or (ft == "build" and bool(BUILD_ADD.match(code)))
 
 
+INCOMPLETE_CONTROL = re.compile(r"^(?:\}\s*)?(?:else(?:\s+if\s*\(.*\))?|if\s*\(.*\)|for\s*\(.*\)|while\s*\(.*\)|do|try)$")
+
+
+def _balanced(code: str) -> bool:
+    depth = 0
+    for ch in _strip_literals(code):
+        if ch in "([{":
+            depth += 1
+        elif ch in ")]}":
+            depth -= 1
+            if depth < 0:
+                return False
+    return depth == 0
+
+
+def _complete(ft: str, code: str) -> bool:
+    """A complete statement or declaration on one line: brackets closed, not ending on an operator, a comma or an
+    opening, not a bare `if (...)` / `else` that waits for its statement."""
+    c = code.strip()
+    if not c or not _balanced(c) or c[-1] in ",(+-*/&|=?:\\.<":
+        return False
+    return not INCOMPLETE_CONTROL.match(c)
+
+
+def _own_line(ft: str, code: str, marker) -> bool:
+    """A line of a run that is a hook by itself: an include / moz.build addition, or a marked complete statement."""
+    return _is_multi_ok(ft, code) or (marker is not None and _complete(ft, code))
+
+
 # --------------------------------------------------------------------------- the analysis
 def _key(rule: str, folder: str, file: str, function: str, text: str) -> str:
     return "%s|%s|%s|%s|%s" % (rule, folder, file, _squeeze(function),
@@ -760,7 +790,8 @@ def analyse_patch(folder: str, text: str):
                 for run in _runs(nonblank):
                     codes = [marker_split(x) for _, x in run]
                     run_text = "\n".join(x for _, x in run)
-                    multi_ok = all(_is_multi_ok(ft, c) for c, _, _ in codes)
+                    # one hook = one line, but two adjacent lines are two hooks when each has its marker and is complete
+                    multi_ok = all(_own_line(ft, c, mk) for c, mk, _ in codes)
                     run_forms, run_hooks = [], []
                     for j, (i, x) in enumerate(run):
                         code, mk, extra = codes[j]
@@ -793,15 +824,14 @@ def analyse_patch(folder: str, text: str):
                         violate("C1", path, section, run_text, "%d lines" % len(run), run_hooks)
                     if not any(mk is not None for _, mk, _ in codes) and not all(is_include(c) for c, _, _ in codes):
                         violate("C2", path, section, run_text, "", run_hooks)
-                    if len(run) == 1:
-                        form, remainder = run_forms[0]
+                    for (form, remainder), hk, (_, x) in zip(run_forms, run_hooks, run) if multi_ok else ():
                         if (form in ("guard", "notice", "anchor", "wrap-expression", "declared-value")
                                 or (form == "unknown" and any(is_stealth_chain(c) for c in calls(remainder))))                                 and has_logic(remainder, ft):
-                            violate("C5", path, section, run_text, "", run_hooks)
+                            violate("C5", path, section, x, "", [hk])
                         if form in ("guard", "notice", "anchor", "wrap-expression"):
                             cs = calls(remainder)
                             if cs and not is_stealth_chain(cs[0]) and not is_known_name(cs[0]):
-                                violate("C10", path, section, run_text, cs[0], run_hooks)
+                                violate("C10", path, section, x, cs[0], [hk])
                 add_text = "\n".join(x for _, x in nonblank)
                 if rem:
                     if not (single_pair and forms and forms[0] in ("wrap-expression", "wrap-call", "wrap-function", "declared-value")):

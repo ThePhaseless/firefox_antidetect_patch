@@ -1,5 +1,6 @@
 [
  "GdkIsX11Display",
+ "NS_ENSURE_SUCCESS",
  "RefreshDocumentLanguage",
  "WriteParam",
  "fonts.clear_namespace",

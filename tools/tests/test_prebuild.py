@@ -485,6 +485,28 @@ def test_restored_file_still_changed_in_the_head_is_not_a_restored_file():
     assert pb.check_restored(p) == []
 
 
+def test_restored_check_5_only_names_of_ours_never_a_name_the_tag_has():
+    base = "class F {\n  int mA;\n  nsPresContext* mCtx;\n  int StealthFlag;\n  int mStealthFlag;\n};\n"
+    tag_f = "class F {\n  int mA;\n};\n"
+    use = {"dom/Own.cpp": "int G(F* f, nsPresContext* c) { return c ? 1 : 0; }\n"}
+
+    def project(tag_extra):
+        tag = {"dom/F.h": tag_f, **tag_extra}
+        head = {"dom/F.h": tag_f, **use}
+        return pb.Project(pb.MemTree(tag), pb.MemTree(head), pb.MemTree({"dom/F.h": base, **use}))
+    # red: nobody has nsPresContext in the tag, it appears only in lines of ours: the use is reported
+    found = pb.check_restored(project({}))
+    assert [f.what.split("`")[1] for f in found] == ["nsPresContext"], [f.what for f in found]
+    # green: the tag has it in a file the head does not touch (Mozilla's name, as CanvasUtils or to_vec)
+    assert pb.check_restored(project({"layout/base/nsPresContext.h": "class nsPresContext {};\n"})) == []
+    # a Stealth name is ours whatever the tag says
+    own_use = {"dom/Own.cpp": "int G(F* f) { return f->StealthFlag; }\n"}
+    p = pb.Project(pb.MemTree({"dom/F.h": tag_f, "dom/Other.h": "int StealthFlag;\n"}),pb.MemTree({"dom/F.h": tag_f, **own_use}), pb.MemTree({"dom/F.h": base, **own_use}))
+    assert [f.what.split("`")[1] for f in pb.check_restored(p)] == ["StealthFlag"]
+    assert pb.OURS_NAME.match("Stealth") and pb.OURS_NAME.match("stealth_x") and pb.OURS_NAME.match("nr_stealth_x")
+    assert not pb.OURS_NAME.match("nsPresContext") and not pb.OURS_NAME.match("mStealthFlag")
+
+
 # ============================================================================================ 6. our files
 def own_project(head, tag=None):
     return pb.Project(pb.MemTree(tag or {"dom/Other.cpp": "int o;\n"}), pb.MemTree(dict(head, **{"dom/Other.cpp": "int o;\n"})))

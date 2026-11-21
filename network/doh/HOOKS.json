@@ -78,9 +78,11 @@
   "file": "netwerk/dns/TRR.cpp",
   "function": "nsresult TRR::SendHTTPRequest() {",
   "kind": "add",
-  "form": "unknown",
+  "form": "anchor",
   "line": "  NS_ENSURE_SUCCESS(rv, rv);  // STEALTH-HOOK(network/doh)",
-  "test": ""
+  "test": "",
+  "anchor": "",
+  "why": ""
  },
  {
   "file": "netwerk/dns/TRR.cpp",

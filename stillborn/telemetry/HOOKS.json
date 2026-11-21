@@ -3,7 +3,7 @@
   "file": "toolkit/components/telemetry/app/TelemetrySend.sys.mjs",
   "function": "import { ServiceRequest } from \"resource://gre/modules/ServiceRequest.sys.mjs\";",
   "kind": "add",
-  "form": "unknown",
+  "form": "registration",
   "line": "import * as StealthPingsender from \"resource://gre/modules/StealthPingsender.sys.mjs\"; // STEALTH-HOOK(stillborn/telemetry)",
   "test": ""
  },

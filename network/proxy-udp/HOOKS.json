@@ -1350,9 +1350,11 @@
   "file": "netwerk/ipc/ProxyConfigLookup.cpp",
   "function": "nsresult ProxyConfigLookup::DoProxyResolve(nsICancelable** aLookupCancellable) {",
   "kind": "add",
-  "form": "unknown",
+  "form": "anchor",
   "line": "  NS_ENSURE_SUCCESS(rv, rv);  // STEALTH-HOOK(network/doh)",
-  "test": ""
+  "test": "",
+  "anchor": "",
+  "why": ""
  },
  {
   "file": "netwerk/ipc/ProxyConfigLookup.h",
@@ -1432,7 +1434,7 @@
   "file": "netwerk/ipc/ProxyConfigLookup.h",
   "function": "class ProxyConfigLookup final : public nsIProtocolProxyCallback {",
   "kind": "add",
-  "form": "unknown",
+  "form": "member",
   "line": "  Maybe<LoadInfoArgs> mLoadInfo;  // STEALTH-HOOK(network/proxy-udp)",
   "test": ""
  },
@@ -1440,7 +1442,7 @@
   "file": "netwerk/ipc/ProxyConfigLookup.h",
   "function": "class ProxyConfigLookup final : public nsIProtocolProxyCallback {",
   "kind": "add",
-  "form": "unknown",
+  "form": "member",
   "line": "  Maybe<OriginAttributes> mOriginAttributes;  // STEALTH-HOOK(network/doh)",
   "test": ""
  },
@@ -1647,7 +1649,7 @@
   "file": "netwerk/ipc/ProxyConfigLookupParent.h",
   "function": "class ProxyConfigLookupParent final : public PProxyConfigLookupParent {",
   "kind": "add",
-  "form": "unknown",
+  "form": "member",
   "line": "  Maybe<LoadInfoArgs> mLoadInfo;  // STEALTH-HOOK(network/proxy-udp)",
   "test": ""
  },
@@ -1655,7 +1657,7 @@
   "file": "netwerk/ipc/ProxyConfigLookupParent.h",
   "function": "class ProxyConfigLookupParent final : public PProxyConfigLookupParent {",
   "kind": "add",
-  "form": "unknown",
+  "form": "member",
   "line": "  Maybe<OriginAttributes> mOriginAttributes;  // STEALTH-HOOK(network/doh)",
   "test": ""
  },
