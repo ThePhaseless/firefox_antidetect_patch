@@ -256,6 +256,24 @@ def cases() -> list:
             ok = "for T1" in str(exc) and "T2" in str(exc)
         add("a lock for another Mozilla tag than the series' is red (a port must run `lock`)", ok)
 
+    tmp, t = tree({"test_declared.js": "task test_one PASS\ntask test_two PASS\nerror Unexpected exception TypeError: NetworkError\n"}, minimum=1)
+    with tmp:
+        code, result, _, junit = t.run()
+        add("an exception that escapes the last task is logged at ERROR with no failed status: that task is FAIL, not 'passed' (run 44944973609: 5/5 passed and red)",
+            code == 1 and result["passed"] == 1 and result["failed"] == 1 and result["files"][0]["tests"][1]["status"] == "FAIL"
+            and "NetworkError" in result["files"][0]["tests"][1]["message"] and "NetworkError" in junit)
+
+    tmp, t = tree({"test_declared.js": "task test_one FAIL\nadd_task(async function test_one() {\nadd_task(async function test_two() {\n"}, minimum=1)
+    with tmp:
+        code, result, _, _ = t.run()
+        add("a failure that stops the run leaves tasks never started: the file says how many of its add_task were not started (collected 1 of 2 was red without saying why)",
+            code == 1 and any("1 of the 2 add_task" in e for e in result["files"][0]["errors"]) and result["files"][0]["declared_tasks"] == 2)
+
+    tmp, t = tree({"test_declared.js": PASSING + "add_task(async function test_one() {\nadd_task(async function test_two() {\n"}, minimum=2)
+    with tmp:
+        code, result, _, _ = t.run()
+        add("a file whose every add_task started has no such error", code == 0 and result["files"][0]["errors"] == [])
+
     # --- the command, the environment and the profile
     tmp, t = tree({"test_declared.js": PASSING}, minimum=2)
     with tmp:
@@ -370,6 +388,9 @@ def cases() -> list:
             and "'44921963200'" in text and on["workflow_dispatch"]["inputs"]["build_run_id"]["default"] == "44921963200")
         add("xpcshell.yml: a Linux leg and a Windows leg, each on its native runner", {(l["runner"], l["kind"]) for l in legs} == {("ubuntu-24.04", "linux"), ("windows-latest", "win")})
         runs = [s for s in steps if "xpcshell_run.py run" in s.get("run", "")]
+        ldd = [s for s in steps if "ldd" in s.get("run", "")]
+        add("xpcshell.yml: ldd sees the package's folder (LD_LIBRARY_PATH) and only a library that is not in the package counts as missing",
+            len(ldd) == 1 and 'LD_LIBRARY_PATH="$PWD/ff"' in ldd[0]["run"] and '[ -e "ff/$lib" ]' in ldd[0]["run"])
         add("xpcshell.yml: one step runs the tests, it binds (no continue-on-error, no `|| true`), and the result is uploaded even when it is red",
             len(runs) == 1 and "continue-on-error" not in runs[0] and "|| true" not in runs[0]["run"]
             and any(s.get("uses", "").startswith("actions/upload-artifact") and "always()" in s.get("if", "") for s in steps))

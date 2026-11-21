@@ -105,10 +105,13 @@ jobs:
           chmod +x "$EXE" 2>/dev/null || true
           echo "FF_EXE=$EXE" >> "$GITHUB_ENV"
           echo "located: $EXE"
+      # The package ships its own NSS, its own libmozsandbox and the rest: ldd must see the package's folder, as the shell does (the runner sets
+      # LD_LIBRARY_PATH to it), or it reports the runner's older libnss3 and every library of the package as missing. What counts is a library
+      # that is neither found nor in the package.
       - name: The shared libraries of the binary are all there
         if: matrix.kind == 'linux'
         run: |
-          missing="$(ldd ff/firefox ff/libxul.so 2>&1 | grep 'not found' || true)"
+          missing="$(LD_LIBRARY_PATH="$PWD/ff" ldd ff/firefox ff/libxul.so 2>&1 | grep -E '=> not found|version .* not found' | sed -E 's/^[[:space:]]*([^ ]+) =>.*/\1/' | sort -u | while read -r lib; do [ -e "ff/$lib" ] || echo "$lib"; done)"
           [ -z "$missing" ] || { echo "missing libraries:"; echo "$missing"; exit 1; }
       - name: Mozilla's unmodified test files, at the tag, as locked
         shell: bash

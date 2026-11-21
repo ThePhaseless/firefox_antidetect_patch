@@ -301,7 +301,7 @@ def parse_log(text: str) -> dict:
     A test is an add_task / add_test (named by its function: «<file> | Starting <name>»); the add_setup ones are not tests but a failure in them
     fails the file. A file without any (run_test()) has one test, `run_test`. A status with an `expected` field is an unexpected one (the logger
     writes it only when the status differs), a SKIP is not a pass, and a log line at ERROR or CRITICAL is a failure that belongs to the file."""
-    started, orphans, errors = [], [], []
+    started, orphans, errors, task_errors = [], [], [], {}
     statuses: dict = {}
     first_time = last_time = None
     for line in text.splitlines():
@@ -323,6 +323,8 @@ def parse_log(text: str) -> dict:
                 started.append({"name": match.group(2), "setup": bool(match.group(1)), "time": when})
             elif level in ("ERROR", "CRITICAL"):
                 errors.append(str(event.get("message", ""))[:300])
+                if started:  # an exception that escapes a task is logged at ERROR, with no failed status: it belongs to the task that was running
+                    task_errors.setdefault(len(started) - 1, []).append(str(event.get("message", ""))[:300])
         elif action == "test_status":
             statuses.setdefault(event.get("subtest") or "", []).append(event)
     names = {t["name"] for t in started}
@@ -334,14 +336,14 @@ def parse_log(text: str) -> dict:
         name = task["name"] or "<anonymous %d>" % (i + 1)
         if seen[task["name"]] > 1:
             name += "#%d" % seen[task["name"]]
-        tests.append({"name": name, "key": task["name"], "setup": task["setup"], "seconds": seconds})
+        tests.append({"name": name, "key": task["name"], "setup": task["setup"], "seconds": seconds, "errors": task_errors.get(i, [])})
     orphans = [s for s in statuses if s and s not in names]
     if not any(not t["setup"] for t in tests):
         # run_test(): the statuses are named by the function the assertion is in; one test for all of them
         every = [e for events in statuses.values() for e in events]
         if every:
             seconds = round((last_time - first_time) / 1000.0, 3) if first_time is not None and last_time is not None else None
-            tests = [t for t in tests if t["setup"]] + [{"name": "run_test", "key": "run_test", "setup": False, "seconds": seconds}]
+            tests = [t for t in tests if t["setup"]] + [{"name": "run_test", "key": "run_test", "setup": False, "seconds": seconds, "errors": list(errors)}]
             statuses = dict(statuses, run_test=every)
             orphans = []
     for test in tests:
@@ -353,6 +355,8 @@ def parse_log(text: str) -> dict:
             test["status"], test["message"] = "FAIL", str(bad[0].get("message", bad[0].get("status")))[:300]
         elif skipped:
             test["status"], test["message"] = "SKIP", str(skipped[0].get("message", "skipped"))[:300]
+        elif test.get("errors"):
+            test["status"], test["message"] = "FAIL", test["errors"][0]
         else:
             test["status"], test["message"] = "PASS", ""
     for subtest in orphans:
@@ -446,6 +450,11 @@ def run_file(binary, series: Path, support: Path, work: Path, modules: Path, rel
         result["errors"].append("timed out after %d s" % timeout)
     elif rc != 0:
         result["errors"].append("exit code %s" % rc)
+    declared = len(re.findall(r"^\s*add_task\(", source.read_text(encoding="utf-8", errors="replace"), re.M))
+    result["declared_tasks"] = declared
+    if tests and declared > len(tests) and not (len(tests) == 1 and tests[0]["name"] == "run_test"):
+        # a failed assertion aborts the process (head.js _abort_failed_test): the tasks after it are never started, and counting only the started ones would hide them
+        result["errors"].append("%d of the %d add_task of the file were never started (the run stopped at a failure)" % (declared - len(tests), declared))
     if not tests:
         result["errors"].append("no test collected (nothing was started or asserted)")
     result["ok"] = rc == 0 and not timed_out and not result["errors"] and result["failed"] == 0 and result["collected"] > 0
