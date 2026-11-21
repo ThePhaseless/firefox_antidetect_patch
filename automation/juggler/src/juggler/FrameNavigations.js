@@ -27,6 +27,18 @@
 // known by its address as the one of a navigation that was replaced before it was heard from, not only of the one in
 // flight.
 //
+// ⛔ A CUT THE CONTENT PROCESS TELLS IS ITS OWN, NOT ALWAYS THE NAVIGATION'S. The docShell of the document being left holds a
+// stand-in for the request (DocumentChannelChild), and a page that navigates itself stops it there (nsDocShell::Stop, from
+// its own location.replace): that process sees NS_BINDING_ABORTED. But the request is the parent's, and once the parent has
+// sent it on to the process that takes the document (DocumentLoadListener::Cancel returns at once when its open promise is
+// resolved), that stop cuts nothing: the navigation commits. Measured on the wrapper's e2e
+// (`test_a_read_right_after_goto_answers[/r50]`, gate 44862426341): the response of our goto had begun in the parent, which
+// switched the browsing context and carried the navigation on (aContinueNavigating), while the page's own timer stopped the
+// stand-in in the content process; goto raised NS_BINDING_ABORTED for a document that loaded. So NS_BINDING_ABORTED from
+// the content process ends a navigation only when the parent never saw its document request. When it did, and that request
+// has not ended (`_carried`), its own end decides: its cut (onDocumentRequestFailed), its document, or any other end without
+// a document (onDocumentRequestEnded), held behind the barrier like a cut, then the abort the content process told.
+//
 // `emit(name, payload, frameId)`: 'navigationstarted' {frameId, navigationId}, 'navigationcommitted'
 // {frameId, navigationId, url, name}, 'navigationaborted' {frameId, navigationId, errorText},
 // 'initialloadfailed' {frameId}: a frame that never committed a document of its own was refused its first load.
@@ -61,6 +73,7 @@ export class FrameNavigations {
     this._ended = new Map();        // frameId -> [navigationId] (committed, aborted or replaced), the last few
     this._replaced = new Map();     // frameId -> Map(navigationId -> its addresses): replaced by a newer navigation before they were heard from
     this._cuts = new Map();         // frameId -> Map(navigationId -> errorText): cuts held until their barrier comes back
+    this._carried = new Map();      // frameId -> Map(navigationId -> errorText or null): document requests the parent still carries, with the cut the content told meanwhile
     this._initialDone = new Set();  // frameIds that have had a navigation end
     this._restoredDocuments = 0;
     this._documents = new Map();    // frameId -> {navigationId, url, name}: the last document told committed
@@ -86,6 +99,32 @@ export class FrameNavigations {
   onDocumentRequest(frameId, navigationId, url) {
     traceNavigations('navigations', 'onDocumentRequest', {frameId, navigationId, url});
     this._start(frameId, navigationId, url);
+    if (!navigationId || !this._inFlight(frameId, navigationId))
+      return;
+    let carried = this._carried.get(frameId);
+    if (!carried) {
+      carried = new Map();
+      this._carried.set(frameId, carried);
+    }
+    if (!carried.has(navigationId))
+      carried.set(navigationId, null);
+    while (carried.size > ENDED_REMEMBERED)
+      carried.delete(carried.keys().next().value);
+  }
+
+  _inFlight(frameId, navigationId) {
+    const pending = this._pending.get(frameId);
+    const replaced = this._replaced.get(frameId);
+    return !!(pending && pending.navigationId === navigationId) || !!(replaced && replaced.has(navigationId));
+  }
+
+  _uncarry(frameId, navigationId) {
+    const carried = this._carried.get(frameId);
+    if (!carried)
+      return;
+    carried.delete(navigationId);
+    if (!carried.size)
+      this._carried.delete(frameId);
   }
 
   // The load was begun in the content process of the frame, whether or not a request follows (about:blank,
@@ -203,6 +242,8 @@ export class FrameNavigations {
   }
 
   _tellCommit(frameId, navigationId, url, name) {
+    if (navigationId)
+      this._uncarry(frameId, navigationId);
     this._documents.set(frameId, {navigationId, url, name});
     this._emit('navigationcommitted', {frameId, navigationId, url, name}, frameId);
   }
@@ -276,6 +317,7 @@ export class FrameNavigations {
   // Before any response no process can have a document of the request: the cut ends the navigation at once.
   onDocumentRequestFailed(frameId, navigationId, errorText, responded = false) {
     traceNavigations('navigations', 'onDocumentRequestFailed', {frameId, navigationId, errorText, responded});
+    this._uncarry(frameId, navigationId);
     if (!responded) {
       this._abort(frameId, navigationId, errorText);
       return false;
@@ -292,6 +334,27 @@ export class FrameNavigations {
       this._cuts.set(frameId, cuts);
     }
     cuts.set(navigationId, errorText);
+    return true;
+  }
+
+  // The last document request of a navigation ended in the parent otherwise than cut: it finished, or failed with another
+  // error. If the content process told a cut of this navigation while the parent carried the request (onNavigationAborted),
+  // no document of it may come but one already on its way: the cut is held like the parent's own, and the answer is true,
+  // for the caller to send the barrier and call `onCutConfirmed`. Otherwise the end says nothing: the content process tells
+  // the other errors, in order with its documents.
+  onDocumentRequestEnded(frameId, navigationId) {
+    const carried = this._carried.get(frameId);
+    const told = carried ? carried.get(navigationId) : undefined;
+    traceNavigations('navigations', 'onDocumentRequestEnded', {frameId, navigationId, contentCut: told || null});
+    this._uncarry(frameId, navigationId);
+    if (!told || !this._inFlight(frameId, navigationId))
+      return false;
+    let cuts = this._cuts.get(frameId);
+    if (!cuts) {
+      cuts = new Map();
+      this._cuts.set(frameId, cuts);
+    }
+    cuts.set(navigationId, told);
     return true;
   }
 
@@ -317,8 +380,17 @@ export class FrameNavigations {
   // script), and it filters the cut it makes itself when a navigation changes process (FrameTree.onStateChange). The cut of
   // a document request may also be told by the parent (onDocumentRequestFailed): whoever says an end first, the registry
   // takes it once. `errorText` is already the protocol's text.
+  //
+  // A cut (NS_BINDING_ABORTED) of a navigation whose document request the parent still carries is not its end (the head of
+  // this file): it is kept, and the end of that request decides.
   onNavigationAborted(frameId, navigationId, errorText) {
     traceNavigations('navigations', 'onNavigationAborted', {frameId, navigationId, errorText});
+    const carried = this._carried.get(frameId);
+    if (errorText === 'NS_BINDING_ABORTED' && carried && carried.has(navigationId) && this._inFlight(frameId, navigationId)) {
+      traceNavigations('navigations', 'content cut not told: the parent still carries the request', {frameId, navigationId});
+      carried.set(navigationId, errorText);
+      return;
+    }
     this._abort(frameId, navigationId, errorText);
   }
 
@@ -327,10 +399,12 @@ export class FrameNavigations {
     if (!pending || pending.navigationId !== navigationId) {
       // A navigation a newer one replaced before its abort was heard: the client still waits for the end of it.
       const replaced = this._replaced.get(frameId);
-      if (replaced && replaced.delete(navigationId))
+      if (replaced && replaced.delete(navigationId)) {
+        this._uncarry(frameId, navigationId);
         this._emit('navigationaborted', {frameId, navigationId, errorText}, frameId);
-      else
+      } else {
         traceNavigations('navigations', 'abort dropped: the navigation is not pending or replaced', {frameId, navigationId, errorText, pendingNavigationId: pending ? pending.navigationId : null});
+      }
       return;
     }
     this._end(frameId, pending, errorText);
@@ -338,6 +412,7 @@ export class FrameNavigations {
 
   _end(frameId, pending, errorText) {
     this._pending.delete(frameId);
+    this._uncarry(frameId, pending.navigationId);
     this._remember(frameId, pending.navigationId);
     this._emit('navigationaborted', {frameId, navigationId: pending.navigationId, errorText}, frameId);
     if (!this._initialDone.has(frameId)) {
@@ -373,6 +448,7 @@ export class FrameNavigations {
     this._ended.delete(frameId);
     this._replaced.delete(frameId);
     this._cuts.delete(frameId);
+    this._carried.delete(frameId);
     this._documents.delete(frameId);
     this._initialDone.delete(frameId);
   }

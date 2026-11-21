@@ -123,6 +123,7 @@ test('a request of a navigation that ended in an abort does not start it again',
   const { registry, events } = setup();
   registry.onDocumentRequest(MAIN, 'nav-1', 'http://a/');
   registry.onNavigationAborted(MAIN, 'nav-1', 'NS_BINDING_ABORTED');
+  registry.onDocumentRequestFailed(MAIN, 'nav-1', 'NS_BINDING_ABORTED', false);   // and cut in the parent, which carried it
   events.length = 0;
   registry.onDocumentRequest(MAIN, 'nav-1', 'http://a/');
   registry.onContentNavigationStarted(MAIN, 'nav-1');
@@ -201,6 +202,7 @@ test('the abort of a navigation the newer one replaced is told under its own id,
   registry.onDocumentRequest(MAIN, 'nav-2', 'http://b/');
   events.length = 0;
   registry.onNavigationAborted(MAIN, 'nav-1', 'NS_BINDING_ABORTED');
+  registry.onDocumentRequestFailed(MAIN, 'nav-1', 'NS_BINDING_ABORTED', false);   // and cut in the parent, which carried it
   assert.deepEqual(events, [aborted(MAIN, 'nav-1', 'NS_BINDING_ABORTED')]);
   assert.equal(registry.pendingNavigationId(MAIN), 'nav-2');
   registry.onNavigationAborted(MAIN, 'nav-1', 'NS_BINDING_ABORTED');   // told once
@@ -527,6 +529,7 @@ test('a document at an address the navigation never went by is not its commit (d
   assert.deepEqual(events, [], "the old page's root element is not the new navigation's document");
   assert.equal(registry.pendingNavigationId(MAIN), 'nav-1');
   registry.onNavigationAborted(MAIN, 'nav-1', 'NS_BINDING_ABORTED');
+  registry.onDocumentRequestFailed(MAIN, 'nav-1', 'NS_BINDING_ABORTED', false);   // and cut in the parent, which carried it
   assert.deepEqual(events, [aborted(MAIN, 'nav-1', 'NS_BINDING_ABORTED')]);
 });
 
@@ -576,6 +579,7 @@ test('the document of a navigation told aborted is committed under its own id', 
   registry.onNavigationAborted(MAIN, 'nav-page', 'NS_BINDING_ABORTED');   // the cancel of the first, told
   events.length = 0;
   registry.onNavigationAborted(MAIN, 'nav-ours', 'NS_BINDING_ABORTED');   // the client's own is over (told by the content)
+  registry.onDocumentRequestFailed(MAIN, 'nav-ours', 'NS_BINDING_ABORTED', false);   // and cut in the parent, which carried it
   registry.onDocumentInserted(MAIN, 'http://x/landed', '', 'nav-page');
   assert.deepEqual(events, [aborted(MAIN, 'nav-ours', 'NS_BINDING_ABORTED'), committed(MAIN, 'nav-page', 'http://x/landed', '')]);
   assert.equal(registry.lastCommittedNavigationId(MAIN), 'nav-page');

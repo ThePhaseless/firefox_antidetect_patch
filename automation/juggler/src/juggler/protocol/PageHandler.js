@@ -456,14 +456,31 @@ export class PageHandler {
     if (protocolEventName === 'Network.requestFailed') {
       // The last request of a document's navigation failed: the request is told as it is, then the navigation ends with
       // it, or, cut after its response had begun, once the barrier says nothing of its document is still on its way.
-      // `navigationId` and `documentResponded` are the registry's, not the client's.
-      const {navigationId, documentResponded, ...failure} = eventDetails;
+      // `navigationId`, `documentResponded` and `documentEnded` are the registry's, not the client's.
+      const {navigationId, documentResponded, documentEnded, ...failure} = eventDetails;
       this._emitFrameKeyed(protocolEventName, failure, frameId);
       if (navigationId && this._frameNavigations.onDocumentRequestFailed(frameId, navigationId, failure.errorCode, !!documentResponded))
         this._confirmCut(frameId, navigationId);
+      this._onDocumentRequestEnded(frameId, documentEnded);
+      return;
+    }
+    if (protocolEventName === 'Network.requestFinished') {
+      const {documentEnded, ...finished} = eventDetails;
+      this._emitFrameKeyed(protocolEventName, finished, frameId);
+      this._onDocumentRequestEnded(frameId, documentEnded);
       return;
     }
     this._emitFrameKeyed(protocolEventName, eventDetails, frameId);
+  }
+
+  // The last request of a document's navigation ended otherwise than cut (`documentEnded`, NetworkObserver): a cut the
+  // content process told meanwhile is held behind the barrier, as the parent's own (FrameNavigations.onDocumentRequestEnded).
+  _onDocumentRequestEnded(frameId, navigationId) {
+    if (!navigationId)
+      return;
+    tracePageHandler('page-handler', 'document request ended', {frameId, navigationId});
+    if (this._frameNavigations.onDocumentRequestEnded(frameId, navigationId))
+      this._confirmCut(frameId, navigationId);
   }
 
   // A held cut (FrameNavigations.onDocumentRequestFailed): a request and its answer through the channel of the process
