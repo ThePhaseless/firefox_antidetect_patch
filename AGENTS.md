@@ -43,8 +43,20 @@ python tools/engine.py hook-debt   # toglie da tools/hook-debt.json le voci riso
 python tools/engine.py hooks-list   # riscrive HOOKS.json di ogni cartella dalla serie (lo fa anche l'export)
 python tools/engine.py drift --to <tag>  # quali nostri file Mozilla ha cambiato fino al tag nuovo
 python tools/engine.py port --to <tag>   # tutte le cartelle a tre vie sul tag nuovo, tutti i conflitti in una corsa
+python tools/prebuild.py --source C:/ff/source --head <ramo> [--base <ramo>] [--folder <cartella> ...] [--json out.json]   # prima di ogni build
 python -m pytest -q tools/tests
 ```
+
+`prebuild` risponde in pochi secondi, dagli oggetti git (nessun checkout, nessuna compilazione), a ciò che una build
+fallita direbbe dopo un'ora: 1 ogni gancio che chiama una funzione nostra (dichiarata, inclusa dal file ospite, definita
+e compilata, numero di argomenti, namespace); 2 ogni `<Nome>_Mozilla` (dichiarazione rinominata, la funzione originale
+definita da noi con gli stessi parametri, nessun chiamante diretto in un file di Mozilla); 3 le righe di Mozilla che la
+serie riscrive o toglie, con il totale; 4 e 5 (con `--base`, il ramo prima del rifacimento) per ogni file diverso se
+`identical`, `include-order` o `changed`, e i file ripristinati; 6 ogni sorgente nostro è compilato o spedito e due file
+nostri non hanno lo stesso nome (G19); 7 ogni suite gtest nostra rientra nel filtro di default di `release.yml`. Stampa una
+riga `FAIL <dove>: <cosa>; <come correggere>` per problema (`WARN ... cannot tell` quando il testo non basta: non cambia
+l'esito) ed esce con 1 se c'è un FAIL. Gira anche come `python tools/engine.py prebuild ...`. I campi a mano di
+`HOOKS.json` che legge: `own_function`, `renamed`, `exception` (con l'approvazione del pm), `calls_mozilla`.
 
 ## Il flusso di ogni modifica
 

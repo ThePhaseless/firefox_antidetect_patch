@@ -13,6 +13,8 @@
     python tools/engine.py port --to <tag>    every folder merged three-way onto the new tag,
                                               all conflicts in one run, branch port/<tag>, then the
                                               birth points of the new tag against the ledger
+    python tools/engine.py prebuild --head <branch> [--base <branch>]   what a failed build would tell an hour later, from git objects,
+                                              in seconds (tools/prebuild.py)
     python tools/engine.py births --tree <dir>   every place the tree makes a network request, against
                                               tools/birth-ledger.json (tools/births.py says how)
 
@@ -1214,6 +1216,9 @@ def status(source: Path, head: str) -> int:
 def main() -> int:
     if len(sys.argv) > 1 and sys.argv[1] == "births":
         return births.main(sys.argv[2:])      # its own options: --tree, --repo/--rev, --skeleton, --accept-changed, --prune, --tsv
+    if len(sys.argv) > 1 and sys.argv[1] == "prebuild":
+        import prebuild
+        return prebuild.main(sys.argv[2:])    # its own options: --head, --base, --folder, --checks, --json (tools/prebuild.py)
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("command", choices=["status", "apply", "materialize", "export", "verify", "check",
                                         "shrink-budget", "hook-debt", "hooks-list", "drift", "port", "births"])
