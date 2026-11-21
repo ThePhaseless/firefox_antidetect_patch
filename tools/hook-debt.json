@@ -8274,13 +8274,6 @@
   "text": "-RefPtr<gfx::SourceSurface> surface = GetSurfaceSnapshot(); // STEALTH-HOOK(fingerprint/canvas/noise-projection) RefPtr<"
  },
  {
-  "key": "C6|fingerprint/canvas/noise-projection|dom/html/HTMLCanvasElement.cpp|void HTMLCanvasElement::SetFrameCapture(|a11819dc8a52",
-  "rule": "C6",
-  "folder": "fingerprint/canvas/noise-projection",
-  "file": "dom/html/HTMLCanvasElement.cpp",
-  "text": "-return mOffscreenDisplay->GetSurfaceSnapshot(); return mOffscreenDisplay->GetSurfaceSnapshotAsDrawn();"
- },
- {
   "key": "C6|fingerprint/canvas/noise-projection|gfx/2d/DrawTargetRecording.cpp|class SourceSurfaceRecording final : public SourceSurface {|6544cac4cef6",
   "rule": "C6",
   "folder": "fingerprint/canvas/noise-projection",
@@ -10668,25 +10661,11 @@
   "text": "mJugglerEventId = aEvent.mJugglerEventId;"
  },
  {
-  "key": "C9|automation/input|widget/nsGUIEventIPC.h|struct ParamTraits<mozilla::WidgetMouseEventBase> {|07e3198788ac",
-  "rule": "C9",
-  "folder": "automation/input",
-  "file": "widget/nsGUIEventIPC.h",
-  "text": "WriteParam(aWriter, aParam.mJugglerEventId);"
- },
- {
   "key": "C9|automation/juggler|toolkit/toolkit.mozbuild|if CONFIG[\"MOZ_WIDGET_TOOLKIT\"] == \"gtk\":|4a6a27b8a761",
   "rule": "C9",
   "folder": "automation/juggler",
   "file": "toolkit/toolkit.mozbuild",
   "text": "\"/juggler\","
- },
- {
-  "key": "C9|automation/navigation|docshell/base/nsDocShell.cpp|class OnLinkClickEvent : public CancelableRunnable, public SupportsWeakPtr {|3dd14ef0aa0d",
-  "rule": "C9",
-  "folder": "automation/navigation",
-  "file": "docshell/base/nsDocShell.cpp",
-  "text": "mStealth.SetRunning(false); // STEALTH-HOOK(automation/navigation)"
  },
  {
   "key": "C9|automation/navigation|docshell/base/nsDocShell.cpp|class OnLinkClickEvent : public CancelableRunnable, public SupportsWeakPtr {|a01cd43ab8e3",
@@ -10841,13 +10820,6 @@
   "folder": "fingerprint/locale-time/workers",
   "file": "dom/worklet/WorkletImpl.h",
   "text": "nsCString mLanguage; nsString mTimezone;"
- },
- {
-  "key": "C9|fingerprint/screen-window/geometry|widget/windows/nsWindow.cpp|bool nsWindow::ProcessMessageInternal(UINT msg, WPARAM& wParam, LPARAM& lParam,|1cf33a902aa2",
-  "rule": "C9",
-  "folder": "fingerprint/screen-window/geometry",
-  "file": "widget/windows/nsWindow.cpp",
-  "text": "mozilla::widget::StealthDeclaredFullscreenTrackSize(*this, mFrameState->GetSizeMode() == nsSizeMode_Fullscreen, mmi); //"
  },
  {
   "key": "C9|fingerprint/webgl/parameters|dom/canvas/ClientWebGLContext.cpp|void ClientWebGLContext::ReadPixels(GLint x, GLint y, GLsizei width,|bde59a0435e7",

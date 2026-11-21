@@ -113,7 +113,7 @@ def test_c8_our_include_is_a_block_after_mozillas_separated_by_a_blank_line():
 
 def test_c9_not_inside_a_list_nor_the_last_line_of_a_block():
     last = patch("dom/Foo.cpp", ["   // lead", " ", " " + FN, "   int x = 1;", "   DoIt(x);",
-                                 "+  StealthNote(this, aArg);" + MARK, " }", " ", " void Next() {}", " void More() {}"])
+                                 "+  mState = StealthState();" + MARK, " }", " ", " void Next() {}", " void More() {}"])
     assert "C9" in rules(last)
     assert "C9" not in rules(top("  StealthNote(this, aArg);" + MARK))
     in_list = patch("dom/moz.build", [" UNIFIED_SOURCES = [", "     \"a.cpp\",", "+    \"StealthX.cpp\",", "     \"b.cpp\",", " ]", " ", " X = 1"], section="")
@@ -242,3 +242,129 @@ def test_check_refuses_a_new_violation_and_a_stale_entry(tmp_path, monkeypatch, 
     assert engine.check() == 0
     assert "hook contract:" in capsys.readouterr().out
 
+
+
+# --------------------------------------------------------------------------- the pm's forms (PM-DECISIONS.md)
+def rewrite(removed, added, file="dom/Foo.cpp", section=FN):
+    """One Mozilla line rewritten, with context on both sides."""
+    return patch(file, ["   // lead", " ", " " + section, "   int x = 1;", "-" + removed, "+" + added + MARK,
+                        "   Done();", "   More();", "   Last();"], section=section)
+
+
+def forms_of(text):
+    return [h.form for h in hc.analyse_patch(FOLDER, text)[0]]
+
+
+def test_wrap_expression_of_a_sub_expression():
+    cases = {       # Mozilla's line -> our line: removing our call and its extra leading arguments gives Mozilla's line back
+        "  mReduction = aReduction;": "  mReduction = StealthPerturbCompressorReduction(aReduction);",
+        "  auto x = Expr(a, b);": "  auto x = StealthWrap(this, Expr(a, b));",
+        "  return aValue;": "  return CanvasUtils::StealthProject(this, aArg, aValue);",
+        "  rv = loadInfo->SetOriginAttributes(attrs);": "  rv = loadInfo->SetOriginAttributes(mozilla::net::StealthRequestAttributes(mOriginAttributes, attrs));",
+        "  sts_thread_, attrs, getter_AddRefs(r))) {": "  sts_thread_, StealthLookupAttributes(this, attrs), getter_AddRefs(r))) {",
+        "  PR_AF_INET, OriginAttributes(), 0, mFD,": "  PR_AF_INET, StealthTransportContext(this, OriginAttributes()), 0, mFD,",
+        "  NS_SUCCEEDED(ResolveProxy())) {": "  NS_SUCCEEDED(nr_stealth_proxy_lookup(this, ResolveProxy()))) {",
+    }
+    for removed, added in cases.items():
+        assert rules(rewrite(removed, added)) == [], (added, rules(rewrite(removed, added)))
+        assert forms_of(rewrite(removed, added)) == ["wrap-expression"], added
+    # red: the expression of Mozilla is altered, or the extra argument comes after it, or the call is not ours
+    for removed, added in (("  mReduction = aReduction;", "  mReduction = StealthPerturb(aReduction * 2);"),
+                           ("  mReduction = aReduction;", "  mReduction = StealthPerturb(aReduction, this);"),
+                           ("  mReduction = aReduction;", "  mReduction = Perturb(aReduction);"),
+                           ("  mReduction = aReduction;", "  mReduction = StealthPerturb(bReduction);"),
+                           ("  auto x = Expr(a, b);", "  auto y = StealthWrap(Expr(a, b));")):
+        assert "C6" in rules(rewrite(removed, added)), added
+    # the logic and the name rules look at our call: extra arguments with logic, a Stealth call that is not first
+    assert "C5" in rules(rewrite("  mReduction = aReduction;", "  mReduction = StealthPerturb(this + 1, aReduction);"))
+
+
+def test_wrap_call_g29_changes_only_the_called_name():
+    ok = {"  MozFn(a, b);": "  StealthMozFn(a, b);",
+          "  rv = obj->MozFn(a, b);": "  rv = obj->StealthMozFn(a, b);",
+          "  rv = MozFn(a, b);": "  rv = mozilla::StealthMozFn(a, b);",
+          "  nr_ice_get_addrs(ctx, 1);": "  nr_stealth_get_addrs(ctx, 1);"}
+    for removed, added in ok.items():
+        assert rules(rewrite(removed, added)) == [], added
+        assert forms_of(rewrite(removed, added)) == ["wrap-call"], added
+    for removed, added in (("  MozFn(a, b);", "  StealthMozFn(a);"),                 # an argument gone
+                           ("  MozFn(a, b);", "  StealthMozFn(this, a, b);"),         # an argument added: not a call wrap
+                           ("  MozFn(a, b);", "  OtherFn(a, b);"),                    # not a Stealth name
+                           ("  MozFn(a, b);", "  StealthA(a, StealthB(b));"),
+                           ("  MozFn(a, b);", "  Stealth_x;")):
+        assert "C6" in rules(rewrite(removed, added)), added
+
+
+def test_wrap_function_renames_g1_g2_by_a_suffix():
+    for removed, added in (("nsresult Foo::Bar(int aArg) {", "nsresult Foo::Bar_Mozilla(int aArg) {"),
+                           ("already_AddRefed<S> Off::GetSurfaceSnapshot(", "already_AddRefed<S> Off::GetSurfaceSnapshotAsDrawn("),
+                           ("  RefPtr<S> surface = GetSurfaceSnapshot();", "  RefPtr<S> surface = GetSurfaceSnapshotAsDrawn();"),
+                           ("  return mDisplay->GetSurfaceSnapshot();", "  return mDisplay->GetSurfaceSnapshotAsDrawn();"),
+                           ("#define FOR_EACH_X(f) \\", "#define FOR_EACH_X_MOZILLA(f) \\")):
+        text = rewrite(removed, added)
+        assert rules(text) == [] and forms_of(text) == ["wrap-function"], (added, rules(text), forms_of(text))
+    for removed, added in (("  RefPtr<S> surface = GetSurfaceSnapshot();", "  RefPtr<S> surface = MyGetSurfaceSnapshot();"),   # not a suffix
+                           ("  RefPtr<S> surface = GetSurfaceSnapshot();", "  RefPtr<S> surface = GetSurfaceSnapshotAsDrawn(a);"),  # arguments
+                           ("  RefPtr<S> surface = GetSurfaceSnapshot();", "  RefPtr<S> shot = GetSurfaceSnapshotAsDrawn();"),  # two changes
+                           ("  mSize = kSize;", "  mSize = kSizeLarge;")):                                                          # a value, not a function
+        assert "C6" in rules(rewrite(removed, added)), added
+
+
+def test_the_declarations_of_a_renamed_function_are_part_of_the_wrap():
+    decl = "  already_AddRefed<S> GetSurfaceSnapshotAsDrawn(bool aA) const;" + MARK
+    rename = patch("dom/Foo.cpp", ["   // lead", " ", "-already_AddRefed<S> Foo::GetSurfaceSnapshot(", "+already_AddRefed<S> Foo::GetSurfaceSnapshotAsDrawn(" + MARK,
+                                   "     bool aA) {", "   Done();", "   More();", "   Last();"], section="")
+    header = patch("dom/Foo.h", [" class Foo {", "   void A();", "+" + decl, "   void C();", "   void D();", "   int e;"], section="class Foo {")
+    assert [h.form for h in hc.analyse_patch(FOLDER, rename + header)[0]] == ["wrap-function", "wrap-function"]
+    assert rules(rename + header) == []
+    assert forms_of(header) == ["member"]          # without the rename in the patch it is a member, not a wrap
+
+
+def test_guards_with_a_value_g15():
+    for text in (top("  if (nsresult rv; StealthGetX(this, aArg, &rv)) return rv;" + MARK),
+                 top("  if (StealthOwnsX()) return StealthX(aArg);" + MARK)):
+        assert rules(text) == [] and forms_of(text) == ["guard"], text
+    mid = patch("dom/Foo.cpp", ["   // lead", " " + FN, "   int x = 1;", "+  if (StealthOwnsX()) return StealthX(aArg);" + MARK,
+                                "   DoIt(x);", "   DoIt(x);", "   return NS_OK;", " }"])
+    assert forms_of(mid) == ["anchor"] and rules(mid) == []
+    red_green("C5", top("  if (nsresult rv; StealthGetX(this, &rv) && aArg) return rv;" + MARK),
+              top("  if (nsresult rv; StealthGetX(this, aArg, &rv)) return rv;" + MARK))
+    assert "C10" in rules(top("  if (OwnsX()) return StealthX(aArg);" + MARK))
+
+
+def test_the_shadow_g21_is_a_declaration_at_the_top_of_a_function():
+    good = top("  const auto GetX = StealthGetX;" + MARK)
+    assert forms_of(good) == ["shadow"] and rules(good) == []
+    assert forms_of(top("  auto& GetY = mozilla::StealthGetY;" + MARK)) == ["shadow"]
+    mid = patch("dom/Foo.cpp", ["   // lead", " " + FN, "   int x = 1;", "+  const auto GetX = StealthGetX;" + MARK,
+                                "   DoIt(x);", "   DoIt(x);", "   return NS_OK;", " }"])
+    assert forms_of(mid) == ["unknown"]                   # not at the top: not a shadow
+    assert forms_of(top("  const auto GetX = GetY;" + MARK)) == ["unknown"]     # not our value
+
+
+def test_a_forward_declaration_and_a_declaration_of_ours_are_registrations_g40():
+    def at_scope(line):
+        return patch("dom/Foo.cpp", [" #include \"a.h\"", " ", " namespace mozilla {", "+" + line + MARK, " ", " class Y {", " };",
+                                     " int z;"], section="")
+    for line in ("class StealthX;", "struct StealthY;", "bool StealthX(int aArg);", "static nsresult mozilla::StealthZ(const nsACString&);"):
+        assert forms_of(at_scope(line)) == ["registration"] and rules(at_scope(line)) == [], line
+    assert forms_of(at_scope("StealthX(aArg);")) == ["anchor"]            # a call is not a declaration
+    assert forms_of(at_scope("bool Other(int aArg);")) == ["unknown"]     # not ours
+
+
+def test_an_anchor_at_the_end_of_a_block_or_of_a_js_module_is_allowed_g30_g33():
+    end = patch("dom/Foo.cpp", ["   // lead", " " + FN, "   int x = 1;", "   DoIt(x);", "+  StealthNote(this, aArg);" + MARK, " }", " ",
+                                " void Next() {}", " void More() {}"])
+    assert forms_of(end) == ["anchor"] and rules(end) == []
+    js = patch("toolkit/Foo.sys.mjs", [" export function a() {", "   return 1;", " }", " ", "+StealthInstall(this);" + MARK], section="", start=40)
+    assert forms_of(js) == ["anchor"] and rules(js) == []
+    # the other forms keep C9 there, and so do the entries of a list
+    member = patch("dom/Foo.h", [" class Foo {", "   void A();", "   void C();", "+  void StealthB();" + MARK, " };", " ", " int k;", " int j;"], section="class Foo {")
+    assert "C9" in rules(member)
+
+
+def test_a_multi_line_mozilla_expression_wrapped_stays_a_violation():
+    two = patch("dom/Foo.cpp", ["   // lead", " ", " " + FN, "   int x = 1;", "-  aData[i] = Convert(", "-      mBuffer[i], -inf);",
+                                "+  aData[i] = StealthBin(i, Convert(" + MARK, "+      mBuffer[i], -inf));", "   Done();", "   More();", "   Last();"])
+    assert "C6" in rules(two) and "C1" in rules(two), rules(two)
+    assert "wrap-expression" not in forms_of(two)

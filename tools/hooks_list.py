@@ -10,13 +10,17 @@ An entry, in this order of keys:
     file      the Mozilla file
     function  the host function (git's hunk header)
     kind      add | rewrite | delete | file   (a deletion and a whole-file removal are listed too: nothing is invisible)
-    form      guard | notice | wrap-expression | wrap-function | declared-value | registration | member | anchor | unknown
+    form      guard | notice | wrap-expression | wrap-call | wrap-function | declared-value | registration | member | shadow | anchor | unknown
     line      the added text ('' for a deletion)
     removed   the Mozilla line a rewrite replaces, or what a deletion takes away (left out for a pure addition)
     ---- written by hand, kept by the export ----
     test      the test that proves the hook ('' while there is none: that is debt, rule T1 of hook_contract)
     anchor    (form anchor only) the Mozilla statement the hook follows
     why       (form anchor only) why the guard, wrap-function and wrap-expression forms are not enough (rule T2)
+    exception (G35, only when the pm granted it) why no form can express this rewritten line
+    pm        (G35) exactly "approvato": the pm granted the exception. Both fields make a declared exception: the
+              hook is left out of contract_violations (its C-rules, T1, T2, T3) and counted apart by `check`; `exception`
+              without `pm: "approvato"` is a failure of `check`
 
 Identity of a hook: file + function + kind + normalized line text (+ normalized removed text). The export
 merges the hand fields into the generated list by identity; a hook whose text changes loses them on
@@ -30,6 +34,15 @@ Test references (the grammar of `test`; '' is allowed and is debt):
     py:<path>::<test_name>          the same for a python test of ours: the file exists and defines test_name
     wrapper:<path>::<test>          a test of the wrapper repository: only the format is checked here
 
+A test must also be RUN by a round (rule T3, G20), judged on the series' copy of the candidate workflow
+(platform/ci/src/.github/workflows/release.yml, not judged when the series has none):
+
+    gtest:<Suite>.<Name>   the suite is in the gtest filter (the `gtest_filter` input's default), by name or by a wildcard
+    node:<path>            the node job runs it: <path> matches a glob of a `node --test` line (juggler/tests/*.test.mjs)
+    py:<path>::<name>      some step of a workflow runs the file, or it is a tree python test of the export gate
+                           (modules/libpref/test/test_stealth_*.py)
+    wrapper:               the wrapper's own rounds run it: format only
+
 Public API:
 
     generated(root, folder)           -> list[dict]   the entries the series generates for one folder
@@ -39,17 +52,24 @@ Public API:
     write_all(root)                   -> dict         writes every HOOKS.json, folder -> number of entries
     problems(root)                    -> list[str]    what `check` reports
     reference_problem(root, ref)      -> str | None   why a test reference does not resolve
-    missing_test_violations(root)     -> list[Violation]   rules T1 and T2 for hook_contract
+    missing_test_violations(root)     -> list[Violation]   rules T1, T2 and T3 for hook_contract
+    declared_exceptions(root)         -> list[(folder, entry)]   the entries with `exception` and `pm: "approvato"` (G35)
 """
 from __future__ import annotations
 
+import fnmatch
 import json
 import re
+import shlex
 from pathlib import Path
 
 import hook_contract as hc
 
-HAND_FIELDS = ("test", "anchor", "why")
+HAND_FIELDS = ("test", "anchor", "why", "exception", "pm")
+PM_APPROVED = "approvato"
+WORKFLOWS = "platform/ci/src/.github/workflows"
+CANDIDATE_WORKFLOW = "release.yml"
+TREE_PY_TESTS = "modules/libpref/test/test_stealth_*.py"       # run by the export gate (tools/export_gate.py)
 GTEST_RE = re.compile(r"\bTEST(?:_F)?\s*\(\s*(\w+)\s*,\s*(\w+)\s*\)")
 GTEST_SUFFIXES = {".cpp", ".cc", ".cxx", ".h", ".hpp"}
 WRAPPER_RE = re.compile(r"^wrapper:[^\s:#]+::\S+$")
@@ -104,11 +124,14 @@ def _with_hand_fields(e: dict, old: dict | None) -> dict:
     if e["form"] == "anchor":
         out["anchor"] = old.get("anchor", "")
         out["why"] = old.get("why", "")
+    for k in ("exception", "pm"):          # G35: only where the pm's decision was written
+        if k in old:
+            out[k] = old[k]
     return out
 
 
 def merge(gen: list, committed: list) -> list:
-    """The generated entries, each with the hand fields (test, anchor, why) of the committed entry of the same
+    """The generated entries, each with the hand fields (test, anchor, why, exception, pm) of the committed entry of the same
     identity; none where there is none. Two entries of one identity are paired in order."""
     pool = {}
     for c in committed or []:
@@ -242,6 +265,30 @@ def _diff(folder: str, gen: list, committed: list) -> list:
     return found
 
 
+def exception_problems(folder: str, e: dict) -> list:
+    """G35: an entry with `exception` needs the reason (a non-empty string) and `pm: "approvato"`; a `pm` that is
+    not exactly "approvato" is wrong whatever the entry says."""
+    found = []
+    if "exception" in e and not (isinstance(e["exception"], str) and e["exception"].strip()):
+        found.append("%s/HOOKS.json: the exception of the hook %s has no reason (a non-empty text)" % (folder, _label(e)))
+    if "exception" in e and e.get("pm") != PM_APPROVED:
+        found.append("%s/HOOKS.json: the hook %s declares an exception without `pm: \"%s\"`: only the pm grants one (G35)"
+                     % (folder, _label(e), PM_APPROVED))
+    elif "pm" in e and e["pm"] != PM_APPROVED:
+        found.append("%s/HOOKS.json: the hook %s has pm %r, which is not \"%s\"" % (folder, _label(e), e["pm"], PM_APPROVED))
+    return found
+
+
+def is_declared_exception(e: dict) -> bool:
+    """G35: the entry has a reason and the pm's approval."""
+    return isinstance(e.get("exception"), str) and bool(e["exception"].strip()) and e.get("pm") == PM_APPROVED
+
+
+def declared_exceptions(root: Path) -> list:
+    """[(folder, entry)] of every hook of the series that is a declared exception (merged with the committed list)."""
+    return [(f, e) for f in folders(root) for e in expected(root, f) if is_declared_exception(e)]
+
+
 def problems(root: Path) -> list:
     """What `check` reports: a folder whose committed HOOKS.json differs from what its hooks.patch generates (missing
     file, a hook missing or extra, a field changed, the order) and a `test` that names a test that does not exist."""
@@ -267,6 +314,7 @@ def problems(root: Path) -> list:
             found.append("%s/HOOKS.json differs from what the series generates (order or a key): python tools/engine.py hooks-list"
                          % folder)
         for c in committed:
+            found += exception_problems(folder, c)
             ref = c.get("test", "")
             if not isinstance(ref, str):
                 found.append("%s/HOOKS.json: the test of the hook %s is not a string" % (folder, _label(c)))
@@ -278,17 +326,103 @@ def problems(root: Path) -> list:
     return found
 
 
-# --------------------------------------------------------------------------- the debt (rules T1, T2)
+# --------------------------------------------------------------------------- rounds (rule T3)
+class _Rounds:
+    """What the rounds run, read from the series' copy of the workflows: the gtest filter of the candidate, its
+    `node --test` globs, and the lines of every workflow that run a python file. `known` is False when the series
+    has no copy of the candidate workflow: nothing can then be judged."""
+
+    def __init__(self, root: Path):
+        wf = Path(root) / WORKFLOWS
+        self.known = (wf / CANDIDATE_WORKFLOW).is_file()
+        self.filter, self.node_globs, self.lines = "", [], []
+        if not self.known:
+            return
+        cand = (wf / CANDIDATE_WORKFLOW).read_text(encoding="utf-8", errors="replace").split("\n")
+        self.filter = self._gtest_filter(cand)
+        for ln in cand:
+            code = ln.split(" #", 1)[0]
+            m = re.search(r"\bnode\s+--test\s+(.+)$", code)
+            if m and not ln.lstrip().startswith("#"):
+                try:
+                    self.node_globs += [a for a in shlex.split(m.group(1)) if not a.startswith("-")]
+                except ValueError:
+                    pass
+        for p in sorted(wf.glob("*.yml")):
+            self.lines += [ln for ln in p.read_text(encoding="utf-8", errors="replace").split("\n")
+                           if not ln.lstrip().startswith("#")]
+
+    @staticmethod
+    def _gtest_filter(lines: list) -> str:
+        """The default of the `gtest_filter` input: the first `default:` under a key `gtest_filter:`."""
+        for i, ln in enumerate(lines):
+            m = re.match(r"^(\s*)gtest_filter:\s*$", ln)
+            if not m:
+                continue
+            for nxt in lines[i + 1:]:
+                if nxt.strip() and len(nxt) - len(nxt.lstrip()) <= len(m.group(1)):
+                    break
+                d = re.match(r"^\s*default:\s*(['\"])(.*)\1\s*$", nxt)
+                if d:
+                    return d.group(2)
+        return ""
+
+    def gtest_runs(self, suite: str, name: str) -> bool:
+        pos, _, neg = self.filter.partition("-")
+        full = "%s.%s" % (suite, name)
+        hit = lambda patterns: any(fnmatch.fnmatchcase(full, q) for q in patterns.split(":") if q)
+        return hit(pos or "*") and not hit(neg)
+
+    def node_runs(self, path: str) -> bool:
+        for g in self.node_globs:
+            rx = "".join("[^/]*" if ch == "*" else "[^/]" if ch == "?" else re.escape(ch) for ch in g)
+            if re.fullmatch(rx, path):
+                return True
+        return False
+
+    def py_runs(self, path: str) -> bool:
+        if fnmatch.fnmatchcase(path, TREE_PY_TESTS):
+            return True
+        pat = re.compile(r"(?<![\w.\-])%s(?![\w])" % re.escape(path))
+        return any(pat.search(ln) for ln in self.lines)
+
+    def runs(self, ref: str):
+        """True/False if a round runs the test `ref` names; None when it cannot be judged (no workflow, a format
+        that is not one of gtest/node/py, a malformed reference: `problems` reports those)."""
+        if not self.known:
+            return None
+        kind, _, rest = ref.partition(":")
+        if kind == "gtest":
+            suite, dot, name = rest.partition(".")
+            return self.gtest_runs(suite, name) if suite and dot and name else None
+        if kind == "node":
+            path = rest.partition("#")[0]
+            return self.node_runs(path) if path else None
+        if kind == "py":
+            path, sep, name = rest.partition("::")
+            return self.py_runs(path) if path and sep and name else None
+        return None
+
+
+# --------------------------------------------------------------------------- the debt (rules T1, T2, T3)
 def missing_test_violations(root: Path) -> list:
-    """T1 for every hook whose entry has no `test`, T2 for every anchor entry without `anchor` or `why`, from the
-    series merged with the committed hand fields (so a missing file makes every hook a T1)."""
+    """T1 for every hook whose entry has no `test`, T2 for every anchor entry without `anchor` or `why`, T3 for every
+    hook whose `test` no round runs, from the series merged with the committed hand fields (so a missing file makes
+    every hook a T1). A declared exception (G35) has none of them."""
     found = []
+    rounds = _Rounds(root)
     for folder in folders(root):
         for e in expected(root, folder):
+            if is_declared_exception(e):
+                continue
             text = e["line"] or ("<%s> %s" % (e["kind"], e.get("removed", "")))
             if not e.get("test"):
                 found.append(hc.Violation("T1", folder, e["file"], e["function"], text,
                                           hc._key("T1", folder, e["file"], e["function"], text), "no test"))
+            elif isinstance(e["test"], str) and rounds.runs(e["test"]) is False:
+                found.append(hc.Violation("T3", folder, e["file"], e["function"], text,
+                                          hc._key("T3", folder, e["file"], e["function"], text),
+                                          "no round runs %s" % e["test"]))
             if e["form"] == "anchor" and not (e.get("anchor") and e.get("why")):
                 found.append(hc.Violation("T2", folder, e["file"], e["function"], text,
                                           hc._key("T2", folder, e["file"], e["function"], text), "no anchor or why"))

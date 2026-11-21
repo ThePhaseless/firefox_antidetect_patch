@@ -390,7 +390,7 @@
   "file": "dom/html/HTMLCanvasElement.cpp",
   "function": "void HTMLCanvasElement::SetFrameCapture(",
   "kind": "rewrite",
-  "form": "unknown",
+  "form": "wrap-function",
   "line": "    return mOffscreenDisplay->GetSurfaceSnapshotAsDrawn();",
   "removed": "    return mOffscreenDisplay->GetSurfaceSnapshot();",
   "test": ""

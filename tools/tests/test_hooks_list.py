@@ -319,3 +319,178 @@ def test_a_backport_folder_of_the_series_has_no_list():
     for f in hl.series_names(engine.ROOT):
         if (engine.ROOT / f / "BACKPORT.json").exists():
             assert not hl.list_path(engine.ROOT, f).exists(), f
+
+
+# --------------------------------------------------------------------------- G35: the declared exception
+EXC_REMOVED = "  DoIt(x);"
+EXC_ADDED = "  DoIt(x, StealthCtx(this));" + MARK        # a parameter of ours in a Mozilla call: no form can express it
+
+
+def exception_series(tmp_path):
+    patch = hunk("dom/A.cpp", ["   // lead", " " + FN, "   int x = 1;", "-" + EXC_REMOVED, "+" + EXC_ADDED, "   Done();",
+                              "   More();", "   Last();"])
+    root = series(tmp_path, patch)
+    entries = hl.expected(root, FOLDER)
+    entries[0]["test"] = "wrapper:tests/test_a.py::test_b"
+    commit_list(root, entries)
+    return root, entries
+
+
+def test_a_declared_exception_is_left_out_of_the_contract_and_counted(tmp_path):
+    root, entries = exception_series(tmp_path)
+    assert [v.rule for v in hc.contract_violations(root)] == ["C6"]            # the rewrite no form expresses
+    assert hl.declared_exceptions(root) == []
+    entries[0].update(exception="a parameter of ours in a Mozilla call", pm="approvato")
+    commit_list(root, entries)
+    assert hc.contract_violations(root) == [] and hl.problems(root) == []
+    assert [(f, e["line"]) for f, e in hl.declared_exceptions(root)] == [(FOLDER, EXC_ADDED.rstrip())]
+    # T1 and T2 are left out too: no test, and the exception stands
+    entries[0]["test"] = ""
+    commit_list(root, entries)
+    assert hc.contract_violations(root) == []
+
+
+def test_an_exception_without_the_pm_is_a_failure_and_no_exception(tmp_path):
+    root, entries = exception_series(tmp_path)
+    for fields in ({"exception": "why"}, {"exception": "why", "pm": "ok"}, {"exception": "why", "pm": ""},
+                   {"exception": "", "pm": "approvato"}, {"pm": "si"}):
+        commit_list(root, [dict(entries[0], **fields)])
+        assert hl.problems(root), fields
+        assert hl.declared_exceptions(root) == [], fields
+        assert [v.rule for v in hc.contract_violations(root)] == ["C6"], fields      # nothing is excluded
+    commit_list(root, [dict(entries[0], exception="why", pm="approvato")])
+    assert hl.problems(root) == []
+
+
+def test_the_exception_fields_survive_a_regeneration_like_the_test(tmp_path):
+    root, entries = exception_series(tmp_path)
+    entries[0].update(exception="why", pm="approvato")
+    commit_list(root, entries)
+    hl.write_all(root)
+    again = read_list(root)
+    assert again[0]["exception"] == "why" and again[0]["pm"] == "approvato" and again[0]["test"] == entries[0]["test"]
+    assert list(again[0]).index("test") < list(again[0]).index("exception") < list(again[0]).index("pm")
+    set_patch(root, hunk("dom/A.cpp", ["   // lead", " " + FN, "   int x = 1;", "-" + EXC_REMOVED, "+  DoIt(x, StealthCtx2(this));" + MARK,
+                                       "   Done();", "   More();", "   Last();"]))
+    assert "exception" not in hl.expected(root, FOLDER)[0]          # a hook whose text changed is asked again
+    # an entry that has none gets none
+    root2 = series(tmp_path / "other", top(G1))
+    assert [k for k in hl.expected(root2, FOLDER)[0]] == ["file", "function", "kind", "form", "line", "test"]
+
+
+def test_a_violation_is_left_out_only_when_every_hook_it_concerns_is_an_exception(tmp_path):
+    two = hunk("dom/A.cpp", ["   // lead", " " + FN, "-  int x = 1;", "-  DoIt(x);", "+  int x = StealthA(this);" + MARK,
+                             "+  DoIt(x, StealthB(this));" + MARK, "   Done();", "   More();", "   Last();"])
+    root = series(tmp_path, two)
+    entries = hl.expected(root, FOLDER)
+    assert len(entries) == 2
+    for e in entries:
+        e["test"] = "wrapper:tests/test_a.py::test_b"
+    entries[0].update(exception="why", pm="approvato")
+    commit_list(root, entries)
+    assert "C6" in {v.rule for v in hc.contract_violations(root)}        # the second line is not an exception
+    entries[1].update(exception="why too", pm="approvato")
+    commit_list(root, entries)
+    assert hc.contract_violations(root) == []
+
+
+def test_check_prints_the_number_of_declared_exceptions(tmp_path, monkeypatch, capsys):
+    root, entries = exception_series(tmp_path)
+    entries[0].update(exception="why", pm="approvato")
+    commit_list(root, entries)
+    monkeypatch.setattr(engine, "ROOT", root)
+    assert engine.declared_exceptions() == 1
+    monkeypatch.undo()
+    assert engine.check() == 0
+    out = capsys.readouterr().out
+    assert "declared exceptions: 0" in out, out
+
+
+# --------------------------------------------------------------------------- T3 (G20): the test of a hook is run by a round
+WORKFLOW = """name: release
+on:
+  workflow_dispatch:
+    inputs:
+      gtest_filter:
+        # what the last green run ran
+        description: "which"
+        default: 'StealthA.*:StealthB.One:Stealth?.Wild:TestStealthC.*-StealthA.Skipped'
+      other:
+        default: 'NotTheFilter.*'
+jobs:
+  checks:
+    steps:
+      - run: node --test juggler/tests/*.test.mjs
+      # - run: python3 scripts/ci/commented_out.py
+      - name: python
+        run: |
+          python3 scripts/ci/test_ci.py
+          python3 scripts/ci/test_stealth_download_watchdog.py
+"""
+
+
+def t3_series(tmp_path, with_workflow=True):
+    root = series(tmp_path, top(G1))
+    if with_workflow:
+        wf = root / "platform" / "ci" / "src" / ".github" / "workflows"
+        wf.mkdir(parents=True)
+        (wf / "release.yml").write_text(WORKFLOW, encoding="utf-8", newline="")
+    return root
+
+
+def t3_rules(root, test):
+    entries = hl.expected(root, FOLDER)
+    entries[0]["test"] = test
+    commit_list(root, entries)
+    return [v.rule for v in hc.contract_violations(root)]
+
+
+def test_t3_a_gtest_must_be_in_the_filter_of_the_candidate(tmp_path):
+    root = t3_series(tmp_path)
+    for ref in ("gtest:StealthA.Any", "gtest:StealthB.One", "gtest:StealthZ.Wild", "gtest:TestStealthC.Anything"):
+        assert t3_rules(root, ref) == [], ref
+    for ref in ("gtest:StealthB.Two", "gtest:Nope.One", "gtest:StealthA.Skipped", "gtest:NotTheFilter.One"):
+        assert t3_rules(root, ref) == ["T3"], ref
+
+
+def test_t3_a_node_test_must_match_a_glob_of_the_node_job(tmp_path):
+    root = t3_series(tmp_path)
+    assert t3_rules(root, "node:juggler/tests/x.test.mjs") == []
+    assert t3_rules(root, "node:juggler/tests/x.test.mjs#a title") == []
+    for ref in ("node:juggler/tests/sub/x.test.mjs", "node:toolkit/x.test.mjs", "node:juggler/tests/x.mjs"):
+        assert t3_rules(root, ref) == ["T3"], ref
+
+
+def test_t3_a_python_test_must_be_run_by_a_step_or_be_a_tree_test_of_the_export_gate(tmp_path):
+    root = t3_series(tmp_path)
+    for ref in ("py:scripts/ci/test_ci.py::test_a", "py:scripts/ci/test_stealth_download_watchdog.py::test_b",
+                "py:modules/libpref/test/test_stealth_prefs.py::test_c"):
+        assert t3_rules(root, ref) == [], ref
+    for ref in ("py:scripts/ci/commented_out.py::test_a", "py:scripts/ci/test_c.py::test_a",
+                "py:modules/libpref/test/other_stealth.py::test_c", "py:scripts/ci/test.py::test_a"):
+        assert t3_rules(root, ref) == ["T3"], ref
+
+
+def test_t3_a_wrapper_test_and_a_series_without_the_workflow_are_not_judged(tmp_path):
+    root = t3_series(tmp_path)
+    assert t3_rules(root, "wrapper:tests/test_a.py::test_b") == []
+    bare = t3_series(tmp_path / "bare", with_workflow=False)
+    assert t3_rules(bare, "gtest:Nope.One") == []
+
+
+def test_t3_is_debt_like_t1_and_has_a_stable_key(tmp_path):
+    root = t3_series(tmp_path)
+    t3_rules(root, "gtest:Nope.One")
+    (v,) = hc.contract_violations(root)
+    assert v.rule == "T3" and v.key.startswith("T3|%s|dom/A.cpp|" % FOLDER) and "gtest:Nope.One" in v.detail
+    assert hc.debt_problems([v], [hc.entry_of(v)], [hc.entry_of(_viol("C2", "x();"))]) == []     # main has no T3: allowed once
+    assert "T3" in hc.RULES and "T3" in hc.debt_summary([hc.entry_of(v)])
+
+
+def test_the_rounds_of_the_real_series():
+    rounds = hl._Rounds(engine.ROOT)
+    assert rounds.known and "StealthFullscreen.*" in rounds.filter
+    assert rounds.gtest_runs("StealthFullscreen", "Anything") and not rounds.gtest_runs("StealthNoSuchSuite", "X")
+    assert rounds.node_runs("juggler/tests/x.test.mjs") and not rounds.node_runs("juggler/tests/sub/x.test.mjs")
+    assert rounds.py_runs("scripts/ci/test_ci.py") and rounds.py_runs("modules/libpref/test/test_stealth_x.py")
+    assert not rounds.py_runs("scripts/ci/commented_out_nowhere.py")

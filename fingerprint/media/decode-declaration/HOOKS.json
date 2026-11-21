@@ -11,7 +11,7 @@
   "file": "dom/media/mediacapabilities/MediaCapabilities.cpp",
   "function": "static uint32_t Vp8EncoderThreads(const uint32_t aPixels,",
   "kind": "add",
-  "form": "unknown",
+  "form": "shadow",
   "line": "  const auto GetNumberOfProcessors = StealthDeclaredNumberOfProcessors;  // STEALTH-HOOK(fingerprint/media/decode-declaration)",
   "test": ""
  },

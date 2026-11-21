@@ -42,8 +42,9 @@ hook contract (tools/hook_contract.py): every line a hooks.patch adds to a Mozil
 
 hooks list (tools/hooks_list.py): each non-backport folder has a HOOKS.json generated from its hooks.patch. `check`
          fails when it differs from the generation (a hook missing or extra, a field changed) and when an entry's
-         `test` names a test that does not exist; a hook with no test (rule T1) or an anchor without its anchor
-         and why (T2) is debt in tools/hook-debt.json.
+         `test` names a test that does not exist; a hook with no test (rule T1), an anchor without its anchor
+         and why (T2) or a test no round runs (T3) is debt in tools/hook-debt.json. A hook with `exception` and
+         `pm: "approvato"` in its entry is a declared exception (G35): left out of the contract, counted by `check`.
 
 check    needs no Firefox: SERIES lists exactly the folders that exist, every folder has
          its MANIFEST and FEATURE.md, every file of ours is listed and present, each
@@ -1134,6 +1135,11 @@ def contract_problems(against_main: bool = False) -> tuple[list, int, int]:
             len(hooks), len(violations))
 
 
+def declared_exceptions() -> int:
+    """How many hooks are declared exceptions (G35: `exception` and `pm: "approvato"` in their HOOKS.json entry)."""
+    return len(hooks_list.declared_exceptions(ROOT)) if (ROOT / "SERIES").is_file() else 0
+
+
 def check(source: Path | None = None, tag: str | None = None, against_main: bool = False) -> int:
     found = problems()
     if against_main:      # the CLI does; it needs git and origin/main, problems() and the tests' fakes do not
@@ -1153,6 +1159,7 @@ def check(source: Path | None = None, tag: str | None = None, against_main: bool
               "or rewritten" % (len(series_folders()), total, gone))
         print("hook contract: %d hooks, %d violations, all in tools/hook-debt.json"
               % (n_hooks, n_violations))
+        print("declared exceptions: %d" % declared_exceptions())
     return 1 if found else 0
 
 
