@@ -392,128 +392,118 @@ def cases() -> list:
         meta = ge.export(notes, profile, "s", Path(tmp) / "o", rc=1, run=fake)
         text = (Path(tmp) / "o" / "s.info").read_text(encoding="utf-8")
         add("export: each object with a profile is converted once, their counts add, and a red rc is a result (passed false)",
-            len(calls) == 2 and "DA:4,2" in text and meta["gcda_files"] == 2 and meta["passed"] is False and meta["rc"] == 1)
+            len(calls) == 3 and "DA:4,2" in text and meta["gcda_files"] == 2 and meta["passed"] is False and meta["rc"] == 1)
         add("export: the converter is called on this object's own .gcno and .gcda",
             any("--gcno=%s" % (notes / "gcno" / "obj-rel" / "dom" / "u1.gcno") in c and "--gcda=%s" % (profile / "obj-rel" / "dom" / "u1.gcda") in c
                 and "--stdout" in c and "--branch-probabilities" in c for c in calls))
+    import subprocess
+    import io as _io
+    from contextlib import redirect_stdout as _redir
+
+    SMOKE = "        -:    0:Source:t.c\n        1:    2:  return 2 * x;\n        -:    3:}\n    #####:    5:  return x;\n"
+
+    def llvm_machine(accepted, help_text="", build_ok=True, files=False, text=SMOKE):
+        """A fake llvm-cov and clang: `gcov` takes exactly the flags in `accepted` (dashes and all), anything else is `Unknown command line argument`."""
+        seen = []
+
+        def run(cmd, **kw):
+            seen.append(cmd)
+            name = str(cmd[0])
+            if name.endswith("clang"):
+                return subprocess.CompletedProcess(cmd, 0 if build_ok else 1, "", "" if build_ok else "no linker")
+            if name.endswith("llvm-cov") and cmd[1:] == ["--version"]:
+                return subprocess.CompletedProcess(cmd, 0, "LLVM version 99.0.0\n", "")
+            if name.endswith("llvm-cov") and cmd[1:] == ["gcov", "--help"]:
+                return subprocess.CompletedProcess(cmd, 0, help_text, "")
+            if name.endswith("llvm-cov"):
+                flags = [a.split("=")[0] for a in cmd[2:] if a.startswith("-")]
+                bad = [f for f in flags if f not in accepted]
+                if bad:
+                    return subprocess.CompletedProcess(cmd, 1, "", "Unknown command line argument '%s'" % bad[0])
+                if files:
+                    (Path(kw["cwd"]) / "t.c.gcov").write_text(text, encoding="utf-8")
+                    return subprocess.CompletedProcess(cmd, 0, "File 't.c'\nLines executed:50.00% of 2\n", "")
+                return subprocess.CompletedProcess(cmd, 0, text, "")
+            return subprocess.CompletedProcess(cmd, 0, "", "")
+        run.seen = seen
+        return run
+
     with tempfile.TemporaryDirectory() as tmp:
-        import subprocess
         bindir = Path(tmp) / "clang" / "bin"
         bindir.mkdir(parents=True)
         (bindir / "llvm-cov").write_text("", encoding="utf-8")
+        (bindir / "clang").write_text("", encoding="utf-8")
         obj = Path(tmp) / "obj-rel"
         obj.mkdir()
         (obj / "config.status.json").write_text(json.dumps({"substs": {"CC": str(bindir / "clang") + " --target=x"}}), encoding="utf-8")
 
-        def helper(text):
-            return lambda cmd, **kw: subprocess.CompletedProcess(cmd, 0, text, "")
-        full = "  --gcno=<gcno>\n  --gcda=<gcda>\n  --stdout\n  --branch-probabilities\n"
-        good = ge.check_tools(obj, helper(full))
-        try:
-            ge.check_tools(obj, helper("  --stdout\n  --gcno=<gcno>\n"))
-            refused = False
-        except SystemExit as exc:
-            refused = "--gcda" in str(exc) and "--branch-probabilities" in str(exc)
-        # with a clang beside it, the export is tried on a program of a few lines: built, run, converted, read
-        (bindir / "clang").write_text("", encoding="utf-8")
-        seen = []
+        def checked(machine, n):
+            sink = _io.StringIO()
+            with _redir(sink):
+                ge.check_tools(obj, machine, work=Path(tmp) / ("w%d" % n))
+            return sink.getvalue(), json.loads((obj / ge.SPELLING_FILE).read_text(encoding="utf-8"))
 
-        def machine(printed):
-            def run(cmd, **kw):
-                seen.append(cmd)
-                if len(cmd) > 1 and cmd[1] == "gcov" and "--help" not in cmd:
-                    return subprocess.CompletedProcess(cmd, 0, printed, "")
-                return subprocess.CompletedProcess(cmd, 0, full if "--help" in cmd else "", "")
-            return run
-        right = "        -:    0:Source:t.c\n        1:    2:  return 2 * x;\n        -:    3:}\n    #####:    5:  return x;\n"
-        ge.check_tools(obj, machine(right), work=Path(tmp) / "w")
-        tried = [c[1:3] for c in seen if str(c[0]).endswith("clang")]
+        said, got = checked(llvm_machine({"--branch-probabilities", "--stdout", "--gcno", "--gcda"}, "  --stdout  Print\n"), 1)
+        add("check-tools: it prints llvm-cov's version and the whole help it gave, and keeps the first spelling that works on the program",
+            "LLVM version 99.0.0" in said and "--stdout  Print" in said and got["label"] == "long, branches, stdout" and got["chosen_by"] == "smoke test")
+        _, got = checked(llvm_machine({"-b", "-t", "-gcno", "-gcda"}), 2)
+        add("check-tools: the long forms refused, the short ones are found", got["label"] == "short, branches, stdout")
+        _, got = checked(llvm_machine({"-stdout", "-gcno", "-gcda"}), 3)
+        add("check-tools: with a single dash and no -b it is the spelling that works (the dashes are not assumed)", got["label"] == "single dash, stdout")
+        _, got = checked(llvm_machine({"--gcno", "--gcda"}, files=True), 4)
+        add("check-tools: when nothing prints to stdout the .gcov files it writes are read", got["mode"] == "files" and got["label"] == "long, files")
         try:
-            ge.check_tools(obj, machine("nothing readable\n"), work=Path(tmp) / "w2")
-            unread = False
+            checked(llvm_machine({"--gcno", "--gcda"}, text="garbage\n", files=False), 5)
+            red = False
         except SystemExit as exc:
-            unread = "cannot read" in str(exc)
-        broken = lambda cmd, **kw: subprocess.CompletedProcess(cmd, 1 if str(cmd[0]).endswith("clang") else 0, full if "--help" in cmd else "", "no linker")
-        warned = ge.check_tools(obj, broken, work=Path(tmp) / "w3").endswith("llvm-cov")
-        (bindir / "clang").unlink()
-        (bindir / "llvm-cov").unlink()
+            red = "no spelling" in str(exc) and "stdout" in str(exc)
         try:
-            ge.check_tools(obj, helper(""))
-            gone = False
+            checked(llvm_machine(set()), 6)
+            red_none = False
         except SystemExit as exc:
-            gone = "no llvm-cov" in str(exc)
-        add("check-tools: llvm-cov is found beside the clang and must list the options the export uses; none, or one that lacks them, stops the build early",
-            good.endswith("llvm-cov") and refused and gone)
-        add("check-tools: the export is tried on a program built and run with the build's clang: an output the parser cannot read stops, a program that cannot be built only warns",
-            len(tried) == 2 and all("--coverage" in c for c in tried) and unread and warned)
-    add("js: a script's URL gives the path below its package, whatever the scheme",
-        [ge.url_tail(u) for u in ("resource://gre/modules/X.sys.mjs", "chrome://juggler/content/Y.js", "resource:///modules/Z.sys.mjs",
-                                  "jar:file:///a/b/omni.ja!/modules/X.sys.mjs?v=1", "chrome://x/content/a.js -> file:///t/b.js")]
-        == ["modules/X.sys.mjs", "content/Y.js", "modules/Z.sys.mjs", "modules/X.sys.mjs", "t/b.js"])
-    resolve = ge.js_resolver(["toolkit/modules/StealthFoo.sys.mjs", "juggler/content/Helper.js", "a/content/index.js", "b/modules/index.js"])
-    add("js: a URL is the file of the series with that name when there is one, else the one whose path ends like the URL's; else none",
-        resolve("resource://gre/modules/StealthFoo.sys.mjs") == "toolkit/modules/StealthFoo.sys.mjs"
-        and resolve("chrome://juggler/content/Helper.js") == "juggler/content/Helper.js"
-        and resolve("chrome://a/content/index.js") == "a/content/index.js" and resolve("resource://gre/modules/index.js") == "b/modules/index.js"
-        and resolve("resource://gre/other/index.js") is None and resolve("resource://gre/modules/Else.sys.mjs") is None)
-    with tempfile.TemporaryDirectory() as tmp:
-        jd = Path(tmp)
-        (jd / "1-10-0.info").write_text("TN:\nSF:resource://gre/modules/StealthFoo.sys.mjs\nFN:1,doIt\nFNDA:2,doIt\nDA:2,2\nDA:3,0\nend_of_record\n"
-                                        "SF:resource://gre/modules/Other.sys.mjs\nDA:1,9\nend_of_record\n", encoding="utf-8")
-        (jd / "2-11-0.info").write_text("SF:resource://gre/modules/StealthFoo.sys.mjs\nFN:1,doIt\nFNDA:1,doIt\nDA:2,1\nDA:3,5\nend_of_record\n", encoding="utf-8")
-        (jd / "3-12-0.info").write_text("SF:chrome://x/content/Nothing.js\nDA:1,1\nend_of_record\n", encoding="utf-8")
-        got, seen, lost = ge.js_files(jd, ["toolkit/modules/StealthFoo.sys.mjs"])
-        add("js: the records of the files of the series are merged over the processes' files and the others are dropped (%d files read)" % seen,
-            seen == 3 and lost == 0 and list(got) == ["toolkit/modules/StealthFoo.sys.mjs"]
-            and got["toolkit/modules/StealthFoo.sys.mjs"]["lines"] == {2: 3, 3: 5} and got["toolkit/modules/StealthFoo.sys.mjs"]["functions"] == {"doIt": (1, 3)})
+            red_none = "Unknown command line argument" in str(exc)
+        add("check-tools: red only when no spelling gives a file the parser reads, and the message says what each said", red and red_none)
+        wrong = SMOKE.replace("1:    2:", "#####:    2:")
+        try:
+            checked(llvm_machine({"--stdout", "--gcno", "--gcda"}, text=wrong), 7)
+            wrong_red = False
+        except SystemExit:
+            wrong_red = True
+        add("check-tools: a file that reads but does not show line 2 run and line 5 not is not accepted", wrong_red)
+        said, got = checked(llvm_machine({"-b", "-t", "-gcno", "-gcda"}, "  -b  branches\n  -t  stdout\n  -gcno=<gcno>\n  -gcda=<gcda>\n", build_ok=False), 8)
+        add("check-tools: a program that cannot be built falls back to the help text, accepting short forms and a single dash",
+            got["label"] == "short, branches, stdout" and got["chosen_by"] == "help text" and "warning" in said)
+        try:
+            checked(llvm_machine(set(), "  --verbose\n", build_ok=False), 9)
+            nohelp = False
+        except SystemExit as exc:
+            nohelp = "lists no spelling" in str(exc)
+        add("check-tools: no program and no listed spelling is red", nohelp)
     with tempfile.TemporaryDirectory() as tmp:
         notes = Path(tmp) / "notes"
         (notes / "gcno" / "obj-rel" / "dom").mkdir(parents=True)
         (notes / "gcno" / "obj-rel" / "dom" / "u1.gcno").write_bytes(b"x")
         (notes / "topsrcdir.txt").write_text("/node/src\n", encoding="utf-8")
         (notes / "interest.json").write_text(json.dumps(["dom/a.cpp"]), encoding="utf-8")
-        (notes / "interest-js.json").write_text(json.dumps(["toolkit/modules/StealthFoo.sys.mjs"]), encoding="utf-8")
         profile = Path(tmp) / "gcda"
         (profile / "obj-rel" / "dom").mkdir(parents=True)
         (profile / "obj-rel" / "dom" / "u1.gcda").write_bytes(b"y")
-        jd = Path(tmp) / "jscov"
-        jd.mkdir()
-        (jd / "1-1-0.info").write_text("SF:resource://gre/modules/StealthFoo.sys.mjs\nDA:2,4\nend_of_record\n", encoding="utf-8")
-        import subprocess as _sp
-        meta = ge.export(notes, profile, "s", Path(tmp) / "o", rc=0, js_dir=jd, sandbox="on",
-                         run=lambda cmd, **kw: _sp.CompletedProcess(cmd, 0, "        -:    0:Source:/node/src/dom/a.cpp\n        1:    4:  DoA();\n", ""))
-        text = (Path(tmp) / "o" / "s.info").read_text(encoding="utf-8")
-        add("export: the JavaScript records go into the suite's lcov beside the C ones, and the meta says how many files were read and the sandbox",
-            "SF:toolkit/modules/StealthFoo.sys.mjs" in text and "DA:2,4" in text and "SF:dom/a.cpp" in text and meta["js_info_files"] == 1 and meta["sandbox"] == "on")
-    resolve_rs = ge.rs_resolver(["gfx/wgpu_bindings/src/stealth_x.rs", "netwerk/x.rs"])
-    add("rust: a path llvm-cov names is a file of the series as it is, or by the path it ends with (a remapped prefix), or none",
-        resolve_rs("netwerk/x.rs") == "netwerk/x.rs" and resolve_rs("/builds/worker/gecko/netwerk/x.rs") == "netwerk/x.rs"
-        and resolve_rs("third_party/rust/other/src/lib.rs") is None)
-    with tempfile.TemporaryDirectory() as tmp:
-        import subprocess as _sp
-        notes = Path(tmp) / "notes"
-        notes.mkdir()
-        for name in ("rust-llvm-cov", "rust-llvm-profdata"):
-            (notes / name).write_text("", encoding="utf-8")
-        raw = Path(tmp) / "rustprof"
-        raw.mkdir()
-        for n in ("1-a.profraw", "2-a.profraw"):
-            (raw / n).write_bytes(b"p")
-        seen = []
+        sample = "        -:    0:Source:/node/src/dom/a.cpp\n        1:    4:  DoA();\n"
+        calls = []
 
-        def machine(cmd, **kw):
-            seen.append(cmd)
-            if cmd[1] == "export":
-                return _sp.CompletedProcess(cmd, 0, "SF:/node/src/netwerk/x.rs\nFN:1,_ZN3foo3barE\nFNDA:2,_ZN3foo3barE\nDA:2,2\nend_of_record\n"
-                                                    "SF:/node/src/third_party/rust/y/src/lib.rs\nDA:1,1\nend_of_record\n", "")
-            return _sp.CompletedProcess(cmd, 0, "", "")
-        got, n = ge.rust_files(raw, notes, [Path("ff/libxul.so")], "/node/src", ["netwerk/x.rs"], machine)
-        add("rust: the .profraw files are merged and exported by the llvm-tools of the rustc, and only the files of the series are kept (%d files)" % n,
-            n == 2 and list(got) == ["netwerk/x.rs"] and got["netwerk/x.rs"]["lines"] == {2: 2}
-            and seen[0][1] == "merge" and "-sparse" in seen[0] and seen[1][1] == "export" and "-format=lcov" in seen[1]
-            and any(a.startswith("-instr-profile=") for a in seen[1]))
-        none, zero = ge.rust_files(Path(tmp) / "empty", notes, [Path("ff/libxul.so")], "/node/src", ["netwerk/x.rs"], machine)
-        add("rust: a suite with no .profraw gives nothing, and says so (0 files)", none == {} and zero == 0)
+        def only_short(cmd, **kw):
+            calls.append(cmd)
+            if "--stdout" in cmd or "--branch-probabilities" in cmd:
+                return subprocess.CompletedProcess(cmd, 1, "", "Unknown command line argument")
+            return subprocess.CompletedProcess(cmd, 0, sample, "")
+        meta = ge.export(notes, profile, "s", Path(tmp) / "o1", run=only_short)
+        add("export: with no spelling in the notes the first that gives a text for the first profile is used, and the meta says so",
+            meta["gcov_command"][0] == "short, branches, stdout" and meta["gcov_command"][2] == "the first profile of this suite" and "DA:4,1" in (Path(tmp) / "o1" / "s.info").read_text(encoding="utf-8"))
+        (notes / ge.SPELLING_FILE).write_text(json.dumps(dict(ge.GCOV_SPELLINGS[4], chosen_by="smoke test")), encoding="utf-8")
+        calls.clear()
+        meta = ge.export(notes, profile, "s", Path(tmp) / "o2", run=only_short)
+        add("export: the spelling in the notes is the one used, with its own flags, and is in the meta",
+            all("-t" in c for c in calls) and tuple(meta["gcov_command"]) == ("short, stdout", ["-t", "-gcno={gcno}", "-gcda={gcda}"], "smoke test"))
     add("env: GCOV_PREFIX_STRIP drops the node's directory", ge.strip_count("/home/runner/work/engine/engine") == 5)
 
     with tempfile.TemporaryDirectory() as tmp:

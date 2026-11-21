@@ -231,37 +231,113 @@ def find_llvm_cov(objdir: Path) -> Path:
 CHECK_C = "int twice(int x) {\n  return 2 * x;\n}\nint never(int x) {\n  return x;\n}\nint main(void) {\n  return twice(0);\n}\n"
 
 
+# The spellings of `llvm-cov gcov` the export may use, in the order they are tried: the long and the short forms of the options, with a single dash
+# or two (LLVM takes both), printing to stdout or writing .gcov files in the directory it runs in. -b (the branch probabilities) is what makes it
+# print `function NAME called N`, which gives the functions; the map does not need the rest of it. Which one this llvm-cov takes is found by
+# trying them on a program of a few lines (check_tools), never by reading its help.
+GCOV_SPELLINGS = (
+    {"label": "long, branches, stdout", "mode": "stdout", "args": ["--branch-probabilities", "--stdout", "--gcno={gcno}", "--gcda={gcda}"]},
+    {"label": "short, branches, stdout", "mode": "stdout", "args": ["-b", "-t", "-gcno={gcno}", "-gcda={gcda}"]},
+    {"label": "single dash, branches, stdout", "mode": "stdout", "args": ["-branch-probabilities", "-stdout", "-gcno={gcno}", "-gcda={gcda}"]},
+    {"label": "long, stdout", "mode": "stdout", "args": ["--stdout", "--gcno={gcno}", "--gcda={gcda}"]},
+    {"label": "short, stdout", "mode": "stdout", "args": ["-t", "-gcno={gcno}", "-gcda={gcda}"]},
+    {"label": "single dash, stdout", "mode": "stdout", "args": ["-stdout", "-gcno={gcno}", "-gcda={gcda}"]},
+    {"label": "long, branches, files", "mode": "files", "args": ["--branch-probabilities", "--gcno={gcno}", "--gcda={gcda}"]},
+    {"label": "long, files", "mode": "files", "args": ["--gcno={gcno}", "--gcda={gcda}"]},
+    {"label": "single dash, files", "mode": "files", "args": ["-gcno={gcno}", "-gcda={gcda}"]},
+)
+SPELLING_FILE = "gcov-spelling.json"
+CHECK_C = "int twice(int x) {\n  return 2 * x;\n}\nint never(int x) {\n  return x;\n}\nint main(void) {\n  return twice(0);\n}\n"
+
+
+def gcov_text(llvm_cov: str, spelling: dict, gcno: Path, gcda: Path, run=subprocess.run) -> str:
+    """The .gcov text `llvm-cov gcov` gives for one object, spelled as `spelling` says: its stdout, or the .gcov files it wrote in a directory of its own."""
+    import tempfile
+    argv = [llvm_cov, "gcov"] + [a.format(gcno=gcno, gcda=gcda) for a in spelling["args"]] + [str(gcno)]
+    if spelling["mode"] == "stdout":
+        done = run(argv, capture_output=True, text=True, check=False, cwd=str(gcno.parent))
+        text = done.stdout or ""
+    else:
+        with tempfile.TemporaryDirectory() as tmp:
+            done = run(argv, capture_output=True, text=True, check=False, cwd=tmp)
+            text = "".join(f.read_text(encoding="utf-8", errors="replace") for f in sorted(Path(tmp).glob("*.gcov")))
+    if done.returncode != 0:
+        raise RuntimeError("llvm-cov exited %d on %s: %s" % (done.returncode, gcno.name, (done.stderr or done.stdout or "").strip()[:300]))
+    if not text.strip():
+        raise RuntimeError("llvm-cov printed no .gcov text for %s (%s)" % (gcno.name, spelling["label"]))
+    return text
+
+
+def help_options(text: str) -> set:
+    """The names of the options a help text lists, whatever their dashes: `-b`, `--stdout`, `-gcno=<gcno>` -> b, stdout, gcno."""
+    return set(re.findall(r"(?<![\w-])-{1,2}([A-Za-z][\w-]*)", text))
+
+
+def spelling_by_help(text: str):
+    """The first spelling all of whose options the help lists (with a single dash, two, or as a short form), else None."""
+    listed = help_options(text)
+    for spelling in GCOV_SPELLINGS:
+        if all(a.lstrip("-").split("=")[0] in listed for a in spelling["args"]):
+            return spelling
+    return None
+
+
+def smoke_ok(files: dict) -> bool:
+    rec = files.get("t.c", {"lines": {}})
+    return rec["lines"].get(2, 0) >= 1 and rec["lines"].get(5) == 0
+
+
 def check_tools(objdir: Path, run=subprocess.run, work=None) -> str:
-    """The build's llvm-cov, what its `gcov` lists of the options the export uses, and the export itself on a program of a few lines, built
-    and run here with the build's own clang. Said right after the toolchain's bootstrap, before an hour of compiling. A program that cannot be
-    built here (no linker for it on this machine) is a warning, not a stop; one whose output the parser cannot read is a stop."""
+    """The build's llvm-cov and which spelling of `llvm-cov gcov` this one takes, said right after the toolchain's bootstrap, before an hour of
+    compiling. It prints `llvm-cov --version` and the whole of `gcov --help`. The authority is a program of a few lines built and run here with the
+    build's own clang: each spelling is tried, in order, on its profile, and the first that gives a file the parser reads, with line 2 run and line 5
+    not, is kept (and written to <objdir>/gcov-spelling.json, which the notes carry to the suites). If the program cannot be built here, the first
+    spelling the help text lists is kept. Red only when none works."""
+    import tempfile
     llvm_cov = find_llvm_cov(objdir)
-    done = run([str(llvm_cov), "gcov", "--help"], capture_output=True, text=True, check=False)
-    text = (done.stdout or "") + (done.stderr or "")
-    missing = [o for o in ("--gcno", "--gcda", "--stdout", "--branch-probabilities") if o not in text]
-    if missing:
-        raise SystemExit("ERROR: %s gcov does not list %s: this llvm-cov cannot give the export the map reads" % (llvm_cov, ", ".join(missing)))
+    version = run([str(llvm_cov), "--version"], capture_output=True, text=True, check=False)
+    print("llvm-cov --version:\n%s" % ((version.stdout or "") + (version.stderr or "")).strip())
+    helped = run([str(llvm_cov), "gcov", "--help"], capture_output=True, text=True, check=False)
+    help_text = (helped.stdout or "") + (helped.stderr or "")
+    print("llvm-cov gcov --help:\n%s" % help_text.strip())
+    chosen, how = None, ""
     clang = Path(llvm_cov).parent / "clang"
+    failed = "no clang beside llvm-cov"
     if clang.is_file():
-        import tempfile
         with tempfile.TemporaryDirectory() as tmp:
             tmp = Path(work or tmp)
             tmp.mkdir(parents=True, exist_ok=True)
             (tmp / "t.c").write_text(CHECK_C, encoding="utf-8", newline="\n")
-            steps = [[str(clang), "--coverage", "-O0", "-c", "t.c", "-o", "t.o"], [str(clang), "--coverage", "t.o", "-o", "t"], [str(tmp / "t")]]
             failed = None
-            for cmd in steps:
+            for cmd in ([str(clang), "--coverage", "-O0", "-c", "t.c", "-o", "t.o"], [str(clang), "--coverage", "t.o", "-o", "t"], [str(tmp / "t")]):
                 done = run(cmd, capture_output=True, text=True, check=False, cwd=str(tmp))
                 if done.returncode != 0:
-                    failed = (done.stderr or done.stdout or "").strip()[:200]
+                    failed = (done.stderr or done.stdout or "").strip()[:200] or "exit %d" % done.returncode
                     break
-            if failed is not None:
-                print("warning: the check program did not build and run with %s (%s): the export's format is not checked here" % (clang, failed))
-            else:
-                got = convert_one(str(llvm_cov), tmp / "t.gcno", tmp / "t.gcda", str(tmp), {"t.c"}, run, None, str(tmp))
-                rec = got.get("t.c", {"lines": {}, "functions": {}})
-                if not (rec["lines"].get(2, 0) >= 1 and rec["lines"].get(5) == 0 and 5 in rec["lines"]):
-                    raise SystemExit("ERROR: llvm-cov gcov printed something the export cannot read on a program of a few lines: %s" % got)
+            if failed is None:
+                tried = []
+                for spelling in GCOV_SPELLINGS:
+                    try:
+                        text = gcov_text(str(llvm_cov), spelling, tmp / "t.gcno", tmp / "t.gcda", run)
+                        ok = smoke_ok(parse_gcov_text(text, str(tmp), {"t.c"}, None, str(tmp)))
+                        tried.append("%s: %s" % (spelling["label"], "read, but not the program's lines" if not ok else "ok"))
+                    except RuntimeError as exc:
+                        ok = False
+                        tried.append("%s: %s" % (spelling["label"], str(exc)[:160]))
+                    if ok:
+                        chosen, how = spelling, "smoke test"
+                        break
+                if chosen is None:
+                    raise SystemExit("ERROR: no spelling of `llvm-cov gcov` gave a file the export reads on a program of a few lines:\n  %s" % "\n  ".join(tried))
+    if chosen is None:
+        print("warning: the check program did not build and run (%s): the spelling is taken from the help text" % failed)
+        chosen, how = spelling_by_help(help_text), "help text"
+        if chosen is None:
+            raise SystemExit("ERROR: %s gcov lists no spelling of the options the export uses (--gcno, --gcda, and --stdout or files), and no program "
+                             "could be built to try them" % llvm_cov)
+    print("gcov spelling: %s (%s): %s" % (chosen["label"], how, " ".join(chosen["args"])))
+    Path(objdir).mkdir(parents=True, exist_ok=True)
+    (Path(objdir) / SPELLING_FILE).write_text(json.dumps(dict(chosen, chosen_by=how), indent=1) + "\n", encoding="utf-8", newline="\n")
     return str(llvm_cov)
 
 
@@ -292,6 +368,8 @@ def bundle(series_root: Path, objdir: Path, topsrcdir: str, out: Path, llvm_cov:
             shutil.copy2(Path(rust_tools) / name, Path(out) / ("rust-" + name))
             os.chmod(Path(out) / ("rust-" + name), 0o755)
     (Path(out) / "topsrcdir.txt").write_text(topsrcdir + "\n", encoding="utf-8")
+    if (Path(objdir) / SPELLING_FILE).is_file():
+        shutil.copy2(Path(objdir) / SPELLING_FILE, Path(out) / SPELLING_FILE)
     (Path(out) / "header-links.json").write_text(json.dumps(links, indent=1, sort_keys=True) + "\n", encoding="utf-8")
     versions = ""
     if llvm_cov:
@@ -370,16 +448,10 @@ def to_lcov(files: dict, suite: str) -> str:
     return "\n".join(out) + ("\n" if out else "")
 
 
-GCOV_FLAGS = ("--branch-probabilities", "--stdout")
-
-
-def convert_one(llvm_cov: str, gcno: Path, gcda: Path, topsrcdir: str, interest: set, run=subprocess.run, links: dict = None, base: str = "") -> dict:
-    """One object's profile through `llvm-cov gcov`: the text it prints for each source file the object names (the headers too)."""
-    done = run([llvm_cov, "gcov", *GCOV_FLAGS, "--gcno=%s" % gcno, "--gcda=%s" % gcda, str(gcno)],
-               capture_output=True, text=True, check=False, cwd=str(gcno.parent))
-    if done.returncode != 0:
-        raise RuntimeError("llvm-cov exited %d on %s: %s" % (done.returncode, gcno.name, (done.stderr or done.stdout).strip()[:300]))
-    return parse_gcov_text(done.stdout, topsrcdir, interest, links, base)
+def convert_one(llvm_cov: str, gcno: Path, gcda: Path, topsrcdir: str, interest: set, run=subprocess.run, links: dict = None, base: str = "",
+                spelling: dict = None) -> dict:
+    """One object's profile through `llvm-cov gcov`: the text it gives for each source file the object names (the headers too)."""
+    return parse_gcov_text(gcov_text(llvm_cov, spelling or GCOV_SPELLINGS[0], gcno, gcda, run), topsrcdir, interest, links, base)
 
 
 def demangle(files: dict, run=subprocess.run) -> None:
@@ -426,13 +498,24 @@ def export(notes: Path, gcda_root: Path, suite: str, out: Path, jobs: int = 4, r
         raise SystemExit("ERROR: suite %s left no profile: not one .gcda of the %d objects the notes name is under %s. The counters did not "
                          "reach the directory: the browser was killed instead of quitting, GCOV_PREFIX did not reach it, or a sandbox refused "
                          "the write" % (suite, len(list((notes / "gcno").rglob("*.gcno"))), gcda_root))
+    spelling_file = notes / SPELLING_FILE
+    spelling = json.loads(spelling_file.read_text(encoding="utf-8")) if spelling_file.is_file() else None
+    if spelling is None:
+        # no check on the node: the first spelling that gives a text for the first profile
+        for candidate in GCOV_SPELLINGS:
+            try:
+                gcov_text(llvm_cov, candidate, pairs[0][0], pairs[0][1], run)
+            except RuntimeError:
+                continue
+            spelling = dict(candidate, chosen_by="the first profile of this suite")
+            break
     files: dict = {}
     errors: list = []
 
     def one(pair):
         try:
             return convert_one(llvm_cov, pair[0], pair[1], topsrcdir, interest, run, links,
-                               str(Path(topsrcdir) / pair[0].relative_to(notes / "gcno").parent))
+                               str(Path(topsrcdir) / pair[0].relative_to(notes / "gcno").parent), spelling)
         except (RuntimeError, ValueError) as exc:
             return exc
 
@@ -459,7 +542,7 @@ def export(notes: Path, gcda_root: Path, suite: str, out: Path, jobs: int = 4, r
     out = Path(out)
     out.mkdir(parents=True, exist_ok=True)
     (out / ("%s.info" % suite)).write_text(to_lcov(files, suite), encoding="utf-8", newline="\n")
-    meta = {"suite": suite, "rc": rc, "gcda_files": len(pairs), "export_errors": len(errors), "files": len(files), "sandbox": sandbox,
+    meta = {"suite": suite, "rc": rc, "gcov_command": ((spelling or {}).get("label"), (spelling or {}).get("args"), (spelling or {}).get("chosen_by")), "gcda_files": len(pairs), "export_errors": len(errors), "files": len(files), "sandbox": sandbox,
             "js_info_files": js_seen, "rust_profraw_files": rust_raw, "js_unresolved_scripts": js_unresolved,
             "lines": sum(len(r["lines"]) for r in files.values())}
     if junit and Path(junit).is_file():
@@ -514,7 +597,7 @@ def main(argv=None) -> int:
             return done.stdout.strip() + "\n"
         print(json.dumps(bundle(a.series_root, a.objdir, a.topsrcdir, a.out, llvm_cov, version, a.rust_tools), sort_keys=True))
     elif a.cmd == "check-tools":
-        print("llvm-cov: %s (the export reads its text output)" % check_tools(a.objdir))
+        print("llvm-cov: %s" % check_tools(a.objdir))
     elif a.cmd == "env":
         top = (a.notes / "topsrcdir.txt").read_text(encoding="utf-8").strip()
         print("GCOV_PREFIX=%s" % a.prefix.resolve())
