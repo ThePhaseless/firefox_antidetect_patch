@@ -57,8 +57,11 @@ def cases() -> list:
     add("gate legs: every leg present is no problem",
         gate_legs.missing([_row("a"), _row("b", ["linux"])], _gate(("a", "linux"), ("a", "windows"), ("b", "linux"))) == [])
     add("gate legs: a Linux-only row needs no Windows leg", gate_legs.missing([_row("b", ["linux"])], _gate(("b", "linux"))) == [])
-    lines = gate_legs.missing([_row("a")], _gate(("a", "linux"), ("a", "windows"), ("stray", "linux")))
-    add("gate legs: a leg whose suite is not in the list is reported%s" % ("" if len(lines) == 1 else ": %s" % lines), len(lines) == 1 and "stray" in lines[0])
+    stray = _gate(("a", "linux"), ("a", "windows"), ("stray", "linux"))
+    lines = gate_legs.unlisted([_row("a")], stray)
+    add("gate legs: a leg whose suite is not in the list is said%s" % ("" if len(lines) == 1 else ": %s" % lines), len(lines) == 1 and "stray" in lines[0])
+    add("gate legs: a leg whose suite is not in the list does not fail the check (the series reaches main before the wrapper lists the suite)",
+        gate_legs.missing([_row("a")], stray) == [])
     add("gate legs: a gate with no wrapper-e2e job reports every leg of the list", len(gate_legs.missing([_row("a")], {"jobs": {}})) == 2)
 
     # the real gate.yml: the legs
