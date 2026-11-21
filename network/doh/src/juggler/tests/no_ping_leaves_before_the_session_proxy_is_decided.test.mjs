@@ -218,9 +218,9 @@ test('Juggler marks the browser as driven as soon as it sees the pipe flag', () 
       'markDriven runs after the flag check and before the registry exists');
 });
 
-test('the pingsender asks the registry for the road and keeps the CRLF of its file', () => {
+test('the pingsender asks the registry for the road and its file ends its lines with LF', () => {
   const bytes = fs.readFileSync(path.join(APP, 'StealthPingsender.sys.mjs'), 'utf8');
   assert.match(bytes, /roadOfSession\(0\)/);
   assert.doesNotMatch(bytes, /proxyRecordFor/);
-  assert.ok(!/[^\r]\n/.test(bytes), 'every line ending of this file is CRLF');
+  assert.ok(!bytes.includes('\r'), 'a file of ours ends its lines with LF only (the series refuses a CR)');
 });
