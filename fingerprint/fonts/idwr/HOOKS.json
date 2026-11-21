@@ -1,0 +1,10 @@
+[
+ {
+  "file": "gfx/moz.build",
+  "function": "if CONFIG[\"MOZ_FONTATIONS\"]:",
+  "kind": "add",
+  "form": "registration",
+  "line": "DIRS += [\"idwr\"]  # STEALTH-HOOK(fingerprint/fonts/idwr)",
+  "test": ""
+ }
+]

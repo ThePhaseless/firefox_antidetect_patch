@@ -1,0 +1,339 @@
+[
+ {
+  "file": "gfx/skia/skia/src/core/SkScalerContext.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "// STEALTH-HOOK(fingerprint/fonts/metrics)",
+  "test": ""
+ },
+ {
+  "file": "gfx/skia/skia/src/core/SkScalerContext.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "#include \"mozilla/gfx/StealthGlyphCoverage.h\"",
+  "test": ""
+ },
+ {
+  "file": "gfx/skia/skia/src/core/SkScalerContext.cpp",
+  "function": "void SkScalerContext::getImage(const SkGlyph& origGlyph) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    // STEALTH-HOOK(fingerprint/fonts/metrics)",
+  "test": ""
+ },
+ {
+  "file": "gfx/skia/skia/src/core/SkScalerContext.cpp",
+  "function": "void SkScalerContext::getImage(const SkGlyph& origGlyph) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    if (unfilteredGlyph->maskFormat() == SkMask::kA8_Format) {",
+  "test": ""
+ },
+ {
+  "file": "gfx/skia/skia/src/core/SkScalerContext.cpp",
+  "function": "void SkScalerContext::getImage(const SkGlyph& origGlyph) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        mozilla::gfx::StealthQuantiseGlyphCoverage(",
+  "test": ""
+ },
+ {
+  "file": "gfx/skia/skia/src/core/SkScalerContext.cpp",
+  "function": "void SkScalerContext::getImage(const SkGlyph& origGlyph) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "                static_cast<uint8_t*>(unfilteredGlyph->fImage),",
+  "test": ""
+ },
+ {
+  "file": "gfx/skia/skia/src/core/SkScalerContext.cpp",
+  "function": "void SkScalerContext::getImage(const SkGlyph& origGlyph) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "                unfilteredGlyph->width(), unfilteredGlyph->height(),",
+  "test": ""
+ },
+ {
+  "file": "gfx/skia/skia/src/core/SkScalerContext.cpp",
+  "function": "void SkScalerContext::getImage(const SkGlyph& origGlyph) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "                unfilteredGlyph->rowBytes());",
+  "test": ""
+ },
+ {
+  "file": "gfx/skia/skia/src/core/SkScalerContext.cpp",
+  "function": "void SkScalerContext::getImage(const SkGlyph& origGlyph) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    }",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxDWriteFonts.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthTextQuality.h\"",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxDWriteFonts.cpp",
+  "function": "using namespace mozilla::gfx;",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/fonts/metrics)",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxDWriteFonts.cpp",
+  "function": "using namespace mozilla::gfx;",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (const Maybe<BYTE> declared = StealthDeclaredTextQuality()) {",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxDWriteFonts.cpp",
+  "function": "using namespace mozilla::gfx;",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    return *declared;",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxDWriteFonts.cpp",
+  "function": "using namespace mozilla::gfx;",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  }",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxDWriteFonts.cpp",
+  "function": "void gfxDWriteFont::UpdateClearTypeVars() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/fonts/metrics)",
+  "removed": "  HRESULT hr = Factory::GetDWriteFactory()->CreateRenderingParams(\n      getter_AddRefs(defaultRenderingParams));",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxDWriteFonts.cpp",
+  "function": "void gfxDWriteFont::UpdateClearTypeVars() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  const bool stealthDeclared = StealthTextQualityDeclared();",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxDWriteFonts.cpp",
+  "function": "void gfxDWriteFont::UpdateClearTypeVars() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  HRESULT hr =",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxDWriteFonts.cpp",
+  "function": "void gfxDWriteFont::UpdateClearTypeVars() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "      StealthCreateRenderingParams(stealthDeclared, defaultRenderingParams);",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxDWriteFonts.cpp",
+  "function": "void gfxDWriteFont::UpdateClearTypeVars() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/fonts/metrics)",
+  "removed": "  if (gfxVars::SystemTextQuality() == CLEARTYPE_QUALITY) {",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxDWriteFonts.cpp",
+  "function": "void gfxDWriteFont::UpdateClearTypeVars() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  if (stealthDeclared || gfxVars::SystemTextQuality() == CLEARTYPE_QUALITY) {",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxFT2FontBase.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthDesignMetrics.h\"  // STEALTH-HOOK(fingerprint/fonts/metrics)",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxFT2FontBase.cpp",
+  "function": "void gfxFT2FontBase::InitExtraMetrics(gfxFloat aEmHeight,",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  StealthDWriteAveCharWidth(*this, mMetrics);  // STEALTH-HOOK(fingerprint/fonts/metrics)",
+  "test": "",
+  "anchor": "",
+  "why": ""
+ },
+ {
+  "file": "gfx/thebes/gfxFT2FontBase.cpp",
+  "function": "bool gfxFT2FontBase::GetFTGlyphExtents(uint16_t aGID, int32_t* aAdvance,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  if (aAdvance && !StealthDesignAdvance(*this, aGID, bold.x, aAdvance)) {  // STEALTH-HOOK(fingerprint/fonts/metrics)",
+  "removed": "  if (aAdvance) {",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxFT2FontBase.cpp",
+  "function": "gfxFT2FontBase::GlyphMetrics gfxFT2FontBase::GetCachedGlyphMetrics(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (StealthDesignGlyphBounds(*this, aGID, aBounds)) {  // STEALTH-HOOK(fingerprint/fonts/metrics)",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxFT2FontBase.cpp",
+  "function": "gfxFT2FontBase::GlyphMetrics gfxFT2FontBase::GetCachedGlyphMetrics(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    return true;",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxFT2FontBase.cpp",
+  "function": "gfxFT2FontBase::GlyphMetrics gfxFT2FontBase::GetCachedGlyphMetrics(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  }",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxFont.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthTextMeasuring.h\"  // STEALTH-HOOK(fingerprint/fonts/metrics)",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxFont.cpp",
+  "function": "gfxFontCache::Observer::Observe(nsISupports* aSubject, const char* aTopic,",
+  "kind": "add",
+  "form": "notice",
+  "line": "  StealthTextMeasuringInit();  // STEALTH-HOOK(fingerprint/fonts/metrics)",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxFont.cpp",
+  "function": "void gfxFont::SanitizeMetrics(bool aIsBadUnderlineFont) {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  StealthImposeBundleVMetrics(mFontEntry, GetAdjustedSize(), &mMetrics);  // STEALTH-HOOK(fingerprint/fonts/metrics)",
+  "test": "",
+  "anchor": "",
+  "why": ""
+ },
+ {
+  "file": "gfx/thebes/gfxFont.h",
+  "function": "class gfxFont {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/fonts/metrics): defined in StealthBundleFontList.cpp",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxFont.h",
+  "function": "class gfxFont {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  bool GetStealthHostIndepVMetrics(gfxFloat& aEmAscent, gfxFloat& aEmDescent,",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxFont.h",
+  "function": "class gfxFont {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "                                   gfxFloat& aMaxAscent, gfxFloat& aMaxDescent);",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxHarfBuzzShaper.cpp",
+  "function": "gfxHarfBuzzShaper::~gfxHarfBuzzShaper() {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  hb_font_destroy(mDesignFont);  // STEALTH-HOOK(fingerprint/fonts/metrics)",
+  "test": "",
+  "anchor": "",
+  "why": ""
+ },
+ {
+  "file": "gfx/thebes/gfxHarfBuzzShaper.h",
+  "function": "class gfxHarfBuzzShaper : public gfxFontShaper {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/fonts/metrics)",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxHarfBuzzShaper.h",
+  "function": "class gfxHarfBuzzShaper : public gfxFontShaper {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  bool GetDesignGlyphExtents(uint16_t aGID, int32_t& aXBearing,",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxHarfBuzzShaper.h",
+  "function": "class gfxHarfBuzzShaper : public gfxFontShaper {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "                             int32_t& aYBearing, int32_t& aWidth,",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxHarfBuzzShaper.h",
+  "function": "class gfxHarfBuzzShaper : public gfxFontShaper {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "                             int32_t& aHeight) const;",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxHarfBuzzShaper.h",
+  "function": "class gfxHarfBuzzShaper : public gfxFontShaper {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  bool GetDesignAdvance(uint16_t aGID, int32_t& aAdvance) const;",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxHarfBuzzShaper.h",
+  "function": "class gfxHarfBuzzShaper : public gfxFontShaper {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/fonts/metrics)",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxHarfBuzzShaper.h",
+  "function": "class gfxHarfBuzzShaper : public gfxFontShaper {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  mutable hb_font_t* mDesignFont = nullptr;",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxHarfBuzzShaper.h",
+  "function": "class gfxHarfBuzzShaper : public gfxFontShaper {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  hb_font_t* GetDesignFont() const;",
+  "test": ""
+ }
+]

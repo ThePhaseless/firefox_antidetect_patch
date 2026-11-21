@@ -1,0 +1,62 @@
+[
+ {
+  "file": "widget/GfxInfoBase.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthGfxFeatureStatus.h\"  // STEALTH-HOOK(platform/declaration-gate)",
+  "test": ""
+ },
+ {
+  "file": "widget/GfxInfoBase.cpp",
+  "function": "GfxInfoBase::GetFeatureStatus(int32_t aFeature, nsACString& aFailureId,",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  if (mozilla::gfx::StealthGfxDeclaredStatus(this, aFeature, aFailureId, aStatus)) return NS_OK;  // STEALTH-HOOK(platform/declaration-gate)",
+  "test": "",
+  "anchor": "",
+  "why": ""
+ },
+ {
+  "file": "widget/GfxInfoBase.cpp",
+  "function": "nsresult GfxInfoBase::GetFeatureStatusImpl(",
+  "kind": "add",
+  "form": "guard",
+  "line": "  if (mozilla::gfx::StealthGfxSuggestedDriverVersion(aVersion)) return NS_OK;  // STEALTH-HOOK(platform/declaration-gate)",
+  "test": ""
+ },
+ {
+  "file": "widget/GfxInfoBase.cpp",
+  "function": "GfxInfoBase::GetFeatureSuggestedDriverVersionStr(const nsAString& aFeature,",
+  "kind": "add",
+  "form": "guard",
+  "line": "  if (mozilla::gfx::StealthGfxDeclarationActive()) return;  // STEALTH-HOOK(platform/declaration-gate)",
+  "test": ""
+ },
+ {
+  "file": "widget/gtk/GfxInfo.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthGfxFeatureStatus.h\"  // STEALTH-HOOK(platform/declaration-gate)",
+  "test": ""
+ },
+ {
+  "file": "widget/gtk/GfxInfo.cpp",
+  "function": "void GfxInfo::GetData() {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  if (gfx::StealthFillGtkGfxInfoWithoutHost(mTestType, mGlxTestError, mAdapterRAM, mIsWayland, mIsXWayland)) return;  // STEALTH-HOOK(platform/declaration-gate)",
+  "test": "",
+  "anchor": "",
+  "why": ""
+ },
+ {
+  "file": "widget/gtk/GfxInfo.cpp",
+  "function": "int GfxInfo::FireTestProcess(const nsAString& aBinaryFile, int* aOutPipe,",
+  "kind": "add",
+  "form": "guard",
+  "line": "  if (gfx::StealthNoHostGLProbe()) return false;  // STEALTH-HOOK(platform/declaration-gate)",
+  "test": ""
+ }
+]

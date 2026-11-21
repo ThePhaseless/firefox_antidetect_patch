@@ -1,0 +1,50 @@
+[
+ {
+  "file": "security/manager/ssl/nsCertOverrideService.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "// STEALTH-HOOK(automation/ignore-https-errors)",
+  "test": ""
+ },
+ {
+  "file": "security/manager/ssl/nsCertOverrideService.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "#  include \"StealthJugglerGate.h\"",
+  "test": ""
+ },
+ {
+  "file": "security/manager/ssl/nsCertOverrideService.cpp",
+  "function": "void nsCertOverrideService::CountPermanentOverrideTelemetry(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(automation/ignore-https-errors)",
+  "test": ""
+ },
+ {
+  "file": "security/manager/ssl/nsCertOverrideService.cpp",
+  "function": "void nsCertOverrideService::CountPermanentOverrideTelemetry(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (StealthJugglerPipeConnected()) {",
+  "test": ""
+ },
+ {
+  "file": "security/manager/ssl/nsCertOverrideService.cpp",
+  "function": "void nsCertOverrideService::CountPermanentOverrideTelemetry(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    return true;",
+  "test": ""
+ },
+ {
+  "file": "security/manager/ssl/nsCertOverrideService.cpp",
+  "function": "void nsCertOverrideService::CountPermanentOverrideTelemetry(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  }",
+  "test": ""
+ }
+]

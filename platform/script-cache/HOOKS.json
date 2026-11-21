@@ -1,0 +1,90 @@
+[
+ {
+  "file": "js/xpconnect/loader/ScriptPreloader.cpp",
+  "function": "nsresult ScriptPreloader::CollectReports(nsIHandleReportCallback* aHandleReport,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(platform/script-cache)",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/loader/ScriptPreloader.cpp",
+  "function": "nsresult ScriptPreloader::CollectReports(nsIHandleReportCallback* aHandleReport,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  ReportWrittenCache(aHandleReport, aData);",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/loader/ScriptPreloader.cpp",
+  "function": "Result<Ok, nsresult> ScriptPreloader::WriteCache() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(platform/script-cache)",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/loader/ScriptPreloader.cpp",
+  "function": "Result<Ok, nsresult> ScriptPreloader::WriteCache() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  AdoptWrittenCache(cacheFile);",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/loader/ScriptPreloader.cpp",
+  "function": "NS_IMPL_ISUPPORTS(ScriptPreloader, nsIObserver, nsIRunnable, nsIMemoryReporter,",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthScriptCache-inl.h\"  // STEALTH-HOOK(platform/script-cache)",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/loader/ScriptPreloader.h",
+  "function": "class ScriptPreloader : public nsIObserver,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(platform/script-cache)",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/loader/ScriptPreloader.h",
+  "function": "class ScriptPreloader : public nsIObserver,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  void AdoptWrittenCache(nsIFile* aCacheFile);",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/loader/ScriptPreloader.h",
+  "function": "class ScriptPreloader : public nsIObserver,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  void ReportWrittenCache(nsIHandleReportCallback* aHandleReport,",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/loader/ScriptPreloader.h",
+  "function": "class ScriptPreloader : public nsIObserver,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "                          nsISupports* aData);",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/loader/ScriptPreloader.h",
+  "function": "class ScriptPreloader : public nsIObserver,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(platform/script-cache)",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/loader/ScriptPreloader.h",
+  "function": "class ScriptPreloader : public nsIObserver,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  AutoMemMap mWrittenCacheData;",
+  "test": ""
+ }
+]

@@ -1,0 +1,106 @@
+[
+ {
+  "file": "dom/base/Navigator.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthDeclarationGate.h\"",
+  "test": ""
+ },
+ {
+  "file": "dom/base/Navigator.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/StaticPrefs_zoom.h\"",
+  "test": ""
+ },
+ {
+  "file": "dom/base/Navigator.cpp",
+  "function": "bool Navigator::GlobalPrivacyControl() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/hardware/profile)",
+  "test": ""
+ },
+ {
+  "file": "dom/base/Navigator.cpp",
+  "function": "bool Navigator::GlobalPrivacyControl() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  {",
+  "test": ""
+ },
+ {
+  "file": "dom/base/Navigator.cpp",
+  "function": "bool Navigator::GlobalPrivacyControl() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    int32_t hwc = StaticPrefs::zoom_stealth_hw_concurrency();",
+  "test": ""
+ },
+ {
+  "file": "dom/base/Navigator.cpp",
+  "function": "bool Navigator::GlobalPrivacyControl() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    if (hwc > 0) return uint64_t(hwc);",
+  "test": ""
+ },
+ {
+  "file": "dom/base/Navigator.cpp",
+  "function": "bool Navigator::GlobalPrivacyControl() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  }",
+  "test": ""
+ },
+ {
+  "file": "dom/base/Navigator.cpp",
+  "function": "uint32_t Navigator::MaxTouchPoints(CallerType aCallerType) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/hardware/profile)",
+  "test": ""
+ },
+ {
+  "file": "dom/base/Navigator.cpp",
+  "function": "uint32_t Navigator::MaxTouchPoints(CallerType aCallerType) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (aCallerType != CallerType::System &&",
+  "test": ""
+ },
+ {
+  "file": "dom/base/Navigator.cpp",
+  "function": "uint32_t Navigator::MaxTouchPoints(CallerType aCallerType) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "      mozilla::gfx::StealthEngineActive()) {",
+  "test": ""
+ },
+ {
+  "file": "dom/base/Navigator.cpp",
+  "function": "uint32_t Navigator::MaxTouchPoints(CallerType aCallerType) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    mozilla::gfx::StealthAssertDeclarationsComplete();",
+  "test": ""
+ },
+ {
+  "file": "dom/base/Navigator.cpp",
+  "function": "uint32_t Navigator::MaxTouchPoints(CallerType aCallerType) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    return uint32_t(mozilla::StaticPrefs::zoom_stealth_max_touch_points());",
+  "test": ""
+ },
+ {
+  "file": "dom/base/Navigator.cpp",
+  "function": "uint32_t Navigator::MaxTouchPoints(CallerType aCallerType) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  }",
+  "test": ""
+ }
+]

@@ -1,0 +1,182 @@
+[
+ {
+  "file": "devtools/server/actors/thread.js",
+  "function": "class ThreadActor extends Actor {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "    let forceDetach = Services.prefs.getBoolPref(\"zoom.stealth.debugger.force_detach\", false);",
+  "removed": "    if (this.alreadyAttached) {",
+  "test": ""
+ },
+ {
+  "file": "devtools/server/actors/thread.js",
+  "function": "class ThreadActor extends Actor {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "    if (this.alreadyAttached || forceDetach) {",
+  "test": ""
+ },
+ {
+  "file": "js/src/debugger/Debugger.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"debugger/StealthDebugger.h\"  // STEALTH-HOOK(fingerprint/js-surface/debugger)",
+  "test": ""
+ },
+ {
+  "file": "js/src/debugger/Debugger.cpp",
+  "function": "bool Debugger::addDebuggeeGlobal(JSContext* cx, Handle<GlobalObject*> global) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/js-surface/debugger)",
+  "test": ""
+ },
+ {
+  "file": "js/src/debugger/Debugger.cpp",
+  "function": "bool Debugger::addDebuggeeGlobal(JSContext* cx, Handle<GlobalObject*> global) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  const bool isStealth = StealthDebuggerReadMode(cx, object);",
+  "test": ""
+ },
+ {
+  "file": "js/src/debugger/Debugger.cpp",
+  "function": "bool Debugger::addDebuggeeGlobal(JSContext* cx, Handle<GlobalObject*> global) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  invisibleDebuggee_ = isStealth;",
+  "test": ""
+ },
+ {
+  "file": "js/src/debugger/Debugger.cpp",
+  "function": "bool Debugger::addDebuggeeGlobal(JSContext* cx, Handle<GlobalObject*> global) {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/js-surface/debugger)",
+  "removed": "  if (!globalDebuggers.append(Realm::DebuggerVectorEntry(this, debuggeeLink))) {",
+  "test": ""
+ },
+ {
+  "file": "js/src/debugger/Debugger.cpp",
+  "function": "bool Debugger::addDebuggeeGlobal(JSContext* cx, Handle<GlobalObject*> global) {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  if (!isStealth && !globalDebuggers.append(Realm::DebuggerVectorEntry(this, debuggeeLink))) {",
+  "test": ""
+ },
+ {
+  "file": "js/src/debugger/Debugger.cpp",
+  "function": "bool Debugger::addDebuggeeGlobal(JSContext* cx, Handle<GlobalObject*> global) {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/js-surface/debugger)",
+  "removed": "  auto globalDebuggersGuard = MakeScopeExit([&] { globalDebuggers.popBack(); });",
+  "test": ""
+ },
+ {
+  "file": "js/src/debugger/Debugger.cpp",
+  "function": "bool Debugger::addDebuggeeGlobal(JSContext* cx, Handle<GlobalObject*> global) {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  auto globalDebuggersGuard = MakeScopeExit([&] { if (!isStealth) { globalDebuggers.popBack(); } });",
+  "test": ""
+ },
+ {
+  "file": "js/src/debugger/Debugger.cpp",
+  "function": "bool Debugger::addDebuggeeGlobal(JSContext* cx, Handle<GlobalObject*> global) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/js-surface/debugger)",
+  "test": ""
+ },
+ {
+  "file": "js/src/debugger/Debugger.cpp",
+  "function": "bool Debugger::addDebuggeeGlobal(JSContext* cx, Handle<GlobalObject*> global) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (isStealth) {",
+  "test": ""
+ },
+ {
+  "file": "js/src/debugger/Debugger.cpp",
+  "function": "bool Debugger::addDebuggeeGlobal(JSContext* cx, Handle<GlobalObject*> global) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    StealthDebuggerReleaseGuards(globalDebuggersGuard, debuggeesGuard, debuggeeZonesGuard);",
+  "test": ""
+ },
+ {
+  "file": "js/src/debugger/Debugger.cpp",
+  "function": "bool Debugger::addDebuggeeGlobal(JSContext* cx, Handle<GlobalObject*> global) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    return true;",
+  "test": ""
+ },
+ {
+  "file": "js/src/debugger/Debugger.cpp",
+  "function": "bool Debugger::addDebuggeeGlobal(JSContext* cx, Handle<GlobalObject*> global) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  }",
+  "test": ""
+ },
+ {
+  "file": "js/src/debugger/Debugger.cpp",
+  "function": "void Debugger::removeDebuggeeGlobal(JS::GCContext* gcx, GlobalObject* global,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/js-surface/debugger)",
+  "removed": "  globalDebuggersVector.erase(\n      findDebuggerInVector(this, &globalDebuggersVector));",
+  "test": ""
+ },
+ {
+  "file": "js/src/debugger/Debugger.cpp",
+  "function": "void Debugger::removeDebuggeeGlobal(JS::GCContext* gcx, GlobalObject* global,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  if (!invisibleDebuggee_) {",
+  "test": ""
+ },
+ {
+  "file": "js/src/debugger/Debugger.cpp",
+  "function": "void Debugger::removeDebuggeeGlobal(JS::GCContext* gcx, GlobalObject* global,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "    globalDebuggersVector.erase(",
+  "test": ""
+ },
+ {
+  "file": "js/src/debugger/Debugger.cpp",
+  "function": "void Debugger::removeDebuggeeGlobal(JS::GCContext* gcx, GlobalObject* global,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "        findDebuggerInVector(this, &globalDebuggersVector));",
+  "test": ""
+ },
+ {
+  "file": "js/src/debugger/Debugger.cpp",
+  "function": "void Debugger::removeDebuggeeGlobal(JS::GCContext* gcx, GlobalObject* global,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  }",
+  "test": ""
+ },
+ {
+  "file": "js/src/debugger/Debugger.h",
+  "function": "class Debugger : private mozilla::LinkedListElement<Debugger> {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/js-surface/debugger)",
+  "test": ""
+ },
+ {
+  "file": "js/src/debugger/Debugger.h",
+  "function": "class Debugger : private mozilla::LinkedListElement<Debugger> {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  bool invisibleDebuggee_ = false;",
+  "test": ""
+ }
+]

@@ -1,0 +1,154 @@
+[
+ {
+  "file": "dom/media/webspeech/synth/SpeechSynthesis.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthSpeechVoices.h\"  // STEALTH-HOOK(fingerprint/media/speech-voices)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webspeech/synth/SpeechSynthesis.cpp",
+  "function": "void SpeechSynthesis::GetVoices(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/media/speech-voices)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webspeech/synth/SpeechSynthesis.cpp",
+  "function": "void SpeechSynthesis::GetVoices(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (StealthGetVoices(this, aResult, mVoiceCache)) {",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webspeech/synth/SpeechSynthesis.cpp",
+  "function": "void SpeechSynthesis::GetVoices(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    return;",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webspeech/synth/SpeechSynthesis.cpp",
+  "function": "void SpeechSynthesis::GetVoices(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  }",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webspeech/synth/SpeechSynthesisVoice.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "// STEALTH-HOOK(fingerprint/media/speech-voices)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webspeech/synth/SpeechSynthesisVoice.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "#include \"StealthSpeechVoice.h\"",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webspeech/synth/SpeechSynthesisVoice.cpp",
+  "function": "JSObject* SpeechSynthesisVoice::WrapObject(JSContext* aCx,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/media/speech-voices)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webspeech/synth/SpeechSynthesisVoice.cpp",
+  "function": "JSObject* SpeechSynthesisVoice::WrapObject(JSContext* aCx,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (StealthVoiceRetailURI(mUri, aRetval)) return;",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webspeech/synth/SpeechSynthesisVoice.cpp",
+  "function": "JSObject* SpeechSynthesisVoice::WrapObject(JSContext* aCx,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/media/speech-voices)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webspeech/synth/SpeechSynthesisVoice.cpp",
+  "function": "JSObject* SpeechSynthesisVoice::WrapObject(JSContext* aCx,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (StealthVoiceName(mUri, aRetval)) return;",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webspeech/synth/SpeechSynthesisVoice.cpp",
+  "function": "void SpeechSynthesisVoice::GetName(nsString& aRetval) const {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/media/speech-voices)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webspeech/synth/SpeechSynthesisVoice.cpp",
+  "function": "void SpeechSynthesisVoice::GetName(nsString& aRetval) const {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (StealthVoiceLang(mUri, aRetval)) return;",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webspeech/synth/SpeechSynthesisVoice.cpp",
+  "function": "void SpeechSynthesisVoice::GetLang(nsString& aRetval) const {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/media/speech-voices)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webspeech/synth/SpeechSynthesisVoice.cpp",
+  "function": "void SpeechSynthesisVoice::GetLang(nsString& aRetval) const {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (Maybe<bool> stealth = StealthVoiceLocal(mUri)) return *stealth;",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webspeech/synth/SpeechSynthesisVoice.cpp",
+  "function": "bool SpeechSynthesisVoice::LocalService() const {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/media/speech-voices)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webspeech/synth/SpeechSynthesisVoice.cpp",
+  "function": "bool SpeechSynthesisVoice::LocalService() const {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (Maybe<bool> stealth = StealthVoiceDefault(mUri)) return *stealth;",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webspeech/synth/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"StealthSpeechVoice.cpp\", \"StealthSpeechVoices.cpp\"]  # STEALTH-HOOK(fingerprint/media/speech-voices)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webspeech/synth/test/mochitest.toml",
+  "function": "support-files = [",
+  "kind": "add",
+  "form": "unknown",
+  "line": "[\"test_stealth_voices.html\"]",
+  "test": ""
+ }
+]

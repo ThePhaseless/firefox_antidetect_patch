@@ -1,0 +1,74 @@
+[
+ {
+  "file": "dom/html/HTMLInputElement.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"nsIDocShell.h\"",
+  "test": ""
+ },
+ {
+  "file": "dom/html/HTMLInputElement.cpp",
+  "function": "nsresult HTMLInputElement::InitFilePicker(FilePickerType aType) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(automation/file-chooser)",
+  "test": ""
+ },
+ {
+  "file": "dom/html/HTMLInputElement.cpp",
+  "function": "nsresult HTMLInputElement::InitFilePicker(FilePickerType aType) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (nsIDocShell* ds = doc->GetDocShell()) {",
+  "test": ""
+ },
+ {
+  "file": "dom/html/HTMLInputElement.cpp",
+  "function": "nsresult HTMLInputElement::InitFilePicker(FilePickerType aType) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    bool interceptFileChooser = false;",
+  "test": ""
+ },
+ {
+  "file": "dom/html/HTMLInputElement.cpp",
+  "function": "nsresult HTMLInputElement::InitFilePicker(FilePickerType aType) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    ds->GetFileInputInterceptionEnabled(&interceptFileChooser);",
+  "test": ""
+ },
+ {
+  "file": "dom/html/HTMLInputElement.cpp",
+  "function": "nsresult HTMLInputElement::InitFilePicker(FilePickerType aType) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    if (interceptFileChooser) {",
+  "test": ""
+ },
+ {
+  "file": "dom/html/HTMLInputElement.cpp",
+  "function": "nsresult HTMLInputElement::InitFilePicker(FilePickerType aType) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "      return NS_OK;",
+  "test": ""
+ },
+ {
+  "file": "dom/html/HTMLInputElement.cpp",
+  "function": "nsresult HTMLInputElement::InitFilePicker(FilePickerType aType) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    }",
+  "test": ""
+ },
+ {
+  "file": "dom/html/HTMLInputElement.cpp",
+  "function": "nsresult HTMLInputElement::InitFilePicker(FilePickerType aType) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  }",
+  "test": ""
+ }
+]

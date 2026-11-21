@@ -1,0 +1,91 @@
+[
+ {
+  "file": "dom/base/nsScreen.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthDeclarationGate.h\"  // STEALTH-HOOK(fingerprint/screen-window/screen)",
+  "test": ""
+ },
+ {
+  "file": "dom/base/nsScreen.cpp",
+  "function": "NS_IMPL_CYCLE_COLLECTION_INHERITED(nsScreen, DOMEventTargetHelper,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/screen-window/screen)",
+  "test": ""
+ },
+ {
+  "file": "dom/base/nsScreen.cpp",
+  "function": "NS_IMPL_CYCLE_COLLECTION_INHERITED(nsScreen, DOMEventTargetHelper,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (int32_t declared = gfx::StealthDeclaredPixelDepth()) return declared;",
+  "test": ""
+ },
+ {
+  "file": "dom/base/nsScreen.cpp",
+  "function": "nsDeviceContext* nsScreen::GetDeviceContext() const {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/screen-window/screen)",
+  "test": ""
+ },
+ {
+  "file": "dom/base/nsScreen.cpp",
+  "function": "nsDeviceContext* nsScreen::GetDeviceContext() const {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (auto declared = gfx::StealthDeclaredScreenRect()) return *declared;",
+  "test": ""
+ },
+ {
+  "file": "dom/base/nsScreen.cpp",
+  "function": "CSSIntRect nsScreen::GetRect() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/screen-window/screen)",
+  "test": ""
+ },
+ {
+  "file": "dom/base/nsScreen.cpp",
+  "function": "CSSIntRect nsScreen::GetRect() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (auto declared = gfx::StealthDeclaredAvailRect()) return *declared;",
+  "test": ""
+ },
+ {
+  "file": "layout/base/nsPresContext.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthDeclarationGate.h\"",
+  "test": ""
+ },
+ {
+  "file": "layout/base/nsPresContext.cpp",
+  "function": "void nsPresContext::SetOverrideDPPX(float aDPPX) {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/screen-window/screen): see FEATURE.md",
+  "removed": "  if (!mDocument->ShouldResistFingerprinting(RFPTarget::WindowOuterSize) ||",
+  "test": ""
+ },
+ {
+  "file": "layout/base/nsPresContext.cpp",
+  "function": "void nsPresContext::SetOverrideDPPX(float aDPPX) {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  if ((!mDocument->ShouldResistFingerprinting(RFPTarget::WindowOuterSize) &&",
+  "test": ""
+ },
+ {
+  "file": "layout/base/nsPresContext.cpp",
+  "function": "void nsPresContext::SetOverrideDPPX(float aDPPX) {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "       !mozilla::gfx::StealthEngineActive()) ||",
+  "test": ""
+ }
+]

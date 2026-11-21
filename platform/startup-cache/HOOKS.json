@@ -1,0 +1,67 @@
+[
+ {
+  "file": "startupcache/StartupCache.cpp",
+  "function": "void StartupCache::MaybeWriteOffMainThread(WriteType aWriteType,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "        if (aUseLowPriorityIO && StartupCache::WritesMayLowerIOPriority()) {",
+  "removed": "        if (aUseLowPriorityIO) {",
+  "test": ""
+ },
+ {
+  "file": "startupcache/StartupCache.h",
+  "function": "class StartupCache : public nsIMemoryReporter {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(platform/startup-cache): see FEATURE.md",
+  "test": ""
+ },
+ {
+  "file": "startupcache/StartupCache.h",
+  "function": "class StartupCache : public nsIMemoryReporter {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  static bool WritesMayLowerIOPriority() { return false; }",
+  "test": ""
+ },
+ {
+  "file": "startupcache/test/TestStartupCache.cpp",
+  "function": "TEST_F(TestStartupCache, WriteObject) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "// STEALTH-HOOK(platform/startup-cache): see FEATURE.md",
+  "test": ""
+ },
+ {
+  "file": "startupcache/test/TestStartupCache.cpp",
+  "function": "TEST_F(TestStartupCache, WriteObject) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "TEST(StartupCache, WritesNeverLowerIOPriority)",
+  "test": ""
+ },
+ {
+  "file": "startupcache/test/TestStartupCache.cpp",
+  "function": "TEST_F(TestStartupCache, WriteObject) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "{",
+  "test": ""
+ },
+ {
+  "file": "startupcache/test/TestStartupCache.cpp",
+  "function": "TEST_F(TestStartupCache, WriteObject) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  EXPECT_FALSE(StartupCache::WritesMayLowerIOPriority());",
+  "test": ""
+ },
+ {
+  "file": "startupcache/test/TestStartupCache.cpp",
+  "function": "TEST_F(TestStartupCache, WriteObject) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "}",
+  "test": ""
+ }
+]

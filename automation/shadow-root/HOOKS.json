@@ -1,0 +1,86 @@
+[
+ {
+  "file": "dom/base/Element.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthShadowRoot.h\"  // STEALTH-HOOK(automation/shadow-root)",
+  "test": ""
+ },
+ {
+  "file": "dom/base/Element.cpp",
+  "function": "void Element::SetSlot(const nsAString& aName, ErrorResult& aError) {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "ShadowRoot* Element::GetShadowRootForBindings(nsIPrincipal& aSubject) const {",
+  "removed": "ShadowRoot* Element::GetShadowRootForBindings() const {",
+  "test": ""
+ },
+ {
+  "file": "dom/base/Element.cpp",
+  "function": "void Element::SetSlot(const nsAString& aName, ErrorResult& aError) {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "    // STEALTH-HOOK(automation/shadow-root)",
+  "removed": "    return nullptr;",
+  "test": ""
+ },
+ {
+  "file": "dom/base/Element.cpp",
+  "function": "void Element::SetSlot(const nsAString& aName, ErrorResult& aError) {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "    return StealthClosedShadowRootForBindings(shadowRoot, aSubject);",
+  "test": ""
+ },
+ {
+  "file": "dom/base/Element.h",
+  "function": "class Element : public FragmentOrElement {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(automation/shadow-root): the subject tells the sandbox apart",
+  "removed": "  ShadowRoot* GetShadowRootForBindings() const;",
+  "test": ""
+ },
+ {
+  "file": "dom/base/Element.h",
+  "function": "class Element : public FragmentOrElement {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  ShadowRoot* GetShadowRootForBindings(nsIPrincipal& aSubject) const;",
+  "test": ""
+ },
+ {
+  "file": "dom/webidl/Element.webidl",
+  "function": "partial interface Element {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  // STEALTH: NeedsSubjectPrincipal only. Same attribute, same name, same",
+  "removed": "  [BinaryName=\"shadowRootForBindings\"]",
+  "test": ""
+ },
+ {
+  "file": "dom/webidl/Element.webidl",
+  "function": "partial interface Element {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  // spec answer for the page - nothing new appears on Element.prototype, which",
+  "test": ""
+ },
+ {
+  "file": "dom/webidl/Element.webidl",
+  "function": "partial interface Element {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  // is what makes this invisible where a new accessor would be the tell.",
+  "test": ""
+ },
+ {
+  "file": "dom/webidl/Element.webidl",
+  "function": "partial interface Element {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  [NeedsSubjectPrincipal, BinaryName=\"shadowRootForBindings\"]",
+  "test": ""
+ }
+]

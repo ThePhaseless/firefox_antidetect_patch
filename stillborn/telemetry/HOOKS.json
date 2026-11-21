@@ -1,0 +1,135 @@
+[
+ {
+  "file": "toolkit/components/telemetry/app/TelemetrySend.sys.mjs",
+  "function": "import { ServiceRequest } from \"resource://gre/modules/ServiceRequest.sys.mjs\";",
+  "kind": "add",
+  "form": "unknown",
+  "line": "import * as StealthPingsender from \"resource://gre/modules/StealthPingsender.sys.mjs\"; // STEALTH-HOOK(stillborn/telemetry)",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/telemetry/app/TelemetrySend.sys.mjs",
+  "function": "import { ServiceRequest } from \"resource://gre/modules/ServiceRequest.sys.mjs\";",
+  "kind": "add",
+  "form": "unknown",
+  "line": "export { PINGSENDER_ROUTE_ENV } from \"resource://gre/modules/StealthPingsender.sys.mjs\"; // STEALTH-HOOK(stillborn/telemetry)",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/telemetry/app/TelemetrySend.sys.mjs",
+  "function": "export function gzipCompressString(string) {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "export function sendStandalonePing(",
+  "removed": "export function sendStandalonePing(endpoint, payload, extraHeaders = {}) {",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/telemetry/app/TelemetrySend.sys.mjs",
+  "function": "export function gzipCompressString(string) {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  endpoint,",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/telemetry/app/TelemetrySend.sys.mjs",
+  "function": "export function gzipCompressString(string) {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  payload,",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/telemetry/app/TelemetrySend.sys.mjs",
+  "function": "export function gzipCompressString(string) {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  extraHeaders = {},",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/telemetry/app/TelemetrySend.sys.mjs",
+  "function": "export function gzipCompressString(string) {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  notificationCallbacks = null // STEALTH-HOOK(stillborn/telemetry)",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/telemetry/app/TelemetrySend.sys.mjs",
+  "function": "export function gzipCompressString(string) {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": ") {",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/telemetry/app/TelemetrySend.sys.mjs",
+  "function": "export function gzipCompressString(string) {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "    StealthPingsender.attachCallbacks(request, notificationCallbacks); // STEALTH-HOOK(stillborn/telemetry)",
+  "test": "",
+  "anchor": "",
+  "why": ""
+ },
+ {
+  "file": "toolkit/components/telemetry/app/TelemetrySend.sys.mjs",
+  "function": "export var TelemetrySendImpl = {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    ({ exeName, params } = StealthPingsender.invocation()); // STEALTH-HOOK(stillborn/telemetry)",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/telemetry/app/TelemetrySend.sys.mjs",
+  "function": "export var TelemetrySendImpl = {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "    StealthPingsender.runAsync(process, params, observer); // STEALTH-HOOK(stillborn/telemetry)",
+  "removed": "    process.runAsync(params, params.length, observer);",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/telemetry/moz.build",
+  "function": "EXTRA_JS_MODULES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "EXTRA_JS_MODULES += [\"app/StealthPingsender.sys.mjs\"]  # STEALTH-HOOK(stillborn/telemetry)",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/telemetry/moz.build",
+  "function": "EXTRA_JS_MODULES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "EXTRA_JS_MODULES.backgroundtasks += [\"pings/StealthPingsenderRoute.sys.mjs\"]  # STEALTH-HOOK(stillborn/telemetry)",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/telemetry/pings/BackgroundTask_pingsender.sys.mjs",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "import * as StealthRoute from \"resource://gre/modules/backgroundtasks/StealthPingsenderRoute.sys.mjs\"; // STEALTH-HOOK(stillborn/telemetry)",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/telemetry/pings/BackgroundTask_pingsender.sys.mjs",
+  "function": "",
+  "kind": "add",
+  "form": "notice",
+  "line": "  StealthRoute.takeSessionRoute(); // STEALTH-HOOK(stillborn/telemetry)",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/telemetry/pings/BackgroundTask_pingsender.sys.mjs",
+  "function": "async function sendPing(endpoint, path) {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  }, StealthRoute.pingAuthFor(hostname)); // STEALTH-HOOK(stillborn/telemetry)",
+  "removed": "  });",
+  "test": ""
+ }
+]

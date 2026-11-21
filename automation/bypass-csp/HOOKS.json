@@ -1,0 +1,58 @@
+[
+ {
+  "file": "dom/security/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"StealthBypassCSP.cpp\"]  # STEALTH-HOOK(automation/bypass-csp)",
+  "test": ""
+ },
+ {
+  "file": "dom/security/nsCSPUtils.cpp",
+  "function": "void CSP_ApplyMetaCSPToDoc(mozilla::dom::Document& aDoc,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(automation/bypass-csp)",
+  "test": ""
+ },
+ {
+  "file": "dom/security/nsCSPUtils.cpp",
+  "function": "void CSP_ApplyMetaCSPToDoc(mozilla::dom::Document& aDoc,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (CSP_IsBypassedFor(aDoc)) {",
+  "test": ""
+ },
+ {
+  "file": "dom/security/nsCSPUtils.cpp",
+  "function": "void CSP_ApplyMetaCSPToDoc(mozilla::dom::Document& aDoc,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    return;",
+  "test": ""
+ },
+ {
+  "file": "dom/security/nsCSPUtils.cpp",
+  "function": "void CSP_ApplyMetaCSPToDoc(mozilla::dom::Document& aDoc,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  }",
+  "test": ""
+ },
+ {
+  "file": "dom/security/nsCSPUtils.h",
+  "function": "bool CSP_ShouldURIInheritCSP(nsIURI* aURI);",
+  "kind": "add",
+  "form": "unknown",
+  "line": "// STEALTH-HOOK(automation/bypass-csp)",
+  "test": ""
+ },
+ {
+  "file": "dom/security/nsCSPUtils.h",
+  "function": "bool CSP_ShouldURIInheritCSP(nsIURI* aURI);",
+  "kind": "add",
+  "form": "unknown",
+  "line": "bool CSP_IsBypassedFor(const mozilla::dom::Document& aDoc);",
+  "test": ""
+ }
+]

@@ -1,0 +1,66 @@
+[
+ {
+  "file": "docshell/base/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"StealthDocShellAttrs.cpp\"]  # STEALTH-HOOK(automation/docshell-attrs)",
+  "test": ""
+ },
+ {
+  "file": "docshell/base/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"StealthNavigation.cpp\"]  # STEALTH-HOOK(automation/navigation)",
+  "test": ""
+ },
+ {
+  "file": "docshell/base/nsDocShell.h",
+  "function": "class nsDocShell final : public nsDocLoader,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(automation/docshell-attrs)",
+  "test": ""
+ },
+ {
+  "file": "docshell/base/nsDocShell.h",
+  "function": "class nsDocShell final : public nsDocLoader,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  bool mFileInputInterceptionEnabled : 1;",
+  "test": ""
+ },
+ {
+  "file": "docshell/base/nsDocShell.h",
+  "function": "class nsDocShell final : public nsDocLoader,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  bool mBypassCSPEnabled : 1;",
+  "test": ""
+ },
+ {
+  "file": "docshell/base/nsIDocShell.idl",
+  "function": "interface nsIDocShell : nsIDocShellTreeItem",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(automation/docshell-attrs): see FEATURE.md",
+  "test": ""
+ },
+ {
+  "file": "docshell/base/nsIDocShell.idl",
+  "function": "interface nsIDocShell : nsIDocShellTreeItem",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  attribute boolean fileInputInterceptionEnabled;",
+  "test": ""
+ },
+ {
+  "file": "docshell/base/nsIDocShell.idl",
+  "function": "interface nsIDocShell : nsIDocShellTreeItem",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  attribute boolean bypassCSPEnabled;",
+  "test": ""
+ }
+]

@@ -1,0 +1,107 @@
+[
+ {
+  "file": "netwerk/base/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"StealthIPv6Literal.cpp\"]  # STEALTH-HOOK(network/ipv6-literal)",
+  "test": ""
+ },
+ {
+  "file": "netwerk/base/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"StealthSocksCredentials.cpp\"]  # STEALTH-HOOK(network/socks)",
+  "test": ""
+ },
+ {
+  "file": "netwerk/base/nsProtocolProxyService.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthSocksCredentials.h\"",
+  "test": ""
+ },
+ {
+  "file": "netwerk/base/nsProtocolProxyService.cpp",
+  "function": "void nsProtocolProxyService::PrefsChanged(nsIPrefBranch* prefBranch,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(network/socks)",
+  "test": ""
+ },
+ {
+  "file": "netwerk/base/nsProtocolProxyService.cpp",
+  "function": "void nsProtocolProxyService::PrefsChanged(nsIPrefBranch* prefBranch,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  StealthSocksPrefsChanged(prefBranch, pref, mSOCKSProxyUsername,",
+  "test": ""
+ },
+ {
+  "file": "netwerk/base/nsProtocolProxyService.cpp",
+  "function": "void nsProtocolProxyService::PrefsChanged(nsIPrefBranch* prefBranch,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "                           mSOCKSProxyPassword);",
+  "test": ""
+ },
+ {
+  "file": "netwerk/base/nsProtocolProxyService.cpp",
+  "function": "nsresult nsProtocolProxyService::Resolve_Internal(nsIChannel* channel,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "    // STEALTH-HOOK(network/socks)",
+  "removed": "    rv = NewProxyInfo_Internal(type, *host, port, \"\"_ns, \"\"_ns, \"\"_ns, \"\"_ns,\n                               \"\"_ns, proxyFlags, UINT32_MAX, nullptr, flags,\n                               result);",
+  "test": ""
+ },
+ {
+  "file": "netwerk/base/nsProtocolProxyService.cpp",
+  "function": "nsresult nsProtocolProxyService::Resolve_Internal(nsIChannel* channel,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "    rv = NewProxyInfo_Internal(type, *host, port, \"\"_ns, mSOCKSProxyUsername,",
+  "test": ""
+ },
+ {
+  "file": "netwerk/base/nsProtocolProxyService.cpp",
+  "function": "nsresult nsProtocolProxyService::Resolve_Internal(nsIChannel* channel,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "                               mSOCKSProxyPassword, \"\"_ns, \"\"_ns, proxyFlags,",
+  "test": ""
+ },
+ {
+  "file": "netwerk/base/nsProtocolProxyService.cpp",
+  "function": "nsresult nsProtocolProxyService::Resolve_Internal(nsIChannel* channel,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "                               UINT32_MAX, nullptr, flags, result);",
+  "test": ""
+ },
+ {
+  "file": "netwerk/base/nsProtocolProxyService.h",
+  "function": "class nsProtocolProxyService final : public nsIProtocolProxyService2,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  nsCString mSOCKSProxyUsername;",
+  "test": ""
+ },
+ {
+  "file": "netwerk/base/nsProtocolProxyService.h",
+  "function": "class nsProtocolProxyService final : public nsIProtocolProxyService2,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  nsCString mSOCKSProxyPassword;",
+  "test": ""
+ },
+ {
+  "file": "netwerk/test/gtest/moz.build",
+  "function": "SOURCES += [",
+  "kind": "add",
+  "form": "unknown",
+  "line": "include(\"stealth.build\")  # STEALTH-HOOK(network/socks)",
+  "test": ""
+ }
+]

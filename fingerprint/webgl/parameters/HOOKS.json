@@ -1,0 +1,456 @@
+[
+ {
+  "file": "dom/canvas/ClientWebGLContext.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthWebGLParams.h\"    // STEALTH-HOOK(fingerprint/webgl/parameters)",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/ClientWebGLContext.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthWebGLReadback.h\"  // STEALTH-HOOK(fingerprint/webgl/parameters)",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/ClientWebGLContext.cpp",
+  "function": "UniquePtr<uint8_t[]> ClientWebGLContext::GetImageBuffer(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/webgl/parameters)",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/ClientWebGLContext.cpp",
+  "function": "UniquePtr<uint8_t[]> ClientWebGLContext::GetImageBuffer(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  snapshot = StealthWebGLReadback::ProjectReaderSnapshot(*this, snapshot, any);",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/ClientWebGLContext.cpp",
+  "function": "ClientWebGLContext::GetInputStream(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/webgl/parameters)",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/ClientWebGLContext.cpp",
+  "function": "ClientWebGLContext::GetInputStream(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  snapshot = StealthWebGLReadback::ProjectReaderSnapshot(*this, snapshot, any);",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/ClientWebGLContext.cpp",
+  "function": "void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/webgl/parameters)",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/ClientWebGLContext.cpp",
+  "function": "void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  const StealthWebGLParameterAnswer stealthAnswer(*this, cx, pname, retval, rv);",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/ClientWebGLContext.cpp",
+  "function": "void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        // STEALTH-HOOK(fingerprint/webgl/parameters)",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/ClientWebGLContext.cpp",
+  "function": "void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        if (StealthWebGLRendererOverride(ret)) break;",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/ClientWebGLContext.cpp",
+  "function": "void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "            // STEALTH-HOOK(fingerprint/webgl/parameters)",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/ClientWebGLContext.cpp",
+  "function": "void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "            if (StealthWebGLUnmaskedRendererOverride(ret)) break;",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/ClientWebGLContext.cpp",
+  "function": "void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "            // STEALTH-HOOK(fingerprint/webgl/parameters)",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/ClientWebGLContext.cpp",
+  "function": "void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "            if (StealthWebGLUnmaskedVendorOverride(ret)) break;",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/ClientWebGLContext.cpp",
+  "function": "ClientWebGLContext::GetShaderPrecisionFormat(const GLenum shadertype,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/webgl/parameters)",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/ClientWebGLContext.cpp",
+  "function": "ClientWebGLContext::GetShaderPrecisionFormat(const GLenum shadertype,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (const auto fake = StealthWebGLShaderPrecision(shadertype, precisiontype))",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/ClientWebGLContext.cpp",
+  "function": "ClientWebGLContext::GetShaderPrecisionFormat(const GLenum shadertype,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    return AsAddRefed(new WebGLShaderPrecisionFormatJS(*fake));",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/ClientWebGLContext.cpp",
+  "function": "void ClientWebGLContext::ReadPixels(GLint x, GLint y, GLsizei width,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/webgl/parameters)",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/ClientWebGLContext.cpp",
+  "function": "void ClientWebGLContext::ReadPixels(GLint x, GLint y, GLsizei width,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  StealthWebGLReadback::ProjectReadPixelsPbo(*this, desc, offset);",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/ClientWebGLContext.cpp",
+  "function": "void ClientWebGLContext::ReadPixels(GLint x, GLint y, GLsizei width,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "    // STEALTH-HOOK(fingerprint/webgl/parameters)",
+  "removed": "    bool succeeded = DoReadPixels(desc, *range);",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/ClientWebGLContext.cpp",
+  "function": "void ClientWebGLContext::ReadPixels(GLint x, GLint y, GLsizei width,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "    bool succeeded = StealthWebGLReadback::ReadPixels(*this, desc, *range);",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/ClientWebGLContext.cpp",
+  "function": "void ClientWebGLContext::ReadPixels(GLint x, GLint y, GLsizei width,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "// STEALTH-HOOK(fingerprint/webgl/parameters)",
+  "removed": "bool ClientWebGLContext::DoReadPixels(const webgl::ReadPixelsDesc& desc,\n                                      const Span<uint8_t> dest) const {",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/ClientWebGLContext.cpp",
+  "function": "void ClientWebGLContext::ReadPixels(GLint x, GLint y, GLsizei width,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "bool ClientWebGLContext::DoReadPixels(",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/ClientWebGLContext.cpp",
+  "function": "void ClientWebGLContext::ReadPixels(GLint x, GLint y, GLsizei width,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "    const webgl::ReadPixelsDesc& desc, const Span<uint8_t> dest,",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/ClientWebGLContext.cpp",
+  "function": "void ClientWebGLContext::ReadPixels(GLint x, GLint y, GLsizei width,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "    webgl::ReadPixelsResult* const aWritten) const {",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/ClientWebGLContext.cpp",
+  "function": "bool ClientWebGLContext::DoReadPixels(const webgl::ReadPixelsDesc& desc,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/webgl/parameters)",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/ClientWebGLContext.cpp",
+  "function": "bool ClientWebGLContext::DoReadPixels(const webgl::ReadPixelsDesc& desc,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (aWritten) *aWritten = webgl::ReadPixelsResult{subrect, byteStride};",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/ClientWebGLContext.cpp",
+  "function": "ClientWebGLContext::DoReadPixelsAsync() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/webgl/parameters)",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/ClientWebGLContext.cpp",
+  "function": "ClientWebGLContext::DoReadPixelsAsync() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  const bool premultiplied = !options.alpha || options.premultipliedAlpha;",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/ClientWebGLContext.cpp",
+  "function": "ClientWebGLContext::DoReadPixelsAsync() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "       expectedSize, premultiplied](",
+  "removed": "       expectedSize](webgl::ReadPixelsResultIpc&& aReply) mutable {",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/ClientWebGLContext.cpp",
+  "function": "ClientWebGLContext::DoReadPixelsAsync() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "          webgl::ReadPixelsResultIpc&& aReply) mutable {",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/ClientWebGLContext.cpp",
+  "function": "ClientWebGLContext::DoReadPixelsAsync() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "        // STEALTH-HOOK(fingerprint/webgl/parameters)",
+  "removed": "        promise->Resolve(std::move(sourceSurface), __func__);",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/ClientWebGLContext.cpp",
+  "function": "ClientWebGLContext::DoReadPixelsAsync() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "        promise->Resolve(StealthWebGLReadback::ProjectAsyncSnapshot(",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/ClientWebGLContext.cpp",
+  "function": "ClientWebGLContext::DoReadPixelsAsync() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "                             *self, sourceSurface, premultiplied),",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/ClientWebGLContext.cpp",
+  "function": "ClientWebGLContext::DoReadPixelsAsync() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "                         __func__);",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/WebGLContextExtensions.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthWebGLParams.h\"  // STEALTH-HOOK(fingerprint/webgl/parameters)",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/WebGLContextExtensions.cpp",
+  "function": "bool WebGLContext::IsExtensionSupported(WebGLExtensionID ext) const {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "      // STEALTH-HOOK(fingerprint/webgl/parameters): declared to the page, so served wherever the GL can",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/WebGLContextExtensions.cpp",
+  "function": "bool WebGLContext::IsExtensionSupported(WebGLExtensionID ext) const {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "      if (StealthWebGLExtensionVerdict(IsWebGL2(), ext) == Some(true)) return true;",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/WebGLContextExtensions.cpp",
+  "function": "void WebGLContext::RequestExtension(const WebGLExtensionID ext,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/webgl/parameters): declared but not served: harmless",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/WebGLContextExtensions.cpp",
+  "function": "void WebGLContext::RequestExtension(const WebGLExtensionID ext,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (!IsExtensionSupported(ext)) return;",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/WebGLContextFramebufferOperations.cpp",
+  "function": "void WebGLContext::ColorMask(const Maybe<GLuint> i, const uint8_t mask) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    // STEALTH-HOOK(fingerprint/webgl/parameters): declared to the page, maybe not enabled here",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/WebGLContextFramebufferOperations.cpp",
+  "function": "void WebGLContext::ColorMask(const Maybe<GLuint> i, const uint8_t mask) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    if (!IsExtensionEnabled(WebGLExtensionID::OES_draw_buffers_indexed)) return;",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/WebGLContextGL.cpp",
+  "function": "void WebGLContext::BlendEquationSeparate(Maybe<GLuint> i, GLenum modeRGB,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    // STEALTH-HOOK(fingerprint/webgl/parameters): declared to the page, maybe not enabled here",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/WebGLContextGL.cpp",
+  "function": "void WebGLContext::BlendEquationSeparate(Maybe<GLuint> i, GLenum modeRGB,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    if (!IsExtensionEnabled(WebGLExtensionID::OES_draw_buffers_indexed)) return;",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/WebGLContextGL.cpp",
+  "function": "void WebGLContext::BlendFuncSeparate(Maybe<GLuint> i, GLenum srcRGB,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    // STEALTH-HOOK(fingerprint/webgl/parameters): declared to the page, maybe not enabled here",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/WebGLContextGL.cpp",
+  "function": "void WebGLContext::BlendFuncSeparate(Maybe<GLuint> i, GLenum srcRGB,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    if (!IsExtensionEnabled(WebGLExtensionID::OES_draw_buffers_indexed)) return;",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/WebGLContextGL.cpp",
+  "function": "void WebGLContext::PolygonOffsetClampEXT(const GLfloat factor,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/webgl/parameters): declared to the page, maybe not enabled here",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/WebGLContextGL.cpp",
+  "function": "void WebGLContext::PolygonOffsetClampEXT(const GLfloat factor,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (!IsExtensionEnabled(WebGLExtensionID::EXT_polygon_offset_clamp)) return;",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/WebGLContextGL.cpp",
+  "function": "void WebGLContext::PolygonOffsetClampEXT(const GLfloat factor,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/webgl/parameters): declared to the page, maybe not enabled here",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/WebGLContextGL.cpp",
+  "function": "void WebGLContext::PolygonOffsetClampEXT(const GLfloat factor,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (!IsExtensionEnabled(WebGLExtensionID::WEBGL_provoking_vertex)) return;",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/WebGLContextGL.cpp",
+  "function": "void WebGLContext::SampleCoverage(GLclampf value, WebGLboolean invert) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/webgl/parameters): declared to the page, maybe not enabled here",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/WebGLContextGL.cpp",
+  "function": "void WebGLContext::SampleCoverage(GLclampf value, WebGLboolean invert) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (!IsExtensionEnabled(WebGLExtensionID::EXT_clip_control)) return;",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/WebGLContextValidate.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthWebGLParams.h\"  // STEALTH-HOOK(fingerprint/webgl/parameters)",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/WebGLContextValidate.cpp",
+  "function": "static webgl::Limits MakeLimits(const WebGLContext& webgl) {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  StealthDeclareExtensions(webgl.IsWebGL2(), limits.supportedExtensions);  // STEALTH-HOOK(fingerprint/webgl/parameters)",
+  "test": "",
+  "anchor": "",
+  "why": ""
+ },
+ {
+  "file": "dom/canvas/WebGLContextValidate.cpp",
+  "function": "bool WebGLContext::InitAndValidateGL(FailureReason* const out_failReason) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/webgl/parameters): the masks start at all ones as under ANGLE, not at the driver's stencil bits (Mesa: 255)",
+  "test": ""
+ },
+ {
+  "file": "dom/canvas/WebGLContextValidate.cpp",
+  "function": "bool WebGLContext::InitAndValidateGL(FailureReason* const out_failReason) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  mStencilValueMaskFront = mStencilValueMaskBack = mStencilWriteMaskFront = mStencilWriteMaskBack = UINT32_MAX;",
+  "test": ""
+ }
+]

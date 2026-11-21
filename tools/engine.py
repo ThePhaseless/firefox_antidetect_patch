@@ -4,6 +4,7 @@
     python tools/engine.py export    write the series from the source tree
     python tools/engine.py verify    rebuild the tree from the series, compare
     python tools/engine.py check     the series' own rules, offline (also in CI)
+    python tools/engine.py hooks-list   write every folder's HOOKS.json from its hooks.patch (the export does it too)
     python tools/engine.py hook-debt    drop the entries of tools/hook-debt.json that no longer occur
                                         (--init writes the list from scratch, --summary only counts it)
     python tools/engine.py apply --head <branch>   the series as a branch: tag + one commit per folder
@@ -24,6 +25,8 @@ export   writes one folder per feature (tools/layout.py says which):
            src/<path>     the files we add to the tree, byte for byte
            MANIFEST.json  what the folder owns (regenerated on every export)
            FEATURE.md     the feature's description, created once and then edited by hand
+           HOOKS.json     the folder's hooks, one entry per hook (tools/hooks_list.py); the hand fields
+                          (test, anchor, why) of the committed file are kept
          SERIES, the order the folders are applied in, and UPSTREAM.json's
          "exported_from". A folder that no longer owns anything is removed.
 
@@ -36,6 +39,11 @@ hook contract (tools/hook_contract.py): every line a hooks.patch adds to a Mozil
          list, no Mozilla line changed but the one of a rewriting form). `check` refuses a violation that is not in
          tools/hook-debt.json, an entry that no longer occurs, and (against origin/main) an entry main's list does
          not have: the debt only shrinks. `hook-debt` removes the entries that are gone; it never adds one.
+
+hooks list (tools/hooks_list.py): each non-backport folder has a HOOKS.json generated from its hooks.patch. `check`
+         fails when it differs from the generation (a hook missing or extra, a field changed) and when an entry's
+         `test` names a test that does not exist; a hook with no test (rule T1) or an anchor without its anchor
+         and why (T2) is debt in tools/hook-debt.json.
 
 check    needs no Firefox: SERIES lists exactly the folders that exist, every folder has
          its MANIFEST and FEATURE.md, every file of ours is listed and present, each
@@ -75,6 +83,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import births  # noqa: E402
 import hook_contract  # noqa: E402
+import hooks_list  # noqa: E402
 import layout  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -186,6 +195,7 @@ def export(source: Path, base: str, head: str) -> None:
         if not feature_md.exists():
             feature_md.write_text(describe(folder, manifest), encoding="utf-8", newline="\n")
     (ROOT / "SERIES").write_text("\n".join(series) + "\n", encoding="utf-8", newline="\n")
+    print(write_hooks_list())
     sync_workflows()
     up = upstream()
     up["exported_from"] = git(source, "rev-parse", head).decode().strip()
@@ -194,6 +204,11 @@ def export(source: Path, base: str, head: str) -> None:
     print("exported %d folders: %d modified files, %d added files, from %s"
           % (len(series), sum(len(plan[f]["modified"]) for f in series),
              sum(len(plan[f]["added"]) for f in series), up["exported_from"][:10]))
+
+
+def write_hooks_list() -> str:
+    """Every folder's HOOKS.json from its hooks.patch (the export and `hooks-list` both come here)."""
+    return "HOOKS.json: " + hooks_list.summary_line(hooks_list.write_all(ROOT))
 
 
 def sync_workflows() -> None:
@@ -1035,6 +1050,7 @@ def problems() -> list:
     for f in present:
         if (ROOT / f / "hooks.patch").exists():
             found += patch_cr_problems(f, (ROOT / f / "hooks.patch").read_bytes())
+    found += hooks_list.problems(ROOT)
     found += births.ledger_problems(births.load_ledger(), set(listed))
     series_wf = {p.name: p.read_bytes() for p in WORKFLOWS_SERIES.glob("*.yml")}
     root_wf = {p.name: p.read_bytes() for p in WORKFLOWS_ROOT.glob("*.yml")}
@@ -1193,7 +1209,7 @@ def main() -> int:
         return births.main(sys.argv[2:])      # its own options: --tree, --repo/--rev, --skeleton, --accept-changed, --prune, --tsv
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("command", choices=["status", "apply", "materialize", "export", "verify", "check",
-                                        "shrink-budget", "hook-debt", "drift", "port", "births"])
+                                        "shrink-budget", "hook-debt", "hooks-list", "drift", "port", "births"])
     ap.add_argument("--to", help="drift/port: the Mozilla tag to move to (a stable release, never a beta)")
     ap.add_argument("--into", type=Path, default=Path("."), help="materialize: the directory to make the tree")
     ap.add_argument("--shared", type=Path, default=None,
@@ -1226,6 +1242,9 @@ def main() -> int:
         return check(a.source, a.against or None, against_main=True)
     if a.command == "hook-debt":
         return hook_debt(a.init, a.summary)
+    if a.command == "hooks-list":
+        print(write_hooks_list())
+        return 0
     if a.command == "shrink-budget":
         shrink_budget()
         return 0

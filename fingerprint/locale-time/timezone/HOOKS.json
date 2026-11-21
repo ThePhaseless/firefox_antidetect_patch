@@ -1,0 +1,262 @@
+[
+ {
+  "file": "docshell/base/BrowsingContext.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/dom/StealthSessionDeclaration.h\"  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "test": ""
+ },
+ {
+  "file": "docshell/base/BrowsingContext.cpp",
+  "function": "void BrowsingContext::Attach(bool aFromIPC, ContentParent* aOriginProcess) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "test": ""
+ },
+ {
+  "file": "docshell/base/BrowsingContext.cpp",
+  "function": "void BrowsingContext::Attach(bool aFromIPC, ContentParent* aOriginProcess) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  SeedDeclaredTimezoneAndLanguage(this);",
+  "test": ""
+ },
+ {
+  "file": "docshell/base/BrowsingContext.cpp",
+  "function": "void BrowsingContext::DidSet(FieldIndex<IDX_LanguageOverride>,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "removed": "  const nsCString& languageOverride = GetLanguageOverride();",
+  "test": ""
+ },
+ {
+  "file": "docshell/base/BrowsingContext.cpp",
+  "function": "void BrowsingContext::DidSet(FieldIndex<IDX_LanguageOverride>,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  nsAutoCString languageOverride;",
+  "test": ""
+ },
+ {
+  "file": "docshell/base/BrowsingContext.cpp",
+  "function": "void BrowsingContext::DidSet(FieldIndex<IDX_LanguageOverride>,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  GetDeclaredLanguage(this, languageOverride);",
+  "test": ""
+ },
+ {
+  "file": "docshell/base/BrowsingContext.cpp",
+  "function": "void BrowsingContext::DidSet(FieldIndex<IDX_LanguageOverride>,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "          // STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "removed": "          JS::SetRealmLocaleOverride(",
+  "test": ""
+ },
+ {
+  "file": "docshell/base/BrowsingContext.cpp",
+  "function": "void BrowsingContext::DidSet(FieldIndex<IDX_LanguageOverride>,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "          SetRealmDeclaredLocale(realm, languageOverride);",
+  "removed": "              realm, PromiseFlatCString(languageOverride).get());",
+  "test": ""
+ },
+ {
+  "file": "docshell/base/BrowsingContext.cpp",
+  "function": "void BrowsingContext::DidSet(FieldIndex<IDX_TimezoneOverride>,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "removed": "  const nsString& timezoneOverride = GetTimezoneOverride();",
+  "test": ""
+ },
+ {
+  "file": "docshell/base/BrowsingContext.cpp",
+  "function": "void BrowsingContext::DidSet(FieldIndex<IDX_TimezoneOverride>,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  nsAutoString timezoneOverride;",
+  "test": ""
+ },
+ {
+  "file": "docshell/base/BrowsingContext.cpp",
+  "function": "void BrowsingContext::DidSet(FieldIndex<IDX_TimezoneOverride>,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  GetDeclaredTimezone(this, timezoneOverride);",
+  "test": ""
+ },
+ {
+  "file": "dom/base/Document.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/dom/StealthSessionDeclaration.h\"  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "test": ""
+ },
+ {
+  "file": "dom/base/Document.cpp",
+  "function": "nsresult Document::InitCSP(nsIChannel* aChannel) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(automation/bypass-csp)",
+  "test": ""
+ },
+ {
+  "file": "dom/base/Document.cpp",
+  "function": "nsresult Document::InitCSP(nsIChannel* aChannel) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (CSP_IsBypassedFor(*this)) return NS_OK;",
+  "test": ""
+ },
+ {
+  "file": "dom/base/Document.cpp",
+  "function": "void Document::SetDocumentURI(nsIURI* aURI) {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "// STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "removed": "static void GetFormattedTimeString(PRTime aTime, bool aUniversal,",
+  "test": ""
+ },
+ {
+  "file": "dom/base/Document.cpp",
+  "function": "void Document::SetDocumentURI(nsIURI* aURI) {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "static void GetFormattedTimeString(PRTime aTime, const Document& aDocument,",
+  "test": ""
+ },
+ {
+  "file": "dom/base/Document.cpp",
+  "function": "void Document::SetDocumentURI(nsIURI* aURI) {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  ExplodeLocalTime(aTime, &aDocument, &prtime);",
+  "removed": "  PR_ExplodeTime(aTime, aUniversal ? PR_GMTParameters : PR_LocalTimeParameters,\n                 &prtime);",
+  "test": ""
+ },
+ {
+  "file": "dom/base/Document.cpp",
+  "function": "void Document::GetLastModified(nsAString& aLastModified) const {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "    GetFormattedTimeString(PR_Now(), *this, aLastModified);",
+  "removed": "    GetFormattedTimeString(PR_Now(),\n                           ShouldResistFingerprinting(RFPTarget::JSDateTimeUTC),\n                           aLastModified);",
+  "test": ""
+ },
+ {
+  "file": "dom/base/Document.cpp",
+  "function": "void Document::SetContainer(nsDocShell* aContainer) {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  if (aContainer) RefreshDocumentLanguage(this);  // STEALTH-HOOK(fingerprint/locale-time/timezone): the context is known now",
+  "test": "",
+  "anchor": "",
+  "why": ""
+ },
+ {
+  "file": "dom/base/Document.cpp",
+  "function": "void Document::RetrieveRelevantHeaders(nsIChannel* aChannel) {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "    GetFormattedTimeString(modDate, *this, mLastModified);",
+  "removed": "    GetFormattedTimeString(modDate,\n                           ShouldResistFingerprinting(RFPTarget::JSDateTimeUTC),\n                           mLastModified);",
+  "test": ""
+ },
+ {
+  "file": "dom/base/Document.cpp",
+  "function": "const LangGroupFontPrefs* Document::GetFontPrefsForLang(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  language = DocumentCharsetLanguage(this, language);  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "test": ""
+ },
+ {
+  "file": "dom/base/Document.h",
+  "function": "class Document : public nsINode,",
+  "kind": "add",
+  "form": "member",
+  "line": "  friend class StealthDocumentAccess;  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "test": ""
+ },
+ {
+  "file": "dom/xslt/xslt/txEXSLTFunctions.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/dom/StealthSessionDeclaration.h\"  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "test": ""
+ },
+ {
+  "file": "dom/xslt/xslt/txEXSLTFunctions.cpp",
+  "function": "nsresult txEXSLTFunctionCall::evaluate(txIEvalContext* aContext,",
+  "kind": "delete",
+  "form": "unknown",
+  "line": "",
+  "removed": "      PRTimeParamFn timezone =\n          sourceDoc->ShouldResistFingerprinting(RFPTarget::JSDateTimeUTC)\n              ? PR_GMTParameters\n              : PR_LocalTimeParameters;\n",
+  "test": ""
+ },
+ {
+  "file": "dom/xslt/xslt/txEXSLTFunctions.cpp",
+  "function": "nsresult txEXSLTFunctionCall::evaluate(txIEvalContext* aContext,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "      // STEALTH-HOOK(fingerprint/locale-time/timezone): the page's local time,",
+  "removed": "      PR_ExplodeTime(time, timezone, &prtime);",
+  "test": ""
+ },
+ {
+  "file": "dom/xslt/xslt/txEXSLTFunctions.cpp",
+  "function": "nsresult txEXSLTFunctionCall::evaluate(txIEvalContext* aContext,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "      // the declared zone's (ExplodeLocalTime), not the C runtime's ([B339]).",
+  "test": ""
+ },
+ {
+  "file": "dom/xslt/xslt/txEXSLTFunctions.cpp",
+  "function": "nsresult txEXSLTFunctionCall::evaluate(txIEvalContext* aContext,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "      ExplodeLocalTime(time, sourceDoc, &prtime);",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/src/nsXPConnect.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/dom/StealthSessionDeclaration.h\"  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/src/nsXPConnect.cpp",
+  "function": "void InitGlobalObjectOptions(JS::RealmOptions& aOptions,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/src/nsXPConnect.cpp",
+  "function": "void InitGlobalObjectOptions(JS::RealmOptions& aOptions,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  mozilla::dom::SetDeclaredRealmTimeAndLanguage(",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/src/nsXPConnect.cpp",
+  "function": "void InitGlobalObjectOptions(JS::RealmOptions& aOptions,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "      aOptions, aForceUTC, aLocaleEnUS, aLanguageOverride, aTimezoneOverride);",
+  "test": ""
+ }
+]

@@ -1,0 +1,362 @@
+[
+ {
+  "file": "docshell/base/CanonicalBrowsingContext.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthNavigationEvents.h\"  // STEALTH-HOOK(automation/navigation)",
+  "test": ""
+ },
+ {
+  "file": "docshell/base/CanonicalBrowsingContext.cpp",
+  "function": "void CanonicalBrowsingContext::LoadURI(nsIURI* aURI,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(automation/navigation)",
+  "test": ""
+ },
+ {
+  "file": "docshell/base/CanonicalBrowsingContext.cpp",
+  "function": "void CanonicalBrowsingContext::LoadURI(nsIURI* aURI,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  StealthNotifyNavigationStarted(this, loadState);",
+  "test": ""
+ },
+ {
+  "file": "docshell/base/CanonicalBrowsingContext.cpp",
+  "function": "void CanonicalBrowsingContext::FixupAndLoadURIString(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(automation/navigation)",
+  "test": ""
+ },
+ {
+  "file": "docshell/base/CanonicalBrowsingContext.cpp",
+  "function": "void CanonicalBrowsingContext::FixupAndLoadURIString(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  StealthNotifyNavigationStarted(this, loadState);",
+  "test": ""
+ },
+ {
+  "file": "docshell/base/nsDocShell.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthNavigation.h\"  // STEALTH-HOOK(automation/navigation)",
+  "test": ""
+ },
+ {
+  "file": "docshell/base/nsDocShell.cpp",
+  "function": "nsDocShell::nsDocShell(BrowsingContext* aBrowsingContext,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "      // STEALTH-HOOK(automation/docshell-attrs)",
+  "test": ""
+ },
+ {
+  "file": "docshell/base/nsDocShell.cpp",
+  "function": "nsDocShell::nsDocShell(BrowsingContext* aBrowsingContext,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "      mFileInputInterceptionEnabled(false),",
+  "test": ""
+ },
+ {
+  "file": "docshell/base/nsDocShell.cpp",
+  "function": "nsDocShell::nsDocShell(BrowsingContext* aBrowsingContext,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "      mBypassCSPEnabled(false),",
+  "test": ""
+ },
+ {
+  "file": "docshell/base/nsDocShell.cpp",
+  "function": "nsresult nsDocShell::InternalLoad(nsDocShellLoadState* aLoadState,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  StealthNavigationLoad stealthLoad(this, aLoadState, !isJavaScript && !sameDocument);  // STEALTH-HOOK(automation/navigation)",
+  "test": ""
+ },
+ {
+  "file": "docshell/base/nsDocShell.cpp",
+  "function": "nsresult nsDocShell::InternalLoad(nsDocShellLoadState* aLoadState,",
+  "kind": "add",
+  "form": "anchor",
+  "line": "    stealthLoad.Failed(rv);  // STEALTH-HOOK(automation/navigation)",
+  "test": "",
+  "anchor": "",
+  "why": ""
+ },
+ {
+  "file": "docshell/base/nsDocShell.cpp",
+  "function": "class OnLinkClickEvent : public CancelableRunnable, public SupportsWeakPtr {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "      mStealth.SetRunning(true);  // STEALTH-HOOK(automation/navigation)",
+  "test": "",
+  "anchor": "",
+  "why": ""
+ },
+ {
+  "file": "docshell/base/nsDocShell.cpp",
+  "function": "class OnLinkClickEvent : public CancelableRunnable, public SupportsWeakPtr {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "      mStealth.SetRunning(false);  // STEALTH-HOOK(automation/navigation)",
+  "test": "",
+  "anchor": "",
+  "why": ""
+ },
+ {
+  "file": "docshell/base/nsDocShell.cpp",
+  "function": "class OnLinkClickEvent : public CancelableRunnable, public SupportsWeakPtr {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "    mStealth.Done(mContent);  // STEALTH-HOOK(automation/navigation)",
+  "test": "",
+  "anchor": "",
+  "why": ""
+ },
+ {
+  "file": "docshell/base/nsDocShell.cpp",
+  "function": "class OnLinkClickEvent : public CancelableRunnable, public SupportsWeakPtr {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "    mStealth.Cancelled(mContent);  // STEALTH-HOOK(automation/navigation)",
+  "test": "",
+  "anchor": "",
+  "why": ""
+ },
+ {
+  "file": "docshell/base/nsDocShell.cpp",
+  "function": "class OnLinkClickEvent : public CancelableRunnable, public SupportsWeakPtr {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  StealthLinkClickAfter mStealth;  // STEALTH-HOOK(automation/navigation)",
+  "test": ""
+ },
+ {
+  "file": "docshell/base/nsDocShell.cpp",
+  "function": "Result<RefPtr<OnLinkClickEvent>, nsresult> nsDocShell::OnLinkClickWithLoadState(",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  StealthLinkClickBefore(aContent);  // STEALTH-HOOK(automation/navigation)",
+  "test": "",
+  "anchor": "",
+  "why": ""
+ },
+ {
+  "file": "netwerk/base/LoadInfo.cpp",
+  "function": "LoadInfo::LoadInfo(const LoadInfo& rhs)",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "      mSkipHTTPSUpgrade(rhs.mSkipHTTPSUpgrade),",
+  "removed": "      mSkipHTTPSUpgrade(rhs.mSkipHTTPSUpgrade) {",
+  "test": ""
+ },
+ {
+  "file": "netwerk/base/LoadInfo.cpp",
+  "function": "LoadInfo::LoadInfo(const LoadInfo& rhs)",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "      mJugglerLoadIdentifier(rhs.mJugglerLoadIdentifier) {",
+  "test": ""
+ },
+ {
+  "file": "netwerk/base/LoadInfo.cpp",
+  "function": "void LoadInfo::UpdateParentAddressSpaceInfo() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "NS_IMETHODIMP",
+  "test": ""
+ },
+ {
+  "file": "netwerk/base/LoadInfo.cpp",
+  "function": "void LoadInfo::UpdateParentAddressSpaceInfo() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "LoadInfo::GetJugglerLoadIdentifier(uint64_t* aResult) {",
+  "test": ""
+ },
+ {
+  "file": "netwerk/base/LoadInfo.cpp",
+  "function": "void LoadInfo::UpdateParentAddressSpaceInfo() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  *aResult = mJugglerLoadIdentifier;",
+  "test": ""
+ },
+ {
+  "file": "netwerk/base/LoadInfo.cpp",
+  "function": "void LoadInfo::UpdateParentAddressSpaceInfo() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  return NS_OK;",
+  "test": ""
+ },
+ {
+  "file": "netwerk/base/LoadInfo.cpp",
+  "function": "void LoadInfo::UpdateParentAddressSpaceInfo() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "}",
+  "test": ""
+ },
+ {
+  "file": "netwerk/base/LoadInfo.cpp",
+  "function": "void LoadInfo::UpdateParentAddressSpaceInfo() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "NS_IMETHODIMP",
+  "test": ""
+ },
+ {
+  "file": "netwerk/base/LoadInfo.cpp",
+  "function": "void LoadInfo::UpdateParentAddressSpaceInfo() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "LoadInfo::SetJugglerLoadIdentifier(uint64_t aID) {",
+  "test": ""
+ },
+ {
+  "file": "netwerk/base/LoadInfo.cpp",
+  "function": "void LoadInfo::UpdateParentAddressSpaceInfo() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  mJugglerLoadIdentifier = aID;",
+  "test": ""
+ },
+ {
+  "file": "netwerk/base/LoadInfo.cpp",
+  "function": "void LoadInfo::UpdateParentAddressSpaceInfo() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  return NS_OK;",
+  "test": ""
+ },
+ {
+  "file": "netwerk/base/LoadInfo.cpp",
+  "function": "void LoadInfo::UpdateParentAddressSpaceInfo() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "}",
+  "test": ""
+ },
+ {
+  "file": "netwerk/base/LoadInfo.h",
+  "function": "class LoadInfo final : public nsILoadInfo {",
+  "kind": "add",
+  "form": "member",
+  "line": "  uint64_t mJugglerLoadIdentifier = 0;",
+  "test": ""
+ },
+ {
+  "file": "netwerk/base/TRRLoadInfo.cpp",
+  "function": "TRRLoadInfo::TRRLoadInfo(nsIURI* aResultPrincipalURI,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  static_cast<TRRLoadInfo*>(loadInfo.get())->mOriginAttributes = mOriginAttributes;  // STEALTH-HOOK(network/doh)",
+  "test": ""
+ },
+ {
+  "file": "netwerk/base/TRRLoadInfo.cpp",
+  "function": "nsresult TRRLoadInfo::GetOriginAttributes(",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  mOriginAttributes = aOriginAttributes;  // STEALTH-HOOK(network/doh)",
+  "removed": "  return NS_ERROR_NOT_IMPLEMENTED;",
+  "test": ""
+ },
+ {
+  "file": "netwerk/base/TRRLoadInfo.cpp",
+  "function": "nsresult TRRLoadInfo::GetOriginAttributes(",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  return NS_OK;  // STEALTH-HOOK(network/doh)",
+  "test": ""
+ },
+ {
+  "file": "netwerk/base/TRRLoadInfo.cpp",
+  "function": "TRRLoadInfo::GetFetchDestination(nsACString& aDestination) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "NS_IMETHODIMP",
+  "test": ""
+ },
+ {
+  "file": "netwerk/base/TRRLoadInfo.cpp",
+  "function": "TRRLoadInfo::GetFetchDestination(nsACString& aDestination) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "TRRLoadInfo::GetJugglerLoadIdentifier(uint64_t* aResult) {",
+  "test": ""
+ },
+ {
+  "file": "netwerk/base/TRRLoadInfo.cpp",
+  "function": "TRRLoadInfo::GetFetchDestination(nsACString& aDestination) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  return NS_ERROR_NOT_IMPLEMENTED;",
+  "test": ""
+ },
+ {
+  "file": "netwerk/base/TRRLoadInfo.cpp",
+  "function": "TRRLoadInfo::GetFetchDestination(nsACString& aDestination) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "}",
+  "test": ""
+ },
+ {
+  "file": "netwerk/base/TRRLoadInfo.cpp",
+  "function": "TRRLoadInfo::GetFetchDestination(nsACString& aDestination) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "NS_IMETHODIMP",
+  "test": ""
+ },
+ {
+  "file": "netwerk/base/TRRLoadInfo.cpp",
+  "function": "TRRLoadInfo::GetFetchDestination(nsACString& aDestination) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "TRRLoadInfo::SetJugglerLoadIdentifier(uint64_t aResult) {",
+  "test": ""
+ },
+ {
+  "file": "netwerk/base/TRRLoadInfo.cpp",
+  "function": "TRRLoadInfo::GetFetchDestination(nsACString& aDestination) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  return NS_ERROR_NOT_IMPLEMENTED;",
+  "test": ""
+ },
+ {
+  "file": "netwerk/base/TRRLoadInfo.cpp",
+  "function": "TRRLoadInfo::GetFetchDestination(nsACString& aDestination) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "}",
+  "test": ""
+ },
+ {
+  "file": "netwerk/base/nsILoadInfo.idl",
+  "function": "interface nsILoadInfo : nsISupports",
+  "kind": "add",
+  "form": "member",
+  "line": "  [infallible] attribute unsigned long long jugglerLoadIdentifier;",
+  "test": ""
+ },
+ {
+  "file": "netwerk/ipc/DocumentLoadListener.cpp",
+  "function": "static auto CreateDocumentLoadInfo(CanonicalBrowsingContext* aBrowsingContext,",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  loadInfo->SetJugglerLoadIdentifier(aLoadState->GetLoadIdentifier());",
+  "test": "",
+  "anchor": "",
+  "why": ""
+ }
+]

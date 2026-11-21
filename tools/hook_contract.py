@@ -28,7 +28,9 @@ comment carries more than the marker; C4 a comment line added; C5 logic in the h
 ternary, arithmetic); C6 Mozilla lines removed or changed outside the three rewriting forms;
 C7 a whole Mozilla file deleted or replaced; C8 an include of ours inside Mozilla's include block;
 C9 inside a Mozilla list or the last line of a block; C10 the called function is not Stealth<What>;
-C11 a value of ours in a numbered space (IDL const/enum).
+C11 a value of ours in a numbered space (IDL const/enum); T1 a hook whose HOOKS.json entry has no
+`test`; T2 an anchor hook whose entry has no `anchor` and `why` (tools/hooks_list.py: the debt list holds
+every hook without a test until it has one).
 
 The key of a violation is rule|folder|file|function|sha1(normalized text)[:12]: no line number, so a
 hook that only moved keeps its key. Folders with a BACKPORT.json are exempt (upstream code).
@@ -58,7 +60,12 @@ RULES = {
     "C9": "inside a Mozilla list or the last line of a block",
     "C10": "the called function is not named Stealth<What>",
     "C11": "a value of ours in a numbered space of Mozilla",
+    "T1": "a hook with no test (the `test` of its HOOKS.json entry is empty)",
+    "T2": "an anchor hook without its `anchor` and `why` in HOOKS.json",
 }
+# Rules added after main's debt list was written: main's list has no entry of them yet, so the entries
+# they add to the list are not "entries main does not have" (tools/hooks_list.py; remove this once main has them).
+INTRODUCED_RULES = {"T1", "T2"}
 
 HASH_COMMENT = {"py", "yaml", "yml", "toml", "build", "configure", "sh", "txt", "in", "ini",
                 "cfg", "cmake", "gitignore", "mk", "conf", "lock"}
@@ -605,8 +612,9 @@ def series_hooks(root) -> list:
 
 
 def contract_violations(root) -> list:
-    """Every rule the series breaks now, ordered by key. See the module's rules C1..C11."""
-    return sorted(_analyse(root)[1], key=lambda v: v.key)
+    """Every rule the series breaks now, ordered by key. See the module's rules C1..C11, T1, T2."""
+    import hooks_list      # imports this module: loaded here, not at the top
+    return sorted(_analyse(root)[1] + hooks_list.missing_test_violations(root), key=lambda v: v.key)
 
 
 # --------------------------------------------------------------------------- the debt list
@@ -651,7 +659,9 @@ def debt_problems(violations: list, debt: list, main_debt: list | None) -> list:
         found.append("tools/hook-debt.json lists %s, which no longer occurs: remove it: python tools/engine.py hook-debt" % key)
     if main_debt is not None:
         main_keys = {e["key"] for e in main_debt}
-        for key in sorted(listed - main_keys):
+        main_rules = {e["rule"] for e in main_debt}
+        for key in sorted(k for k in listed - main_keys
+                          if not (k.split("|", 1)[0] in INTRODUCED_RULES and k.split("|", 1)[0] not in main_rules)):
             found.append("tools/hook-debt.json has %s, which main's list does not have: the debt only shrinks" % key)
     return found
 

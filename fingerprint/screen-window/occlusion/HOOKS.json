@@ -1,0 +1,37 @@
+[
+ {
+  "file": "widget/gtk/nsWindow.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/StaticPrefs_zoom.h\"",
+  "test": ""
+ },
+ {
+  "file": "widget/gtk/nsWindow.cpp",
+  "function": "void nsWindow::DispatchPanGesture(PanGestureInput& aPanInput) {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  auto state = aState == GDK_VISIBILITY_FULLY_OBSCURED &&  // STEALTH-HOOK(fingerprint/screen-window/occlusion): B149, see FEATURE.md",
+  "removed": "  auto state = aState == GDK_VISIBILITY_FULLY_OBSCURED",
+  "test": ""
+ },
+ {
+  "file": "widget/gtk/nsWindow.cpp",
+  "function": "void nsWindow::DispatchPanGesture(PanGestureInput& aPanInput) {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "                       StaticPrefs::zoom_stealth_widget_occlusion_tracking_enabled()",
+  "test": ""
+ },
+ {
+  "file": "widget/gtk/nsWindow.cpp",
+  "function": "static bool IsFullscreenSupported(GtkWidget* aShell) {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  if (GdkIsX11Display() && !IsFullscreenSupported(mShell) && StealthMakeFullScreenWithoutWM(aFullScreen)) return NS_OK;  // STEALTH-HOOK(fingerprint/screen-window/geometry)",
+  "test": "",
+  "anchor": "",
+  "why": ""
+ }
+]

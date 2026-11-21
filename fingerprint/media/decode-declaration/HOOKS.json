@@ -1,0 +1,186 @@
+[
+ {
+  "file": "dom/media/mediacapabilities/MediaCapabilities.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthMediaDeclaration.h\"  // STEALTH-HOOK(fingerprint/media/decode-declaration)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/mediacapabilities/MediaCapabilities.cpp",
+  "function": "static uint32_t Vp8EncoderThreads(const uint32_t aPixels,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  const auto GetNumberOfProcessors = StealthDeclaredNumberOfProcessors;  // STEALTH-HOOK(fingerprint/media/decode-declaration)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/mediacapabilities/MediaCapabilities.cpp",
+  "function": "void MediaCapabilities::CreateNonWebRTCDecodingInfo(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "               // STEALTH-HOOK(fingerprint/media/decode-declaration)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/mediacapabilities/MediaCapabilities.cpp",
+  "function": "void MediaCapabilities::CreateNonWebRTCDecodingInfo(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "               if (auto d = StealthDeclaredDecodingInfoFor(aConfiguration)) {",
+  "test": ""
+ },
+ {
+  "file": "dom/media/mediacapabilities/MediaCapabilities.cpp",
+  "function": "void MediaCapabilities::CreateNonWebRTCDecodingInfo(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "                 return promise->MaybeResolve(std::move(*d));",
+  "test": ""
+ },
+ {
+  "file": "dom/media/mediacapabilities/MediaCapabilities.cpp",
+  "function": "void MediaCapabilities::CreateNonWebRTCDecodingInfo(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "               }",
+  "test": ""
+ },
+ {
+  "file": "dom/media/moz.build",
+  "function": "EXPORTS += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "EXPORTS += [\"StealthMediaDeclaration.h\"]  # STEALTH-HOOK(fingerprint/media/decode-declaration)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"StealthMediaDeclaration.cpp\"]  # STEALTH-HOOK(fingerprint/media/decode-declaration)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/platforms/PDMFactory.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthMediaDeclaration.h\"",
+  "test": ""
+ },
+ {
+  "file": "dom/media/platforms/PDMFactory.cpp",
+  "function": "DecodeSupportSet PDMFactory::SupportsMimeType(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/media/decode-declaration)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/platforms/PDMFactory.cpp",
+  "function": "DecodeSupportSet PDMFactory::SupportsMimeType(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (auto declared = StealthDeclaredDecodeSupportSet(aParams.MimeType())) {",
+  "test": ""
+ },
+ {
+  "file": "dom/media/platforms/PDMFactory.cpp",
+  "function": "DecodeSupportSet PDMFactory::SupportsMimeType(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    return *declared;",
+  "test": ""
+ },
+ {
+  "file": "dom/media/platforms/PDMFactory.cpp",
+  "function": "DecodeSupportSet PDMFactory::SupportsMimeType(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  }",
+  "test": ""
+ },
+ {
+  "file": "dom/media/platforms/PDMFactory.cpp",
+  "function": "DecodeSupportSet PDMFactory::Supports(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/media/decode-declaration)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/platforms/PDMFactory.cpp",
+  "function": "DecodeSupportSet PDMFactory::Supports(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (auto declared = StealthDeclaredDecodeSupportSet(aParams.MimeType())) {",
+  "test": ""
+ },
+ {
+  "file": "dom/media/platforms/PDMFactory.cpp",
+  "function": "DecodeSupportSet PDMFactory::Supports(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    return PDMSupportsDecoderPromise::CreateAndResolve(*declared, __func__);",
+  "test": ""
+ },
+ {
+  "file": "dom/media/platforms/PDMFactory.cpp",
+  "function": "DecodeSupportSet PDMFactory::Supports(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  }",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/jsapi/DefaultCodecPreferences.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthMediaDeclaration.h\"  // STEALTH-HOOK(fingerprint/media/decode-declaration)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/jsapi/DefaultCodecPreferences.cpp",
+  "function": "bool DefaultCodecPreferences::H264EnabledStatic() {",
+  "kind": "add",
+  "form": "guard",
+  "line": "  if (auto d = StealthDeclaredSoftwareH264()) return *d;  // STEALTH-HOOK(fingerprint/media/decode-declaration)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/jsapi/DefaultCodecPreferences.cpp",
+  "function": "bool DefaultCodecPreferences::HardwareH264EnabledStatic() {",
+  "kind": "add",
+  "form": "guard",
+  "line": "  if (auto d = StealthDeclaredSoftwareH264()) return *d;  // STEALTH-HOOK(fingerprint/media/decode-declaration)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/libwebrtcglue/WebrtcVideoCodecFactory.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthMediaDeclaration.h\"  // STEALTH-HOOK(fingerprint/media/decode-declaration)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/libwebrtcglue/WebrtcVideoCodecFactory.cpp",
+  "function": "PlatformEncodeSupportOrNone(const EncoderConfig& aConfig) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/media/decode-declaration)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/libwebrtcglue/WebrtcVideoCodecFactory.cpp",
+  "function": "PlatformEncodeSupportOrNone(const EncoderConfig& aConfig) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (auto declared = StealthDeclaredWebrtcEncodeSupport(aConfig)) return declared;",
+  "test": ""
+ }
+]

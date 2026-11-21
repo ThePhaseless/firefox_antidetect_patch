@@ -1,0 +1,51 @@
+[
+ {
+  "file": "dom/base/nsFrameLoader.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthFrameCrash.h\"  // STEALTH-HOOK(automation/juggler)",
+  "test": ""
+ },
+ {
+  "file": "dom/base/nsFrameLoader.cpp",
+  "function": "void nsFrameLoader::MaybeNotifyCrashed(BrowsingContext* aBrowsingContext,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  nsAutoString crashedContext;  // STEALTH-HOOK(automation/juggler)",
+  "removed": "  os->NotifyObservers(ToSupports(this), \"oop-frameloader-crashed\", nullptr);",
+  "test": ""
+ },
+ {
+  "file": "dom/base/nsFrameLoader.cpp",
+  "function": "void nsFrameLoader::MaybeNotifyCrashed(BrowsingContext* aBrowsingContext,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  os->NotifyObservers(",
+  "test": ""
+ },
+ {
+  "file": "dom/base/nsFrameLoader.cpp",
+  "function": "void nsFrameLoader::MaybeNotifyCrashed(BrowsingContext* aBrowsingContext,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "      ToSupports(this), \"oop-frameloader-crashed\",",
+  "test": ""
+ },
+ {
+  "file": "dom/base/nsFrameLoader.cpp",
+  "function": "void nsFrameLoader::MaybeNotifyCrashed(BrowsingContext* aBrowsingContext,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "      StealthCrashedContextData(aBrowsingContext, crashedContext));",
+  "test": ""
+ },
+ {
+  "file": "toolkit/toolkit.mozbuild",
+  "function": "if CONFIG[\"MOZ_WIDGET_TOOLKIT\"] == \"gtk\":",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        \"/juggler\",",
+  "test": ""
+ }
+]

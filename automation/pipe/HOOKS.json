@@ -1,0 +1,52 @@
+[
+ {
+  "file": "browser/app/winlauncher/LauncherProcessWin.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "// STEALTH-HOOK(automation/pipe)",
+  "test": ""
+ },
+ {
+  "file": "browser/app/winlauncher/LauncherProcessWin.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "#include \"StealthJugglerPipe.h\"",
+  "test": ""
+ },
+ {
+  "file": "browser/app/winlauncher/LauncherProcessWin.cpp",
+  "function": "Maybe<int> LauncherMain(int& argc, wchar_t* argv[]) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(automation/pipe)",
+  "test": ""
+ },
+ {
+  "file": "browser/app/winlauncher/LauncherProcessWin.cpp",
+  "function": "Maybe<int> LauncherMain(int& argc, wchar_t* argv[]) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  StealthAddJugglerPipeHandles(argc, argv, attrs);",
+  "test": ""
+ },
+ {
+  "file": "toolkit/xre/nsWindowsWMain.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthPipeStdio.h\"  // STEALTH-HOOK(automation/pipe)",
+  "test": ""
+ },
+ {
+  "file": "toolkit/xre/nsWindowsWMain.cpp",
+  "function": "static void FreeAllocStrings(int argc, char** argv) {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  StealthJugglerPipeStdio(argc, argv);  // STEALTH-HOOK(automation/pipe)",
+  "test": "",
+  "anchor": "",
+  "why": ""
+ }
+]

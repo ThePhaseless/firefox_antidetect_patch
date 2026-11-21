@@ -1,0 +1,152 @@
+[
+ {
+  "file": "browser/branding/unofficial/pref/firefox-branding.js",
+  "function": "pref(\"startup.homepage_override_url\", \"\");",
+  "kind": "rewrite",
+  "form": "declared-value",
+  "line": "pref(\"app.update.interval\", 21600); // 6 hours, the release value  // STEALTH-HOOK(stillborn/updater)",
+  "removed": "pref(\"app.update.interval\", 86400); // 24 hours",
+  "test": ""
+ },
+ {
+  "file": "browser/branding/unofficial/pref/firefox-branding.js",
+  "function": "pref(\"startup.homepage_override_url\", \"\");",
+  "kind": "rewrite",
+  "form": "declared-value",
+  "line": "pref(\"app.update.promptWaitTime\", 691200);  // STEALTH-HOOK(stillborn/updater)",
+  "removed": "pref(\"app.update.promptWaitTime\", 86400);",
+  "test": ""
+ },
+ {
+  "file": "browser/branding/unofficial/pref/firefox-branding.js",
+  "function": "pref(\"startup.homepage_override_url\", \"\");",
+  "kind": "rewrite",
+  "form": "declared-value",
+  "line": "pref(\"app.update.url.manual\", \"https://www.mozilla.org/%LOCALE%/firefox/new?reason=manual-update\");  // STEALTH-HOOK(stillborn/updater)",
+  "removed": "pref(\"app.update.url.manual\", \"https://nightly.mozilla.org\");",
+  "test": ""
+ },
+ {
+  "file": "browser/branding/unofficial/pref/firefox-branding.js",
+  "function": "pref(\"startup.homepage_override_url\", \"\");",
+  "kind": "rewrite",
+  "form": "declared-value",
+  "line": "pref(\"app.update.url.details\", \"https://www.mozilla.org/%LOCALE%/firefox/notes\");  // STEALTH-HOOK(stillborn/updater)",
+  "removed": "pref(\"app.update.url.details\", \"https://nightly.mozilla.org\");",
+  "test": ""
+ },
+ {
+  "file": "browser/branding/unofficial/pref/firefox-branding.js",
+  "function": "pref(\"startup.homepage_override_url\", \"\");",
+  "kind": "rewrite",
+  "form": "declared-value",
+  "line": "pref(\"app.update.checkInstallTime.days\", 63);  // STEALTH-HOOK(stillborn/updater)",
+  "removed": "pref(\"app.update.checkInstallTime.days\", 2);",
+  "test": ""
+ },
+ {
+  "file": "browser/branding/unofficial/pref/firefox-branding.js",
+  "function": "pref(\"startup.homepage_override_url\", \"\");",
+  "kind": "rewrite",
+  "form": "declared-value",
+  "line": "pref(\"app.update.badgeWaitTime\", 345600);  // STEALTH-HOOK(stillborn/updater)",
+  "removed": "pref(\"app.update.badgeWaitTime\", 0);",
+  "test": ""
+ },
+ {
+  "file": "toolkit/mozapps/update/BackgroundUpdate.sys.mjs",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "import * as StealthUpdate from \"resource://gre/modules/StealthUpdate.sys.mjs\"; // STEALTH-HOOK(stillborn/updater)",
+  "test": ""
+ },
+ {
+  "file": "toolkit/mozapps/update/BackgroundUpdate.sys.mjs",
+  "function": "export var BackgroundUpdate = {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    // STEALTH-HOOK(stillborn/updater)",
+  "test": ""
+ },
+ {
+  "file": "toolkit/mozapps/update/BackgroundUpdate.sys.mjs",
+  "function": "export var BackgroundUpdate = {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    if (StealthUpdate.refusesHostTask()) {",
+  "test": ""
+ },
+ {
+  "file": "toolkit/mozapps/update/BackgroundUpdate.sys.mjs",
+  "function": "export var BackgroundUpdate = {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "      return null;",
+  "test": ""
+ },
+ {
+  "file": "toolkit/mozapps/update/BackgroundUpdate.sys.mjs",
+  "function": "export var BackgroundUpdate = {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    }",
+  "test": ""
+ },
+ {
+  "file": "toolkit/mozapps/update/UpdateService.sys.mjs",
+  "function": "import {",
+  "kind": "add",
+  "form": "registration",
+  "line": "import * as StealthUpdate from \"resource://gre/modules/StealthUpdate.sys.mjs\"; // STEALTH-HOOK(stillborn/updater)",
+  "test": ""
+ },
+ {
+  "file": "toolkit/mozapps/update/UpdateService.sys.mjs",
+  "function": "export class UpdateService {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    // STEALTH-HOOK(stillborn/updater)",
+  "test": ""
+ },
+ {
+  "file": "toolkit/mozapps/update/UpdateService.sys.mjs",
+  "function": "export class UpdateService {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    if (StealthUpdate.refusesDownload()) {",
+  "test": ""
+ },
+ {
+  "file": "toolkit/mozapps/update/UpdateService.sys.mjs",
+  "function": "export class UpdateService {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "      return Ci.nsIApplicationUpdateService.DOWNLOAD_FAILURE_GENERIC;",
+  "test": ""
+ },
+ {
+  "file": "toolkit/mozapps/update/UpdateService.sys.mjs",
+  "function": "export class UpdateService {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    }",
+  "test": ""
+ },
+ {
+  "file": "toolkit/mozapps/update/UpdateService.sys.mjs",
+  "function": "export class CheckerService {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    updates = StealthUpdate.noneOffered(updates); // STEALTH-HOOK(stillborn/updater)",
+  "test": ""
+ },
+ {
+  "file": "toolkit/mozapps/update/moz.build",
+  "function": "EXTRA_JS_MODULES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "EXTRA_JS_MODULES += [\"StealthUpdate.sys.mjs\"]  # STEALTH-HOOK(stillborn/updater)",
+  "test": ""
+ }
+]

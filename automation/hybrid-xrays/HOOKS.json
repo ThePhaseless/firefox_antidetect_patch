@@ -1,0 +1,425 @@
+[
+ {
+  "file": "js/xpconnect/src/Sandbox.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthSandbox.h\"  // STEALTH-HOOK(automation/hybrid-xrays)",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/src/Sandbox.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"XrayWrapper.h\"  // STEALTH-HOOK(automation/hybrid-xrays)",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/src/Sandbox.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/intl/StealthSessionPrefs.h\"  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/src/Sandbox.cpp",
+  "function": "bool SandboxProxyHandler::getPropertyDescriptorImpl(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  } else if (xpc::IsHybridXrayWrapper(obj)) {",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/src/Sandbox.cpp",
+  "function": "bool SandboxProxyHandler::getPropertyDescriptorImpl(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    // STEALTH-HOOK(automation/hybrid-xrays)",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/src/Sandbox.cpp",
+  "function": "bool SandboxProxyHandler::getPropertyDescriptorImpl(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    if (!xpc::HybridXrayGetBareName(cx, obj, id, desc_)) {",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/src/Sandbox.cpp",
+  "function": "bool SandboxProxyHandler::getPropertyDescriptorImpl(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "      return false;",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/src/Sandbox.cpp",
+  "function": "bool SandboxProxyHandler::getPropertyDescriptorImpl(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    }",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/src/Sandbox.cpp",
+  "function": "nsresult xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(automation/hybrid-xrays)",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/src/Sandbox.cpp",
+  "function": "nsresult xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (!xpc::StealthCheckHybridXrays(cx, principal, options)) {",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/src/Sandbox.cpp",
+  "function": "nsresult xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    return NS_ERROR_INVALID_ARG;",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/src/Sandbox.cpp",
+  "function": "nsresult xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  }",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/src/Sandbox.cpp",
+  "function": "nsresult xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "        // STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "removed": "        realmOptions.behaviors().setLocaleOverride(\n            PromiseFlatCString(localeOverride).get());",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/src/Sandbox.cpp",
+  "function": "nsresult xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "        nsAutoCString primaryLocale;",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/src/Sandbox.cpp",
+  "function": "nsresult xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "        mozilla::intl::PrimaryLanguageTag(localeOverride, primaryLocale);",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/src/Sandbox.cpp",
+  "function": "nsresult xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "        realmOptions.behaviors().setLocaleOverride(primaryLocale.get());",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/src/Sandbox.cpp",
+  "function": "nsresult xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    // STEALTH-HOOK(automation/hybrid-xrays)",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/src/Sandbox.cpp",
+  "function": "nsresult xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    MOZ_RELEASE_ASSERT(priv->hybridXrays == options.hybridXrays);",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/src/Sandbox.cpp",
+  "function": "nsresult xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    // STEALTH-HOOK(automation/hybrid-xrays)",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/src/Sandbox.cpp",
+  "function": "nsresult xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    priv->hybridXrays = options.hybridXrays;",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/src/Sandbox.cpp",
+  "function": "bool SandboxOptions::Parse() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "            // STEALTH-HOOK(automation/hybrid-xrays)",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/src/Sandbox.cpp",
+  "function": "bool SandboxOptions::Parse() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "            ParseBoolean(\"hybridXrays\", &hybridXrays) &&",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/src/XPCJSRuntime.cpp",
+  "function": "CompartmentPrivate::CompartmentPrivate(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "      hybridXrays(false),",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/src/xpcprivate.h",
+  "function": "class MOZ_STACK_CLASS SandboxOptions : public OptionsBase {",
+  "kind": "add",
+  "form": "member",
+  "line": "        hybridXrays(false),",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/src/xpcprivate.h",
+  "function": "class MOZ_STACK_CLASS SandboxOptions : public OptionsBase {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(automation/hybrid-xrays)",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/src/xpcprivate.h",
+  "function": "class MOZ_STACK_CLASS SandboxOptions : public OptionsBase {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  bool hybridXrays;",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/src/xpcprivate.h",
+  "function": "class CompartmentPrivate {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "    return !wantXrays && !hybridXrays && !isWebExtensionContentScript &&",
+  "removed": "    return !wantXrays && !isWebExtensionContentScript &&",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/src/xpcprivate.h",
+  "function": "class CompartmentPrivate {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(automation/hybrid-xrays)",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/src/xpcprivate.h",
+  "function": "class CompartmentPrivate {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  bool hybridXrays;",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthHybridXray.h\"  // STEALTH-HOOK(automation/hybrid-xrays)",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
+  "function": "static void DEBUG_CheckUnwrapSafety(HandleObject obj,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "          // STEALTH-HOOK(automation/hybrid-xrays)",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
+  "function": "static void DEBUG_CheckUnwrapSafety(HandleObject obj,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "          !targetCompartmentPrivate->hybridXrays &&",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
+  "function": "JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(automation/hybrid-xrays)",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
+  "function": "JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  const StealthXrayFlags xray = StealthComputeXrayFlags(origin, target);",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
+  "function": "JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "           (!targetSubsumesOrigin ||",
+  "removed": "           (!targetSubsumesOrigin || (!originCompartmentPrivate->wantXrays &&",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
+  "function": "JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "            (!xray.originForcesXrays && !xray.targetForcesXrays))) {",
+  "removed": "                                      !targetCompartmentPrivate->wantXrays))) {",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
+  "function": "JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(automation/hybrid-xrays)",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
+  "function": "JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  else if (StealthCallerObjectApplies(origin, target, targetIsChrome,",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
+  "function": "JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "                                      targetSubsumesOrigin)) {",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
+  "function": "JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    wrapper = StealthCallerObjectWrapper();",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
+  "function": "JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  }",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
+  "function": "JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "           !xray.originForcesXrays && !xray.targetForcesXrays &&",
+  "removed": "           !originCompartmentPrivate->wantXrays &&\n           !targetCompartmentPrivate->wantXrays &&",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
+  "function": "JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "    bool sameOriginXrays = xray.originForcesXrays || xray.targetForcesXrays;",
+  "removed": "    bool sameOriginXrays = originCompartmentPrivate->wantXrays ||\n                           targetCompartmentPrivate->wantXrays;",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
+  "function": "JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "    // STEALTH-HOOK(automation/hybrid-xrays)",
+  "removed": "    wrapper = SelectWrapper(securityWrapper, xrayType, waiveXrays, obj);",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
+  "function": "JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "    wrapper = xray.targetHybrid && !securityWrapper && !waiveXrays",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
+  "function": "JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "                  ? StealthHybridWrapper(xrayType)",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
+  "function": "JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "                  : SelectWrapper(securityWrapper, xrayType, waiveXrays, obj);",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/wrappers/XrayWrapper.h",
+  "function": "class XrayWrapper : public Base {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(automation/hybrid-xrays)",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/wrappers/XrayWrapper.h",
+  "function": "class XrayWrapper : public Base {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  constexpr XrayWrapper(unsigned flags, bool aHasPrototype);",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/wrappers/XrayWrapper.h",
+  "function": "JSObject* EnsureXrayExpandoObject(JSContext* cx, JS::HandleObject wrapper);",
+  "kind": "add",
+  "form": "unknown",
+  "line": "// STEALTH-HOOK(automation/hybrid-xrays)",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/wrappers/XrayWrapper.h",
+  "function": "JSObject* EnsureXrayExpandoObject(JSContext* cx, JS::HandleObject wrapper);",
+  "kind": "add",
+  "form": "unknown",
+  "line": "#include \"StealthHybridXray.h\"",
+  "test": ""
+ },
+ {
+  "file": "js/xpconnect/wrappers/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "SOURCES += [\"StealthHybridXray.cpp\"]  # STEALTH-HOOK(automation/hybrid-xrays)",
+  "test": ""
+ }
+]

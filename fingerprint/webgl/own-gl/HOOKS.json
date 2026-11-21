@@ -1,0 +1,46 @@
+[
+ {
+  "file": "gfx/gl/GLContextProviderLinux.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthOwnGL.h\"  // STEALTH-HOOK(fingerprint/webgl/own-gl)",
+  "test": ""
+ },
+ {
+  "file": "gfx/gl/GLContextProviderLinux.cpp",
+  "function": "already_AddRefed<GLContext> GLContextProviderLinux::CreateForCompositorWidget(",
+  "kind": "add",
+  "form": "guard",
+  "line": "  if (StealthOwnGLRequired()) return sGLContextProviderEGL.CreateHeadless(desc, out_failureId);  // STEALTH-HOOK(fingerprint/webgl/own-gl): never GLX",
+  "test": ""
+ },
+ {
+  "file": "gfx/gl/GLLibraryEGL.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthOwnGL.h\"  // STEALTH-HOOK(fingerprint/webgl/own-gl)",
+  "test": ""
+ },
+ {
+  "file": "gfx/gl/GLLibraryEGL.cpp",
+  "function": "bool GLLibraryEGL::Init(nsACString* const out_failureId) {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  if (!StealthLoadOwnGLOrRefuse(&mEGLLibrary, &mGLLibrary, out_failureId)) return false;  // STEALTH-HOOK(fingerprint/webgl/own-gl): ours or none",
+  "test": "",
+  "anchor": "",
+  "why": ""
+ },
+ {
+  "file": "gfx/gl/GLLibraryEGL.cpp",
+  "function": "std::shared_ptr<EglDisplay> GLLibraryEGL::CreateDisplayLocked(",
+  "kind": "add",
+  "form": "anchor",
+  "line": "    if (StealthOwnGLRequired()) return StealthOwnGLSurfacelessDisplay(*this, aProofOfLock);  // STEALTH-HOOK(fingerprint/webgl/own-gl): surfaceless only",
+  "test": "",
+  "anchor": "",
+  "why": ""
+ }
+]

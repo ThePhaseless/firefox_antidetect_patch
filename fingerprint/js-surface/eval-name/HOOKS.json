@@ -1,0 +1,44 @@
+[
+ {
+  "file": "js/src/debugger/Frame.cpp",
+  "function": "static bool EvaluateInEnv(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // Stealth: use generic filename instead of \"debugger eval code\" to prevent",
+  "test": ""
+ },
+ {
+  "file": "js/src/debugger/Frame.cpp",
+  "function": "static bool EvaluateInEnv(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // a commercial fingerprinting service from detecting automation via",
+  "test": ""
+ },
+ {
+  "file": "js/src/debugger/Frame.cpp",
+  "function": "static bool EvaluateInEnv(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // Error.stack analysis.",
+  "test": ""
+ },
+ {
+  "file": "js/src/debugger/Frame.cpp",
+  "function": "static bool EvaluateInEnv(",
+  "kind": "rewrite",
+  "form": "declared-value",
+  "line": "      evalOptions.filename() ? evalOptions.filename() : \"eval code\";",
+  "removed": "      evalOptions.filename() ? evalOptions.filename() : \"debugger eval code\";",
+  "test": ""
+ },
+ {
+  "file": "js/src/debugger/Frame.cpp",
+  "function": "static bool EvaluateInEnv(",
+  "kind": "rewrite",
+  "form": "declared-value",
+  "line": "      .setIntroductionType(\"eval\")",
+  "removed": "      .setIntroductionType(\"debugger eval\")",
+  "test": ""
+ }
+]

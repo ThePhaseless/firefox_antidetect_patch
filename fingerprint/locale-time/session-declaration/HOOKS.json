@@ -1,0 +1,66 @@
+[
+ {
+  "file": "dom/base/moz.build",
+  "function": "EXPORTS.mozilla.dom += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "EXPORTS.mozilla.dom += [\"StealthSessionDeclaration.h\"]  # STEALTH-HOOK(fingerprint/locale-time/session-declaration)",
+  "test": ""
+ },
+ {
+  "file": "dom/base/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"StealthSessionDeclaration.cpp\"]  # STEALTH-HOOK(fingerprint/locale-time/session-declaration)",
+  "test": ""
+ },
+ {
+  "file": "intl/locale/OSPreferences.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/intl/StealthSessionPrefs.h\"  // STEALTH-HOOK(fingerprint/locale-time/session-declaration)",
+  "test": ""
+ },
+ {
+  "file": "intl/locale/OSPreferences.cpp",
+  "function": "bool OSPreferences::GetDateTimeConnectorPattern(const nsACString& aLocale,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/locale-time/session-declaration): why here, StealthSessionPrefs.h",
+  "test": ""
+ },
+ {
+  "file": "intl/locale/OSPreferences.cpp",
+  "function": "bool OSPreferences::GetDateTimeConnectorPattern(const nsACString& aLocale,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (SessionSystemLocales(aRetVal)) return NS_OK;",
+  "test": ""
+ },
+ {
+  "file": "intl/locale/OSPreferences.cpp",
+  "function": "OSPreferences::GetSystemLocales(nsTArray<nsCString>& aRetVal) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/locale-time/session-declaration): the same",
+  "test": ""
+ },
+ {
+  "file": "intl/locale/OSPreferences.cpp",
+  "function": "OSPreferences::GetSystemLocales(nsTArray<nsCString>& aRetVal) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (SessionSystemLocale(aRetVal)) return NS_OK;",
+  "test": ""
+ },
+ {
+  "file": "intl/locale/tests/gtest/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"TestStealthSystemLocales.cpp\"]  # STEALTH-HOOK(fingerprint/locale-time/session-declaration)",
+  "test": ""
+ }
+]

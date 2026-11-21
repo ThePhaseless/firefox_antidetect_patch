@@ -1,0 +1,34 @@
+[
+ {
+  "file": "remote/marionette/atom.sys.mjs",
+  "function": "const ATOMS = {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "// The sources themselves, for a caller that runs them in a sandbox of its",
+  "test": ""
+ },
+ {
+  "file": "remote/marionette/atom.sys.mjs",
+  "function": "const ATOMS = {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "// own: Juggler's Page.elementAtom runs them through Xrays, so the page's",
+  "test": ""
+ },
+ {
+  "file": "remote/marionette/atom.sys.mjs",
+  "function": "const ATOMS = {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "// own functions are never called and the answer is Marionette's.",
+  "test": ""
+ },
+ {
+  "file": "remote/marionette/atom.sys.mjs",
+  "function": "const ATOMS = {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "export const ATOM_SOURCES = ATOMS;",
+  "test": ""
+ }
+]

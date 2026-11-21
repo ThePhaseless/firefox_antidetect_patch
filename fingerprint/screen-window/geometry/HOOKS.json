@@ -1,0 +1,337 @@
+[
+ {
+  "file": "dom/base/nsGlobalWindowOuter.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/dom/StealthSessionDeclaration.h\"  // STEALTH-HOOK(fingerprint/locale-time/session-declaration)",
+  "test": ""
+ },
+ {
+  "file": "dom/base/nsGlobalWindowOuter.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthWindowGeometry.h\"  // STEALTH-HOOK(fingerprint/screen-window/geometry)",
+  "test": ""
+ },
+ {
+  "file": "dom/base/nsGlobalWindowOuter.cpp",
+  "function": "static nsresult CreateNativeGlobalForInner(",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "      // STEALTH-HOOK(fingerprint/locale-time/session-declaration)",
+  "removed": "      aDocument->GetBrowsingContext()->Top()->GetLanguageOverride(),",
+  "test": ""
+ },
+ {
+  "file": "dom/base/nsGlobalWindowOuter.cpp",
+  "function": "static nsresult CreateNativeGlobalForInner(",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "      GetDeclaredRealmLanguage(aDocument), GetDeclaredRealmTimezone(aDocument));",
+  "removed": "      aDocument->GetBrowsingContext()->Top()->GetTimezoneOverride());",
+  "test": ""
+ },
+ {
+  "file": "dom/base/nsGlobalWindowOuter.cpp",
+  "function": "CSSIntSize nsGlobalWindowOuter::GetOuterSize(CallerType aCallerType,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/screen-window/geometry)",
+  "test": ""
+ },
+ {
+  "file": "dom/base/nsGlobalWindowOuter.cpp",
+  "function": "CSSIntSize nsGlobalWindowOuter::GetOuterSize(CallerType aCallerType,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (CSSIntSize size; StealthOuterSize(*this, size, aError)) {",
+  "test": ""
+ },
+ {
+  "file": "dom/base/nsGlobalWindowOuter.cpp",
+  "function": "CSSIntSize nsGlobalWindowOuter::GetOuterSize(CallerType aCallerType,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    return size;",
+  "test": ""
+ },
+ {
+  "file": "dom/base/nsGlobalWindowOuter.cpp",
+  "function": "CSSIntSize nsGlobalWindowOuter::GetOuterSize(CallerType aCallerType,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  }",
+  "test": ""
+ },
+ {
+  "file": "dom/base/nsGlobalWindowOuter.cpp",
+  "function": "CSSIntPoint nsGlobalWindowOuter::GetScreenXY(CallerType aCallerType,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/screen-window/geometry)",
+  "test": ""
+ },
+ {
+  "file": "dom/base/nsGlobalWindowOuter.cpp",
+  "function": "CSSIntPoint nsGlobalWindowOuter::GetScreenXY(CallerType aCallerType,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (CSSIntPoint point; StealthScreenXY(*this, treeOwnerAsWin, point)) {",
+  "test": ""
+ },
+ {
+  "file": "dom/base/nsGlobalWindowOuter.cpp",
+  "function": "CSSIntPoint nsGlobalWindowOuter::GetScreenXY(CallerType aCallerType,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    return point;",
+  "test": ""
+ },
+ {
+  "file": "dom/base/nsGlobalWindowOuter.cpp",
+  "function": "CSSIntPoint nsGlobalWindowOuter::GetScreenXY(CallerType aCallerType,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  }",
+  "test": ""
+ },
+ {
+  "file": "dom/base/nsGlobalWindowOuter.cpp",
+  "function": "float nsGlobalWindowOuter::GetMozInnerScreenXOuter(CallerType aCallerType) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/screen-window/geometry)",
+  "test": ""
+ },
+ {
+  "file": "dom/base/nsGlobalWindowOuter.cpp",
+  "function": "float nsGlobalWindowOuter::GetMozInnerScreenXOuter(CallerType aCallerType) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (const Maybe<float> x = StealthMozInnerScreenX(*this, r)) {",
+  "test": ""
+ },
+ {
+  "file": "dom/base/nsGlobalWindowOuter.cpp",
+  "function": "float nsGlobalWindowOuter::GetMozInnerScreenXOuter(CallerType aCallerType) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    return *x;",
+  "test": ""
+ },
+ {
+  "file": "dom/base/nsGlobalWindowOuter.cpp",
+  "function": "float nsGlobalWindowOuter::GetMozInnerScreenXOuter(CallerType aCallerType) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  }",
+  "test": ""
+ },
+ {
+  "file": "dom/base/nsGlobalWindowOuter.cpp",
+  "function": "float nsGlobalWindowOuter::GetMozInnerScreenYOuter(CallerType aCallerType) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/screen-window/geometry)",
+  "test": ""
+ },
+ {
+  "file": "dom/base/nsGlobalWindowOuter.cpp",
+  "function": "float nsGlobalWindowOuter::GetMozInnerScreenYOuter(CallerType aCallerType) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (const Maybe<float> y = StealthMozInnerScreenY(*this, r)) {",
+  "test": ""
+ },
+ {
+  "file": "dom/base/nsGlobalWindowOuter.cpp",
+  "function": "float nsGlobalWindowOuter::GetMozInnerScreenYOuter(CallerType aCallerType) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    return *y;",
+  "test": ""
+ },
+ {
+  "file": "dom/base/nsGlobalWindowOuter.cpp",
+  "function": "float nsGlobalWindowOuter::GetMozInnerScreenYOuter(CallerType aCallerType) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  }",
+  "test": ""
+ },
+ {
+  "file": "dom/base/nsGlobalWindowOuter.h",
+  "function": "class nsGlobalWindowOuter final : public mozilla::dom::EventTarget,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/screen-window/geometry)",
+  "test": ""
+ },
+ {
+  "file": "dom/base/nsGlobalWindowOuter.h",
+  "function": "class nsGlobalWindowOuter final : public mozilla::dom::EventTarget,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  static mozilla::Maybe<nsPoint> StealthContentOriginShift(",
+  "test": ""
+ },
+ {
+  "file": "dom/base/nsGlobalWindowOuter.h",
+  "function": "class nsGlobalWindowOuter final : public mozilla::dom::EventTarget,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "      nsPresContext* aPresContext);",
+  "test": ""
+ },
+ {
+  "file": "dom/events/Event.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthScreenCoords.h\"  // STEALTH-HOOK(fingerprint/screen-window/geometry)",
+  "test": ""
+ },
+ {
+  "file": "dom/events/Event.cpp",
+  "function": "Maybe<CSSDoublePoint> Event::GetScreenCoords(",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "          aPresContext->DeviceContext()->AppUnitsPerDevPixel()) +",
+  "removed": "          aPresContext->DeviceContext()->AppUnitsPerDevPixel()));",
+  "test": ""
+ },
+ {
+  "file": "dom/events/Event.cpp",
+  "function": "Maybe<CSSDoublePoint> Event::GetScreenCoords(",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "      // STEALTH-HOOK(fingerprint/screen-window/geometry)",
+  "test": ""
+ },
+ {
+  "file": "dom/events/Event.cpp",
+  "function": "Maybe<CSSDoublePoint> Event::GetScreenCoords(",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "      StealthScreenOriginShift(aPresContext));",
+  "test": ""
+ },
+ {
+  "file": "dom/events/test/gtest/moz.build",
+  "function": "with Files(\"**\"):",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"TestStealthWindowGeometry.cpp\"]  # STEALTH-HOOK(fingerprint/screen-window/geometry)",
+  "test": ""
+ },
+ {
+  "file": "widget/gtk/moz.build",
+  "function": "SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "SOURCES += [\"StealthFullscreenGtk.cpp\"]  # STEALTH-HOOK(fingerprint/screen-window/geometry)",
+  "test": ""
+ },
+ {
+  "file": "widget/gtk/nsWindow.h",
+  "function": "class nsWindow : public nsIWidget {",
+  "kind": "add",
+  "form": "member",
+  "line": "  bool StealthMakeFullScreenWithoutWM(bool aFullScreen);  // STEALTH-HOOK(fingerprint/screen-window/geometry)",
+  "test": ""
+ },
+ {
+  "file": "widget/moz.build",
+  "function": "SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"StealthFullscreen.cpp\"]  # STEALTH-HOOK(fingerprint/screen-window/geometry)",
+  "test": ""
+ },
+ {
+  "file": "widget/nsIWidget.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthFullscreen.h\"  // STEALTH-HOOK(fingerprint/screen-window/geometry)",
+  "test": ""
+ },
+ {
+  "file": "widget/nsIWidget.cpp",
+  "function": "void nsIWidget::InfallibleMakeFullScreen(bool aFullScreen) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    if (const auto declared = mozilla::widget::StealthDeclaredFullscreenRect(*this)) {  // STEALTH-HOOK(fingerprint/screen-window/geometry)",
+  "test": ""
+ },
+ {
+  "file": "widget/nsIWidget.cpp",
+  "function": "void nsIWidget::InfallibleMakeFullScreen(bool aFullScreen) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "      doReposition(*declared);",
+  "test": ""
+ },
+ {
+  "file": "widget/nsIWidget.cpp",
+  "function": "void nsIWidget::InfallibleMakeFullScreen(bool aFullScreen) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "      return void(mSavedBounds->screenRect = GetScreenBounds() / GetDesktopToDeviceScale());",
+  "test": ""
+ },
+ {
+  "file": "widget/nsIWidget.cpp",
+  "function": "void nsIWidget::InfallibleMakeFullScreen(bool aFullScreen) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    }",
+  "test": ""
+ },
+ {
+  "file": "widget/tests/gtest/moz.build",
+  "function": "UNIFIED_SOURCES = [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"TestStealthFullscreen.cpp\"]  # STEALTH-HOOK(fingerprint/screen-window/geometry)",
+  "test": ""
+ },
+ {
+  "file": "widget/windows/moz.build",
+  "function": "SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "SOURCES += [\"StealthFullscreenWin.cpp\"]  # STEALTH-HOOK(fingerprint/screen-window/geometry)",
+  "test": ""
+ },
+ {
+  "file": "widget/windows/nsWindow.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthFullscreenWin.h\"  // STEALTH-HOOK(fingerprint/screen-window/geometry)",
+  "test": ""
+ },
+ {
+  "file": "widget/windows/nsWindow.cpp",
+  "function": "bool nsWindow::ProcessMessageInternal(UINT msg, WPARAM& wParam, LPARAM& lParam,",
+  "kind": "add",
+  "form": "anchor",
+  "line": "      mozilla::widget::StealthDeclaredFullscreenTrackSize(*this, mFrameState->GetSizeMode() == nsSizeMode_Fullscreen, mmi);  // STEALTH-HOOK(fingerprint/screen-window/geometry)",
+  "test": "",
+  "anchor": "",
+  "why": ""
+ },
+ {
+  "file": "widget/windows/nsWindow.cpp",
+  "function": "void nsWindow::OnWindowPosChanging(WINDOWPOS* info) {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  mozilla::widget::StealthHoldDeclaredFullscreen(*this, mFrameState->GetSizeMode() == nsSizeMode_Fullscreen, info);  // STEALTH-HOOK(fingerprint/screen-window/geometry)",
+  "test": "",
+  "anchor": "",
+  "why": ""
+ }
+]

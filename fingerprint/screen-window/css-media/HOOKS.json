@@ -1,0 +1,58 @@
+[
+ {
+  "file": "layout/style/nsMediaFeatures.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthMediaFeatures.h\"  // STEALTH-HOOK(fingerprint/screen-window/css-media)",
+  "test": ""
+ },
+ {
+  "file": "layout/style/nsMediaFeatures.cpp",
+  "function": "static nsSize GetSize(const Document& aDocument) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/screen-window/css-media)",
+  "test": ""
+ },
+ {
+  "file": "layout/style/nsMediaFeatures.cpp",
+  "function": "static nsSize GetSize(const Document& aDocument) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (Maybe<nsSize> declared = StealthDeclaredDeviceSize()) return *declared;",
+  "test": ""
+ },
+ {
+  "file": "layout/style/nsMediaFeatures.cpp",
+  "function": "static PointerCapabilities GetPointerCapabilities(const Document* aDocument,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/screen-window/css-media)",
+  "test": ""
+ },
+ {
+  "file": "layout/style/nsMediaFeatures.cpp",
+  "function": "static PointerCapabilities GetPointerCapabilities(const Document* aDocument,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (Maybe<int32_t> declared = StealthDeclaredPointerCapabilities(aID)) {",
+  "test": ""
+ },
+ {
+  "file": "layout/style/nsMediaFeatures.cpp",
+  "function": "static PointerCapabilities GetPointerCapabilities(const Document* aDocument,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    return static_cast<PointerCapabilities>(*declared);",
+  "test": ""
+ },
+ {
+  "file": "layout/style/nsMediaFeatures.cpp",
+  "function": "static PointerCapabilities GetPointerCapabilities(const Document* aDocument,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  }",
+  "test": ""
+ }
+]

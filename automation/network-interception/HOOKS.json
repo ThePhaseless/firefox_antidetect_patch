@@ -1,0 +1,90 @@
+[
+ {
+  "file": "netwerk/base/nsINetworkInterceptController.idl",
+  "function": "interface nsIInterceptedChannel : nsISupports",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    // STEALTH-HOOK(automation/network-interception): see FEATURE.md",
+  "test": ""
+ },
+ {
+  "file": "netwerk/base/nsINetworkInterceptController.idl",
+  "function": "interface nsIInterceptedChannel : nsISupports",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    void resetInterceptionWithURI(in nsIURI aURI);",
+  "test": ""
+ },
+ {
+  "file": "netwerk/base/nsINetworkInterceptController.idl",
+  "function": "interface nsIInterceptedChannel : nsISupports",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    void interceptAfterServiceWorkerResets();",
+  "test": ""
+ },
+ {
+  "file": "netwerk/protocol/http/InterceptedHttpChannel.cpp",
+  "function": "NS_IMETHODIMP",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(automation/network-interception)",
+  "test": ""
+ },
+ {
+  "file": "netwerk/protocol/http/InterceptedHttpChannel.cpp",
+  "function": "NS_IMETHODIMP",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (mInterceptAfterServiceWorkerResets) {",
+  "test": ""
+ },
+ {
+  "file": "netwerk/protocol/http/InterceptedHttpChannel.cpp",
+  "function": "NS_IMETHODIMP",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    return StealthInterceptAgain(aBypass);",
+  "test": ""
+ },
+ {
+  "file": "netwerk/protocol/http/InterceptedHttpChannel.cpp",
+  "function": "NS_IMETHODIMP",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  }",
+  "test": ""
+ },
+ {
+  "file": "netwerk/protocol/http/InterceptedHttpChannel.h",
+  "function": "class InterceptedHttpChannel final",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(automation/network-interception)",
+  "test": ""
+ },
+ {
+  "file": "netwerk/protocol/http/InterceptedHttpChannel.h",
+  "function": "class InterceptedHttpChannel final",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  bool mInterceptAfterServiceWorkerResets{false};",
+  "test": ""
+ },
+ {
+  "file": "netwerk/protocol/http/InterceptedHttpChannel.h",
+  "function": "class InterceptedHttpChannel final",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  bool mServiceWorkerResetBypass{true};",
+  "test": ""
+ },
+ {
+  "file": "netwerk/protocol/http/InterceptedHttpChannel.h",
+  "function": "class InterceptedHttpChannel final",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  nsresult StealthInterceptAgain(bool aBypass);",
+  "test": ""
+ }
+]

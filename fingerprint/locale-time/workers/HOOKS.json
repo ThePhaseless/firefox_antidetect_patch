@@ -1,0 +1,251 @@
+[
+ {
+  "file": "dom/base/test/browser.toml",
+  "function": "skip-if = [",
+  "kind": "add",
+  "form": "unknown",
+  "line": "# STEALTH-HOOK(fingerprint/locale-time/workers)",
+  "test": ""
+ },
+ {
+  "file": "dom/base/test/browser.toml",
+  "function": "skip-if = [",
+  "kind": "add",
+  "form": "unknown",
+  "line": "[\"browser_stealth_language_workers.js\"]",
+  "test": ""
+ },
+ {
+  "file": "dom/serviceworkers/ServiceWorkerPrivate.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthWorkerDeclaration.h\"  // STEALTH-HOOK(fingerprint/locale-time/workers)",
+  "test": ""
+ },
+ {
+  "file": "dom/serviceworkers/ServiceWorkerPrivate.cpp",
+  "function": "void ServiceWorkerPrivate::RefreshRemoteWorkerData(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/locale-time/workers)",
+  "test": ""
+ },
+ {
+  "file": "dom/serviceworkers/ServiceWorkerPrivate.cpp",
+  "function": "void ServiceWorkerPrivate::RefreshRemoteWorkerData(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  StealthWorkerDeclaration(mInfo->Principal(), mRemoteWorkerData);",
+  "test": ""
+ },
+ {
+  "file": "dom/serviceworkers/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"StealthWorkerDeclaration.cpp\"]  # STEALTH-HOOK(fingerprint/locale-time/workers)",
+  "test": ""
+ },
+ {
+  "file": "dom/workers/WorkerPrivate.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthWorkerDeclaration.h\"  // STEALTH-HOOK(fingerprint/locale-time/workers)",
+  "test": ""
+ },
+ {
+  "file": "dom/workers/WorkerPrivate.cpp",
+  "function": "WorkerPrivate::WorkerPrivate(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    // STEALTH-HOOK(fingerprint/locale-time/workers)",
+  "test": ""
+ },
+ {
+  "file": "dom/workers/WorkerPrivate.cpp",
+  "function": "WorkerPrivate::WorkerPrivate(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    DeclareWorkerLanguageAndZone(mLoadInfo);",
+  "test": ""
+ },
+ {
+  "file": "dom/workers/WorkerPrivate.cpp",
+  "function": "void WorkerPrivate::UpdateLanguageOverrideInternal(",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "          // STEALTH-HOOK(fingerprint/locale-time/workers)",
+  "removed": "          JS::SetRealmLocaleOverride(realm, aLanguageOverride.get());",
+  "test": ""
+ },
+ {
+  "file": "dom/workers/WorkerPrivate.cpp",
+  "function": "void WorkerPrivate::UpdateLanguageOverrideInternal(",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "          SetWorkerRealmLocale(realm, aLanguageOverride);",
+  "test": ""
+ },
+ {
+  "file": "dom/workers/WorkerPrivate.cpp",
+  "function": "void WorkerPrivate::UpdateTimezoneOverrideInternal(JSContext* aCx,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/locale-time/workers)",
+  "test": ""
+ },
+ {
+  "file": "dom/workers/WorkerPrivate.cpp",
+  "function": "void WorkerPrivate::UpdateTimezoneOverrideInternal(JSContext* aCx,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (WorkerFollowsOwnerLanguage(mLoadInfo)) {",
+  "test": ""
+ },
+ {
+  "file": "dom/workers/WorkerPrivate.cpp",
+  "function": "void WorkerPrivate::UpdateTimezoneOverrideInternal(JSContext* aCx,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    return;",
+  "test": ""
+ },
+ {
+  "file": "dom/workers/WorkerPrivate.cpp",
+  "function": "void WorkerPrivate::UpdateTimezoneOverrideInternal(JSContext* aCx,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  }",
+  "test": ""
+ },
+ {
+  "file": "dom/worklet/WorkletGlobalScope.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/dom/StealthSessionDeclaration.h\"  // STEALTH-HOOK(fingerprint/locale-time/workers)",
+  "test": ""
+ },
+ {
+  "file": "dom/worklet/WorkletGlobalScope.cpp",
+  "function": "JS::RealmOptions WorkletGlobalScope::CreateRealmOptions() const {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  SetDeclaredRealmTimeAndLanguage(  // STEALTH-HOOK(fingerprint/locale-time/workers)",
+  "test": ""
+ },
+ {
+  "file": "dom/worklet/WorkletGlobalScope.cpp",
+  "function": "JS::RealmOptions WorkletGlobalScope::CreateRealmOptions() const {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "      options, ShouldResistFingerprinting(RFPTarget::JSDateTimeUTC),",
+  "test": ""
+ },
+ {
+  "file": "dom/worklet/WorkletGlobalScope.cpp",
+  "function": "JS::RealmOptions WorkletGlobalScope::CreateRealmOptions() const {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "      ShouldResistFingerprinting(RFPTarget::JSLocale),",
+  "test": ""
+ },
+ {
+  "file": "dom/worklet/WorkletGlobalScope.cpp",
+  "function": "JS::RealmOptions WorkletGlobalScope::CreateRealmOptions() const {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "      mImpl->LoadInfo().Language(), mImpl->LoadInfo().Timezone());",
+  "test": ""
+ },
+ {
+  "file": "dom/worklet/WorkletImpl.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/dom/StealthSessionDeclaration.h\"  // STEALTH-HOOK(fingerprint/locale-time/workers)",
+  "test": ""
+ },
+ {
+  "file": "dom/worklet/WorkletImpl.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "// STEALTH-HOOK(fingerprint/locale-time/workers)",
+  "test": ""
+ },
+ {
+  "file": "dom/worklet/WorkletImpl.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "#include \"nsPIDOMWindowInlines.h\"",
+  "test": ""
+ },
+ {
+  "file": "dom/worklet/WorkletImpl.cpp",
+  "function": "WorkletLoadInfo::WorkletLoadInfo(nsPIDOMWindowInner* aWindow)",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  dom::GetDeclaredLanguage(aWindow->GetBrowsingContext(), mLanguage);",
+  "test": ""
+ },
+ {
+  "file": "dom/worklet/WorkletImpl.cpp",
+  "function": "WorkletLoadInfo::WorkletLoadInfo(nsPIDOMWindowInner* aWindow)",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  dom::GetDeclaredTimezone(aWindow->GetBrowsingContext(), mTimezone);",
+  "test": ""
+ },
+ {
+  "file": "dom/worklet/WorkletImpl.h",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"nsString.h\"",
+  "test": ""
+ },
+ {
+  "file": "dom/worklet/WorkletImpl.h",
+  "function": "class WorkletLoadInfo {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/locale-time/workers)",
+  "test": ""
+ },
+ {
+  "file": "dom/worklet/WorkletImpl.h",
+  "function": "class WorkletLoadInfo {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  const nsCString& Language() const { return mLanguage; }",
+  "test": ""
+ },
+ {
+  "file": "dom/worklet/WorkletImpl.h",
+  "function": "class WorkletLoadInfo {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  const nsString& Timezone() const { return mTimezone; }",
+  "test": ""
+ },
+ {
+  "file": "dom/worklet/WorkletImpl.h",
+  "function": "class WorkletLoadInfo {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  nsCString mLanguage;",
+  "test": ""
+ },
+ {
+  "file": "dom/worklet/WorkletImpl.h",
+  "function": "class WorkletLoadInfo {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  nsString mTimezone;",
+  "test": ""
+ }
+]

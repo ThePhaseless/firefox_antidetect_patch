@@ -1,0 +1,513 @@
+[
+ {
+  "file": "dom/base/nsDOMWindowUtils.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "// STEALTH-HOOK(fingerprint/canvas/as-drawn)",
+  "test": ""
+ },
+ {
+  "file": "dom/base/nsDOMWindowUtils.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "#include \"StealthCanvasAsDrawn.h\"",
+  "test": ""
+ },
+ {
+  "file": "dom/base/nsDOMWindowUtils.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "// STEALTH-HOOK(fingerprint/input/event-birth)",
+  "test": ""
+ },
+ {
+  "file": "dom/base/nsDOMWindowUtils.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "#include \"StealthInputEventBirth.h\"",
+  "test": ""
+ },
+ {
+  "file": "dom/base/nsDOMWindowUtils.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "// STEALTH-HOOK(automation/input)",
+  "test": ""
+ },
+ {
+  "file": "dom/base/nsDOMWindowUtils.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "#include \"StealthJugglerInput.h\"",
+  "test": ""
+ },
+ {
+  "file": "dom/base/nsDOMWindowUtils.cpp",
+  "function": "nsDOMWindowUtils::SendWheelEvent(float aX, float aY, double aDeltaX,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "                                 nsISynthesizedEventCallback* aCallback,",
+  "removed": "                                 nsISynthesizedEventCallback* aCallback) {",
+  "test": ""
+ },
+ {
+  "file": "dom/base/nsDOMWindowUtils.cpp",
+  "function": "nsDOMWindowUtils::SendWheelEvent(float aX, float aY, double aDeltaX,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "                                 double aLatency) {",
+  "test": ""
+ },
+ {
+  "file": "dom/base/nsDOMWindowUtils.cpp",
+  "function": "nsDOMWindowUtils::SendWheelEvent(float aX, float aY, double aDeltaX,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/input/event-birth)",
+  "test": ""
+ },
+ {
+  "file": "dom/base/nsDOMWindowUtils.cpp",
+  "function": "nsDOMWindowUtils::SendWheelEvent(float aX, float aY, double aDeltaX,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  StealthSetInputEventBirth(wheelEvent, aLatency, GetDocument());",
+  "test": ""
+ },
+ {
+  "file": "dom/base/nsDOMWindowUtils.cpp",
+  "function": "nsDOMWindowUtils::NodesFromRect(float aX, float aY, float aTopSize,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/canvas/as-drawn)",
+  "removed": "  SurfaceFromElementResult result = nsLayoutUtils::SurfaceFromElement(aCanvas);",
+  "test": ""
+ },
+ {
+  "file": "dom/base/nsDOMWindowUtils.cpp",
+  "function": "nsDOMWindowUtils::NodesFromRect(float aX, float aY, float aTopSize,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  SurfaceFromElementResult result = StealthSurfaceFromCanvasAsDrawn(aCanvas);",
+  "test": ""
+ },
+ {
+  "file": "dom/events/EventStateManager.cpp",
+  "function": "void EventStateManager::BeginTrackingDragGesture(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  mGestureDownFromJuggler = aMouseDownOrTouchDragEvent.mJugglerEventId != 0;",
+  "test": ""
+ },
+ {
+  "file": "dom/events/EventStateManager.cpp",
+  "function": "void EventStateManager::GenerateDragGesture(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(automation/input): B288, see FEATURE.md",
+  "test": ""
+ },
+ {
+  "file": "dom/events/EventStateManager.cpp",
+  "function": "void EventStateManager::GenerateDragGesture(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (const WidgetMouseEvent* mouseEvent =",
+  "test": ""
+ },
+ {
+  "file": "dom/events/EventStateManager.cpp",
+  "function": "void EventStateManager::GenerateDragGesture(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "          aMouseOrTouchOrPointerEvent.AsMouseEvent()) {",
+  "test": ""
+ },
+ {
+  "file": "dom/events/EventStateManager.cpp",
+  "function": "void EventStateManager::GenerateDragGesture(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    if ((mouseEvent->mJugglerEventId != 0) != mGestureDownFromJuggler) {",
+  "test": ""
+ },
+ {
+  "file": "dom/events/EventStateManager.cpp",
+  "function": "void EventStateManager::GenerateDragGesture(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "      return;",
+  "test": ""
+ },
+ {
+  "file": "dom/events/EventStateManager.cpp",
+  "function": "void EventStateManager::GenerateDragGesture(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    }",
+  "test": ""
+ },
+ {
+  "file": "dom/events/EventStateManager.cpp",
+  "function": "void EventStateManager::GenerateDragGesture(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  }",
+  "test": ""
+ },
+ {
+  "file": "dom/events/EventStateManager.h",
+  "function": "class EventStateManager : public nsSupportsWeakReference, public nsIObserver {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // Stealthfox [B288]: whether the press that started the gesture came from",
+  "test": ""
+ },
+ {
+  "file": "dom/events/EventStateManager.h",
+  "function": "class EventStateManager : public nsSupportsWeakReference, public nsIObserver {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // Juggler (nsIDOMWindowUtils.jugglerSendMouseEvent). Only moves of the same",
+  "test": ""
+ },
+ {
+  "file": "dom/events/EventStateManager.h",
+  "function": "class EventStateManager : public nsSupportsWeakReference, public nsIObserver {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // origin continue it; see GenerateDragGesture.",
+  "test": ""
+ },
+ {
+  "file": "dom/events/EventStateManager.h",
+  "function": "class EventStateManager : public nsSupportsWeakReference, public nsIObserver {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  bool mGestureDownFromJuggler = false;",
+  "test": ""
+ },
+ {
+  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
+  "function": "interface nsIDOMWindowUtils : nsISupports {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "                      [optional] in nsISynthesizedEventCallback aCallback,",
+  "removed": "                      [optional] in nsISynthesizedEventCallback aCallback);",
+  "test": ""
+ },
+ {
+  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
+  "function": "interface nsIDOMWindowUtils : nsISupports {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "                      [optional] in double aLatency);",
+  "test": ""
+ },
+ {
+  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
+  "function": "interface nsIDOMWindowUtils : nsISupports {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  /** Playwright: synthetic mouse event, returns an event id; documented at JugglerSendMouseEvent in dom/base/StealthJugglerInput.h. */",
+  "test": ""
+ },
+ {
+  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
+  "function": "interface nsIDOMWindowUtils : nsISupports {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  [can_run_script]",
+  "test": ""
+ },
+ {
+  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
+  "function": "interface nsIDOMWindowUtils : nsISupports {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  unsigned long jugglerSendMouseEvent(in AString aType,",
+  "test": ""
+ },
+ {
+  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
+  "function": "interface nsIDOMWindowUtils : nsISupports {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "                         in float aX,",
+  "test": ""
+ },
+ {
+  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
+  "function": "interface nsIDOMWindowUtils : nsISupports {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "                         in float aY,",
+  "test": ""
+ },
+ {
+  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
+  "function": "interface nsIDOMWindowUtils : nsISupports {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "                         in long aButton,",
+  "test": ""
+ },
+ {
+  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
+  "function": "interface nsIDOMWindowUtils : nsISupports {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "                         in long aClickCount,",
+  "test": ""
+ },
+ {
+  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
+  "function": "interface nsIDOMWindowUtils : nsISupports {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "                         in long aModifiers,",
+  "test": ""
+ },
+ {
+  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
+  "function": "interface nsIDOMWindowUtils : nsISupports {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "                         in boolean aIgnoreRootScrollFrame,",
+  "test": ""
+ },
+ {
+  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
+  "function": "interface nsIDOMWindowUtils : nsISupports {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "                         in float aPressure,",
+  "test": ""
+ },
+ {
+  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
+  "function": "interface nsIDOMWindowUtils : nsISupports {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "                         in unsigned short aInputSourceArg,",
+  "test": ""
+ },
+ {
+  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
+  "function": "interface nsIDOMWindowUtils : nsISupports {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "                         in boolean aIsDOMEventSynthesized,",
+  "test": ""
+ },
+ {
+  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
+  "function": "interface nsIDOMWindowUtils : nsISupports {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "                         in boolean aIsWidgetEventSynthesized,",
+  "test": ""
+ },
+ {
+  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
+  "function": "interface nsIDOMWindowUtils : nsISupports {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "                         in long aButtons,",
+  "test": ""
+ },
+ {
+  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
+  "function": "interface nsIDOMWindowUtils : nsISupports {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "                         in unsigned long aIdentifier,",
+  "test": ""
+ },
+ {
+  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
+  "function": "interface nsIDOMWindowUtils : nsISupports {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "                         in double aLatency);",
+  "test": ""
+ },
+ {
+  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
+  "function": "interface nsIDOMWindowUtils : nsISupports {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  /** Stealthfox: synthetic DRAG event; documented at JugglerSendDragEvent in dom/base/StealthJugglerInput.h. */",
+  "test": ""
+ },
+ {
+  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
+  "function": "interface nsIDOMWindowUtils : nsISupports {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  [can_run_script]",
+  "test": ""
+ },
+ {
+  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
+  "function": "interface nsIDOMWindowUtils : nsISupports {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  void jugglerSendDragEvent(in AString aType,",
+  "test": ""
+ },
+ {
+  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
+  "function": "interface nsIDOMWindowUtils : nsISupports {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "                            in float aX,",
+  "test": ""
+ },
+ {
+  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
+  "function": "interface nsIDOMWindowUtils : nsISupports {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "                            in float aY,",
+  "test": ""
+ },
+ {
+  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
+  "function": "interface nsIDOMWindowUtils : nsISupports {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "                            in long aModifiers);",
+  "test": ""
+ },
+ {
+  "file": "dom/ipc/CoalescedMouseData.cpp",
+  "function": "void CoalescedMouseData::Coalesce(const WidgetMouseEvent& aMouseOrPointerEvent,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    // Stealthfox [B217]: the coalesced event acks the LAST id folded into it,",
+  "test": ""
+ },
+ {
+  "file": "dom/ipc/CoalescedMouseData.cpp",
+  "function": "void CoalescedMouseData::Coalesce(const WidgetMouseEvent& aMouseOrPointerEvent,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    // which is the one a caller waiting on \"has my move landed\" holds.",
+  "test": ""
+ },
+ {
+  "file": "dom/ipc/CoalescedMouseData.cpp",
+  "function": "void CoalescedMouseData::Coalesce(const WidgetMouseEvent& aMouseOrPointerEvent,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    mCoalescedInputEvent->mJugglerEventId =",
+  "test": ""
+ },
+ {
+  "file": "dom/ipc/CoalescedMouseData.cpp",
+  "function": "void CoalescedMouseData::Coalesce(const WidgetMouseEvent& aMouseOrPointerEvent,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        aMouseOrPointerEvent.mJugglerEventId;",
+  "test": ""
+ },
+ {
+  "file": "layout/base/PresShell.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthJugglerAck.h\"  // STEALTH-HOOK(automation/input)",
+  "test": ""
+ },
+ {
+  "file": "layout/base/PresShell.cpp",
+  "function": "nsresult PresShell::HandleEvent(nsIFrame* aFrameForPresShell,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(automation/input)",
+  "test": ""
+ },
+ {
+  "file": "layout/base/PresShell.cpp",
+  "function": "nsresult PresShell::HandleEvent(nsIFrame* aFrameForPresShell,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  StealthJugglerMouseAck jugglerMouseAck(aGUIEvent);",
+  "test": ""
+ },
+ {
+  "file": "widget/MouseEvents.h",
+  "function": "class WidgetMouseEventBase : public WidgetInputEvent {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(automation/input): B217, see FEATURE.md",
+  "test": ""
+ },
+ {
+  "file": "widget/MouseEvents.h",
+  "function": "class WidgetMouseEventBase : public WidgetInputEvent {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  uint32_t mJugglerEventId = 0;",
+  "test": ""
+ },
+ {
+  "file": "widget/MouseEvents.h",
+  "function": "class WidgetMouseEventBase : public WidgetInputEvent {",
+  "kind": "add",
+  "form": "member",
+  "line": "    mJugglerEventId = aEvent.mJugglerEventId;",
+  "test": ""
+ },
+ {
+  "file": "widget/nsGUIEventIPC.h",
+  "function": "struct ParamTraits<mozilla::WidgetMouseEventBase> {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "    WriteParam(aWriter, aParam.mJugglerEventId);",
+  "test": "",
+  "anchor": "",
+  "why": ""
+ },
+ {
+  "file": "widget/nsGUIEventIPC.h",
+  "function": "struct ParamTraits<mozilla::WidgetMouseEventBase> {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "           ReadParam(aReader, &aResult->mInputSource) &&",
+  "removed": "           ReadParam(aReader, &aResult->mInputSource);",
+  "test": ""
+ },
+ {
+  "file": "widget/nsGUIEventIPC.h",
+  "function": "struct ParamTraits<mozilla::WidgetMouseEventBase> {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "           ReadParam(aReader, &aResult->mJugglerEventId);",
+  "test": ""
+ },
+ {
+  "file": "xpcom/reflect/xptinfo/xptinfo.h",
+  "function": "static_assert(sizeof(nsXPTMethodInfo) == 8, \"wrong size\");",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "// Stealthfox: bumped 14 -> 15 for jugglerSendMouseEvent (15 args).",
+  "removed": "#  define PARAM_BUFFER_COUNT 14",
+  "test": ""
+ },
+ {
+  "file": "xpcom/reflect/xptinfo/xptinfo.h",
+  "function": "static_assert(sizeof(nsXPTMethodInfo) == 8, \"wrong size\");",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "#  define PARAM_BUFFER_COUNT 15",
+  "test": ""
+ }
+]

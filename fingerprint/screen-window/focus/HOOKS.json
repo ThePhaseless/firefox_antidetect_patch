@@ -1,0 +1,98 @@
+[
+ {
+  "file": "xpfe/appshell/AppWindow.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/StaticPrefs_zoom.h\"",
+  "test": ""
+ },
+ {
+  "file": "xpfe/appshell/AppWindow.cpp",
+  "function": "void AppWindow::WindowActivated() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        // STEALTH-HOOK(fingerprint/screen-window/focus)",
+  "test": ""
+ },
+ {
+  "file": "xpfe/appshell/AppWindow.cpp",
+  "function": "void AppWindow::WindowActivated() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        if (StaticPrefs::zoom_stealth_focus_ignore_os_deactivation()) {",
+  "test": ""
+ },
+ {
+  "file": "xpfe/appshell/AppWindow.cpp",
+  "function": "void AppWindow::WindowActivated() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "          nsCOMPtr<nsPIDOMWindowOuter> active = fm->GetActiveWindow();",
+  "test": ""
+ },
+ {
+  "file": "xpfe/appshell/AppWindow.cpp",
+  "function": "void AppWindow::WindowActivated() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "          if (active && active != window) {",
+  "test": ""
+ },
+ {
+  "file": "xpfe/appshell/AppWindow.cpp",
+  "function": "void AppWindow::WindowActivated() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "            fm->WindowLowered(active, nsFocusManager::GenerateFocusActionId());",
+  "test": ""
+ },
+ {
+  "file": "xpfe/appshell/AppWindow.cpp",
+  "function": "void AppWindow::WindowActivated() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "          }",
+  "test": ""
+ },
+ {
+  "file": "xpfe/appshell/AppWindow.cpp",
+  "function": "void AppWindow::WindowActivated() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        }",
+  "test": ""
+ },
+ {
+  "file": "xpfe/appshell/AppWindow.cpp",
+  "function": "void AppWindow::WindowActivated() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/screen-window/focus)",
+  "test": ""
+ },
+ {
+  "file": "xpfe/appshell/AppWindow.cpp",
+  "function": "void AppWindow::WindowActivated() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (StaticPrefs::zoom_stealth_focus_ignore_os_deactivation()) {",
+  "test": ""
+ },
+ {
+  "file": "xpfe/appshell/AppWindow.cpp",
+  "function": "void AppWindow::WindowActivated() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    return;",
+  "test": ""
+ },
+ {
+  "file": "xpfe/appshell/AppWindow.cpp",
+  "function": "void AppWindow::WindowActivated() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  }",
+  "test": ""
+ }
+]

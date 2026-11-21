@@ -1,0 +1,50 @@
+[
+ {
+  "file": "dom/workers/WorkerNavigator.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/StaticPrefs_zoom.h\"",
+  "test": ""
+ },
+ {
+  "file": "dom/workers/WorkerNavigator.cpp",
+  "function": "void WorkerNavigator::GetUserAgent(nsCString& aUserAgent,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/hardware/concurrency)",
+  "test": ""
+ },
+ {
+  "file": "dom/workers/WorkerNavigator.cpp",
+  "function": "void WorkerNavigator::GetUserAgent(nsCString& aUserAgent,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  {",
+  "test": ""
+ },
+ {
+  "file": "dom/workers/WorkerNavigator.cpp",
+  "function": "void WorkerNavigator::GetUserAgent(nsCString& aUserAgent,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    int32_t hwc = mozilla::StaticPrefs::zoom_stealth_hw_concurrency();",
+  "test": ""
+ },
+ {
+  "file": "dom/workers/WorkerNavigator.cpp",
+  "function": "void WorkerNavigator::GetUserAgent(nsCString& aUserAgent,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    if (hwc > 0) return uint64_t(hwc);",
+  "test": ""
+ },
+ {
+  "file": "dom/workers/WorkerNavigator.cpp",
+  "function": "void WorkerNavigator::GetUserAgent(nsCString& aUserAgent,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  }",
+  "test": ""
+ }
+]

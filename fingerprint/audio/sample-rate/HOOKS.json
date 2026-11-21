@@ -1,0 +1,50 @@
+[
+ {
+  "file": "dom/media/CubebUtils.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/StaticPrefs_zoom.h\"",
+  "test": ""
+ },
+ {
+  "file": "dom/media/CubebUtils.cpp",
+  "function": "uint32_t PreferredSampleRate(bool aShouldResistFingerprinting) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/audio/sample-rate)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/CubebUtils.cpp",
+  "function": "uint32_t PreferredSampleRate(bool aShouldResistFingerprinting) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  {",
+  "test": ""
+ },
+ {
+  "file": "dom/media/CubebUtils.cpp",
+  "function": "uint32_t PreferredSampleRate(bool aShouldResistFingerprinting) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    int32_t rate = mozilla::StaticPrefs::zoom_stealth_audio_sample_rate();",
+  "test": ""
+ },
+ {
+  "file": "dom/media/CubebUtils.cpp",
+  "function": "uint32_t PreferredSampleRate(bool aShouldResistFingerprinting) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    if (rate > 0) return (uint32_t)rate;",
+  "test": ""
+ },
+ {
+  "file": "dom/media/CubebUtils.cpp",
+  "function": "uint32_t PreferredSampleRate(bool aShouldResistFingerprinting) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  }",
+  "test": ""
+ }
+]

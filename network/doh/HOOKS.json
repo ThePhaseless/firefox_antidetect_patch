@@ -1,0 +1,456 @@
+[
+ {
+  "file": "dom/media/webrtc/jsapi/MediaTransportHandler.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"transport/StealthIceResolverContext.h\"  // STEALTH-HOOK(network/doh)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/jsapi/MediaTransportHandler.cpp",
+  "function": "void MediaTransportImplNicer::SetProxyConfig(",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  mDNSResolver->SetOriginAttributes(StealthIceResolverAttributes(aProxyConfig));  // STEALTH-HOOK(network/doh)",
+  "test": "",
+  "anchor": "",
+  "why": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/nriceresolver.cpp",
+  "function": "int NrIceResolver::resolve(nr_resolver_resource* resource,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  OriginAttributes attrs = mAttrs;  // STEALTH-HOOK(network/doh)",
+  "removed": "  OriginAttributes attrs;",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/nriceresolver.h",
+  "function": "OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthIceResolverContext.h\"  // STEALTH-HOOK(network/doh)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/nriceresolver.h",
+  "function": "class NrIceResolver {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  void SetOriginAttributes(const OriginAttributes& aAttrs) { mAttrs = aAttrs; }  // STEALTH-HOOK(network/doh)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/nriceresolver.h",
+  "function": "class NrIceResolver {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  const OriginAttributes& GetOriginAttributes() const { return mAttrs; }  // STEALTH-HOOK(network/doh)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/nriceresolver.h",
+  "function": "class NrIceResolver {",
+  "kind": "add",
+  "form": "member",
+  "line": "  OriginAttributes mAttrs;  // STEALTH-HOOK(network/doh)",
+  "test": ""
+ },
+ {
+  "file": "netwerk/dns/TRR.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/net/StealthTRRContext.h\"  // STEALTH-HOOK(network/doh)",
+  "test": ""
+ },
+ {
+  "file": "netwerk/dns/TRR.cpp",
+  "function": "nsresult TRR::SendHTTPRequest() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  rv = StealthApplyTRRContextToChannel(channel, StealthTRRContextOfSuffix(mOriginSuffix));  // STEALTH-HOOK(network/doh)",
+  "test": ""
+ },
+ {
+  "file": "netwerk/dns/TRR.cpp",
+  "function": "nsresult TRR::SendHTTPRequest() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  NS_ENSURE_SUCCESS(rv, rv);  // STEALTH-HOOK(network/doh)",
+  "test": ""
+ },
+ {
+  "file": "netwerk/dns/TRR.cpp",
+  "function": "nsresult TRR::SendHTTPRequest() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "      StaticPrefs::network_trr_async_connInfo() && StealthTRRContextOfSuffix(mOriginSuffix).isNothing()) {  // STEALTH-HOOK(network/doh)",
+  "removed": "      StaticPrefs::network_trr_async_connInfo()) {",
+  "test": ""
+ },
+ {
+  "file": "netwerk/dns/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"StealthSessionResolver.cpp\"]  # STEALTH-HOOK(network/doh)",
+  "test": ""
+ },
+ {
+  "file": "netwerk/dns/nsHostResolver.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthSessionResolver.h\"  // STEALTH-HOOK(network/doh)",
+  "test": ""
+ },
+ {
+  "file": "netwerk/dns/nsHostResolver.cpp",
+  "function": "nsresult nsHostResolver::ResolveHost(const nsACString& aHost,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(network/doh): the lookup resolves by the proxy of its context.",
+  "test": ""
+ },
+ {
+  "file": "netwerk/dns/nsHostResolver.cpp",
+  "function": "nsresult nsHostResolver::ResolveHost(const nsACString& aHost,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  flags = StealthFlagsFollowSession(aHost, aOriginAttributes, flags);",
+  "test": ""
+ },
+ {
+  "file": "netwerk/dns/nsHostResolver.cpp",
+  "function": "void nsHostResolver::DetachCallback(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  flags = StealthFlagsFollowSession(host, aOriginAttributes,",
+  "test": ""
+ },
+ {
+  "file": "netwerk/dns/nsHostResolver.cpp",
+  "function": "void nsHostResolver::DetachCallback(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "                                    flags);  // STEALTH-HOOK(network/doh)",
+  "test": ""
+ },
+ {
+  "file": "netwerk/protocol/http/TLSTransportLayer.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/net/StealthTRRContext.h\"  // STEALTH-HOOK(network/doh)",
+  "test": ""
+ },
+ {
+  "file": "netwerk/protocol/http/TLSTransportLayer.cpp",
+  "function": "bool TLSTransportLayer::Init(const char* aTLSHost, int32_t aTLSPort) {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "      PR_AF_INET, aTLSHost, aTLSPort, nullptr, StealthTransportContext(mSocketTransport), 0, 0, mFD,  // STEALTH-HOOK(network/doh)",
+  "removed": "      PR_AF_INET, aTLSHost, aTLSPort, nullptr, OriginAttributes(), 0, 0, mFD,",
+  "test": ""
+ },
+ {
+  "file": "netwerk/protocol/http/TRRServiceChannel.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/net/StealthTRRContext.h\"  // STEALTH-HOOK(network/doh)",
+  "test": ""
+ },
+ {
+  "file": "netwerk/protocol/http/TRRServiceChannel.cpp",
+  "function": "nsresult TRRServiceChannel::MaybeResolveProxyAndBeginConnect() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  nsresult proxyRv = NS_OK;  // STEALTH-HOOK(network/doh)",
+  "test": ""
+ },
+ {
+  "file": "netwerk/protocol/http/TRRServiceChannel.cpp",
+  "function": "nsresult TRRServiceChannel::MaybeResolveProxyAndBeginConnect() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "      NS_SUCCEEDED(proxyRv = ResolveProxy())) {  // STEALTH-HOOK(network/doh)",
+  "removed": "      NS_SUCCEEDED(ResolveProxy())) {",
+  "test": ""
+ },
+ {
+  "file": "netwerk/protocol/http/TRRServiceChannel.cpp",
+  "function": "nsresult TRRServiceChannel::MaybeResolveProxyAndBeginConnect() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (StealthTRRServiceFailClosed(this, proxyRv, false)) { return NS_OK; }  // STEALTH-HOOK(network/doh)",
+  "test": ""
+ },
+ {
+  "file": "netwerk/protocol/http/TRRServiceChannel.cpp",
+  "function": "nsresult TRRServiceChannel::ResolveProxy() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "      getter_AddRefs(proxyRequest), Nothing(), StealthTRRContextOfLoadInfo(mLoadInfo));  // STEALTH-HOOK(network/doh)",
+  "removed": "      getter_AddRefs(proxyRequest));",
+  "test": ""
+ },
+ {
+  "file": "netwerk/protocol/http/TRRServiceChannel.cpp",
+  "function": "TRRServiceChannel::OnProxyAvailable(nsICancelable* request, nsIChannel* channel,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (StealthTRRServiceFailClosed(this, StealthTRRProxyAnswer(status, pi, true), mCanceled)) { return NS_OK; }  // STEALTH-HOOK(network/doh)",
+  "test": ""
+ },
+ {
+  "file": "netwerk/protocol/http/TRRServiceChannel.cpp",
+  "function": "nsresult TRRServiceChannel::BeginConnect() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  OriginAttributes stealthAttrs = StealthTRRContextOfLoadInfo(mLoadInfo).valueOr(OriginAttributes());  // STEALTH-HOOK(network/doh)",
+  "test": ""
+ },
+ {
+  "file": "netwerk/protocol/http/TRRServiceChannel.cpp",
+  "function": "nsresult TRRServiceChannel::BeginConnect() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "      host, port, \"\"_ns, mUsername, proxyInfo, stealthAttrs, isHttps);  // STEALTH-HOOK(network/doh)",
+  "removed": "      host, port, \"\"_ns, mUsername, proxyInfo, OriginAttributes(), isHttps);",
+  "test": ""
+ },
+ {
+  "file": "netwerk/protocol/http/TRRServiceChannel.cpp",
+  "function": "nsresult TRRServiceChannel::BeginConnect() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "                               stealthAttrs);  // STEALTH-HOOK(network/doh)",
+  "removed": "                               OriginAttributes());",
+  "test": ""
+ },
+ {
+  "file": "netwerk/protocol/http/nsHttpChannel.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/net/StealthTRRContext.h\"  // STEALTH-HOOK(network/doh)",
+  "test": ""
+ },
+ {
+  "file": "netwerk/protocol/http/nsHttpChannel.cpp",
+  "function": "void nsHttpChannel::AsyncOpenFinal(TimeStamp aTimeStamp) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  nsresult proxyRv = NS_OK;  // STEALTH-HOOK(network/doh)",
+  "test": ""
+ },
+ {
+  "file": "netwerk/protocol/http/nsHttpChannel.cpp",
+  "function": "void nsHttpChannel::MaybeResolveProxyAndBeginConnect() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "    } else if (NS_SUCCEEDED(proxyRv = ResolveProxy())) {  // STEALTH-HOOK(network/doh)",
+  "removed": "    } else if (NS_SUCCEEDED(ResolveProxy())) {",
+  "test": ""
+ },
+ {
+  "file": "netwerk/protocol/http/nsHttpChannel.cpp",
+  "function": "void nsHttpChannel::MaybeResolveProxyAndBeginConnect() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (StealthTRRFailClosed(this, proxyRv, StealthProxyIsMandatory(LoadIsTRRServiceChannel(), mLoadInfo.get()), mCanceled)) { return; }  // STEALTH-HOOK(network/doh)",
+  "test": ""
+ },
+ {
+  "file": "netwerk/protocol/http/nsHttpChannel.cpp",
+  "function": "nsHttpChannel::OnProxyAvailable(nsICancelable* request, nsIChannel* channel,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (StealthTRRFailClosed(this, StealthTRRProxyAnswer(status, pi, LoadIsTRRServiceChannel()), StealthProxyIsMandatory(LoadIsTRRServiceChannel(), mLoadInfo.get()), mCanceled)) { return NS_OK; }  // STEALTH-HOOK(network/doh)",
+  "test": ""
+ },
+ {
+  "file": "security/manager/ssl/nsNSSCallbacks.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/net/StealthTRRContext.h\"  // STEALTH-HOOK(network/doh)",
+  "test": ""
+ },
+ {
+  "file": "security/manager/ssl/nsNSSCallbacks.cpp",
+  "function": "OCSPRequest::Run() {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "    mozilla::net::StealthKeepRequestContext(mOriginAttributes, attrs);  // STEALTH-HOOK(network/doh)",
+  "test": "",
+  "anchor": "",
+  "why": ""
+ },
+ {
+  "file": "toolkit/components/parentalcontrols/nsParentalControlsServiceDefault.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthParentalControls.h\"  // STEALTH-HOOK(network/doh)",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/parentalcontrols/nsParentalControlsServiceDefault.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (StealthParentalControlsDeclared(&mEnabled)) { return; }  // STEALTH-HOOK(network/doh)",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/parentalcontrols/nsParentalControlsServiceWin.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthParentalControls.h\"  // STEALTH-HOOK(network/doh)",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/parentalcontrols/nsParentalControlsServiceWin.cpp",
+  "function": "static nsAutoString GetUserSid() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (StealthParentalControlsDeclared(&mEnabled)) { return; }  // STEALTH-HOOK(network/doh)",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/url-classifier/UrlClassifierHashCompleter.sys.mjs",
+  "function": "const PREF_DEBUG_ENABLED = \"browser.safebrowsing.debug\";",
+  "kind": "add",
+  "form": "unknown",
+  "line": "// STEALTH-HOOK(network/doh)",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/url-classifier/UrlClassifierHashCompleter.sys.mjs",
+  "function": "const PREF_DEBUG_ENABLED = \"browser.safebrowsing.debug\";",
+  "kind": "add",
+  "form": "unknown",
+  "line": "import {",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/url-classifier/UrlClassifierHashCompleter.sys.mjs",
+  "function": "const PREF_DEBUG_ENABLED = \"browser.safebrowsing.debug\";",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  stealthApplyContext,",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/url-classifier/UrlClassifierHashCompleter.sys.mjs",
+  "function": "const PREF_DEBUG_ENABLED = \"browser.safebrowsing.debug\";",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  stealthCompleteInContext,",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/url-classifier/UrlClassifierHashCompleter.sys.mjs",
+  "function": "const PREF_DEBUG_ENABLED = \"browser.safebrowsing.debug\";",
+  "kind": "add",
+  "form": "unknown",
+  "line": "} from \"resource://gre/modules/StealthHashCompleterContext.sys.mjs\";",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/url-classifier/UrlClassifierHashCompleter.sys.mjs",
+  "function": "export class HashCompleter {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    if (stealthCompleteInContext(this, aPartialHash, aGethashUrl, aTableName, aCallback)) { return; }  // STEALTH-HOOK(network/doh)",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/url-classifier/UrlClassifierHashCompleter.sys.mjs",
+  "function": "class HashCompleterRequestBase {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "    stealthApplyContext(channel, this.completer);  // STEALTH-HOOK(network/doh)",
+  "test": "",
+  "anchor": "",
+  "why": ""
+ },
+ {
+  "file": "toolkit/components/url-classifier/moz.build",
+  "function": "SOURCES += [",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    \"StealthHashCompleterContext.sys.mjs\",  # STEALTH-HOOK(network/doh)",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/url-classifier/nsIUrlClassifierHashCompleter.idl",
+  "function": "interface nsIUrlClassifierHashCompleterCallback : nsISupports",
+  "kind": "add",
+  "form": "member",
+  "line": "  readonly attribute uint32_t userContextId;  // STEALTH-HOOK(network/doh)",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/url-classifier/nsUrlClassifierDBService.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/net/StealthTRRContext.h\"  // STEALTH-HOOK(network/doh)",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/url-classifier/nsUrlClassifierDBService.cpp",
+  "function": "class nsUrlClassifierHashCompleterBase",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  uint32_t mStealthUserContextId = mozilla::net::StealthCurrentLookupContext();  // STEALTH-HOOK(network/doh)",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/url-classifier/nsUrlClassifierDBService.cpp",
+  "function": "class nsUrlClassifierHashCompleterBase",
+  "kind": "add",
+  "form": "unknown",
+  "line": "NS_IMETHODIMP nsUrlClassifierHashCompleterBase::GetUserContextId(uint32_t* aId) { return mozilla::net::StealthLookupContextOut(mStealthUserContextId, aId); }  // STEALTH-HOOK(network/doh)",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/url-classifier/nsUrlClassifierDBService.cpp",
+  "function": "nsUrlClassifierDBService::Classify(nsIPrincipal* aPrincipal,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  mozilla::net::StealthLookupContextScope stealthScope(aPrincipal);  // STEALTH-HOOK(network/doh)",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/url-classifier/tests/unit/xpcshell.toml",
+  "function": "tags = \"remote-settings\"",
+  "kind": "add",
+  "form": "unknown",
+  "line": "[\"test_stealth_hashcompleter_context.js\"]  # STEALTH-HOOK(network/doh)",
+  "test": ""
+ },
+ {
+  "file": "toolkit/profile/nsProfileLock.cpp",
+  "function": "nsresult nsProfileLock::LockWithSymlink(nsIFile* aLockFile,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "#    if 0  // STEALTH-HOOK(network/doh): the host's own name is never looked up; the signature keeps 127.0.0.1",
+  "test": ""
+ },
+ {
+  "file": "toolkit/profile/nsProfileLock.cpp",
+  "function": "nsresult nsProfileLock::LockWithSymlink(nsIFile* aLockFile,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "#    endif  // STEALTH-HOOK(network/doh)",
+  "test": ""
+ }
+]

@@ -1,0 +1,725 @@
+[
+ {
+  "file": "dom/media/webrtc/transport/build/moz.build",
+  "function": "EXPORTS.transport += [",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    \"../nr_stealth_network.h\",  # STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/common.build",
+  "function": "transport_lcppsrcs = [",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    \"nr_stealth_network.cpp\",",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/common.build",
+  "function": "transport_lcppsrcs = [",
+  "kind": "add",
+  "form": "registration",
+  "line": "transport_lcppsrcs += [\"StealthIceResolverContext.cpp\"]  # STEALTH-HOOK(network/doh)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/ipc/StunAddrsRequestParent.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"transport/nr_stealth_network.h\"  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/ipc/StunAddrsRequestParent.cpp",
+  "function": "void StunAddrsRequestParent::SendStunAddrs(const NrIceStunAddrArray& addrs) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/webrtc/declared-network): the responder joins the mDNS group on the loopback and",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/ipc/StunAddrsRequestParent.cpp",
+  "function": "void StunAddrsRequestParent::SendStunAddrs(const NrIceStunAddrArray& addrs) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // speaks through it, not on the adapters of the list: the list is the declaration, whose address the OS does",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/ipc/StunAddrsRequestParent.cpp",
+  "function": "void StunAddrsRequestParent::SendStunAddrs(const NrIceStunAddrArray& addrs) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // not own (a join on it fails, and the responder would never hear its own query). On the loopback the query",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/ipc/StunAddrsRequestParent.cpp",
+  "function": "void StunAddrsRequestParent::SendStunAddrs(const NrIceStunAddrArray& addrs) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // and the answer make the same round trip through the responder's thread as on a real adapter.",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/ipc/StunAddrsRequestParent.cpp",
+  "function": "void StunAddrsRequestParent::SendStunAddrs(const NrIceStunAddrArray& addrs) {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "    (void)MDNSServiceWrapper::EnsureInstance(nr_stealth_mdns_interfaces());",
+  "removed": "    std::ostringstream o;\n    char buffer[16];\n    for (auto& addr : addrs) {\n      nr_local_addr localAddr;\n      addr.toNrLocalAddr(localAddr);\n      if (localAddr.addr.ip_version == NR_IPV4 &&\n          !nr_transport_addr_is_loopback(&localAddr.addr)) {\n        nr_transport_addr_get_addrstring(&localAddr.addr, buffer, 16);\n        o << buffer << \";\";\n      }\n    }\n    std::string addrstring = o.str();\n    if (!addrstring.empty()) {\n      (void)MDNSServiceWrapper::EnsureInstance(addrstring);\n    }",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
+  "function": "impl MDNSService {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "        for addr in &addrs {",
+  "removed": "        for addr in addrs {",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
+  "function": "impl MDNSService {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "            if let Err(err) = socket.join_multicast_v4(&mdns_addr, addr) {",
+  "removed": "            if let Err(err) = socket.join_multicast_v4(&mdns_addr, &addr) {",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
+  "function": "impl MDNSService {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        // STEALTH-HOOK(fingerprint/webrtc/declared-network): the parent gives the loopback",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
+  "function": "impl MDNSService {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        // (nr_stealth_mdns_interfaces). The responder speaks through the interface it joined on, or a query",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
+  "function": "impl MDNSService {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        // would leave on the default multicast route and never come back to this socket: on Linux a join on",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
+  "function": "impl MDNSService {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        // 127.0.0.1 hears nothing without it (captures/mdns-loopback/loopback-join of invisible_WebRTC).",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
+  "function": "impl MDNSService {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        if let Some(addr) = addrs.first() {",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
+  "function": "impl MDNSService {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "            if let Err(err) = socket2::SockRef::from(&socket).set_multicast_if_v4(addr) {",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
+  "function": "impl MDNSService {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "                warn!(\"Could not send multicast through interface: {:?}: {}\", addr, err);",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
+  "function": "impl MDNSService {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "            }",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
+  "function": "impl MDNSService {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        }",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/moz.build",
+  "function": "include(\"/tools/fuzzing/libfuzzer-config.mozbuild\")",
+  "kind": "add",
+  "form": "registration",
+  "line": "TEST_DIRS += [\"test/gtest\"]  # STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/nricectx.cpp",
+  "function": "OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/RandomNum.h\"  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/nricectx.cpp",
+  "function": "NrIceCtx::NrIceCtx(const std::string& name)",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "      proxy_config_(nullptr),",
+  "removed": "      proxy_config_(nullptr) {}",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/nricectx.cpp",
+  "function": "NrIceCtx::NrIceCtx(const std::string& name)",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "      host_ports_(mozilla::RandomUint64OrDie()) {}  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/nricectx.cpp",
+  "function": "int nr_socket_local_create(void* obj, nr_transport_addr* addr,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/webrtc/declared-network): a host UDP socket of a declared address takes the next port",
+  "removed": "  r = NrSocketBase::CreateSocket(addr, &sock, config);",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/nricectx.cpp",
+  "function": "int nr_socket_local_create(void* obj, nr_transport_addr* addr,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  // of its connection (R3); a busy one is skipped (R_ALREADY from NrSocket::create), as the kernel skips it.",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/nricectx.cpp",
+  "function": "int nr_socket_local_create(void* obj, nr_transport_addr* addr,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  if (obj && addr->protocol == IPPROTO_UDP && !nr_stealth_addr_is_wildcard_ip(addr) &&",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/nricectx.cpp",
+  "function": "int nr_socket_local_create(void* obj, nr_transport_addr* addr,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "      !nr_transport_addr_is_loopback(addr)) {",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/nricectx.cpp",
+  "function": "int nr_socket_local_create(void* obj, nr_transport_addr* addr,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "    nr_transport_addr chosen;",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/nricectx.cpp",
+  "function": "int nr_socket_local_create(void* obj, nr_transport_addr* addr,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "    r = R_ALREADY;",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/nricectx.cpp",
+  "function": "int nr_socket_local_create(void* obj, nr_transport_addr* addr,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "    bool internal_error = false;",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/nricectx.cpp",
+  "function": "int nr_socket_local_create(void* obj, nr_transport_addr* addr,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "    static_cast<NrIceCtx*>(obj)->TakeHostPort([&](uint16_t port) {",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/nricectx.cpp",
+  "function": "int nr_socket_local_create(void* obj, nr_transport_addr* addr,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "      if (nr_transport_addr_copy(&chosen, addr) || nr_transport_addr_set_port(&chosen, port)) {",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/nricectx.cpp",
+  "function": "int nr_socket_local_create(void* obj, nr_transport_addr* addr,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "        internal_error = true;",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/nricectx.cpp",
+  "function": "int nr_socket_local_create(void* obj, nr_transport_addr* addr,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "        return true;",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/nricectx.cpp",
+  "function": "int nr_socket_local_create(void* obj, nr_transport_addr* addr,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "      }",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/nricectx.cpp",
+  "function": "int nr_socket_local_create(void* obj, nr_transport_addr* addr,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "      r = NrSocketBase::CreateSocket(&chosen, &sock, config);",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/nricectx.cpp",
+  "function": "int nr_socket_local_create(void* obj, nr_transport_addr* addr,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "      return r != R_ALREADY;",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/nricectx.cpp",
+  "function": "int nr_socket_local_create(void* obj, nr_transport_addr* addr,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "    });",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/nricectx.cpp",
+  "function": "int nr_socket_local_create(void* obj, nr_transport_addr* addr,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "    if (internal_error) ABORT(R_INTERNAL);",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/nricectx.cpp",
+  "function": "int nr_socket_local_create(void* obj, nr_transport_addr* addr,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  } else {",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/nricectx.cpp",
+  "function": "int nr_socket_local_create(void* obj, nr_transport_addr* addr,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "    r = NrSocketBase::CreateSocket(addr, &sock, config);",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/nricectx.cpp",
+  "function": "int nr_socket_local_create(void* obj, nr_transport_addr* addr,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  }",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/nricectx.h",
+  "function": "OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"nr_stealth_network.h\"  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/nricectx.h",
+  "function": "class NrIceCtx {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/webrtc/declared-network): the next host UDP port of this connection (R3,",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/nricectx.h",
+  "function": "class NrIceCtx {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // nr_stealth_network.h StealthHostPorts).",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/nricectx.h",
+  "function": "class NrIceCtx {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  template <typename F>",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/nricectx.h",
+  "function": "class NrIceCtx {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  uint16_t TakeHostPort(F aTry) {",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/nricectx.h",
+  "function": "class NrIceCtx {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    return host_ports_.NextAvailable(aTry);",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/nricectx.h",
+  "function": "class NrIceCtx {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  }",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/nricectx.h",
+  "function": "class NrIceCtx {",
+  "kind": "add",
+  "form": "member",
+  "line": "  StealthHostPorts host_ports_;  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/test/gtest_utils.h",
+  "function": "class MtransportTest : public ::testing::Test {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    // STEALTH-HOOK(fingerprint/webrtc/declared-network): the interfaces are declared, never read from the host",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/test/gtest_utils.h",
+  "function": "class MtransportTest : public ::testing::Test {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    // (nr_stealth_network.h). These tests gather on the declared adapter, as the browser does.",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/test/gtest_utils.h",
+  "function": "class MtransportTest : public ::testing::Test {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    std::string declared;",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/test/gtest_utils.h",
+  "function": "class MtransportTest : public ::testing::Test {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    GetEnvironment(\"STEALTHFOX_WEBRTC_NETWORK\", declared);",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/test/gtest_utils.h",
+  "function": "class MtransportTest : public ::testing::Test {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    if (declared.empty()) {",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/test/gtest_utils.h",
+  "function": "class MtransportTest : public ::testing::Test {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "      setenv(\"STEALTHFOX_WEBRTC_NETWORK\", \"v4=192.168.10.20;v6=0;p6=\", 1);",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/test/gtest_utils.h",
+  "function": "class MtransportTest : public ::testing::Test {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    }",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/third_party/nICEr/moz.yaml",
+  "function": "vendoring:",
+  "kind": "delete",
+  "form": "unknown",
+  "line": "",
+  "removed": "    - src/stun/addrs-bsd.c\n    - src/stun/addrs-bsd.h\n    - src/stun/addrs-netlink.c\n    - src/stun/addrs-netlink.h\n    - src/stun/addrs-win32.c\n    - src/stun/addrs-win32.h",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/third_party/nICEr/nicer.gyp",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "              # transport dir — for nr_stealth_network.h",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/third_party/nICEr/nicer.gyp",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "              '../..',",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/third_party/nICEr/nicer.gyp",
+  "function": "",
+  "kind": "delete",
+  "form": "unknown",
+  "line": "",
+  "removed": "                \"./src/stun/addrs-bsd.cpp\",\n                \"./src/stun/addrs-bsd.h\",\n                \"./src/stun/addrs-netlink.cpp\",\n                \"./src/stun/addrs-netlink.h\",\n                \"./src/stun/addrs-netlink-wireless.cpp\",\n                \"./src/stun/addrs-win32.cpp\",\n                \"./src/stun/addrs-win32.h\",",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/third_party/nICEr/src/ice/ice_ctx.cpp",
+  "function": "OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"nr_stealth_network.h\"  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/third_party/nICEr/src/ice/ice_ctx.cpp",
+  "function": "static int nr_ice_ctx_pair_new_trickle_candidates(nr_ice_ctx *ctx, nr_ice_candid",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "/* STEALTH-HOOK(fingerprint/webrtc/declared-network): the default address of a family is the declared",
+  "removed": "/* Get the default address by creating a UDP socket, binding it to a wildcard\n   address, and connecting it to the remote IP. Because this is UDP, no packets\n   are sent. This lets us query the local address assigned to the socket by the\n   kernel.\n\n   If the context's remote address is NULL, then the application wasn't loaded\n   over the network, and we can fall back on connecting to a known public\n   address (namely Google's):\n\n   IPv4: 8.8.8.8\n   IPv6: 2001:4860:4860::8888\n*/\nstatic int nr_ice_get_default_address(nr_ice_ctx *ctx, int ip_version, nr_transport_addr* addrp)\n  {\n    int r,_status;\n    nr_transport_addr addr, known_remote_addr;\n    nr_transport_addr *remote_addr=ctx->target_for_default_local_address_lookup;\n    nr_socket *sock=0;\n\n    switch(ip_version) {\n      case NR_IPV4:\n        if ((r=nr_str_port_to_transport_addr(\"0.0.0.0\", nullptr, 0, IPPROTO_UDP, &addr)))\n          ABORT(r);\n        if (!remote_addr || nr_transport_addr_is_loopback(remote_addr)) {\n          if ((r=nr_str_port_to_transport_addr(\"8.8.8.8\", nullptr, 53, IPPROTO_UDP, &known_remote_addr)))\n            ABORT(r);\n          remote_addr=&known_remote_addr;\n        }\n        break;\n      case NR_IPV6:\n        if ((r=nr_str_port_to_transport_addr(\"::0\", nullptr, 0, IPPROTO_UDP, &addr)))\n          ABORT(r);\n        if (!remote_addr || nr_transport_addr_is_loopback(remote_addr)) {\n          if ((r=nr_str_port_to_transport_addr(\"2001:4860:4860::8888\", nullptr, 53, IPPROTO_UDP, &known_remote_addr)))\n            ABORT(r);\n          remote_addr=&known_remote_addr;\n        }\n        break;\n      default:\n        assert(0);\n        ABORT(R_INTERNAL);\n    }\n\n    if ((r=nr_socket_factory_create_socket(ctx->socket_factory, &addr, &sock)))\n      ABORT(r);\n    if ((r=nr_socket_connect(sock, remote_addr)))\n      ABORT(r);\n    if ((r=nr_socket_getaddr(sock, addrp)))\n      ABORT(r);\n\n    r_log(LOG_GENERIC, LOG_DEBUG, \"Default address: %s\", addrp->as_string);\n\n    _status=0;\n  abort:\n    nr_socket_destroy(&sock);\n    return(_status);\n  }\n",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/third_party/nICEr/src/ice/ice_ctx.cpp",
+  "function": "static int nr_ice_ctx_pair_new_trickle_candidates(nr_ice_ctx *ctx, nr_ice_candid",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "   address of that family (nr_stealth_network.h), found in the list the parent sent, which is the",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/third_party/nICEr/src/ice/ice_ctx.cpp",
+  "function": "static int nr_ice_ctx_pair_new_trickle_candidates(nr_ice_ctx *ctx, nr_ice_candid",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "   declaration. There is no route probe: no socket is connected and getsockname() is not read, so nothing of",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/third_party/nICEr/src/ice/ice_ctx.cpp",
+  "function": "static int nr_ice_ctx_pair_new_trickle_candidates(nr_ice_ctx *ctx, nr_ice_candid",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "   the host's routing reaches the candidates. A family the declaration does not have has no default address,",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/third_party/nICEr/src/ice/ice_ctx.cpp",
+  "function": "static int nr_ice_ctx_pair_new_trickle_candidates(nr_ice_ctx *ctx, nr_ice_candid",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "   as a machine without a route in that family has none. */",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/third_party/nICEr/src/ice/ice_ctx.cpp",
+  "function": "static int nr_ice_ctx_pair_new_trickle_candidates(nr_ice_ctx *ctx, nr_ice_candid",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "    return nr_stealth_default_local_address(ip_version, addrs, addr_ct, addrp);",
+  "removed": "    int r,_status;\n    nr_transport_addr default_addr;\n    int i;\n\n    if ((r=nr_ice_get_default_address(ctx, ip_version, &default_addr)))\n        ABORT(r);\n\n    for (i=0; i < addr_ct; ++i) {\n      // if default addr is found in local addrs, copy the more fully\n      // complete local addr to the output arg.  Don't need to worry\n      // about comparing ports here.\n      if (!nr_transport_addr_cmp(&default_addr, &addrs[i].addr,\n                                 NR_TRANSPORT_ADDR_CMP_MODE_ADDR)) {\n        if ((r=nr_local_addr_copy(addrp, &addrs[i])))\n          ABORT(r);\n        break;\n      }\n    }\n\n    // if default addr is not in local addrs, just copy the transport addr\n    // to output arg.\n    if (i == addr_ct) {\n      if ((r=nr_transport_addr_copy(&addrp->addr, &default_addr)))\n        ABORT(r);\n      (void)strlcpy(addrp->addr.ifname, \"default route\", sizeof(addrp->addr.ifname));\n    }\n\n    _status=0;\n  abort:\n    return(_status);",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/third_party/nICEr/src/ice/ice_ctx.cpp",
+  "function": "int nr_ice_set_local_addresses(nr_ice_ctx *ctx,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        /* STEALTH-HOOK(fingerprint/webrtc/declared-network): the family of the page's server is a property of the real",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/third_party/nICEr/src/ice/ice_ctx.cpp",
+  "function": "int nr_ice_set_local_addresses(nr_ice_ctx *ctx,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "           network path, which the declared machine hides. A machine declared without IPv6 whose page was reached over",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/third_party/nICEr/src/ice/ice_ctx.cpp",
+  "function": "int nr_ice_set_local_addresses(nr_ice_ctx *ctx,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "           IPv6 asks for the family it has: with no default address of the target's family the gathering found no",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/third_party/nICEr/src/ice/ice_ctx.cpp",
+  "function": "int nr_ice_set_local_addresses(nr_ice_ctx *ctx,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "           address at all (measured on the firefox-63 candidate, Windows, direct: zero candidates). */",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/third_party/nICEr/src/ice/ice_ctx.cpp",
+  "function": "int nr_ice_set_local_addresses(nr_ice_ctx *ctx,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "               ctx, nr_stealth_default_family(ctx->target_for_default_local_address_lookup->ip_version,",
+  "removed": "               ctx, ctx->target_for_default_local_address_lookup->ip_version,",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/third_party/nICEr/src/ice/ice_ctx.cpp",
+  "function": "int nr_ice_set_local_addresses(nr_ice_ctx *ctx,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "                                              local_addrs, addr_ct),",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/third_party/nICEr/src/stun/addrs-bsd.cpp",
+  "function": "",
+  "kind": "file",
+  "form": "unknown",
+  "line": "",
+  "removed": "<deleted file>",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/third_party/nICEr/src/stun/addrs-bsd.h",
+  "function": "",
+  "kind": "file",
+  "form": "unknown",
+  "line": "",
+  "removed": "<deleted file>",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/third_party/nICEr/src/stun/addrs-netlink-wireless.cpp",
+  "function": "",
+  "kind": "file",
+  "form": "unknown",
+  "line": "",
+  "removed": "<deleted file>",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/third_party/nICEr/src/stun/addrs-netlink.cpp",
+  "function": "",
+  "kind": "file",
+  "form": "unknown",
+  "line": "",
+  "removed": "<deleted file>",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/third_party/nICEr/src/stun/addrs-netlink.h",
+  "function": "",
+  "kind": "file",
+  "form": "unknown",
+  "line": "",
+  "removed": "<deleted file>",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/third_party/nICEr/src/stun/addrs-win32.cpp",
+  "function": "",
+  "kind": "file",
+  "form": "unknown",
+  "line": "",
+  "removed": "<deleted file>",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/third_party/nICEr/src/stun/addrs-win32.h",
+  "function": "",
+  "kind": "file",
+  "form": "unknown",
+  "line": "",
+  "removed": "<deleted file>",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/third_party/nICEr/src/stun/addrs.cpp",
+  "function": "OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.",
+  "kind": "delete",
+  "form": "unknown",
+  "line": "",
+  "removed": "#ifdef WIN32\n#include \"addrs-win32.h\"\n#elif defined(BSD) || defined(DARWIN)\n#include \"addrs-bsd.h\"\n#else\n#include \"addrs-netlink.h\"\n#endif\n",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/third_party/nICEr/src/stun/addrs.cpp",
+  "function": "OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"nr_stealth_network.h\"  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/third_party/nICEr/src/stun/addrs.cpp",
+  "function": "nr_stun_get_addrs(nr_local_addr addrs[], int maxaddrs, int *count)",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "    // STEALTH-HOOK(fingerprint/webrtc/declared-network): the declared adapter, never the host's.",
+  "removed": "    _status = stun_getaddrs_filtered(addrs, maxaddrs, count);",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/third_party/nICEr/src/stun/addrs.cpp",
+  "function": "nr_stun_get_addrs(nr_local_addr addrs[], int maxaddrs, int *count)",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "    _status = nr_stealth_declared_addrs(addrs, maxaddrs, count);",
+  "test": ""
+ },
+ {
+  "file": "netwerk/base/nsIOService.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthIPv6Literal.h\"  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "test": ""
+ },
+ {
+  "file": "netwerk/base/nsIOService.cpp",
+  "function": "static const char* gCallbackSecurityPrefs[] = {",
+  "kind": "add",
+  "form": "notice",
+  "line": "  StealthApplyDeclaredNetwork();  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "test": ""
+ }
+]

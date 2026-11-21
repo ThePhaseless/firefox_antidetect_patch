@@ -1,0 +1,177 @@
+[
+ {
+  "file": "toolkit/components/url-classifier/SafeBrowsing.sys.mjs",
+  "function": "export var SafeBrowsing = {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    // STEALTH-HOOK(stillborn/api-keys): see FEATURE.md",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/url-classifier/SafeBrowsing.sys.mjs",
+  "function": "export var SafeBrowsing = {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    Services.prefs.addObserver(\"zoom.stealth.apikey\", this);",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/urlformatter/URLFormatter.sys.mjs",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "// STEALTH-HOOK(stillborn/api-keys)",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/urlformatter/URLFormatter.sys.mjs",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "import {",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/urlformatter/URLFormatter.sys.mjs",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  stealthApplyApiKeyGetters,",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/urlformatter/URLFormatter.sys.mjs",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  stealthTrimApiKeys,",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/urlformatter/URLFormatter.sys.mjs",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "} from \"resource://gre/modules/StealthApiKeys.sys.mjs\";",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/urlformatter/URLFormatter.sys.mjs",
+  "function": "nsURLFormatterService.prototype = {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    aMsg = stealthTrimApiKeys(aMsg); // STEALTH-HOOK(stillborn/api-keys)",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/urlformatter/URLFormatter.sys.mjs",
+  "function": "nsURLFormatterService.prototype = {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "// STEALTH-HOOK(stillborn/api-keys)",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/urlformatter/URLFormatter.sys.mjs",
+  "function": "nsURLFormatterService.prototype = {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "stealthApplyApiKeyGetters(nsURLFormatterService.prototype);",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/urlformatter/moz.build",
+  "function": "XPIDL_MODULE = \"urlformatter\"",
+  "kind": "add",
+  "form": "registration",
+  "line": "EXTRA_JS_MODULES += [\"StealthApiKeys.sys.mjs\"]  # STEALTH-HOOK(stillborn/api-keys)",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/urlformatter/tests/unit/xpcshell.toml",
+  "function": "skip-if = [",
+  "kind": "add",
+  "form": "unknown",
+  "line": "[\"test_stealth_apikeys.js\"]",
+  "test": ""
+ },
+ {
+  "file": "toolkit/modules/AppConstants.sys.mjs",
+  "function": "export var AppConstants = Object.freeze({",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(stillborn/api-keys): three API keys removed, see FEATURE.md",
+  "removed": "#if !defined(MOZ_WIDGET_ANDROID) && !defined(XP_WIN)\n  MOZ_GOOGLE_LOCATION_SERVICE_API_KEY: \"@MOZ_GOOGLE_LOCATION_SERVICE_API_KEY@\",\n#endif\n  MOZ_GOOGLE_SAFEBROWSING_API_KEY: \"@MOZ_GOOGLE_SAFEBROWSING_API_KEY@\",\n  MOZ_MOZILLA_API_KEY: \"@MOZ_MOZILLA_API_KEY@\",",
+  "test": ""
+ },
+ {
+  "file": "toolkit/modules/moz.build",
+  "function": "if \"Android\" != CONFIG[\"OS_TARGET\"]:",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "# ⛔ STEALTHFOX: qui stava il DEFINES di MOZ_GOOGLE_LOCATION_SERVICE_API_KEY,",
+  "removed": "if CONFIG[\"OS_TARGET\"] not in (\"Android\", \"WINNT\"):",
+  "test": ""
+ },
+ {
+  "file": "toolkit/modules/moz.build",
+  "function": "if \"Android\" != CONFIG[\"OS_TARGET\"]:",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "# tolto insieme agli altri due nel blocco `for var` qui sotto. Le tre chiavi",
+  "removed": "    DEFINES[\"MOZ_GOOGLE_LOCATION_SERVICE_API_KEY\"] = (",
+  "test": ""
+ },
+ {
+  "file": "toolkit/modules/moz.build",
+  "function": "if \"Android\" != CONFIG[\"OS_TARGET\"]:",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "# non sono piu' incise nella build: le dichiara invisible_core e arrivano",
+  "removed": "        CONFIG[\"MOZ_GOOGLE_LOCATION_SERVICE_API_KEY\"] or \"\"",
+  "test": ""
+ },
+ {
+  "file": "toolkit/modules/moz.build",
+  "function": "if \"Android\" != CONFIG[\"OS_TARGET\"]:",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "# come pref (URLFormatter.sys.mjs, stealthDeclaredApiKey).",
+  "removed": "    )",
+  "test": ""
+ },
+ {
+  "file": "toolkit/modules/moz.build",
+  "function": "for var in (",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "    # ⛔ STEALTHFOX: MOZ_GOOGLE_SAFEBROWSING_API_KEY e MOZ_MOZILLA_API_KEY",
+  "removed": "    \"MOZ_GOOGLE_SAFEBROWSING_API_KEY\",",
+  "test": ""
+ },
+ {
+  "file": "toolkit/modules/moz.build",
+  "function": "for var in (",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "    # stavano qui, in ordine alfabetico fra le due righe accanto. Tolte: le tre",
+  "test": ""
+ },
+ {
+  "file": "toolkit/modules/moz.build",
+  "function": "for var in (",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "    # chiavi le dichiara invisible_core, non le incide piu' la compilazione.",
+  "test": ""
+ },
+ {
+  "file": "toolkit/modules/moz.build",
+  "function": "for var in (",
+  "kind": "delete",
+  "form": "unknown",
+  "line": "",
+  "removed": "    \"MOZ_MOZILLA_API_KEY\",",
+  "test": ""
+ }
+]

@@ -1,0 +1,138 @@
+[
+ {
+  "file": "dom/base/TextInputProcessor.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthInputEventBirth.h\"  // STEALTH-HOOK(fingerprint/input/event-birth)",
+  "test": ""
+ },
+ {
+  "file": "dom/base/TextInputProcessor.cpp",
+  "function": "TextInputProcessor::CommitCompositionWith(const nsAString& aCommitString,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  StealthKeyBirthScope stealthBirth(mStealthKeyBirth);  // STEALTH-HOOK(fingerprint/input/event-birth)",
+  "test": ""
+ },
+ {
+  "file": "dom/base/TextInputProcessor.cpp",
+  "function": "nsresult TextInputProcessor::InitEditCommands(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "NS_IMETHODIMP TextInputProcessor::SetNextKeyLatency(double aLatencyMs, uint64_t aPageId) { return StealthSetNextKeyLatency(mStealthKeyBirth, aLatencyMs, aPageId, nsContentUtils::IsCallerChrome()); }  // STEALTH-HOOK(fingerprint/input/event-birth)",
+  "test": ""
+ },
+ {
+  "file": "dom/base/TextInputProcessor.cpp",
+  "function": "nsresult TextInputProcessor::InitEditCommands(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  StealthKeyBirthScope stealthBirth(mStealthKeyBirth);  // STEALTH-HOOK(fingerprint/input/event-birth)",
+  "test": ""
+ },
+ {
+  "file": "dom/base/TextInputProcessor.cpp",
+  "function": "nsresult TextInputProcessor::KeydownInternal(",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  StealthKeyBirthScope::Stamp(keyEvent);  // STEALTH-HOOK(fingerprint/input/event-birth)",
+  "test": "",
+  "anchor": "",
+  "why": ""
+ },
+ {
+  "file": "dom/base/TextInputProcessor.cpp",
+  "function": "TextInputProcessor::Keyup(Event* aDOMKeyEvent, uint32_t aKeyFlags,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  StealthKeyBirthScope stealthBirth(mStealthKeyBirth);  // STEALTH-HOOK(fingerprint/input/event-birth)",
+  "test": ""
+ },
+ {
+  "file": "dom/base/TextInputProcessor.cpp",
+  "function": "nsresult TextInputProcessor::KeyupInternal(",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  StealthKeyBirthScope::Stamp(keyEvent);  // STEALTH-HOOK(fingerprint/input/event-birth)",
+  "test": "",
+  "anchor": "",
+  "why": ""
+ },
+ {
+  "file": "dom/base/TextInputProcessor.h",
+  "function": "class TextInputProcessor final : public nsITextInputProcessor,",
+  "kind": "add",
+  "form": "member",
+  "line": "  struct { double mLatencyMs = 0; uint64_t mPageId = 0; } mStealthKeyBirth;  // STEALTH-HOOK(fingerprint/input/event-birth) shape of StealthKeyBirth",
+  "test": ""
+ },
+ {
+  "file": "dom/base/nsContentUtils.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthInputEventBirth.h\"  // STEALTH-HOOK(fingerprint/input/event-birth)",
+  "test": ""
+ },
+ {
+  "file": "dom/base/nsContentUtils.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthJugglerEventId.h\"  // STEALTH-HOOK(automation/input)",
+  "test": ""
+ },
+ {
+  "file": "dom/base/nsContentUtils.cpp",
+  "function": "Result<bool, nsresult> nsContentUtils::SynthesizeMouseEvent(",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  StealthSetJugglerId(mouseOrPointerEvent, aMouseEventData.mJugglerEventId);  // STEALTH-HOOK(automation/input)",
+  "test": "",
+  "anchor": "",
+  "why": ""
+ },
+ {
+  "file": "dom/base/nsContentUtils.cpp",
+  "function": "Result<bool, nsresult> nsContentUtils::SynthesizeMouseEvent(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/input/event-birth)",
+  "test": ""
+ },
+ {
+  "file": "dom/base/nsContentUtils.cpp",
+  "function": "Result<bool, nsresult> nsContentUtils::SynthesizeMouseEvent(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  StealthSetInputEventBirth(mouseOrPointerEvent, aMouseEventData.mLatency, aPresShell);",
+  "test": ""
+ },
+ {
+  "file": "dom/base/nsContentUtils.cpp",
+  "function": "Result<bool, nsresult> nsContentUtils::SynthesizeMouseEvent(",
+  "kind": "add",
+  "form": "anchor",
+  "line": "    StealthJugglerNotAsyncSynthesized(mouseOrPointerEvent);  // STEALTH-HOOK(automation/input)",
+  "test": "",
+  "anchor": "",
+  "why": ""
+ },
+ {
+  "file": "dom/base/test/gtest/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"TestStealthDocumentLanguage.cpp\", \"TestStealthInputEventBirth.cpp\"]  # STEALTH-HOOK(fingerprint/input/event-birth)",
+  "test": ""
+ },
+ {
+  "file": "dom/interfaces/base/nsITextInputProcessor.idl",
+  "function": "interface nsITextInputProcessor : nsISupports",
+  "kind": "add",
+  "form": "member",
+  "line": "  void setNextKeyLatency(in double aLatencyMs, [optional] in unsigned long long aPageId);  // STEALTH-HOOK(fingerprint/input/event-birth)",
+  "test": ""
+ }
+]

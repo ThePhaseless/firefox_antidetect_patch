@@ -1,0 +1,182 @@
+[
+ {
+  "file": "uriloader/exthandler/moz.build",
+  "function": "XPIDL_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "XPIDL_SOURCES += [\"StealthDownloadInterceptor.idl\"]  # STEALTH-HOOK(automation/downloads)",
+  "test": ""
+ },
+ {
+  "file": "uriloader/exthandler/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"StealthDownloadIntercept.cpp\"]  # STEALTH-HOOK(automation/downloads)",
+  "test": ""
+ },
+ {
+  "file": "uriloader/exthandler/nsExternalHelperAppService.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthDownloadIntercept.h\"  // STEALTH-HOOK(automation/downloads)",
+  "test": ""
+ },
+ {
+  "file": "uriloader/exthandler/nsExternalHelperAppService.cpp",
+  "function": "NS_IMETHODIMP nsExternalHelperAppService::GetPreferredDownloadsDirectory(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "// STEALTH-HOOK(automation/downloads)",
+  "test": ""
+ },
+ {
+  "file": "uriloader/exthandler/nsExternalHelperAppService.cpp",
+  "function": "NS_IMETHODIMP nsExternalHelperAppService::GetPreferredDownloadsDirectory(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "NS_IMETHODIMP nsExternalHelperAppService::SetDownloadInterceptor(",
+  "test": ""
+ },
+ {
+  "file": "uriloader/exthandler/nsExternalHelperAppService.cpp",
+  "function": "NS_IMETHODIMP nsExternalHelperAppService::GetPreferredDownloadsDirectory(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    nsIDownloadInterceptor* interceptor) {",
+  "test": ""
+ },
+ {
+  "file": "uriloader/exthandler/nsExternalHelperAppService.cpp",
+  "function": "NS_IMETHODIMP nsExternalHelperAppService::GetPreferredDownloadsDirectory(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  mInterceptor = interceptor;",
+  "test": ""
+ },
+ {
+  "file": "uriloader/exthandler/nsExternalHelperAppService.cpp",
+  "function": "NS_IMETHODIMP nsExternalHelperAppService::GetPreferredDownloadsDirectory(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  return NS_OK;",
+  "test": ""
+ },
+ {
+  "file": "uriloader/exthandler/nsExternalHelperAppService.cpp",
+  "function": "NS_IMETHODIMP nsExternalHelperAppService::GetPreferredDownloadsDirectory(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "}",
+  "test": ""
+ },
+ {
+  "file": "uriloader/exthandler/nsExternalHelperAppService.cpp",
+  "function": "NS_IMETHODIMP nsExternalAppHandler::OnStartRequest(nsIRequest* request) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(automation/downloads): the interceptor may own the download.",
+  "test": ""
+ },
+ {
+  "file": "uriloader/exthandler/nsExternalHelperAppService.cpp",
+  "function": "NS_IMETHODIMP nsExternalAppHandler::OnStartRequest(nsIRequest* request) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (StealthDownloadIntercept::Start(this, request)) return NS_OK;",
+  "test": ""
+ },
+ {
+  "file": "uriloader/exthandler/nsExternalHelperAppService.cpp",
+  "function": "nsExternalAppHandler::OnSaveComplete(nsIBackgroundFileSaver* aSaver,",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  StealthDownloadIntercept::Complete(this, aStatus);  // STEALTH-HOOK(automation/downloads)",
+  "test": "",
+  "anchor": "",
+  "why": ""
+ },
+ {
+  "file": "uriloader/exthandler/nsExternalHelperAppService.cpp",
+  "function": "NS_IMETHODIMP nsExternalAppHandler::Cancel(nsresult aReason) {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  StealthDownloadIntercept::Complete(this, aReason);  // STEALTH-HOOK(automation/downloads)",
+  "test": "",
+  "anchor": "",
+  "why": ""
+ },
+ {
+  "file": "uriloader/exthandler/nsExternalHelperAppService.h",
+  "function": "class nsExternalHelperAppService : public nsIExternalHelperAppService,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // Stealthfox: our automation's download interceptor (set via",
+  "test": ""
+ },
+ {
+  "file": "uriloader/exthandler/nsExternalHelperAppService.h",
+  "function": "class nsExternalHelperAppService : public nsIExternalHelperAppService,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // setDownloadInterceptor). When non-null, StealthDownloadIntercept::Start",
+  "test": ""
+ },
+ {
+  "file": "uriloader/exthandler/nsExternalHelperAppService.h",
+  "function": "class nsExternalHelperAppService : public nsIExternalHelperAppService,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // asks it to redirect each download into the automation's downloads folder.",
+  "test": ""
+ },
+ {
+  "file": "uriloader/exthandler/nsExternalHelperAppService.h",
+  "function": "class nsExternalHelperAppService : public nsIExternalHelperAppService,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  nsCOMPtr<nsIDownloadInterceptor> mInterceptor;",
+  "test": ""
+ },
+ {
+  "file": "uriloader/exthandler/nsExternalHelperAppService.h",
+  "function": "class nsExternalHelperAppService : public nsIExternalHelperAppService,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  friend class StealthDownloadIntercept;  // STEALTH-HOOK(automation/downloads)",
+  "test": ""
+ },
+ {
+  "file": "uriloader/exthandler/nsExternalHelperAppService.h",
+  "function": "class nsExternalAppHandler final : public nsIStreamListener,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  friend class StealthDownloadIntercept;  // STEALTH-HOOK(automation/downloads)",
+  "test": ""
+ },
+ {
+  "file": "uriloader/exthandler/nsExternalHelperAppService.h",
+  "function": "class nsExternalAppHandler final : public nsIStreamListener,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  bool mStealthIntercepted = false;       // STEALTH-HOOK(automation/downloads)",
+  "test": ""
+ },
+ {
+  "file": "uriloader/exthandler/nsIExternalHelperAppService.idl",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthDownloadInterceptor.idl\" // STEALTH-HOOK(automation/downloads)",
+  "test": ""
+ },
+ {
+  "file": "uriloader/exthandler/nsIExternalHelperAppService.idl",
+  "function": "interface nsIExternalHelperAppService : nsISupports",
+  "kind": "add",
+  "form": "member",
+  "line": "  void setDownloadInterceptor(in nsIDownloadInterceptor interceptor); // STEALTH-HOOK(automation/downloads)",
+  "test": ""
+ }
+]

@@ -1,0 +1,82 @@
+[
+ {
+  "file": "third_party/libwebrtc/modules/desktop_capture/cropping_window_capturer_win.cc",
+  "function": "bool CroppingWindowCapturerWin::ShouldUseScreenCapturer() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(platform/hidden-desktop)",
+  "test": ""
+ },
+ {
+  "file": "third_party/libwebrtc/modules/desktop_capture/cropping_window_capturer_win.cc",
+  "function": "bool CroppingWindowCapturerWin::ShouldUseScreenCapturer() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (!window_capture_helper_.IsWindowOnInputDesktop(selected)) {",
+  "test": ""
+ },
+ {
+  "file": "third_party/libwebrtc/modules/desktop_capture/cropping_window_capturer_win.cc",
+  "function": "bool CroppingWindowCapturerWin::ShouldUseScreenCapturer() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    return false;",
+  "test": ""
+ },
+ {
+  "file": "third_party/libwebrtc/modules/desktop_capture/cropping_window_capturer_win.cc",
+  "function": "bool CroppingWindowCapturerWin::ShouldUseScreenCapturer() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  }",
+  "test": ""
+ },
+ {
+  "file": "third_party/libwebrtc/modules/desktop_capture/win/window_capture_utils.cc",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"modules/desktop_capture/win/StealthWindowInputDesktop.h\"  // STEALTH-HOOK(platform/hidden-desktop)",
+  "test": ""
+ },
+ {
+  "file": "third_party/libwebrtc/modules/desktop_capture/win/window_capture_utils.cc",
+  "function": "bool WindowCaptureHelperWin::IsWindowVisibleOnCurrentDesktop(HWND hwnd) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "bool WindowCaptureHelperWin::IsWindowOnInputDesktop(HWND hwnd) {  // STEALTH-HOOK(platform/hidden-desktop)",
+  "test": ""
+ },
+ {
+  "file": "third_party/libwebrtc/modules/desktop_capture/win/window_capture_utils.cc",
+  "function": "bool WindowCaptureHelperWin::IsWindowVisibleOnCurrentDesktop(HWND hwnd) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  return StealthIsWindowOnInputDesktop(hwnd);",
+  "test": ""
+ },
+ {
+  "file": "third_party/libwebrtc/modules/desktop_capture/win/window_capture_utils.cc",
+  "function": "bool WindowCaptureHelperWin::IsWindowVisibleOnCurrentDesktop(HWND hwnd) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "}",
+  "test": ""
+ },
+ {
+  "file": "third_party/libwebrtc/modules/desktop_capture/win/window_capture_utils.h",
+  "function": "class WindowCaptureHelperWin {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(platform/hidden-desktop)",
+  "test": ""
+ },
+ {
+  "file": "third_party/libwebrtc/modules/desktop_capture/win/window_capture_utils.h",
+  "function": "class WindowCaptureHelperWin {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  bool IsWindowOnInputDesktop(HWND hwnd);",
+  "test": ""
+ }
+]

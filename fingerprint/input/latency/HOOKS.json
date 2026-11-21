@@ -1,0 +1,26 @@
+[
+ {
+  "file": "dom/webidl/Window.webidl",
+  "function": "dictionary SynthesizeEventData {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/input/latency): members are ordered by name, not here.",
+  "test": ""
+ },
+ {
+  "file": "dom/webidl/Window.webidl",
+  "function": "dictionary SynthesizeEventData {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  unsigned long jugglerEventId = 0;",
+  "test": ""
+ },
+ {
+  "file": "dom/webidl/Window.webidl",
+  "function": "dictionary SynthesizeEventData {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  double latency = 0;",
+  "test": ""
+ }
+]

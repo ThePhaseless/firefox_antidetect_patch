@@ -1,0 +1,335 @@
+[
+ {
+  "file": "dom/geolocation/GeolocationSystemWin.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/StealthGeolocation.h\"  // STEALTH-HOOK(fingerprint/geolocation/no-host-provider)",
+  "test": ""
+ },
+ {
+  "file": "dom/geolocation/GeolocationSystemWin.cpp",
+  "function": "NS_IMPL_ISUPPORTS(LocationPermissionWifiScanListener, nsIWifiListener)",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/geolocation/no-host-provider): the OS location switch is declared on; the OS is not asked.",
+  "test": ""
+ },
+ {
+  "file": "dom/geolocation/GeolocationSystemWin.cpp",
+  "function": "NS_IMPL_ISUPPORTS(LocationPermissionWifiScanListener, nsIWifiListener)",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (StealthSystemLocationDeclaredOn()) {",
+  "test": ""
+ },
+ {
+  "file": "dom/geolocation/GeolocationSystemWin.cpp",
+  "function": "NS_IMPL_ISUPPORTS(LocationPermissionWifiScanListener, nsIWifiListener)",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    return SystemGeolocationPermissionBehavior::NoPrompt;",
+  "test": ""
+ },
+ {
+  "file": "dom/geolocation/GeolocationSystemWin.cpp",
+  "function": "NS_IMPL_ISUPPORTS(LocationPermissionWifiScanListener, nsIWifiListener)",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  }",
+  "test": ""
+ },
+ {
+  "file": "dom/permission/PermissionObserver.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/StealthGeolocation.h\"  // STEALTH-HOOK(fingerprint/geolocation/no-host-provider)",
+  "test": ""
+ },
+ {
+  "file": "dom/permission/PermissionObserver.cpp",
+  "function": "void PermissionObserver::RemoveSink(PermissionStatusSink* aSink) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (aName == PermissionName::Geolocation &&",
+  "test": ""
+ },
+ {
+  "file": "dom/permission/PermissionObserver.cpp",
+  "function": "void PermissionObserver::RemoveSink(PermissionStatusSink* aSink) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "      StealthSystemLocationDeclaredOn()) {  // STEALTH-HOOK(fingerprint/geolocation/no-host-provider): declared on, never changes",
+  "test": ""
+ },
+ {
+  "file": "dom/permission/PermissionObserver.cpp",
+  "function": "void PermissionObserver::RemoveSink(PermissionStatusSink* aSink) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    return;",
+  "test": ""
+ },
+ {
+  "file": "dom/permission/PermissionObserver.cpp",
+  "function": "void PermissionObserver::RemoveSink(PermissionStatusSink* aSink) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  }",
+  "test": ""
+ },
+ {
+  "file": "dom/system/windows/PWindowsUtils.ipdl",
+  "function": "",
+  "kind": "delete",
+  "form": "unknown",
+  "line": "",
+  "removed": "include protocol PWindowsLocation;\n",
+  "test": ""
+ },
+ {
+  "file": "dom/system/windows/PWindowsUtils.ipdl",
+  "function": "",
+  "kind": "delete",
+  "form": "unknown",
+  "line": "",
+  "removed": "  manages PWindowsLocation;\n\nchild:\n  // Proxies the ILocation COM API for geolocation\n  async PWindowsLocation();",
+  "test": ""
+ },
+ {
+  "file": "dom/system/windows/WindowsUtilsChild.cpp",
+  "function": "",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "namespace mozilla::dom {}  // namespace mozilla::dom",
+  "removed": "#include \"WindowsLegacyLocationChild.h\"\n#include \"mozilla/StaticPrefs_geo.h\"\n#include \"mozilla/dom/PWindowsUtilsChild.h\"\n#include \"mozilla/dom/WindowsLocationChild.h\"\n\n#if !defined(__MINGW32__)\n#  include \"WindowsRuntimeLocationChild.h\"\n#endif\n\nnamespace mozilla::dom {\n\nalready_AddRefed<PWindowsLocationChild>\nWindowsUtilsChild::AllocPWindowsLocationChild() {\n  // MinGW has windows.devices.geolocation.h header, but it lacks some\n  // Geolocation classes/structures such as BasicGeoposition.\n#if !defined(__MINGW32__)\n  if (StaticPrefs::geo_provider_use_winrt()) {\n    return MakeAndAddRef<WindowsRuntimeLocationChild>();\n  }\n#endif\n  return MakeAndAddRef<WindowsLegacyLocationChild>();\n}\n\n}  // namespace mozilla::dom",
+  "test": ""
+ },
+ {
+  "file": "dom/system/windows/WindowsUtilsChild.h",
+  "function": "",
+  "kind": "delete",
+  "form": "unknown",
+  "line": "",
+  "removed": "#include \"mozilla/dom/WindowsLocationChild.h\"",
+  "test": ""
+ },
+ {
+  "file": "dom/system/windows/WindowsUtilsChild.h",
+  "function": "namespace mozilla::dom {",
+  "kind": "delete",
+  "form": "unknown",
+  "line": "",
+  "removed": " public:\n  already_AddRefed<PWindowsLocationChild> AllocPWindowsLocationChild();\n",
+  "test": ""
+ },
+ {
+  "file": "dom/system/windows/location/PWindowsLocation.ipdl",
+  "function": "",
+  "kind": "file",
+  "form": "unknown",
+  "line": "",
+  "removed": "<deleted file>",
+  "test": ""
+ },
+ {
+  "file": "dom/system/windows/location/WindowsLegacyLocationChild.cpp",
+  "function": "",
+  "kind": "file",
+  "form": "unknown",
+  "line": "",
+  "removed": "<deleted file>",
+  "test": ""
+ },
+ {
+  "file": "dom/system/windows/location/WindowsLegacyLocationChild.h",
+  "function": "",
+  "kind": "file",
+  "form": "unknown",
+  "line": "",
+  "removed": "<deleted file>",
+  "test": ""
+ },
+ {
+  "file": "dom/system/windows/location/WindowsLocationChild.cpp",
+  "function": "",
+  "kind": "file",
+  "form": "unknown",
+  "line": "",
+  "removed": "<deleted file>",
+  "test": ""
+ },
+ {
+  "file": "dom/system/windows/location/WindowsLocationChild.h",
+  "function": "",
+  "kind": "file",
+  "form": "unknown",
+  "line": "",
+  "removed": "<deleted file>",
+  "test": ""
+ },
+ {
+  "file": "dom/system/windows/location/WindowsLocationParent.cpp",
+  "function": "",
+  "kind": "file",
+  "form": "unknown",
+  "line": "",
+  "removed": "<deleted file>",
+  "test": ""
+ },
+ {
+  "file": "dom/system/windows/location/WindowsLocationParent.h",
+  "function": "",
+  "kind": "file",
+  "form": "unknown",
+  "line": "",
+  "removed": "<deleted file>",
+  "test": ""
+ },
+ {
+  "file": "dom/system/windows/location/WindowsLocationProvider.cpp",
+  "function": "",
+  "kind": "file",
+  "form": "unknown",
+  "line": "",
+  "removed": "<deleted file>",
+  "test": ""
+ },
+ {
+  "file": "dom/system/windows/location/WindowsLocationProvider.h",
+  "function": "",
+  "kind": "file",
+  "form": "unknown",
+  "line": "",
+  "removed": "<deleted file>",
+  "test": ""
+ },
+ {
+  "file": "dom/system/windows/location/WindowsRuntimeLocationChild.cpp",
+  "function": "",
+  "kind": "file",
+  "form": "unknown",
+  "line": "",
+  "removed": "<deleted file>",
+  "test": ""
+ },
+ {
+  "file": "dom/system/windows/location/WindowsRuntimeLocationChild.h",
+  "function": "",
+  "kind": "file",
+  "form": "unknown",
+  "line": "",
+  "removed": "<deleted file>",
+  "test": ""
+ },
+ {
+  "file": "dom/system/windows/location/moz.build",
+  "function": "",
+  "kind": "file",
+  "form": "unknown",
+  "line": "",
+  "removed": "<deleted file>",
+  "test": ""
+ },
+ {
+  "file": "dom/system/windows/moz.build",
+  "function": "IPDL_SOURCES += [",
+  "kind": "delete",
+  "form": "unknown",
+  "line": "",
+  "removed": "LOCAL_INCLUDES += [\n    \"/dom/system/windows/location\",\n]\n\nDIRS += [\"location\"]\n",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/geolocation/GeolocationService.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/StealthGeolocation.h\"  // STEALTH-HOOK(fingerprint/geolocation/no-host-provider)",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/geolocation/GeolocationService.cpp",
+  "function": "",
+  "kind": "delete",
+  "form": "unknown",
+  "line": "",
+  "removed": "#ifdef XP_WIN\n#  include \"WindowsLocationProvider.h\"\n#endif\n",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/geolocation/GeolocationService.cpp",
+  "function": "nsresult GeolocationService::Init() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/geolocation/no-host-provider): the provider is the network one, never a host one.",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/geolocation/GeolocationService.cpp",
+  "function": "nsresult GeolocationService::Init() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (StealthSelectGeolocationProvider(mProvider)) {",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/geolocation/GeolocationService.cpp",
+  "function": "nsresult GeolocationService::Init() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    return NS_OK;",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/geolocation/GeolocationService.cpp",
+  "function": "nsresult GeolocationService::Init() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  }",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/geolocation/GeolocationService.cpp",
+  "function": "nsresult GeolocationService::Init() {",
+  "kind": "delete",
+  "form": "unknown",
+  "line": "",
+  "removed": "#ifdef XP_WIN\n  if (Preferences::GetBool(\"geo.provider.ms-windows-location\", false)) {\n    mProvider = new WindowsLocationProvider();\n  }\n#endif\n",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/geolocation/moz.build",
+  "function": "with Files(\"**\"):",
+  "kind": "add",
+  "form": "registration",
+  "line": "EXPORTS.mozilla += [\"StealthGeolocation.h\"]  # STEALTH-HOOK(fingerprint/geolocation/no-host-provider)",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/geolocation/moz.build",
+  "function": "with Files(\"**\"):",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"StealthGeolocation.cpp\"]  # STEALTH-HOOK(fingerprint/geolocation/no-host-provider)",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/geolocation/moz.build",
+  "function": "XPCOM_MANIFESTS += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "TEST_DIRS += [\"test/gtest\"]  # STEALTH-HOOK(fingerprint/geolocation/no-host-provider)",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/geolocation/moz.build",
+  "function": "elif CONFIG[\"MOZ_WIDGET_TOOLKIT\"] == \"cocoa\":",
+  "kind": "delete",
+  "form": "unknown",
+  "line": "",
+  "removed": "elif CONFIG[\"MOZ_WIDGET_TOOLKIT\"] == \"windows\":\n    LOCAL_INCLUDES += [\n        \"/dom/system/windows/location\",\n    ]",
+  "test": ""
+ }
+]

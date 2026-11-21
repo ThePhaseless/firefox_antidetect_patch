@@ -1,0 +1,223 @@
+[
+ {
+  "file": "dom/media/MediaManager.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "// STEALTH-HOOK(fingerprint/media/enumeration)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/MediaManager.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "#include \"StealthMediaEnumeration.h\"",
+  "test": ""
+ },
+ {
+  "file": "dom/media/MediaManager.cpp",
+  "function": "bool MediaManager::EnumerationParams::RealDeviceRequested() const {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "         // STEALTH-HOOK(fingerprint/media/enumeration)",
+  "removed": "         mFlags.contains(EnumerationFlag::EnumerateAudioOutputs);",
+  "test": ""
+ },
+ {
+  "file": "dom/media/MediaManager.cpp",
+  "function": "bool MediaManager::EnumerationParams::RealDeviceRequested() const {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "         StealthHostSpeakersRequested(",
+  "test": ""
+ },
+ {
+  "file": "dom/media/MediaManager.cpp",
+  "function": "bool MediaManager::EnumerationParams::RealDeviceRequested() const {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "             mFlags.contains(EnumerationFlag::EnumerateAudioOutputs));",
+  "test": ""
+ },
+ {
+  "file": "dom/media/MediaManager.cpp",
+  "function": "MediaManager::MaybeRequestPermissionAndEnumerateRawDevices(",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/media/enumeration)",
+  "removed": "  const bool hasAudioOutput =\n      aParams.mFlags.contains(EnumerationFlag::EnumerateAudioOutputs);",
+  "test": ""
+ },
+ {
+  "file": "dom/media/MediaManager.cpp",
+  "function": "MediaManager::MaybeRequestPermissionAndEnumerateRawDevices(",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  const bool hasAudioOutput = StealthHostSpeakersRequested(",
+  "test": ""
+ },
+ {
+  "file": "dom/media/MediaManager.cpp",
+  "function": "MediaManager::MaybeRequestPermissionAndEnumerateRawDevices(",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "      aParams.mFlags.contains(EnumerationFlag::EnumerateAudioOutputs));",
+  "test": ""
+ },
+ {
+  "file": "dom/media/MediaManager.cpp",
+  "function": "MediaManager::EnumerateRawDevices(EnumerationParams aParams) {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/media/enumeration)",
+  "removed": "  if (aParams.mFlags.contains(EnumerationFlag::EnumerateAudioOutputs)) {",
+  "test": ""
+ },
+ {
+  "file": "dom/media/MediaManager.cpp",
+  "function": "MediaManager::EnumerateRawDevices(EnumerationParams aParams) {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  if (StealthHostSpeakersRequested(",
+  "test": ""
+ },
+ {
+  "file": "dom/media/MediaManager.cpp",
+  "function": "MediaManager::EnumerateRawDevices(EnumerationParams aParams) {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "          aParams.mFlags.contains(EnumerationFlag::EnumerateAudioOutputs))) {",
+  "test": ""
+ },
+ {
+  "file": "dom/media/MediaManager.cpp",
+  "function": "MediaManager::EnumerateRawDevices(EnumerationParams aParams) {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "    // STEALTH-HOOK(fingerprint/media/enumeration)",
+  "removed": "    if (videoBackend == realBackend) {",
+  "test": ""
+ },
+ {
+  "file": "dom/media/MediaManager.cpp",
+  "function": "MediaManager::EnumerateRawDevices(EnumerationParams aParams) {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "    if (videoBackend == realBackend && StealthHostSpeakersMayBeAsked()) {",
+  "test": ""
+ },
+ {
+  "file": "dom/media/MediaManager.cpp",
+  "function": "RefPtr<ConstDeviceSetPromise> MediaManager::GetPhysicalDevices() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "            auto resolve = [self, this, promises,",
+  "removed": "            for (auto& promiseHolder : *promises) {\n              promiseHolder.Resolve(aDevices, __func__);\n            }\n            // mPendingDevicesPromises may have changed if devices have changed.\n            if (promises == mPendingDevicesPromises) {\n              mPendingDevicesPromises = nullptr;\n              mPhysicalDevices = std::move(aDevices);\n            }",
+  "test": ""
+ },
+ {
+  "file": "dom/media/MediaManager.cpp",
+  "function": "RefPtr<ConstDeviceSetPromise> MediaManager::GetPhysicalDevices() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "                            aDevices = std::move(aDevices)]() mutable {",
+  "test": ""
+ },
+ {
+  "file": "dom/media/MediaManager.cpp",
+  "function": "RefPtr<ConstDeviceSetPromise> MediaManager::GetPhysicalDevices() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "              for (auto& promiseHolder : *promises) {",
+  "test": ""
+ },
+ {
+  "file": "dom/media/MediaManager.cpp",
+  "function": "RefPtr<ConstDeviceSetPromise> MediaManager::GetPhysicalDevices() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "                promiseHolder.Resolve(aDevices, __func__);",
+  "test": ""
+ },
+ {
+  "file": "dom/media/MediaManager.cpp",
+  "function": "RefPtr<ConstDeviceSetPromise> MediaManager::GetPhysicalDevices() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "              }",
+  "test": ""
+ },
+ {
+  "file": "dom/media/MediaManager.cpp",
+  "function": "RefPtr<ConstDeviceSetPromise> MediaManager::GetPhysicalDevices() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "              // mPendingDevicesPromises may have changed if devices have",
+  "test": ""
+ },
+ {
+  "file": "dom/media/MediaManager.cpp",
+  "function": "RefPtr<ConstDeviceSetPromise> MediaManager::GetPhysicalDevices() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "              // changed.",
+  "test": ""
+ },
+ {
+  "file": "dom/media/MediaManager.cpp",
+  "function": "RefPtr<ConstDeviceSetPromise> MediaManager::GetPhysicalDevices() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "              if (promises == mPendingDevicesPromises) {",
+  "test": ""
+ },
+ {
+  "file": "dom/media/MediaManager.cpp",
+  "function": "RefPtr<ConstDeviceSetPromise> MediaManager::GetPhysicalDevices() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "                mPendingDevicesPromises = nullptr;",
+  "test": ""
+ },
+ {
+  "file": "dom/media/MediaManager.cpp",
+  "function": "RefPtr<ConstDeviceSetPromise> MediaManager::GetPhysicalDevices() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "                mPhysicalDevices = std::move(aDevices);",
+  "test": ""
+ },
+ {
+  "file": "dom/media/MediaManager.cpp",
+  "function": "RefPtr<ConstDeviceSetPromise> MediaManager::GetPhysicalDevices() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "              }",
+  "test": ""
+ },
+ {
+  "file": "dom/media/MediaManager.cpp",
+  "function": "RefPtr<ConstDeviceSetPromise> MediaManager::GetPhysicalDevices() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "            };",
+  "test": ""
+ },
+ {
+  "file": "dom/media/MediaManager.cpp",
+  "function": "RefPtr<ConstDeviceSetPromise> MediaManager::GetPhysicalDevices() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "            // STEALTH-HOOK(fingerprint/media/enumeration)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/MediaManager.cpp",
+  "function": "RefPtr<ConstDeviceSetPromise> MediaManager::GetPhysicalDevices() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "            StealthDeclaredEnumeration(std::move(resolve));",
+  "test": ""
+ }
+]

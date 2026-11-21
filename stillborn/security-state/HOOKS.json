@@ -1,0 +1,34 @@
+[
+ {
+  "file": "security/manager/ssl/RemoteSecuritySettings.sys.mjs",
+  "function": "export var RemoteSecuritySettings = {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    // STEALTH-HOOK(stillborn/security-state)",
+  "test": ""
+ },
+ {
+  "file": "security/manager/ssl/RemoteSecuritySettings.sys.mjs",
+  "function": "export var RemoteSecuritySettings = {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    const { StealthSecurityState } = ChromeUtils.importESModule(\"resource://gre/modules/psm/StealthSecurityState.sys.mjs\");",
+  "test": ""
+ },
+ {
+  "file": "security/manager/ssl/RemoteSecuritySettings.sys.mjs",
+  "function": "export var RemoteSecuritySettings = {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    if (StealthSecurityState.ownsSync()) { return this; }",
+  "test": ""
+ },
+ {
+  "file": "security/manager/ssl/moz.build",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "DIRS += [\"stealth\"]  # STEALTH-HOOK(stillborn/security-state)",
+  "test": ""
+ }
+]

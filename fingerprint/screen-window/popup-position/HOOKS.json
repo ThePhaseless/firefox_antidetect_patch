@@ -1,0 +1,92 @@
+[
+ {
+  "file": "toolkit/components/windowwatcher/nsWindowWatcher.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "#include \"JugglerWindowSize.h\"  // STEALTH-HOOK(automation/window-size)",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/windowwatcher/nsWindowWatcher.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "// STEALTH-HOOK(fingerprint/screen-window/popup-position)",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/windowwatcher/nsWindowWatcher.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "#include \"StealthWindowPlacement.h\"",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/windowwatcher/nsWindowWatcher.cpp",
+  "function": "uint32_t nsWindowWatcher::CalculateChromeFlagsForContent(",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(automation/window-size)",
+  "removed": "  return *aIsPopupRequested ? nsIWebBrowserChrome::CHROME_MINIMAL_POPUP",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/windowwatcher/nsWindowWatcher.cpp",
+  "function": "uint32_t nsWindowWatcher::CalculateChromeFlagsForContent(",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  return *aIsPopupRequested ? mozilla::JugglerPopupChromeFlags(aFeatures)",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/windowwatcher/nsWindowWatcher.cpp",
+  "function": "static void SizeOpenedWindow(nsIDocShellTreeOwner* aTreeOwner,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/screen-window/popup-position)",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/windowwatcher/nsWindowWatcher.cpp",
+  "function": "static void SizeOpenedWindow(nsIDocShellTreeOwner* aTreeOwner,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  const bool stealthPlaced = mozilla::StealthPlacePopupAtDefault(",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/windowwatcher/nsWindowWatcher.cpp",
+  "function": "static void SizeOpenedWindow(nsIDocShellTreeOwner* aTreeOwner,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "      aIsCallerChrome, treeOwnerAsWin, aSizeSpec.mLeft.isSome(),",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/windowwatcher/nsWindowWatcher.cpp",
+  "function": "static void SizeOpenedWindow(nsIDocShellTreeOwner* aTreeOwner,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "      aSizeSpec.mTop.isSome(), left, top);",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/windowwatcher/nsWindowWatcher.cpp",
+  "function": "static void SizeOpenedWindow(nsIDocShellTreeOwner* aTreeOwner,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/screen-window/popup-position)",
+  "removed": "  bool positionSpecified = aSizeSpec.PositionSpecified();",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/windowwatcher/nsWindowWatcher.cpp",
+  "function": "static void SizeOpenedWindow(nsIDocShellTreeOwner* aTreeOwner,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  bool positionSpecified = aSizeSpec.PositionSpecified() || stealthPlaced;",
+  "test": ""
+ }
+]

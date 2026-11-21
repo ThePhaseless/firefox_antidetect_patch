@@ -1,0 +1,1037 @@
+[
+ {
+  "file": ".gitignore",
+  "function": "CLAUDE.local.md",
+  "kind": "add",
+  "form": "unknown",
+  "line": "release-out/",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "# Questo albero non e' mozilla-central: e' il nostro Firefox patchato",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "Ramo `stealth/157`. Le istruzioni di Mozilla qui sopra valgono; queste vengono",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "prima quando si contraddicono.",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "## Sei nell'unico posto dove il sorgente si modifica",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "`C:/ff/source` (da WSL `/mnt/c/ff/source`). Non cercarne un altro e non",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "crearne: **`~/ff-build/firefox-150` e' uno specchio di build**, esiste solo",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "perche' Firefox si compila nativamente su ciascun sistema, e un hook di",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "pre-commit li' rifiuta i commit. Si allinea con `git fetch win stealth/157`.",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "macOS non ha checkout locale, lo costruisce la CI dalla stessa storia.",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "Un solo `.mozconfig`, alla radice, identico per le due macchine - e decide",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "anche cosa costruisce la CI, che non ne ha uno suo e ci appende solo le opzioni",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "per target.",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "Verifica: `python scripts/check_tree_parity.py` dal workbench.",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "## Compilare",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "`./mach build`. E' incrementale. **Mai `mach clobber`**, mai cancellare",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "l'objdir: 15-60 minuti contro 3-4 ore, e il clobber quasi mai risolve qualcosa",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "che non risolva un `mach build`.",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "**Il costo dipende da COSA tocchi, non da quanto scrivi**, e sono ordini di",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "grandezza diversi: un `.cpp` da solo circa 2 minuti; `dom/base/Element.h`, che",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "e' incluso quasi ovunque, 38 minuti per tre righe. Quando la stessa modifica si",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "puo' fare senza toccare un header molto incluso, quella scelta vale mezz'ora e",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "va fatta scrivendo la patch, non dopo. Toccare `.mozconfig` forza un",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "reconfigure.",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "La cache di compilazione e' gia' dichiarata nel `.mozconfig` (`sccache`, anche",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "per Rust) e si usa da sola: non c'e' niente da lanciare prima. Si controlla con",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "`sccache --show-stats`. Il primo giro dopo un reconfigure e' piu' LENTO con la",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "cache che senza, perche' deve popolarsi.",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "## Compilare in CI (`release.yml`)",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "- **Candidata** (`kind=candidate`): compila con sccache appoggiato alla cache",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  di GitHub Actions (`compile_cache=gha`, il default), quindi la corsa dopo una",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  correzione ricompila solo cio' che e' cambiato. Per correggere errori di",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  build si itera cosi', non con corse a freddo.",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "- **Release**: con la cache anche lei (decisione del 03/11). `compile_cache=off`",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  chiede una build a freddo, e `publish.yml` non rifiuta niente per la cache.",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  Si lancia a mano da `main`, una candidata da un ramo; da un tag non parte",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  nessuna build. Una candidata si pubblica senza ricompilare da `republish.yml`.",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "- Ogni build gira con `--keep-going`: una corsa fallita elenca tutti gli",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  errori della gamba, non solo il primo.",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "- La decisione sta in un posto solo, `scripts/release_plan.py` (con i suoi casi",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  in `scripts/test_release_plan.py`); i workflow leggono il piano e basta.",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "- `core_ref` vuoto vuol dire `main`. Una versione nuova del motore passa il ramo",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  del core che la segue: il controllo della superficie giudica il branding che",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  quel core dichiara.",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "## Le due regole che rompono il prodotto se ignorate",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "1. **Ogni spoof passa da una pref** `zoom.stealth.*` o `stealthfox.*` (o",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "   `STEALTHFOX_*` per il contratto binario/Juggler). Mai valori cablati in C++",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "   o in Python, e **mai rinominare quelle pref**: sono il contratto fra il",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "   binario e il wrapper.",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "2. **Sembrare reale, non \"non perdere niente\".** Un segnale soppresso, bloccato",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "   o vuoto e' esso stesso un indizio e vale come fallimento. Prima di scrivere",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "   \"i browser veri fanno cosi'\", provalo su un Firefox retail della stessa",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "   major che dichiariamo.",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "## Dove sta scritto il resto",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "I documenti NON sono in questo albero: stanno nel workbench, in",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "`c:/src/firefox-stealth/docs/firefox-stealth-architecture/`. Si entra da",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "`INDEX.md`, che dice quale file risponde a quale domanda. Le patch e il loro",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "perche' stanno in `20-our-patches.md`, i bug aperti in `70-known-bugs.md`.",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "**Ogni modifica al sorgente aggiorna quei documenti nello stesso lavoro.** Le",
+  "test": ""
+ },
+ {
+  "file": "CLAUDE.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "regole di comportamento complete stanno in `c:/src/firefox-stealth/CLAUDE.md`.",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "# firefox_antidetect_patch",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "[![browser launches](https://raw.githubusercontent.com/oss-invisible/playwright/badges/docs/badges/launches.svg)](https://github.com/oss-invisible/firefox_antidetect_patch/releases/tag/usage-counter)",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "Firefox, patched at the C++ source level so the browser fingerprint is produced by the",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "engine instead of being injected into the page. This repository holds the patched",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "source and publishes the built binaries as releases.",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "It is the engine behind two projects, and most people want one of those instead of",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "this repository:",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "- **[invisible_playwright](https://github.com/oss-invisible/playwright)**, a",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  Python wrapper that drives it through the standard Playwright API.",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "- **[invisible_firefox](https://github.com/feder-cr/invisible_firefox)**, a profile",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  manager for running many identities from one desktop app.",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "Current release: **firefox-18**, built from Firefox 151.0. Branch **`stealth/151`** is",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "the source of truth; see [STEALTH_BRANCH_README.md](STEALTH_BRANCH_README.md) for the",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "patch series.",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "## What is patched, and why it is done here",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "An injected script has to run inside the page, which means the page can find it. The",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "override is a function whose source can be printed, its result can be compared against",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "a value nobody thought to change with it, and a worker or an iframe can ask the same",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "question in a context the patch never reached. Doing it in the engine removes the seam",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "instead of hiding it.",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "The surfaces set from source: navigator and the user agent,",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "[screen geometry](https://github.com/oss-invisible/playwright/blob/main/docs/screen-size-headless-tells.md),",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "[WebGL vendor and renderer strings](https://github.com/oss-invisible/playwright/blob/main/docs/webgl-renderer-strings.md)",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "with [their numeric limits](https://github.com/oss-invisible/playwright/blob/main/docs/webgl-parameters-are-identical.md),",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "canvas pixel output, [the font set](https://github.com/oss-invisible/playwright/blob/main/docs/bundled-fonts-cross-platform.md),",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "[the audio pipeline](https://github.com/oss-invisible/playwright/blob/main/docs/audiocontext-fingerprinting.md),",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "[WebRTC ICE candidates](https://github.com/oss-invisible/playwright/blob/main/docs/webrtc-ice-candidate-spoofing.md),",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "timezone, locale, and the proxy path.",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "Every value arrives through a preference, so nothing is hardcoded in C++ and one seed",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "reproduces one machine. What each of those surfaces reveals, and what it costs to get",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "right, is written up one at a time in the pages linked above.",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "## Pointer input and page zoom",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "Juggler accepts pointer positions in page CSS pixels. Mouse input, native",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "cursor motion and wheel hit positions account for the page's current browser",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "zoom, including site-specific zoom restored from a persistent profile.",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "Device scaling is handled separately by Gecko; callers should not multiply",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "pointer coordinates by `window.devicePixelRatio`. Landing verification remains",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "enabled.",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "## Anonymous launch counter",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "This build issues a single HTTPS GET to a public asset on",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "[oss-invisible/firefox_antidetect_patch](https://github.com/oss-invisible/firefox_antidetect_patch/releases/tag/usage-counter)",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "every time the browser process starts. That asset's `download_count` is the global",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "launch counter in the badge above, which also carries the 1,162,836 launches counted",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "before 2026-07-22 (the asset was hosted elsewhere until then, and its count cannot be",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "carried over, so the badge adds the two).",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "What is sent:",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "- One `GET https://github.com/oss-invisible/firefox_antidetect_patch/releases/download/usage-counter/launch.txt`",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "- A standard Firefox User-Agent. No identifiers, no payload, no cookies.",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "When it fires:",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "- At `final-ui-startup`, before any tab exists and before web content can observe the",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  request from a page context.",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "- Fire and forget. Errors are swallowed and the browser never blocks on the network.",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "It is not optional: the request is made at every start, to this address, and nothing",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "in the package or in a setting skips it or moves it. The address is a constant in",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "[`browser/components/StealthLaunchCounter.sys.mjs`](browser/components/StealthLaunchCounter.sys.mjs).",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "Why it exists: the build is given away, and archive download counts both undercount",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "and overcount, because caches and mirrors hide real installs while CI re-pulls inflate",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "them. A per-launch ping is the closest honest signal of how many installs are real.",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "## Bugs and questions",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "File them in this repository's issue tracker. Please do not file them at Mozilla: this",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "is an unaffiliated fork, and the patches here are not theirs.",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "---",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "# Firefox (upstream)",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "This project is a fork of Firefox. It is not affiliated with or endorsed by Mozilla.",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "The upstream project's own README follows, because everything in it is still true of",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "the code this fork is built on.",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "Bugs in Firefox itself belong at [bugzilla.mozilla.org](https://bugzilla.mozilla.org/). Bugs in this fork do not; see above.",
+  "removed": "We use [bugzilla.mozilla.org](https://bugzilla.mozilla.org/) as our issue tracker, please file bugs there.",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "* [Firefox Source Docs](https://firefox-source-docs.mozilla.org/) is the primary documentation repository",
+  "removed": "* [Firefox Source Docs](https://firefox-source-docs.mozilla.org/) is our primary documentation repository",
+  "test": ""
+ },
+ {
+  "file": "README.md",
+  "function": "",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "* Nightly development builds can be downloaded from the [Firefox Nightly page](https://www.mozilla.org/firefox/channel/desktop/#nightly)",
+  "removed": "* Nightly development builds can be downloaded from [Firefox Nightly page](https://www.mozilla.org/firefox/channel/desktop/#nightly)",
+  "test": ""
+ }
+]

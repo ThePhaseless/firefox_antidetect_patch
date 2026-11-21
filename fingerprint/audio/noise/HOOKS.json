@@ -1,0 +1,130 @@
+[
+ {
+  "file": "dom/media/gtest/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"TestStealthAudioNoise.cpp\"]  # STEALTH-HOOK(fingerprint/audio/noise)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/gtest/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"TestStealthMediaDeclaration.cpp\"]  # STEALTH-HOOK(fingerprint/media/decode-declaration)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webaudio/AnalyserNode.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthAudioNoise.h\"  // STEALTH-HOOK(fingerprint/audio/noise)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webaudio/AnalyserNode.cpp",
+  "function": "void AnalyserNode::GetFloatFrequencyData(const Float32Array& aArray) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    // STEALTH-HOOK(fingerprint/audio/noise)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webaudio/AnalyserNode.cpp",
+  "function": "void AnalyserNode::GetFloatFrequencyData(const Float32Array& aArray) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    StealthAddFrequencyNoise(aData, length);",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webaudio/AnalyserNode.cpp",
+  "function": "void AnalyserNode::GetFloatTimeDomainData(const Float32Array& aArray) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    // STEALTH-HOOK(fingerprint/audio/noise)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webaudio/AnalyserNode.cpp",
+  "function": "void AnalyserNode::GetFloatTimeDomainData(const Float32Array& aArray) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    StealthAddTimeDomainNoise(aData, length);",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webaudio/AudioDestinationNode.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthAudioNoise.h\"  // STEALTH-HOOK(fingerprint/audio/noise)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webaudio/AudioDestinationNode.cpp",
+  "function": "class OfflineDestinationNodeEngine final : public AudioNodeEngine {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "      // STEALTH-HOOK(fingerprint/audio/noise)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webaudio/AudioDestinationNode.cpp",
+  "function": "class OfflineDestinationNodeEngine final : public AudioNodeEngine {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "      StealthAddOfflineAudioNoise(aInput.IsNull(), i, inputChannelCount,",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webaudio/AudioDestinationNode.cpp",
+  "function": "class OfflineDestinationNodeEngine final : public AudioNodeEngine {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "                                  mWriteIndex, mLength, duration, outputData);",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webaudio/DynamicsCompressorNode.h",
+  "function": "namespace mozilla::dom {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "// STEALTH-HOOK(fingerprint/audio/noise)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webaudio/DynamicsCompressorNode.h",
+  "function": "namespace mozilla::dom {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "float StealthPerturbCompressorReduction(float aReduction);",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webaudio/DynamicsCompressorNode.h",
+  "function": "class DynamicsCompressorNode final : public AudioNode {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    // STEALTH-HOOK(fingerprint/audio/noise)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webaudio/DynamicsCompressorNode.h",
+  "function": "class DynamicsCompressorNode final : public AudioNode {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    aReduction = StealthPerturbCompressorReduction(aReduction);",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webaudio/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"StealthAudioNoise.cpp\"]  # STEALTH-HOOK(fingerprint/audio/noise)",
+  "test": ""
+ }
+]

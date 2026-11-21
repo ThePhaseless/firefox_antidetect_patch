@@ -1,0 +1,1258 @@
+[
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "use crate::glyph_cache::GlyphCache;",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "use glyph_rasterizer::{GlyphRasterizer, SharedFontResources};",
+  "removed": "use glyph_rasterizer::GlyphRasterizer;",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "pub struct RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    /// The font resources shared by every window of this backend's pool (the instance the pool's scene",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "pub struct RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    /// builder has too). A window's resource cache clears a namespace's fonts out of them; this handle is",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "pub struct RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    /// for a namespace whose window was unregistered first: `ApiMsg::UnregisterWindow` goes on the direct",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "pub struct RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    /// channel and `ClearNamespace` through the low-priority scene builder, and the window took its",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "pub struct RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    /// resource cache with it, so nobody else would ever take those fonts out.",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "pub struct RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    fonts: SharedFontResources,",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        fonts: SharedFontResources,",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "            fonts,",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    /// A namespace's `RenderApi` was dropped: its resources and documents go.",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    ///",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    /// The resource cache of the window clears the images and glyphs (its own) and the fonts (shared by",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    /// the pool); when the window is no longer registered the shared fonts are cleared here, or they would",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    /// stay in the pool for as long as it lives: a web font of a closed page is up to a few MB, kept once",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    /// per distinct font.",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    fn clear_namespace(&mut self, backend_id: RenderBackendId, id: IdNamespace) {",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        if let Some(win) = self.windows.get_mut(&backend_id) {",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "            win.resource_cache.clear_namespace(id);",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        } else {",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "            self.fonts.clear_namespace(id);",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        }",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        self.documents.retain(|doc_id, _doc| doc_id.namespace_id != id);",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        self.document_to_window.retain(|doc_id, _| doc_id.namespace_id != id);",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    }",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "                self.clear_namespace(backend_id, id);",
+  "removed": "                if let Some(win) = self.windows.get_mut(&backend_id) {\n                    win.resource_cache.clear_namespace(id);\n                }\n                self.documents.retain(|doc_id, _doc| doc_id.namespace_id != id);\n                self.document_to_window.retain(|doc_id, _| doc_id.namespace_id != id);",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "#[cfg(test)]",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "mod clear_namespace_tests {",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    use super::*;",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    use api::channel::unbounded_channel;",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    use api::{FontKey, FontTemplate};",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    use std::sync::Arc;",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    fn backend_with_a_font_of(namespace: u32) -> (RenderBackend, SharedFontResources) {",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        let mut fonts = SharedFontResources::new(IdNamespace(0));",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        let key = FontKey::new(IdNamespace(namespace), 1);",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        let template = FontTemplate::Raw(Arc::new(vec![1, 2, 3, 4]), 0);",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        let shared = fonts.font_keys.add_key(&key, &template).expect(\"a first font gets a shared key\");",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        fonts.templates.add_font(shared, template);",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        let (_api_tx, api_rx) = unbounded_channel::<ApiMsg>();",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        let (scene_tx, _scene_rx) = unbounded_channel::<SceneBuilderRequest>();",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        let backend = RenderBackend::new(api_rx, scene_tx, None, false, fonts.clone());",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        (backend, fonts)",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    }",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    /// The message the scene builder sends the backend when a `RenderApi` was dropped, for a backend",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    /// that has no window registered under that id: `UnregisterWindow` came first.",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    #[test]",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    fn the_fonts_of_a_namespace_leave_the_shared_resources_when_its_window_is_gone() {",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        let (mut backend, fonts) = backend_with_a_font_of(7);",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        assert_eq!(fonts.templates.len(), 1);",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        let mut frames = 0;",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        backend.process_scene_builder_result(",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "            SceneBuilderResult::ClearNamespace(RenderBackendId(1), IdNamespace(7)),",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "            &mut frames,",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        );",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        assert_eq!(fonts.templates.len(), 0, \"the font of a namespace whose window left stays in the pool for good\");",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    }",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    #[test]",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    fn the_fonts_of_another_namespace_stay() {",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        let (mut backend, fonts) = backend_with_a_font_of(7);",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        let mut frames = 0;",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        backend.process_scene_builder_result(",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "            SceneBuilderResult::ClearNamespace(RenderBackendId(1), IdNamespace(8)),",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "            &mut frames,",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        );",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        assert_eq!(fonts.templates.len(), 1);",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    }",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "}",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend_pool.rs",
+  "function": "impl RenderBackendPool {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        let rb_fonts = fonts.clone();",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend_pool.rs",
+  "function": "impl RenderBackendPool {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "                rb_fonts,",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/resource_cache.rs",
+  "function": "impl ResourceCache {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "        // The shared font resources are cleared by SharedFontResources::clear_namespace, which a",
+  "removed": "        // First clear out any non-shared resources associated with the namespace.\n        self.resources.fonts.instances.clear_namespace(namespace);\n        let deleted_keys = self.resources.fonts.templates.clear_namespace(namespace);\n        self.glyph_rasterizer.delete_fonts(&deleted_keys);",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/resource_cache.rs",
+  "function": "impl ResourceCache {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "        // namespace whose window left first is cleared through as well (RenderBackend::clear_namespace);",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/resource_cache.rs",
+  "function": "impl ResourceCache {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "        // what is left here is what only this window has.",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/resource_cache.rs",
+  "function": "impl ResourceCache {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "        let cleared = self.resources.fonts.clear_namespace(namespace);",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/resource_cache.rs",
+  "function": "impl ResourceCache {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "        self.glyph_rasterizer.delete_fonts(&cleared.local_font_keys);",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/resource_cache.rs",
+  "function": "impl ResourceCache {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "        if !cleared.shared_instance_keys.is_empty() {",
+  "removed": "        let shared_instance_keys = self.resources.fonts.instance_keys.clear_namespace(namespace);\n        if !shared_instance_keys.is_empty() {\n            self.resources.fonts.instances.delete_font_instances(&shared_instance_keys);\n            self.cached_glyphs.delete_font_instances(&shared_instance_keys, &mut self.glyph_rasterizer);",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/resource_cache.rs",
+  "function": "impl ResourceCache {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "            self.cached_glyphs.delete_font_instances(&cleared.shared_instance_keys, &mut self.glyph_rasterizer);",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/resource_cache.rs",
+  "function": "impl ResourceCache {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "        if !cleared.shared_font_keys.is_empty() {",
+  "removed": "        let shared_keys = self.resources.fonts.font_keys.clear_namespace(namespace);\n        if !shared_keys.is_empty() {\n            self.glyph_rasterizer.delete_fonts(&shared_keys);\n            self.resources.fonts.templates.delete_fonts(&shared_keys);\n            self.cached_glyphs.delete_fonts(&shared_keys);",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/resource_cache.rs",
+  "function": "impl ResourceCache {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "            self.glyph_rasterizer.delete_fonts(&cleared.shared_font_keys);",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/resource_cache.rs",
+  "function": "impl ResourceCache {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "            self.cached_glyphs.delete_fonts(&cleared.shared_font_keys);",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/webrender/src/resource_cache.rs",
+  "function": "impl ResourceCache {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "                for &key in &cleared.shared_font_keys {",
+  "removed": "                for &key in &shared_keys {",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "pub struct SharedFontResources {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "/// What `SharedFontResources::clear_namespace` took out, for the owner of a window's resource cache to",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "pub struct SharedFontResources {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "/// remove from the glyph rasterizer and the glyph cache, which are not shared.",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "pub struct SharedFontResources {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "#[derive(Default)]",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "pub struct SharedFontResources {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "pub struct ClearedFonts {",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "pub struct SharedFontResources {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    /// The font keys of the namespace's own templates (not shared with another namespace).",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "pub struct SharedFontResources {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    pub local_font_keys: Vec<FontKey>,",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "pub struct SharedFontResources {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    /// The shared font keys that no namespace refers to any more.",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "pub struct SharedFontResources {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    pub shared_font_keys: Vec<FontKey>,",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "pub struct SharedFontResources {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    /// The shared font instance keys that no namespace refers to any more.",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "pub struct SharedFontResources {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    pub shared_instance_keys: Vec<FontInstanceKey>,",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "pub struct SharedFontResources {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "}",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "impl SharedFontResources {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    /// Takes everything a namespace put in the shared font resources out of them: its own templates and",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "impl SharedFontResources {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    /// instances, its mappings to shared keys, and the shared templates and instances that were left",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "impl SharedFontResources {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    /// with no mapping.",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "impl SharedFontResources {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    ///",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "impl SharedFontResources {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    /// This is the part of clearing a namespace that does not need a window: a namespace's fonts live here,",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "impl SharedFontResources {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    /// in the resources every window of a pool shares, and a namespace whose window was unregistered before",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "impl SharedFontResources {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    /// its `ClearNamespace` arrived has no resource cache to clear them through.",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "impl SharedFontResources {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    pub fn clear_namespace(&mut self, namespace: IdNamespace) -> ClearedFonts {",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "impl SharedFontResources {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        // First clear out any non-shared resources associated with the namespace.",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "impl SharedFontResources {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        self.instances.clear_namespace(namespace);",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "impl SharedFontResources {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        let local_font_keys = self.templates.clear_namespace(namespace);",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "impl SharedFontResources {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        // Then any shared instance keys that were remapped from the namespace.",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "impl SharedFontResources {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        let shared_instance_keys = self.instance_keys.clear_namespace(namespace);",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "impl SharedFontResources {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        self.instances.delete_font_instances(&shared_instance_keys);",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "impl SharedFontResources {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        // Finally any shared font keys that were remapped from the namespace.",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "impl SharedFontResources {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        let shared_font_keys = self.font_keys.clear_namespace(namespace);",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "impl SharedFontResources {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        self.templates.delete_fonts(&shared_font_keys);",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "impl SharedFontResources {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        ClearedFonts { local_font_keys, shared_font_keys, shared_instance_keys }",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "impl SharedFontResources {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    }",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "mod test_glyph_rasterizer {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "#[cfg(test)]",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "mod test_glyph_rasterizer {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "mod test_shared_fonts_clear_namespace {",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "mod test_glyph_rasterizer {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    use super::*;",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "mod test_glyph_rasterizer {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    use std::sync::Arc;",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "mod test_glyph_rasterizer {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    /// What a window's resource cache does when a font is added: map the key to a shared key",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "mod test_glyph_rasterizer {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    /// (one per distinct bytes), and store the template once.",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "mod test_glyph_rasterizer {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    fn add(fonts: &mut SharedFontResources, namespace: u32, id: u32, bytes: &[u8]) {",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "mod test_glyph_rasterizer {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        let key = FontKey::new(IdNamespace(namespace), id);",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "mod test_glyph_rasterizer {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        let template = FontTemplate::Raw(Arc::new(bytes.to_vec()), 0);",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "mod test_glyph_rasterizer {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        if let Some(shared) = fonts.font_keys.add_key(&key, &template) {",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "mod test_glyph_rasterizer {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "            fonts.templates.add_font(shared, template);",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "mod test_glyph_rasterizer {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        }",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "mod test_glyph_rasterizer {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    }",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "mod test_glyph_rasterizer {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    #[test]",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "mod test_glyph_rasterizer {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    fn a_namespace_takes_its_fonts_out_of_the_shared_resources() {",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "mod test_glyph_rasterizer {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        let mut fonts = SharedFontResources::new(IdNamespace(0));",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "mod test_glyph_rasterizer {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        add(&mut fonts, 7, 1, b\"font one\");",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "mod test_glyph_rasterizer {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        add(&mut fonts, 7, 2, b\"font two\");",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "mod test_glyph_rasterizer {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        assert_eq!(fonts.templates.len(), 2);",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "mod test_glyph_rasterizer {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        let cleared = fonts.clear_namespace(IdNamespace(7));",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "mod test_glyph_rasterizer {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        assert_eq!(fonts.templates.len(), 0, \"the templates of the namespace stay in the shared resources\");",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "mod test_glyph_rasterizer {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        assert!(fonts.font_keys.keys().is_empty());",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "mod test_glyph_rasterizer {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        assert_eq!(cleared.shared_font_keys.len(), 2);",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "mod test_glyph_rasterizer {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    }",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "mod test_glyph_rasterizer {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    #[test]",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "mod test_glyph_rasterizer {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    fn a_font_two_namespaces_have_stays_until_the_last_one_is_cleared() {",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "mod test_glyph_rasterizer {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        let mut fonts = SharedFontResources::new(IdNamespace(0));",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "mod test_glyph_rasterizer {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        add(&mut fonts, 7, 1, b\"the same bytes\");",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "mod test_glyph_rasterizer {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        add(&mut fonts, 8, 1, b\"the same bytes\");",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "mod test_glyph_rasterizer {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        assert_eq!(fonts.templates.len(), 1, \"the bytes are stored once\");",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "mod test_glyph_rasterizer {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        let first = fonts.clear_namespace(IdNamespace(7));",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "mod test_glyph_rasterizer {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        assert_eq!(fonts.templates.len(), 1);",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "mod test_glyph_rasterizer {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        assert!(first.shared_font_keys.is_empty());",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "mod test_glyph_rasterizer {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        let last = fonts.clear_namespace(IdNamespace(8));",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "mod test_glyph_rasterizer {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        assert_eq!(fonts.templates.len(), 0);",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "mod test_glyph_rasterizer {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        assert_eq!(last.shared_font_keys.len(), 1);",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "mod test_glyph_rasterizer {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    }",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "mod test_glyph_rasterizer {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    #[test]",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "mod test_glyph_rasterizer {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    fn another_namespace_is_not_touched() {",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "mod test_glyph_rasterizer {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        let mut fonts = SharedFontResources::new(IdNamespace(0));",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "mod test_glyph_rasterizer {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        add(&mut fonts, 7, 1, b\"font of seven\");",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "mod test_glyph_rasterizer {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        add(&mut fonts, 8, 1, b\"font of eight\");",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "mod test_glyph_rasterizer {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "        fonts.clear_namespace(IdNamespace(7));",
+  "test": "",
+  "anchor": "",
+  "why": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "mod test_glyph_rasterizer {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        assert_eq!(fonts.templates.len(), 1);",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "mod test_glyph_rasterizer {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        assert_eq!(fonts.font_keys.keys().len(), 1);",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "mod test_glyph_rasterizer {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    }",
+  "test": ""
+ },
+ {
+  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
+  "function": "mod test_glyph_rasterizer {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "}",
+  "test": ""
+ }
+]

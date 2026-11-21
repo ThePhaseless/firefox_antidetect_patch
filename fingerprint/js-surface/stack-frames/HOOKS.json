@@ -1,0 +1,50 @@
+[
+ {
+  "file": "js/src/vm/SavedStacks.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"vm/StealthStackFrames.h\"  // STEALTH-HOOK(fingerprint/js-surface/stack-frames)",
+  "test": ""
+ },
+ {
+  "file": "js/src/vm/SavedStacks.cpp",
+  "function": "JS_PUBLIC_API bool BuildStackString(JSContext* cx, JSPrincipals* principals,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "      if (StealthIsJugglerFrameSource(frame->getSource())) {",
+  "test": ""
+ },
+ {
+  "file": "js/src/vm/SavedStacks.cpp",
+  "function": "JS_PUBLIC_API bool BuildStackString(JSContext* cx, JSPrincipals* principals,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        frame = nextFrame;",
+  "test": ""
+ },
+ {
+  "file": "js/src/vm/SavedStacks.cpp",
+  "function": "JS_PUBLIC_API bool BuildStackString(JSContext* cx, JSPrincipals* principals,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        skippedAsync = skippedNextAsync;",
+  "test": ""
+ },
+ {
+  "file": "js/src/vm/SavedStacks.cpp",
+  "function": "JS_PUBLIC_API bool BuildStackString(JSContext* cx, JSPrincipals* principals,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        continue;",
+  "test": ""
+ },
+ {
+  "file": "js/src/vm/SavedStacks.cpp",
+  "function": "JS_PUBLIC_API bool BuildStackString(JSContext* cx, JSPrincipals* principals,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "      }  // STEALTH-HOOK(fingerprint/js-surface/stack-frames)",
+  "test": ""
+ }
+]

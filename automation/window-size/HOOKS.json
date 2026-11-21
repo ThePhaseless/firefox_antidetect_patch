@@ -1,0 +1,18 @@
+[
+ {
+  "file": "toolkit/components/windowwatcher/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"JugglerWindowSize.cpp\"]  # STEALTH-HOOK(automation/window-size)",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/windowwatcher/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"StealthWindowPlacement.cpp\"]  # STEALTH-HOOK(fingerprint/screen-window/popup-position)",
+  "test": ""
+ }
+]

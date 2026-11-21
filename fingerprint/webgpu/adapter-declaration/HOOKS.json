@@ -1,0 +1,243 @@
+[
+ {
+  "file": "dom/webgpu/Adapter.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthWebGPUDeclaration.h\"  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
+  "test": ""
+ },
+ {
+  "file": "dom/webgpu/Adapter.cpp",
+  "function": "uint32_t AdapterInfo::SubgroupMaxSize() const {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
+  "test": ""
+ },
+ {
+  "file": "dom/webgpu/Adapter.cpp",
+  "function": "uint32_t AdapterInfo::SubgroupMaxSize() const {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (const auto declared = StealthWebGPUDeclaredIsFallback(mParent.get())) {",
+  "test": ""
+ },
+ {
+  "file": "dom/webgpu/Adapter.cpp",
+  "function": "uint32_t AdapterInfo::SubgroupMaxSize() const {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    return *declared;",
+  "test": ""
+ },
+ {
+  "file": "dom/webgpu/Adapter.cpp",
+  "function": "uint32_t AdapterInfo::SubgroupMaxSize() const {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  }",
+  "test": ""
+ },
+ {
+  "file": "dom/webgpu/Adapter.cpp",
+  "function": "struct FeatureImplementationStatus {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "static std::string_view ToJsKey(const Limit limit);  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
+  "test": ""
+ },
+ {
+  "file": "dom/webgpu/Adapter.cpp",
+  "function": "Adapter::Adapter(Instance* const aParent, WebGPUChild* const aChild,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
+  "test": ""
+ },
+ {
+  "file": "dom/webgpu/Adapter.cpp",
+  "function": "Adapter::Adapter(Instance* const aParent, WebGPUChild* const aChild,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  StealthWebGPUDeclareAdapter(this, aParent, aInfo->id, mFeatures,",
+  "test": ""
+ },
+ {
+  "file": "dom/webgpu/Adapter.cpp",
+  "function": "Adapter::Adapter(Instance* const aParent, WebGPUChild* const aChild,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "                              *mLimits->mFfi, StealthAdaptLimitKey<ToJsKey>);",
+  "test": ""
+ },
+ {
+  "file": "dom/webgpu/Adapter.cpp",
+  "function": "already_AddRefed<dom::Promise> Adapter::RequestDevice(",
+  "kind": "add",
+  "form": "anchor",
+  "line": "    StealthWebGPUClampToReal(ffiDesc, *mInfoInner, StealthAdaptLimitKey<ToJsKey>);  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
+  "test": "",
+  "anchor": "",
+  "why": ""
+ },
+ {
+  "file": "dom/webgpu/Instance.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthWebGPUDeclaration.h\"  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
+  "test": ""
+ },
+ {
+  "file": "dom/webgpu/Instance.cpp",
+  "function": "already_AddRefed<dom::Promise> Instance::RequestAdapter(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
+  "test": ""
+ },
+ {
+  "file": "dom/webgpu/Instance.cpp",
+  "function": "already_AddRefed<dom::Promise> Instance::RequestAdapter(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (StealthWebGPUNoAdapter()) {",
+  "test": ""
+ },
+ {
+  "file": "dom/webgpu/Instance.cpp",
+  "function": "already_AddRefed<dom::Promise> Instance::RequestAdapter(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    promise->MaybeResolve(JS::NullValue());",
+  "test": ""
+ },
+ {
+  "file": "dom/webgpu/Instance.cpp",
+  "function": "already_AddRefed<dom::Promise> Instance::RequestAdapter(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    return promise.forget();",
+  "test": ""
+ },
+ {
+  "file": "dom/webgpu/Instance.cpp",
+  "function": "already_AddRefed<dom::Promise> Instance::RequestAdapter(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  }",
+  "test": ""
+ },
+ {
+  "file": "dom/webgpu/Instance.cpp",
+  "function": "already_AddRefed<dom::Promise> Instance::RequestAdapter(",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  StealthWebGPUNoteRequest(this, adapter_id, aOptions.mForceFallbackAdapter);  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
+  "test": "",
+  "anchor": "",
+  "why": ""
+ },
+ {
+  "file": "dom/webgpu/ipc/WebGPUParent.cpp",
+  "function": "extern void wgpu_parent_swap_chain_drop(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  *aOutLuid = {};  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
+  "test": ""
+ },
+ {
+  "file": "dom/webgpu/moz.build",
+  "function": "h_and_cpp = [",
+  "kind": "add",
+  "form": "registration",
+  "line": "EXPORTS.mozilla.webgpu += [\"StealthWebGPUDeclaration.h\"]  # STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
+  "test": ""
+ },
+ {
+  "file": "dom/webgpu/moz.build",
+  "function": "h_and_cpp = [",
+  "kind": "add",
+  "form": "registration",
+  "line": "SOURCES += [\"StealthWebGPUDeclaration.cpp\"]  # STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxPlatform.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/webgpu/StealthWebGPUDeclaration.h\"  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxPlatform.cpp",
+  "function": "void gfxPlatform::InitWebGPUConfig() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  mozilla::webgpu::StealthWebGPUPlatformInit();  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration): Linux's Vulkan driver is ours; external textures are on as on Windows",
+  "removed": "#if !defined(XP_WIN) && !defined(XP_MACOSX)",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxPlatform.cpp",
+  "function": "void gfxPlatform::InitWebGPUConfig() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "#if !defined(XP_WIN) && !defined(XP_MACOSX) && 0",
+  "test": ""
+ },
+ {
+  "file": "gfx/wgpu_bindings/src/server.rs",
+  "function": "pub extern \"C\" fn wgpu_server_new(owner: WebGPUParentPtr) -> *mut Global {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    #[path = \"stealth_webgpu_env.rs\"] mod stealth_webgpu_env; stealth_webgpu_env::without_host_env(&mut instance_flags); // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
+  "test": ""
+ },
+ {
+  "file": "gfx/wgpu_bindings/src/server.rs",
+  "function": "unsafe fn process_message(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "            #[path = \"stealth_webgpu_adapter.rs\"] mod stealth_webgpu_adapter; stealth_webgpu_adapter::settle(global, &desc, adapter_id, &mut result); // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
+  "test": ""
+ },
+ {
+  "file": "modules/libpref/init/StaticPrefList.yaml",
+  "function": "",
+  "kind": "rewrite",
+  "form": "declared-value",
+  "line": "  value: true  # STEALTH-HOOK(fingerprint/webgpu/adapter-declaration): Windows' value on every OS",
+  "removed": "  value: false",
+  "test": ""
+ },
+ {
+  "file": "modules/libpref/init/StaticPrefList.yaml",
+  "function": "",
+  "kind": "rewrite",
+  "form": "declared-value",
+  "line": "  value: 0  # STEALTH-HOOK(network/proxy): direct, the host's proxy settings are never read",
+  "removed": "  value: 5",
+  "test": ""
+ },
+ {
+  "file": "modules/libpref/init/StaticPrefList.yaml",
+  "function": "",
+  "kind": "rewrite",
+  "form": "declared-value",
+  "line": "  value: 30000  # STEALTH-HOOK(network/doh): the TRR-only timeout; a proxied lookup is TRR_ONLY per request in global mode 0",
+  "removed": "  value: 1500",
+  "test": ""
+ },
+ {
+  "file": "modules/libpref/init/StaticPrefList.yaml",
+  "function": "",
+  "kind": "rewrite",
+  "form": "declared-value",
+  "line": "  value: false  # STEALTH-HOOK(network/doh): the host's hosts file is never read, not even at start-up",
+  "removed": "  value: true",
+  "test": ""
+ }
+]

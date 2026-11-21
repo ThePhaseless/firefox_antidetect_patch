@@ -1,0 +1,42 @@
+[
+ {
+  "file": "gfx/gl/GLContext.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthGLMultisample.h\"  // STEALTH-HOOK(fingerprint/webgl/multisample)",
+  "test": ""
+ },
+ {
+  "file": "gfx/gl/GLContext.cpp",
+  "function": "bool GLContext::InitImpl() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  const bool stealthMultisample = IsSupported(GLFeature::framebuffer_multisample);  // STEALTH-HOOK(fingerprint/webgl/multisample)",
+  "test": ""
+ },
+ {
+  "file": "gfx/gl/GLContext.cpp",
+  "function": "bool GLContext::InitImpl() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (StealthDeclaredMultisample(stealthMultisample)) mAvailableFeatures[size_t(GLFeature::framebuffer_multisample)] = true;  // STEALTH-HOOK(fingerprint/webgl/multisample)",
+  "test": ""
+ },
+ {
+  "file": "gfx/gl/gtest/moz.build",
+  "function": "include(\"/ipc/chromium/chromium-config.mozbuild\")",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"TestStealthGLMultisample.cpp\"]  # STEALTH-HOOK(fingerprint/webgl/multisample)",
+  "test": ""
+ },
+ {
+  "file": "gfx/gl/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"StealthGLMultisample.cpp\"]  # STEALTH-HOOK(fingerprint/webgl/multisample)",
+  "test": ""
+ }
+]

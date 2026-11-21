@@ -1,0 +1,579 @@
+[
+ {
+  "file": "browser/fonts/moz.build",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "include(\"StealthFonts.mozbuild\")  # STEALTH-HOOK(fingerprint/fonts/bundle)",
+  "test": ""
+ },
+ {
+  "file": "browser/installer/package-manifest.in",
+  "function": "",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "#if defined(XP_WIN) || defined(MOZ_WIDGET_GTK) || defined(XP_MACOSX)",
+  "removed": "#if defined(XP_WIN) || defined(MOZ_WIDGET_GTK)",
+  "test": ""
+ },
+ {
+  "file": "gfx/2d/ScaledFontDWrite.cpp",
+  "function": "bool UnscaledFontDWrite::GetFontDescriptor(FontDescriptorOutput aCb,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/fonts/bundle)",
+  "test": ""
+ },
+ {
+  "file": "gfx/2d/ScaledFontDWrite.cpp",
+  "function": "bool UnscaledFontDWrite::GetFontDescriptor(FontDescriptorOutput aCb,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  if (!mPercorsoDichiarato.empty()) {",
+  "test": ""
+ },
+ {
+  "file": "gfx/2d/ScaledFontDWrite.cpp",
+  "function": "bool UnscaledFontDWrite::GetFontDescriptor(FontDescriptorOutput aCb,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    aCb(reinterpret_cast<const uint8_t*>(mPercorsoDichiarato.c_str()),",
+  "test": ""
+ },
+ {
+  "file": "gfx/2d/ScaledFontDWrite.cpp",
+  "function": "bool UnscaledFontDWrite::GetFontDescriptor(FontDescriptorOutput aCb,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        (mPercorsoDichiarato.size() + 1) * sizeof(WCHAR), mFontFace->GetIndex(),",
+  "test": ""
+ },
+ {
+  "file": "gfx/2d/ScaledFontDWrite.cpp",
+  "function": "bool UnscaledFontDWrite::GetFontDescriptor(FontDescriptorOutput aCb,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        aBaton);",
+  "test": ""
+ },
+ {
+  "file": "gfx/2d/ScaledFontDWrite.cpp",
+  "function": "bool UnscaledFontDWrite::GetFontDescriptor(FontDescriptorOutput aCb,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    return true;",
+  "test": ""
+ },
+ {
+  "file": "gfx/2d/ScaledFontDWrite.cpp",
+  "function": "bool UnscaledFontDWrite::GetFontDescriptor(FontDescriptorOutput aCb,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  }",
+  "test": ""
+ },
+ {
+  "file": "gfx/2d/UnscaledFontDWrite.h",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include <string>",
+  "test": ""
+ },
+ {
+  "file": "gfx/2d/UnscaledFontDWrite.h",
+  "function": "class ScaledFontDWrite;",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/fonts/bundle)",
+  "test": ""
+ },
+ {
+  "file": "gfx/2d/UnscaledFontDWrite.h",
+  "function": "class ScaledFontDWrite;",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "                     const RefPtr<IDWriteFont>& aFont,",
+  "removed": "                     const RefPtr<IDWriteFont>& aFont)\n      : mFontFace(aFontFace), mFont(aFont) {}",
+  "test": ""
+ },
+ {
+  "file": "gfx/2d/UnscaledFontDWrite.h",
+  "function": "class ScaledFontDWrite;",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "                     const std::wstring& aFilePath = std::wstring())",
+  "test": ""
+ },
+ {
+  "file": "gfx/2d/UnscaledFontDWrite.h",
+  "function": "class ScaledFontDWrite;",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "      : mFontFace(aFontFace), mFont(aFont), mPercorsoDichiarato(aFilePath) {}",
+  "test": ""
+ },
+ {
+  "file": "gfx/2d/UnscaledFontDWrite.h",
+  "function": "class UnscaledFontDWrite final : public UnscaledFont {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/fonts/bundle)",
+  "test": ""
+ },
+ {
+  "file": "gfx/2d/UnscaledFontDWrite.h",
+  "function": "class UnscaledFontDWrite final : public UnscaledFont {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  std::wstring mPercorsoDichiarato;",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/FontData.h",
+  "function": "class FontData final {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/fonts/bundle): bytes lent by the bundle cache.",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/FontData.h",
+  "function": "class FontData final {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  enum class Borrowed { Yes };",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/FontData.h",
+  "function": "class FontData final {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  FontData(const uint8_t* aData, uint32_t aLength, Borrowed)",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/FontData.h",
+  "function": "class FontData final {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "      : mData(aData), mLength(aLength), mBorrowed(true) {}",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/FontData.h",
+  "function": "class FontData final {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  ~FontData() {",
+  "removed": "  ~FontData() { free(const_cast<uint8_t*>(mData)); }",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/FontData.h",
+  "function": "class FontData final {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "    if (!mBorrowed) {  // STEALTH-HOOK(fingerprint/fonts/bundle)",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/FontData.h",
+  "function": "class FontData final {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "      free(const_cast<uint8_t*>(mData));",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/FontData.h",
+  "function": "class FontData final {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "    }",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/FontData.h",
+  "function": "class FontData final {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  }",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/FontData.h",
+  "function": "class FontData final {",
+  "kind": "add",
+  "form": "member",
+  "line": "  bool const mBorrowed = false;  // STEALTH-HOOK(fingerprint/fonts/bundle)",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxDWriteFontList.h",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include <string>",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxDWriteFontList.h",
+  "function": "class gfxDWriteFontEntry final : public gfxFontEntry {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/fonts/bundle)",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxDWriteFontList.h",
+  "function": "class gfxDWriteFontEntry final : public gfxFontEntry {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  uint16_t mBundleFaceIndex = 0;",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxDWriteFontList.h",
+  "function": "class gfxDWriteFontEntry final : public gfxFontEntry {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  std::wstring mBundleFilePath;",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxDWriteFontList.h",
+  "function": "class gfxDWriteFontList final : public gfxPlatformFontList {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/fonts/bundle)",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxDWriteFontList.h",
+  "function": "class gfxDWriteFontList final : public gfxPlatformFontList {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  already_AddRefed<gfxFontEntry> CreateStealthBundleFontEntry(",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxDWriteFontList.h",
+  "function": "class gfxDWriteFontList final : public gfxPlatformFontList {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "      mozilla::fontlist::Face* aFace, const mozilla::fontlist::Family* aFamily);",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxFcPlatformFontList.h",
+  "function": "struct default_delete<FcObjectSet> {",
+  "kind": "add",
+  "form": "member",
+  "line": "  friend struct StealthFcAccess;  // STEALTH-HOOK(fingerprint/fonts/bundle)",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxFontEntry.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthBundleFontList.h\"  // STEALTH-HOOK(fingerprint/fonts/bundle)",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxFontEntry.cpp",
+  "function": "bool gfxFontEntry::SetSkrifaFont(SkrifaFontRef* aSkrifaFont) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "// STEALTH-HOOK(fingerprint/fonts/bundle)",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxFontEntry.cpp",
+  "function": "bool gfxFontEntry::SetSkrifaFont(SkrifaFontRef* aSkrifaFont) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "bool gfxFontEntry::ShouldPublishCharacterMap() const {",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxFontEntry.cpp",
+  "function": "bool gfxFontEntry::SetSkrifaFont(SkrifaFontRef* aSkrifaFont) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  return StealthBundleFontList::ShouldPublishCharacterMap(*this);",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxFontEntry.cpp",
+  "function": "bool gfxFontEntry::SetSkrifaFont(SkrifaFontRef* aSkrifaFont) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "}",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxFontEntry.h",
+  "function": "class gfxFontEntry {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "    // STEALTH-HOOK(fingerprint/fonts/bundle)",
+  "removed": "    operator hb_face_t*() const { return mFace; }",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxFontEntry.h",
+  "function": "class gfxFontEntry {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "    operator hb_face_t*() const& { return mFace; }",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxFontEntry.h",
+  "function": "class gfxFontEntry {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "    operator hb_face_t*() const&& = delete;",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxFontEntry.h",
+  "function": "class gfxFontEntry {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/fonts/bundle)",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxFontEntry.h",
+  "function": "class gfxFontEntry {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  bool ShouldPublishCharacterMap() const;",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxFontUtils.cpp",
+  "function": "static int DirEntryCmp(const void* aKey, const void* aItem) {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "                                               uint32_t aTableTag,",
+  "removed": "                                               uint32_t aTableTag) {\n  const SFNTHeader* header = reinterpret_cast<const SFNTHeader*>(aFontData);",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxFontUtils.cpp",
+  "function": "static int DirEntryCmp(const void* aKey, const void* aItem) {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "                                               uint32_t aFaceIndex) {",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxFontUtils.cpp",
+  "function": "static int DirEntryCmp(const void* aKey, const void* aItem) {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/fonts/bundle)",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxFontUtils.cpp",
+  "function": "static int DirEntryCmp(const void* aKey, const void* aItem) {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  const SFNTHeader* header = FindSfntOffset(aFontData, aFaceIndex);",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxFontUtils.cpp",
+  "function": "static int DirEntryCmp(const void* aKey, const void* aItem) {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  if (!header) {",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxFontUtils.cpp",
+  "function": "static int DirEntryCmp(const void* aKey, const void* aItem) {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "    return nullptr;",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxFontUtils.cpp",
+  "function": "static int DirEntryCmp(const void* aKey, const void* aItem) {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  }",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxFontUtils.cpp",
+  "function": "TableDirEntry* gfxFontUtils::FindTableDirEntry(const void* aFontData,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "                                              uint32_t aTableTag,",
+  "removed": "                                              uint32_t aTableTag) {\n  const TableDirEntry* dir = FindTableDirEntry(aFontData, aTableTag);",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxFontUtils.cpp",
+  "function": "TableDirEntry* gfxFontUtils::FindTableDirEntry(const void* aFontData,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "                                              uint32_t aFaceIndex) {",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxFontUtils.cpp",
+  "function": "TableDirEntry* gfxFontUtils::FindTableDirEntry(const void* aFontData,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  const TableDirEntry* dir =",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxFontUtils.cpp",
+  "function": "TableDirEntry* gfxFontUtils::FindTableDirEntry(const void* aFontData,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "      FindTableDirEntry(aFontData, aTableTag, aFaceIndex);",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxFontUtils.h",
+  "function": "class gfxFontUtils {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/fonts/bundle)",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxFontUtils.h",
+  "function": "class gfxFontUtils {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  static const mozilla::SFNTHeader* FindSfntOffset(const void* aFontData,",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxFontUtils.h",
+  "function": "class gfxFontUtils {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "                                                   uint32_t aFaceIndex);",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxFontUtils.h",
+  "function": "class gfxFontUtils {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "                                                   uint32_t aTableTag,",
+  "removed": "                                                   uint32_t aTableTag);",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxFontUtils.h",
+  "function": "class gfxFontUtils {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "                                                   uint32_t aFaceIndex = 0);",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxFontUtils.h",
+  "function": "class gfxFontUtils {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "                                         uint32_t aTableTag,",
+  "removed": "                                         uint32_t aTableTag);",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxFontUtils.h",
+  "function": "class gfxFontUtils {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "                                         uint32_t aFaceIndex = 0);",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxPlatformGtk.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthBundleFontList.h\"  // STEALTH-HOOK(fingerprint/fonts/bundle)",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxPlatformGtk.cpp",
+  "function": "static const char kFontNotoSansSymbols2[] = \"Noto Sans Symbols2\";",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/fonts/bundle)",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxPlatformGtk.cpp",
+  "function": "static const char kFontNotoSansSymbols2[] = \"Noto Sans Symbols2\";",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  StealthAppendWindowsFallbackNames(PrefersColor(aPresentation), aFontList);",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxTextRun.cpp",
+  "function": "already_AddRefed<gfxFont> gfxFontGroup::FindFallbackFaceForChar(",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/fonts/bundle)",
+  "removed": "  if (!aFamily->IsFullyInitialized() &&\n      StaticPrefs::gfx_font_rendering_fallback_async() &&\n      !XRE_IsParentProcess()) {",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/gfxTextRun.cpp",
+  "function": "already_AddRefed<gfxFont> gfxFontGroup::FindFallbackFaceForChar(",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  if (!aFamily->IsFullyInitialized() && pfl->MayDeferCmapLoading()) {",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/moz.build",
+  "function": "USE_LIBS += [",
+  "kind": "add",
+  "form": "unknown",
+  "line": "include(\"StealthDeclarationGate.mozbuild\")  # STEALTH-HOOK(platform/declaration-gate)",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/moz.build",
+  "function": "USE_LIBS += [",
+  "kind": "add",
+  "form": "unknown",
+  "line": "include(\"StealthBundleFontList.mozbuild\")  # STEALTH-HOOK(fingerprint/fonts/bundle)",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/moz.build",
+  "function": "USE_LIBS += [",
+  "kind": "add",
+  "form": "unknown",
+  "line": "include(\"StealthFcFontList.mozbuild\")  # STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": ""
+ },
+ {
+  "file": "gfx/thebes/moz.build",
+  "function": "USE_LIBS += [",
+  "kind": "add",
+  "form": "unknown",
+  "line": "include(\"StealthDesignMetrics.mozbuild\")  # STEALTH-HOOK(fingerprint/fonts/metrics)",
+  "test": ""
+ }
+]

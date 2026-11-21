@@ -1,0 +1,90 @@
+[
+ {
+  "file": "dom/media/webaudio/AudioContext.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/StaticPrefs_zoom.h\"",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webaudio/AudioContext.cpp",
+  "function": "double AudioContext::OutputLatency() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/audio/context-values)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webaudio/AudioContext.cpp",
+  "function": "double AudioContext::OutputLatency() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  {",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webaudio/AudioContext.cpp",
+  "function": "double AudioContext::OutputLatency() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    int32_t latency_ms = mozilla::StaticPrefs::zoom_stealth_audio_output_latency_ms();",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webaudio/AudioContext.cpp",
+  "function": "double AudioContext::OutputLatency() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    if (latency_ms > 0) return latency_ms / 1000.0;",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webaudio/AudioContext.cpp",
+  "function": "double AudioContext::OutputLatency() {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  }",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webaudio/AudioContext.cpp",
+  "function": "void AudioContext::UnregisterActiveNode(AudioNode* aNode) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  // STEALTH-HOOK(fingerprint/audio/context-values)",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webaudio/AudioContext.cpp",
+  "function": "void AudioContext::UnregisterActiveNode(AudioNode* aNode) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  {",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webaudio/AudioContext.cpp",
+  "function": "void AudioContext::UnregisterActiveNode(AudioNode* aNode) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    int32_t ch = mozilla::StaticPrefs::zoom_stealth_audio_max_channel_count();",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webaudio/AudioContext.cpp",
+  "function": "void AudioContext::UnregisterActiveNode(AudioNode* aNode) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    if (ch > 0) return (uint32_t)ch;",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webaudio/AudioContext.cpp",
+  "function": "void AudioContext::UnregisterActiveNode(AudioNode* aNode) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  }",
+  "test": ""
+ }
+]

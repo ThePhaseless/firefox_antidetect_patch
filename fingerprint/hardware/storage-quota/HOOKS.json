@@ -1,0 +1,35 @@
+[
+ {
+  "file": "dom/quota/OriginOperations.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthQuotaEstimate.h\"  // STEALTH-HOOK(fingerprint/hardware/storage-quota)",
+  "test": ""
+ },
+ {
+  "file": "dom/quota/OriginOperations.cpp",
+  "function": "void EstimateOp::GetResponse(RequestResponse& aResponse) {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  estimateResponse.limit() =",
+  "removed": "  estimateResponse.limit() = mUsageAndLimit.second;",
+  "test": ""
+ },
+ {
+  "file": "dom/quota/OriginOperations.cpp",
+  "function": "void EstimateOp::GetResponse(RequestResponse& aResponse) {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "      StealthEstimateLimit(mUsageAndLimit.second, mScope == Scope::Origin);  // STEALTH-HOOK(fingerprint/hardware/storage-quota)",
+  "test": ""
+ },
+ {
+  "file": "dom/quota/test/gtest/moz.build",
+  "function": "UNIFIED_SOURCES = [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"TestStealthQuotaEstimate.cpp\"]  # STEALTH-HOOK(fingerprint/hardware/storage-quota)",
+  "test": ""
+ }
+]
