@@ -477,12 +477,19 @@ jobs:
           SUITE: ${{ matrix.suite }}
           WRAPPER_REF: ${{ inputs.wrapper_ref }}
         run: |
-          if python3 -c "import json,os,sys; sys.exit(0 if any(r.get('id') == os.environ['SUITE'] for r in json.load(open('ci/required-suites.json', encoding='utf-8'))) else 1)"; then
-            echo "LISTED=1" >> "$GITHUB_ENV"
-          else
-            echo "LISTED=0" >> "$GITHUB_ENV"
-            echo "::warning::$SUITE is not in ci/required-suites.json of wrapper_ref $WRAPPER_REF yet: the leg is said, not run (its row ends this)"
-          fi
+          # exit 0: listed; exit 3: not listed; anything else (no interpreter, no list, a list that does not parse) is red, never "not listed".
+          # A listed suite whose leg then reports nothing is red in wrapper-e2e-complete ("has no result: the leg did not report").
+          PY="$(command -v python3 || command -v python)"
+          set +e
+          "$PY" -c "import json,os,sys; sys.exit(0 if any(r.get('id') == os.environ['SUITE'] for r in json.load(open('ci/required-suites.json', encoding='utf-8'))) else 3)"
+          rc=$?
+          set -e
+          case "$rc" in
+            0) echo "LISTED=1" >> "$GITHUB_ENV" ;;
+            3) echo "LISTED=0" >> "$GITHUB_ENV"
+               echo "::warning::$SUITE is not in ci/required-suites.json of wrapper_ref $WRAPPER_REF yet: the leg is said, not run (its row ends this)" ;;
+            *) echo "::error::the list of wrapper_ref could not be read ($rc): the leg cannot know whether $SUITE is required"; exit 1 ;;
+          esac
       - name: Download asset
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:

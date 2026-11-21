@@ -128,6 +128,16 @@ def cases() -> list:
         len(listed) == 1 and 0 <= listed[0] < suite
         and sorted(guarded) == sorted(["The suite - every listed test runs and passes", "The leg ran with the pinned GeoIP database", "Verdict - required suite"]))
 
+    # ... and a suite that IS listed and reports nothing stays red: the completeness job runs whatever the legs did, on the candidate's list
+    comp = gate["jobs"].get("wrapper-e2e-complete", {})
+    comp_run = " ".join(str(s.get("run", "")) for s in comp.get("steps", []))
+    listed_run = steps[listed[0]]["run"] if len(listed) == 1 else ""
+    add("gate legs: a listed suite with no result is red (wrapper-e2e-complete runs always, after the legs, `complete` on the candidate's list), "
+        "and a list the leg cannot read is red, never 'not listed'",
+        comp.get("needs") in ("wrapper-e2e", ["wrapper-e2e"]) and "always()" in str(comp.get("if", ""))
+        and "complete --required ci/required-suites.json" in comp_run
+        and "3) " in listed_run and "*) " in listed_run and "exit 1" in listed_run.split("*) ", 1)[-1])
+
     # the real release.yml: the check runs before the node
     release = yaml.safe_load((WORKFLOWS / "release.yml").read_text(encoding="utf-8"))
     rsteps = release["jobs"]["checks"]["steps"]
