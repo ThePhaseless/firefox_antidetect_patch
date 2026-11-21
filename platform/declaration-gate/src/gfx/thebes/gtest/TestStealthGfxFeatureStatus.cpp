@@ -16,6 +16,10 @@
 #include "nsIGfxInfo.h"
 #include "nsIObserver.h"
 
+#ifdef MOZ_WIDGET_GTK
+#  include "mozilla/GfxInfo.h"
+#endif
+
 using namespace mozilla;
 using namespace mozilla::gfx;
 
@@ -154,31 +158,37 @@ TEST(StealthGfxFeatureStatus, EveryBrokenRuleIsRefused)
   }
 }
 
-// On GTK the only WebGL path is native GL, which WEBGL_OPENGL gates; on
-// Windows it gates WGL, which retail never takes (ANGLE is the path).
+// On GTK the only WebGL path is native GL, which WEBGL_OPENGL gates, so it
+// answers the declared WEBGL entry and nothing about the host is probed; on
+// Windows it gates WGL, which retail never takes (ANGLE is the path), and
+// keeps its own declared entry.
 TEST(StealthGfxFeatureStatus, WebglOpenglGatesTheWebglPathOfThisPlatform)
 {
   StealthGfxFeatureTable table;
   nsAutoCString error;
   ASSERT_TRUE(StealthParseGfxFeatureStatus(nsDependentCString(kUhd620), table,
                                            error));
+  // The UHD 620 declares WEBGL OK and WEBGL_OPENGL discouraged: the two
+  // answers differ, so which entry is asked is visible.
+  ASSERT_TRUE(table[nsIGfxInfo::FEATURE_WEBGL]);
+  EXPECT_EQ(table[nsIGfxInfo::FEATURE_WEBGL]->mStatus,
+            int32_t(nsIGfxInfo::FEATURE_STATUS_OK));
   nsAutoCString failure;
   int32_t status = 0;
   ASSERT_TRUE(StealthAnswerGfxFeature(table, nsIGfxInfo::FEATURE_WEBGL_OPENGL,
-                                      true, failure, &status));
+                                      failure, &status));
 #ifdef MOZ_WIDGET_GTK
+  EXPECT_EQ(status, table[nsIGfxInfo::FEATURE_WEBGL]->mStatus);
+  EXPECT_TRUE(failure.Equals(table[nsIGfxInfo::FEATURE_WEBGL]->mFailureId));
   EXPECT_EQ(status, int32_t(nsIGfxInfo::FEATURE_STATUS_OK));
   EXPECT_TRUE(failure.IsEmpty());
-  ASSERT_TRUE(StealthAnswerGfxFeature(table, nsIGfxInfo::FEATURE_WEBGL_OPENGL,
-                                      false, failure, &status));
-  EXPECT_EQ(status, int32_t(nsIGfxInfo::FEATURE_BLOCKED_DEVICE));
 #else
   EXPECT_EQ(status, int32_t(nsIGfxInfo::FEATURE_DISCOURAGED));
   EXPECT_TRUE(failure.EqualsLiteral("WEBGL_NATIVE_GL_OLD_INTEL"));
 #endif
   // Outside the live set nothing is answered: Mozilla's path keeps it.
   EXPECT_FALSE(StealthAnswerGfxFeature(table, nsIGfxInfo::FEATURE_INVALID,
-                                       true, failure, &status));
+                                       failure, &status));
 }
 
 // Every live feature, through the real nsIGfxInfo, answers the declared
@@ -198,11 +208,6 @@ TEST(StealthGfxFeatureStatus, EveryLiveFeatureAnswersFromTheDeclaration)
   nsAutoCString error;
   ASSERT_TRUE(StealthParseGfxFeatureStatus(nsDependentCString(kUhd620), table,
                                            error));
-  bool probe = true;
-#ifdef MOZ_WIDGET_GTK
-  nsAutoString testType;
-  probe = NS_SUCCEEDED(gfxInfo->GetTestType(testType)) && !testType.IsEmpty();
-#endif
   for (int32_t id = nsIGfxInfo::FEATURE_START; id < nsIGfxInfo::FEATURE_COUNT;
        ++id) {
     if (!LiveFeature(id)) {
@@ -213,7 +218,7 @@ TEST(StealthGfxFeatureStatus, EveryLiveFeatureAnswersFromTheDeclaration)
     ASSERT_EQ(gfxInfo->GetFeatureStatus(id, failure, &status), NS_OK) << id;
     nsAutoCString wantFailure;
     int32_t want = 0;
-    ASSERT_TRUE(StealthAnswerGfxFeature(table, id, probe, wantFailure, &want));
+    ASSERT_TRUE(StealthAnswerGfxFeature(table, id, wantFailure, &want));
     EXPECT_EQ(status, want) << id;
     EXPECT_TRUE(failure.Equals(wantFailure)) << id;
   }
@@ -260,3 +265,45 @@ TEST(StealthGfxFeatureStatus, NoSuggestedDriverVersionWhileDeclared)
             NS_OK);
   EXPECT_TRUE(version.IsEmpty());
 }
+
+#ifdef MOZ_WIDGET_GTK
+// The host's GL stack (glxtest: the host's libEGL, libGL, libpci, libdrm, a
+// 4 s timeout) is never read. Before this, GetTestType came from that child
+// and WEBGL_OPENGL was blocked when it was empty, so one slow or failed
+// glxtest took WebGL away for the whole session. A fresh GfxInfo is used
+// because the process-wide service was filled in at startup, before any
+// declaration existed (this binary starts as stock Firefox).
+TEST(StealthGfxFeatureStatus, TheHostIsNotProbedWhileDeclared)
+{
+  Declared declared(kRtx3060);
+
+  // No child, whatever was fired before: it reports "not fired".
+  EXPECT_FALSE(widget::GfxInfo::FireGLXTestProcess());
+
+  RefPtr<widget::GfxInfo> info = new widget::GfxInfo();
+  ASSERT_EQ(info->Init(), NS_OK);
+  nsCOMPtr<nsIGfxInfo> gfxInfo = info.get();
+
+  nsAutoString testType;
+  ASSERT_EQ(gfxInfo->GetTestType(testType), NS_OK);
+  EXPECT_TRUE(testType.EqualsLiteral("EGL"));
+
+  nsAutoCString failure;
+  int32_t status = nsIGfxInfo::FEATURE_STATUS_INVALID;
+  ASSERT_EQ(gfxInfo->GetFeatureStatus(nsIGfxInfo::FEATURE_WEBGL_OPENGL,
+                                      failure, &status),
+            NS_OK);
+  EXPECT_EQ(status, int32_t(nsIGfxInfo::FEATURE_STATUS_OK));
+  EXPECT_TRUE(failure.IsEmpty());
+
+  // No adapter, driver or DRM device of the host is reported.
+  nsAutoString text;
+  ASSERT_EQ(gfxInfo->GetAdapterDescription(text), NS_OK);
+  EXPECT_TRUE(text.IsEmpty());
+  ASSERT_EQ(gfxInfo->GetAdapterDriverVendor(text), NS_OK);
+  EXPECT_TRUE(text.IsEmpty());
+  nsAutoCString drm;
+  ASSERT_EQ(gfxInfo->GetDrmRenderDevice(drm), NS_OK);
+  EXPECT_TRUE(drm.IsEmpty());
+}
+#endif

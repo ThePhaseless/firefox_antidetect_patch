@@ -1,6 +1,7 @@
 {
  "modified": [
-  "widget/GfxInfoBase.cpp"
+  "widget/GfxInfoBase.cpp",
+  "widget/gtk/GfxInfo.cpp"
  ],
  "added": {
   "gfx/2d/StealthRefuse.h": "100644",
@@ -34,6 +35,29 @@
    "verifier": {
     "changed": [],
     "why": "Written with the hook, 2026-11-01."
+   }
+  },
+  {
+   "file": "widget/gtk/GfxInfo.cpp",
+   "category": "spoof",
+   "feature": "gfx-feature-status-declared",
+   "prefs": [
+    "zoom.stealth.gfx.feature_status"
+   ],
+   "added": 3,
+   "removed": 0,
+   "hunks": 3,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "after #include \"MediaCodecsSupport.h\"; the top of FireGLXTestProcess; right after GfxInfoBase::GetData() in GetData",
+   "evidence": [
+    "+  if (gfx::StealthNoHostGLProbe()) return false;  // STEALTH-HOOK(platform/declaration-gate)",
+    "+  if (gfx::StealthFillGtkGfxInfoWithoutHost(mTestType, mGlxTestError, mAdapterRAM, mIsWayland, mIsXWayland)) return;  // STEALTH-HOOK(platform/declaration-gate)"
+   ],
+   "notes": "glxtest, the child that dlopens the host's GL stack, is removed from the Linux build: FireGLXTestProcess spawns nothing (this also covers the early fire in XRE_mainStartup) and GetData fills the test type EGL, no glxtest error, no adapter RAM and the display-protocol flags from our own function, leaving every adapter, driver, DRM and PCI field empty. Our own GL is the only GL; WEBGL_OPENGL answers the declared WEBGL status (StealthGfxFeatureStatus.cpp).",
+   "verifier": {
+    "changed": [],
+    "why": "Written with the hook, 2026-11-21."
    }
   }
  ]
