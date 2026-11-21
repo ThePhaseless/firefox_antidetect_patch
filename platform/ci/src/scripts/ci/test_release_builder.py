@@ -96,6 +96,15 @@ def cache_keys(doc: dict, leg, runner_arch: str, on_node: bool) -> set:
     return found
 
 
+DIAGNOSTICS = "diagnostics.yml"
+
+
+def cache_writers(wf: dict) -> list:
+    """Every step of a workflow that can write a cache entry: actions/cache (restore and save in one) or actions/cache/save."""
+    return [s.get("uses", "") for job in (wf.get("jobs") or {}).values() for s in job.get("steps") or []
+            if s.get("uses", "").startswith("actions/cache") and not s.get("uses", "").startswith("actions/cache/restore@")]
+
+
 def series_root():
     """The series repository, whose root holds the workflows GitHub runs: the plan job's
     checkout, this file's own repository, SERIES_REPO, or C:/ff/engine beside a worktree."""
@@ -256,8 +265,16 @@ def group_cache_sharing(doc, jobs, build, steps) -> list:
                 and 'key=lavapipe-${{ matrix.leg }}-' in steps.get("WebGPU's Vulkan driver (linux-x86_64) - its inputs", {}).get("run", "")))
     out.append(("cache: no build leg on GitHub's runners, so none reads an entry the node writes: no executable of the node's runs there",
                 not [l.leg for l in legs.LEGS if not l.node]))
-    all_files = "\n".join(p.read_text(encoding="utf-8") for p in WORKFLOWS.glob("*.yml") if p.name != "release.yml")
-    out.append(("cache: and no other workflow restores a cache at all", "actions/cache" not in all_files))
+    all_files = "\n".join(p.read_text(encoding="utf-8") for p in WORKFLOWS.glob("*.yml") if p.name not in ("release.yml", DIAGNOSTICS))
+    out.append(("cache: and no other workflow restores a cache at all, but diagnostics.yml, which only restores (below)", "actions/cache" not in all_files))
+    # The one exemption: the coverage build of diagnostics.yml restores release's entries (toolchains, sccache binary, Vulkan driver) and saves NOTHING: the
+    # repository's cache is capped (10 GB, least recently used first), and an entry of its own could evict release.yml's and make the next release cold.
+    diag_path = WORKFLOWS / DIAGNOSTICS
+    diag = load(diag_path.read_text(encoding="utf-8")) if diag_path.is_file() else {"jobs": {}}
+    out.append(("cache: diagnostics.yml uses actions/cache/restore only: no save, no actions/cache with a key of its own", not cache_writers(diag)))
+    probe = {"jobs": {"j": {"steps": [{"uses": "actions/cache/restore@x"}, {"uses": "actions/cache/save@x"}, {"uses": "actions/cache@x"}]}}}
+    out.append(("cache: and the check sees a save and a plain actions/cache", cache_writers(probe) == ["actions/cache/save@x", "actions/cache@x"]
+                and not cache_writers({"jobs": {"j": {"steps": [{"uses": "actions/cache/restore@x"}]}}})))
     lavapipe = steps.get("WebGPU's Vulkan driver (linux-x86_64) - built before", {})
     tool = steps.get("Toolchains - restore", {})
     out.append(("cache: the executables' entries are the node legs' only", "matrix.leg == 'linux-x86_64'" in lavapipe.get("if", "") and tool.get("if") == "matrix.node"))

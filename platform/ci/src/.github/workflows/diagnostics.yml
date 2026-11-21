@@ -1,0 +1,660 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# diagnostics.yml — which hook of the series does a test execute? A coverage build of Linux x86_64, our gtests and the wrapper's Linux
+# gate suites run against it, one profile per suite, and a per-hook CSV (scripts/ci/coverage_map.py).
+#
+# A TEST-ONLY BUILD. It publishes nothing: no seal for a release, no draft, no release, no asset. Its archives are named cov-* and live
+# three days. IT SAVES NO CACHE ENTRY AT ALL: the repository's Actions cache is capped (10 GB, least recently used goes first), and an entry of
+# ours could evict release.yml's and make the next release cold. The toolchains, the sccache binary and the Vulkan driver are RESTORED from
+# release.yml's own entries (actions/cache/restore only: scripts/ci/test_release_builder.py holds the workflow to it); the compile cache is
+# sccache's directory on the node's disk and dies with the node.
+#
+# Trigger: a push to a branch `latitude/<name>-diag` (a workflow that only has workflow_dispatch answers 404 until it is on main, so the push is
+# the event; the dispatch is kept). A newer push to the same branch cancels the older run, node and all (`stop-node` turns it off).
+#
+# WHAT IS MEASURED. `--enable-coverage` is the tree's own switch (gcov-style: --coverage in every C and C++ compile; the tree turns the fast
+# shutdown off and defines NS_FREE_PERMANENT_DATA for it, so every child process writes its counters at exit through its atexit hooks). Rust,
+# JavaScript, IDL and build files are not instrumented: the map says so for the hooks written in them. The mozconfig is
+# scripts/ci/coverage_mozconfig.py: opt, no LTO, no PGO, the layers of release's own for the cache, the platform and the machine.
+#
+# PER-SUITE ATTRIBUTION. A suite is one job: its own runner, its own GCOV_PREFIX directory, its own export. The sandbox of the child processes
+# is switched off at run time (MOZ_DISABLE_*_SANDBOX: it is still compiled), because a sandboxed process may not create a .gcda; the one suite
+# that tests the sandbox keeps it, and its children's counters are not in its profile. A browser that is killed instead of quitting writes none.
+#
+# A TEST THAT FAILS ON A COVERAGE BUILD IS NOT A FINDING: each suite's result (rc, tests, failures) goes into its meta, and the job is red only
+# when the suite left NO profile. The map job is red only when the tool broke (no profile, no line mapped, a hook text not in its file).
+#
+# WHAT IT COPIES FROM release.yml (never the scripts' logic, which is called), with the lines it comes from:
+#   plan:       «The last published release» (release.yml 163-170)
+#   node:       «Turn the run's node on...» (349-359)
+#   build:      the apt-free node steps of the `build` job: materialize (478-498), Python (472-474), Rust (630-635), the sccache build and its
+#               environment (684-710), the node's compile jobs (740-745), the Build step with its background phases (778-857), lavapipe (868-883,
+#               1003-1021), the toolchains (600-628, 918-928), «Build - the link» (930-939), the cancel step (943-946)
+#   stop-node:  «Turn both nodes off and see them gone» (1388-1409), without --if-legs-done: no `build-win-x86_64` job exists in this run
+#   suites:     the wrapper's gate steps of gate.yml's `wrapper-e2e` (439-640): the setup, the core under test, the seal, the pytest line
+# The node's second runner (win-x86_64) is started by `provision` as always and stays idle: latitude_node.py has no per-leg option.
+# ─────────────────────────────────────────────────────────────────────────────
+name: diagnostics
+run-name: diagnostics, the hooks a test executes, on ${{ github.ref_name }}
+
+on:
+  push:
+    branches: ['latitude/*-diag']
+  workflow_dispatch:
+    inputs:
+      wrapper_ref:
+        description: 'invisible_playwright ref the suites run against (empty is main)'
+        default: ''
+      core_ref:
+        description: 'invisible_core ref the suites install (empty is main)'
+        default: ''
+
+permissions: { contents: read }
+
+# A newer push to the branch replaces this run, node and all.
+concurrency:
+  group: diagnostics-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions: { actions: read, contents: read }
+    outputs:
+      attempt: ${{ github.run_attempt }}
+      node_label: latitude-${{ github.run_id }}-${{ github.run_attempt }}-linux-x86_64
+      seal_tag: ${{ steps.plan.outputs.seal_tag }}
+      gtest_filter: ${{ steps.plan.outputs.gtest_filter }}
+      core_ref: ${{ steps.plan.outputs.core_ref }}
+      wrapper_ref: ${{ steps.plan.outputs.wrapper_ref }}
+      build_date: ${{ steps.build_date.outputs.build_date }}
+      suites: ${{ steps.suites.outputs.suites }}
+    steps:
+      - name: The series (this repository, this commit)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with: { path: .series, fetch-depth: 1 }
+      # copied from release.yml «The last published release»
+      - name: The last published release
+        id: last_release
+        run: |
+          set -e
+          LAST=$(git ls-remote --tags --refs "https://github.com/${GITHUB_REPOSITORY}" 'refs/tags/firefox-*' \
+            | sed 's#.*refs/tags/firefox-##' | grep -E '^[0-9]+$' | sort -n | tail -1)
+          [ -n "$LAST" ] || { echo "ERROR: no firefox-N tag in ${GITHUB_REPOSITORY}: the number of the next engine is unknown"; exit 1; }
+          echo "last_release=$LAST" | tee -a "$GITHUB_OUTPUT"
+      # release's own planner, as a candidate with the gtests: the seal tag a local seal takes, the gtest filter release.yml runs, the refs
+      - name: Plan (scripts/release_plan.py, as a candidate)
+        id: plan
+        env:
+          LAST_RELEASE: ${{ steps.last_release.outputs.last_release }}
+          REF_NAME: ${{ github.ref_name }}
+          CORE_REF: ${{ inputs.core_ref }}
+          WRAPPER_REF: ${{ inputs.wrapper_ref }}
+        run: |
+          set -e
+          python3 .series/platform/ci/src/scripts/release_plan.py --event workflow_dispatch --kind candidate \
+            --ref-name "$REF_NAME" --ref-type branch --gtests true --core-ref "$CORE_REF" --wrapper-ref "$WRAPPER_REF" \
+            --last-release "$LAST_RELEASE" > plan.txt
+          cat plan.txt
+          cat plan.txt >> "$GITHUB_OUTPUT"
+      - name: One build date for the build
+        id: build_date
+        run: echo "build_date=$(date -u +%Y%m%d%H%M%S)" | tee -a "$GITHUB_OUTPUT"
+      # Every Linux suite of the wrapper's list has a leg below, before a node is turned on (the gate's own check, scripts/ci/gate_legs.py, asks
+      # for the Windows legs too)
+      - name: The wrapper's list of required suites
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          repository: oss-invisible/playwright
+          ref: ${{ steps.plan.outputs.wrapper_ref }}
+          path: .wrapper
+          fetch-depth: 1
+          sparse-checkout: ci/required-suites.json
+      - name: Every Linux suite of the list has its leg
+        run: python3 .series/platform/ci/src/scripts/ci/coverage_map.py legs-check --required .wrapper/ci/required-suites.json --workflow .series/.github/workflows/diagnostics.yml
+      - name: The map's own cases
+        run: python3 .series/platform/ci/src/scripts/ci/test_coverage_map.py
+      - name: The suites this run expects a profile of
+        id: suites
+        run: echo "suites=$(python3 .series/platform/ci/src/scripts/ci/coverage_map.py suites --workflow .series/.github/workflows/diagnostics.yml)" | tee -a "$GITHUB_OUTPUT"
+
+  # copied from release.yml's `node` job: the same environment, the same script
+  node:
+    name: node
+    needs: [plan]
+    if: needs.plan.outputs.attempt == github.run_attempt
+    runs-on: ubuntu-24.04
+    environment: latitude-builder
+    timeout-minutes: 45
+    permissions: { actions: read, contents: read }
+    steps:
+      - name: The series (this repository, this commit)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with: { path: .series, fetch-depth: 1 }
+      - name: Turn the run's node on, prepare it, start one runner per leg
+        env:
+          LATITUDE_API_KEY: ${{ secrets.LATITUDE_API_KEY }}
+          LATITUDE_PROJECT: ${{ secrets.LATITUDE_PROJECT }}
+          LATITUDE_EXCLUDE_SITES: ${{ vars.LATITUDE_EXCLUDE_SITES }}
+          RUNNER_ADMIN_TOKEN: ${{ secrets.RUNNER_ADMIN_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 .series/platform/ci/src/scripts/ci/latitude_node.py provision \
+            --run "$GITHUB_RUN_ID" --attempt "$GITHUB_RUN_ATTEMPT" --upstream .series/UPSTREAM.json
+
+  build:
+    name: build-linux-x86_64-coverage
+    needs: [plan, node]
+    # This run's label, one leg: the label the node's runner was registered with (a rerun of failed jobs has no node, and gets an empty label)
+    runs-on: ${{ needs.plan.outputs.attempt == github.run_attempt && needs.plan.outputs.node_label || '' }}
+    # about twice the expected 90-110 minutes of a cold build with its gtests
+    timeout-minutes: 240
+    permissions: { contents: read }
+    env:
+      MOZ_BUILD_DATE: ${{ needs.plan.outputs.build_date }}
+      CI_LEG: linux-x86_64
+      CARGO_HOME: /home/runner/.cargo
+    steps:
+      - name: Python for the series tool
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with: { python-version: '3.12' }
+      - name: The series (this repository, this commit)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with: { path: .series, fetch-depth: 1 }
+      - name: The source tree, the Mozilla tag with our series applied (tools/engine.py)
+        shell: bash
+        env:
+          GIT_CONFIG_COUNT: '2'
+          GIT_CONFIG_KEY_0: core.splitIndex
+          GIT_CONFIG_VALUE_0: 'true'
+          GIT_CONFIG_KEY_1: checkout.workers
+          GIT_CONFIG_VALUE_1: '0'
+        run: |
+          MATERIALIZE="python .series/tools/engine.py materialize --into ."
+          [ -z "${NODE_SHARED:-}" ] || MATERIALIZE="$MATERIALIZE --shared $NODE_SHARED"
+          python3 .series/platform/ci/src/scripts/ci/background.py start materialize -- $MATERIALIZE
+      - name: The source tree - materialized
+        run: python3 .series/platform/ci/src/scripts/ci/background.py wait materialize
+      - name: Toolchains - their versions
+        id: toolchains-key
+        shell: bash
+        run: |
+          RUST="$(python3 scripts/upstream_toolchain.py --leg linux-x86_64 rust-version)"
+          echo "rust=$RUST" >> "$GITHUB_OUTPUT"
+          echo "key=toolchains-linux-x86_64-rust$RUST-${{ hashFiles('taskcluster/kinds/toolchain/*.yml', 'build/vs/*.yaml', 'build/moz.configure/bootstrap.configure') }}" | tee -a "$GITHUB_OUTPUT"
+      # RESTORE ONLY, release.yml's own entry: this workflow saves no cache entry at all (the repository's Actions cache is capped, and a
+      # multi-GB entry of ours could evict release.yml's and make the next release cold). A miss fetches the toolchains again.
+      - name: Toolchains - restore (release's entry, read only)
+        id: toolchains
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.mozbuild
+            !~/.mozbuild/srcdirs
+            ~/.rustup/toolchains/${{ steps.toolchains-key.outputs.rust }}-x86_64-unknown-linux-gnu
+          key: ${{ steps.toolchains-key.outputs.key }}
+      - name: Rust, the retail's release for this tree
+        run: |
+          RUST="$(python3 scripts/upstream_toolchain.py --leg linux-x86_64 rust-version)"
+          rustup toolchain install "$RUST" --profile minimal --target x86_64-unknown-linux-gnu
+          rustup default "$RUST"
+          rustc --version
+      - name: Compile cache - the sccache binary, if built before (release's entry, read only)
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/sccache-bin
+          key: sccache-bin-${{ runner.os }}-${{ runner.arch }}-node-v0.18.0-${{ hashFiles('scripts/ci/sccache/*.patch') }}
+      - name: Compile cache - build the one sccache this build uses
+        shell: bash
+        run: |
+          SCCACHE_PATH="$(python3 scripts/ci sccache-build --tag v0.18.0 --patches scripts/ci/sccache --out "$HOME/.cache/sccache-bin")"
+          "$SCCACHE_PATH" --version
+          echo "SCCACHE_PATH=$SCCACHE_PATH" >> "$GITHUB_ENV"
+      - name: Compile cache - sccache keeps it on the runner's disk
+        run: |
+          {
+            echo "SCCACHE_DIR=$HOME/.cache/sccache-ci"
+            echo "SCCACHE_CACHE_SIZE=30G"
+            echo "SCCACHE_PINNED_VERSION=0.18.0"
+            echo "SCCACHE_IDLE_TIMEOUT=0"
+          } >> "$GITHUB_ENV"
+      - name: The node - compile jobs from its limits
+        run: |
+          PARALLEL="$(python3 scripts/ci node-parallel)"
+          [ "$PARALLEL" -ge 1 ] || { echo "ERROR: no compile jobs from the node's limits: '$PARALLEL'"; exit 1; }
+          echo "CI_PARALLEL=$PARALLEL" | tee -a "$GITHUB_ENV"
+      - name: The coverage .mozconfig, in layers
+        run: |
+          rm -f mozconfig
+          test -x "$SCCACHE_PATH" || { echo "ERROR: no sccache at SCCACHE_PATH=$SCCACHE_PATH"; exit 1; }
+          python3 scripts/ci/coverage_mozconfig.py --compile-cache gha
+
+      # The toolchain bootstrap (clang, the sysroot, Rust's tools) is configure's: done here, alone, so that what the map needs of the clang is
+      # known in minutes and not after the compile (an hour of a node): its llvm-cov, and that `llvm-cov gcov` knows --json-format.
+      - name: Configure (the toolchain bootstrap), and the coverage tools of the build's clang
+        timeout-minutes: 40
+        run: |
+          python3 scripts/ci phase configure -- ./mach configure
+          python3 scripts/ci/gcov_export.py check-tools --objdir obj-rel
+      - name: Build
+        id: build
+        timeout-minutes: 200
+        run: |
+          python3 -u scripts/memory_watch.py --log memwatch.log &
+          python3 scripts/ci/background.py start build -- python3 scripts/ci phase build -- ./mach build --keep-going
+          python3 scripts/ci/background.py until-compiled build
+          # the gtests' libxul beside the browser's link, as release.yml does
+          python3 scripts/ci/background.py start gtest -- python3 scripts/ci phase gtest -- ./mach build --keep-going recurse_gtest
+      # WebGPU's Vulkan driver and WebGL's GL, from release's own script and (read only) release's entry: the browser does not answer
+      # requestAdapter() or make a WebGL context without them, and a suite that draws would measure nothing
+      - name: WebGPU's Vulkan driver - its inputs
+        id: lavapipe-key
+        if: steps.build.outputs.compiled == 'true'
+        run: echo "key=lavapipe-linux-x86_64-$(python3 scripts/ci/lavapipe_build.py --key)" >> "$GITHUB_OUTPUT"
+      - name: WebGPU's Vulkan driver - built before (release's entry, read only)
+        id: lavapipe-cache
+        if: steps.build.outputs.compiled == 'true'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/lavapipe
+          key: ${{ steps.lavapipe-key.outputs.key }}
+      - name: WebGPU's Vulkan driver - build
+        if: steps.build.outputs.compiled == 'true'
+        run: |
+          python3 scripts/ci/background.py start lavapipe --nice 19 -- \
+            python3 scripts/ci phase lavapipe -- python3 scripts/ci/lavapipe_build.py --out "$HOME/.cache/lavapipe" --jobs "${CI_PARALLEL:-4}"
+      - name: Build - the link
+        id: build-end
+        if: "!cancelled() && steps.build.outcome == 'success'"
+        timeout-minutes: 120
+        run: |
+          python3 scripts/ci/background.py wait build
+          python3 scripts/ci/background.py wait gtest
+      - name: The node - a cancel or a failure ends what runs beside the steps
+        if: cancelled() || failure()
+        timeout-minutes: 2
+        run: python3 scripts/ci/background.py stop build lavapipe gtest
+      - name: WebGPU's Vulkan driver - done
+        id: lavapipe
+        if: steps.build-end.outcome == 'success'
+        timeout-minutes: 150
+        run: |
+          python3 scripts/ci/background.py wait lavapipe
+          mkdir -p obj-rel/dist/bin/lavapipe obj-rel/dist/bin/llvmpipe
+          cp "$HOME/.cache/lavapipe/libvulkan_lvp.so" "$HOME/.cache/lavapipe/VERSION.json" obj-rel/dist/bin/lavapipe/
+          cp "$HOME/.cache/lavapipe/gl/"* obj-rel/dist/bin/llvmpipe/
+          cat obj-rel/dist/bin/lavapipe/VERSION.json
+      # The three archives (scripts/ci/coverage_package.sh): the browser, the gtests' dist/bin, and the notes the map needs
+      - name: Package the coverage build
+        if: steps.lavapipe.outcome == 'success'
+        timeout-minutes: 40
+        env:
+          SERIES_DIR: .series
+        run: python3 scripts/ci phase package -- bash scripts/ci/coverage_package.sh
+      - name: Upload the browser (never a release asset)
+        if: steps.lavapipe.outcome == 'success'
+        timeout-minutes: 30
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: cov-linux-x86_64
+          path: out/cov-linux-x86_64.tar.gz
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 3
+      - name: Upload the gtests' binaries
+        if: steps.lavapipe.outcome == 'success'
+        timeout-minutes: 40
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: cov-gtest-linux-x86_64
+          path: out/cov-gtest-linux-x86_64.tar.gz
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 3
+      - name: Upload the notes of the build
+        if: steps.lavapipe.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: cov-notes-linux-x86_64
+          path: out/cov-notes-linux-x86_64.tar.gz
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 3
+      - name: Upload the logs of a failed build
+        if: failure() || cancelled()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: cov-buildlog
+          path: |
+            logs/
+            memwatch.log
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Compile cache - what this build hit and missed
+        if: always()
+        run: '"$SCCACHE_PATH" --show-stats | tee sccache-stats.txt || true'
+      - name: Upload this build's events
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: cov-events
+          path: |
+            events.jsonl
+            memwatch.log
+            sccache-stats.txt
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # The gtests of release.yml's filter, on the coverage build, in one profile directory of their own
+  gtest:
+    name: gtest-linux-x86_64
+    needs: [plan, build]
+    if: ${{ !cancelled() && needs.build.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: The series (the scripts of the diagnostics)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with: { path: .series, fetch-depth: 1, sparse-checkout: platform/ci/src/scripts }
+      - name: apt - network timeouts and retries
+        run: |
+          printf '%s\n' 'Acquire::http::Timeout "60";' 'Acquire::https::Timeout "60";' 'Acquire::Retries "5";' \
+            | sudo tee /etc/apt/apt.conf.d/80-ci-network >/dev/null
+      - name: A display
+        timeout-minutes: 20
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb gdb
+      - name: The coverage build's gtest binaries
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: cov-gtest-linux-x86_64
+          path: art/gtest
+      - name: The notes of the build
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: cov-notes-linux-x86_64
+          path: art/notes
+      - name: Unpack, and say where the counters go (one directory for this suite)
+        run: |
+          mkdir -p gtest-run notes "$RUNNER_TEMP/gcda"
+          tar -C gtest-run -xzf art/gtest/cov-gtest-linux-x86_64.tar.gz
+          tar -C notes -xzf art/notes/cov-notes-linux-x86_64.tar.gz
+          python3 .series/platform/ci/src/scripts/ci/gcov_export.py env --notes notes --prefix "$RUNNER_TEMP/gcda" | tee -a "$GITHUB_ENV"
+      - name: Engine gtests (release.yml's filter), a failure is a result and not a red
+        env:
+          GTEST_FILTER_INPUT: ${{ needs.plan.outputs.gtest_filter }}
+        run: |
+          mkdir -p result
+          set +e
+          xvfb-run -a python3 .series/platform/ci/src/scripts/ci/gtest_run.py --root gtest-run --reports gtest-reports
+          echo "$?" > result/rc.txt
+          cat result/rc.txt
+      - name: The suite's profile, as an lcov file of the series' files
+        run: |
+          python3 .series/platform/ci/src/scripts/ci/gcov_export.py export --notes notes --gcda "$RUNNER_TEMP/gcda" --suite gtest \
+            --out profile --rc "$(cat result/rc.txt)" --raw profile/gtest.gcda.tar.gz --jobs 4
+      - name: Keep the profile
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: cov-profile-gtest
+          path: |
+            profile
+            gtest-reports
+          if-no-files-found: error
+          retention-days: 7
+
+  # One job per Linux suite of the wrapper's gate: the suites of gate.yml's `wrapper-e2e` (the rows of the wrapper's ci/required-suites.json for
+  # Linux) and the three steps of its `gate` job that read the binary (the drive, the guards, the host gate's dump). The job's name is the suite's.
+  wrapper-e2e:
+    name: ${{ matrix.suite }}
+    needs: [plan, build]
+    if: ${{ !cancelled() && needs.build.result == 'success' }}
+    runs-on: ubuntu-24.04
+    # twice a suite's usual 25 minutes and more: a coverage process writes its counters when it exits, and a browser is many processes
+    timeout-minutes: ${{ matrix.timeout || 75 }}
+    strategy:
+      fail-fast: false
+      # the account's queue is shared with the node's runs: a hunt takes at most 8 jobs
+      max-parallel: 8
+      matrix:
+        include:
+          - { suite: wrapper.e2e.udp, os: linux }
+          # Linux as root: the trap points /etc/resolv.conf at a counting resolver
+          - { suite: wrapper.e2e.udp.exit, os: linux, root: true }
+          # the same road with the browser's sandbox ON: its children's counters are not in this profile
+          - { suite: wrapper.e2e.udp.sandbox, os: linux, sandbox: true }
+          - { suite: wrapper.e2e.web, os: linux }
+          - { suite: wrapper.unit.udp, os: linux }
+          - { suite: wrapper.unit.all.linux, os: linux, timeout: 120 }
+          - { suite: wrapper.e2e.doh, os: linux, root: true }
+          - { suite: wrapper.e2e.realness, os: linux, root: true }
+          - { suite: wrapper.e2e.page, os: linux, timeout: 120 }
+          - { suite: wrapper.unit.page, os: linux }
+          - { suite: wrapper.e2e.context.egress, os: linux, root: true }
+          - { suite: wrapper.e2e.context.sink, os: linux, root: true }
+          - { suite: wrapper.e2e.compositing, os: linux }
+          - { suite: wrapper.unit.compositing, os: linux }
+          - { suite: wrapper.e2e.fontconfig, os: linux }
+          - { suite: wrapper.e2e.securitystate, os: linux }
+          - { suite: wrapper.e2e.fakeweb, os: linux }
+          - { suite: gate.drive, os: linux }
+          - { suite: gate.guards, os: linux }
+          - { suite: gate.hostdump, os: linux }
+    steps:
+      - name: Checkout wrapper (its tests, ci/required-suites.json and scripts/ci_verdict.py)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          repository: oss-invisible/playwright
+          ref: ${{ needs.plan.outputs.wrapper_ref }}
+          fetch-depth: 1
+      - name: The series (the scripts of the diagnostics)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with: { path: .series, fetch-depth: 1, sparse-checkout: platform/ci/src/scripts }
+      - name: The coverage build
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: cov-linux-x86_64
+          path: art/browser
+      - name: The notes of the build
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: cov-notes-linux-x86_64
+          path: art/notes
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with: { python-version: '3.11' }
+      - name: The GeoIP database (made by the repository, same bytes every run)
+        shell: bash
+        run: python scripts/ci_lab_geoip.py build --pin ci/geoip.json
+      - name: The security state (set by the repository, same bytes every run)
+        shell: bash
+        run: python scripts/ci_lab_security_state.py set --pin ci/security-state.pin.json
+      - name: Linux system deps (Firefox runtime libs, a virtual display)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+          if [ "${{ matrix.suite }}" = "wrapper.e2e.fontconfig" ]; then sudo apt-get install -y strace; fi
+          python -m pip install --quiet "playwright==$(cat scripts/playwright_pin.txt)"
+          sudo "$(which python)" -m playwright install-deps firefox
+      - name: Unpack the browser and the notes; say where this suite's counters go
+        shell: bash
+        run: |
+          mkdir -p ff notes "$RUNNER_TEMP/gcda"
+          tar -xzf art/browser/cov-linux-x86_64.tar.gz -C ff
+          tar -xzf art/notes/cov-notes-linux-x86_64.tar.gz -C notes
+          [ -x ff/firefox ] || { echo "ERROR: no firefox in the coverage build"; exit 1; }
+          echo "FF_EXE=$PWD/ff/firefox" >> "$GITHUB_ENV"
+          python3 .series/platform/ci/src/scripts/ci/gcov_export.py env --notes notes --prefix "$RUNNER_TEMP/gcda" | tee -a "$GITHUB_ENV"
+          # A process of the browser may not create a .gcda inside its sandbox, and the core strips the whole MOZ_ family from the
+          # engine's environment (invisible_core/environment.py: HOST_FAMILIES, MOZ_PASSED), so MOZ_DISABLE_*_SANDBOX never reaches the browser from
+          # here. A stand-in does it: the real binary renamed, and a `firefox` of the same place that sets them and execs it (same pid, same
+          # arguments, same descriptors). The core reads the tree beside the entry (application.ini, platform.ini, omni.ja), never the entry's bytes,
+          # so the seal and the launch see the same engine. GCOV_* are not of a family the core strips. The suite that tests the sandbox has none.
+          if [ "${{ matrix.sandbox }}" != "true" ]; then
+            mv ff/firefox ff/firefox.cov-real
+            cat > ff/firefox <<'STANDIN'
+          #!/bin/sh
+          MOZ_DISABLE_CONTENT_SANDBOX=1
+          MOZ_DISABLE_GMP_SANDBOX=1
+          MOZ_DISABLE_RDD_SANDBOX=1
+          MOZ_DISABLE_SOCKET_PROCESS_SANDBOX=1
+          MOZ_DISABLE_UTILITY_SANDBOX=1
+          export MOZ_DISABLE_CONTENT_SANDBOX MOZ_DISABLE_GMP_SANDBOX MOZ_DISABLE_RDD_SANDBOX MOZ_DISABLE_SOCKET_PROCESS_SANDBOX MOZ_DISABLE_UTILITY_SANDBOX
+          exec "$(dirname "$0")/firefox.cov-real" "$@"
+          STANDIN
+            chmod 755 ff/firefox
+          fi
+      # as gate.yml: the core under test is exactly core_ref, from git, over what the wrapper's pin resolves
+      - name: The core under test (core_ref, from git) and the wrapper with its dev extra
+        shell: bash
+        env:
+          CORE_REF: ${{ needs.plan.outputs.core_ref }}
+        run: |
+          export INVISIBLE_CORE_AUTOFIX=off INVISIBLE_CORE_PIN=allow
+          CORE_GIT="git+https://github.com/oss-invisible/core@$CORE_REF"
+          python -m pip install --quiet "$CORE_GIT"
+          python -m pip install --quiet ".[dev]"
+          python -m pip install --quiet --force-reinstall "$CORE_GIT"
+          python -c "from importlib.metadata import version; print('core under test:', version('invisible-core'))"
+      - name: Seal of the binary under test (a local seal, this run's only)
+        shell: bash
+        env:
+          SEAL_TAG: ${{ needs.plan.outputs.seal_tag }}
+        run: |
+          export INVISIBLE_CORE_AUTOFIX=off INVISIBLE_CORE_PIN=allow
+          python -m invisible_core seal --binary "$FF_EXE" --tag "$SEAL_TAG" -o gate.seal.json
+      - name: User namespaces for a normal user (the sandbox leg)
+        if: matrix.sandbox
+        shell: bash
+        run: |
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          unshare -U true && echo "user namespaces: allowed for $(id -un)"
+      # The root legs run an engine of root's that everyone can read (gate.yml says why)
+      - name: The engine where root can run it (the root legs)
+        if: matrix.root
+        shell: bash
+        run: |
+          sudo rm -rf /opt/ff
+          sudo cp -a "$(dirname "$FF_EXE")" /opt/ff
+          sudo chown -R root:root /opt/ff
+          sudo chmod -R go+rX /opt/ff
+          echo "FF_EXE=/opt/ff/$(basename "$FF_EXE")" >> "$GITHUB_ENV"
+      - name: Playwright's own Firefox (the control, the fake web only)
+        if: matrix.suite == 'wrapper.e2e.fakeweb'
+        shell: bash
+        run: python -m playwright install firefox
+      # A failure is a result, never a red: rc, and the junit of the pytest suites, go into the suite's meta
+      - name: The suite, its counters in a directory of its own
+        shell: bash
+        env:
+          SUITE: ${{ matrix.suite }}
+          ROOT: ${{ matrix.root }}
+        run: |
+          export INVISIBLE_CORE_AUTOFIX=off INVISIBLE_CORE_PIN=allow
+          export INVISIBLE_SEAL_FILE="$PWD/gate.seal.json" INVPW_BINARY_PATH="$FF_EXE" STEALTHFOX_E2E_BINARY="$FF_EXE" PYTHONUNBUFFERED=1
+          mkdir -p result
+          set +e
+          case "$SUITE" in
+            gate.drive)
+              python scripts/ci_drive_gate.py "$FF_EXE" --full;;
+            gate.guards)
+              python -m pytest tests/test_hidden_desktop.py "tests/test_fingerprint_surface.py::test_webgl_readpixels_no_masking_signature" \
+                tests/test_webgl_draws_on_the_engine_s_own_gl_e2e.py -m e2e -o addopts='' -q -p no:cacheprovider -p no:rerunfailures \
+                -o junit_family=xunit2 --junitxml="result/$SUITE.xml";;
+            gate.hostdump)
+              python scripts/ci_host_gate.py dump "$FF_EXE" --leg linux-x86_64 --out host-dump;;
+            *)
+              python scripts/ci_verdict.py args --required ci/required-suites.json --suite "$SUITE" --os linux --with-marker > result/args.txt
+              mapfile -t SELECT < <(tr -d '\r' < result/args.txt)
+              PYTEST=(python -m pytest "${SELECT[@]}" -o addopts='' -o junit_family=xunit2 -q -p no:cacheprovider -p no:rerunfailures -rs --junitxml="result/$SUITE.xml")
+              if [ "$ROOT" = "true" ]; then
+                sudo -H -E env -u PYTEST_ADDOPTS -u XDG_RUNTIME_DIR INVPW_REQUIRE_TRAP=1 "PATH=$PATH" "${PYTEST[@]}"
+              else
+                env -u PYTEST_ADDOPTS "${PYTEST[@]}"
+              fi;;
+          esac
+          echo "$?" > result/rc.txt
+          cat result/rc.txt
+      - name: The suite's profile, as an lcov file of the series' files (red only when the suite left no profile)
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          python3 .series/platform/ci/src/scripts/ci/gcov_export.py export --notes notes --gcda "$RUNNER_TEMP/gcda" --suite "${{ matrix.suite }}" \
+            --out profile --rc "$(cat result/rc.txt)" --junit "result/${{ matrix.suite }}.xml" --raw "profile/${{ matrix.suite }}.gcda.tar.gz" --jobs 4
+      - name: Keep the profile
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: cov-profile-${{ matrix.suite }}
+          path: |
+            profile
+            result
+          if-no-files-found: error
+          retention-days: 7
+
+  # Merges the profiles and writes the CSVs. Red only when the tool broke.
+  map:
+    name: map
+    needs: [plan, build, gtest, wrapper-e2e]
+    if: ${{ !cancelled() && needs.build.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: The series (the hooks of every folder, and the scripts)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with: { path: .series, fetch-depth: 1 }
+      - name: The notes of the build
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: cov-notes-linux-x86_64
+          path: art
+      - name: Every suite's profile
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: cov-profile-*
+          path: profiles
+      - name: The map of every hook
+        shell: bash
+        env:
+          SUITES: ${{ needs.plan.outputs.suites }}
+        run: |
+          mkdir -p notes
+          tar -xzf art/cov-notes-linux-x86_64.tar.gz -C notes
+          python3 .series/platform/ci/src/scripts/ci/coverage_map.py map --profiles profiles --source-root notes/sources --series-root .series \
+            --out cov-map --run-id "$GITHUB_RUN_ID" --source-commit "$(cat notes/source-commit.txt)" --series-commit "$(cat notes/series-commit.txt)" \
+            --toolchain "$(head -n 4 notes/versions.txt | tr '\n' ' ')" --strip-prefix "$(cat notes/topsrcdir.txt)" --compiled notes/compiled.json \
+            --expect $SUITES | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Upload the CSVs
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: cov-map
+          path: cov-map
+          if-no-files-found: error
+          retention-days: 90
+
+  # Turns the node off when the build ends, whatever happened (copied from release.yml's `stop-node`). Without --if-legs-done: that option waits
+  # for a `build-win-x86_64` job this run does not have, and the node would stay for the sweeper.
+  stop-node:
+    needs: [plan, node, build]
+    if: always() && needs.plan.result == 'success'
+    runs-on: ubuntu-24.04
+    environment: latitude-builder
+    timeout-minutes: 15
+    permissions: { actions: read, contents: read }
+    steps:
+      - name: The series (this repository, this commit)
+        if: always()
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with: { path: .series, fetch-depth: 1 }
+      - name: Turn the node off and see it gone
+        if: always()
+        timeout-minutes: 12
+        env:
+          LATITUDE_API_KEY: ${{ secrets.LATITUDE_API_KEY }}
+          LATITUDE_PROJECT: ${{ secrets.LATITUDE_PROJECT }}
+          RUNNER_ADMIN_TOKEN: ${{ secrets.RUNNER_ADMIN_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+        run: python3 .series/platform/ci/src/scripts/ci/latitude_node.py off --run "$GITHUB_RUN_ID" --attempt "$GITHUB_RUN_ATTEMPT"

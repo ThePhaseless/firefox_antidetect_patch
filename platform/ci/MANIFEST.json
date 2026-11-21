@@ -1,6 +1,7 @@
 {
  "modified": [],
  "added": {
+  ".github/workflows/diagnostics.yml": "100644",
   ".github/workflows/gate-only.yml": "100644",
   ".github/workflows/gate.yml": "100644",
   ".github/workflows/latitude-sweeper.yml": "100644",
@@ -15,7 +16,11 @@
   "scripts/ci/__main__.py": "100644",
   "scripts/ci/background.py": "100644",
   "scripts/ci/cache_rules.py": "100644",
+  "scripts/ci/coverage_map.py": "100644",
+  "scripts/ci/coverage_mozconfig.py": "100644",
+  "scripts/ci/coverage_package.sh": "100644",
   "scripts/ci/gate_legs.py": "100644",
+  "scripts/ci/gcov_export.py": "100644",
   "scripts/ci/gh_expr.py": "100644",
   "scripts/ci/gtest_run.py": "100644",
   "scripts/ci/input_watch.py": "100644",
@@ -56,6 +61,7 @@
   "scripts/ci/symbols_match.py": "100644",
   "scripts/ci/test_cache_rules.py": "100644",
   "scripts/ci/test_ci.py": "100644",
+  "scripts/ci/test_coverage_map.py": "100644",
   "scripts/ci/test_gate_geoip.py": "100644",
   "scripts/ci/test_gate_legs.py": "100644",
   "scripts/ci/test_gate_protocol_mirror.py": "100644",
