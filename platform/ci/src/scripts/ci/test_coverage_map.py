@@ -114,6 +114,36 @@ end_of_record
 """
 
 
+GCOV_SAMPLE = """\
+        -:    0:Source:/node/src/dom/a.cpp
+        -:    0:Graph:/node/src/obj-rel/dom/u1.gcno
+        -:    0:Data:/gcda/obj-rel/dom/u1.gcda
+        -:    0:Runs:3
+        -:    1:#include "a.h"
+function _Z3Foov called 2 returned 100% blocks executed 100%
+        2:    2:void Foo() {
+        2:    3:  Work();
+       2*:    4:  DoA();  // STEALTH-HOOK(feat/a)
+    #####:    5:  Never();
+    =====:    6:  Thrown();
+        -:    7:}
+call    0 returned 2
+branch  0 taken 2
+branch  1 taken 0
+        -:    0:Source:../../dom/other.cpp
+        -:    0:Graph:/node/src/obj-rel/dom/u1.gcno
+function _Z5Otherv called 0 returned 0% blocks executed 0%
+    #####:   10:int Other() {
+    #####:   11:  return 1;
+        -:    0:Source:/usr/include/c++/v1/vector
+        -:    0:Graph:/node/src/obj-rel/dom/u1.gcno
+        7:    1:T x;
+        -:    0:Source:/node/src/dom/a.h
+        -:    0:Graph:/node/src/obj-rel/dom/u1.gcno
+        5:   30:inline void InHeader() {}
+"""
+
+
 def hook(file, function, line, kind="add", form="unknown"):
     return {"file": file, "function": function, "kind": kind, "form": form, "line": line, "test": ""}
 
@@ -265,18 +295,25 @@ def cases() -> list:
                 found == {"obj-rel/dist/include/mozilla/Foo.h": "dom/Foo.h"})
         except OSError:
             add("notes: dist/include's links (no symlinks on this machine: not run)", True)
-    doc = {"current_working_directory": "/node/src/obj-rel/dom", "files": [
-        {"file": "/node/src/dom/a.cpp", "lines": [{"line_number": 4, "count": 2}, {"line_number": 5, "count": 0}],
-         "functions": [{"name": "_Z3Foov", "demangled_name": "Foo()", "start_line": 2, "execution_count": 2}]},
-        {"file": "../../dom/other.cpp", "lines": [{"line_number": 1, "count": 9}], "functions": []},
-        {"file": "/usr/include/x.h", "lines": [{"line_number": 1, "count": 9}], "functions": []}]}
-    got = ge.parse_gcov_json(doc, topsrc, {"dom/a.cpp", "dom/other.cpp"})
-    add("export: llvm-cov's JSON gives the lines and the functions of the files of the series, and drops the others",
-        sorted(got) == ["dom/a.cpp", "dom/other.cpp"] and got["dom/a.cpp"]["lines"] == {4: 2, 5: 0}
-        and got["dom/a.cpp"]["functions"] == {"Foo()": (2, 2)} and got["dom/other.cpp"]["lines"] == {1: 9})
+    got = ge.parse_gcov_text(GCOV_SAMPLE, topsrc, {"dom/a.cpp", "dom/other.cpp", "dom/a.h"}, base="/node/src/obj-rel/dom")
+    add("export: llvm-cov's text gives the lines (executed, unexecuted, never-run exception blocks) and drops the lines with no code",
+        sorted(got) == ["dom/a.cpp", "dom/a.h", "dom/other.cpp"]
+        and got["dom/a.cpp"]["lines"] == {2: 2, 3: 2, 4: 2, 5: 0, 6: 0} and got["dom/other.cpp"]["lines"] == {10: 0, 11: 0})
+    add("export: a function line gives the function its start line (the line after it) and its count; a header and a relative Source are read; others dropped",
+        got["dom/a.cpp"]["functions"] == {"_Z3Foov": (2, 2)} and got["dom/other.cpp"]["functions"] == {"_Z5Otherv": (10, 0)}
+        and got["dom/a.h"]["lines"] == {30: 5} and "usr/include/c++/v1/vector" not in "".join(got))
+    names = ge.demangle({"f": {"lines": {}, "functions": {"_Z3Foov": (2, 2), "plain": (3, 1)}}}) or None
+    files = {"f": {"lines": {}, "functions": {"_Z3Foov": (2, 2), "plain": (3, 1)}}}
+    import subprocess as _sp
+    ge.demangle(files, lambda cmd, **kw: _sp.CompletedProcess(cmd, 0, "Foo()\n", ""))
+    add("export: mangled names go through c++filt, and stay as they are when it says nothing usable",
+        files["f"]["functions"] == {"Foo()": (2, 2), "plain": (3, 1)} and names is None)
+    gone = {"f": {"lines": {}, "functions": {"_Z3Foov": (2, 2)}}}
+    ge.demangle(gone, lambda cmd, **kw: (_ for _ in ()).throw(FileNotFoundError("c++filt")))
+    add("export: no c++filt on the machine leaves the names mangled", gone["f"]["functions"] == {"_Z3Foov": (2, 2)})
     again = ge.to_lcov(got, "s")
     back = cm.parse_lcov(again)
-    add("export: what it writes is what the map reads", back["dom/a.cpp"]["lines"] == {4: 2, 5: 0} and back["dom/a.cpp"]["functions"]["Foo()"] == (2, 2))
+    add("export: what it writes is what the map reads", back["dom/a.cpp"]["lines"] == {2: 2, 3: 2, 4: 2, 5: 0, 6: 0} and back["dom/a.cpp"]["functions"]["_Z3Foov"] == (2, 2))
 
     with tempfile.TemporaryDirectory() as tmp:
         notes = Path(tmp) / "notes"
@@ -292,8 +329,7 @@ def cases() -> list:
         def fake(cmd, **kw):
             calls.append(cmd)
             import subprocess
-            return subprocess.CompletedProcess(cmd, 0, json.dumps({"files": [{"file": "/node/src/dom/a.cpp", "lines": [{"line_number": 4, "count": 1}],
-                                                                              "functions": []}]}), "")
+            return subprocess.CompletedProcess(cmd, 0, "        -:    0:Source:/node/src/dom/a.cpp\n        1:    4:  DoA();\n", "")
         try:
             ge.export(notes, profile, "s", Path(tmp) / "o", run=fake)
             none = False
@@ -307,7 +343,8 @@ def cases() -> list:
         add("export: each object with a profile is converted once, their counts add, and a red rc is a result (passed false)",
             len(calls) == 2 and "DA:4,2" in text and meta["gcda_files"] == 2 and meta["passed"] is False and meta["rc"] == 1)
         add("export: the converter is called on this object's own .gcno and .gcda",
-            any("--gcno=%s" % (notes / "gcno" / "obj-rel" / "dom" / "u1.gcno") in c and "--gcda=%s" % (profile / "obj-rel" / "dom" / "u1.gcda") in c for c in calls))
+            any("--gcno=%s" % (notes / "gcno" / "obj-rel" / "dom" / "u1.gcno") in c and "--gcda=%s" % (profile / "obj-rel" / "dom" / "u1.gcda") in c
+                and "--stdout" in c and "--branch-probabilities" in c for c in calls))
     with tempfile.TemporaryDirectory() as tmp:
         import subprocess
         bindir = Path(tmp) / "clang" / "bin"
@@ -319,20 +356,45 @@ def cases() -> list:
 
         def helper(text):
             return lambda cmd, **kw: subprocess.CompletedProcess(cmd, 0, text, "")
-        good = ge.check_tools(obj, helper("  --json-format  Output JSON"))
+        full = "  --gcno=<gcno>\n  --gcda=<gcda>\n  --stdout\n  --branch-probabilities\n"
+        good = ge.check_tools(obj, helper(full))
         try:
-            ge.check_tools(obj, helper("  --stdout"))
+            ge.check_tools(obj, helper("  --stdout\n  --gcno=<gcno>\n"))
             refused = False
         except SystemExit as exc:
-            refused = "--json-format" in str(exc)
+            refused = "--gcda" in str(exc) and "--branch-probabilities" in str(exc)
+        # with a clang beside it, the export is tried on a program of a few lines: built, run, converted, read
+        (bindir / "clang").write_text("", encoding="utf-8")
+        seen = []
+
+        def machine(printed):
+            def run(cmd, **kw):
+                seen.append(cmd)
+                if len(cmd) > 1 and cmd[1] == "gcov" and "--help" not in cmd:
+                    return subprocess.CompletedProcess(cmd, 0, printed, "")
+                return subprocess.CompletedProcess(cmd, 0, full if "--help" in cmd else "", "")
+            return run
+        right = "        -:    0:Source:t.c\n        1:    2:  return 2 * x;\n        -:    3:}\n    #####:    5:  return x;\n"
+        ge.check_tools(obj, machine(right), work=Path(tmp) / "w")
+        tried = [c[1:3] for c in seen if str(c[0]).endswith("clang")]
+        try:
+            ge.check_tools(obj, machine("nothing readable\n"), work=Path(tmp) / "w2")
+            unread = False
+        except SystemExit as exc:
+            unread = "cannot read" in str(exc)
+        broken = lambda cmd, **kw: subprocess.CompletedProcess(cmd, 1 if str(cmd[0]).endswith("clang") else 0, full if "--help" in cmd else "", "no linker")
+        warned = ge.check_tools(obj, broken, work=Path(tmp) / "w3").endswith("llvm-cov")
+        (bindir / "clang").unlink()
         (bindir / "llvm-cov").unlink()
         try:
             ge.check_tools(obj, helper(""))
             gone = False
         except SystemExit as exc:
             gone = "no llvm-cov" in str(exc)
-        add("check-tools: the build's llvm-cov is found beside its clang and must list --json-format; one that does not, or none, stops the build early",
+        add("check-tools: llvm-cov is found beside the clang and must list the options the export uses; none, or one that lacks them, stops the build early",
             good.endswith("llvm-cov") and refused and gone)
+        add("check-tools: the export is tried on a program built and run with the build's clang: an output the parser cannot read stops, a program that cannot be built only warns",
+            len(tried) == 2 and all("--coverage" in c for c in tried) and unread and warned)
     add("env: GCOV_PREFIX_STRIP drops the node's directory", ge.strip_count("/home/runner/work/engine/engine") == 5)
 
     with tempfile.TemporaryDirectory() as tmp:

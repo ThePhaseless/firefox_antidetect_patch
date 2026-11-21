@@ -730,7 +730,7 @@ def main() -> int:
         cases += found
     # A floor per module: one that returns fewer cases than it had (an emptied list, a stopped import) is red, not a shorter green. Raise a floor by
     # hand when a case is added; lower it never.
-    floors = {"test_release_checks": 65, "test_gate_geoip": 5, "test_gate_security_state": 4, "test_gate_protocol_mirror": 4, "test_workflow_steps_bind": 18, "test_gate_windows_temp": 19, "test_gate_legs": 23, "test_latitude_node": 294, "test_coverage_map": 43}
+    floors = {"test_release_checks": 65, "test_gate_geoip": 5, "test_gate_security_state": 4, "test_gate_protocol_mirror": 4, "test_workflow_steps_bind": 18, "test_gate_windows_temp": 19, "test_gate_legs": 23, "test_latitude_node": 294, "test_coverage_map": 50}
     short = {name: (len(parts[name]), floor) for name, floor in floors.items() if len(parts[name]) < floor}
     cases.append(("the modules this file runs still bring their cases (a floor each)%s" % ("" if not short else ": fewer than the floor: %s" % short), not short))
 

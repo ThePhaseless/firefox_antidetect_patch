@@ -230,7 +230,7 @@ jobs:
           python3 scripts/ci/coverage_mozconfig.py --compile-cache gha
 
       # The toolchain bootstrap (clang, the sysroot, Rust's tools) is configure's: done here, alone, so that what the map needs of the clang is
-      # known in minutes and not after the compile (an hour of a node): its llvm-cov, and that `llvm-cov gcov` knows --json-format.
+      # known in minutes and not after the compile (an hour of a node): its llvm-cov, that `llvm-cov gcov` lists the options the export uses, and the export on a program of a few lines.
       - name: Configure (the toolchain bootstrap), and the coverage tools of the build's clang
         timeout-minutes: 40
         run: |
