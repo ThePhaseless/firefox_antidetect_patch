@@ -4,6 +4,8 @@
     python tools/engine.py export    write the series from the source tree
     python tools/engine.py verify    rebuild the tree from the series, compare
     python tools/engine.py check     the series' own rules, offline (also in CI)
+    python tools/engine.py hook-debt    drop the entries of tools/hook-debt.json that no longer occur
+                                        (--init writes the list from scratch, --summary only counts it)
     python tools/engine.py apply --head <branch>   the series as a branch: tag + one commit per folder
     python tools/engine.py materialize --into <dir> CI: fetch the tag, apply, check out the tree
     python tools/engine.py drift --to <tag>   our patched Mozilla files that Mozilla changed
@@ -28,6 +30,12 @@ export   writes one folder per feature (tools/layout.py says which):
 verify   rebuilds the tree from the series on top of the tag, in a throwaway git index
          (no checkout of Firefox, works in a bare repository), and compares it with the
          source head's tree. Identical trees mean the series IS the engine.
+
+hook contract (tools/hook_contract.py): every line a hooks.patch adds to a Mozilla file is a hook of one of
+         the forms of STRUCTURE.md (one line, the marker on it, no logic, a Stealth<What> call, never inside a
+         list, no Mozilla line changed but the one of a rewriting form). `check` refuses a violation that is not in
+         tools/hook-debt.json, an entry that no longer occurs, and (against origin/main) an entry main's list does
+         not have: the debt only shrinks. `hook-debt` removes the entries that are gone; it never adds one.
 
 check    needs no Firefox: SERIES lists exactly the folders that exist, every folder has
          its MANIFEST and FEATURE.md, every file of ours is listed and present, each
@@ -66,6 +74,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import births  # noqa: E402
+import hook_contract  # noqa: E402
 import layout  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -73,6 +82,7 @@ INVENTORY = ROOT / "tools" / "inventory.json"
 UPSTREAM = ROOT / "UPSTREAM.json"
 BUDGET = ROOT / "tools" / "hook-budget.json"
 REMOVED_BUDGET = ROOT / "tools" / "removed-budget.json"
+HOOK_DEBT = ROOT / "tools" / "hook-debt.json"
 # The workflows live in the series (the tree's tests read them beside scripts/), and
 # GitHub runs them from this repository's root: export copies them there and check
 # requires the two identical. series.yml and noreply-identity.yml are the root's own.
@@ -1045,16 +1055,32 @@ def main_budget_text(name: str) -> str | None:
     return done.stdout.decode("utf-8") if done.returncode == 0 else None
 
 
-def load_main_budgets() -> tuple[dict, dict]:
-    """Main's hook and removed budgets. Fetches origin/main once if it is not there yet."""
-    texts = [main_budget_text("hook-budget.json"), main_budget_text("removed-budget.json")]
-    if None in texts:
+def ensure_main_ref() -> None:
+    """origin/main resolves, or it is fetched once (depth 1); SystemExit if it still does not."""
+    def resolves():
+        return subprocess.run(["git", "-C", str(ROOT), "rev-parse", "--verify", "-q", "origin/main"],
+                              capture_output=True).returncode == 0
+    if not resolves():
         subprocess.run(["git", "-C", str(ROOT), "fetch", "--no-tags", "--depth=1", "origin",
                         "+refs/heads/main:" + MAIN_REF], capture_output=True)
-        texts = [main_budget_text("hook-budget.json"), main_budget_text("removed-budget.json")]
+    if not resolves():
+        raise SystemExit("cannot read origin/main: fetch it")
+
+
+def load_main_budgets() -> tuple[dict, dict]:
+    """Main's hook and removed budgets. Fetches origin/main once if it is not there yet."""
+    ensure_main_ref()
+    texts = [main_budget_text("hook-budget.json"), main_budget_text("removed-budget.json")]
     if None in texts:
         raise SystemExit("cannot read main's budgets: fetch origin main")
     return json.loads(texts[0]), json.loads(texts[1])
+
+
+def load_main_debt() -> list | None:
+    """Main's hook-debt list, or None while main has none yet."""
+    ensure_main_ref()
+    text = main_budget_text("hook-debt.json")
+    return json.loads(text) if text is not None else None
 
 
 def budget_raise_problems(hook: dict, removed: dict, main_hook: dict, main_removed: dict) -> list:
@@ -1080,12 +1106,26 @@ def budget_raise_problems(hook: dict, removed: dict, main_hook: dict, main_remov
     return found
 
 
+def contract_problems(against_main: bool = False) -> tuple[list, int, int]:
+    """The hook contract against tools/hook-debt.json (and, against_main, against main's list):
+    the problems, the number of hooks and the number of violations."""
+    hooks = hook_contract.series_hooks(ROOT)
+    violations = hook_contract.contract_violations(ROOT)
+    if not HOOK_DEBT.is_file():
+        return ["tools/hook-debt.json is missing: python tools/engine.py hook-debt --init"], len(hooks), len(violations)
+    return (hook_contract.debt_problems(violations, hook_contract.load_debt(HOOK_DEBT),
+                                        load_main_debt() if against_main else None),
+            len(hooks), len(violations))
+
+
 def check(source: Path | None = None, tag: str | None = None, against_main: bool = False) -> int:
     found = problems()
     if against_main:      # the CLI does; it needs git and origin/main, problems() and the tests' fakes do not
         found += budget_raise_problems(json.loads(BUDGET.read_text(encoding="utf-8")),
                                        json.loads(REMOVED_BUDGET.read_text(encoding="utf-8")),
                                        *load_main_budgets())
+    contract, n_hooks, n_violations = contract_problems(against_main)
+    found += contract
     if source is not None and tag:
         found += backport_in_tag_problems(source, tag)
     for p in found:
@@ -1095,6 +1135,8 @@ def check(source: Path | None = None, tag: str | None = None, against_main: bool
         gone = sum(json.loads(REMOVED_BUDGET.read_text(encoding="utf-8")).values())
         print("ok: %d folders, %d of our lines in Mozilla files, %d of Mozilla's lines removed "
               "or rewritten" % (len(series_folders()), total, gone))
+        print("hook contract: %d hooks, %d violations, all in tools/hook-debt.json"
+              % (n_hooks, n_violations))
     return 1 if found else 0
 
 
@@ -1117,6 +1159,23 @@ def shrink_budget() -> None:
     write_json(REMOVED_BUDGET, {p: n for p, n in sorted(removed_budget.items()) if n})
 
 
+def hook_debt(init: bool = False, summary: bool = False) -> int:
+    """Writes tools/hook-debt.json: without --init only the entries that still occur stay (the list
+    never grows by itself); --summary prints the per-rule and per-folder counts and writes nothing."""
+    violations = hook_contract.contract_violations(ROOT)
+    debt = hook_contract.load_debt(HOOK_DEBT)
+    if summary:
+        print(hook_contract.debt_summary(debt))
+        return 0
+    if not HOOK_DEBT.is_file() and not init:
+        raise SystemExit("tools/hook-debt.json does not exist: python tools/engine.py hook-debt --init")
+    kept = hook_contract.update_debt(debt, violations, init)
+    hook_contract.write_debt(HOOK_DEBT, kept)
+    print("tools/hook-debt.json: %d entries (%d before), %d violations now"
+          % (len(kept), len(debt), len(violations)))
+    return 0
+
+
 def status(source: Path, head: str) -> int:
     up = upstream()
     now = git(source, "rev-parse", head).decode().strip()
@@ -1134,7 +1193,7 @@ def main() -> int:
         return births.main(sys.argv[2:])      # its own options: --tree, --repo/--rev, --skeleton, --accept-changed, --prune, --tsv
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("command", choices=["status", "apply", "materialize", "export", "verify", "check",
-                                        "shrink-budget", "drift", "port", "births"])
+                                        "shrink-budget", "hook-debt", "drift", "port", "births"])
     ap.add_argument("--to", help="drift/port: the Mozilla tag to move to (a stable release, never a beta)")
     ap.add_argument("--into", type=Path, default=Path("."), help="materialize: the directory to make the tree")
     ap.add_argument("--shared", type=Path, default=None,
@@ -1143,6 +1202,8 @@ def main() -> int:
     ap.add_argument("--source", type=Path, default=Path(os.environ.get("ENGINE_SOURCE", "C:/ff/source")))
     ap.add_argument("--against", help="check: also try the backports of Mozilla commits against this tag, "
                                       "found in --source (a port does it by itself)")
+    ap.add_argument("--init", action="store_true", help="hook-debt: write the list from every violation of now (once)")
+    ap.add_argument("--summary", action="store_true", help="hook-debt: count the list per rule and folder, write nothing")
     ap.add_argument("--base")
     ap.add_argument("--head", help="the source branch (apply: the branch it creates)")
     ap.add_argument("--force", action="store_true", help="apply: rebuild an existing branch")
@@ -1163,6 +1224,8 @@ def main() -> int:
         return 0
     if a.command == "check":
         return check(a.source, a.against or None, against_main=True)
+    if a.command == "hook-debt":
+        return hook_debt(a.init, a.summary)
     if a.command == "shrink-budget":
         shrink_budget()
         return 0
