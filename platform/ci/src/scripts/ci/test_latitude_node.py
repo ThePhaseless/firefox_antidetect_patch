@@ -1677,7 +1677,7 @@ RUNNER_ENV = {"GITHUB_RUN_ID": "5", "GITHUB_RUN_ATTEMPT": "1", "GITHUB_REF_NAME"
               "GITHUB_REPOSITORY": "o/r", "GITHUB_OUTPUT": os.devnull}
 STEP_VALUES = {"LATITUDE_API_KEY": KEY, "LATITUDE_PROJECT": PROJECT, "RUNNER_ADMIN_TOKEN": "ADMIN", "GH_TOKEN": "TOKEN", "KIND": "release",
                "TAG": "firefox-99", "COMPILE_CACHE": "gha", "CORE_REF": "core-x", "WRAPPER_REF": "wrap-y", "GTESTS": "true",
-               "GTEST_FILTER_INPUT": "X*", "STOP_AFTER": "", "RELAUNCH_OF": "", "ONLY_IF": "--if-legs-done", "LATITUDE_EXCLUDE_SITES": ""}
+               "GTEST_FILTER_INPUT": "X*", "RELAUNCH_OF": "", "ONLY_IF": "--if-legs-done", "LATITUDE_EXCLUDE_SITES": ""}
 
 
 def workflow():

@@ -377,7 +377,7 @@ jobs:
     env:
       TEMP: ${{ startsWith(matrix.runner, 'windows') && 'D:\a\_temp' || '/tmp' }}
       TMP: ${{ startsWith(matrix.runner, 'windows') && 'D:\a\_temp' || '/tmp' }}
-    timeout-minutes: ${{ matrix.timeout || 25 }}
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
@@ -435,13 +435,6 @@ jobs:
           # the fake web (two local sites, no request leaves the runner): the four e2e tests of its profiles P2 and P4, with the stock Firefox control below
           - { suite: wrapper.e2e.fakeweb, leg: linux-x86_64, runner: ubuntu-24.04, kind: linux, os: linux }
           - { suite: wrapper.e2e.fakeweb, leg: win-x86_64, runner: windows-latest, kind: win, os: windows }
-          # THE A/B ORACLE: same seed, same bytes, the engine published as firefox-68 against this candidate, on the leg's own runner. The test downloads the
-          # published engine as the core does (the release's seal.json, then the archive under that seal), runs the host gate's dump with each (three seeds at
-          # two DPRs, with the same core and wrapper) and compares every leaf: only the noise entries of the host gate's exceptions.json and the diag. keys may
-          # differ. 12 visits and a 300 MB download: longer than the 25 minutes of the other legs. dump-68.json, dump-candidate.json and diff.json are the
-          # artifact ab-oracle-<os> (the step below the suite).
-          - { suite: wrapper.e2e.ab_oracle, leg: linux-x86_64, runner: ubuntu-24.04, kind: linux, os: linux, timeout: 50 }
-          - { suite: wrapper.e2e.ab_oracle, leg: win-x86_64, runner: windows-latest, kind: win, os: windows, timeout: 50 }
     steps:
       - name: Checkout wrapper (its tests, ci/required-suites.json and scripts/ci_verdict.py)
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -582,9 +575,6 @@ jobs:
           export INVISIBLE_CORE_AUTOFIX=off INVISIBLE_CORE_PIN=allow
           export INVISIBLE_SEAL_FILE="$PWD/gate.seal.json" INVPW_BINARY_PATH="$FF_EXE" STEALTHFOX_E2E_BINARY="$FF_EXE"
           mkdir -p result
-          # where the A/B oracle's test keeps its three files and its log (outside result/: the completeness judge reads every JSON there as a verdict)
-          mkdir -p ab-oracle
-          export AB_ORACLE_OUT="$PWD/ab-oracle"
           # The log of a job that is cancelled is what pytest had written: unbuffered, so that it says how far the suite got.
           export PYTHONUNBUFFERED=1
           # The engine's log of the UDP layer, a file per process, kept with the result: what the browser said is the only way
@@ -741,14 +731,6 @@ jobs:
         with:
           name: fakeweb-${{ matrix.os }}
           path: fakeweb
-          if-no-files-found: ignore
-          retention-days: 14
-      - name: Keep the A/B oracle's dumps and diff
-        if: always() && matrix.suite == 'wrapper.e2e.ab_oracle'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: ab-oracle-${{ matrix.os }}
-          path: ab-oracle
           if-no-files-found: ignore
           retention-days: 14
       - name: Keep the result

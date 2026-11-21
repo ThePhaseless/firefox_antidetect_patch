@@ -888,14 +888,14 @@ def leg_state(job, machine, now, cancelled=False):
     return None
 
 
-def relaunch_inputs(run, kind, tag, compile_cache, core_ref, wrapper_ref, gtests="", gtest_filter="", stop_after="") -> dict:
+def relaunch_inputs(run, kind, tag, compile_cache, core_ref, wrapper_ref, gtests="", gtest_filter="") -> dict:
     """The same run, once more: every input it ran with, by value, and its mark. Never
     a default left to chance: the refs are what its gate would have run against."""
     if not core_ref or not wrapper_ref:
         raise NodeError("a re-launch must name core_ref and wrapper_ref (got %r and %r)" % (core_ref, wrapper_ref))
     inputs = {"kind": kind, "compile_cache": compile_cache, "core_ref": core_ref, "wrapper_ref": wrapper_ref,
               "relaunch_of": str(run)}
-    for key, value in (("release_tag", tag), ("gtests", gtests), ("gtest_filter", gtest_filter), ("stop_after", stop_after)):
+    for key, value in (("release_tag", tag), ("gtests", gtests), ("gtest_filter", gtest_filter)):
         if value:
             inputs[key] = value
     return inputs
@@ -1208,7 +1208,7 @@ def run_watch(a) -> int:
         raise NodeError("GITHUB_REPOSITORY is not set")
     env = os.environ.get
     inputs = relaunch_inputs(a.run, env("KIND", ""), env("TAG", ""), env("COMPILE_CACHE", ""), env("CORE_REF", ""),
-                             env("WRAPPER_REF", ""), env("GTESTS", ""), env("GTEST_FILTER_INPUT", ""), env("STOP_AFTER", ""))
+                             env("WRAPPER_REF", ""), env("GTESTS", ""), env("GTEST_FILTER_INPUT", ""))
     try:
         verdict = watch(latitude, github, a.run, a.attempt, a.ref, inputs, env("RELAUNCH_OF", ""), sha=env("GITHUB_SHA", ""))
     except WatchBlind as exc:

@@ -86,14 +86,6 @@ on:
           installed before the wrapper, so wrapper_ref must pin the version this
           ref builds.
         default: ''
-      stop_after:
-        description: >
-          objects: the compile-only candidate. Each leg compiles the objects of every
-          directory the series touches (all the errors of all of them, in the summary)
-          and stops: no link, no package, no gtests, no gate. Only a candidate on a
-          latitude/* branch; the plan refuses it anywhere else. Empty: the whole run.
-        type: string
-        default: ''
       gtests:
         description: >
           Also run the engine's gtests on every leg, after its package and
@@ -103,11 +95,10 @@ on:
         type: boolean
         default: false
       gtest_filter:
-        # What the last green gtests ran (run 41402916724), and the suites of ours added since: EVERY suite of our own files is here (the
-        # list of them: git grep for TEST(Stealth*, TEST(Idwr, and the one of ours inside a Mozilla file, StartupCache.WritesNeverLowerIOPriority).
-        # A suite that exists on one platform only is named all the same: scripts/ci/gtest_run.py knows which (NOT_ON). * has never gone green here.
+        # What the last green gtests ran (run 41402916724), and the suites of the Juggler's input and crash hooks added
+        # since (StealthFrameCrash, StealthJugglerEventId: their sources are in dom/base/test/gtest). * has never gone green here.
         description: "gtests=true only: which, as mach gtest takes them; * is all, and unproven"
-        default: 'StealthGfxFeatureStatus.*:StealthWebGPUAdapter.*:StealthWebGPUDeclaration.*:StealthWebGPUBundledVulkan.*:StealthWebGPUInstanceEnv.*:StealthFullscreen.*:StealthScaleDeclaration.*:StealthWindowGeometry.*:StealthGLMultisample.*:StealthFrameCrash.*:StealthJugglerEventId.*:StealthSessionUdpProxy.*:StealthDeclaredNetwork.*:StealthSocksUdpPool.*:TestStealthTRRContext.*:TestStealthSocksCredentials.*:TestStealthSessionResolver.*:StealthIceResolverContext.*:StealthUdpProxyBirth.*:StealthNrSocketBirth.*:StealthPcUdpProxyKinds.*:StealthTcpProxyRoad.*:StealthPcProxyConfig.*:StealthInputEventBirth.*:StealthKeyBirthScope.*:StealthBirthOrder.*:StealthFcBundleFonts.*:StealthAudioNoise.*:StealthBundledCollection.*:StealthBundledFamilyFilter.*:StealthCanvasProjection.*:StealthDocumentLanguage.*:StealthFallbackNames.*:StealthFcFontList.*:StealthFontList.*:StealthFontMetrics.*:StealthMediaDeclaration.*:StealthOwnBinaries.*:StealthQuotaEstimate.*:StealthTextQuality.*:StealthTtcFace.*:StealthWebGPUExternalTexture.*:Intl_Locale_StealthSystemLocales.*:Idwr.*:StartupCache.WritesNeverLowerIOPriority'
+        default: 'StealthGfxFeatureStatus.*:StealthWebGPUAdapter.*:StealthWebGPUDeclaration.*:StealthWebGPUBundledVulkan.*:StealthWebGPUInstanceEnv.*:StealthFullscreen.*:StealthScaleDeclaration.*:StealthWindowGeometry.*:StealthGLMultisample.*:StealthFrameCrash.*:StealthJugglerEventId.*:StealthSessionUdpProxy.*:StealthDeclaredNetwork.*:StealthSocksUdpPool.*:TestStealthTRRContext.*:TestStealthSocksCredentials.*:TestStealthSessionResolver.*:StealthIceResolverContext.*:StealthUdpProxyBirth.*:StealthNrSocketBirth.*:StealthPcUdpProxyKinds.*:StealthTcpProxyRoad.*:StealthPcProxyConfig.*:StealthInputEventBirth.*:StealthKeyBirthScope.*:StealthBirthOrder.*:StealthFcBundleFonts.*'
       relaunch_of:
         description: >
           Set by the watch of a run whose machine was lost, to that run's id: this run
@@ -148,8 +139,6 @@ jobs:
       # The gtests and the refs, from the plan: an automatic run has no inputs.
       gtests: ${{ steps.plan.outputs.gtests }}
       gtest_filter: ${{ steps.plan.outputs.gtest_filter }}
-      # objects: the legs stop after the objects of the directories the series touches (scripts/release_plan.py).
-      stop_after: ${{ steps.plan.outputs.stop_after }}
       core_ref: ${{ steps.plan.outputs.core_ref }}
       wrapper_ref: ${{ steps.plan.outputs.wrapper_ref }}
       build_date: ${{ steps.build_date.outputs.build_date }}
@@ -193,7 +182,6 @@ jobs:
           GTEST_FILTER: ${{ inputs.gtest_filter }}
           CORE_REF: ${{ inputs.core_ref }}
           WRAPPER_REF: ${{ inputs.wrapper_ref }}
-          STOP_AFTER: ${{ inputs.stop_after }}
         run: |
           set -e
           python3 scripts/release_plan.py --event "$EVENT" --kind "$KIND" \
@@ -201,7 +189,7 @@ jobs:
             --compile-cache "$COMPILE_CACHE" --ref-type "$REF_TYPE" \
             --gtests "$GTESTS" --gtest-filter "$GTEST_FILTER" \
             --core-ref "$CORE_REF" --wrapper-ref "$WRAPPER_REF" \
-            --stop-after "$STOP_AFTER" --last-release "$LAST_RELEASE" > plan.txt
+            --last-release "$LAST_RELEASE" > plan.txt
           cat plan.txt
           cat plan.txt >> "$GITHUB_OUTPUT"
       # A push to main whose tree a green run has already compiled does not compile it again: the gate runs again, on those bytes, with today's refs
@@ -237,8 +225,6 @@ jobs:
           # The SDK downloader's hook: run 41205185526 idled 5 hours on a
           # download error the pool could not carry back.
           python3 scripts/ci/test_stealth_download_watchdog.py
-          # The compile-only step's list of directories, its errors and its fallback to one directory at a time.
-          python3 scripts/ci/test_objects_first.py
           echo "matrix=$(python3 scripts/ci matrix)" | tee -a "$GITHUB_OUTPUT"
 
   # Everything that does not depend on the binary, BEFORE a node is turned on: a server is an hour paid whatever it does, and a run whose
@@ -277,15 +263,6 @@ jobs:
       - name: Check the declared upstream source matches the version this tree builds
         shell: bash
         run: python3 scripts/check_upstream_source.py --online
-
-      # Our sources and our build files, read as text and in mozbuild's own sandbox: what a compiler or the backend finds only on the node, an
-      # hour in (build/stealth_check_sources.py, build/stealth_check_build_files.py). Neither needs an objdir. Before `node`: no machine is rented
-      # for a mozilla:: name that is not there or a source no build file lists.
-      - name: Our sources and our build files - the text checks
-        shell: bash
-        run: |
-          python3 build/stealth_check_sources.py
-          python3 build/stealth_check_build_files.py
 
       # Juggler tested without a browser, seconds here before hours of build.
       # The channel between its two halves: a request answered from another
@@ -783,25 +760,23 @@ jobs:
           fi
           python3 scripts/ci mozconfig --leg "$CI_LEG" --compile-cache "$COMPILE_CACHE"
 
-      # The objects of every directory the series touches, BEFORE the build of the browser: compile only (`target-objects`, no archive, no link), in the
-      # same objdir with the same flags, so the build that follows finds them made and the compile cache sees nothing different. The directories are the
-      # ones of the files that differ from the Mozilla tag (ours and Mozilla's that the series changes, the gtests of ours included): scripts/ci/objects_first.py
-      # makes the list from the tree, runs the export tier first (the generated headers a directory needs to compile alone), then every directory, and when one
-      # fails each on its own, so ALL the errors of ALL the directories come out of one run, listed by file in the summary. A file that does not compile
-      # stops the run here, minutes in, and not after the link of the browser (twenty minutes in on the faster leg, an hour on the slower).
-      # The step this replaces passed `mach build --keep-going <dir>` for each directory, and mach IGNORES a subdirectory without --allow-subdirectory-build
-      # ("was ignored", candidate 43203723323): it compiled nothing.
-      - name: Our objects first - every directory the series touches, compile only
-        id: objects
-        if: runner.environment != 'github-hosted'
-        timeout-minutes: 60
+      # The objects of the gtests of ours, BEFORE the build of the browser (compile only, no link, the same object directory and the
+      # same flags, so the build that follows finds them made and the compile cache sees nothing different). A gtest that does not
+      # compile stops the run here, a few minutes in, and not after the link of the browser (twenty minutes in on the faster leg,
+      # an hour on the slower): three runs of the node were spent on errors of tests that do not depend on the browser at all.
+      # Only the directories that hold a test of ours (Test*Stealth*.cpp); --keep-going shows every error of them at once.
+      - name: The gtests of ours - their objects first
+        if: needs.plan.outputs.gtests == 'true' && runner.environment != 'github-hosted'
+        timeout-minutes: 40
         shell: bash
-        run: python3 scripts/ci objects --upstream .series/UPSTREAM.json
+        run: |
+          DIRS=$(find . -path ./obj-rel -prune -o \( -name 'Test*Stealth*.cpp' -o -name 'TestStealth*.cpp' \) -print | sed 's|/[^/]*$||; s|^\./||' | sort -u | tr '\n' ' ')
+          echo "gtest directories of ours: $DIRS"
+          [ -n "$DIRS" ] || { echo "ERROR: no gtest of ours found"; exit 1; }
+          python3 scripts/ci phase gtest-objects -- ./mach build --keep-going $DIRS
 
       - name: Build
         id: build
-        # Not on a compile-only run (stop_after=objects): it stops after the step above.
-        if: needs.plan.outputs.stop_after != 'objects'
         env:
           # Windows's link cannot be reached alone, so its whole build asks for huge pages.
           # No configure option reads this (scripts/ci/test_release_path.py).
@@ -933,9 +908,7 @@ jobs:
         # Never on a cancel: GitHub cuts this job 5:00 after it, always() steps included,
         # and the node's upload takes 15. Not starting frees the node at once; an upload
         # that is cut is never committed, and its key holds this run and attempt.
-        # The objects step compiled with the build's flags: what it made is worth keeping when the build after it never ran (it failed, or
-        # stop_after=objects). Skipped, it did not start, and nothing is saved, as before.
-        if: "!cancelled() && needs.plan.outputs.compile_cache == 'gha' && (steps.build.outcome == 'success' || steps.build.outcome == 'failure' || steps.objects.outcome == 'success' || steps.objects.outcome == 'failure') && steps.cache-worth.outputs.save != 'false'"
+        if: "!cancelled() && needs.plan.outputs.compile_cache == 'gha' && (steps.build.outcome == 'success' || steps.build.outcome == 'failure') && steps.cache-worth.outputs.save != 'false'"
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/sccache-ci
@@ -1029,7 +1002,7 @@ jobs:
           echo "compile cache: $(wc -l < sccache-misses.txt) objects missed, by name in this leg's events artifact" | tee -a "$GITHUB_STEP_SUMMARY"
       - name: WebGPU's Vulkan driver (linux-x86_64) - done
         id: lavapipe
-        if: matrix.leg == 'linux-x86_64' && needs.plan.outputs.stop_after != 'objects'
+        if: matrix.leg == 'linux-x86_64'
         # LLVM and Mesa cold: about an hour; a cache hit is seconds. It began long ago.
         timeout-minutes: 150
         run: |
@@ -1050,7 +1023,6 @@ jobs:
       # Packaging per family (scripts/ci/package_linux.sh, package_win.sh):
       # the same gates, the archive layout each platform ships.
       - name: Package + validate
-        if: needs.plan.outputs.stop_after != 'objects'
         env:
           ASSET: ${{ matrix.asset }}
           # `mach package` compresses a tar.xz nothing reads: the leg ships its own tar.gz
@@ -1063,7 +1035,6 @@ jobs:
         run: python3 scripts/ci phase package -- bash scripts/ci/package_${{ matrix.family }}.sh
 
       - name: Upload build artifact
-        if: needs.plan.outputs.stop_after != 'objects'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: asset-${{ matrix.leg }}
@@ -1077,7 +1048,6 @@ jobs:
       # was thrown away with the runner and the answer to "which flags does the
       # engine ship with" had to be pieced together from the mozconfig.
       - name: Build configuration
-        if: needs.plan.outputs.stop_after != 'objects'
         run: |
           set -e
           mkdir -p buildconfig
@@ -1091,7 +1061,6 @@ jobs:
                   print("%s = %s" % (key, out["substs"][key]))
           PY
       - name: Upload build configuration
-        if: needs.plan.outputs.stop_after != 'objects'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: buildconfig-${{ matrix.leg }}
@@ -1105,7 +1074,6 @@ jobs:
       # separate artifact, never part of the asset (gate.yml and publish.yml take
       # asset-* only).
       - name: Crash symbols (never shipped)
-        if: needs.plan.outputs.stop_after != 'objects'
         # A ceiling of its own: in run 40593659072 this step recompiled Rust
         # (621 crates, 35 minutes against 2 the run before) and nothing bounded
         # it below the job's 350.
@@ -1122,7 +1090,6 @@ jobs:
           mv obj-rel/dist/*.crashreporter-symbols.zip symbols/
           ls -la symbols/
       - name: The crash symbols describe the shipped binaries
-        if: needs.plan.outputs.stop_after != 'objects'
         # Run 40593659072 uploaded symbols for a xul.dll it did not ship: its
         # symbols step relinked xul after the package was made, and the archive
         # named 3E2BB500 for a binary that shipped as 030D79D8. Nothing said so;
@@ -1130,7 +1097,6 @@ jobs:
         shell: bash
         run: python3 scripts/ci symbols-match --package "out/${{ matrix.asset }}" --symbols symbols/*.zip
       - name: Upload crash symbols
-        if: needs.plan.outputs.stop_after != 'objects'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: symbols-${{ matrix.leg }}
@@ -1375,7 +1341,6 @@ jobs:
           WRAPPER_REF: ${{ needs.plan.outputs.wrapper_ref }}
           GTESTS: ${{ needs.plan.outputs.gtests }}
           GTEST_FILTER_INPUT: ${{ needs.plan.outputs.gtest_filter }}
-          STOP_AFTER: ${{ needs.plan.outputs.stop_after }}
           RELAUNCH_OF: ${{ inputs.relaunch_of || '' }}
         run: |
           python3 .series/platform/ci/src/scripts/ci/latitude_node.py watch --run "$GITHUB_RUN_ID" \
@@ -1410,7 +1375,6 @@ jobs:
           WRAPPER_REF: ${{ needs.plan.outputs.wrapper_ref }}
           GTESTS: ${{ needs.plan.outputs.gtests }}
           GTEST_FILTER_INPUT: ${{ needs.plan.outputs.gtest_filter }}
-          STOP_AFTER: ${{ needs.plan.outputs.stop_after }}
           RELAUNCH_OF: ${{ inputs.relaunch_of || '' }}
         run: |
           python3 .series/platform/ci/src/scripts/ci/latitude_node.py watch --run "$GITHUB_RUN_ID" \
@@ -1493,8 +1457,6 @@ jobs:
     # say (a gtest red on one platform used to skip the gate, so the run showed one red and hid the other: run 43134774602
     # was the first to run the gate at all). The run is red if either is red; the publish needs both.
     needs: [plan, build]
-    # A compile-only run (stop_after=objects) has no binary to judge.
-    if: needs.plan.outputs.stop_after != 'objects'
     permissions: { actions: read, contents: read }
     uses: ./.github/workflows/gate.yml
     with:

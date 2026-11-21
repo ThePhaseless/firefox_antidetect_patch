@@ -9,9 +9,6 @@
   cpu-report [--samples F] [--events F]
                                   the CPU use of this leg's phases, for the step summary
   phase NAME -- CMD...            run CMD as phase NAME, recording its events
-  objects [--upstream F] [--base C] [--objdir D]
-                                  compile, compile only, every directory the series touches against the Mozilla tag
-                                  (objects_first.py); lists every compile error in the summary and fails on any
   report DIR                      the run's summary from the legs' events
   assets | version                every leg's asset name | the version the tree builds
   payload-guard --tag T --repo R --seal F
@@ -46,10 +43,6 @@ def main(argv) -> int:
             print("usage: phase NAME -- CMD...", file=sys.stderr)
             return 2
         return phase.run(argv[1], argv[3:])
-
-    if argv[:1] == ["objects"]:
-        import objects_first
-        return objects_first.main(argv[1:])
 
     ap = argparse.ArgumentParser(prog="scripts/ci")
     sub = ap.add_subparsers(dest="cmd", required=True)

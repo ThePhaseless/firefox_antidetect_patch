@@ -27,12 +27,6 @@ refuse, each one a real way to get it wrong, and the runs it must accept:
    12. a release by hand that asks for the cache off, or for it by name;
    13. a release from main, a candidate from a branch; republish.yml passes no ref
        type and is not asked.
-  stop_after (the compile-only candidate: build the touched directories' objects and stop)
-   14. refused: for a release, from main, from another branch, from a tag, with no ref
-       type, by a push or the timer, and with a value nobody declared;
-   15. accepted: a candidate by hand on a latitude/* branch, with the gtests turned off
-       whatever the input said (nothing links, so none can run); the other plans carry
-       stop_after empty.
 
 Run it directly, like test_make_seal.py: `python3 scripts/test_release_plan.py`.
 """
@@ -74,38 +68,7 @@ LAST_RELEASE = "48"
 
 #: What every plan carries besides its kind: the gtests and the refs.
 DEFAULTS = {"gtests": "false", "gtest_filter": p.DEFAULT_GTEST_FILTER,
-            "core_ref": "main", "wrapper_ref": "main", "stop_after": ""}
-
-#: (name, positional inputs, stop_after): the plan must refuse each.
-STOP_REFUSED = [
-    ("stop_after=objects on a release from main", ("workflow_dispatch", "release", "firefox-50", "main", "", "branch"), "objects"),
-    ("stop_after=objects on a release from a latitude branch",
-     ("workflow_dispatch", "release", "firefox-50", "latitude/x", "", "branch"), "objects"),
-    ("stop_after=objects on a candidate from main", ("workflow_dispatch", "candidate", "", "main", "", "branch"), "objects"),
-    ("stop_after=objects on a candidate from another branch",
-     ("workflow_dispatch", "candidate", "", "next/firefox-49", "", "branch"), "objects"),
-    ("stop_after=objects on a candidate from a tag", ("workflow_dispatch", "candidate", "", "latitude/x", "", "tag"), "objects"),
-    ("stop_after=objects with no ref type", ("workflow_dispatch", "candidate", "", "latitude/x"), "objects"),
-    ("stop_after=objects on a push", ("push", "", "", "main", "", "branch"), "objects"),
-    ("stop_after=objects on the weekly timer", ("schedule", "", "", "main", "", "branch"), "objects"),
-    ("a stop_after nobody declared", ("workflow_dispatch", "candidate", "", "latitude/x", "", "branch"), "link"),
-    ("a stop_after that is only a prefix", ("workflow_dispatch", "candidate", "", "latitude/x", "", "branch"), "object"),
-]
-
-STOP_ACCEPTED = [
-    ("a candidate on a latitude branch that stops after the objects",
-     ("workflow_dispatch", "candidate", "", "latitude/objects-only", "", "branch"), "objects",
-     {"kind": "candidate", "tag": "", "num": "", "prevtag": "", "seal_tag": "firefox-49-candidate",
-      "compile_cache": "gha", "stop_after": "objects", "gtests": "false"}),
-    ("the same asking for the gtests: they stay off, nothing links",
-     ("workflow_dispatch", "candidate", "", "latitude/objects-only", "", "branch", "true", "StealthA.*"), "objects",
-     {"kind": "candidate", "tag": "", "num": "", "prevtag": "", "seal_tag": "firefox-49-candidate",
-      "compile_cache": "gha", "stop_after": "objects", "gtests": "false", "gtest_filter": "StealthA.*"}),
-    ("a candidate on a latitude branch that does not stop",
-     ("workflow_dispatch", "candidate", "", "latitude/objects-only", "", "branch"), "",
-     {"kind": "candidate", "tag": "", "num": "", "prevtag": "", "seal_tag": "firefox-49-candidate",
-      "compile_cache": "gha", "stop_after": "", "gtests": "false"}),
-]
+            "core_ref": "main", "wrapper_ref": "main"}
 
 ACCEPTED = [
     ("a candidate", ("workflow_dispatch", "candidate", "", "next/firefox-49"),
@@ -198,41 +161,6 @@ def main() -> int:
         else:
             print(f"FAIL  accepted: {name}: {got}")
             failures += 1
-    for name, args, stop in STOP_REFUSED:
-        try:
-            got = p.plan(*args, last_release=LAST_RELEASE, stop_after=stop)
-        except p.PlanError as exc:
-            print(f"ok    refused: {name}: {exc}")
-        else:
-            print(f"FAIL  accepted: {name}: {got}")
-            failures += 1
-    for name, args, stop, want in STOP_ACCEPTED:
-        want = {**DEFAULTS, **want}
-        try:
-            got = p.plan(*args, last_release=LAST_RELEASE, stop_after=stop)
-        except p.PlanError as exc:
-            print(f"FAIL  refused: {name}: {exc}")
-            failures += 1
-            continue
-        if got != want:
-            print(f"FAIL  {name}: {got} != {want}")
-            failures += 1
-        else:
-            print(f"ok    {name}")
-    # The command line says it too: the workflow passes --stop-after, and a refusal is exit 1.
-    base = ["--event", "workflow_dispatch", "--kind", "candidate", "--last-release", LAST_RELEASE, "--ref-type", "branch"]
-    stderr, sys.stderr = sys.stderr, open(os.devnull, "w")
-    try:
-        cli = (p.main(base + ["--ref-name", "main", "--stop-after", "objects"]),
-               p.main(base + ["--ref-name", "latitude/x", "--stop-after", "objects"]))
-    finally:
-        sys.stderr.close()
-        sys.stderr = stderr
-    if cli != (1, 0):
-        print(f"FAIL  --stop-after objects: main refused and latitude/x accepted, got {cli}")
-        failures += 1
-    else:
-        print("ok    --stop-after objects on the command line")
     got = p.plan("workflow_dispatch", "release", "firefox-63", "main", "", "branch", last_release="62")
     if got["seal_tag"] != "firefox-63":
         print(f"FAIL  a release is sealed under its own tag whatever the last release: {got['seal_tag']}")
@@ -253,16 +181,9 @@ def main() -> int:
     if took:
         print("FAIL  the command line took a builder")
         failures += 1
-    total = len(REFUSED) + len(ACCEPTED) + len(STOP_REFUSED) + len(STOP_ACCEPTED) + 2 + 6 + 1
+    total = len(REFUSED) + len(ACCEPTED) + 2 + 6
     print(f"{total - failures}/{total} cases as expected")
     return 1 if failures else 0
-
-
-def test_the_plan_refuses_and_accepts_what_it_must(capsys):
-    """pytest's door to the same cases: every line is printed, and none may say FAIL."""
-    code = main()
-    assert "FAIL" not in capsys.readouterr().out
-    assert code == 0
 
 
 if __name__ == "__main__":

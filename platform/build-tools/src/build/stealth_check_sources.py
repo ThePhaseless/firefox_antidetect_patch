@@ -174,13 +174,8 @@ def scoped_tokens(text):
 def text_problems(rel, text):
     """Rules 2 and 3 on one file of ours (raw text)."""
     bad = []
-    code = strip(text)
-    # A member reached with `->` or `.` (nICEr's own `addr->interface`) is the field Mozilla's code uses
-    # in the same translation units, not the macro: the macro rule reads the code without such members.
-    members = re.sub(r"(->|\.)\s*(%s)\b" % "|".join(sorted(WINDOWS_MACROS)), r"\1member_", code)
-    macro_toks = {tok for tok, _ in scoped_tokens(members)}
-    for tok, ns in scoped_tokens(code):
-        if tok in WINDOWS_MACROS and tok in macro_toks:
+    for tok, ns in scoped_tokens(strip(text)):
+        if tok in WINDOWS_MACROS:
             bad.append(f"{rel}: `{tok}` is a macro in Windows headers")
         if tok in NR_LOG_LEVELS and rel.endswith(".h") and ns[:1] != ("mozilla",):
             bad.append(f"{rel}: {tok} outside namespace mozilla")
