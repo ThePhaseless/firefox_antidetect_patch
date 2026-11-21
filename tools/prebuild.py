@@ -25,6 +25,9 @@ renamed body that is allowed).
                         to the tag, and nothing references what its old hunk introduced
     6  OUR FILES        every source of ours is compiled or shipped by a build file; no two share a basename
     7  GTEST FILTER     every gtest suite of ours is matched by the default `gtest_filter` of release.yml
+    8  REMOVED LINES    (--base) rule G51: per Mozilla file, the lines the head removes or rewrites (`-` lines of the
+                        diff against the tag) are not more than the base's, unless a HOOKS.json entry of the file
+                        carries `"replaces": [...]` (one rewritten line standing for several hooks)
 
 The checks are textual (no preprocessor, no templates, no overload resolution): where the text does not
 decide, the check says WARN and does not guess.
@@ -1619,9 +1622,61 @@ def check_gtest_filter(proj: Project) -> list:
     return out
 
 
+# ============================================================================================ 8. removed lines
+def removed_counts(old: Tree, new: Tree) -> dict:
+    """{path: number of `-` lines of the diff old -> new}: the lines of a Mozilla file rewritten or removed (a
+    deleted file counts all its lines). Files the diff does not remove a line from are left out."""
+    out: dict = {}
+    if isinstance(old, GitTree) and isinstance(new, GitTree):
+        raw = old.git("diff", "--numstat", "--no-renames", "-z", old.ref, new.ref).split(b"\0")
+        for rec in raw:
+            parts = rec.decode("utf-8", "replace").lstrip("\n").split("\t", 2)
+            if len(parts) == 3 and parts[1].isdigit() and int(parts[1]):
+                out[parts[2]] = int(parts[1])
+        return out
+    status, patch = diff_trees(old, new)
+    for f in hc.parse_patch(patch):
+        n = sum(1 for h in f["hunks"] for t, _ in h["lines"] if t == "-")
+        if n:
+            out[f["file"]] = n
+    for path, st in status.items():
+        if st == "D":
+            t = old.read(path) or ""
+            n = t.count("\n") + (1 if t and not t.endswith("\n") else 0)
+            if n:
+                out[path] = n
+    return out
+
+
+def removed_rows(proj: Project) -> list:
+    """[(file, base, head, replaces)] for every Mozilla file whose count of rewritten or removed lines differs
+    between the base and the head, inside the scope of the folders asked for (all files when none)."""
+    base = removed_counts(proj.tag, proj.base)
+    head = removed_counts(proj.tag, proj.head)
+    replaces: dict = {}
+    for e in proj.hook_entries():
+        if e.get("replaces"):
+            replaces.setdefault(e.get("file"), []).extend(_as_list(e["replaces"]))
+    rows = []
+    for p in sorted(set(base) | set(head)):
+        if not proj.in_scope(p) or base.get(p, 0) == head.get(p, 0):
+            continue
+        rows.append((p, base.get(p, 0), head.get(p, 0), replaces.get(p, [])))
+    return rows
+
+
+def check_removed_lines(proj: Project) -> list:
+    out = []
+    for p, b, h, rep in removed_rows(proj):
+        if h > b and not rep:
+            out.append(Finding(FAIL, 8, p, "Mozilla lines rewritten or removed grew: %d on the base, %d on the head" % (b, h),
+                               "rewrite no more Mozilla lines than the base does, or record in HOOKS.json the entry of this file with `replaces` listing the hooks one rewritten line stands for"))
+    return out
+
+
 # ============================================================================================ run
 CHECK_NAMES = {1: "hook link", 2: "rename consistency", 3: "Mozilla tokens untouched", 4: "mechanical equivalence",
-               5: "restored files", 6: "our files built and unique", 7: "gtest filter"}
+               5: "restored files", 6: "our files built and unique", 7: "gtest filter", 8: "removed lines not more than the base"}
 
 
 def run(proj: Project, checks=(1, 2, 3, 4, 5, 6, 7), tree_path: str | None = None) -> dict:
@@ -1649,6 +1704,8 @@ def run(proj: Project, checks=(1, 2, 3, 4, 5, 6, 7), tree_path: str | None = Non
             f = check_restored(proj) if proj.base is not None else []
         elif n == 6:
             f = check_our_files(proj, tree_path)
+        elif n == 8:
+            f = check_removed_lines(proj) if proj.base is not None else []
         else:
             f = check_gtest_filter(proj)
         res["findings"] += f
@@ -1680,8 +1737,8 @@ def report(res: dict, proj: Project, checks) -> str:
             for r in res["equivalence"]:
                 counts[r["class"]] = counts.get(r["class"], 0) + 1
             extra += "; %d files differ: %s" % (len(res["equivalence"]), ", ".join("%s %d" % kv for kv in sorted(counts.items())))
-        if n == 5 and proj.base is None:
-            lines.append("prebuild 5 %s: skipped (needs --base)" % CHECK_NAMES[5])
+        if n in (5, 8) and proj.base is None:
+            lines.append("prebuild %d %s: skipped (needs --base)" % (n, CHECK_NAMES[n]))
             continue
         lines.append("prebuild %d %s: %d FAIL, %d WARN%s (%.1fs)" % (
             n, CHECK_NAMES[n], sum(1 for f in fs if f.level == FAIL), sum(1 for f in fs if f.level == WARN), extra, res["times"].get(n, 0)))
@@ -1699,12 +1756,12 @@ def main(argv=None) -> int:
     up = json.loads((ROOT / "UPSTREAM.json").read_text(encoding="utf-8"))
     ap.add_argument("--source", default=os.environ.get("ENGINE_SOURCE", "C:/ff/source"), help="the Firefox repository (read only)")
     ap.add_argument("--head", default=up["source_branch"], help="the source branch to check")
-    ap.add_argument("--base", help="the source branch before the rework (checks 4 and 5)")
+    ap.add_argument("--base", help="the source branch before the rework (checks 4, 5 and 8)")
     ap.add_argument("--tag", help="the Mozilla tag (default: UPSTREAM.json)")
     ap.add_argument("--series", type=Path, default=ROOT, help="the series repository whose HOOKS.json and MANIFEST.json to read")
     ap.add_argument("--folder", action="append", default=[], help="only the files of this series folder (repeatable)")
     ap.add_argument("--tree", help="a full checkout: also run its build/stealth_check_build_files.py (check 6)")
-    ap.add_argument("--checks", default="1,2,3,4,5,6,7", help="which checks, e.g. 1,3")
+    ap.add_argument("--checks", default="1,2,3,4,5,6,7", help="which checks, e.g. 1,3 (8 is only run when asked for)")
     ap.add_argument("--json", type=Path, help="write the findings, the Mozilla lines and the per-file classes here")
     a = ap.parse_args(argv)
     tag = a.tag or up["mozilla_tag"]

@@ -1,4 +1,4 @@
-"""tools/prebuild.py: each of its seven checks shown red on a synthetic tree and green on the fixed one, and
+"""tools/prebuild.py: each of its eight checks shown red on a synthetic tree and green on the fixed one, and
 the text helpers they stand on.
 
     python -m pytest -q tools/tests/test_prebuild.py
@@ -637,3 +637,45 @@ def test_the_folder_scope_limits_the_files_checked():
     head["dom/StealthX.cpp"] = "// no body\n"
     assert any(f.level == "FAIL" for f in pb.check_hook_links(project(tag, head)))
     assert pb.check_hook_links(project(tag, head, scope={"other/File.cpp"})) == []
+
+
+# ---- 8. removed lines (rule G51)
+G51_TAG = "int a = 1;\nint b = 2;\nint c = 3;\nint d = 4;\n"
+G51_BASE = "int a = 1;\nint b = 22;\nint c = 3;\nint d = 4;\n"  # one line rewritten
+G51_HEAD_MORE = "int a = 11;\nint b = 22;\nint c = 3;\nint d = 44;\n"  # three lines rewritten
+G51_HEAD_LESS = G51_TAG  # none: back to the tag
+
+
+def g51(head_text, hooks=None, scope=None):
+    tag, base, head = {"dom/F.cpp": G51_TAG}, {"dom/F.cpp": G51_BASE}, {"dom/F.cpp": head_text}
+    return project(tag, head, base, hooks=hooks, scope=scope)
+
+
+def test_removed_lines_more_than_the_base_is_red_and_fewer_or_equal_is_green():
+    red = pb.check_removed_lines(g51(G51_HEAD_MORE))
+    assert [(f.level, f.check, f.where) for f in red] == [("FAIL", 8, "dom/F.cpp")]
+    assert "1 on the base, 3 on the head" in red[0].what
+    assert pb.check_removed_lines(g51(G51_BASE)) == []
+    assert pb.check_removed_lines(g51(G51_HEAD_LESS)) == []
+
+
+def test_removed_lines_a_replaces_note_on_the_file_clears_it_and_another_file_does_not():
+    assert pb.check_removed_lines(g51(G51_HEAD_MORE, hooks=[{"file": "dom/F.cpp", "replaces": ["a/x", "a/y"]}])) == []
+    assert len(pb.check_removed_lines(g51(G51_HEAD_MORE, hooks=[{"file": "dom/Other.cpp", "replaces": ["a/x"]}]))) == 1
+
+
+def test_removed_lines_a_deleted_file_counts_all_its_lines_and_scope_limits_the_files():
+    tag, base = {"dom/F.cpp": G51_TAG}, {"dom/F.cpp": G51_BASE}
+    assert [r[:3] for r in pb.removed_rows(project(tag, {}, base))] == [("dom/F.cpp", 1, 4)]
+    assert pb.check_removed_lines(project(tag, {}, base))[0].level == "FAIL"
+    assert pb.check_removed_lines(g51(G51_HEAD_MORE, scope={"other/File.cpp"})) == []
+
+
+def test_removed_lines_needs_a_base_and_run_reports_check_8():
+    tag, head = fixture()
+    res = pb.run(project(tag, head), (8,))
+    assert res["findings"] == []
+    assert "prebuild 8 removed lines not more than the base: skipped (needs --base)" in pb.report(res, project(tag, head), (8,))
+    res = pb.run(g51(G51_HEAD_MORE), (8,))
+    assert [f.check for f in res["findings"]] == [8]
+    assert "prebuild 8 removed lines not more than the base: 1 FAIL" in pb.report(res, g51(G51_HEAD_MORE), (8,))
