@@ -377,7 +377,7 @@ jobs:
     env:
       TEMP: ${{ startsWith(matrix.runner, 'windows') && 'D:\a\_temp' || '/tmp' }}
       TMP: ${{ startsWith(matrix.runner, 'windows') && 'D:\a\_temp' || '/tmp' }}
-    timeout-minutes: 25
+    timeout-minutes: ${{ matrix.timeout || 25 }}
     strategy:
       fail-fast: false
       matrix:
@@ -435,6 +435,23 @@ jobs:
           # the fake web (two local sites, no request leaves the runner): the four e2e tests of its profiles P2 and P4, with the stock Firefox control below
           - { suite: wrapper.e2e.fakeweb, leg: linux-x86_64, runner: ubuntu-24.04, kind: linux, os: linux }
           - { suite: wrapper.e2e.fakeweb, leg: win-x86_64, runner: windows-latest, kind: win, os: windows }
+          # THE A/B ORACLE: same seed, same bytes, the engine published as firefox-68 against this candidate, on the leg's own runner. The test downloads the
+          # published engine as the core does (the release's seal.json, then the archive under that seal), runs the host gate's dump with each (three seeds at
+          # two DPRs, with the same core and wrapper) and compares every leaf: only the noise entries of the host gate's exceptions.json and the diag. keys may
+          # differ. 12 visits and a 300 MB download: longer than the 25 minutes of the other legs. dump-68.json, dump-candidate.json and diff.json are the
+          # artifact ab-oracle-<os> (the step below the suite).
+          - { suite: wrapper.e2e.ab_oracle, leg: linux-x86_64, runner: ubuntu-24.04, kind: linux, os: linux, timeout: 50 }
+          - { suite: wrapper.e2e.ab_oracle, leg: win-x86_64, runner: windows-latest, kind: win, os: windows, timeout: 50 }
+          # THE NETWORK AND HOST A/B ORACLES, the same scheme: the published engine fetched as the core fetches it, the A/A first (the published engine
+          # against itself: a difference is a broken control), then the published engine against this candidate. Network: the fake web's journey through
+          # the lab's SOCKS gateway, DoH, HTTPS h1/h2, HTTP/3, WebRTC and an idle launch, every leaf of what the wire carried (ClientHello, h2 frames,
+          # header order, DNS questions, destinations; a direct connection is red on either side). Host: the multiset of process kinds and the mapped
+          # modules per kind after the same journey, and the children that came and went from launch. Their files go to the same folder as the page
+          # oracle's, kept as <suite>-<os>.
+          - { suite: wrapper.e2e.ab_network, leg: linux-x86_64, runner: ubuntu-24.04, kind: linux, os: linux, timeout: 60 }
+          - { suite: wrapper.e2e.ab_network, leg: win-x86_64, runner: windows-latest, kind: win, os: windows, timeout: 60 }
+          - { suite: wrapper.e2e.ab_host, leg: linux-x86_64, runner: ubuntu-24.04, kind: linux, os: linux, timeout: 50 }
+          - { suite: wrapper.e2e.ab_host, leg: win-x86_64, runner: windows-latest, kind: win, os: windows, timeout: 50 }
     steps:
       - name: Checkout wrapper (its tests, ci/required-suites.json and scripts/ci_verdict.py)
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -451,6 +468,28 @@ jobs:
           ref: main
           path: wrapper-main
           fetch-depth: 1
+      # A leg comes first in this file and its row in the wrapper's ci/required-suites.json second: a leg whose suite the list of wrapper_ref does
+      # not have yet is SAID (a warning on the run) and does not run its suite or its verdict, instead of failing. Once the row is in the list the
+      # leg is bound like every other, and a row can never leave the list (the judge compares it with main's).
+      - name: The suite is in the wrapper's list (a leg the list does not have yet is said, not failed)
+        shell: bash
+        env:
+          SUITE: ${{ matrix.suite }}
+          WRAPPER_REF: ${{ inputs.wrapper_ref }}
+        run: |
+          # exit 0: listed; exit 3: not listed; anything else (no interpreter, no list, a list that does not parse) is red, never "not listed".
+          # A listed suite whose leg then reports nothing is red in wrapper-e2e-complete ("has no result: the leg did not report").
+          PY="$(command -v python3 || command -v python)"
+          set +e
+          "$PY" -c "import json,os,sys; sys.exit(0 if any(r.get('id') == os.environ['SUITE'] for r in json.load(open('ci/required-suites.json', encoding='utf-8'))) else 3)"
+          rc=$?
+          set -e
+          case "$rc" in
+            0) echo "LISTED=1" >> "$GITHUB_ENV" ;;
+            3) echo "LISTED=0" >> "$GITHUB_ENV"
+               echo "::warning::$SUITE is not in ci/required-suites.json of wrapper_ref $WRAPPER_REF yet: the leg is said, not run (its row ends this)" ;;
+            *) echo "::error::the list of wrapper_ref could not be read ($rc): the leg cannot know whether $SUITE is required"; exit 1 ;;
+          esac
       - name: Download asset
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
@@ -572,9 +611,13 @@ jobs:
       - name: The suite - every listed test runs and passes
         shell: bash
         run: |
+          [ "$LISTED" = 1 ] || { echo "this suite is not in the wrapper's list yet: said, not run"; exit 0; }
           export INVISIBLE_CORE_AUTOFIX=off INVISIBLE_CORE_PIN=allow
           export INVISIBLE_SEAL_FILE="$PWD/gate.seal.json" INVPW_BINARY_PATH="$FF_EXE" STEALTHFOX_E2E_BINARY="$FF_EXE"
           mkdir -p result
+          # where the A/B oracle's test keeps its three files and its log (outside result/: the completeness judge reads every JSON there as a verdict)
+          mkdir -p ab-oracle
+          export AB_ORACLE_OUT="$PWD/ab-oracle"
           # The log of a job that is cancelled is what pytest had written: unbuffered, so that it says how far the suite got.
           export PYTHONUNBUFFERED=1
           # The engine's log of the UDP layer, a file per process, kept with the result: what the browser said is the only way
@@ -638,12 +681,14 @@ jobs:
         if: always()
         shell: bash
         run: |
+          [ "$LISTED" = 1 ] || { echo "this suite is not in the wrapper's list yet: said, not run"; exit 0; }
           GEOIP_PIN=ci/geoip.json
           [ -f wrapper-main/ci/geoip.json ] && GEOIP_PIN=wrapper-main/ci/geoip.json
           python scripts/ci_lab_geoip.py verify --pin "$GEOIP_PIN" --evidence geoip-evidence.json --used "$GEOIP_USED_OUT"
       - name: Verdict - required suite
         shell: bash
         run: |
+          [ "$LISTED" = 1 ] || { echo "this suite is not in the wrapper's list yet: said, not run"; exit 0; }
           # main's list is read from the checkout of main above: a failed download cannot pass for "main has no list".
           if [ -f wrapper-main/ci/required-suites.json ]; then
             MAIN=(--main-required wrapper-main/ci/required-suites.json)
@@ -733,6 +778,14 @@ jobs:
           path: fakeweb
           if-no-files-found: ignore
           retention-days: 14
+      - name: Keep the A/B oracles' dumps and diffs (page, network, host)
+        if: always() && (matrix.suite == 'wrapper.e2e.ab_oracle' || matrix.suite == 'wrapper.e2e.ab_network' || matrix.suite == 'wrapper.e2e.ab_host')
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ matrix.suite == 'wrapper.e2e.ab_oracle' && 'ab-oracle' || matrix.suite }}-${{ matrix.os }}
+          path: ab-oracle
+          if-no-files-found: ignore
+          retention-days: 14
       - name: Keep the result
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -814,3 +867,16 @@ jobs:
         with: { python-version: '3.11' }
       - name: HOST GATE - the same on every host, retail's where the identity does not decide
         run: python scripts/ci_host_gate.py compare host-dump
+
+  # OUR XPCSHELL TESTS on the candidate's packaged binary (`firefox -xpcshell`), on each leg's native runner: xpcshell.yml, called with this gate's
+  # build_run_id so that it takes the candidate's asset-* artifacts as every job above does (never the published engine: that is its measurement
+  # on a push, and it has no build_run_id there). A reusable-workflow job has no timeout of its own: the legs' budget, 15 minutes, is in xpcshell.yml.
+  # Its verdict is a job of this gate: red when a test fails or is skipped, a declared file collects nothing, or the declared list and the xpcshell tests
+  # of ours that the series holds differ.
+  xpcshell:
+    name: xpcshell
+    permissions: { actions: read, contents: read }
+    uses: ./.github/workflows/xpcshell.yml
+    with:
+      build_run_id: ${{ inputs.build_run_id }}
+      wrapper_ref: ${{ inputs.wrapper_ref }}

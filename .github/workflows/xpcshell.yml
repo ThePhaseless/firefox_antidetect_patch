@@ -14,8 +14,18 @@
 # THE VERDICT is this job's: red when a test fails or is skipped, a process exits non-zero or hangs, a declared file collects no test, a support file is
 # not the locked one, or fewer tests were collected than `min_tests` of scripts/ci/xpcshell_tests.json. The list grows as the folders land.
 #
-# Called by gate.yml (workflow_call), and run alone for a MEASUREMENT: a push to a branch `latitude/<name>-oracles` runs it on the artifacts of one
-# candidate (build_run_id below), never a build. The seconds of every file and of every test are in the result JSON and in the job's summary.
+# WHICH ENGINE. The gate calls this with the candidate's build_run_id: the candidate's own archives are what runs. Alone, a push to a branch
+# `latitude/<name>-oracles` (the measurement) runs the PUBLISHED engine, firefox-68 unless `published_tag` says another: the release's archives are
+# downloaded with `gh release download` and checked against the sha256 of the release's seal.json (xpcshell_run.py verify-asset), so the verdict of a
+# push is that of the engine users have, with the tests of the series at the commit pushed. `build_run_id` is for the gate call and for a dispatch
+# that names a candidate run; a `published_tag` that is set wins over it.
+#
+# THE LIST IS THE SET. Before anything is downloaded, `xpcshell_run.py check` computes from the series checkout the xpcshell tests of OURS (test_*.js in
+# an xpcshell folder of a feature's src/) and compares them with scripts/ci/xpcshell_tests.json: a test of ours that the list does not run is red, so
+# is a listed file that the series does not have. `run` makes the same comparison again, so the verdict carries it.
+#
+# Called by gate.yml (workflow_call), and run alone for a MEASUREMENT. The seconds of every file and of every test are in the result JSON and in the
+# job's summary.
 # ─────────────────────────────────────────────────────────────────────────────
 name: xpcshell
 run-name: xpcshell, our tests on the packaged binary (${{ inputs.build_run_id || github.ref_name }})
@@ -31,6 +41,10 @@ on:
         description: unused here; the gate passes it to every workflow it calls
         type: string
         default: main
+      published_tag:
+        description: a release tag whose archives to test instead of the run's (empty for the candidate's own)
+        type: string
+        default: ''
   push:
     branches: ['latitude/*-oracles']
   workflow_dispatch:
@@ -39,6 +53,10 @@ on:
         description: the run whose asset-* artifacts to test
         type: string
         default: '44921963200'
+      published_tag:
+        description: a release tag whose archives to test instead of the run's artifacts (empty for the run's)
+        type: string
+        default: ''
 
 permissions: { actions: read, contents: read }
 
@@ -50,7 +68,11 @@ jobs:
     env:
       TEMP: ${{ startsWith(matrix.runner, 'windows') && 'D:\a\_temp' || '/tmp' }}
       TMP: ${{ startsWith(matrix.runner, 'windows') && 'D:\a\_temp' || '/tmp' }}
-    timeout-minutes: 20
+      # The release whose archives run: the input, else firefox-68 on this workflow's own push (the measurement), else none (the run's artifacts).
+      # A call from the gate has github.event_name of ITS caller (release.yml is also run by a push) and always has build_run_id: only a push of this
+      # workflow has none, so that is what says "the measurement", never the event name alone.
+      PUBLISHED_TAG: ${{ inputs.published_tag || (inputs.build_run_id == '' && github.event_name == 'push' && 'firefox-68' || '') }}
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -71,8 +93,17 @@ jobs:
             /UPSTREAM.json
             /platform/ci/src/scripts/ci/xpcshell_*
             /*/*/src/**/tests/
+            /*/*/src/**/test/
           sparse-checkout-cone-mode: false
-      - name: Download asset
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with: { python-version: '3.11' }
+      # No download, no install: the list and the series, in the first seconds of the job.
+      - name: The declared list is exactly the set of our xpcshell tests
+        shell: bash
+        run: python engine-series/platform/ci/src/scripts/ci/xpcshell_run.py check --series engine-series --list engine-series/platform/ci/src/scripts/ci/xpcshell_tests.json
+      - name: Download asset (the run's)
+        if: env.PUBLISHED_TAG == ''
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: asset-${{ matrix.leg }}
@@ -80,9 +111,17 @@ jobs:
           # another run's artifacts need the token; this run's do not. A push to latitude/*-oracles has no input: the measurement's candidate.
           run-id: ${{ inputs.build_run_id || '44921963200' }}
           github-token: ${{ (inputs.build_run_id || '44921963200') != github.run_id && github.token || '' }}
-      - name: Set up Python
-        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
-        with: { python-version: '3.11' }
+      # The published engine: the release's seal.json and this leg's archive, the archive's sha256 checked against the seal (as the core does).
+      - name: Download asset (the published engine's, as sealed)
+        if: env.PUBLISHED_TAG != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          mkdir -p art
+          gh release download "$PUBLISHED_TAG" -R "$GITHUB_REPOSITORY" --pattern seal.json --pattern "firefox-*-stealth-${{ matrix.leg }}.*" --dir art
+          python engine-series/platform/ci/src/scripts/ci/xpcshell_run.py verify-asset --dir art --leg ${{ matrix.leg }}
       - name: Linux libraries and a display for the shell
         if: matrix.kind == 'linux'
         run: |

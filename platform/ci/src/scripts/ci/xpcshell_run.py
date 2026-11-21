@@ -7,12 +7,17 @@ of the source tree, never shipped. This script is the part of Mozilla's runner (
 
   fetch  the unmodified Mozilla files the tests need, at the tag of the series' UPSTREAM.json, from the lock (scripts/ci/xpcshell_support.json: a path
          and a sha256 each); a file whose bytes are not the locked ones is a red, never a quiet substitute
-  run    for each declared file (scripts/ci/xpcshell_tests.json): read its manifest (head files, prefs, firefox-appdir, environment), build the
+  run    for each declared file (scripts/ci/xpcshell_tests.json): read the manifest that lists it (ours beside it in the series, else Mozilla's of the
+         folder: head files, prefs, firefox-appdir, environment), build the
          command of buildXpcsCmd / buildCmdHead / buildCmdTestFile, run it with the runner's environment (no non-local connection), parse the
          structured log head.js prints, and write junit + a result JSON. Exit 1 when a test fails or is skipped, a process dies or times out, a file
          collects no test, or fewer tests were collected than the declared minimum
-  lock   (a person, on a machine that has the Mozilla tag in git) rewrite the lock: the files every test needs, the manifest and the head files of
-         the folder of each declared test, each with its sha256, computed from the blobs of the tag
+  check  the declared list is exactly the set of our xpcshell tests that the series holds (discover): one the list does not run is a red, so is a
+         listed one that the series does not have, so a new test of ours cannot be left out of the leg unseen
+  verify-asset  the published engine (`gh release download <tag>`, seal.json and the leg's archive) is the one the seal says: sha256 of the archive
+  lock   (a person, on a machine that has the Mozilla tag in git) rewrite the lock: the files every test needs, and for each declared test the manifest of
+         Mozilla's folder and its head files, or, when a manifest of OURS lists the test (xpcshell-stealth.toml beside it in the series), the head files that
+         manifest names and that are not ours; each with its sha256, computed from the blobs of the tag
 
 The files of OURS (the tests) come from the series checkout: `<series>/<group>/<folder>/src/<path of the test in the tree>`. Mozilla's come from the
 lock. The layout the shell sees is the one of an objdir's `_tests/xpcshell/<folder>`: the test and the head files side by side, the working directory
@@ -118,6 +123,60 @@ def locate_test(series: Path, rel: str) -> Path:
     return found[0]
 
 
+XPCSHELL_DIRS = ("unit", "xpcshell")
+
+
+def is_xpcshell_dir(parts) -> bool:
+    """A folder name of Mozilla's xpcshell tests: `unit`, `xpcshell`, or `unit_<kind>` (every xpcshell folder of the tree is `tests/unit`, `test/unit`,
+    `tests/xpcshell` or a `unit_*` next to them)."""
+    return any(p in XPCSHELL_DIRS or p.startswith("unit_") for p in parts)
+
+
+def discover(series: Path) -> list:
+    """The xpcshell tests of OURS in the series, computed from the checkout: every `test_*.js` / `test_*.mjs` of `<group>/<folder>/src/` that is in an
+    xpcshell folder (see is_xpcshell_dir), or whose folder holds an `xpcshell*.toml` of ours. The series' src holds only the files a feature ADDS (what
+    it modifies is in hooks.patch), so each one is ours. Paths in the tree, sorted."""
+    found = set()
+    for src in sorted(Path(series).glob("*/*/src")):
+        if not src.is_dir():
+            continue
+        for path in src.rglob("test_*"):
+            if path.suffix not in (".js", ".mjs") or path.name.endswith(".sys.mjs") or not path.is_file():
+                continue
+            rel = path.relative_to(src)
+            if is_xpcshell_dir(rel.parts[:-1]) or any(path.parent.glob("xpcshell*.toml")):
+                found.add(rel.as_posix())
+    return sorted(found)
+
+
+def check_list(series: Path, files: list) -> list:
+    """The reds of the list against the series, as lines: a test of ours that the list does not run, a listed file that the series does not have (or has
+    twice), a listed file that is not an xpcshell test of ours by the rule of `discover` (the rule and the list must say the same)."""
+    ours = set(discover(series))
+    reasons = []
+    for rel in sorted(ours - set(files)):
+        reasons.append("%s: an xpcshell test of ours that the declared list does not run (add it to scripts/ci/xpcshell_tests.json and run `lock`)" % rel)
+    for rel in files:
+        try:
+            locate_test(series, rel)
+        except FileNotFoundError as exc:
+            reasons.append("%s: declared, and the series does not have it (%s)" % (rel, exc))
+            continue
+        if rel not in ours:
+            reasons.append("%s: declared, but it is not an xpcshell test of ours by the rule of discover (test_*.js or test_*.mjs in a unit/xpcshell folder, "
+                           "or beside an xpcshell*.toml of ours)" % rel)
+    return reasons
+
+
+def check_cmd(series: Path, list_path: Path) -> int:
+    declared = load_list(list_path)
+    reasons = check_list(series, declared["files"])
+    for reason in reasons:
+        print("RED " + reason)
+    print("check: %d declared, %d found in the series, %d problem(s)" % (len(declared["files"]), len(discover(series)), len(reasons)))
+    return 1 if reasons else 0
+
+
 # ----------------------------------------------------------------------------------------------------------------------------------------------
 # fetch
 # ----------------------------------------------------------------------------------------------------------------------------------------------
@@ -172,6 +231,34 @@ def _safe(function, item):
         return "%s: %s" % (item[0], exc)
 
 
+def verify_asset(directory: Path, leg: str) -> int:
+    """The published engine as downloaded (`gh release download <tag> --pattern seal.json --pattern 'firefox-*-stealth-<leg>.*'`): exactly one archive of
+    the leg, named in the release's seal.json, with the sha256 the seal has. Anything else is a red, never a quiet use of the archive."""
+    directory = Path(directory)
+    try:
+        seal = json.loads((directory / "seal.json").read_text(encoding="utf-8"))
+        assets = seal["assets"]
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        print("RED seal.json of the release could not be read: %s" % exc)
+        return 1
+    archives = sorted(p for p in directory.glob("firefox-*-stealth-%s.*" % leg) if p.is_file())
+    if len(archives) != 1:
+        print("RED expected one firefox-*-stealth-%s archive in %s, found %d: %s" % (leg, directory, len(archives), [p.name for p in archives]))
+        return 1
+    archive = archives[0]
+    record = assets.get(archive.name) if isinstance(assets, dict) else None
+    want = record.get("sha256") if isinstance(record, dict) else None
+    if not want:
+        print("RED %s is not in the assets of seal.json (tag %s)" % (archive.name, seal.get("tag")))
+        return 1
+    got = sha256_of(archive)
+    if got != want:
+        print("RED %s: sha256 %s, seal.json (tag %s) has %s" % (archive.name, got, seal.get("tag"), want))
+        return 1
+    print("verify-asset: %s is the %s archive of the seal, sha256 %s" % (archive.name, seal.get("tag"), got))
+    return 0
+
+
 # ----------------------------------------------------------------------------------------------------------------------------------------------
 # the manifest of a folder, and the files the command needs
 # ----------------------------------------------------------------------------------------------------------------------------------------------
@@ -182,6 +269,18 @@ def manifest_entry(manifest_text: str, name: str) -> dict:
     entry = dict(data.get("DEFAULT", {}))
     entry.update(data.get(name, {}))
     return entry
+
+
+def our_manifest_entry(source: Path, name: str):
+    """The entry of `name` in an `xpcshell*.toml` of OURS beside the test in the series (xpcshell-stealth.toml: a feature's own manifest, registered by its
+    moz.build), as manifest_entry reads it; None when none of ours lists the test (then the folder's manifest is Mozilla's, from the lock)."""
+    for manifest in sorted(Path(source).parent.glob("xpcshell*.toml")):
+        data = tomllib.loads(manifest.read_text(encoding="utf-8"))
+        if name in data:
+            entry = dict(data.get("DEFAULT", {}))
+            entry.update(data[name])
+            return entry
+    return None
 
 
 def head_files(entry: dict) -> list:
@@ -406,18 +505,24 @@ def run_file(binary, series: Path, support: Path, work: Path, modules: Path, rel
         source = locate_test(series, rel)
         folder = Path(rel).parent.as_posix()
         name = Path(rel).name
-        manifest = support / folder / "xpcshell.toml"
-        if not manifest.is_file():
-            raise FileNotFoundError("%s/xpcshell.toml is not in the support folder: the lock lacks it (run `lock`)" % folder)
-        entry = manifest_entry(manifest.read_text(encoding="utf-8"), name)
+        # The manifest that lists the test: one of ours beside it in the series (xpcshell-stealth.toml), else Mozilla's xpcshell.toml of the folder (the lock).
+        entry = our_manifest_entry(source, name)
+        if entry is None:
+            manifest = support / folder / "xpcshell.toml"
+            if not manifest.is_file():
+                raise FileNotFoundError("%s/xpcshell.toml is not in the support folder: the lock lacks it (run `lock`)" % folder)
+            entry = manifest_entry(manifest.read_text(encoding="utf-8"), name)
         run_dir = work / hashlib.sha256(rel.encode()).hexdigest()[:8]  # short: Windows paths, and Firefox makes its own folders under it
         stage = run_dir / "stage"
         stage.mkdir(parents=True, exist_ok=True)
         heads = []
         for head in head_files(entry):
-            origin = support / folder / head
+            # a head file of ours is beside the test in the series; Mozilla's is in the support folder
+            origin = source.parent / head
             if not origin.is_file():
-                raise FileNotFoundError("head file %s/%s of the manifest is not in the support folder: the lock lacks it (run `lock`)" % (folder, head))
+                origin = support / folder / head
+            if not origin.is_file():
+                raise FileNotFoundError("head file %s/%s of the manifest is in neither the series nor the support folder: the lock lacks it (run `lock`)" % (folder, head))
             shutil.copyfile(origin, stage / head)
             heads.append(stage / head)
         shutil.copyfile(source, stage / name)
@@ -529,6 +634,11 @@ def run(binary, series: Path, support: Path, list_path: Path, lock_path: Path, o
             result = verdict(files, declared["min_tests"])
         finally:
             shutil.rmtree(work, ignore_errors=True)
+    # the list against the series: a test of ours the list does not run, or a listed file the series does not have, is red whatever else ran
+    problems = check_list(series, declared["files"])
+    if problems:
+        result["reasons"] = list(result["reasons"]) + problems
+        result["verdict"] = "red"
     result.update(system=system, mozilla_tag=lock["mozilla_tag"], seconds=round(sum(f["seconds"] for f in result["files"]), 3))
     write_lf(out / "xpcshell-result.json", json.dumps(result, indent=1) + "\n")
     write_lf(out / "xpcshell-junit.xml", junit(result, system))
@@ -549,8 +659,10 @@ def _git(repo: str, *args: str) -> bytes:
     return subprocess.run(["git", "-C", repo, *args], check=True, capture_output=True).stdout
 
 
-def lock_files(repo: str, tag: str, folders: list) -> dict:
-    """{path: sha256} of the blobs of `tag` that the declared tests need."""
+def lock_files(repo: str, tag: str, items: list) -> dict:
+    """{path: sha256} of the blobs of `tag` that the declared tests need. `items` is [(folder, name, our_entry, our_dir)] per declared test: with an entry of
+    ours (a manifest of ours lists it) the heads come from that entry, and a head that sits in our_dir (the series) is ours and is not locked; without one the
+    folder's xpcshell.toml of the tag is read and locked, with the heads of the test's entry."""
     def blob(path: str) -> bytes:
         return _git(repo, "cat-file", "blob", "%s:%s" % (tag, path))
 
@@ -559,22 +671,25 @@ def lock_files(repo: str, tag: str, folders: list) -> dict:
     wanted += [MODULES_DIR + "/" + n for n in listing if n not in MODULES_SKIP and _git(repo, "cat-file", "-t", "%s:%s/%s" % (tag, MODULES_DIR, n)).strip() == b"blob"]
     for name in json.loads(blob(PROFILES_DIR + "/profiles.json"))[PROFILE_NAME]:
         wanted.append("%s/%s/user.js" % (PROFILES_DIR, name))
-    for folder, names in folders:
-        manifest = folder + "/xpcshell.toml"
-        wanted.append(manifest)
-        text = blob(manifest).decode("utf-8")
-        for name in names:
-            wanted += ["%s/%s" % (folder, h) for h in head_files(manifest_entry(text, name))]
+    for folder, name, ours, our_dir in items:
+        if ours is None:
+            manifest = folder + "/xpcshell.toml"
+            wanted.append(manifest)
+            entry = manifest_entry(blob(manifest).decode("utf-8"), name)
+            wanted += ["%s/%s" % (folder, h) for h in head_files(entry)]
+        else:
+            wanted += ["%s/%s" % (folder, h) for h in head_files(ours) if not (our_dir and (Path(our_dir) / h).is_file())]
     return {path: hashlib.sha256(blob(path)).hexdigest() for path in sorted(set(wanted))}
 
 
 def lock_cmd(repo: str, series: Path, list_path: Path, out: Path) -> int:
     declared = load_list(list_path)
     tag = upstream(series)["mozilla_tag"]
-    by_folder: dict = {}
+    items = []
     for rel in declared["files"]:
-        by_folder.setdefault(Path(rel).parent.as_posix(), []).append(Path(rel).name)
-    files = lock_files(repo, tag, sorted(by_folder.items()))
+        source = locate_test(series, rel)
+        items.append((Path(rel).parent.as_posix(), Path(rel).name, our_manifest_entry(source, Path(rel).name), source.parent))
+    files = lock_files(repo, tag, items)
     write_lf(Path(out), json.dumps({"mozilla_tag": tag, "files": files}, indent=1) + "\n")
     print("lock: %d files at %s -> %s" % (len(files), tag, out))
     return 0
@@ -596,6 +711,12 @@ def main(argv=None) -> int:
     r.add_argument("--out", required=True, type=Path)
     r.add_argument("--timeout", type=float, default=TIMEOUT_S)
     r.add_argument("--only", default="", help="run only the declared files whose path contains this text (a measurement aid; the verdict then lacks the others)")
+    c = sub.add_parser("check")
+    c.add_argument("--series", required=True, type=Path)
+    c.add_argument("--list", type=Path, default=LIST)
+    v = sub.add_parser("verify-asset")
+    v.add_argument("--dir", required=True, type=Path)
+    v.add_argument("--leg", required=True)
     k = sub.add_parser("lock")
     k.add_argument("--git", required=True, help="a git repository that has the Mozilla tag of the series' UPSTREAM.json")
     k.add_argument("--series", required=True, type=Path)
@@ -604,6 +725,10 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
     if args.cmd == "fetch":
         return fetch(args.series, args.lock, args.into)
+    if args.cmd == "check":
+        return check_cmd(args.series, args.list)
+    if args.cmd == "verify-asset":
+        return verify_asset(args.dir, args.leg)
     if args.cmd == "lock":
         return lock_cmd(args.git, args.series, args.list, args.out)
     return run(args.binary, args.series, args.support.resolve(), args.list, args.lock, args.out, args.timeout, args.only)

@@ -37,7 +37,7 @@ import subprocess
 import sys
 
 TREE = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-for p in ["python/mozbuild", "python/mach", "python/mozversioncontrol", "python/mozterm", "python/mozboot"] + [
+for p in ["python/mozbuild", "python/mach", "python/mozversioncontrol", "python/mozterm", "python/mozboot", "layout/tools/reftest"] + [
     os.path.relpath(d, TREE) for d in glob.glob(os.path.join(TREE, "testing/mozbase/*")) + glob.glob(os.path.join(TREE, "third_party/python/*"))
 ]:
     for sub in ("", "lib", "src"):
@@ -50,8 +50,8 @@ from mozbuild.frontend.reader import BuildReader, EmptyConfig  # noqa: E402
 
 TARGETS = {
     "windows": {"OS_TARGET": "WINNT", "OS_ARCH": "WINNT", "MOZ_WIDGET_TOOLKIT": "windows", "TARGET_CPU": "x86_64", "CC_TYPE": "clang-cl", "TARGET_KERNEL": "WINNT"},
-    "linux": {"OS_TARGET": "Linux", "OS_ARCH": "Linux", "MOZ_WIDGET_TOOLKIT": "gtk", "TARGET_CPU": "x86_64", "CC_TYPE": "clang", "TARGET_KERNEL": "Linux", "MOZ_X11": "1", "MOZ_WAYLAND": "1"},
-    "macos": {"OS_TARGET": "Darwin", "OS_ARCH": "Darwin", "MOZ_WIDGET_TOOLKIT": "cocoa", "TARGET_CPU": "aarch64", "CC_TYPE": "clang", "TARGET_KERNEL": "Darwin"},
+    "linux": {"OS_TARGET": "Linux", "OS_ARCH": "Linux", "MOZ_WIDGET_TOOLKIT": "gtk", "TARGET_CPU": "x86_64", "CC_TYPE": "clang", "CC_VERSION": "19.1.0", "TARGET_KERNEL": "Linux", "MOZ_X11": "1", "MOZ_WAYLAND": "1"},
+    "macos": {"OS_TARGET": "Darwin", "OS_ARCH": "Darwin", "MOZ_WIDGET_TOOLKIT": "cocoa", "TARGET_CPU": "aarch64", "CC_TYPE": "clang", "CC_VERSION": "19.1.0", "TARGET_KERNEL": "Darwin"},
 }
 # Lists whose entries are files of the source directory (a leading "!" is the
 # objdir, a leading "/" the top of the tree).

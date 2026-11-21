@@ -15,6 +15,7 @@ import hashlib
 import io
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import xml.etree.ElementTree as ET
@@ -325,11 +326,11 @@ def cases() -> list:
     declared = x.load_list(x.LIST)
     lock = x.load_lock(x.LOCK)
     folders = {Path(f).parent.as_posix() for f in declared["files"]}
-    add("the declared list has our three xpcshell tests of the line and the minimum is their eight tasks",
-        len(declared["files"]) == 3 and declared["min_tests"] == 8 and all(Path(f).name.startswith("test_stealth_") for f in declared["files"]))
-    add("the lock has the harness, the modules, the profiles, and the manifest of every folder of a declared test",
+    add("the declared list has our three xpcshell tests of the line and the minimum is their seven tasks (the launch counter's hook test is a node test now)",
+        len(declared["files"]) == 3 and declared["min_tests"] == 7 and all(Path(f).name.startswith("test_stealth_") for f in declared["files"]))
+    add("the lock has the harness, the modules and the profiles (the manifests of the folders are held by the lock cases of the two layouts below)",
         x.HARNESS in lock["files"] and all(r in lock["files"] for r in x.MODULES_EXTRA) and "testing/modules/StructuredLog.sys.mjs" in lock["files"]
-        and "testing/profiles/xpcshell/user.js" in lock["files"] and all(f + "/xpcshell.toml" in lock["files"] for f in folders)
+        and "testing/profiles/xpcshell/user.js" in lock["files"]
         and all(len(h) == 64 and set(h) <= set("0123456789abcdef") for h in lock["files"].values()))
     add("the lock holds blobs of one tag only, no moz.build and no folder", not any(p_.endswith("moz.build") or p_.endswith("/tests") for p_ in lock["files"]))
     raw = x.LOCK.read_bytes() + x.LIST.read_bytes() + (HERE / "xpcshell_run.py").read_bytes()
@@ -374,6 +375,205 @@ def cases() -> list:
             code = x.fetch(t.series, t.lock, Path(tmp.name) / "fetched3", opener=down, sleep=lambda s: None)
         add("fetch: a file that cannot be read after the retries is red, not a traceback", code == 1)
 
+    # --- the list is the set: our xpcshell tests that the series holds against the declared list
+    def series_with(paths):
+        tmp_ = tempfile.TemporaryDirectory()
+        base = Path(tmp_.name)
+        for rel in paths:
+            f = base / rel
+            f.parent.mkdir(parents=True, exist_ok=True)
+            f.write_text("// x\n", encoding="utf-8")
+        return tmp_, base
+
+    def checked(series, list_path):
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            code = x.check_cmd(series, list_path)
+        return code, buf.getvalue()
+
+    S = "grp/fold/src/"
+    tmp, base = series_with([
+        S + "a/tests/unit/test_stealth_one.js", S + "b/test/unit/test_stealth_two.mjs", S + "c/tests/xpcshell/test_three.js", S + "d/unit_ipc/test_four.js",
+        S + "e/tests/test_with_a_toml.js", S + "e/tests/xpcshell-stealth.toml",
+        # not ours or not xpcshell: a head file, a python test, a module, a node test, a mochitest, a test outside any xpcshell folder, files outside src
+        S + "a/tests/unit/head_x.js", S + "a/tests/unit/test_stealth_py.py", S + "a/tests/unit/test_stealth_mod.sys.mjs", S + "juggler/tests/x.test.mjs",
+        S + "f/tests/browser/browser_test_x.js", S + "g/tests/mochitest/test_not_xpcshell.js", "grp/fold/FEATURE.md", "grp/fold/hooks.patch",
+        "other/test_unit_root.js", "grp/fold/notsrc/unit/test_outside_src.js"])
+    with tmp:
+        add("discover: test_*.js/.mjs in a unit, xpcshell or unit_* folder of a feature's src, or beside an xpcshell*.toml of ours, and nothing else",
+            x.discover(base) == ["a/tests/unit/test_stealth_one.js", "b/test/unit/test_stealth_two.mjs", "c/tests/xpcshell/test_three.js", "d/unit_ipc/test_four.js",
+                                 "e/tests/test_with_a_toml.js"])
+    tmp, base = series_with([])
+    with tmp:
+        add("discover: a series with no feature has none", x.discover(base) == [])
+
+    tmp, t = tree({"test_declared.js": PASSING}, minimum=2)
+    with tmp:
+        code, result, _, _ = t.run()
+        add("a list that is the set, and tests that pass: no reason from the check, green", code == 0 and result["reasons"] == [] and checked(t.series, t.list)[0] == 0)
+
+    tmp, t = tree({"test_declared.js": PASSING}, minimum=2)
+    with tmp:
+        (t.series / "grp" / "fold" / "src" / "dir" / "unit" / "test_new_of_ours.js").write_text("// a new xpcshell test of ours\n", encoding="utf-8")
+        code, result, text, _ = t.run()
+        add("a test of ours in the series that the list does not run is RED, said by name, even when every listed test passes",
+            code == 1 and result["verdict"] == "red" and result["passed"] == 2 and result["failed"] == 0
+            and any("dir/unit/test_new_of_ours.js" in r and "declared list does not run" in r for r in result["reasons"]) and "RED dir/unit/test_new_of_ours.js" in text)
+        code, said = checked(t.series, t.list)
+        add("check: the same test of ours that the list does not run is exit 1, by name", code == 1 and "test_new_of_ours.js" in said and "1 problem" in said)
+        t.list.write_text(json.dumps({"files": ["dir/unit/test_declared.js", "dir/unit/test_new_of_ours.js"], "min_tests": 2}), encoding="utf-8")
+        code, said = checked(t.series, t.list)
+        add("check: the list that has every test of ours is exit 0", code == 0 and "0 problem" in said)
+
+    tmp, t = tree({"test_declared.js": PASSING}, minimum=2)
+    with tmp:
+        t.list.write_text(json.dumps({"files": ["dir/unit/test_declared.js", "dir/unit/test_gone.js"], "min_tests": 2}), encoding="utf-8")
+        code, result, _, _ = t.run()
+        add("a listed file that the series does not have is RED in the verdict, with the reason of the check and the one of the run",
+            code == 1 and any("test_gone.js" in r and "series does not have it" in r for r in result["reasons"]) and any("test_gone.js" in r and "exactly one" in r for r in result["reasons"]))
+        code, said = checked(t.series, t.list)
+        add("check: a listed file that is not in the series is exit 1, by name", code == 1 and "test_gone.js" in said)
+
+    tmp, t = tree({"test_declared.js": PASSING}, minimum=2)
+    with tmp:
+        odd = t.series / "grp" / "fold" / "src" / "dir" / "mochitest"
+        odd.mkdir(parents=True)
+        (odd / "test_listed_but_not_xpcshell.js").write_text("// not in an xpcshell folder\n", encoding="utf-8")
+        reasons = x.check_list(t.series, ["dir/unit/test_declared.js", "dir/mochitest/test_listed_but_not_xpcshell.js"])
+        add("a listed file that exists but is not an xpcshell test of ours by the rule is RED (the rule and the list say the same)",
+            len(reasons) == 1 and "not an xpcshell test of ours" in reasons[0])
+
+    tmp, t = tree({"test_declared.js": PASSING}, minimum=2)
+    with tmp:
+        other = t.series / "grp2" / "fold2" / "src" / "dir" / "unit"
+        other.mkdir(parents=True)
+        (other / "test_declared.js").write_text("// the same path in another feature\n", encoding="utf-8")
+        reasons = x.check_list(t.series, ["dir/unit/test_declared.js"])
+        add("the same path in two features of the series is RED (exactly one file)", any("test_declared.js" in r and "series does not have it" in r for r in reasons))
+
+    # --- the published engine: seal.json and the archive of the leg
+    def published(archive_bytes=b"engine", seal_sha=None, name="firefox-159.0-stealth-linux-x86_64.tar.gz", extra=()):
+        tmp_ = tempfile.TemporaryDirectory()
+        d = Path(tmp_.name)
+        (d / name).write_bytes(archive_bytes)
+        sha = seal_sha if seal_sha is not None else hashlib.sha256(archive_bytes).hexdigest()
+        (d / "seal.json").write_text(json.dumps({"tag": "firefox-68", "assets": {name: {"sha256": sha}}}), encoding="utf-8")
+        for other_name in extra:
+            (d / other_name).write_bytes(b"x")
+        return tmp_, d
+
+    def verify(d, leg="linux-x86_64"):
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            code = x.verify_asset(d, leg)
+        return code, buf.getvalue()
+
+    tmp, d = published()
+    with tmp:
+        code, said = verify(d)
+        add("verify-asset: the leg's archive with the sha256 of the seal is green", code == 0 and "firefox-68" in said)
+    tmp, d = published(seal_sha="0" * 64)
+    with tmp:
+        code, said = verify(d)
+        add("verify-asset: an archive whose sha256 is not the seal's is RED, with both hashes",
+            code == 1 and "RED" in said and "0" * 64 in said and hashlib.sha256(b"engine").hexdigest() in said)
+    tmp, d = published()
+    with tmp:
+        (d / "seal.json").write_text(json.dumps({"tag": "firefox-68", "assets": {"firefox-159.0-stealth-win-x86_64.zip": {"sha256": "ab"}}}), encoding="utf-8")
+        code, said = verify(d)
+        add("verify-asset: an archive that the seal does not name is RED", code == 1 and "not in the assets" in said)
+    tmp, d = published()
+    with tmp:
+        code, said = verify(d, leg="win-x86_64")
+        add("verify-asset: a leg with no archive is RED", code == 1 and "found 0" in said)
+    tmp, d = published(extra=("firefox-160.0-stealth-linux-x86_64.tar.gz",))
+    with tmp:
+        code, said = verify(d)
+        add("verify-asset: two archives of the leg are RED (one is the engine, which one is not guessed)", code == 1 and "found 2" in said)
+    tmp, d = published()
+    with tmp:
+        (d / "seal.json").unlink()
+        code, said = verify(d)
+        add("verify-asset: no seal.json is RED", code == 1 and "seal.json" in said)
+    tmp, d = published()
+    with tmp:
+        (d / "seal.json").write_text("{not json", encoding="utf-8")
+        add("verify-asset: a seal.json that is not JSON is RED, not a traceback", verify(d)[0] == 1)
+
+    # --- the two layouts of a manifest: Mozilla's xpcshell.toml of the folder (support) and a manifest of OURS beside the test (xpcshell-stealth.toml in the series)
+    OURS_TOML = '[DEFAULT]\nhead = "head_ours.js head_x.js"\nprefs = ["ours.number=7"]\nenvironment = ["EXTRA_FROM_MANIFEST=ours"]\n\n["test_declared.js"]\n'
+    tmp, t = tree({"test_declared.js": PASSING}, minimum=2)
+    with tmp:
+        cap = Path(tmp.name) / "capture-mozilla.json"
+        code, result, _, _ = t.run(capture=cap)
+        seen = json.loads(cap.read_text(encoding="utf-8"))
+        add("layout Mozilla: the test is listed by the folder's xpcshell.toml of the tag; its head file comes from the support folder, its prefs and environment from that manifest",
+            code == 0 and [Path(h).name for h in seen["evals"]["_HEAD_FILES"]] == ["head_x.js"] and 'user_pref("demo.number", 3);' in seen["prefs"]
+            and seen["env"]["EXTRA_FROM_MANIFEST"] == "yes" and x.our_manifest_entry(t.series / "grp/fold/src/dir/unit/test_declared.js", "test_declared.js") is None)
+
+    tmp, t = tree({"test_declared.js": PASSING}, minimum=2)
+    with tmp:
+        unit = t.series / "grp" / "fold" / "src" / "dir" / "unit"
+        (unit / "xpcshell-stealth.toml").write_text(OURS_TOML, encoding="utf-8")
+        (unit / "head_ours.js").write_text("// a head file of ours, beside the test in the series\n", encoding="utf-8")
+        cap = Path(tmp.name) / "capture-ours.json"
+        code, result, _, _ = t.run(capture=cap)
+        seen = json.loads(cap.read_text(encoding="utf-8"))
+        stage = Path(seen["evals"]["_TEST_FILE"][0]).parent
+        add("layout ours: the test is listed by xpcshell-stealth.toml beside it; the manifest read is ours (its prefs and environment, not Mozilla's section)",
+            code == 0 and result["verdict"] == "green" and 'user_pref("ours.number", 7);' in seen["prefs"] and 'user_pref("demo.number", 3);' not in seen["prefs"]
+            and seen["env"]["EXTRA_FROM_MANIFEST"] == "ours")
+        add("layout ours: a head file named by it comes from the series when it is ours (head_ours.js) and from the support folder when it is Mozilla's (head_x.js), both staged beside the test",
+            [Path(h).name for h in seen["evals"]["_HEAD_FILES"]] == ["head_ours.js", "head_x.js"] and seen["problems"] == [])
+        add("layout ours: discovery finds the test (it is in a unit folder and beside a manifest of ours), and the list that has it is the set",
+            x.discover(t.series) == ["dir/unit/test_declared.js"] and x.check_list(t.series, ["dir/unit/test_declared.js"]) == []
+            and x.our_manifest_entry(unit / "test_declared.js", "test_declared.js")["prefs"] == ["ours.number=7"])
+
+    # a test in a folder that is not named unit/xpcshell is found by the manifest of ours beside it, in both layouts it must be in the list
+    tmp, base = series_with([S + "w/tests/test_odd_name.js", S + "w/tests/xpcshell-stealth.toml", S + "x/tests/test_odd_name2.js"])
+    with tmp:
+        add("layout ours: a test beside xpcshell-stealth.toml in a folder with any name is ours; the same file with no manifest of ours and no unit/xpcshell folder is not",
+            x.discover(base) == ["w/tests/test_odd_name.js"])
+
+    tmp, t = tree({"test_declared.js": PASSING}, minimum=2)
+    with tmp:
+        unit = t.series / "grp" / "fold" / "src" / "dir" / "unit"
+        (unit / "xpcshell-stealth.toml").write_text(OURS_TOML.replace("head_ours.js head_x.js", "head_missing.js"), encoding="utf-8")
+        code, result, _, _ = t.run()
+        add("layout ours: a head file that is neither beside the test nor in the support folder is the file's red, said by name",
+            code == 1 and any("head_missing.js" in e for e in result["files"][0]["errors"]))
+
+    # the lock, from a real git repository with a tag, for both layouts
+    def git_repo(files):
+        tmp_ = tempfile.TemporaryDirectory()
+        repo = Path(tmp_.name)
+        for rel, text in files.items():
+            f = repo / rel
+            f.parent.mkdir(parents=True, exist_ok=True)
+            f.write_text(text, encoding="utf-8")
+        env = dict(os.environ, GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@t", GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@t")
+        for args in (["init", "-q"], ["add", "-A"], ["commit", "-q", "-m", "tag"], ["tag", "T1"]):
+            subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True, env=env)
+        return tmp_, str(repo)
+
+    base_files = {
+        "testing/xpcshell/head.js": "// h\n", "testing/modules/Assert.sys.mjs": "// a\n", "toolkit/modules/tests/modules/PromiseTestUtils.sys.mjs": "// b\n",
+        "tools/code-coverage/PerTestCoverageUtils.sys.mjs": "// c\n", "netwerk/test/httpserver/httpd.sys.mjs": "// d\n",
+        "testing/profiles/profiles.json": json.dumps({"xpcshell": ["base"]}), "testing/profiles/base/user.js": "// u\n",
+        "dir/unit/xpcshell.toml": '[DEFAULT]\nhead = "head_x.js"\n\n["test_declared.js"]\n', "dir/unit/head_x.js": "// x\n", "dir/unit/head_ours.js": "// not ours in the tag\n",
+        "dir/unit/head_unlisted.js": "// y\n"}
+    tmp_g, repo = git_repo(base_files)
+    with tmp_g:
+        moz = x.lock_files(repo, "T1", [("dir/unit", "test_declared.js", None, None)])
+        add("lock, layout Mozilla: the folder's xpcshell.toml of the tag and the head files of the test's entry are locked",
+            "dir/unit/xpcshell.toml" in moz and "dir/unit/head_x.js" in moz and "dir/unit/head_unlisted.js" not in moz and x.HARNESS in moz)
+        with tempfile.TemporaryDirectory() as ours_dir:
+            (Path(ours_dir) / "head_ours.js").write_text("// ours\n", encoding="utf-8")
+            entry = {"head": "head_ours.js head_x.js"}
+            mine = x.lock_files(repo, "T1", [("dir/unit", "test_declared.js", entry, ours_dir)])
+            add("lock, layout ours: the head file of Mozilla's that the manifest of ours names is locked, the head file of ours (beside the test in the series) is not, and the folder's xpcshell.toml is not needed",
+                "dir/unit/head_x.js" in mine and "dir/unit/head_ours.js" not in mine and "dir/unit/xpcshell.toml" not in mine and x.HARNESS in mine)
+
     # the workflow
     wf = ROOT / ".github" / "workflows" / "xpcshell.yml"
     text = wf.read_text(encoding="utf-8") if wf.is_file() else ""
@@ -383,9 +583,26 @@ def cases() -> list:
         on = doc.get(True, doc.get("on", {}))
         legs = doc["jobs"]["xpcshell"]["strategy"]["matrix"]["include"]
         steps = doc["jobs"]["xpcshell"]["steps"]
-        add("xpcshell.yml: a workflow_call with build_run_id and wrapper_ref, a push on latitude/*-oracles with the measurement's candidate as default, no schedule",
-            set(on["workflow_call"]["inputs"]) == {"build_run_id", "wrapper_ref"} and on["push"]["branches"] == ["latitude/*-oracles"] and "schedule" not in on
+        add("xpcshell.yml: a workflow_call with build_run_id, wrapper_ref and published_tag, a push on latitude/*-oracles, no schedule, the dispatch's candidate as default",
+            set(on["workflow_call"]["inputs"]) == {"build_run_id", "wrapper_ref", "published_tag"} and on["push"]["branches"] == ["latitude/*-oracles"] and "schedule" not in on
             and "'44921963200'" in text and on["workflow_dispatch"]["inputs"]["build_run_id"]["default"] == "44921963200")
+        env = doc["jobs"]["xpcshell"]["env"]
+        run_dl = [st for st in steps if st.get("name", "").startswith("Download asset (the run's)")]
+        pub_dl = [st for st in steps if st.get("name", "").startswith("Download asset (the published")]
+        add("xpcshell.yml: the legs have 15 minutes", doc["jobs"]["xpcshell"]["timeout-minutes"] == 15)
+        add("xpcshell.yml: the published engine is firefox-68 on this workflow's own push (no build_run_id) and never because the caller's event is a push",
+            "inputs.build_run_id == ''" in env["PUBLISHED_TAG"] and "github.event_name == 'push'" in env["PUBLISHED_TAG"] and "'firefox-68'" in env["PUBLISHED_TAG"]
+            and env["PUBLISHED_TAG"].index("inputs.build_run_id == ''") < env["PUBLISHED_TAG"].index("github.event_name") and "inputs.published_tag" in env["PUBLISHED_TAG"])
+        add("xpcshell.yml: the run's artifacts are downloaded only with no published tag, the release's archives only with one",
+            len(run_dl) == 1 and run_dl[0]["if"] == "env.PUBLISHED_TAG == ''" and "run-id" in run_dl[0]["with"]
+            and len(pub_dl) == 1 and pub_dl[0]["if"] == "env.PUBLISHED_TAG != ''")
+        add("xpcshell.yml: the published download is `gh release download` of the seal and the leg's archive, then verify-asset (the sha256 of the seal) before anything is extracted",
+            len(pub_dl) == 1 and "gh release download" in pub_dl[0]["run"] and "--pattern seal.json" in pub_dl[0]["run"] and "xpcshell_run.py verify-asset" in pub_dl[0]["run"]
+            and [i for i, st in enumerate(steps) if st is pub_dl[0]][0] < [i for i, st in enumerate(steps) if st.get("name", "").startswith("Extract")][0])
+        chk = [i for i, st in enumerate(steps) if "xpcshell_run.py check" in st.get("run", "")]
+        add("xpcshell.yml: the list-against-the-series check runs before any download, and it binds",
+            len(chk) == 1 and chk[0] < [i for i, st in enumerate(steps) if st is run_dl[0]][0] and "continue-on-error" not in steps[chk[0]] and "|| true" not in steps[chk[0]]["run"])
+        add("xpcshell.yml: the series checkout reaches the test folders named `test` too, not only `tests`", "/*/*/src/**/test/" in text and "/*/*/src/**/tests/" in text)
         add("xpcshell.yml: a Linux leg and a Windows leg, each on its native runner", {(l["runner"], l["kind"]) for l in legs} == {("ubuntu-24.04", "linux"), ("windows-latest", "win")})
         runs = [s for s in steps if "xpcshell_run.py run" in s.get("run", "")]
         ldd = [s for s in steps if "ldd" in s.get("run", "")]
