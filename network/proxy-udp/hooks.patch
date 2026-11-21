@@ -211,7 +211,7 @@ index 47332372f34482172ce0801dd8e16520d365e64d..d7954045e92de94dc1f8fe09dcffd50d
    // dom::ProxyConfig includes stuff that conflicts with nICEr includes.
    // Make it possible to include this header file without tripping over this
 diff --git a/dom/media/webrtc/transport/nr_socket_prsock.cpp b/dom/media/webrtc/transport/nr_socket_prsock.cpp
-index f15df437c8b6bbe76fb701ad62dbb6308b07456a..c5a67bbc39eab765d1a3f9ea0b47aa48bdc5a2be 100644
+index f15df437c8b6bbe76fb701ad62dbb6308b07456a..70875f6887d67a13691f80534a2d296ea48977e5 100644
 --- a/dom/media/webrtc/transport/nr_socket_prsock.cpp
 +++ b/dom/media/webrtc/transport/nr_socket_prsock.cpp
 @@ -155,6 +155,8 @@ nrappkit copyright:
@@ -262,7 +262,7 @@ index f15df437c8b6bbe76fb701ad62dbb6308b07456a..c5a67bbc39eab765d1a3f9ea0b47aa48
 +        ABORT(R_INTERNAL);
 +      }
 +    }
-+    status = StealthBind(fd_, &bindaddr) ? PR_SUCCESS : PR_FAILURE;
++    status = StealthBindAndBear(fd_, &bindaddr) ? PR_SUCCESS : PR_FAILURE;  // STEALTH-HOOK(network/proxy-udp)
 +  }
    if (status != PR_SUCCESS) {
 +    // A port that is not available: another socket holds it, or the system keeps it (Windows reserves ranges of the dynamic
@@ -464,7 +464,7 @@ index 70621a068d6bdf361e962460e3e9cb3bc26a831e..7c120f755ae27bdf9961d05923e3d0aa
  
    static void SerializeProxyInfo(nsProxyInfo* aProxyInfo,
 diff --git a/netwerk/base/nsUDPSocket.cpp b/netwerk/base/nsUDPSocket.cpp
-index f052d8afa22e136bb85ce10d02de6c732dd26cc8..e7d169168f6beed011bc662ba0542eed114e0f41 100644
+index f052d8afa22e136bb85ce10d02de6c732dd26cc8..ecad7796f33358671d78a1b633a196e796481d7e 100644
 --- a/netwerk/base/nsUDPSocket.cpp
 +++ b/netwerk/base/nsUDPSocket.cpp
 @@ -13,7 +13,10 @@
@@ -478,18 +478,24 @@ index f052d8afa22e136bb85ce10d02de6c732dd26cc8..e7d169168f6beed011bc662ba0542eed
  #include "nsIDNSRecord.h"
  #include "nsIDNSService.h"
  #include "nsIOService.h"
-@@ -618,6 +621,10 @@ nsUDPSocket::InitWithAddress(const NetAddr* aAddr, nsIPrincipal* aPrincipal,
+@@ -618,6 +621,8 @@ nsUDPSocket::InitWithAddress(const NetAddr* aAddr, nsIPrincipal* aPrincipal,
      return NS_ERROR_FAILURE;
    }
  
-+  if (mSocksProxy && NS_FAILED(StealthPutSocksUdpLayer(mFD, mSocksProxy))) {  // STEALTH-HOOK(network/proxy-udp)
-+    goto fail;
-+  }
++  if (mSocksProxy && NS_FAILED(StealthPutSocksUdpLayer(mFD, mSocksProxy))) goto fail;  // STEALTH-HOOK(network/proxy-udp)
 +
  #ifdef FUZZING
    if (StaticPrefs::fuzzing_necko_enabled()) {
      rv = AttachFuzzyIOLayer(mFD);
-@@ -688,6 +695,13 @@ fail:
+@@ -659,6 +664,7 @@ nsUDPSocket::InitWithAddress(const NetAddr* aAddr, nsIPrincipal* aPrincipal,
+     NS_WARNING("failed to bind socket");
+     goto fail;
+   }
++  nsSOCKSUDPIOLayerSocketBorn(mFD);  // STEALTH-HOOK(network/proxy-udp): only a bound socket takes an association
+ 
+   // get the resulting socket address, which may be different than what
+   // we passed to bind.
+@@ -688,6 +694,13 @@ fail:
    return NS_ERROR_FAILURE;
  }
  
@@ -503,7 +509,7 @@ index f052d8afa22e136bb85ce10d02de6c732dd26cc8..e7d169168f6beed011bc662ba0542eed
  NS_IMETHODIMP
  nsUDPSocket::Connect(const NetAddr* aAddr) {
    UDPSOCKET_LOG(("nsUDPSocket::Connect [this=%p]\n", this));
-@@ -1263,6 +1277,10 @@ nsUDPSocket::SendWithAddress(const NetAddr* aAddr, const uint8_t* aData,
+@@ -1263,6 +1276,10 @@ nsUDPSocket::SendWithAddress(const NetAddr* aAddr, const uint8_t* aData,
  
  int64_t nsUDPSocket::GetFileDescriptor() {
    MOZ_ASSERT(OnSocketThread(), "not on socket thread");

@@ -1,0 +1,26 @@
+diff --git a/security/manager/ssl/RemoteSecuritySettings.sys.mjs b/security/manager/ssl/RemoteSecuritySettings.sys.mjs
+index 3e5f9f35ae383837d3504ebef9c52e118dabf053..b241e649d51351777df7f9ad1064c8edf2e20eff 100644
+--- a/security/manager/ssl/RemoteSecuritySettings.sys.mjs
++++ b/security/manager/ssl/RemoteSecuritySettings.sys.mjs
+@@ -248,6 +248,9 @@ export var RemoteSecuritySettings = {
+    * @returns {object} instantiated clients for security remote settings.
+    */
+   init() {
++    // STEALTH-HOOK(stillborn/security-state)
++    const { StealthSecurityState } = ChromeUtils.importESModule("resource://gre/modules/psm/StealthSecurityState.sys.mjs");
++    if (StealthSecurityState.ownsSync()) { return this; }
+     // Avoid repeated initialization (work-around for bug 1730026).
+     if (this._initialized) {
+       return this;
+diff --git a/security/manager/ssl/moz.build b/security/manager/ssl/moz.build
+index a216ee987cac8c06d7c5060254aba7eb4ff1718f..10c4fc11aa631742fc76bc4dafdd6585374d4ac5 100644
+--- a/security/manager/ssl/moz.build
++++ b/security/manager/ssl/moz.build
+@@ -3,6 +3,7 @@
+ # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ 
+ DIRS += ["abridged_certs", "pdf_trust_anchors", "qwac_trust_anchors"]
++DIRS += ["stealth"]  # STEALTH-HOOK(stillborn/security-state)
+ 
+ TEST_DIRS += ["tests"]
+ 

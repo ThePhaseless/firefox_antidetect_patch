@@ -2,7 +2,7 @@
 
 Category: other, spoof
 Prefs: none
-Test: StealthSessionUdpProxy.* (netwerk/test/gtest/TestStealthSocksCredentials.cpp), StealthUdpProxyBirth.* (dom/media/webrtc/transport/test/gtest/TestStealthUdpProxyBirth.cpp, the rule at the birth of a UDP socket); the node test the_udp_of_a_socks5_proxy_is_a_flag_of_its_proxy_info; the e2e of invisible_playwright (tests/test_*_e2e.py: srflx through the relay, proxy without UDP, TURN over TCP per context, two contexts, HTTP/3)
+Test: StealthSessionUdpProxy.* (netwerk/test/gtest/TestStealthSocksCredentials.cpp), StealthUdpProxyBirth.* (dom/media/webrtc/transport/test/gtest/TestStealthUdpProxyBirth.cpp, the rule at the birth of a UDP socket); StealthNrSocketBirth.TwoRefusedPortsLeaveTheReadyAssociationsToTheSocketThatIsBorn (dom/media/webrtc/transport/test/gtest/TestStealthNrSocketBirth.cpp, a refused port takes nothing from the pool); the node test the_udp_of_a_socks5_proxy_is_a_flag_of_its_proxy_info; the e2e of invisible_playwright (tests/test_*_e2e.py: srflx through the relay, proxy without UDP, TURN over TCP per context, two contexts, HTTP/3)
 
 ## What it does
 
@@ -30,7 +30,11 @@ and otherwise builds it from the principal of the window; when that cannot be do
 The UDP is decided where a socket is born. `NrSocket::create` (ICE sockets) and `nsUDPSocket::InitWithAddress` (HTTP/3,
 `setSocksProxy`) push the SOCKS UDP layer (netwerk/socket/nsSOCKSUDPIOLayer) when the proxy is SOCKS5. The layer returns at
 once: the association (resolve, connect, greeting, auth, UDP ASSOCIATE) is made afterwards on the socket thread, the first
-datagrams are held (16 at most) and sent when it is ready, so a candidate is not late. A proxy without UDP is a router that
+datagrams are held (16 at most) and sent when it is ready, so a candidate is not late. The layer is pushed before the bind (an
+AF_INET6 socket is made dual-stack, which a bound one can no longer be) and the socket takes its road, an association of the pool
+included, only once it is born: after a bind that worked (`StealthBindAndBear` in `NrSocket::create`, `nsSOCKSUDPIOLayerSocketBorn`
+after the `PR_Bind` of `nsUDPSocket`). A port the system refuses (in use, or a range Windows keeps for itself) is a socket that is
+never born and takes nothing, so the socket born after a run of refused ports finds the ready associations. A proxy without UDP is a router that
 drops: what is sent goes nowhere and nothing is received. Datagrams to loopback go direct in every state. In a content
 process the UDP sockets of a PeerConnection are refused: they would go out direct.
 
@@ -65,7 +69,7 @@ document's load info, so a page on the loopback, a `file:`, a `data:` or a docum
 - `netwerk/ipc/ProxyConfigLookup*.{h,cpp}`, `PSocketProcess.ipdl`, `SocketProcessParent.{h,cpp}`: the optional load info of the
   document goes with the lookup. The same files carry the hooks of network/doh (the origin attributes of the DoH context go with
   the load info; tagged with that feature).
-- `netwerk/base/nsIUDPSocket.idl`, `nsUDPSocket.{h,cpp}`, `nsProxyInfo.{h,cpp}`, `nsIProxyInfo.idl`: `setSocksProxy`, the SOCKS5 test, the flag CARRIES_COHERENT_UDP (a value of ours in a slot Mozilla leaves free), and no OS handle for a socket with the layer.
+- `netwerk/base/nsIUDPSocket.idl`, `nsUDPSocket.{h,cpp}`, `nsProxyInfo.{h,cpp}`, `nsIProxyInfo.idl`: `setSocksProxy`, the SOCKS5 test, the birth after the bind, the flag CARRIES_COHERENT_UDP (a value of ours in a slot Mozilla leaves free), and no OS handle for a socket with the layer.
 - `netwerk/protocol/http/{AlternateServices,DnsAndConnectSocket,HttpBaseChannel,HttpConnectionUDP}.cpp`: the HTTP/3 gates.
 - `netwerk/protocol/http/Http3Session.cpp`: `mUseNSPRForIO` also for a SOCKS5 connection (3 lines).
 - `netwerk/protocol/http/Http3ConnectUDPStream.cpp`: `setSocksProxy` answers not implemented (the CONNECT-UDP stream has its own proxy).

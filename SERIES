@@ -13,7 +13,7 @@ platform/startup-cache
 platform/untrusted-modules
 platform/webrender-memory
 stillborn/api-keys
-stillborn/intermediates
+stillborn/security-state
 stillborn/telemetry
 stillborn/updater
 network/doh
