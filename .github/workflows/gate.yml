@@ -442,6 +442,16 @@ jobs:
           # artifact ab-oracle-<os> (the step below the suite).
           - { suite: wrapper.e2e.ab_oracle, leg: linux-x86_64, runner: ubuntu-24.04, kind: linux, os: linux, timeout: 50 }
           - { suite: wrapper.e2e.ab_oracle, leg: win-x86_64, runner: windows-latest, kind: win, os: windows, timeout: 50 }
+          # THE NETWORK AND HOST A/B ORACLES, the same scheme: the published engine fetched as the core fetches it, the A/A first (the published engine
+          # against itself: a difference is a broken control), then the published engine against this candidate. Network: the fake web's journey through
+          # the lab's SOCKS gateway, DoH, HTTPS h1/h2, HTTP/3, WebRTC and an idle launch, every leaf of what the wire carried (ClientHello, h2 frames,
+          # header order, DNS questions, destinations; a direct connection is red on either side). Host: the multiset of process kinds and the mapped
+          # modules per kind after the same journey, and the children that came and went from launch. Their files go to the same folder as the page
+          # oracle's, kept as <suite>-<os>.
+          - { suite: wrapper.e2e.ab_network, leg: linux-x86_64, runner: ubuntu-24.04, kind: linux, os: linux, timeout: 60 }
+          - { suite: wrapper.e2e.ab_network, leg: win-x86_64, runner: windows-latest, kind: win, os: windows, timeout: 60 }
+          - { suite: wrapper.e2e.ab_host, leg: linux-x86_64, runner: ubuntu-24.04, kind: linux, os: linux, timeout: 50 }
+          - { suite: wrapper.e2e.ab_host, leg: win-x86_64, runner: windows-latest, kind: win, os: windows, timeout: 50 }
     steps:
       - name: Checkout wrapper (its tests, ci/required-suites.json and scripts/ci_verdict.py)
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -458,6 +468,21 @@ jobs:
           ref: main
           path: wrapper-main
           fetch-depth: 1
+      # A leg comes first in this file and its row in the wrapper's ci/required-suites.json second: a leg whose suite the list of wrapper_ref does
+      # not have yet is SAID (a warning on the run) and does not run its suite or its verdict, instead of failing. Once the row is in the list the
+      # leg is bound like every other, and a row can never leave the list (the judge compares it with main's).
+      - name: The suite is in the wrapper's list (a leg the list does not have yet is said, not failed)
+        shell: bash
+        env:
+          SUITE: ${{ matrix.suite }}
+          WRAPPER_REF: ${{ inputs.wrapper_ref }}
+        run: |
+          if python3 -c "import json,os,sys; sys.exit(0 if any(r.get('id') == os.environ['SUITE'] for r in json.load(open('ci/required-suites.json', encoding='utf-8'))) else 1)"; then
+            echo "LISTED=1" >> "$GITHUB_ENV"
+          else
+            echo "LISTED=0" >> "$GITHUB_ENV"
+            echo "::warning::$SUITE is not in ci/required-suites.json of wrapper_ref $WRAPPER_REF yet: the leg is said, not run (its row ends this)"
+          fi
       - name: Download asset
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
@@ -579,6 +604,7 @@ jobs:
       - name: The suite - every listed test runs and passes
         shell: bash
         run: |
+          [ "$LISTED" = 1 ] || { echo "this suite is not in the wrapper's list yet: said, not run"; exit 0; }
           export INVISIBLE_CORE_AUTOFIX=off INVISIBLE_CORE_PIN=allow
           export INVISIBLE_SEAL_FILE="$PWD/gate.seal.json" INVPW_BINARY_PATH="$FF_EXE" STEALTHFOX_E2E_BINARY="$FF_EXE"
           mkdir -p result
@@ -648,12 +674,14 @@ jobs:
         if: always()
         shell: bash
         run: |
+          [ "$LISTED" = 1 ] || { echo "this suite is not in the wrapper's list yet: said, not run"; exit 0; }
           GEOIP_PIN=ci/geoip.json
           [ -f wrapper-main/ci/geoip.json ] && GEOIP_PIN=wrapper-main/ci/geoip.json
           python scripts/ci_lab_geoip.py verify --pin "$GEOIP_PIN" --evidence geoip-evidence.json --used "$GEOIP_USED_OUT"
       - name: Verdict - required suite
         shell: bash
         run: |
+          [ "$LISTED" = 1 ] || { echo "this suite is not in the wrapper's list yet: said, not run"; exit 0; }
           # main's list is read from the checkout of main above: a failed download cannot pass for "main has no list".
           if [ -f wrapper-main/ci/required-suites.json ]; then
             MAIN=(--main-required wrapper-main/ci/required-suites.json)
@@ -743,11 +771,11 @@ jobs:
           path: fakeweb
           if-no-files-found: ignore
           retention-days: 14
-      - name: Keep the A/B oracle's dumps and diff
-        if: always() && matrix.suite == 'wrapper.e2e.ab_oracle'
+      - name: Keep the A/B oracles' dumps and diffs (page, network, host)
+        if: always() && (matrix.suite == 'wrapper.e2e.ab_oracle' || matrix.suite == 'wrapper.e2e.ab_network' || matrix.suite == 'wrapper.e2e.ab_host')
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: ab-oracle-${{ matrix.os }}
+          name: ${{ matrix.suite == 'wrapper.e2e.ab_oracle' && 'ab-oracle' || matrix.suite }}-${{ matrix.os }}
           path: ab-oracle
           if-no-files-found: ignore
           retention-days: 14

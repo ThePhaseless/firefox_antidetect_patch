@@ -102,22 +102,31 @@ def cases() -> list:
     add("gate legs: Playwright's own Firefox is installed for the fake web only, before the suite",
         len(browser) == 1 and "matrix.suite == 'wrapper.e2e.fakeweb'" in steps[browser[0]].get("if", "") and 0 <= browser[0] < suite)
 
-    # the A/B oracle (published engine against the candidate): its legs, its longer budget, and the three files kept
-    ORACLE = "wrapper.e2e.ab_oracle"
-    add("gate legs: the real gate.yml has a %s leg on Linux and on Windows" % ORACLE, {(ORACLE, "linux"), (ORACLE, "windows")} <= have)
-    oracle_rows = [r for r in gate_legs.legs(gate) if r.get("suite") == ORACLE]
-    add("gate legs: the oracle's legs have more than the default 25 minutes, and the job reads its budget from the leg",
-        len(oracle_rows) == 2 and all(int(r.get("timeout", 0)) > 25 for r in oracle_rows)
+    # the A/B oracles (published engine against the candidate: page, network, host): their legs, their longer budget, and their files kept
+    ORACLES = ("wrapper.e2e.ab_oracle", "wrapper.e2e.ab_network", "wrapper.e2e.ab_host")
+    for ORACLE in ORACLES:
+        add("gate legs: the real gate.yml has a %s leg on Linux and on Windows" % ORACLE, {(ORACLE, "linux"), (ORACLE, "windows")} <= have)
+    oracle_rows = [r for r in gate_legs.legs(gate) if r.get("suite") in ORACLES]
+    add("gate legs: the oracles' legs have more than the default 25 minutes, and the job reads its budget from the leg",
+        len(oracle_rows) == 2 * len(ORACLES) and all(int(r.get("timeout", 0)) > 25 for r in oracle_rows)
         and str(gate["jobs"]["wrapper-e2e"].get("timeout-minutes", "")).replace(" ", "") == "${{matrix.timeout||25}}")
     suite_run = steps[suite]["run"] if suite >= 0 else ""
-    add("gate legs: the suite step gives the oracle's test a folder of its own outside result/ (the completeness judge reads every JSON in result/)",
+    add("gate legs: the suite step gives the oracles' tests a folder of their own outside result/ (the completeness judge reads every JSON in result/)",
         'export AB_ORACLE_OUT="$PWD/ab-oracle"' in suite_run and "mkdir -p ab-oracle" in suite_run and "result/ab-oracle" not in suite_run)
     oracle_kept = [s for s in steps if (s.get("with") or {}).get("path") == "ab-oracle"]
-    add("gate legs: the oracle's dumps and diff are kept in an artifact of their own per system, after a red suite too, for the oracle's suite only",
-        len(oracle_kept) == 1 and "matrix.suite == 'wrapper.e2e.ab_oracle'" in oracle_kept[0].get("if", "") and "always()" in oracle_kept[0].get("if", "")
-        and oracle_kept[0]["with"].get("name") == "ab-oracle-${{ matrix.os }}" and not str(oracle_kept[0]["with"]["name"]).startswith("result-"))
-    add("gate legs: the oracle's artifact is kept before the result",
+    add("gate legs: the oracles' dumps and diffs are kept in an artifact of their own per suite and system, after a red suite too, for the oracles' suites only",
+        len(oracle_kept) == 1 and all("matrix.suite == '%s'" % o in oracle_kept[0].get("if", "") for o in ORACLES) and "always()" in oracle_kept[0].get("if", "")
+        and str(oracle_kept[0]["with"].get("name")).endswith("-${{ matrix.os }}") and "result-" not in str(oracle_kept[0]["with"]["name"]))
+    add("gate legs: the oracles' artifact is kept before the result",
         len(oracle_kept) == 1 and keep >= 0 and steps.index(oracle_kept[0]) < keep and steps.index(oracle_kept[0]) > verdict >= 0)
+
+    # a leg first, its row second: a suite the wrapper's list does not have yet is said, not failed, and nothing else is skipped
+    listed = [i for i, s in enumerate(steps) if "LISTED=1" in str(s.get("run", ""))]
+    guard = '[ "$LISTED" = 1 ] || {'
+    guarded = [s.get("name", "") for s in steps if str(s.get("run", "")).lstrip().startswith(guard)]
+    add("gate legs: a leg whose suite is not in the wrapper's list is said before the suite, and only the suite, the GeoIP check and the verdict wait for the row",
+        len(listed) == 1 and 0 <= listed[0] < suite
+        and sorted(guarded) == sorted(["The suite - every listed test runs and passes", "The leg ran with the pinned GeoIP database", "Verdict - required suite"]))
 
     # the real release.yml: the check runs before the node
     release = yaml.safe_load((WORKFLOWS / "release.yml").read_text(encoding="utf-8"))
