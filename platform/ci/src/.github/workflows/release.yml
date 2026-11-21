@@ -789,14 +789,20 @@ jobs:
       # makes the list from the tree, runs the export tier first (the generated headers a directory needs to compile alone), then every directory, and when one
       # fails each on its own, so ALL the errors of ALL the directories come out of one run, listed by file in the summary. A file that does not compile
       # stops the run here, minutes in, and not after the link of the browser (twenty minutes in on the faster leg, an hour on the slower).
+      # It first runs the pre-export and export tiers (dist/include and the generated headers: `export` alone left dist/include empty, run 44942834683).
       # The step this replaces passed `mach build --keep-going <dir>` for each directory, and mach IGNORES a subdirectory without --allow-subdirectory-build
       # ("was ignored", candidate 43203723323): it compiled nothing.
       - name: Our objects first - every directory the series touches, compile only
         id: objects
         if: runner.environment != 'github-hosted'
         timeout-minutes: 60
+        # A whole candidate never loses a leg to this step: it reports in the summary and the real build runs next (its errors would be the same).
+        # Only the compile-only run (stop_after=objects) fails on an error, which is all it is for. continue-on-error covers a crash of the step itself.
+        continue-on-error: ${{ needs.plan.outputs.stop_after != 'objects' }}
         shell: bash
-        run: python3 scripts/ci objects --upstream .series/UPSTREAM.json
+        env:
+          STRICT: ${{ needs.plan.outputs.stop_after == 'objects' && '--strict' || '' }}
+        run: python3 scripts/ci objects --upstream .series/UPSTREAM.json $STRICT
 
       - name: Build
         id: build

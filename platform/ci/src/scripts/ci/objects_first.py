@@ -16,19 +16,34 @@ How the list is made, from the tree and the tag, nothing written by hand:
            tag commit the series is applied on, is the same commit)
   files    `git diff --name-only base HEAD`, the ones that are compiled: C, C++, Objective-C
            sources and headers, assembly, and the build files (moz.build, *.mozbuild)
-  dirs     for each file the nearest directory, going up, that has a Makefile in the objdir (a
+  dirs     for each file the nearest directory, going up, that has objects in the compile graph (see below; a
            source listed by a parent's moz.build belongs to the parent; a directory this build
            does not configure, the Windows ones on the Linux leg, is not a target and is said)
 
-The tiers come first: `export` (generated headers, the IDL and IPDL ones) is what a directory
-needs to compile alone, and the build runs it anyway. Then one `mach build --keep-going
-<dir>/target-objects ...` for all the directories. mach stops at the first directory that fails
-(--keep-going goes on inside one make only), so when that run fails each directory is run on its
+The tiers come first, the ones the build itself runs before it compiles anything. `mach build` is `make` on the
+objdir, whose default target runs `$(TIERS)` in order (config/rules.mk:314-315, `$(foreach tier,$(TIERS),$(call SUBMAKE,$(tier)))`), and TIERS is pre-export, export, then
+compile and the rest (config/baseconfig.mk:63). A directory compiles alone only with dist/include populated: that is
+the pre-export tier's install-manifests (Makefile.in:55-59: `recurse_pre-export: install-manifests`), and the export tier
+adds the generated headers (IDL, IPDL, WebIDL, cbindgen) on top of it. `export` alone ran 5 seconds and made a few
+stubs (run 44942834683): so `./mach build --keep-going pre-export export`, two make runs in that order (a target with
+no `/` is a top-level make target: python/mozbuild/mozbuild/util.py resolve_target_to_make; mach runs them one after
+the other: controller/building.py:1510 "Build target pairs").
+
+Then the directories, as nodes of the compile graph. Every directory with objects is a top-level make target
+`<dir>/target-objects` (python/mozbuild/mozbuild/backend/recursivemake.py, _compile_graph), listed in the
+objdir's root.mk as `compile_targets`, and config/recurse.mk:78-79 gives each the rule that recurses into the
+directory after its graph dependencies (the generated sources of the pre-compile tier it needs). A directory with
+no objects has no node: it is not a target. They are run as `./mach build --keep-going -C . <dir>/target-objects ...`:
+`-C .` makes the target a top-level one (building.py:1462 `make_dir = join(topobjdir, directory)`), which keeps the graph's
+dependencies; `mach build <dir>/target-objects` would run make inside the directory and lose them. mach stops at the first
+directory that fails (--keep-going goes on inside one make only), so when that run fails each directory is run on its
 own: every error of every directory comes out of ONE run, not one directory per run.
 
 The errors are parsed out of the compilers' output (`file:line:col: error:` of clang, `file(line,col):
 error:` of clang-cl), listed by file in the job summary and as annotations, and the step fails
-if there is any, or if a mach run failed with none recognised (the last lines are then shown).
+if there is any, or if a mach run failed with none recognised (the last lines are then shown), but only with --strict
+(the compile-only candidate, stop_after=objects). Without it the step reports and exits 0: a whole candidate goes on to
+the real build, which would find the same errors anyway, and never loses a leg to this step.
 
     scripts/ci/test_objects_first.py holds its known-bad inputs.
 """
@@ -70,16 +85,32 @@ def is_compiled(path: str) -> bool:
     return path.lower().endswith(SOURCE_SUFFIXES) or name == "moz.build" or name.endswith(".mozbuild")
 
 
-def touched_dirs(files, has_makefile) -> tuple:
-    """(directories to compile, files with no directory in this build). `has_makefile(dir)` says
-    whether the objdir has a Makefile there. A file goes up to the nearest directory that has one;
-    the top of the tree is never a target (it is the whole build)."""
+def compile_targets(objdir: Path) -> set:
+    """The `compile_targets` of the objdir's root.mk: the nodes of the compile graph, as `dir/target-objects`."""
+    text = (objdir / "root.mk").read_text(encoding="utf-8", errors="replace")
+    words, taking = [], False
+    for line in text.splitlines():
+        if not taking and re.match(r"compile_targets\s*:=", line):
+            line, taking = line.split(":=", 1)[1], True
+        elif not taking:
+            continue
+        more = line.rstrip().endswith("\\")
+        words += line.rstrip().rstrip("\\").split()
+        if not more:
+            return set(words)
+    raise SystemExit("ERROR: no compile_targets in %s: the backend did not run" % (objdir / "root.mk"))
+
+
+def touched_dirs(files, has_objects) -> tuple:
+    """(directories to compile, files with no directory in this build). `has_objects(dir)` says
+    whether the compile graph has the directory's objects. A file goes up to the nearest directory that has
+    them; the top of the tree is never a target (it is the whole build)."""
     dirs, outside = set(), []
     for path in files:
         if not is_compiled(path):
             continue
         d = posixpath.dirname(path)
-        while d and not has_makefile(d):
+        while d and not has_objects(d):
             d = posixpath.dirname(d)
         if d:
             dirs.add(d)
@@ -136,8 +167,8 @@ def render(leg: str, dirs, errors, failed, outside, other_lines=(), unparsed=())
     return "\n".join(out)
 
 
-def annotations(errors) -> list:
-    return ["::error file=%s,line=%d::%s" % (p, l, m.replace("%", "%25").replace("\r", "").replace("\n", " "))
+def annotations(errors, level: str = "error") -> list:
+    return ["::%s file=%s,line=%d::%s" % (level, p, l, m.replace("%", "%25").replace("\r", "").replace("\n", " "))
             for p, l, m in errors[:MAX_ANNOTATIONS]]
 
 
@@ -188,14 +219,14 @@ def run_mach(args, log) -> tuple:
 def build_objects(dirs, mach=run_mach, log=None) -> tuple:
     """(0 or 1, [(dir, exit code)] of the ones that failed on their own, all the output lines)."""
     targets = ["%s/target-objects" % d for d in dirs]
-    code, lines = mach(targets, log)
+    code, lines = mach(["-C", ".", *targets], log)
     if code == 0:
         return 0, [], lines
     # mach stopped at the first directory that failed: each on its own, so the others' errors come out too.
     print("objects: a directory failed (exit %d); each one on its own, so that every error shows" % code, flush=True)
     failed, everything = [], list(lines)
     for d, target in zip(dirs, targets):
-        one, more = mach([target], log)
+        one, more = mach(["-C", ".", target], log)
         everything += more
         if one:
             failed.append((d, one))
@@ -208,20 +239,23 @@ def main(argv=None, mach=run_mach) -> int:
     ap.add_argument("--upstream", type=Path, default=Path(".series/UPSTREAM.json"))
     ap.add_argument("--base", default="", help="the commit to compare with (default: the Mozilla tag's)")
     ap.add_argument("--objdir", type=Path, default=Path("obj-rel"))
+    ap.add_argument("--strict", action="store_true", help="fail the step on any error (stop_after=objects); else report and exit 0")
     a = ap.parse_args(argv)
     leg = os.environ.get("CI_LEG", "")
     phase.LOGS.mkdir(parents=True, exist_ok=True)
     phase.event("objects", "start")
     began = time.monotonic()
     with (phase.LOGS / "objects.log").open("w", encoding="utf-8", errors="replace") as log:
-        # The export tier first, and it configures: the objdir is what says which directories exist.
-        code, lines = mach(["export"], log)
+        # The tiers the build runs before it compiles (the docstring says why both), and the first mach run configures:
+        # the objdir's root.mk is what says which directories have objects.
+        code, lines = mach(["pre-export", "export"], log)
         errors, other = parse_errors(lines, os.getcwd())
         dirs, outside, failed = [], [], []
         if code == 0:
             base = a.base or tag_commit(json.loads(a.upstream.read_text(encoding="utf-8"))["mozilla_tag"])
             files = changed_files(base)
-            dirs, outside = touched_dirs(files, lambda d: (a.objdir / d / "Makefile").is_file())
+            targets = compile_targets(a.objdir)
+            dirs, outside = touched_dirs(files, lambda d: "%s/target-objects" % d in targets)
             print("objects: %d files differ from %s; %d are compiled; %d directories of this build:\n  %s"
                   % (len(files), base[:10], sum(1 for f in files if is_compiled(f)), len(dirs), "\n  ".join(dirs)), flush=True)
             if not dirs:
@@ -236,12 +270,15 @@ def main(argv=None, mach=run_mach) -> int:
     seconds = round(time.monotonic() - began)
     bad = bool(errors or failed or code)
     text = render(leg, dirs, errors, [d for d, _ in failed], outside, unparsed=lines)
+    if bad and not a.strict:
+        text += "\n\nthis run goes on to the build (no stop_after=objects): the step does not fail the leg"
     say(text)
     phase.summary(text)
-    for note in annotations(errors):
+    for note in annotations(errors, "error" if a.strict else "warning"):
         print(note)
-    phase.event("objects", "end", exit=1 if bad else 0, seconds=seconds, errors=["%s:%d: %s" % e for e in errors[:10]])
-    return 1 if bad else 0
+    phase.event("objects", "end", exit=1 if (bad and a.strict) else 0, seconds=seconds, found=1 if bad else 0,
+                errors=["%s:%d: %s" % e for e in errors[:10]])
+    return 1 if (bad and a.strict) else 0
 
 
 if __name__ == "__main__":

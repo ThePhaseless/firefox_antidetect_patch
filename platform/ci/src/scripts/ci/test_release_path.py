@@ -179,8 +179,15 @@ def group_compile_only(doc) -> list:
     out.append(("compile-only: every step of the browser's build and package is off with stop_after=objects, and on without it",
                 all(n in steps and not e.step_runs(steps[n], on) for n in AFTER_THE_OBJECTS)
                 and all(e.step_runs(steps[n], context("false", leg="linux-x86_64")) for n in ("Build", "Package + validate", "Upload build artifact"))))
-    out.append(("compile-only: the objects step runs `scripts/ci objects` and keeps no `continue-on-error`",
-                "scripts/ci objects" in steps[OBJECTS_STEP]["run"] and "continue-on-error" not in steps[OBJECTS_STEP]))
+    step = steps[OBJECTS_STEP]
+    strict = "${{ needs.plan.outputs.stop_after == 'objects' && '--strict' || '' }}"
+    out.append(("compile-only: the objects step fails the leg only with stop_after=objects (--strict), and in a whole candidate neither its exit nor a crash stops the leg",
+                "scripts/ci objects" in step["run"] and "$STRICT" in step["run"] and step["env"]["STRICT"] == strict
+                and step["continue-on-error"] == "${{ needs.plan.outputs.stop_after != 'objects' }}"
+                and e.evaluate("needs.plan.outputs.stop_after == 'objects' && '--strict' || ''", on) == "--strict"
+                and e.evaluate("needs.plan.outputs.stop_after == 'objects' && '--strict' || ''", off) == ""
+                and e.evaluate("needs.plan.outputs.stop_after != 'objects'", on) is False
+                and e.evaluate("needs.plan.outputs.stop_after != 'objects'", off) is True))
     out.append(("compile-only: the compile cache is saved after the objects step even when the build never ran",
                 "steps.objects.outcome == 'success'" in steps["Compile cache - save this leg's"]["if"]
                 and "steps.objects.outcome == 'failure'" in steps["Compile cache - save this leg's"]["if"]))
