@@ -28,6 +28,13 @@ import mozconfig  # noqa: E402
 LEG = "linux-x86_64"
 
 
+def rust_coverage(leg, plan) -> mozconfig.Layer:
+    return mozconfig.Layer("rust-coverage", (
+        "Only on a branch latitude/*-diag-rust: the Rust code is instrumented too (-C instrument-coverage, stable rustc and its profiler runtime); "
+        "every process writes a .profraw at exit. An experiment: it may not link beside the gcov runtime, and the first run says."),
+        ["mk_add_options 'export RUSTFLAGS=-Cinstrument-coverage'"])
+
+
 def coverage(leg, plan) -> mozconfig.Layer:
     return mozconfig.Layer("coverage", (
         "gcov-style coverage of every C and C++ object (--enable-coverage: --coverage in each compile, and the tree's own handling of it: no fast "
@@ -43,11 +50,11 @@ def coverage(leg, plan) -> mozconfig.Layer:
 LAYERS = (mozconfig.cache, coverage, mozconfig.platform, mozconfig.machine)
 
 
-def compose(base: str, plan: mozconfig.Plan) -> str:
+def compose(base: str, plan: mozconfig.Plan, rust: bool = False) -> str:
     leg = legs.by_name(LEG)
     kept = [line for line in base.splitlines() if not mozconfig._SCCACHE_ACTIVE.match(line)]
     out = kept + ["", "# --- diagnostics CI layers for the coverage build of %s (never published) ---" % leg.leg]
-    for make in LAYERS:
+    for make in LAYERS + ((rust_coverage,) if rust else ()):
         layer = make(leg, plan)
         out.append("# [%s] %s" % (layer.name, layer.why))
         out.extend(layer.lines)
@@ -58,13 +65,14 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--compile-cache", required=True, choices=("gha", "off"))
     ap.add_argument("--sccache", default=os.environ.get("SCCACHE_PATH", ""))
+    ap.add_argument("--rust", action="store_true", help="also instrument the Rust code (-C instrument-coverage)")
     ap.add_argument("--parallel", type=int, default=int(os.environ.get("CI_PARALLEL") or 4))
     a = ap.parse_args(argv)
     path = Path(".mozconfig")
     if not path.is_file():
         print("ERROR: no .mozconfig in the source", file=sys.stderr)
         return 1
-    text = compose(path.read_text(encoding="utf-8"), mozconfig.Plan(a.compile_cache, a.sccache, parallel=a.parallel))
+    text = compose(path.read_text(encoding="utf-8"), mozconfig.Plan(a.compile_cache, a.sccache, parallel=a.parallel), a.rust)
     path.write_text(text, encoding="utf-8", newline="\n")
     print("----- final .mozconfig (coverage) -----")
     print(text)

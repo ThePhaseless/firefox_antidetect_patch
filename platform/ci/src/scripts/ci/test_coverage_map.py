@@ -87,6 +87,22 @@ DA:7,1
 DA:8,0
 end_of_record
 """
+JS_A = """\
+SF:/node/src/toolkit/modules/StealthFoo.sys.mjs
+FN:1,doIt
+FNDA:3,doIt
+DA:2,3
+DA:3,3
+end_of_record
+"""
+RS_A = """\
+SF:/node/src/netwerk/x.rs
+FN:1,_ZN3foo3barE
+FNDA:2,_ZN3foo3barE
+DA:2,2
+end_of_record
+"""
+SUITE_A += JS_A
 SUITE_B = """\
 TN:suiteB
 SF:/node/src/dom/a.cpp
@@ -144,15 +160,21 @@ function _Z5Otherv called 0 returned 0% blocks executed 0%
 """
 
 
+JS_SOURCE = "function doIt() {\n  count++;\n  other++;\n}\n"
+JS_PREPROCESSED = "#ifdef MOZ_X\nlet a = 1;\n#endif\nlet b = 2;\n"
+
+
 def hook(file, function, line, kind="add", form="unknown"):
     return {"file": file, "function": function, "kind": kind, "form": form, "line": line, "test": ""}
 
 
-def fixture(root: Path, hooks_a=None, hooks_b=None) -> dict:
+def fixture(root: Path, hooks_a=None, hooks_b=None, js=True, rust=False) -> dict:
     """A series, a source tree and the exports under `root`; the paths of the arguments of `map`."""
     series, src, prof = root / "series", root / "src", root / "profiles"
     for rel, text in {"dom/a.cpp": A_CPP, "dom/dup.cpp": DUP_CPP, "dom/gated.cpp": IFDEF_CPP,
-                      "dom/windows_only.cpp": "void W() {\n  WinThing();\n}\n"}.items():
+                      "dom/windows_only.cpp": "void W() {\n  WinThing();\n}\n", "toolkit/modules/StealthFoo.sys.mjs": JS_SOURCE,
+                      "toolkit/modules/NeverLoaded.sys.mjs": JS_SOURCE, "browser/app/pp.js": JS_PREPROCESSED,
+                      "netwerk/x.rs": "fn x() {\n    do_it();\n}\n"}.items():
         (src / rel).parent.mkdir(parents=True, exist_ok=True)
         (src / rel).write_text(text, encoding="utf-8", newline="\n")
     hooks_a = hooks_a if hooks_a is not None else [
@@ -160,7 +182,10 @@ def fixture(root: Path, hooks_a=None, hooks_b=None) -> dict:
         hook("dom/a.cpp", "void Bar() {", "  DoB();"),                                          # a counter, no suite counts it
         hook("dom/windows_only.cpp", "void W() {", "  WinThing();"),                           # in no export: not compiled
         hook("dom/a.cpp", "void Foo() {", "  }", form="unknown"),                              # a brace: no counter, takes the hook beside it
-        hook("netwerk/x.rs", "fn x() {", "    do_it();"),                                    # Rust
+        dict(hook("netwerk/x.rs", "fn x() {", "    do_it();"), test="tests/test_rust_thing.py"),  # Rust, with the test its author declared
+        hook("toolkit/modules/StealthFoo.sys.mjs", "function doIt() {", "  count++;"),            # JavaScript, run by suiteA
+        hook("toolkit/modules/NeverLoaded.sys.mjs", "function doIt() {", "  count++;"),         # JavaScript, in no export
+        hook("browser/app/pp.js", "", "let b = 2;"),                                            # preprocessed JavaScript
         dict(hook("dom/a.cpp", "void Foo() {", "", kind="delete"), removed="  Old();"),       # a hook that deletes lines: no line of its own
     ]
     hooks_b = hooks_b if hooks_b is not None else [
@@ -174,17 +199,19 @@ def fixture(root: Path, hooks_a=None, hooks_b=None) -> dict:
         (d / "MANIFEST.json").write_text(json.dumps({"modified": [], "added": {"dom/own.cpp": "100644", "dom/own.h": "100644", "x/y.py": "100644"}}),
                                          encoding="utf-8")
     prof.mkdir(parents=True, exist_ok=True)
-    (prof / "suiteA.info").write_text(SUITE_A, encoding="utf-8")
+    (prof / "suiteA.info").write_text(SUITE_A + (RS_A if rust else ""), encoding="utf-8")
     (prof / "suiteB.info").write_text(SUITE_B, encoding="utf-8")
-    (prof / "suiteA.meta.json").write_text(json.dumps({"rc": 0, "passed": True}), encoding="utf-8")
-    (prof / "suiteB.meta.json").write_text(json.dumps({"rc": 1, "passed": False, "failures": 2}), encoding="utf-8")
+    (prof / "suiteA.meta.json").write_text(json.dumps({"rc": 0, "passed": True, "sandbox": "off", "js_info_files": 3 if js else 0,
+                                                                  "rust_profraw_files": 4 if rust else 0}), encoding="utf-8")
+    (prof / "suiteB.meta.json").write_text(json.dumps({"rc": 1, "passed": False, "failures": 2, "sandbox": "on", "js_info_files": 5 if js else 0}),
+                                           encoding="utf-8")
     return {"profiles": prof, "source_root": src, "series_root": series}
 
 
 def run(root: Path, **extra):
     """(exit code, stderr, rows by (file, text) of hooks.csv) of `map` over the fixture."""
     import csv
-    paths = fixture(root, **{k: v for k, v in extra.items() if k in ("hooks_a", "hooks_b")})
+    paths = fixture(root, **{k: v for k, v in extra.items() if k in ("hooks_a", "hooks_b", "js", "rust")})
     out = root / "out"
     argv = ["map", "--profiles", str(paths["profiles"]), "--source-root", str(paths["source_root"]), "--series-root", str(paths["series_root"]),
             "--out", str(out), "--run-id", "7", "--source-commit", "abc", "--series-commit", "def", "--strip-prefix", "/node/src",
@@ -230,7 +257,16 @@ def cases() -> list:
         b = rows[("dom/a.cpp", "void Foo() {", "5")]
         add("map: a closing brace takes the status of the hook line beside it", b["executed"] == "yes" and b["suites"] == "suiteA")
         r = rows[("netwerk/x.rs", "fn x() {", "")]
-        add("map: a hook in Rust is not-instrumented, not no", r["executed"] == "not-instrumented")
+        add("map: a hook in Rust is not-measured, not no", r["executed"] == "not-measured")
+        rt = rows[("netwerk/x.rs", "fn x() {", "")]
+        add("map: a hook that is not measured carries the test its authors declared, in hooks.csv and not_measured.txt",
+            rt["test"] == "tests/test_rust_thing.py" and "tests/test_rust_thing.py" in (out_dir / "not_measured.txt").read_text(encoding="utf-8"))
+        jr = rows[("toolkit/modules/StealthFoo.sys.mjs", "function doIt() {", "2")]
+        add("map: a JavaScript hook is measured like a C one, from the lcov of SpiderMonkey: the suite that ran it is named", jr["executed"] == "yes" and jr["suites"] == "suiteA")
+        ju = rows[("toolkit/modules/NeverLoaded.sys.mjs", "function doIt() {", "2")]
+        add("map: a JavaScript file that no suite loaded is no, for that reason", ju["executed"] == "no" and ju["reason"] == cm.REASON_JS_UNLOADED)
+        add("map: a preprocessed JavaScript file is not measured (its lines are the generated file's)",
+            rows[("browser/app/pp.js", "", "")]["executed"] == "not-measured" and "preprocessed" in rows[("browser/app/pp.js", "", "")]["reason"])
         removed = [r for r in rows.values() if r["executed"] == "removed"]
         add("map: a hook that deletes lines has no line to find and is removed, not a failure", len(removed) == 1 and removed[0]["file"] == "dom/a.cpp")
         meta = json.loads((out_dir / "meta.json").read_text(encoding="utf-8"))
@@ -238,9 +274,24 @@ def cases() -> list:
             meta["source_commit"] == "abc" and meta["series_commit"] == "def" and meta["run_id"] == "7"
             and meta["suites"]["suiteA"]["passed"] is True and meta["suites"]["suiteB"]["passed"] is False
             and meta["suites_without_profile"] == ["suiteC"])
+        add("map: meta declares that the sandbox was off in the coverage runs, except in the suite that had it on",
+            "suiteB" in meta["sandbox"] and "switched off" in meta["sandbox"] and meta["javascript_measured"] is True)
         add("map: the INDEX row is one line under its header", len((out_dir / "index.csv").read_text(encoding="utf-8").splitlines()) == 2)
         own = (out_dir / "functions.csv").read_text(encoding="utf-8")
         add("map: functions.csv is of our own files only (dom/a.cpp is not one, dom/own.cpp has no function here)", own.splitlines() == ["file,function,line,executed,suites"])
+
+    with tempfile.TemporaryDirectory() as tmp:
+        code, err, rows, out_dir = run(Path(tmp), rust=True)
+        rr = rows[("netwerk/x.rs", "fn x() {", "2")]
+        add("map: with a Rust profile in a suite a Rust hook is measured like a C one (yes, and which suite)",
+            code == 0 and rr["executed"] == "yes" and rr["suites"] == "suiteA"
+            and json.loads((out_dir / "meta.json").read_text(encoding="utf-8"))["rust_measured"] is True)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        code, err, rows, out_dir = run(Path(tmp), js=False)
+        jr = rows[("toolkit/modules/StealthFoo.sys.mjs", "function doIt() {", "")]
+        add("map: with no JavaScript profile in any suite the JavaScript hooks are not-measured, not no",
+            code == 0 and jr["executed"] == "not-measured" and json.loads((out_dir / "meta.json").read_text(encoding="utf-8"))["javascript_measured"] is False)
 
     with tempfile.TemporaryDirectory() as tmp:
         code, err, _, _ = run(Path(tmp), hooks_b=[hook("dom/dup.cpp", "void Second() {", "  NotInTheFile();")])
@@ -269,7 +320,7 @@ def cases() -> list:
 
     parsed = cm.parse_lcov(SUITE_A, "/node/src")
     add("lcov: the build machine's directory is stripped, lines and functions are read",
-        sorted(parsed) == ["dom/a.cpp", "dom/dup.cpp", "dom/gated.cpp"] and parsed["dom/a.cpp"]["lines"][4] == 3
+        sorted(parsed) == ["dom/a.cpp", "dom/dup.cpp", "dom/gated.cpp", "toolkit/modules/StealthFoo.sys.mjs"] and parsed["dom/a.cpp"]["lines"][4] == 3
         and parsed["dom/a.cpp"]["functions"]["Foo"] == (2, 3))
 
     # the export of a suite's profiles
@@ -395,6 +446,74 @@ def cases() -> list:
             good.endswith("llvm-cov") and refused and gone)
         add("check-tools: the export is tried on a program built and run with the build's clang: an output the parser cannot read stops, a program that cannot be built only warns",
             len(tried) == 2 and all("--coverage" in c for c in tried) and unread and warned)
+    add("js: a script's URL gives the path below its package, whatever the scheme",
+        [ge.url_tail(u) for u in ("resource://gre/modules/X.sys.mjs", "chrome://juggler/content/Y.js", "resource:///modules/Z.sys.mjs",
+                                  "jar:file:///a/b/omni.ja!/modules/X.sys.mjs?v=1", "chrome://x/content/a.js -> file:///t/b.js")]
+        == ["modules/X.sys.mjs", "content/Y.js", "modules/Z.sys.mjs", "modules/X.sys.mjs", "t/b.js"])
+    resolve = ge.js_resolver(["toolkit/modules/StealthFoo.sys.mjs", "juggler/content/Helper.js", "a/content/index.js", "b/modules/index.js"])
+    add("js: a URL is the file of the series with that name when there is one, else the one whose path ends like the URL's; else none",
+        resolve("resource://gre/modules/StealthFoo.sys.mjs") == "toolkit/modules/StealthFoo.sys.mjs"
+        and resolve("chrome://juggler/content/Helper.js") == "juggler/content/Helper.js"
+        and resolve("chrome://a/content/index.js") == "a/content/index.js" and resolve("resource://gre/modules/index.js") == "b/modules/index.js"
+        and resolve("resource://gre/other/index.js") is None and resolve("resource://gre/modules/Else.sys.mjs") is None)
+    with tempfile.TemporaryDirectory() as tmp:
+        jd = Path(tmp)
+        (jd / "1-10-0.info").write_text("TN:\nSF:resource://gre/modules/StealthFoo.sys.mjs\nFN:1,doIt\nFNDA:2,doIt\nDA:2,2\nDA:3,0\nend_of_record\n"
+                                        "SF:resource://gre/modules/Other.sys.mjs\nDA:1,9\nend_of_record\n", encoding="utf-8")
+        (jd / "2-11-0.info").write_text("SF:resource://gre/modules/StealthFoo.sys.mjs\nFN:1,doIt\nFNDA:1,doIt\nDA:2,1\nDA:3,5\nend_of_record\n", encoding="utf-8")
+        (jd / "3-12-0.info").write_text("SF:chrome://x/content/Nothing.js\nDA:1,1\nend_of_record\n", encoding="utf-8")
+        got, seen, lost = ge.js_files(jd, ["toolkit/modules/StealthFoo.sys.mjs"])
+        add("js: the records of the files of the series are merged over the processes' files and the others are dropped (%d files read)" % seen,
+            seen == 3 and lost == 0 and list(got) == ["toolkit/modules/StealthFoo.sys.mjs"]
+            and got["toolkit/modules/StealthFoo.sys.mjs"]["lines"] == {2: 3, 3: 5} and got["toolkit/modules/StealthFoo.sys.mjs"]["functions"] == {"doIt": (1, 3)})
+    with tempfile.TemporaryDirectory() as tmp:
+        notes = Path(tmp) / "notes"
+        (notes / "gcno" / "obj-rel" / "dom").mkdir(parents=True)
+        (notes / "gcno" / "obj-rel" / "dom" / "u1.gcno").write_bytes(b"x")
+        (notes / "topsrcdir.txt").write_text("/node/src\n", encoding="utf-8")
+        (notes / "interest.json").write_text(json.dumps(["dom/a.cpp"]), encoding="utf-8")
+        (notes / "interest-js.json").write_text(json.dumps(["toolkit/modules/StealthFoo.sys.mjs"]), encoding="utf-8")
+        profile = Path(tmp) / "gcda"
+        (profile / "obj-rel" / "dom").mkdir(parents=True)
+        (profile / "obj-rel" / "dom" / "u1.gcda").write_bytes(b"y")
+        jd = Path(tmp) / "jscov"
+        jd.mkdir()
+        (jd / "1-1-0.info").write_text("SF:resource://gre/modules/StealthFoo.sys.mjs\nDA:2,4\nend_of_record\n", encoding="utf-8")
+        import subprocess as _sp
+        meta = ge.export(notes, profile, "s", Path(tmp) / "o", rc=0, js_dir=jd, sandbox="on",
+                         run=lambda cmd, **kw: _sp.CompletedProcess(cmd, 0, "        -:    0:Source:/node/src/dom/a.cpp\n        1:    4:  DoA();\n", ""))
+        text = (Path(tmp) / "o" / "s.info").read_text(encoding="utf-8")
+        add("export: the JavaScript records go into the suite's lcov beside the C ones, and the meta says how many files were read and the sandbox",
+            "SF:toolkit/modules/StealthFoo.sys.mjs" in text and "DA:2,4" in text and "SF:dom/a.cpp" in text and meta["js_info_files"] == 1 and meta["sandbox"] == "on")
+    resolve_rs = ge.rs_resolver(["gfx/wgpu_bindings/src/stealth_x.rs", "netwerk/x.rs"])
+    add("rust: a path llvm-cov names is a file of the series as it is, or by the path it ends with (a remapped prefix), or none",
+        resolve_rs("netwerk/x.rs") == "netwerk/x.rs" and resolve_rs("/builds/worker/gecko/netwerk/x.rs") == "netwerk/x.rs"
+        and resolve_rs("third_party/rust/other/src/lib.rs") is None)
+    with tempfile.TemporaryDirectory() as tmp:
+        import subprocess as _sp
+        notes = Path(tmp) / "notes"
+        notes.mkdir()
+        for name in ("rust-llvm-cov", "rust-llvm-profdata"):
+            (notes / name).write_text("", encoding="utf-8")
+        raw = Path(tmp) / "rustprof"
+        raw.mkdir()
+        for n in ("1-a.profraw", "2-a.profraw"):
+            (raw / n).write_bytes(b"p")
+        seen = []
+
+        def machine(cmd, **kw):
+            seen.append(cmd)
+            if cmd[1] == "export":
+                return _sp.CompletedProcess(cmd, 0, "SF:/node/src/netwerk/x.rs\nFN:1,_ZN3foo3barE\nFNDA:2,_ZN3foo3barE\nDA:2,2\nend_of_record\n"
+                                                    "SF:/node/src/third_party/rust/y/src/lib.rs\nDA:1,1\nend_of_record\n", "")
+            return _sp.CompletedProcess(cmd, 0, "", "")
+        got, n = ge.rust_files(raw, notes, [Path("ff/libxul.so")], "/node/src", ["netwerk/x.rs"], machine)
+        add("rust: the .profraw files are merged and exported by the llvm-tools of the rustc, and only the files of the series are kept (%d files)" % n,
+            n == 2 and list(got) == ["netwerk/x.rs"] and got["netwerk/x.rs"]["lines"] == {2: 2}
+            and seen[0][1] == "merge" and "-sparse" in seen[0] and seen[1][1] == "export" and "-format=lcov" in seen[1]
+            and any(a.startswith("-instr-profile=") for a in seen[1]))
+        none, zero = ge.rust_files(Path(tmp) / "empty", notes, [Path("ff/libxul.so")], "/node/src", ["netwerk/x.rs"], machine)
+        add("rust: a suite with no .profraw gives nothing, and says so (0 files)", none == {} and zero == 0)
     add("env: GCOV_PREFIX_STRIP drops the node's directory", ge.strip_count("/home/runner/work/engine/engine") == 5)
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -436,6 +555,10 @@ def cases() -> list:
         and not [l for l in active if "profile-use" in l or "pgo" in l.lower() or "enable-lto" in l]
         and "ac_add_options --host=x86_64-unknown-linux-gnu" in active and "mk_add_options MOZ_PARALLEL_BUILD=12" in active
         and "mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/obj-rel" in active)
+    rust_text = coverage_mozconfig.compose(base, mozconfig.Plan("gha", "/x/sccache", parallel=12), rust=True)
+    add("mozconfig: Rust is instrumented only when asked (-C instrument-coverage in RUSTFLAGS), and the rest is the same",
+        "mk_add_options 'export RUSTFLAGS=-Cinstrument-coverage'" in mozconfig.active(rust_text) and "RUSTFLAGS" not in text
+        and [l for l in mozconfig.active(rust_text) if "RUSTFLAGS" not in l] == active)
     add("mozconfig: the cache is the pinned sccache by its path, once, and the sandbox stays compiled",
         "ac_add_options --with-ccache=/x/sccache" in active and not [l for l in active if "=sccache" in l]
         and not [l for l in active if "disable-sandbox" in l])
@@ -445,8 +568,9 @@ def cases() -> list:
     wf = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
     text = WORKFLOW.read_text(encoding="utf-8")
     on = wf.get(True, wf.get("on"))
-    add("workflow: it starts on a push to latitude/*-diag and by hand, and cancels the older run of its ref",
-        on["push"] == {"branches": ["latitude/*-diag"]} and "workflow_dispatch" in on and wf["concurrency"]["cancel-in-progress"] is True
+    add("workflow: it starts on a push to latitude/*-diag (and *-diag-rust, which also measures Rust) and by hand, and cancels the older run of its ref",
+        on["push"] == {"branches": ["latitude/*-diag", "latitude/*-diag-rust"]}
+        and wf["jobs"]["plan"]["outputs"]["rust"] == "${{ endsWith(github.ref_name, '-rust') && 'true' || 'false' }}" and "workflow_dispatch" in on and wf["concurrency"]["cancel-in-progress"] is True
         and "github.ref" in wf["concurrency"]["group"])
     uploads = [s["with"]["name"] for j in wf["jobs"].values() for s in j.get("steps", []) if "upload-artifact" in s.get("uses", "")]
     add("workflow: every artifact is named cov-*, never asset-, symbols- or an archive of a release (%s)" % ", ".join(uploads),

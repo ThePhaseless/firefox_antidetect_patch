@@ -36,7 +36,13 @@ tar --owner=0 --group=0 --numeric-owner -czf out/cov-linux-x86_64.tar.gz -C "$ST
 mkdir -p "$OBJ/_tests/gtest"
 tar -chzf out/cov-gtest-linux-x86_64.tar.gz -C "$OBJ/dist" bin -C ../_tests gtest
 
-python3 scripts/ci/gcov_export.py bundle --series-root "$SERIES" --objdir "$OBJ" --topsrcdir "$PWD" --out notes
+RUST_TOOLS=()
+if [ "${RUST_COVERAGE:-}" = true ]; then
+  RUST_BIN="$(rustc --print sysroot)/lib/rustlib/x86_64-unknown-linux-gnu/bin"
+  [ -x "$RUST_BIN/llvm-cov" ] && [ -x "$RUST_BIN/llvm-profdata" ] || { echo "ERROR: no llvm-tools of the rustc in $RUST_BIN"; exit 1; }
+  RUST_TOOLS=(--rust-tools "$RUST_BIN")
+fi
+python3 scripts/ci/gcov_export.py bundle --series-root "$SERIES" --objdir "$OBJ" --topsrcdir "$PWD" --out notes ${RUST_TOOLS[@]+"${RUST_TOOLS[@]}"}
 git rev-parse HEAD > notes/source-commit.txt
 git -C "$SERIES" rev-parse HEAD > notes/series-commit.txt
 tar -czf out/cov-notes-linux-x86_64.tar.gz -C notes .

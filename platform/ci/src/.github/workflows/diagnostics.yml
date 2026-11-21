@@ -13,7 +13,8 @@
 #
 # WHAT IS MEASURED. `--enable-coverage` is the tree's own switch (gcov-style: --coverage in every C and C++ compile; the tree turns the fast
 # shutdown off and defines NS_FREE_PERMANENT_DATA for it, so every child process writes its counters at exit through its atexit hooks). Rust,
-# JavaScript, IDL and build files are not instrumented: the map says so for the hooks written in them. The mozconfig is
+# IDL and build files are not measured: the map says so for the hooks written in them, with the test their authors declared. JavaScript is
+# measured at run time by SpiderMonkey itself (JS_CODE_COVERAGE_OUTPUT_DIR, one lcov file per process and runtime, no build flag). The mozconfig is
 # scripts/ci/coverage_mozconfig.py: opt, no LTO, no PGO, the layers of release's own for the cache, the platform and the machine.
 #
 # PER-SUITE ATTRIBUTION. A suite is one job: its own runner, its own GCOV_PREFIX directory, its own export. The sandbox of the child processes
@@ -38,7 +39,7 @@ run-name: diagnostics, the hooks a test executes, on ${{ github.ref_name }}
 
 on:
   push:
-    branches: ['latitude/*-diag']
+    branches: ['latitude/*-diag', 'latitude/*-diag-rust']
   workflow_dispatch:
     inputs:
       wrapper_ref:
@@ -69,6 +70,8 @@ jobs:
       wrapper_ref: ${{ steps.plan.outputs.wrapper_ref }}
       build_date: ${{ steps.build_date.outputs.build_date }}
       suites: ${{ steps.suites.outputs.suites }}
+      # a branch latitude/<name>-diag-rust also instruments the Rust code (an experiment: -C instrument-coverage beside gcov)
+      rust: ${{ endsWith(github.ref_name, '-rust') && 'true' || 'false' }}
     steps:
       - name: The series (this repository, this commit)
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -199,6 +202,10 @@ jobs:
           rustup toolchain install "$RUST" --profile minimal --target x86_64-unknown-linux-gnu
           rustup default "$RUST"
           rustc --version
+      # the Rust coverage run only: the llvm-profdata and llvm-cov of THIS rustc read what its LLVM wrote (the build's clang may be older)
+      - name: Rust - llvm-tools (the Rust coverage run only)
+        if: needs.plan.outputs.rust == 'true'
+        run: rustup component add llvm-tools --toolchain "$(rustc --version | cut -d' ' -f2)"
       - name: Compile cache - the sccache binary, if built before (release's entry, read only)
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -224,10 +231,12 @@ jobs:
           [ "$PARALLEL" -ge 1 ] || { echo "ERROR: no compile jobs from the node's limits: '$PARALLEL'"; exit 1; }
           echo "CI_PARALLEL=$PARALLEL" | tee -a "$GITHUB_ENV"
       - name: The coverage .mozconfig, in layers
+        env:
+          RUST_FLAG: ${{ needs.plan.outputs.rust == 'true' && '--rust' || '' }}
         run: |
           rm -f mozconfig
           test -x "$SCCACHE_PATH" || { echo "ERROR: no sccache at SCCACHE_PATH=$SCCACHE_PATH"; exit 1; }
-          python3 scripts/ci/coverage_mozconfig.py --compile-cache gha
+          python3 scripts/ci/coverage_mozconfig.py --compile-cache gha $RUST_FLAG
 
       # The toolchain bootstrap (clang, the sysroot, Rust's tools) is configure's: done here, alone, so that what the map needs of the clang is
       # known in minutes and not after the compile (an hour of a node): its llvm-cov, that `llvm-cov gcov` lists the options the export uses, and the export on a program of a few lines.
@@ -290,6 +299,7 @@ jobs:
         timeout-minutes: 40
         env:
           SERIES_DIR: .series
+          RUST_COVERAGE: ${{ needs.plan.outputs.rust }}
         run: python3 scripts/ci phase package -- bash scripts/ci/coverage_package.sh
       - name: Upload the browser (never a release asset)
         if: steps.lavapipe.outcome == 'success'
@@ -481,12 +491,12 @@ jobs:
       - name: Unpack the browser and the notes; say where this suite's counters go
         shell: bash
         run: |
-          mkdir -p ff notes "$RUNNER_TEMP/gcda"
+          mkdir -p ff notes "$RUNNER_TEMP/gcda" "$RUNNER_TEMP/jscov" "$RUNNER_TEMP/rustprof"
           tar -xzf art/browser/cov-linux-x86_64.tar.gz -C ff
           tar -xzf art/notes/cov-notes-linux-x86_64.tar.gz -C notes
           [ -x ff/firefox ] || { echo "ERROR: no firefox in the coverage build"; exit 1; }
           echo "FF_EXE=$PWD/ff/firefox" >> "$GITHUB_ENV"
-          python3 .series/platform/ci/src/scripts/ci/gcov_export.py env --notes notes --prefix "$RUNNER_TEMP/gcda" | tee -a "$GITHUB_ENV"
+          python3 .series/platform/ci/src/scripts/ci/gcov_export.py env --notes notes --prefix "$RUNNER_TEMP/gcda" --js "$RUNNER_TEMP/jscov" --rust "$RUNNER_TEMP/rustprof" | tee -a "$GITHUB_ENV"
           # A process of the browser may not create a .gcda inside its sandbox, and the core strips the whole MOZ_ family from the
           # engine's environment (invisible_core/environment.py: HOST_FAMILIES, MOZ_PASSED), so MOZ_DISABLE_*_SANDBOX never reaches the browser from
           # here. A stand-in does it: the real binary renamed, and a `firefox` of the same place that sets them and execs it (same pid, same
@@ -582,7 +592,7 @@ jobs:
         shell: bash
         run: |
           python3 .series/platform/ci/src/scripts/ci/gcov_export.py export --notes notes --gcda "$RUNNER_TEMP/gcda" --suite "${{ matrix.suite }}" \
-            --out profile --rc "$(cat result/rc.txt)" --junit "result/${{ matrix.suite }}.xml" --raw "profile/${{ matrix.suite }}.gcda.tar.gz" --jobs 4
+            --out profile --rc "$(cat result/rc.txt)" --junit "result/${{ matrix.suite }}.xml" --raw "profile/${{ matrix.suite }}.gcda.tar.gz" --jobs 4             --js "$RUNNER_TEMP/jscov" --rust "$RUNNER_TEMP/rustprof" --object ff/libxul.so --sandbox "${{ matrix.sandbox && 'on' || 'off' }}"
       - name: Keep the profile
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

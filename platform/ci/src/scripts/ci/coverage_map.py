@@ -25,12 +25,13 @@ Status of a hook
   no             the line carries a counter and no suite counted it;
   not-compiled   the file is not in the Linux build, or the line is in a #if region whose code no suite has a counter for;
   no-counter     a comment, a brace or a declaration: no counter on the line and none on a hook line beside it;
-  not-instrumented  the file is not C or C++ (Rust, JavaScript, build files, IDL, Markdown): this build measures C and C++ only;
+  not-measured   this build does not measure the file: IDL, Markdown, build files, a preprocessed JavaScript file, JavaScript when no suite
+                 produced a JavaScript profile, and Rust unless the run is of a branch `latitude/*-diag-rust` (-C instrument-coverage). The hook's `test` (what its authors declared in HOOKS.json) is in hooks.csv and not_measured.txt;
   removed        the hook deletes lines (its text is empty, the lines it removed are in HOOKS.json's `removed`): nothing to execute.
 A line without a counter takes the status of the hook lines that touch it (a run of hook lines within two lines of each other): the
 closing brace of an `if` whose condition was counted is executed when the condition is.
 
-Output (--out): hooks.csv, functions.csv, uncovered.txt (hooks with status no), not_compiled.txt (with the reason), not_instrumented.txt,
+Output (--out): hooks.csv, functions.csv, uncovered.txt (hooks with status no), not_compiled.txt (with the reason), not_measured.txt (with each hook's declared test),
 meta.json, index.csv (one row for the study repository's INDEX).
 
 Exit 0, or 1 only when the tool broke: no profile, no line mapped in any of them, a hook text that is not in its file.
@@ -48,9 +49,13 @@ from collections import defaultdict
 from pathlib import Path
 
 C_EXT = (".c", ".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp", ".hxx")
+JS_EXT = (".js", ".mjs", ".jsm")
+RS_EXT = (".rs",)
 GAP = 2  # hook lines this close are one run (a brace and the condition that opened it)
 REASON_FILE = "file not compiled on Linux"
 REASON_IFDEF = "line in an #ifdef region not compiled"
+REASON_JS_UNLOADED = "file not loaded by any suite (or not shipped on Linux)"
+PREPROCESSED = re.compile(r"^#\s*(include|includesubst|ifdef|ifndef|if|else|elif|endif|define|undef|filter|unfilter|expand|literal)\b", re.M)
 
 
 class MapError(Exception):
@@ -149,6 +154,14 @@ def is_c(path: str) -> bool:
     return path.lower().endswith(C_EXT)
 
 
+def is_js(path: str) -> bool:
+    return path.lower().endswith(JS_EXT)
+
+
+def is_rs(path: str) -> bool:
+    return path.lower().endswith(RS_EXT)
+
+
 # -------------------------------------------------------------------------------------------------------------------- locating
 
 def _same(a: str, b: str) -> bool:
@@ -222,7 +235,7 @@ def counters_of(suites: dict, path: str) -> dict:
     return by_line
 
 
-def build(profiles: dict, hooks: list, source_root: Path, own: list, compiled: set = frozenset(), expect=()) -> dict:
+def build(profiles: dict, hooks: list, source_root: Path, own: list, compiled: set = frozenset(), expect=(), js_measured: bool = False, rust_measured: bool = False) -> dict:
     """The rows of hooks.csv and functions.csv, and the counts. `profiles` is load_profiles()'s answer."""
     seen_files = {path for data in profiles.values() for path in data["files"]}
     compiled_files = set(seen_files) | set(compiled)
@@ -239,26 +252,39 @@ def build(profiles: dict, hooks: list, source_root: Path, own: list, compiled: s
         group = [h for h in group if h["kind"] != "delete" and h["line"].strip()]
         if not group:
             continue
-        if not is_c(path):
+        js = is_js(path)
+        rs = is_rs(path)
+        if not is_c(path) and not (js and js_measured) and not (rs and rust_measured):
+            why = ("JavaScript coverage gave no file in any suite" if js else
+                   "Rust coverage gave no profile in any suite (it is measured only by a run of a branch latitude/*-diag-rust)" if rs else
+                   "%s: not C, C++, JavaScript or Rust" % (Path(path).suffix or "no extension"))
             for hook in group:
-                hook.update(lineno=0, status="not-instrumented", reason="%s: this build measures C and C++" % (Path(path).suffix or "no extension"),
-                            suites=[])
+                hook.update(lineno=0, status="not-measured", reason=why, suites=[])
             continue
         source = Path(source_root) / path
         try:
             lines = source.read_text(encoding="utf-8", errors="replace").splitlines()
         except OSError as exc:
             raise MapError("%s: the source of the built commit is not readable: %s" % (path, exc))
+        if js and PREPROCESSED.search("\n".join(lines)):
+            for hook in group:
+                hook.update(lineno=0, status="not-measured", suites=[],
+                            reason="a preprocessed file: the lines of its coverage are those of the generated file")
+            continue
         # one list per folder: each folder's HOOKS.json is in the order of its own diff
         for folder in sorted({h["folder"] for h in group}):
             locate(lines, [h for h in group if h["folder"] == folder])
         group.sort(key=lambda h: h["lineno"])
-        if path not in compiled_files:
+        if path not in compiled_files and not js:
             for hook in group:
                 hook.update(status="not-compiled", reason=REASON_FILE, suites=[])
             continue
+        if js and path not in seen_files:
+            for hook in group:
+                hook.update(status="no", reason=REASON_JS_UNLOADED, suites=[])
+            continue
         counters = counters_of(profiles, path)
-        regions = conditional_regions(lines)
+        regions = [] if (js or rs) else conditional_regions(lines)
         for hook in group:
             own_counter = counters.get(hook["lineno"])
             hook["counter"] = own_counter is not None
@@ -301,7 +327,7 @@ def build(profiles: dict, hooks: list, source_root: Path, own: list, compiled: s
 
     functions = []
     for path in own:
-        if not is_c(path):
+        if not (is_c(path) or (js_measured and is_js(path)) or (rust_measured and is_rs(path))):
             continue
         names: dict = {}
         for suite, data in profiles.items():
@@ -333,9 +359,9 @@ def write_outputs(result: dict, out: Path, meta: dict) -> None:
             w.writerows(rows)
 
     hooks = result["hooks"]
-    table("hooks.csv", ["folder", "file", "line", "kind", "form", "function", "executed", "reason", "suites"],
+    table("hooks.csv", ["folder", "file", "line", "kind", "form", "function", "executed", "reason", "suites", "test"],
           [[h["folder"], h["file"], h["lineno"] or "", h["kind"], h["form"], h["function"].strip(), h["status"], h.get("reason", ""),
-            ";".join(h["suites"])] for h in hooks])
+            ";".join(h["suites"]), h.get("test") or ""] for h in hooks])
     table("functions.csv", ["file", "function", "line", "executed", "suites"],
           [[f["file"], f["function"], f["line"], f["executed"], ";".join(f["suites"])] for f in result["functions"]])
 
@@ -349,18 +375,19 @@ def write_outputs(result: dict, out: Path, meta: dict) -> None:
     write("uncovered.txt", "".join("%s: %s:%d  %s\n" % (h["folder"], h["file"], h["lineno"], h["line"].strip()) for h in lines_of("no")))
     write("not_compiled.txt", "".join("%s: %s:%s  [%s]  %s\n" % (h["folder"], h["file"], h["lineno"] or "?", h["reason"], h["line"].strip())
                                       for h in lines_of("not-compiled")))
-    write("not_instrumented.txt", "".join("%s: %s  [%s]\n" % (h["folder"], h["file"], h["reason"]) for h in lines_of("not-instrumented")))
+    write("not_measured.txt", "".join("%s: %s  [%s]  test: %s\n" % (h["folder"], h["file"], h["reason"], h.get("test") or "none declared")
+                                      for h in lines_of("not-measured")))
     meta = dict(meta, counts=dict(sorted(result["statuses"].items()), hooks=len(hooks), functions=len(result["functions"]),
                                   mapped_lines=result["mapped_lines"]))
     write("meta.json", json.dumps(meta, indent=1, sort_keys=True) + "\n")
     suites = meta.get("suites") or {}
     passed = sorted(s for s, m in suites.items() if m.get("passed") is True)
     index = ["run_id", "date", "source_commit", "series_commit", "toolchain", "suites", "suites_passed", "hooks", "yes", "no",
-             "not_compiled", "no_counter", "not_instrumented", "removed", "functions", "mapped_lines"]
+             "not_compiled", "no_counter", "not_measured", "removed", "functions", "mapped_lines"]
     c = meta["counts"]
     table("index.csv", index, [[meta.get("run_id", ""), meta.get("date", ""), meta.get("source_commit", ""), meta.get("series_commit", ""),
                                 meta.get("toolchain", ""), len(suites), len(passed), c["hooks"], c.get("yes", 0), c.get("no", 0),
-                                c.get("not-compiled", 0), c.get("no-counter", 0), c.get("not-instrumented", 0), c.get("removed", 0), c["functions"], c["mapped_lines"]]])
+                                c.get("not-compiled", 0), c.get("no-counter", 0), c.get("not-measured", 0), c.get("removed", 0), c["functions"], c["mapped_lines"]]])
 
 
 def run_map(args) -> int:
@@ -373,7 +400,9 @@ def run_map(args) -> int:
     if args.compiled:
         compiled = set(json.loads(Path(args.compiled).read_text(encoding="utf-8")))
     try:
-        result = build(profiles, load_hooks(series), Path(args.source_root), own_files(series), compiled, args.expect or ())
+        js_measured = any((data["meta"].get("js_info_files") or 0) > 0 for data in profiles.values())
+        rust_measured = any((data["meta"].get("rust_profraw_files") or 0) > 0 for data in profiles.values())
+        result = build(profiles, load_hooks(series), Path(args.source_root), own_files(series), compiled, args.expect or (), js_measured, rust_measured)
     except MapError as exc:
         print("ERROR: %s" % exc, file=sys.stderr)
         return 1
@@ -385,11 +414,15 @@ def run_map(args) -> int:
     suites = {name: dict(data["meta"], lines=sum(len(r["lines"]) for r in data["files"].values())) for name, data in sorted(profiles.items())}
     meta = {"source_commit": args.source_commit, "series_commit": args.series_commit, "run_id": args.run_id, "toolchain": args.toolchain,
             "date": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d"), "suites": suites,
-            "suites_without_profile": result["missing_suites"], "flavour": "gcov (--enable-coverage), C and C++ only"}
+            "suites_without_profile": result["missing_suites"], "flavour": "gcov (--enable-coverage) for C and C++; SpiderMonkey's lcov (JS_CODE_COVERAGE_OUTPUT_DIR) for JavaScript when a suite produced it",
+            "javascript_measured": js_measured, "rust_measured": rust_measured,
+            "sandbox": ("switched off at run time (MOZ_DISABLE_*_SANDBOX, by a stand-in firefox) in every suite but %s: the processes of those could "
+                        "write their counters" % (", ".join(sorted(s for s, m in suites.items() if m.get("sandbox") == "on")) or "none")
+                        + "; the children of the suites with the sandbox on wrote none")}
     write_outputs(result, out, meta)
     c = json.loads((out / "meta.json").read_text(encoding="utf-8"))["counts"]
-    print("hooks: %d | yes %d | no %d | not-compiled %d | no-counter %d | not-instrumented %d | removed %d | suites with a profile: %d | without: %s"
-          % (c["hooks"], c.get("yes", 0), c.get("no", 0), c.get("not-compiled", 0), c.get("no-counter", 0), c.get("not-instrumented", 0),
+    print("hooks: %d | yes %d | no %d | not-compiled %d | no-counter %d | not-measured %d | removed %d | suites with a profile: %d | without: %s"
+          % (c["hooks"], c.get("yes", 0), c.get("no", 0), c.get("not-compiled", 0), c.get("no-counter", 0), c.get("not-measured", 0),
              c.get("removed", 0), len(profiles), ", ".join(result["missing_suites"]) or "none"))
     return 0
 
