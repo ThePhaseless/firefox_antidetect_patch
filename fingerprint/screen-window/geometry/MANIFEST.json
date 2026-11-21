@@ -1,9 +1,11 @@
 {
  "modified": [
+  "docshell/base/BrowsingContext.h",
   "dom/base/nsGlobalWindowOuter.cpp",
   "dom/base/nsGlobalWindowOuter.h",
   "dom/events/Event.cpp",
   "dom/events/test/gtest/moz.build",
+  "dom/ipc/BrowserParent.cpp",
   "widget/gtk/moz.build",
   "widget/gtk/nsWindow.h",
   "widget/moz.build",
@@ -16,6 +18,7 @@
   "dom/base/StealthWindowGeometry.h": "100644",
   "dom/events/StealthScreenCoords.h": "100644",
   "dom/events/test/gtest/TestStealthWindowGeometry.cpp": "100644",
+  "dom/ipc/StealthTopChromeOffset.h": "100644",
   "widget/StealthFullscreen.cpp": "100644",
   "widget/StealthFullscreen.h": "100644",
   "widget/gtk/StealthFullscreenGtk.cpp": "100644",
@@ -24,6 +27,24 @@
   "widget/windows/StealthFullscreenWin.h": "100644"
  },
  "inventory": [
+  {
+   "file": "docshell/base/BrowsingContext.h",
+   "category": "spoof",
+   "feature": "window-geometry",
+   "prefs": [
+    "zoom.stealth.fpp.hw_seed"
+   ],
+   "added": 4,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "the synced FIELD list, after InnerSizeSpoofedForRFP",
+   "evidence": [
+    "+  /* STEALTH-HOOK(fingerprint/screen-window/geometry): see                     \\"
+   ],
+   "notes": "A synced field of the top BrowsingContext, written by the parent only: the top-level browser's chrome offset, which an out-of-process iframe's BrowserChild is never told (its chrome offset is 0). StealthContentOriginShift reads it to keep the iframe's distance from the top-level content area in mozInnerScreenX/Y and in the screen point of events."
+  },
   {
    "file": "dom/base/nsGlobalWindowOuter.cpp",
    "category": "spoof",
@@ -108,6 +129,24 @@
     "changed": [],
     "why": "Written with the hook, 2026-11-01."
    }
+  },
+  {
+   "file": "dom/ipc/BrowserParent.cpp",
+   "category": "spoof",
+   "feature": "window-geometry",
+   "prefs": [
+    "zoom.stealth.fpp.hw_seed"
+   ],
+   "added": 3,
+   "removed": 0,
+   "hunks": 2,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "the includes; UpdateDimensions right after mChromeOffset = chromeOffset",
+   "evidence": [
+    "+    // STEALTH-HOOK(fingerprint/screen-window/geometry)"
+   ],
+   "notes": "Publishes the top-level chrome offset into the synced field of the top BrowsingContext (dom/ipc/StealthTopChromeOffset.h), only for the top-level BrowserParent and only when it changes."
   },
   {
    "file": "widget/gtk/moz.build",

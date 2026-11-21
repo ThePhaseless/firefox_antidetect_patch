@@ -301,6 +301,7 @@ OWN_FILES = [
     (r"^widget/windows/StealthFullscreenWin\.", "fingerprint/screen-window/geometry"),
     (r"^widget/tests/gtest/TestStealthFullscreen\.cpp$", "fingerprint/screen-window/geometry"),
     (r"^dom/events/StealthScreenCoords\.", "fingerprint/screen-window/geometry"),
+    (r"^dom/ipc/StealthTopChromeOffset\.h$", "fingerprint/screen-window/geometry"),
     (r"^dom/media/StealthMediaDeclaration\.", "fingerprint/media/decode-declaration"),
     (r"^dom/media/webrtc/transport/nr_stealth_network\.", "fingerprint/webrtc/declared-network"),
     (r"^dom/media/webrtc/transport/test/gtest/(moz\.build|TestStealthDeclaredNetwork\.cpp)$", "fingerprint/webrtc/declared-network"),

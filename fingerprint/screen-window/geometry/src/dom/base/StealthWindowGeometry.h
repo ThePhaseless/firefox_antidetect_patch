@@ -229,29 +229,52 @@ mozilla::Maybe<nsPoint> nsGlobalWindowOuter::StealthContentOriginShift(
   if (!aPresContext || !mozilla::gfx::StealthEngineActive()) {
     return mozilla::Nothing();
   }
-  // L'origine reale e' l'offset su schermo del root widget: nel processo di
-  // contenuto e' il PuppetWidget, il cui offset e' l'origine dell'area di
-  // contenuto di primo livello - per il documento top coincide con
-  // GetInnerScreenRect(), per un sottoframe no, ed e' proprio quella
-  // differenza che va conservata. Solo chiamate al widget, niente layout:
+  // L'origine reale e' sempre quella dell'area di contenuto del PRIMO LIVELLO
+  // sullo schermo: e' l'ancora da cui si dichiara, e la stessa per ogni
+  // documento della pagina, cosi' lo scarto non cancella la distanza fra un
+  // sottoframe e il primo livello. Solo chiamate al widget, niente layout:
   // Event.cpp chiama questa funzione per ogni evento del mouse.
+  //
+  // Nel processo del primo livello il root widget e' il suo PuppetWidget, e il
+  // suo offset su schermo e' proprio quell'origine (finestra + client +
+  // chrome). In un iframe FUORI PROCESSO il PuppetWidget e' l'origine
+  // dell'iframe: il suo offset comprende la posizione dell'iframe nella
+  // pagina, e prenderlo come origine la toglieva dal risultato (mozInnerScreenX
+  // dentro l'iframe uguale a quello del top, screenX degli eventi senza
+  // l'offset dell'iframe). Li' il chrome offset del BrowserChild e' sempre 0
+  // (vale solo per il primo livello: BrowserParent::UpdateDimensions), quindi
+  // l'origine e' la posizione della finestra + il chrome offset del primo
+  // livello, che il processo padre pubblica nel BrowsingContext top
+  // (StealthTopChromeOffset).
   nsCOMPtr<nsIWidget> rootWidget = aPresContext->GetRootWidget();
   if (!rootWidget) {
     return mozilla::Nothing();
   }
   const int32_t auPerDevPx = aPresContext->AppUnitsPerDevPixel();
-  const nsPoint real = mozilla::LayoutDevicePixel::ToAppUnits(
-      rootWidget->WidgetToScreenOffset(), auPerDevPx);
+  mozilla::dom::Document* doc = aPresContext->Document();
+  mozilla::dom::BrowsingContext* bc =
+      doc ? doc->GetBrowsingContext() : nullptr;
+  mozilla::dom::BrowserChild* child = rootWidget->GetOwningBrowserChild();
+  // Before the parent has published the top chrome offset, the frame keeps the
+  // old anchor (its own puppet offset): the declared origin without the
+  // iframe's offset. Never Nothing() here: that would let the real, undeclared
+  // screen position of the host through.
+  mozilla::LayoutDeviceIntPoint realOrigin = rootWidget->WidgetToScreenOffset();
+  if (child && !child->IsTopLevel() && bc) {
+    const mozilla::Maybe<mozilla::LayoutDeviceIntPoint>& topChrome =
+        bc->Top()->GetStealthTopChromeOffset();
+    if (topChrome.isSome()) {
+      realOrigin = rootWidget->TopLevelWidgetToScreenOffset() + *topChrome;
+    }
+  }
+  const nsPoint real =
+      mozilla::LayoutDevicePixel::ToAppUnits(realOrigin, auPerDevPx);
   // Un popup si dichiara dalla sua posizione REALE: il rettangolo esterno della
   // finestra di primo livello, che BrowserChild riceve dal genitore - anche in
   // un iframe fuori processo, dove arriva dall'embedder. E' la stessa fonte di
   // GetScreenXY (nsIBaseWindow::GetPosition del tree owner).
   mozilla::Maybe<mozilla::LayoutDeviceIntPoint> popupOrigin;
-  mozilla::dom::Document* doc = aPresContext->Document();
-  mozilla::dom::BrowsingContext* bc =
-      doc ? doc->GetBrowsingContext() : nullptr;
   if (bc && bc->Top()->GetIsPopupRequested()) {
-    mozilla::dom::BrowserChild* child = rootWidget->GetOwningBrowserChild();
     if (!child) {
       // Il processo genitore non serve pagine: niente da dichiarare.
       return mozilla::Nothing();
