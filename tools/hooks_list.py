@@ -18,9 +18,11 @@ An entry, in this order of keys:
     anchor    (form anchor only) the Mozilla statement the hook follows
     why       (form anchor only) why the guard, wrap-function and wrap-expression forms are not enough (rule T2)
     exception (G35, only when the pm granted it) why no form can express this rewritten line
-    pm        (G35) exactly "approvato": the pm granted the exception. Both fields make a declared exception: the
-              hook is left out of contract_violations (its C-rules, T1, T2, T3) and counted apart by `check`; `exception`
-              without `pm: "approvato"` is a failure of `check`
+    untestable  (only when the pm granted it) why the hook has no test: `test` stays '' and rule T1 does not apply
+    pm        exactly "approvato": the pm granted the exception (G35) or the untestable. `exception` and `pm` make a
+              declared exception: the hook is left out of contract_violations (its C-rules, T1, T2, T3) and counted
+              apart by `check`; `untestable` and `pm` leave out T1 only, counted apart too. `exception` or `untestable`
+              without `pm: "approvato"` is a failure of `check`, and so is `untestable` beside a `test`
 
 Identity of a hook: file + function + kind + normalized line text (+ normalized removed text). The export
 merges the hand fields into the generated list by identity; a hook whose text changes loses them on
@@ -32,6 +34,8 @@ Test references (the grammar of `test`; '' is allowed and is debt):
     node:<path>[#<test title>]      <path> is a tree path (juggler/tests/x.test.mjs): <folder>/src/<path> exists in some
                                     folder; with a title, the title string appears in the file
     py:<path>::<test_name>          the same for a python test of ours: the file exists and defines test_name
+    xpcshell:<path>#<test>          the same for an xpcshell test: the file exists and the title is in it (rule T3: no
+                                    round runs xpcshell yet, so it is debt until a gate leg does)
     wrapper:<path>::<test>          a test of the wrapper repository: only the format is checked here
 
 A test must also be RUN by a round (rule T3, G20), judged on the series' copy of the candidate workflow
@@ -42,6 +46,7 @@ A test must also be RUN by a round (rule T3, G20), judged on the series' copy of
     py:<path>::<name>      some step of a workflow runs the file, or it is a tree python test of the export gate
                            (modules/libpref/test/test_stealth_*.py)
     wrapper:               the wrapper's own rounds run it: format only
+    xpcshell:              run by no round, until a workflow line runs that file with xpcshell
 
 Public API:
 
@@ -65,7 +70,7 @@ from pathlib import Path
 
 import hook_contract as hc
 
-HAND_FIELDS = ("test", "anchor", "why", "exception", "pm")
+HAND_FIELDS = ("test", "anchor", "why", "exception", "untestable", "pm")
 PM_APPROVED = "approvato"
 WORKFLOWS = "platform/ci/src/.github/workflows"
 CANDIDATE_WORKFLOW = "release.yml"
@@ -124,7 +129,7 @@ def _with_hand_fields(e: dict, old: dict | None) -> dict:
     if e["form"] == "anchor":
         out["anchor"] = old.get("anchor", "")
         out["why"] = old.get("why", "")
-    for k in ("exception", "pm"):          # G35: only where the pm's decision was written
+    for k in ("exception", "untestable", "pm"):          # the pm's decisions (G35): only where they were written
         if k in old:
             out[k] = old[k]
     return out
@@ -230,9 +235,19 @@ def reference_problem(root: Path, ref: str, index: _Index | None = None) -> str 
         if not re.search(r"\bdef\s+%s\b" % re.escape(name), p.read_text(encoding="utf-8", errors="replace")):
             return "%s does not define %s" % (path, name)
         return None
+    if kind == "xpcshell":
+        path, sep, title = rest.partition("#")
+        if not (path and sep and title):
+            return "xpcshell:<path>#<test> expected"
+        p = index.src_file(path)
+        if p is None:
+            return "%s is in no folder's src/" % path
+        if title not in p.read_text(encoding="utf-8", errors="replace"):
+            return "the title %r is not in %s" % (title, path)
+        return None
     if kind == "wrapper":
         return None if WRAPPER_RE.match(ref) else "wrapper:<path>::<test> expected"
-    return "unknown test reference %r: gtest:, node:, py: or wrapper:" % ref
+    return "unknown test reference %r: gtest:, node:, py:, xpcshell: or wrapper:" % ref
 
 
 # --------------------------------------------------------------------------- the check
@@ -276,12 +291,31 @@ def exception_problems(folder: str, e: dict) -> list:
                      % (folder, _label(e), PM_APPROVED))
     elif "pm" in e and e["pm"] != PM_APPROVED:
         found.append("%s/HOOKS.json: the hook %s has pm %r, which is not \"%s\"" % (folder, _label(e), e["pm"], PM_APPROVED))
+    if "untestable" in e:
+        if not (isinstance(e["untestable"], str) and e["untestable"].strip()):
+            found.append("%s/HOOKS.json: the untestable of the hook %s has no reason (a non-empty text)" % (folder, _label(e)))
+        if e.get("pm") != PM_APPROVED:
+            found.append("%s/HOOKS.json: the hook %s is untestable without `pm: \"%s\"`: only the pm grants it"
+                         % (folder, _label(e), PM_APPROVED))
+        if e.get("test"):
+            found.append("%s/HOOKS.json: the hook %s is untestable and names a test: one or the other" % (folder, _label(e)))
     return found
 
 
 def is_declared_exception(e: dict) -> bool:
     """G35: the entry has a reason and the pm's approval."""
     return isinstance(e.get("exception"), str) and bool(e["exception"].strip()) and e.get("pm") == PM_APPROVED
+
+
+def is_untestable(e: dict) -> bool:
+    """The entry has a reason, the pm's approval and no test: rule T1 does not apply to it."""
+    return (isinstance(e.get("untestable"), str) and bool(e["untestable"].strip()) and e.get("pm") == PM_APPROVED
+            and not e.get("test"))
+
+
+def untestable_hooks(root: Path) -> list:
+    """[(folder, entry)] of every hook of the series that the pm declared untestable."""
+    return [(f, e) for f in folders(root) for e in expected(root, f) if is_untestable(e)]
 
 
 def declared_exceptions(root: Path) -> list:
@@ -386,12 +420,19 @@ class _Rounds:
         pat = re.compile(r"(?<![\w.\-])%s(?![\w])" % re.escape(path))
         return any(pat.search(ln) for ln in self.lines)
 
+    def xpcshell_runs(self, path: str) -> bool:
+        pat = re.compile(r"(?<![\w.\-])%s(?![\w])" % re.escape(path))
+        return any("xpcshell" in ln and pat.search(ln) for ln in self.lines)
+
     def runs(self, ref: str):
         """True/False if a round runs the test `ref` names; None when it cannot be judged (no workflow, a format
         that is not one of gtest/node/py, a malformed reference: `problems` reports those)."""
+        kind, _, rest = ref.partition(":")
+        if kind == "xpcshell":      # no round runs xpcshell yet: debt until a workflow line does
+            path = rest.partition("#")[0]
+            return self.xpcshell_runs(path) if path else None
         if not self.known:
             return None
-        kind, _, rest = ref.partition(":")
         if kind == "gtest":
             suite, dot, name = rest.partition(".")
             return self.gtest_runs(suite, name) if suite and dot and name else None
@@ -416,10 +457,10 @@ def missing_test_violations(root: Path) -> list:
             if is_declared_exception(e):
                 continue
             text = e["line"] or ("<%s> %s" % (e["kind"], e.get("removed", "")))
-            if not e.get("test"):
+            if not e.get("test") and not is_untestable(e):
                 found.append(hc.Violation("T1", folder, e["file"], e["function"], text,
                                           hc._key("T1", folder, e["file"], e["function"], text), "no test"))
-            elif isinstance(e["test"], str) and rounds.runs(e["test"]) is False:
+            elif isinstance(e["test"], str) and e["test"] and rounds.runs(e["test"]) is False:
                 found.append(hc.Violation("T3", folder, e["file"], e["function"], text,
                                           hc._key("T3", folder, e["file"], e["function"], text),
                                           "no round runs %s" % e["test"]))

@@ -1,0 +1,16 @@
+[
+ "GdkIsX11Display",
+ "RefreshDocumentLanguage",
+ "WriteParam",
+ "fonts.clear_namespace",
+ "hb_font_destroy",
+ "loadInfo->SetJugglerLoadIdentifier",
+ "mDNSResolver->SetOriginAttributes",
+ "mStealth.Cancelled",
+ "mStealth.Done",
+ "mStealth.SetRunning",
+ "mozilla::net::nsSOCKSUDPIOLayerWarm",
+ "nsSOCKSUDPIOLayerSocketBorn",
+ "stealthApplyContext",
+ "stealthLoad.Failed"
+]

@@ -323,7 +323,7 @@ def test_a_backport_folder_of_the_series_has_no_list():
 
 # --------------------------------------------------------------------------- G35: the declared exception
 EXC_REMOVED = "  DoIt(x);"
-EXC_ADDED = "  DoIt(x, StealthCtx(this));" + MARK        # a parameter of ours in a Mozilla call: no form can express it
+EXC_ADDED = "  DoIt(x, StealthCtx(this), StealthMore(this));" + MARK     # two arguments of ours in a Mozilla call: no form can express it
 
 
 def exception_series(tmp_path):
@@ -494,3 +494,63 @@ def test_the_rounds_of_the_real_series():
     assert rounds.node_runs("juggler/tests/x.test.mjs") and not rounds.node_runs("juggler/tests/sub/x.test.mjs")
     assert rounds.py_runs("scripts/ci/test_ci.py") and rounds.py_runs("modules/libpref/test/test_stealth_x.py")
     assert not rounds.py_runs("scripts/ci/commented_out_nowhere.py")
+
+
+# --------------------------------------------------------------------------- xpcshell refs and the untestable hook
+def test_an_xpcshell_reference_must_exist_with_its_title(tmp_path):
+    root = series(tmp_path, top(G1))
+    d = root / FOLDER / "src" / "toolkit" / "test"
+    d.mkdir(parents=True)
+    (d / "test_x.js").write_text("add_task(async function test_the_title() {});\n", encoding="utf-8")
+    assert hl.reference_problem(root, "xpcshell:toolkit/test/test_x.js#test_the_title") is None
+    for ref in ("xpcshell:toolkit/test/test_x.js", "xpcshell:#t", "xpcshell:toolkit/test/test_x.js#nope", "xpcshell:toolkit/none.js#t"):
+        assert hl.reference_problem(root, ref), ref
+
+
+def test_t3_an_xpcshell_test_is_run_by_no_round_until_a_workflow_line_runs_it(tmp_path):
+    root = t3_series(tmp_path)
+    assert t3_rules(root, "xpcshell:toolkit/test/test_x.js#test_the_title") == ["T3"]
+    wf = root / "platform" / "ci" / "src" / ".github" / "workflows" / "release.yml"
+    wf.write_text(WORKFLOW + "      - run: firefox -xpcshell toolkit/test/test_x.js\n", encoding="utf-8", newline="")
+    assert t3_rules(root, "xpcshell:toolkit/test/test_x.js#test_the_title") == []
+    bare = t3_series(tmp_path / "bare", with_workflow=False)
+    assert t3_rules(bare, "xpcshell:toolkit/test/test_x.js#test_the_title") == ["T3"]
+
+
+def test_an_untestable_hook_is_counted_apart_and_has_no_t1(tmp_path, monkeypatch):
+    root = series(tmp_path, top(G1))
+    assert [v.rule for v in hc.contract_violations(root)] == ["T1"]
+    entries = hl.expected(root, FOLDER)
+    entries[0].update(untestable="no browser path reaches it", pm="approvato")
+    commit_list(root, entries)
+    assert hc.contract_violations(root) == [] and hl.problems(root) == []
+    assert [(f, e["line"]) for f, e in hl.untestable_hooks(root)] == [(FOLDER, G1.rstrip())]
+    assert hl.declared_exceptions(root) == []                 # counted apart from the exceptions
+    monkeypatch.setattr(engine, "ROOT", root)
+    assert engine.untestable_hooks() == 1 and engine.declared_exceptions() == 0
+    # the C-rules still apply to an untestable hook: it excuses the missing test only
+    set_patch(root, top("  // the reason", G1))
+    entries = hl.expected(root, FOLDER)
+    entries[-1].update(untestable="why", pm="approvato")
+    commit_list(root, entries)
+    assert "C4" in {v.rule for v in hc.contract_violations(root)}
+
+
+def test_an_untestable_without_the_pm_or_beside_a_test_is_a_failure(tmp_path):
+    root = series(tmp_path, top(G1))
+    base = hl.expected(root, FOLDER)[0]
+    for fields in ({"untestable": "why"}, {"untestable": "why", "pm": "ok"}, {"untestable": "", "pm": "approvato"},
+                   {"untestable": "why", "pm": "approvato", "test": "wrapper:tests/test_a.py::test_b"}):
+        commit_list(root, [dict(base, **fields)])
+        assert hl.problems(root), fields
+    commit_list(root, [dict(base, untestable="why", pm="approvato")])
+    assert hl.problems(root) == []
+    commit_list(root, [dict(base, untestable="why")])
+    assert hl.untestable_hooks(root) == [] and [v.rule for v in hc.contract_violations(root)] == ["T1"]    # no pm: still debt
+    entries = hl.expected(root, FOLDER)
+    assert list(entries[0]) == ["file", "function", "kind", "form", "line", "test", "untestable"]
+
+
+def test_check_prints_the_untestable_count(capsys):
+    assert engine.check() == 0
+    assert "untestable hooks: 0" in capsys.readouterr().out

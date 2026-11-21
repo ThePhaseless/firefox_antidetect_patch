@@ -1,110 +1,5 @@
 [
  {
-  "key": "C10|automation/input|widget/nsGUIEventIPC.h|struct ParamTraits<mozilla::WidgetMouseEventBase> {|07e3198788ac",
-  "rule": "C10",
-  "folder": "automation/input",
-  "file": "widget/nsGUIEventIPC.h",
-  "text": "WriteParam(aWriter, aParam.mJugglerEventId);"
- },
- {
-  "key": "C10|automation/navigation|docshell/base/nsDocShell.cpp|class OnLinkClickEvent : public CancelableRunnable, public SupportsWeakPtr {|110803565bbf",
-  "rule": "C10",
-  "folder": "automation/navigation",
-  "file": "docshell/base/nsDocShell.cpp",
-  "text": "mStealth.Done(mContent); // STEALTH-HOOK(automation/navigation)"
- },
- {
-  "key": "C10|automation/navigation|docshell/base/nsDocShell.cpp|class OnLinkClickEvent : public CancelableRunnable, public SupportsWeakPtr {|3dd14ef0aa0d",
-  "rule": "C10",
-  "folder": "automation/navigation",
-  "file": "docshell/base/nsDocShell.cpp",
-  "text": "mStealth.SetRunning(false); // STEALTH-HOOK(automation/navigation)"
- },
- {
-  "key": "C10|automation/navigation|docshell/base/nsDocShell.cpp|class OnLinkClickEvent : public CancelableRunnable, public SupportsWeakPtr {|81f5ca173d3d",
-  "rule": "C10",
-  "folder": "automation/navigation",
-  "file": "docshell/base/nsDocShell.cpp",
-  "text": "mStealth.SetRunning(true); // STEALTH-HOOK(automation/navigation)"
- },
- {
-  "key": "C10|automation/navigation|docshell/base/nsDocShell.cpp|class OnLinkClickEvent : public CancelableRunnable, public SupportsWeakPtr {|8b01b080e37c",
-  "rule": "C10",
-  "folder": "automation/navigation",
-  "file": "docshell/base/nsDocShell.cpp",
-  "text": "mStealth.Cancelled(mContent); // STEALTH-HOOK(automation/navigation)"
- },
- {
-  "key": "C10|automation/navigation|docshell/base/nsDocShell.cpp|nsresult nsDocShell::InternalLoad(nsDocShellLoadState* aLoadState,|beda5ec2a947",
-  "rule": "C10",
-  "folder": "automation/navigation",
-  "file": "docshell/base/nsDocShell.cpp",
-  "text": "stealthLoad.Failed(rv); // STEALTH-HOOK(automation/navigation)"
- },
- {
-  "key": "C10|automation/navigation|netwerk/ipc/DocumentLoadListener.cpp|static auto CreateDocumentLoadInfo(CanonicalBrowsingContext* aBrowsingContext,|f649b4fb0ae2",
-  "rule": "C10",
-  "folder": "automation/navigation",
-  "file": "netwerk/ipc/DocumentLoadListener.cpp",
-  "text": "loadInfo->SetJugglerLoadIdentifier(aLoadState->GetLoadIdentifier());"
- },
- {
-  "key": "C10|fingerprint/fonts/metrics|gfx/thebes/gfxHarfBuzzShaper.cpp|gfxHarfBuzzShaper::~gfxHarfBuzzShaper() {|66284f2e1503",
-  "rule": "C10",
-  "folder": "fingerprint/fonts/metrics",
-  "file": "gfx/thebes/gfxHarfBuzzShaper.cpp",
-  "text": "hb_font_destroy(mDesignFont); // STEALTH-HOOK(fingerprint/fonts/metrics)"
- },
- {
-  "key": "C10|fingerprint/locale-time/timezone|dom/base/Document.cpp|void Document::SetContainer(nsDocShell* aContainer) {|c8cf74c97219",
-  "rule": "C10",
-  "folder": "fingerprint/locale-time/timezone",
-  "file": "dom/base/Document.cpp",
-  "text": "if (aContainer) RefreshDocumentLanguage(this); // STEALTH-HOOK(fingerprint/locale-time/timezone): the context is known n"
- },
- {
-  "key": "C10|fingerprint/screen-window/occlusion|widget/gtk/nsWindow.cpp|static bool IsFullscreenSupported(GtkWidget* aShell) {|c10e7ae107c9",
-  "rule": "C10",
-  "folder": "fingerprint/screen-window/occlusion",
-  "file": "widget/gtk/nsWindow.cpp",
-  "text": "if (GdkIsX11Display() && !IsFullscreenSupported(mShell) && StealthMakeFullScreenWithoutWM(aFullScreen)) return NS_OK; //"
- },
- {
-  "key": "C10|network/doh|dom/media/webrtc/jsapi/MediaTransportHandler.cpp|void MediaTransportImplNicer::SetProxyConfig(|bf45b49800e4",
-  "rule": "C10",
-  "folder": "network/doh",
-  "file": "dom/media/webrtc/jsapi/MediaTransportHandler.cpp",
-  "text": "mDNSResolver->SetOriginAttributes(StealthIceResolverAttributes(aProxyConfig)); // STEALTH-HOOK(network/doh)"
- },
- {
-  "key": "C10|network/doh|toolkit/components/url-classifier/UrlClassifierHashCompleter.sys.mjs|class HashCompleterRequestBase {|18322c011537",
-  "rule": "C10",
-  "folder": "network/doh",
-  "file": "toolkit/components/url-classifier/UrlClassifierHashCompleter.sys.mjs",
-  "text": "stealthApplyContext(channel, this.completer); // STEALTH-HOOK(network/doh)"
- },
- {
-  "key": "C10|network/proxy-udp|netwerk/base/nsUDPSocket.cpp|nsUDPSocket::InitWithAddress(const NetAddr* aAddr, nsIPrincipal* aPrincipal,|56f146847c13",
-  "rule": "C10",
-  "folder": "network/proxy-udp",
-  "file": "netwerk/base/nsUDPSocket.cpp",
-  "text": "nsSOCKSUDPIOLayerSocketBorn(mFD); // STEALTH-HOOK(network/proxy-udp): only a bound socket takes an association"
- },
- {
-  "key": "C10|network/proxy-udp|netwerk/socket/nsSOCKSIOLayer.cpp|nsresult nsSOCKSIOLayerAddToSocket(int32_t family, const char* host,|7748b9710fdd",
-  "rule": "C10",
-  "folder": "network/proxy-udp",
-  "file": "netwerk/socket/nsSOCKSIOLayer.cpp",
-  "text": "if (socksVersion == 5) mozilla::net::nsSOCKSUDPIOLayerWarm(proxy); // STEALTH-HOOK(network/proxy-udp)"
- },
- {
-  "key": "C10|platform/webrender-memory|gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs|mod test_glyph_rasterizer {|3d9480599187",
-  "rule": "C10",
-  "folder": "platform/webrender-memory",
-  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
-  "text": "fonts.clear_namespace(IdNamespace(7));"
- },
- {
   "key": "C11|fingerprint/input/latency|dom/webidl/Window.webidl|dictionary SynthesizeEventData {|27b6abc04560",
   "rule": "C11",
   "folder": "fingerprint/input/latency",
@@ -5418,13 +5313,6 @@
   "text": "// STEALTH-HOOK(automation/docshell-attrs)"
  },
  {
-  "key": "C4|automation/navigation|netwerk/base/LoadInfo.cpp|void LoadInfo::UpdateParentAddressSpaceInfo() {|56e64db4d1da",
-  "rule": "C4",
-  "folder": "automation/navigation",
-  "file": "netwerk/base/LoadInfo.cpp",
-  "text": "*aResult = mJugglerLoadIdentifier;"
- },
- {
   "key": "C4|automation/network-interception|netwerk/base/nsINetworkInterceptController.idl|interface nsIInterceptedChannel : nsISupports|af6b5ae03644",
   "rule": "C4",
   "folder": "automation/network-interception",
@@ -5556,13 +5444,6 @@
   "folder": "fingerprint/canvas/as-drawn",
   "file": "widget/nsBaseDragService.cpp",
   "text": "// The drag image shows the canvas; a page never reads it back."
- },
- {
-  "key": "C4|fingerprint/canvas/as-drawn|widget/nsBaseDragService.cpp|nsresult nsBaseDragSession::DrawDragForImage(|3e1bcee3564f",
-  "rule": "C4",
-  "folder": "fingerprint/canvas/as-drawn",
-  "file": "widget/nsBaseDragService.cpp",
-  "text": "*aSurface = aCanvas->GetSurfaceSnapshotAsDrawn();"
  },
  {
   "key": "C4|fingerprint/canvas/as-drawn|widget/windows/TaskbarPreview.cpp|TaskbarPreviewCallback::Done(nsISupports* aCanvas, bool aDrawBorder) {|95f7d6122658",
@@ -6811,13 +6692,6 @@
   "text": "// STEALTH-HOOK(fingerprint/screen-window/screen): see FEATURE.md"
  },
  {
-  "key": "C4|fingerprint/webgl/parameters|dom/canvas/ClientWebGLContext.cpp|ClientWebGLContext::DoReadPixelsAsync() {|a695ec92667b",
-  "rule": "C4",
-  "folder": "fingerprint/webgl/parameters",
-  "file": "dom/canvas/ClientWebGLContext.cpp",
-  "text": "*self, sourceSurface, premultiplied),"
- },
- {
   "key": "C4|fingerprint/webgl/parameters|dom/canvas/ClientWebGLContext.cpp|ClientWebGLContext::DoReadPixelsAsync() {|fe6475fb01ce",
   "rule": "C4",
   "folder": "fingerprint/webgl/parameters",
@@ -7042,13 +6916,6 @@
   "text": "// STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)"
  },
  {
-  "key": "C4|fingerprint/webgpu/adapter-declaration|dom/webgpu/Adapter.cpp|Adapter::Adapter(Instance* const aParent, WebGPUChild* const aChild,|4ae00f2c2d9e",
-  "rule": "C4",
-  "folder": "fingerprint/webgpu/adapter-declaration",
-  "file": "dom/webgpu/Adapter.cpp",
-  "text": "*mLimits->mFfi, StealthAdaptLimitKey<ToJsKey>);"
- },
- {
   "key": "C4|fingerprint/webgpu/adapter-declaration|dom/webgpu/Adapter.cpp|uint32_t AdapterInfo::SubgroupMaxSize() const {|3a437c29e0dc",
   "rule": "C4",
   "folder": "fingerprint/webgpu/adapter-declaration",
@@ -7061,13 +6928,6 @@
   "folder": "fingerprint/webgpu/adapter-declaration",
   "file": "dom/webgpu/Instance.cpp",
   "text": "// STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)"
- },
- {
-  "key": "C4|fingerprint/webgpu/adapter-declaration|dom/webgpu/ipc/WebGPUParent.cpp|extern void wgpu_parent_swap_chain_drop(|f7be9c4c5d76",
-  "rule": "C4",
-  "folder": "fingerprint/webgpu/adapter-declaration",
-  "file": "dom/webgpu/ipc/WebGPUParent.cpp",
-  "text": "*aOutLuid = {}; // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)"
  },
  {
   "key": "C4|fingerprint/webrtc/declared-network|dom/media/webrtc/transport/ipc/StunAddrsRequestParent.cpp|void StunAddrsRequestParent::SendStunAddrs(const NrIceStunAddrArray& addrs) {|6cdc858a16a5",
@@ -7348,20 +7208,6 @@
   "folder": "network/proxy-udp",
   "file": "dom/media/webrtc/transport/nr_socket_prsock.cpp",
   "text": "// known and the layer is put on them; here (the content process) they would go out direct, around any proxy."
- },
- {
-  "key": "C4|network/proxy-udp|dom/media/webrtc/transport/nr_socket_prsock.cpp|int NrSocketBase::CreateSocket(|9ba2864fb89a",
-  "rule": "C4",
-  "folder": "network/proxy-udp",
-  "file": "dom/media/webrtc/transport/nr_socket_prsock.cpp",
-  "text": "*sock = new NrSocket(config); // STEALTH-HOOK(network/proxy-udp)"
- },
- {
-  "key": "C4|network/proxy-udp|dom/media/webrtc/transport/nr_socket_prsock.cpp|int NrSocketBase::CreateSocket(|9ba2864fb89a#2",
-  "rule": "C4",
-  "folder": "network/proxy-udp",
-  "file": "dom/media/webrtc/transport/nr_socket_prsock.cpp",
-  "text": "*sock = new NrSocket(config); // STEALTH-HOOK(network/proxy-udp)"
  },
  {
   "key": "C4|network/proxy-udp|dom/media/webrtc/transport/nr_socket_prsock.cpp|int NrSocketBase::CreateSocket(|ad5655b81c1b",

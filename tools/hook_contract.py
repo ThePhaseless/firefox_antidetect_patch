@@ -8,7 +8,8 @@ comment, in one of these forms:
     notice            StealthX(this, aArg);                          first statement of a function
     wrap-expression   Mozilla's expression, unchanged, inside our call (one Mozilla line rewritten): the whole
                       expression, or a sub-expression of the line, with our extra leading arguments (`this, `)
-    wrap-call         G29: the one called identifier `Foo` of Mozilla's line becomes `StealthFoo`, same arguments
+    wrap-call         G29: the one called identifier `Foo` of Mozilla's line becomes `StealthFoo`, same arguments;
+                      G9: or one argument of ours (a Stealth call) is added to a call of Mozilla's line
     wrap-function     G1/G2: the signature or macro `Foo` renamed `Foo_Mozilla` (or by another suffix, `FooAsDrawn`),
                       one line rewritten; the one-line declarations and the internal calls rewritten to the same new name
     declared-value    one Mozilla line rewritten with our value (a pref default)
@@ -34,7 +35,8 @@ comment carries more than the marker; C4 a comment line added; C5 logic in the h
 ternary, arithmetic); C6 Mozilla lines removed or changed outside the three rewriting forms;
 C7 a whole Mozilla file deleted or replaced; C8 an include of ours inside Mozilla's include block;
 C9 inside a Mozilla list or the last line of a block (an anchor there is G30/G33: not C9, T2 asks for
-its `anchor` and `why`); C10 the called function is not Stealth<What>; C11 a value of ours in a numbered
+its `anchor` and `why`); C10 the called function is not Stealth<What> and is not an existing function (G41: tools/hook-names.json, the
+called names of the hooks that existed when the rule came; a new function takes a Stealth name); C11 a value of ours in a numbered
 space (IDL const/enum); T1 a hook whose HOOKS.json entry has no `test`; T2 an anchor hook whose entry has
 no `anchor` and `why`; T3 a hook whose `test` no round runs (tools/hooks_list.py: the debt list holds
 every hook without a test until it has one).
@@ -72,7 +74,7 @@ RULES = {
     "C7": "a whole Mozilla file deleted or replaced",
     "C8": "an include of ours inside Mozilla's include block",
     "C9": "inside a Mozilla list or the last line of a block",
-    "C10": "the called function is not named Stealth<What>",
+    "C10": "the called function is not named Stealth<What> and is not an existing function (tools/hook-names.json)",
     "C11": "a value of ours in a numbered space of Mozilla",
     "T1": "a hook with no test (the `test` of its HOOKS.json entry is empty)",
     "T2": "an anchor hook without its `anchor` and `why` in HOOKS.json",
@@ -223,6 +225,7 @@ BUILD_ADD = re.compile(r"^[A-Za-z_][\w.\[\]\"']*\s*\+=\s*\[.*\]$")
 GUARD_C = re.compile(r"^if\s*\(.*\)\s*return\b[^;{}]*;$")        # a guard: a call in its condition
 GUARD_PY = re.compile(r"^if\s+.*:\s*return\b.*$")
 NOTICE = re.compile(r"^([\w:.\->]+)\s*\(.*\)\s*;?$")
+BLOCK_CONTINUATION = re.compile(r"^\*(\s|$)")      # ` * text` inside a block comment; `*aSurface = x;` is code
 STEALTH_CALL = re.compile(r"(?:[A-Za-z_]\w*::)*(?:nr_stealth_|Stealth|stealth_)\w*\s*\(")
 STEALTH_CHAIN = re.compile(r"(?:[A-Za-z_]\w*::)*(?:nr_stealth_|Stealth|stealth_)\w*")
 IDENT = re.compile(r"^[A-Za-z_]\w*$")
@@ -244,7 +247,7 @@ def is_comment_line(t: str, ft: str) -> bool:
     s = t.strip()
     if not s:
         return False
-    if s.startswith(("//", "/*", "*/")) or (s.startswith("*") and ft in SLASH_COMMENT):
+    if s.startswith(("//", "/*", "*/")) or (ft in SLASH_COMMENT and BLOCK_CONTINUATION.match(s)):
         return True
     if ft in HASH_COMMENT and s.startswith("#"):
         return True
@@ -285,6 +288,9 @@ def marker_split(line: str):
             code, extra = pre[:k].rstrip(), pre[k:]
         else:
             code, extra = pre, pre
+    cont = re.fullmatch(r"(?:\*/)?\s*\\", post) if opener == "/*" else None
+    if cont:       # G2: the marker as a block comment before the backslash of a macro line is the marker on the line
+        return (code.strip() + " \\"), m.group(1), extra
     if post not in CLOSERS:
         extra = (extra + " " + post).strip()
     return code.strip(), m.group(1), extra
@@ -295,7 +301,38 @@ def calls(code: str) -> list:
 
 
 def is_stealth_chain(chain: str) -> bool:
+    """`StealthX`, `Class::StealthX`, `ns::Class::StealthX`, `obj->StealthX`: some segment is Stealth-named."""
     return any(STEALTH_NAME.match(seg) for seg in re.split(r"::|\.|->", chain))
+
+
+KNOWN_NAMES_FILE = Path(__file__).with_name("hook-names.json")
+_known_names = None
+
+
+def known_names() -> set:
+    """G41: the called names of the hooks that existed when the rule came (tools/hook-names.json, written once by
+    write_known_names): a function that exists keeps its name, only a new one must be Stealth-named. A name is known
+    whole (`nsContentUtils::SessionSystemLocales`) or by its last segment."""
+    global _known_names
+    if _known_names is None:
+        names = json.loads(KNOWN_NAMES_FILE.read_text(encoding="utf-8")) if KNOWN_NAMES_FILE.is_file() else []
+        _known_names = set(names) | {re.split(r"::|\.|->", n)[-1] for n in names}
+    return _known_names
+
+
+def is_known_name(chain: str) -> bool:
+    names = known_names()
+    return chain in names or re.split(r"::|\.|->", chain)[-1] in names
+
+
+def write_known_names(root) -> list:
+    """Writes tools/hook-names.json: the non-Stealth names called by the hooks of the series now (the C10 details).
+    Run once (G41); a new function is not added to it, it is named Stealth<What>."""
+    global _known_names
+    names = sorted({v.detail for v in _analyse(root)[1] if v.rule == "C10"})
+    KNOWN_NAMES_FILE.write_text(json.dumps(names, indent=1, ensure_ascii=False) + "\n", encoding="utf-8", newline="")
+    _known_names = None
+    return names
 
 
 def _strip_literals(code: str) -> str:
@@ -492,6 +529,31 @@ def _one_identifier_differs(removed: str, code: str):
     return (i, r[i], c[i], c) if IDENT.match(r[i]) and IDENT.match(c[i]) else None
 
 
+def _added_argument(removed: str, code: str):
+    """G9: the Stealth name if our line is Mozilla's with exactly one argument of ours, a Stealth call, added to one of
+    its calls (first, last or only argument), else None."""
+    want = _toks(removed)
+    if not want:
+        return None
+    for m in STEALTH_CALL.finditer(code):
+        o = m.end() - 1
+        c = _close_paren(code, o)
+        if c < 0 or has_logic(code[m.start():c + 1], "cpp"):
+            continue
+        before, after = code[:m.start()].rstrip(), code[c + 1:].lstrip()
+        options = []
+        if before.endswith(","):
+            options.append((before[:-1], after))              # ..., Stealth(...))
+        if after.startswith(","):
+            options.append((before, after[1:]))               # (Stealth(...), ...
+        if before.endswith("(") and after.startswith(")"):
+            options.append((before, after))                   # (Stealth(...))
+        for left, right in options:
+            if _toks(left + " " + right) == want:
+                return m.group(0)[:-1].rstrip()
+    return None
+
+
 def renamed_identifier(removed: str, code: str):
     """G1/G2: the new name if the only token difference between Mozilla's line and ours is one identifier extended by
     a suffix and it is a function or macro (a `(` follows it, or the suffix is `_Mozilla`/`_MOZILLA`), else None."""
@@ -537,7 +599,7 @@ def line_form(ft: str, base: str, code: str, removed: str, kind: str, placement:
         if removed and renamed_identifier(removed, code):
             return "wrap-function", code
         if pair and removed:
-            call = called_replacement(removed, code)
+            call = called_replacement(removed, code) or _added_argument(removed, code)
             if call:
                 return "wrap-call", call + "()"
             got = _mozilla_expression(removed, code)
@@ -738,7 +800,7 @@ def analyse_patch(folder: str, text: str):
                             violate("C5", path, section, run_text, "", run_hooks)
                         if form in ("guard", "notice", "anchor", "wrap-expression"):
                             cs = calls(remainder)
-                            if cs and not is_stealth_chain(cs[0]):
+                            if cs and not is_stealth_chain(cs[0]) and not is_known_name(cs[0]):
                                 violate("C10", path, section, run_text, cs[0], run_hooks)
                 add_text = "\n".join(x for _, x in nonblank)
                 if rem:

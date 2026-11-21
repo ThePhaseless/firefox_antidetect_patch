@@ -368,3 +368,86 @@ def test_a_multi_line_mozilla_expression_wrapped_stays_a_violation():
                                 "+  aData[i] = StealthBin(i, Convert(" + MARK, "+      mBuffer[i], -inf));", "   Done();", "   More();", "   Last();"])
     assert "C6" in rules(two) and "C1" in rules(two), rules(two)
     assert "wrap-expression" not in forms_of(two)
+
+
+# --------------------------------------------------------------------------- second pass: G9, `*` lines, G41, G2 marker, G7 names
+def test_g9_one_argument_of_ours_added_to_a_call_of_mozilla_is_a_call_wrap():
+    cases = {
+        "  rv = ResolveProxy(a, Nothing());": "  rv = ResolveProxy(a, Nothing(), StealthCtx(mLoadInfo));",
+        "  Foo(a, b);": "  Foo(StealthX(this), a, b);",
+        "  Foo(a, b);": "  Foo(a, StealthX(this), b);",
+        "  Foo();": "  Foo(StealthX(this));",
+        "      getter_AddRefs(proxyRequest));": "      getter_AddRefs(proxyRequest), mozilla::net::StealthCtx(mLoadInfo));",
+    }
+    for removed, added in cases.items():
+        text = rewrite(removed, added)
+        assert rules(text) == [] and forms_of(text) == ["wrap-call"], (added, rules(text), forms_of(text))
+    for removed, added in (("  Foo(a, b);", "  Foo(a, b, StealthX(this), StealthY(this));"),      # two arguments of ours
+                           ("  Foo(a, b);", "  Foo(a, b, c);"),                                   # the argument is not ours
+                           ("  Foo(a, b);", "  Foo(a, b, StealthX(this + 1));"),                  # logic in it
+                           ("  Foo(a, b);", "  Foo(a, c, StealthX(this));"),                      # Mozilla's argument changed
+                           ("  Foo(a, b);", "  Foo(a, b, StealthX(this)) + 1;")):
+        assert "C6" in rules(rewrite(removed, added)), added
+
+
+def test_a_line_starting_with_a_star_is_code_unless_it_continues_a_block_comment():
+    for code in ("  *aSurface = StealthProject(aSurface);", "  *sock = StealthWrap(sock);"):
+        assert rules(top(code + MARK)) == [], code
+        assert not hc.is_comment_line(code, "cpp")
+    red_green("C4", top("  * the reason", "  StealthNote(this, aArg);" + MARK), top("  StealthNote(this, aArg);" + MARK))
+    for comment in (" * text", " *", " */", "/* text */", "// text"):
+        assert hc.is_comment_line(comment, "cpp"), comment
+    # a rewrite of a dereferencing line is a wrap
+    text = rewrite("  *aSurface = snapshot;", "  *aSurface = StealthProject(this, snapshot);")
+    assert rules(text) == [] and forms_of(text) == ["wrap-expression"]
+
+
+def test_c10_only_a_new_function_must_be_stealth_named_g41(monkeypatch):
+    monkeypatch.setattr(hc, "_known_names", {"CSP_IsBypassedFor", "SessionSystemLocales"})
+    red_green("C10", top("  if (CSP_IsBypassedForNew(this)) return NS_OK;" + MARK), top("  if (CSP_IsBypassedFor(this)) return NS_OK;" + MARK))
+    assert rules(top("  if (nsContentUtils::SessionSystemLocales(this)) return NS_OK;" + MARK)) == []      # the last segment is known
+    assert rules(top("  SessionSystemLocales(this, aArg);" + MARK)) == []
+    assert "C10" in rules(top("  NoteIt(this, aArg);" + MARK))
+    assert rules(top("  StealthNote(this, aArg);" + MARK)) == []
+    monkeypatch.setattr(hc, "_known_names", set())
+    assert "C10" in rules(top("  SessionSystemLocales(this, aArg);" + MARK))
+
+
+def test_the_committed_names_of_existing_functions():
+    names = json.loads(hc.KNOWN_NAMES_FILE.read_text(encoding="utf-8"))
+    assert names == sorted(set(names)) and names, "tools/hook-names.json is sorted and not empty"
+    assert not any(hc.is_stealth_chain(n) for n in names)
+    assert "stealthApplyContext" in hc.known_names() and hc.is_known_name("obj->stealthApplyContext")
+    assert not hc.is_known_name("NotAnExistingFunction")
+
+
+def test_a_marker_block_comment_before_the_backslash_of_a_macro_line_is_the_marker_g2():
+    def macro(added):
+        return patch("dom/Foo.h", [" #define OTHER(f) \\", " ", "-#define FOR_EACH_X(f) \\", "+" + added, "   f(A) \\", "   f(B) \\",
+                                   "   f(C)"], section="")
+    good = macro("#define FOR_EACH_X_MOZILLA(f) /* STEALTH-HOOK(fingerprint/x) */ \\")
+    assert hc.marker_split("#define FOR_EACH_X_MOZILLA(f) /* STEALTH-HOOK(fingerprint/x) */ \\") == \
+        ("#define FOR_EACH_X_MOZILLA(f) \\", FOLDER, "")
+    assert rules(good) == [] and forms_of(good) == ["wrap-function"], (rules(good), forms_of(good))
+    assert "C3" in rules(macro("#define FOR_EACH_X_MOZILLA(f) /* because STEALTH-HOOK(fingerprint/x) */ \\"))
+    assert "C3" in rules(macro("#define FOR_EACH_X_MOZILLA(f) /* STEALTH-HOOK(fingerprint/x) because */ \\"))
+    assert "C2" in rules(macro("#define FOR_EACH_X_MOZILLA(f) \\"))
+
+
+def test_a_qualified_callee_is_stealth_named_in_every_form_g7():
+    for name in ("Class::StealthFn", "ns::Class::StealthFn", "mozilla::net::nr_stealth_fn", "obj->StealthFn"):
+        assert hc.is_stealth_chain(name), name
+    q = "mozilla::dom::Cls::StealthFn"
+    guard = top("  if (%s(this, aArg)) return NS_OK;" % q + MARK)
+    notice = top("  %s(this, aArg);" % q + MARK)
+    mid = patch("dom/Foo.cpp", ["   // lead", " " + FN, "   int x = 1;", "+  %s(this, &x);" % q + MARK, "   DoIt(x);", "   DoIt(x);",
+                                "   return NS_OK;", " }"])
+    expr = rewrite("  x = aArg;", "  x = %s(this, aArg);" % q)
+    sub = rewrite("  NS_SUCCEEDED(ResolveProxy())) {", "  NS_SUCCEEDED(%s(this, ResolveProxy()))) {" % q)
+    call = rewrite("  rv = Foo(a);", "  rv = Cls::StealthFoo(a);")
+    arg = rewrite("  rv = Foo(a);", "  rv = Foo(a, %s(this));" % q)
+    shadow = top("  const auto GetX = %s;" % q + MARK)
+    decl = patch("dom/Foo.cpp", [" #include \"a.h\"", " ", " namespace mozilla {", "+bool %s(int aArg);" % q + MARK, " ", " class Y {", " };", " int z;"], section="")
+    for text, form in ((guard, "guard"), (notice, "notice"), (mid, "anchor"), (expr, "wrap-expression"), (sub, "wrap-expression"),
+                       (call, "wrap-call"), (arg, "wrap-call"), (shadow, "shadow"), (decl, "registration")):
+        assert rules(text) == [] and forms_of(text) == [form], (form, rules(text), forms_of(text))

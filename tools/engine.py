@@ -46,7 +46,8 @@ hooks list (tools/hooks_list.py): each non-backport folder has a HOOKS.json gene
          fails when it differs from the generation (a hook missing or extra, a field changed) and when an entry's
          `test` names a test that does not exist; a hook with no test (rule T1), an anchor without its anchor
          and why (T2) or a test no round runs (T3) is debt in tools/hook-debt.json. A hook with `exception` and
-         `pm: "approvato"` in its entry is a declared exception (G35): left out of the contract, counted by `check`.
+         `pm: "approvato"` in its entry is a declared exception (G35): left out of the contract, counted by `check`; one with
+         `untestable` and that `pm` has no T1 and is counted too.
 
 check    needs no Firefox: SERIES lists exactly the folders that exist, every folder has
          its MANIFEST and FEATURE.md, every file of ours is listed and present, each
@@ -1142,6 +1143,11 @@ def declared_exceptions() -> int:
     return len(hooks_list.declared_exceptions(ROOT)) if (ROOT / "SERIES").is_file() else 0
 
 
+def untestable_hooks() -> int:
+    """How many hooks the pm declared untestable (`untestable` and `pm: "approvato"` in their HOOKS.json entry)."""
+    return len(hooks_list.untestable_hooks(ROOT)) if (ROOT / "SERIES").is_file() else 0
+
+
 def check(source: Path | None = None, tag: str | None = None, against_main: bool = False) -> int:
     found = problems()
     if against_main:      # the CLI does; it needs git and origin/main, problems() and the tests' fakes do not
@@ -1162,6 +1168,7 @@ def check(source: Path | None = None, tag: str | None = None, against_main: bool
         print("hook contract: %d hooks, %d violations, all in tools/hook-debt.json"
               % (n_hooks, n_violations))
         print("declared exceptions: %d" % declared_exceptions())
+        print("untestable hooks: %d" % untestable_hooks())
     return 1 if found else 0
 
 
