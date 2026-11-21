@@ -235,7 +235,7 @@
  "netwerk/base/nsProxyInfo.cpp": 5,
  "netwerk/base/nsProxyInfo.h": 1,
  "netwerk/base/nsSocketTransport2.cpp": 2,
- "netwerk/base/nsUDPSocket.cpp": 18,
+ "netwerk/base/nsUDPSocket.cpp": 17,
  "netwerk/base/nsUDPSocket.h": 1,
  "netwerk/dns/TRR.cpp": 4,
  "netwerk/dns/moz.build": 1,

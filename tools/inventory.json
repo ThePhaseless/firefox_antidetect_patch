@@ -3854,18 +3854,18 @@
   "category": "other",
   "feature": "proxy-udp-egress",
   "prefs": [],
-  "added": 18,
+  "added": 17,
   "removed": 0,
-  "hunks": 4,
+  "hunks": 5,
   "inline_logic_lines": 7,
   "hookable": "movable",
-  "anchor": "includes; nsUDPSocket::InitWithAddress after PR_OpenUDPSocket; nsUDPSocket::SetSocksProxy",
+  "anchor": "includes; nsUDPSocket::InitWithAddress after PR_OpenUDPSocket and after PR_Bind; nsUDPSocket::SetSocksProxy",
   "evidence": [
    "+#include \"StealthPcUdpProxy.h\"  // STEALTH-HOOK(network/proxy-udp)",
    "+#include \"nsIProxyInfo.h\"  // STEALTH-HOOK(network/proxy-udp)",
    "+#include \"nsSOCKSUDPIOLayer.h\"  // STEALTH-HOOK(network/proxy-udp)"
   ],
-  "notes": "Puts the SOCKS5 UDP layer of the connection's proxy on the socket when it opens it (StealthPutSocksUdpLayer), the same layer and associations as the ICE sockets. Also GetFileDescriptor: a socket with the SOCKS UDP layer gives no OS handle (-1), so nothing writes on it direct.",
+  "notes": "Puts the SOCKS5 UDP layer of the connection's proxy on the socket when it opens it (StealthPutSocksUdpLayer), the same layer and associations as the ICE sockets; the socket takes its association only after its PR_Bind worked (nsSOCKSUDPIOLayerSocketBorn). Also GetFileDescriptor: a socket with the SOCKS UDP layer gives no OS handle (-1), so nothing writes on it direct.",
   "verifier": {
    "changed": [],
    "why": "Written from the diff against the tag."
