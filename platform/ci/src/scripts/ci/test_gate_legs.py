@@ -86,7 +86,14 @@ def cases() -> list:
     verdict = names.index(VERDICT_STEP) if VERDICT_STEP in names else -1
     keep = names.index(KEEP_STEP) if KEEP_STEP in names else -1
     add("gate legs: the control runs after the verdict and before the result is kept", verdict >= 0 and keep >= 0 and bool(ctl) and all(verdict < i < keep for i in ctl))
-    add("gate legs: the control writes under result/, which is kept", bool(run) and all("result/fakeweb-" in r for r in run))
+    # The fake web's reports go to fakeweb/ and an artifact of their own: result/ is what the completeness judge reads, and it takes every JSON
+    # file there for a verdict (candidate 44865995733 was red on the three reports alone).
+    add("gate legs: the control writes under fakeweb/, never under result/",
+        bool(run) and all("fakeweb/fakeweb-" in r and "result/fakeweb" not in r for r in run))
+    kept = [s for s in steps if (s.get("with") or {}).get("path") == "fakeweb"]
+    add("gate legs: what the fake web wrote is kept in an artifact of its own, only for the fake web's suite",
+        len(kept) == 1 and "matrix.suite == 'wrapper.e2e.fakeweb'" in kept[0].get("if", "") and "always()" in kept[0].get("if", "")
+        and not str(kept[0]["with"].get("name", "")).startswith("result-"))
     add("gate legs: the control steps set the environment of the suite step",
         bool(run) and all("INVISIBLE_CORE_AUTOFIX=off INVISIBLE_CORE_PIN=allow" in r and 'INVISIBLE_SEAL_FILE="$PWD/gate.seal.json"' in r
                           and 'INVPW_BINARY_PATH="$FF_EXE"' in r and 'STEALTHFOX_E2E_BINARY="$FF_EXE"' in r for r in run))
