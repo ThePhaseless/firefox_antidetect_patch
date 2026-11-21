@@ -46,24 +46,30 @@ GREEN_FILTER = ("StealthGfxFeatureStatus.*:StealthWebGPUAdapter.*:StealthWebGPUD
                 "StealthNrSocketBirth.*:StealthPcUdpProxyKinds.*:StealthTcpProxyRoad.*:StealthPcProxyConfig.*:"
                         "StealthInputEventBirth.*:StealthKeyBirthScope.*:StealthBirthOrder.*:StealthFcBundleFonts.*")
 GTEST_JOBS = ("gtest-linux", "gtest-cross")
+COMPILE_ONLY_IF = "needs.plan.outputs.stop_after != 'objects'"
+# The steps of a build leg that come after the objects, and are for the browser's build and its package: a compile-only run (stop_after=objects) runs none.
+AFTER_THE_OBJECTS = ("Build", "WebGPU's Vulkan driver (linux-x86_64) - done", "Package + validate", "Upload build artifact", "Build configuration",
+                     "Upload build configuration", "Crash symbols (never shipped)", "The crash symbols describe the shipped binaries",
+                     "Upload crash symbols")
+OBJECTS_STEP = "Our objects first - every directory the series touches, compile only"
 # configure's files, for which options exist; the ones the tree has at the plan's stage too.
 CONFIGURE_FILES = ("moz.configure", "toolkit/moz.configure", "js/moz.configure", "browser/moz.configure", "build/moz.configure/*.configure")
 
 
-def context(gtests="true", attempt="1", gtest_filter=GREEN_FILTER, environment="self-hosted", node=True, leg="linux-x86_64"):
+def context(gtests="true", attempt="1", gtest_filter=GREEN_FILTER, environment="self-hosted", node=True, leg="linux-x86_64", stop_after=""):
     # The gtests and the filter come from the plan's outputs (an automatic run has no
     # inputs); `inputs` stays for what only a run by hand carries.
     return {"github": {"event": {"inputs": {"gtests": gtests, "gtest_filter": gtest_filter}}, "run_attempt": attempt, "run_id": "7"},
             "inputs": {"gtest_filter": gtest_filter}, "runner": {"environment": environment, "os": "Linux", "arch": "X64"},
-            "needs": {"plan": {"outputs": {"gtests": gtests, "gtest_filter": gtest_filter}}},
+            "needs": {"plan": {"outputs": {"gtests": gtests, "gtest_filter": gtest_filter, "stop_after": stop_after}}},
             "matrix": {"leg": leg, "node": node}}
 
 
-def outcome(jobs, forced, gtests="true", kind="release", cancelled=False, attempt="1", plan_attempt="1"):
+def outcome(jobs, forced, gtests="true", kind="release", cancelled=False, attempt="1", plan_attempt="1", stop_after=""):
     outputs = {"plan": {"kind": kind, "attempt": plan_attempt, "node_label": "latitude-7-%s" % plan_attempt,
-                        "gtests": gtests, "gtest_filter": GREEN_FILTER}}
+                        "gtests": gtests, "gtest_filter": GREEN_FILTER, "stop_after": stop_after}}
     base = {"plan": "success", "node": "success", "build": "success"}
-    return e.jobs_after(jobs, dict(base, **forced), context(gtests, attempt), outputs, cancelled)
+    return e.jobs_after(jobs, dict(base, **forced), context(gtests, attempt, stop_after=stop_after), outputs, cancelled)
 
 
 def group_expressions() -> list:
@@ -109,8 +115,10 @@ def group_gate(doc) -> list:
     red_gate_green_gtests = outcome(jobs, {"gate": "failure"})
     out.append(("gate: a red gate leaves the gtests as they are (two verdicts: the run is red if either is)",
                 red_gate_green_gtests["gtest-linux"] == "success" and red_gate_green_gtests["gtest-cross"] == "success"))
-    out.append(("gate: neither has an `if` that would run it past what it needs",
-                "if" not in jobs["gate"] and not e.STATUS.search(str(jobs["publish"].get("if", "")))))
+    out.append(("gate: neither has an `if` that would run it past what it needs (no status function; the gate's only condition is a compile-only run's)",
+                jobs["gate"].get("if") in (None, COMPILE_ONLY_IF) and not e.STATUS.search(str(jobs["gate"].get("if", "")))
+                and not e.STATUS.search(str(jobs["publish"].get("if", "")))))
+    out += group_compile_only(doc)
     candidate = outcome(jobs, {}, kind="candidate")
     out.append(("gate: a candidate gates and publishes nothing", candidate["gate"] == "success" and candidate["publish"] == "skipped"))
     return out
@@ -141,6 +149,51 @@ if env.get("FAKE_CRASH") and suite.startswith(env["FAKE_CRASH"]):
 sys.exit(3 if env.get("FAKE_FAIL") and suite.startswith(env["FAKE_FAIL"]) else 0)
 """ % str(record), encoding="utf-8", newline="\n")
     path.chmod(path.stat().st_mode | stat.S_IEXEC)
+
+
+def group_compile_only(doc) -> list:
+    """stop_after=objects: the leg compiles the touched directories' objects and stops; the gate and the publish do not run; a whole run is unchanged."""
+    jobs = doc["jobs"]
+    steps = {st.get("name"): st for st in jobs["build"]["steps"]}
+    order = [st.get("name") for st in jobs["build"]["steps"]]
+    out = []
+    objects = outcome(jobs, {}, gtests="false", kind="candidate", stop_after="objects")
+    out.append(("compile-only: the gate and the publish are skipped, the gtest jobs are green with no step run",
+                objects["gate"] == "skipped" and objects["publish"] == "skipped"
+                and all(objects[j] == "success" for j in GTEST_JOBS)))
+    whole = outcome(jobs, {}, gtests="false", kind="candidate")
+    out.append(("compile-only: a run that does not stop gates as before", whole["gate"] == "success"))
+    on = context("false", stop_after="objects")
+    off = context("false")
+    out.append(("compile-only: the objects step runs on the node, in a compile-only run and in a whole one",
+                OBJECTS_STEP in steps and e.step_runs(steps[OBJECTS_STEP], on) and e.step_runs(steps[OBJECTS_STEP], off)
+                and not e.step_runs(steps[OBJECTS_STEP], context("false", environment="github-hosted"))))
+    out.append(("compile-only: it comes before the browser's build and nothing in the leg compiles before it",
+                OBJECTS_STEP in order and order.index(OBJECTS_STEP) < order.index("Build")
+                and order.index("The CI's .mozconfig, in layers") < order.index(OBJECTS_STEP)))
+    out.append(("compile-only: every step of the browser's build and package is off with stop_after=objects, and on without it",
+                all(n in steps and not e.step_runs(steps[n], on) for n in AFTER_THE_OBJECTS)
+                and all(e.step_runs(steps[n], context("false", leg="linux-x86_64")) for n in ("Build", "Package + validate", "Upload build artifact"))))
+    out.append(("compile-only: the objects step runs `scripts/ci objects` and keeps no `continue-on-error`",
+                "scripts/ci objects" in steps[OBJECTS_STEP]["run"] and "continue-on-error" not in steps[OBJECTS_STEP]))
+    out.append(("compile-only: the compile cache is saved after the objects step even when the build never ran",
+                "steps.objects.outcome == 'success'" in steps["Compile cache - save this leg's"]["if"]
+                and "steps.objects.outcome == 'failure'" in steps["Compile cache - save this leg's"]["if"]))
+    plan_run = next(st["run"] for st in jobs["plan"]["steps"] if st.get("id") == "plan")
+    plan_env = next(st["env"] for st in jobs["plan"]["steps"] if st.get("id") == "plan")
+    out.append(("compile-only: the input reaches the plan, and the plan's output reaches the re-launch of a lost machine",
+                plan_env.get("STOP_AFTER") == "${{ inputs.stop_after }}" and '--stop-after "$STOP_AFTER"' in plan_run
+                and jobs["plan"]["outputs"].get("stop_after") == "${{ steps.plan.outputs.stop_after }}"
+                and all(next(st for st in jobs[w]["steps"] if st.get("id") == "watch")["env"].get("STOP_AFTER") == "${{ needs.plan.outputs.stop_after }}"
+                        for w in ("watch-1", "watch-2"))))
+    inputs = doc[True]["workflow_dispatch"]["inputs"]
+    out.append(("compile-only: stop_after is an input, empty by default",
+                inputs["stop_after"]["default"] == "" and inputs["stop_after"]["type"] == "string"))
+    texts = [st for st in jobs["checks"]["steps"] if "stealth_check_sources.py" in st.get("run", "")]
+    out.append(("checks: build/stealth_check_sources.py and build/stealth_check_build_files.py run on the materialized tree, before the node is rented",
+                len(texts) == 1 and "build/stealth_check_build_files.py" in texts[0]["run"] and "continue-on-error" not in texts[0]
+                and "node" not in jobs["checks"].get("needs", []) and "checks" in jobs["node"]["needs"]))
+    return out
 
 
 def group_gtest(doc) -> list:

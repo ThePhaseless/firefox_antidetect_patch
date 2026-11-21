@@ -45,7 +45,13 @@ SUITE = re.compile(r"(\S+)\.(  # .*)?")
 # on one platform whose cause the sources do not say.
 LOGGED = {"StealthSessionUdpProxy": "sync,SOCKS-UDP:5,nsHostResolver:5"}
 # Named by the default filter and compiled for one platform only, from run 41402916724's logs.
-NOT_ON = {"linux": {"StealthWebGPUAdapter", "StealthWebGPUInstanceEnv"}, "win": {"StealthWebGPUBundledVulkan", "StealthFcBundleFonts"}}
+# From the moz.build of each gtest directory: the font-list suites of Windows (TestStealthBundledCollection.cpp, TestStealthTextQuality.cpp, the
+# DirectWrite ones) and the untrusted-modules one (toolkit/xre/dllservices, Windows only) are not built on Linux; fontconfig's are GTK's.
+WINDOWS_ONLY = {"StealthBundledCollection", "StealthBundledFamilyFilter", "StealthFallbackNames", "StealthFontList", "StealthTtcFace",
+                "StealthTextQuality", "StealthOwnBinaries"}
+LINUX_ONLY = {"StealthFcFontList", "StealthFontMetrics"}
+NOT_ON = {"linux": {"StealthWebGPUAdapter", "StealthWebGPUInstanceEnv"} | WINDOWS_ONLY,
+          "win": {"StealthWebGPUBundledVulkan", "StealthFcBundleFonts"} | LINUX_ONLY}
 
 
 def suite_names(listing: str) -> list:
