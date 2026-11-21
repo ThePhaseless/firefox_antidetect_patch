@@ -34,3 +34,31 @@ index 9ebeb94673c98bde3238c03208d6fa9408c21452..1768d2e8a353df6fdeffc692146cbb15
    // If the list is empty, then we don't actually want to call
    // GetFeatureStatusImpl since we will use the static list instead. In that
    // case, all we want to do is make sure the pref is removed.
+diff --git a/widget/gtk/GfxInfo.cpp b/widget/gtk/GfxInfo.cpp
+index cac1557e2f595204473e75e8977055e6a121a810..6d1068386ec936f7a2d6e66431f899d5f3a111a4 100644
+--- a/widget/gtk/GfxInfo.cpp
++++ b/widget/gtk/GfxInfo.cpp
+@@ -17,6 +17,7 @@
+ #include <string>
+ 
+ #include "MediaCodecsSupport.h"
++#include "StealthGfxFeatureStatus.h"  // STEALTH-HOOK(platform/declaration-gate)
+ #include "WidgetUtilsGtk.h"
+ #include "mozilla/GUniquePtr.h"
+ #include "mozilla/SSE.h"
+@@ -252,6 +253,7 @@ void GfxInfo::GetData() {
+   GfxInfo::FireGLXTestProcess();
+ 
+   GfxInfoBase::GetData();
++  if (gfx::StealthFillGtkGfxInfoWithoutHost(mTestType, mGlxTestError, mAdapterRAM, mIsWayland, mIsXWayland)) return;  // STEALTH-HOOK(platform/declaration-gate)
+ 
+   char* glxData = nullptr;
+   auto free = mozilla::MakeScopeExit([&] { g_free((void*)glxData); });
+@@ -695,6 +697,7 @@ int GfxInfo::FireTestProcess(const nsAString& aBinaryFile, int* aOutPipe,
+ }
+ 
+ bool GfxInfo::FireGLXTestProcess() {
++  if (gfx::StealthNoHostGLProbe()) return false;  // STEALTH-HOOK(platform/declaration-gate)
+   if (sGLXTestPID != 0) {
+     return true;
+   }

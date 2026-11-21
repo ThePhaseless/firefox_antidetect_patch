@@ -44,12 +44,12 @@ bool StealthParseGfxFeatureStatus(const nsACString& aDeclaration,
 
 // The answer for one feature from a parsed table. On builds where the only
 // WebGL path is native GL (GTK), WEBGL_OPENGL answers the declared WEBGL
-// entry when the host's GL probe succeeded (aGLProbeSucceeded), because on
-// Windows that path is ANGLE and WEBGL_OPENGL gates a path retail never
-// takes. False for an id outside the live set.
+// entry, because on Windows that path is ANGLE and WEBGL_OPENGL gates a path
+// retail never takes. Nothing about the host is probed (see
+// StealthNoHostGLProbe). False for an id outside the live set.
 bool StealthAnswerGfxFeature(const StealthGfxFeatureTable& aTable,
-                             int32_t aFeature, bool aGLProbeSucceeded,
-                             nsACString& aFailureId, int32_t* aStatus);
+                             int32_t aFeature, nsACString& aFailureId,
+                             int32_t* aStatus);
 
 // The hook in GfxInfoBase::GetFeatureStatus. False when the engine is off
 // (stock Firefox) or the id is outside the live set: Mozilla's path runs.
@@ -66,6 +66,28 @@ bool StealthGfxDeclarationActive();
 // The suggested driver version (about:support): empty while declared. True
 // when it answered.
 bool StealthGfxSuggestedDriverVersion(nsAString& aVersion);
+
+#ifdef MOZ_WIDGET_GTK
+// Linux: glxtest, the child that dlopens the HOST's libEGL, libGL, libpci and
+// libdrm to read its adapter, is removed from our build, not switched off by a
+// pref. Our own GL (llvmpipe behind EGL, in the package) is the only GL, so a
+// host probe has no use, and what it reported (adapter, driver, DRM device,
+// PCI ids, uname) is host data no page may see; its 4 s timeout or a failure
+// used to disable WebGL for the whole session. Always true; a function so the
+// intent lives here and GfxInfo::FireGLXTestProcess, which also covers the
+// early fire in nsAppRunner (before the prefs are read), carries one line.
+bool StealthNoHostGLProbe();
+
+// What GfxInfo::GetData fills in without glxtest: the test type is EGL (our
+// own GL; keeps gfxPlatformGtk's X11_EGL decision on the declared status), no
+// glxtest error, no adapter RAM, and the two display-protocol flags from the
+// display connection. Every adapter, driver, DRM and PCI field stays empty.
+// Always true: the caller returns.
+bool StealthFillGtkGfxInfoWithoutHost(nsACString& aTestType,
+                                      bool& aGlxTestError,
+                                      uint32_t& aAdapterRAM, bool& aIsWayland,
+                                      bool& aIsXWayland);
+#endif
 
 // Tests only: forget the parsed declaration so the next call parses again.
 void StealthResetGfxFeatureStatusForTesting();
