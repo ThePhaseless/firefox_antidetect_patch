@@ -70,7 +70,8 @@ test('Init() carries the hook: an include and a call with an early return, marke
     '  if (StealthSelectGeolocationProvider(mProvider)) {\n' +
     '    return NS_OK;\n' +
     '  }\n'));
-  const hookLines = service.split('\n').filter(l => l.includes('STEALTH-HOOK'));
+  // Only this folder's hooks: another feature folder may tag its own line in the same file.
+  const hookLines = service.split('\n').filter(l => l.includes(`STEALTH-HOOK(${FOLDER})`));
   assert.equal(hookLines.length, 2);
   const added = ['#include "mozilla/StealthGeolocation.h"', 'StealthSelectGeolocationProvider', 'return NS_OK;'];
   assert.ok(added.length <= 5);
