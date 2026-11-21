@@ -40,11 +40,16 @@ import linker_shim  # noqa: E402
 ROOT = HERE.parent.parent
 WORKFLOW = ROOT / ".github" / "workflows" / "release.yml"
 # The filter of run 41402916724, from its log, with the suites added to the default since (StealthSessionUdpProxy, StealthDeclaredNetwork, StealthSocksUdpPool, TestStealthTRRContext, TestStealthSocksCredentials, TestStealthSessionResolver, StealthIceResolverContext, StealthUdpProxyBirth).
-GREEN_FILTER = ("StealthGfxFeatureStatus.*:StealthWebGPUAdapter.*:StealthWebGPUDeclaration.*:StealthWebGPUBundledVulkan.*:"
-                "StealthWebGPUInstanceEnv.*:StealthFullscreen.*:StealthScaleDeclaration.*:StealthWindowGeometry.*:StealthGLMultisample.*:"
-                "StealthFrameCrash.*:StealthJugglerEventId.*:StealthSessionUdpProxy.*:StealthDeclaredNetwork.*:StealthSocksUdpPool.*:TestStealthTRRContext.*:TestStealthSocksCredentials.*:TestStealthSessionResolver.*:StealthIceResolverContext.*:StealthUdpProxyBirth.*:"
-                "StealthNrSocketBirth.*:StealthPcUdpProxyKinds.*:StealthTcpProxyRoad.*:StealthPcProxyConfig.*:"
-                        "StealthInputEventBirth.*:StealthKeyBirthScope.*:StealthBirthOrder.*:StealthFcBundleFonts.*")
+GREEN_FILTER = ("StealthGfxFeatureStatus.*:StealthWebGPUAdapter.*:StealthWebGPUDeclaration.*:StealthWebGPUBundledVulkan.*:Steal"
+                "thWebGPUInstanceEnv.*:StealthFullscreen.*:StealthScaleDeclaration.*:StealthWindowGeometry.*:StealthGLMultisamp"
+                "le.*:StealthFrameCrash.*:StealthJugglerEventId.*:StealthSessionUdpProxy.*:StealthDeclaredNetwork.*:StealthSock"
+                "sUdpPool.*:TestStealthTRRContext.*:TestStealthSocksCredentials.*:TestStealthSessionResolver.*:StealthIceResolv"
+                "erContext.*:StealthUdpProxyBirth.*:StealthNrSocketBirth.*:StealthPcUdpProxyKinds.*:StealthTcpProxyRoad.*:Steal"
+                "thPcProxyConfig.*:StealthInputEventBirth.*:StealthKeyBirthScope.*:StealthBirthOrder.*:StealthFcBundleFonts.*:S"
+                "tealthAudioNoise.*:StealthBundledCollection.*:StealthBundledFamilyFilter.*:StealthCanvasProjection.*:StealthDo"
+                "cumentLanguage.*:StealthFallbackNames.*:StealthFcFontList.*:StealthFontList.*:StealthFontMetrics.*:StealthMedi"
+                "aDeclaration.*:StealthOwnBinaries.*:StealthQuotaEstimate.*:StealthTextQuality.*:StealthTtcFace.*:StealthWebGPU"
+                "ExternalTexture.*:Intl_Locale_StealthSystemLocales.*:Idwr.*:StartupCache.WritesNeverLowerIOPriority")
 GTEST_JOBS = ("gtest-linux", "gtest-cross")
 COMPILE_ONLY_IF = "needs.plan.outputs.stop_after != 'objects'"
 # The steps of a build leg that come after the objects, and are for the browser's build and its package: a compile-only run (stop_after=objects) runs none.
