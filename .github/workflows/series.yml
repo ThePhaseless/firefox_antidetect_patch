@@ -21,6 +21,9 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install pytest pyyaml
+      # The budget rule compares with main's budgets: origin/main must exist on pull requests too.
+      - name: Main's budgets
+        run: git fetch --no-tags --depth=1 origin +refs/heads/main:refs/remotes/origin/main
       - name: The repo's tests
         run: python -m pytest -q tools/tests
       - name: The series' rules (folders, manifests, hook budgets, workflow copies)

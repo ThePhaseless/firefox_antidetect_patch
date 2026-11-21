@@ -1035,8 +1035,57 @@ def problems() -> list:
     return found
 
 
-def check(source: Path | None = None, tag: str | None = None) -> int:
+MAIN_REF = "refs/remotes/origin/main"
+
+
+def main_budget_text(name: str) -> str | None:
+    """tools/<name> as origin/main has it, never from the branch; None if main does not resolve."""
+    done = subprocess.run(["git", "-C", str(ROOT), "show", "origin/main:tools/" + name],
+                          capture_output=True)
+    return done.stdout.decode("utf-8") if done.returncode == 0 else None
+
+
+def load_main_budgets() -> tuple[dict, dict]:
+    """Main's hook and removed budgets. Fetches origin/main once if it is not there yet."""
+    texts = [main_budget_text("hook-budget.json"), main_budget_text("removed-budget.json")]
+    if None in texts:
+        subprocess.run(["git", "-C", str(ROOT), "fetch", "--no-tags", "--depth=1", "origin",
+                        "+refs/heads/main:" + MAIN_REF], capture_output=True)
+        texts = [main_budget_text("hook-budget.json"), main_budget_text("removed-budget.json")]
+    if None in texts:
+        raise SystemExit("cannot read main's budgets: fetch origin main")
+    return json.loads(texts[0]), json.loads(texts[1])
+
+
+def budget_raise_problems(hook: dict, removed: dict, main_hook: dict, main_removed: dict) -> list:
+    """Budgets only go down: a value above main's, or a new file's hook above 5 lines, is a failure."""
+    found = []
+    for path, n in sorted(hook.items()):
+        if path in main_hook:
+            if n > main_hook[path]:
+                found.append("%s: hook budget %d is above main's %d: budgets only go down, move the "
+                             "logic into our files" % (path, n, main_hook[path]))
+        elif n > 5:
+            found.append("%s: hook budget %d for a file new to the series: a new hook is at most 5 "
+                         "lines" % (path, n))
+    for path, n in sorted(removed.items()):
+        if path in main_hook:
+            was = main_removed.get(path, 0)
+            if n > was:
+                found.append("%s: removed budget %d is above main's %d: budgets only go down, leave "
+                             "Mozilla's lines as they are" % (path, n, was))
+        elif n > 5:
+            found.append("%s: removed budget %d for a file new to the series: at most 5 of Mozilla's "
+                         "lines, leave the rest as they are" % (path, n))
+    return found
+
+
+def check(source: Path | None = None, tag: str | None = None, against_main: bool = False) -> int:
     found = problems()
+    if against_main:      # the CLI does; it needs git and origin/main, problems() and the tests' fakes do not
+        found += budget_raise_problems(json.loads(BUDGET.read_text(encoding="utf-8")),
+                                       json.loads(REMOVED_BUDGET.read_text(encoding="utf-8")),
+                                       *load_main_budgets())
     if source is not None and tag:
         found += backport_in_tag_problems(source, tag)
     for p in found:
@@ -1113,7 +1162,7 @@ def main() -> int:
         apply(a.source, base, head, a.force)
         return 0
     if a.command == "check":
-        return check(a.source, a.against) if a.against else check()
+        return check(a.source, a.against or None, against_main=True)
     if a.command == "shrink-budget":
         shrink_budget()
         return 0
