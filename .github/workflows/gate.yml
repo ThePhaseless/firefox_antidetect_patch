@@ -670,29 +670,31 @@ jobs:
       # first and ours second, one browser at a time, and the verdict is "the same outcome as stock", never a time. A stock Firefox that is not what the
       # fake web declares is a BROKEN CONTROL: red as such, not a finding about ours. They come after the verdict so that its file is always written first,
       # and they run even when the suite was red, so that one run shows both. A red step here is a red leg (the exit code), as in fakeweb.yml.
+      # What the fake web writes goes to fakeweb/, never to result/: result/ is the verdict of the suite, and the completeness judge reads
+      # every JSON file in it as one. The reports and traces are kept in an artifact of their own below.
       - name: Fake web profile P2, stock first and ours second, on a reused routed page
         if: always() && matrix.suite == 'wrapper.e2e.fakeweb'
         shell: bash
         run: |
           export INVISIBLE_CORE_AUTOFIX=off INVISIBLE_CORE_PIN=allow
           export INVISIBLE_SEAL_FILE="$PWD/gate.seal.json" INVPW_BINARY_PATH="$FF_EXE" STEALTHFOX_E2E_BINARY="$FF_EXE"
-          mkdir -p result
+          mkdir -p fakeweb
           PREFIX=""; [ "$RUNNER_OS" = Linux ] && PREFIX="xvfb-run -a"
-          $PREFIX python -u scripts/run_fakeweb.py --profile p2 --binary "$FF_EXE" --repetitions 10 --out result/fakeweb-p2.json
+          $PREFIX python -u scripts/run_fakeweb.py --profile p2 --binary "$FF_EXE" --repetitions 10 --out fakeweb/fakeweb-p2.json
       - name: Fake web profile P4, stock first and ours second, three walks of the journey
         if: always() && matrix.suite == 'wrapper.e2e.fakeweb'
         shell: bash
         run: |
           export INVISIBLE_CORE_AUTOFIX=off INVISIBLE_CORE_PIN=allow
           export INVISIBLE_SEAL_FILE="$PWD/gate.seal.json" INVPW_BINARY_PATH="$FF_EXE" STEALTHFOX_E2E_BINARY="$FF_EXE"
-          mkdir -p result
+          mkdir -p fakeweb
           PREFIX=""; [ "$RUNNER_OS" = Linux ] && PREFIX="xvfb-run -a"
           set +e
-          $PREFIX python -u scripts/run_fakeweb.py --profile p4 --binary "$FF_EXE" --repetitions 3 --out result/fakeweb-p4.json 2>&1 | tee result/fakeweb-p4.log
-          python scripts/fakeweb_p4_report.py journey result/fakeweb-p4.json > result/fakeweb-p4-summary.md
+          $PREFIX python -u scripts/run_fakeweb.py --profile p4 --binary "$FF_EXE" --repetitions 3 --out fakeweb/fakeweb-p4.json 2>&1 | tee fakeweb/fakeweb-p4.log
+          python scripts/fakeweb_p4_report.py journey fakeweb/fakeweb-p4.json > fakeweb/fakeweb-p4-summary.md
           rc=$?
-          cat result/fakeweb-p4-summary.md >> "$GITHUB_STEP_SUMMARY"
-          cat result/fakeweb-p4-summary.md
+          cat fakeweb/fakeweb-p4-summary.md >> "$GITHUB_STEP_SUMMARY"
+          cat fakeweb/fakeweb-p4-summary.md
           case "$rc" in
             0) echo "journey: green, ours equals stock on every step";;
             1) echo "journey: RED, ours differs from stock on a step of a walk whose control is sound";;
@@ -708,14 +710,14 @@ jobs:
         run: |
           export INVISIBLE_CORE_AUTOFIX=off INVISIBLE_CORE_PIN=allow
           export INVISIBLE_SEAL_FILE="$PWD/gate.seal.json" INVPW_BINARY_PATH="$FF_EXE" STEALTHFOX_E2E_BINARY="$FF_EXE"
-          mkdir -p result
+          mkdir -p fakeweb
           PREFIX=""; [ "$RUNNER_OS" = Linux ] && PREFIX="xvfb-run -a"
           set +e
-          $PREFIX python -u scripts/run_fakeweb.py --profile p4 --binary "$FF_EXE" --repetitions 1 --trace --out result/fakeweb-p4-trace.json 2>&1 | tee result/fakeweb-p4-trace.log
-          python scripts/fakeweb_p4_report.py trace result/fakeweb-p4-trace.json > result/fakeweb-p4-trace-summary.md
+          $PREFIX python -u scripts/run_fakeweb.py --profile p4 --binary "$FF_EXE" --repetitions 1 --trace --out fakeweb/fakeweb-p4-trace.json 2>&1 | tee fakeweb/fakeweb-p4-trace.log
+          python scripts/fakeweb_p4_report.py trace fakeweb/fakeweb-p4-trace.json > fakeweb/fakeweb-p4-trace-summary.md
           rc=$?
-          cat result/fakeweb-p4-trace-summary.md >> "$GITHUB_STEP_SUMMARY"
-          cat result/fakeweb-p4-trace-summary.md
+          cat fakeweb/fakeweb-p4-trace-summary.md >> "$GITHUB_STEP_SUMMARY"
+          cat fakeweb/fakeweb-p4-trace-summary.md
           case "$rc" in
             0) echo "request types: green, ours does what stock does";;
             1) echo "request types: RED, ours differs from stock, see the summary";;
@@ -723,6 +725,14 @@ jobs:
             *) echo "request types: RED ($rc), see the summary";;
           esac
           exit "$rc"
+      - name: Keep what the fake web wrote
+        if: always() && matrix.suite == 'wrapper.e2e.fakeweb'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: fakeweb-${{ matrix.os }}
+          path: fakeweb
+          if-no-files-found: ignore
+          retention-days: 14
       - name: Keep the result
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
