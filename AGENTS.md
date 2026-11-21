@@ -111,13 +111,13 @@ Per un gancio a metà funzione si prende la forma più portabile che dà lo stes
 | Valore dichiarato | la riga che dà il default | il valore sulla riga di Mozilla (pref dichiarate una volta sola; 1 riga riscritta) |
 | Registrazione | include, build, file dichiarativi | `#include "StealthX.h"` in un blocco nostro dopo quelli di Mozilla, separato da una riga vuota; nei `moz.build` dopo la `]` di chiusura (`VAR += ["StealthX.cpp"]`); una riga in `.ipdl`, `.webidl`, `components.conf`, `jar.mn` |
 | Membro | dichiarazione in una classe di Mozilla | una riga, subito dopo un membro esistente, mai l'ultima del blocco |
-| Àncora | subito dopo un'istruzione di Mozilla nominata in `HOOKS.json` | `StealthX(this, &locale);` |
+| Àncora | subito dopo un'istruzione di Mozilla nominata in `HOOKS.json`, quando il gancio ha bisogno di ciò che quell'istruzione ha prodotto o quando le istruzioni sopra devono comunque girare | avviso `StealthX(this, &locale);` oppure guardia `if (StealthX(this)) return rv;` |
 
 **Il contratto** (vale per ogni gancio fuori dalle cartelle `backport`; lo fa rispettare `tools/hook_contract.py`, regole C1-C11)
 
 1. Una riga, senza logica: la chiamata e, nella guardia, il `return`. Niente `&&`, `||`, ternari, calcoli.
 2. Il marcatore `// STEALTH-HOOK(<cartella della funzione>)` sulla stessa riga (o il commento del linguaggio del file).
-3. Argomenti: solo `this`, i parametri della funzione o l'espressione avvolta; mai variabili locali (tranne l'àncora) né campi letti direttamente: la funzione nostra usa gli accessori pubblici.
+3. Argomenti: `this`, i parametri della funzione o l'espressione avvolta. Se la funzione nostra deve leggere o scrivere uno stato privato senza accessore pubblico, si passa quel campo (per riferimento o puntatore) e `HOOKS.json` lo nomina: se Mozilla lo rinomina, l'errore esce alla compilazione. Mai variabili locali, tranne l'àncora. `friend` (forma Membro) solo quando i campi sono più d'uno.
 4. Nessuna riga di Mozilla tolta o cambiata, tranne la riga unica delle tre forme che riscrivono.
 5. Guardia e avviso sono la prima istruzione del corpo. Mai dentro un elenco di Mozilla né ultima riga di un blocco: fra noi e ciò che Mozilla aggiunge a ogni release deve restare una riga intatta.
 6. Nessun commento nei file di Mozilla oltre il marcatore.
@@ -136,7 +136,9 @@ Per un gancio a metà funzione si prende la forma più portabile che dà lo stes
 
 - Gancio che dipende dal motore attivo: lo stesso test legge il valore a motore spento (quello di Firefox di serie) e a motore acceso (quello dichiarato) e i due devono differire; il valore dichiarato è uno che nessun runner ha. Il test fallisce se il gancio viene tolto o invertito.
 - Gancio senza condizione (cosa tolta dalla build per tutti, come `glxtest`): il test prova l'effetto, `HOOKS.json` prova che il gancio c'è.
-- Un gancio rifatto conserva i test che aveva, senza toccarli. Il nome del test va anche nella riga `Test:` di `FEATURE.md`.
+- Un gancio rifatto conserva i test di comportamento che aveva, senza toccarli. Il nome del test va anche nella riga `Test:` di `FEATURE.md`.
+- Un test per comportamento: il campo `test` di più ganci può nominare lo stesso test (un gtest della cartella, un e2e), se fallirebbe senza ciascuno di loro.
+- I test che leggono il testo dei sorgenti (contano i marcatori, cercano la riga di un gancio, asseriscono che un file di Mozilla non c'è) non sono test di comportamento: la presenza del gancio la prova `HOOKS.json`. Si riscrivono per asserire l'unico ingresso («l'unico punto dell'albero che costruisce X sta sotto la nostra guardia»: un secondo ingresso aggiunto da Mozilla fa fallire il test); dove non resta niente da asserire, si cancellano.
 
 **Tetti e debito**
 
