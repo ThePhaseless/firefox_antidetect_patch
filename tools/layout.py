@@ -155,6 +155,7 @@ FEATURES = {
 
 # Files we add to Firefox's tree, first match wins.
 OWN_FILES = [
+    (r"^dom/media/webrtc/transport/mdns_service/src/stealth_tests\.rs$", "fingerprint/webrtc/declared-network"),
     (r"^build/stealth_check_build_files\.", "platform/build-tools"),
     (r"^build/stealth_check_sources\.", "platform/build-tools"),
     (r"^modules/libpref/test/test_stealth_prefs_declared_once\.", "platform/prefs"),
