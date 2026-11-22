@@ -507,6 +507,14 @@ def cases() -> list:
         add("discover: test_*.js/.mjs in a unit, xpcshell or unit_* folder of a feature's src, or beside an xpcshell*.toml of ours, and nothing else",
             x.discover(base) == ["a/tests/unit/test_stealth_one.js", "b/test/unit/test_stealth_two.mjs", "c/tests/xpcshell/test_three.js", "d/unit_ipc/test_four.js",
                                  "e/tests/test_with_a_toml.js"])
+    # a feature three deep (fingerprint/js-surface/branding/src/...): discover finds its test, locate_test reaches it, and the checkout of the leg has it
+    tmp, base = series_with(["fingerprint/js-surface/branding/src/chrome/test/unit/test_stealth_deep.js"])
+    with tmp:
+        add("discover and locate_test: a feature folder three deep (group/area/folder/src) is a feature like one two deep",
+            x.discover(base) == ["chrome/test/unit/test_stealth_deep.js"]
+            and x.locate_test(base, "chrome/test/unit/test_stealth_deep.js").is_file())
+    xw = (Path(__file__).resolve().parents[2] / ".github" / "workflows" / "xpcshell.yml").read_text(encoding="utf-8")
+    add("xpcshell.yml: the checkout of the series takes the tests of the folders three deep too", "/*/*/*/src/**/tests/" in xw and "/*/*/*/src/**/test/" in xw)
     tmp, base = series_with([])
     with tmp:
         add("discover: a series with no feature has none", x.discover(base) == [])

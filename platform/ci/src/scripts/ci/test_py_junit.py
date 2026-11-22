@@ -41,8 +41,11 @@ def cases() -> list:
         put(tree, "browser/components/x/marionette/test_mozilla.py")
         put(series / "grp" / "other" / "src", "tools/test_class_style.py", "class TestIt:\n    def test_a(self):\n        pass\n")
         put(tree, "tools/test_class_style.py")
-        add("the tests of ours with something to collect are listed, sorted, as paths in the tree",
-            pj.ours(series, tree) == ["modules/libpref/test/test_stealth_a.py", "scripts/test_b.py", "tools/test_class_style.py"])
+        put(series / "fingerprint" / "area" / "deep" / "src", "tools/test_three_deep.py")
+        put(tree, "tools/test_three_deep.py")
+        add("the tests of ours with something to collect are listed, sorted, as paths in the tree (a feature three deep too)",
+            pj.ours(series, tree) == ["modules/libpref/test/test_stealth_a.py", "scripts/test_b.py", "tools/test_class_style.py",
+                                      "tools/test_three_deep.py"])
         add("scripts/ci/ and scripts/tests/ are left out", not any(p.startswith(pj.SKIPPED) for p in pj.ours(series, tree)))
         add("a Mozilla test of the tree (not in the series' src) is not listed", "browser/components/x/marionette/test_mozilla.py" not in pj.ours(series, tree))
         add("a file of ours that the tree does not have, and a script with no `def test_`, are not listed",

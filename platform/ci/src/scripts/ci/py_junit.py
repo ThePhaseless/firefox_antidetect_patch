@@ -32,7 +32,7 @@ HAS_TESTS = re.compile(r"^(?:def test_|async def test_|class Test)", re.M)
 def ours(series: Path, tree: Path) -> list:
     """The python tests of ours that exist in `tree`, collectable by pytest, as paths in the tree."""
     found = set()
-    for src in sorted(Path(series).glob("*/*/src")):
+    for src in sorted(set(Path(series).glob("*/*/src")) | set(Path(series).glob("*/*/*/src"))):  # folders two or three deep
         for path in src.rglob("test_*.py"):
             rel = path.relative_to(src).as_posix()
             if rel.startswith(SKIPPED) or not (Path(tree) / rel).is_file():

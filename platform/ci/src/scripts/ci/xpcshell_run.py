@@ -120,11 +120,16 @@ def check_lock_matches_upstream(lock: dict, up: dict) -> None:
                          % (lock["mozilla_tag"], up.get("mozilla_tag")))
 
 
+def series_srcs(series: Path) -> list:
+    """The src folders of the series: `<group>/<folder>/src` and `<group>/<area>/<folder>/src` (fingerprint/js-surface/branding is three deep)."""
+    return sorted(set(Path(series).glob("*/*/src")) | set(Path(series).glob("*/*/*/src")))
+
+
 def locate_test(series: Path, rel: str) -> Path:
-    """The file of ours at `rel` (a path in the tree): `<series>/<group>/<folder>/src/<rel>`, exactly one."""
-    found = sorted(Path(series).glob("*/*/src/" + rel))
+    """The file of ours at `rel` (a path in the tree): `<series>/<folder>/src/<rel>`, the folder two or three deep, exactly one."""
+    found = sorted(p for p in (src / rel for src in series_srcs(series)) if p.is_file())
     if len(found) != 1:
-        raise FileNotFoundError("%s: %d files in the series (`*/*/src/%s`), exactly one is needed" % (rel, len(found), rel))
+        raise FileNotFoundError("%s: %d files in the series (`*/*/src/%s` or `*/*/*/src/%s`), exactly one is needed" % (rel, len(found), rel, rel))
     return found[0]
 
 
@@ -142,7 +147,7 @@ def discover(series: Path) -> list:
     xpcshell folder (see is_xpcshell_dir), or whose folder holds an `xpcshell*.toml` of ours. The series' src holds only the files a feature ADDS (what
     it modifies is in hooks.patch), so each one is ours. Paths in the tree, sorted."""
     found = set()
-    for src in sorted(Path(series).glob("*/*/src")):
+    for src in series_srcs(series):
         if not src.is_dir():
             continue
         for path in src.rglob("test_*"):
