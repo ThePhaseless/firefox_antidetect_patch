@@ -183,6 +183,14 @@
  },
  {
   "file": "netwerk/ipc/DocumentLoadListener.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"../../docshell/base/StealthNavigationEvents.h\"  // STEALTH-HOOK(automation/navigation)",
+  "test": "wrapper:tests/test_a_navigation_that_moved_is_told_by_the_engine_e2e.py::test_a_cross_site_goto_is_told_moved_by_the_engine_with_the_process_it_left"
+ },
+ {
+  "file": "netwerk/ipc/DocumentLoadListener.cpp",
   "function": "static auto CreateDocumentLoadInfo(CanonicalBrowsingContext* aBrowsingContext,",
   "kind": "add",
   "form": "anchor",
@@ -190,5 +198,13 @@
   "test": "wrapper:tests/test_goto_script_redirect_e2e.py::test_goto_returns_on_the_page_that_replaced_itself_from_script",
   "anchor": "return loadInfo.forget(); (CreateDocumentLoadInfo)",
   "why": "sets the identifier on the LoadInfo built here, right before it leaves; aLoadState is a parameter, the LoadInfo a local of this static function"
+ },
+ {
+  "file": "netwerk/ipc/DocumentLoadListener.cpp",
+  "function": "bool DocumentLoadListener::MaybeTriggerProcessSwitch(",
+  "kind": "add",
+  "form": "notice",
+  "line": "  StealthNotifyNavigationMoved(aContext, mContentParent, mLoadIdentifier, mIsDocumentLoad, aIsNewTab);  // STEALTH-HOOK(automation/navigation)",
+  "test": "wrapper:tests/test_a_navigation_that_moved_is_told_by_the_engine_e2e.py::test_a_cross_site_goto_is_told_moved_by_the_engine_with_the_process_it_left"
  }
 ]

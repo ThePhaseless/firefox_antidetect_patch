@@ -101,8 +101,8 @@ export class PageAgent {
     this._reportWorkers();
 
     if (this._frameTree.isPageReady()) {
-      this._browserPage.emit('pageReady', {});
       const mainFrame = this._frameTree.mainFrame();
+      this._browserPage.emit('pageReady', {frameId: mainFrame.id()});
       const domWindow = mainFrame.domWindow();
       const document = domWindow ? domWindow.document : null;
       const readyState = document ? document.readyState : null;
@@ -139,7 +139,7 @@ export class PageAgent {
       helper.on(this._frameTree, 'documentrestored', this._onDocumentRestored.bind(this)),
       helper.on(this._frameTree, 'navigationaborted', this._onNavigationAborted.bind(this)),
       helper.on(this._frameTree, 'samedocumentnavigation', this._onSameDocumentNavigation.bind(this)),
-      helper.on(this._frameTree, 'pageready', () => this._browserPage.emit('pageReady', {})),
+      helper.on(this._frameTree, 'pageready', () => this._browserPage.emit('pageReady', {frameId: this._frameTree.mainFrame().id()})),
       helper.on(this._frameTree, 'workercreated', this._onWorkerCreated.bind(this)),
       helper.on(this._frameTree, 'workerdestroyed', this._onWorkerDestroyed.bind(this)),
       helper.on(this._frameTree, 'websocketcreated', event => this._browserPage.emit('webSocketCreated', event)),
@@ -480,11 +480,15 @@ export class PageAgent {
   // process says so because it is the one that sees the end of the load in order with the documents it inserts: a
   // navigation whose document was inserted before the load was cut (a page that navigates from its first script) has
   // committed, and is not aborted.
-  _onNavigationAborted(frame, navigationId, errorText) {
+  //
+  // `reporter`: {browsingContextId, childId}, the docShell that saw the end and this process. The parent knows from which
+  // docShell it moved a navigation, and does not take for the navigation's end what that docShell says of it afterwards.
+  _onNavigationAborted(frame, navigationId, errorText, reporter) {
     const aborted = {
       frameId: frame.id(),
       navigationId,
       errorText,
+      reporter,
     };
     tracePageAgent('page-agent', 'frameNavigationAborted', aborted);
     this._framesChannel.emit('frameNavigationAborted', aborted);

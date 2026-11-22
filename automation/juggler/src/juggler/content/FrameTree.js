@@ -28,6 +28,20 @@ let restoredDocuments = 0;
 // declaration; Frame._globalForWorld says what each one is.
 const WORLD_KINDS = new Set(['isolated', 'caller']);
 
+// Who tells the end of a navigation, for the parent: the browsing context of the docShell and this process, by its child id
+// (Services.appinfo.uniqueProcessID, which is what the parent reads as ContentParent::ChildID, and 0 in the parent process): the
+// system pid is not the same on both sides when a sandbox gives the child a pid namespace of its own. The parent knows
+// where it moved a navigation from (FrameNavigations.onNavigationMoved), and what that docShell says of it afterwards is not
+// the navigation's end. Both are compared there: a browsing context replaced in the same process changes only the id.
+// A docShell that cannot say who it is (it is going away) tells nothing, and the parent takes the end as it always did.
+function reporterOf(docShell) {
+  try {
+    return { browsingContextId: docShell.browsingContext.id, childId: Services.appinfo.uniqueProcessID };
+  } catch (e) {
+    return undefined;
+  }
+}
+
 export class FrameTree {
   constructor(rootBrowsingContext) {
     helper.decorateAsEventEmitter(this);
@@ -475,7 +489,7 @@ export class FrameTree {
     frame._suppressedAbort = null;
     if (heldAbort && navigationId && heldAbort.navigationId !== navigationId) {
       traceFrameTree('frame-tree', 'held abort told: another navigation\'s document came', {frameId: frame._frameId, heldNavigationId: heldAbort.navigationId, navigationId});
-      this.emit(FrameTree.Events.NavigationAborted, frame, heldAbort.navigationId, heldAbort.errorText);
+      this.emit(FrameTree.Events.NavigationAborted, frame, heldAbort.navigationId, heldAbort.errorText, heldAbort.reporter);
     }
     if (navigationId) {
       docShell.QueryInterface(Ci.nsIWebNavigation);
@@ -485,6 +499,11 @@ export class FrameTree {
     // Said to the parent for every document, with the navigation this process had in flight for it, if it had one
     // (the navigation may have begun in another process, and then the parent knows its id).
     this.emit(FrameTree.Events.DocumentInserted, frame, navigationId || undefined);
+
+    // The page is ready with the document of its first navigation, said AFTER that document: the client announces the
+    // page when it is ready and reads the address of the commit it has heard of by then.
+    if (navigationId && this._isPageMain(frame))
+      this.forcePageReady();
 
     // The listeners that record where a pointer event landed are on the chrome event handler of the ROOT of this
     // tree: the page's main frame, or the root of a fragment in another process (an <iframe> of another site).
@@ -503,7 +522,9 @@ export class FrameTree {
   }
 
   // The commit itself, without what a NEW document does to the tree: a
-  // document restored from the back-forward cache keeps its children.
+  // document restored from the back-forward cache keeps its children. It does
+  // not force the page ready: the ready of a page follows the document that
+  // made it ready, so each caller forces it once it has said that document.
   _commit(frame, url) {
     const navigationId = frame._pendingNavigationId;
     traceFrameTree('frame-tree', '_commit', {frameId: frame._frameId, navigationId, url});
@@ -511,8 +532,6 @@ export class FrameTree {
     frame._lastCommittedNavigationId = navigationId;
     frame._url = url;
     this.emit(FrameTree.Events.NavigationCommitted, frame);
-    if (this._isPageMain(frame))
-      this.forcePageReady();
   }
 
   onStateChange(progress, request, flag, status) {
@@ -537,7 +556,9 @@ export class FrameTree {
       frame._pendingNavigationId = null;
       // Always report download navigation as failure to match other browsers.
       const errorText = helper.getNetworkErrorStatusText(status);
-      traceFrameTree('frame-tree', 'onStateChange abort', {frameId: frame._frameId, navigationId, status, errorText, bindingAborted: status === Cr.NS_BINDING_ABORTED});
+      // Told now, from this docShell: it may be gone when the decision below is made.
+      const reporter = reporterOf(docShell);
+      traceFrameTree('frame-tree', 'onStateChange abort', {frameId: frame._frameId, navigationId, status, errorText, bindingAborted: status === Cr.NS_BINDING_ABORTED, reporter});
       // Stealthfox [B302]: the main frame's NS_BINDING_ABORTED is SPURIOUS
       // when a Fission process swap takes the navigation to another process:
       // the old channel is disconnected there, by
@@ -570,18 +591,18 @@ export class FrameTree {
           }
           traceFrameTree('frame-tree', 'abort decided', {frameId: frame._frameId, navigationId, swapped, suppressed: swapped});
           if (!swapped) {
-            this.emit(FrameTree.Events.NavigationAborted, frame, navigationId, errorText);
+            this.emit(FrameTree.Events.NavigationAborted, frame, navigationId, errorText, reporter);
             return;
           }
           // Not reported now: if this navigation's own document follows, the abort was the swap's. But a document
           // that is not this navigation's can follow instead (the page's own location.replace, restarted under its
           // own load identifier while this navigation was cancelled): then this navigation is over, and nothing
           // else would say so. The next document inserted in the frame decides (onWindowEvent).
-          frame._suppressedAbort = { navigationId, errorText };
+          frame._suppressedAbort = { navigationId, errorText, reporter };
         });
         return;
       }
-      this.emit(FrameTree.Events.NavigationAborted, frame, navigationId, errorText);
+      this.emit(FrameTree.Events.NavigationAborted, frame, navigationId, errorText, reporter);
       if (this._isPageMain(frame) && status !== Cr.NS_BINDING_ABORTED)
         this.forcePageReady();
     }
@@ -603,7 +624,7 @@ export class FrameTree {
       return;
     frame._pendingNavigationId = null;
     this.emit(FrameTree.Events.NavigationAborted, frame, navigationId,
-              helper.getNetworkErrorStatusText(+status));
+              helper.getNetworkErrorStatusText(+status), reporterOf(docShell));
     if (this._isPageMain(frame))
       this.forcePageReady();
   }
@@ -662,6 +683,9 @@ export class FrameTree {
     // protocol events is PageAgent's, which is why this is an event and not a
     // call into the agent.
     this.emit(FrameTree.Events.DocumentRestored, frame);
+    // A tree that is new (the page came back in a top-level context of its own) is not ready yet: the restored
+    // document makes it ready, said after the document.
+    this.forcePageReady();
   }
 
   _onBrowsingContextAttached(browsingContext) {

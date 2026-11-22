@@ -190,16 +190,28 @@ test('detaching a frame that was never announced says nothing to the client', ()
   assert.equal(tree._frameIdToFrame.has('subframe-' + standIn.id), false, 'it is forgotten all the same');
 });
 
-test('the commit of a fragment root that is not the page main does not make the page ready', () => {
+// The document of the navigation in flight appears in the main frame of the tree.
+function documentAppears(tree, url) {
+  const frame = tree.mainFrame();
+  const docShell = frame.docShell();
+  docShell.QueryInterface = () => docShell;
+  docShell.currentURI = { spec: url };
+  tree._installMainFrameInputListeners = () => {};
+  frame._pendingNavigationId = 'nav-1';
+  tree.onWindowEvent({ type: 'DOMDocElementInserted', target: { documentGlobal: { docShell } } });
+}
+
+test('the document of a fragment root that is not the page main does not make the page ready', () => {
   const top = bc();
   const mid = bc({ parent: top, docShell: false });
   const leaf = bc({ parent: mid });
   const leafTree = build(leaf);
-  leafTree._commit(leafTree.mainFrame(), 'http://a.test/leaf');
+  documentAppears(leafTree, 'http://a.test/leaf');
   assert.equal(leafTree.log.forcePageReady, 0);
   const topTree = build(top);
-  topTree._commit(topTree.mainFrame(), 'http://a.test/top');
+  documentAppears(topTree, 'http://a.test/top');
   assert.equal(topTree.log.forcePageReady, 1);
+  assert.equal(topTree._emitted.at(-1)[0], FrameTree.Events.DocumentInserted, 'and the page is forced ready after its document is said');
 });
 
 test('a fragment root that is not the page main restores no "main document"', () => {

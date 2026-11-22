@@ -213,7 +213,7 @@
  "netwerk/dns/TRR.cpp": 4,
  "netwerk/dns/moz.build": 1,
  "netwerk/dns/nsHostResolver.cpp": 4,
- "netwerk/ipc/DocumentLoadListener.cpp": 1,
+ "netwerk/ipc/DocumentLoadListener.cpp": 4,
  "netwerk/ipc/PSocketProcess.ipdl": 5,
  "netwerk/ipc/ProxyConfigLookup.cpp": 22,
  "netwerk/ipc/ProxyConfigLookup.h": 12,

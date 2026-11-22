@@ -52,7 +52,7 @@ const queue = [];
 const { FrameTree } = load('content/FrameTree.js', {
   Components: { interfaces: Ci, results: Cr, utils: {} },
   ChromeUtils: { importESModule: () => ({ Helper }) },
-  Services: { tm: { dispatchToMainThread: fn => queue.push(fn) } },
+  Services: { tm: { dispatchToMainThread: fn => queue.push(fn) }, appinfo: { uniqueProcessID: 4242 } },
   dump: () => {},
 }, ['FrameTree']);
 
@@ -64,10 +64,10 @@ function runQueue() {
 // A tree as far as the answer needs it: one main frame and one child frame on
 // their docShells, and what it emits.
 function setup() {
-  const mainShell = { destroyed: false, browsingContext: { isInBFCache: false },
+  const mainShell = { destroyed: false, browsingContext: { isInBFCache: false, id: 7 },
                       isBeingDestroyed() { return this.destroyed; },
                       currentURI: { spec: 'http://x/old' }, QueryInterface() { return this; } };
-  const childShell = { destroyed: false, browsingContext: { isInBFCache: false },
+  const childShell = { destroyed: false, browsingContext: { isInBFCache: false, id: 8 },
                        isBeingDestroyed() { return this.destroyed; } };
   // The page's main frame has no parent browsing context; a child has one (FrameTree._isPageMain).
   const main = { _pendingNavigationId: 'nav-1', _children: new Set(), _browsingContext: { parent: null } };
@@ -77,7 +77,8 @@ function setup() {
     _mainFrame: main,
     _isPageMain: FrameTree.prototype._isPageMain,
     frameForDocShell: shell => shell === mainShell ? main : shell === childShell ? child : null,
-    emit: (event, frame, ...args) => emitted.push([event, frame === main ? 'main' : 'child', ...args]),
+    // Copied into this realm: the tree runs in a vm context, whose objects have another prototype.
+    emit: (event, frame, ...args) => emitted.push([event, frame === main ? 'main' : 'child', ...args.map(a => a && typeof a === 'object' ? { ...a } : a)]),
     forcePageReady: () => emitted.push(['pageReady']),
     _detachFrame() {},
     _frameNavigationCommitted: FrameTree.prototype._frameNavigationCommitted,
@@ -97,13 +98,17 @@ function docElementInserted(t, shell) {
 }
 
 const ABORTED = FrameTree.Events.NavigationAborted;
+// Who tells an end, for the parent: the browsing context of the docShell and this process (the parent knows where it moved a
+// navigation from, FrameNavigations.onNavigationMoved).
+const MAIN_REPORTER = { browsingContextId: 7, childId: 4242 };
+const CHILD_REPORTER = { browsingContextId: 8, childId: 4242 };
 const COMMITTED = FrameTree.Events.NavigationCommitted;
 
 test('a real abort of the main frame (document.open, window.stop) is reported', () => {
   const { t, mainShell, emitted } = setup();
   stop(t, mainShell, Cr.NS_BINDING_ABORTED);
   runQueue();
-  assert.deepEqual(emitted, [[ABORTED, 'main', 'nav-1', 'NS_BINDING_ABORTED']]);
+  assert.deepEqual(emitted, [[ABORTED, 'main', 'nav-1', 'NS_BINDING_ABORTED', MAIN_REPORTER]]);
 });
 
 test('the document.write after the abort is not taken for the navigation\'s commit', () => {
@@ -114,7 +119,7 @@ test('the document.write after the abort is not taken for the navigation\'s comm
   assert.equal(main._pendingNavigationId, null);
   assert.equal(emitted.filter(e => e[0] === COMMITTED).length, 0);
   // The document is still said to the parent, with no navigation: the one in flight was aborted.
-  assert.deepEqual(emitted, [['documentinserted', 'main', undefined], [ABORTED, 'main', 'nav-1', 'NS_BINDING_ABORTED']]);
+  assert.deepEqual(emitted, [['documentinserted', 'main', undefined], [ABORTED, 'main', 'nav-1', 'NS_BINDING_ABORTED', MAIN_REPORTER]]);
 });
 
 test('the process swap\'s abort, the old document entering the BFCache in the same task, is not reported', () => {
@@ -136,14 +141,14 @@ test('the process swap\'s abort while the old docShell is destroyed is not repor
 test('a network failure of the main frame is reported at once, and readies the page', () => {
   const { t, mainShell, emitted } = setup();
   stop(t, mainShell, Cr.NS_ERROR_CONNECTION_REFUSED);
-  assert.deepEqual(emitted, [[ABORTED, 'main', 'nav-1', 'NS_ERROR_CONNECTION_REFUSED'], ['pageReady']]);
+  assert.deepEqual(emitted, [[ABORTED, 'main', 'nav-1', 'NS_ERROR_CONNECTION_REFUSED', MAIN_REPORTER], ['pageReady']]);
 });
 
 test('a child frame\'s real abort (the iframe\'s window.stop) is reported, once the task has ended', () => {
   const { t, childShell, emitted } = setup();
   stop(t, childShell, Cr.NS_BINDING_ABORTED);
   runQueue();
-  assert.deepEqual(emitted, [[ABORTED, 'child', 'nav-2', 'NS_BINDING_ABORTED']]);
+  assert.deepEqual(emitted, [[ABORTED, 'child', 'nav-2', 'NS_BINDING_ABORTED', CHILD_REPORTER]]);
 });
 
 test('the abort an iframe\'s old process makes when the iframe goes to another process is not the navigation\'s', () => {
@@ -183,9 +188,9 @@ test('an abort held back as a swap\'s is reported when the document that appears
   assert.deepEqual(emitted, []);                      // held: not yet known to be the swap's
   main._pendingNavigationId = 'nav-page';             // the page's own navigation, restarted under its own load identifier
   docElementInserted(t, mainShell);
-  assert.deepEqual(emitted.map(e => e[0]), [ABORTED, COMMITTED, 'pageReady', 'documentinserted'],
+  assert.deepEqual(emitted.map(e => e[0]), [ABORTED, COMMITTED, 'documentinserted', 'pageReady'],
                    'the abort of the held navigation, then the commit and the document of the other one');
-  assert.deepEqual(emitted[0], [ABORTED, 'main', 'nav-1', 'NS_BINDING_ABORTED']);
+  assert.deepEqual(emitted[0], [ABORTED, 'main', 'nav-1', 'NS_BINDING_ABORTED', MAIN_REPORTER]);
   assert.equal(main._suppressedAbort, null);
 });
 
@@ -197,7 +202,7 @@ test('an abort held back as a swap\'s stays silent when the navigation\'s own do
   main._pendingNavigationId = 'nav-1';                // the same navigation, carried to the new document
   docElementInserted(t, mainShell);
   assert.equal(emitted.filter(e => e[0] === ABORTED).length, 0);
-  assert.deepEqual(emitted.map(e => e[0]), [COMMITTED, 'pageReady', 'documentinserted']);
+  assert.deepEqual(emitted.map(e => e[0]), [COMMITTED, 'documentinserted', 'pageReady']);
 });
 
 test('an abort held back as a swap\'s is dropped by the next document, once', () => {
@@ -219,4 +224,20 @@ test("an abort held back as a swap's stays silent when the document that appears
   assert.equal(main._pendingNavigationId, null);      // the swap cleared it and nothing restarted it
   docElementInserted(t, mainShell);
   assert.equal(emitted.filter(e => e[0] === ABORTED).length, 0, "it may be this navigation's own document: not ours to end");
+});
+
+test('a docShell that cannot say which browsing context it is tells its end with no reporter: the parent takes it as it always did', () => {
+  const { t, mainShell, emitted } = setup();
+  Object.defineProperty(mainShell.browsingContext, 'id', { get() { throw new Error('the docShell is going away'); } });
+  stop(t, mainShell, Cr.NS_BINDING_ABORTED);
+  runQueue();
+  assert.deepEqual(emitted, [[ABORTED, 'main', 'nav-1', 'NS_BINDING_ABORTED', undefined]]);
+});
+
+test('the reporter of an abort is the docShell that was stopped, told when it was stopped and not when the task decides', () => {
+  const { t, mainShell, emitted } = setup();
+  stop(t, mainShell, Cr.NS_BINDING_ABORTED);
+  mainShell.browsingContext.id = 99;                 // by the time the task runs, the browsing context is another
+  runQueue();
+  assert.deepEqual(emitted, [[ABORTED, 'main', 'nav-1', 'NS_BINDING_ABORTED', MAIN_REPORTER]]);
 });

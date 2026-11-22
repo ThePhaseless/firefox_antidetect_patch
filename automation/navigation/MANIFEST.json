@@ -177,16 +177,18 @@
    "category": "juggler",
    "feature": "juggler-load-identifier",
    "prefs": [],
-   "added": 1,
+   "added": 4,
    "removed": 0,
-   "hunks": 1,
+   "hunks": 3,
    "inline_logic_lines": 1,
    "hookable": "already-hook",
    "anchor": "CreateDocumentLoadInfo (static function)",
    "evidence": [
-    "+  loadInfo->SetJugglerLoadIdentifier(aLoadState->GetLoadIdentifier());"
+    "+  loadInfo->SetJugglerLoadIdentifier(aLoadState->GetLoadIdentifier());",
+    "+#include \"../../docshell/base/StealthNavigationEvents.h\"  // STEALTH-HOOK(automation/navigation)",
+    "+  StealthNotifyNavigationMoved(aContext, mContentParent, mLoadIdentifier, mIsDocumentLoad, aIsNewTab);  // STEALTH-HOOK(automation/navigation)"
    ],
-   "notes": "Copies the load identifier from the load state to the LoadInfo of each document load. GetLoadIdentifier confirmed at C:/ff/source/docshell/base/nsDocShellLoadState.h:365 (returns mLoadIdentifier). The only place in this diff that sets the identifier.",
+   "notes": "Copies the load identifier from the load state to the LoadInfo of each document load. GetLoadIdentifier confirmed at C:/ff/source/docshell/base/nsDocShellLoadState.h:365 (returns mLoadIdentifier). The only place in this diff that sets the identifier. TriggerProcessSwitch tells the Juggler, as its first statement, that the parent moved the navigation to another process (StealthNotifyNavigationMoved, docshell/base/StealthNavigationEvents.h), so the docShell it left does not end it: goto aborted wrongly, an intermittent of the 68 (Federico, 22/11: the engine fixes of the intermittents enter the 69). The include is a registration line with its blank line.",
    "verifier": {
     "changed": [],
     "why": "All fields and cited facts checked against the diff and source; no change."

@@ -45,12 +45,14 @@ const { Helper } = load('Helper.js', {
 const { FrameTree } = load('content/FrameTree.js', {
   Components: { interfaces: Ci, results: Cr, utils: {} },
   ChromeUtils: { importESModule: () => ({ Helper }) },
+  Services: { appinfo: { uniqueProcessID: 4242 } },
   dump: () => {},
 }, ['FrameTree']);
 
 function setup(pending) {
-  const mainShell = {};
-  const childShell = {};
+  // The docShell that refused the load tells its end with who it is: its browsing context and this process.
+  const mainShell = { browsingContext: { id: 7 } };
+  const childShell = { browsingContext: { id: 8 } };
   // The page's main frame has no parent browsing context; a child has one (FrameTree._isPageMain).
   const main = { _pendingNavigationId: pending, _children: new Set(), _browsingContext: { parent: null } };
   const child = { _pendingNavigationId: 'nav-7', _children: new Set(), _browsingContext: { parent: {} } };
@@ -59,7 +61,8 @@ function setup(pending) {
     _mainFrame: main,
     _isPageMain: FrameTree.prototype._isPageMain,
     frameForDocShell: shell => shell === mainShell ? main : shell === childShell ? child : null,
-    emit: (event, frame, ...args) => emitted.push([event, frame === main ? 'main' : 'child', ...args]),
+    // Copied into this realm: the tree runs in a vm context, whose objects have another prototype.
+    emit: (event, frame, ...args) => emitted.push([event, frame === main ? 'main' : 'child', ...args.map(a => a && typeof a === 'object' ? { ...a } : a)]),
     forcePageReady: () => emitted.push(['pageReady']),
   };
   const failed = (shell, payload) => FrameTree.prototype._onNavigationFailed.call(t, shell, payload);
@@ -70,7 +73,7 @@ test('a navigation refused before a channel ends, with its reason', () => {
   const s = setup('nav-88');
   s.failed(s.mainShell, `88 ${Cr.NS_ERROR_PORT_ACCESS_NOT_ALLOWED}`);
   assert.deepEqual(s.emitted, [
-    [FrameTree.Events.NavigationAborted, 'main', 'nav-88', 'NS_ERROR_PORT_ACCESS_NOT_ALLOWED'],
+    [FrameTree.Events.NavigationAborted, 'main', 'nav-88', 'NS_ERROR_PORT_ACCESS_NOT_ALLOWED', { browsingContextId: 7, childId: 4242 }],
     ['pageReady'],
   ]);
   assert.equal(s.main._pendingNavigationId, null);
@@ -80,7 +83,7 @@ test('a refused navigation of a child frame ends without the page being ready', 
   const s = setup('nav-88');
   s.failed(s.childShell, `7 ${Cr.NS_ERROR_UNKNOWN_PROTOCOL}`);
   assert.deepEqual(s.emitted, [
-    [FrameTree.Events.NavigationAborted, 'child', 'nav-7', 'NS_ERROR_UNKNOWN_PROTOCOL'],
+    [FrameTree.Events.NavigationAborted, 'child', 'nav-7', 'NS_ERROR_UNKNOWN_PROTOCOL', { browsingContextId: 8, childId: 4242 }],
   ]);
 });
 

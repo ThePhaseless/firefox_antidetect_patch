@@ -179,10 +179,19 @@ index a3e7384515b976681d9e12318cbc1156415a9a50..58ff528d032b9da7fd40c0031e06a306
    /**
     * see https://html.spec.whatwg.org/#user-navigation-involvement
 diff --git a/netwerk/ipc/DocumentLoadListener.cpp b/netwerk/ipc/DocumentLoadListener.cpp
-index 10b16322a4a55f7c5d4459489a70347ee1debc4f..d626ab0c4dc4e99dbab171399f8b646d15231dae 100644
+index 10b16322a4a55f7c5d4459489a70347ee1debc4f..75549cdd5fd5a17c645174ed7154f0543dff3bbb 100644
 --- a/netwerk/ipc/DocumentLoadListener.cpp
 +++ b/netwerk/ipc/DocumentLoadListener.cpp
-@@ -206,6 +206,7 @@ static auto CreateDocumentLoadInfo(CanonicalBrowsingContext* aBrowsingContext,
+@@ -88,6 +88,8 @@
+ #  include "mozilla/widget/nsWindow.h"
+ #endif /* ANDROID */
+ 
++#include "../../docshell/base/StealthNavigationEvents.h"  // STEALTH-HOOK(automation/navigation)
++
+ mozilla::LazyLogModule gDocumentChannelLog("DocumentChannel");
+ #define LOG(fmt) MOZ_LOG(gDocumentChannelLog, mozilla::LogLevel::Verbose, fmt)
+ 
+@@ -206,6 +208,7 @@ static auto CreateDocumentLoadInfo(CanonicalBrowsingContext* aBrowsingContext,
        aLoadState->HasLoadFlags(nsIWebNavigation::LOAD_FLAGS_FROM_EXTERNAL));
    loadInfo->SetIsMetaRefresh(aLoadState->IsMetaRefresh());
  
@@ -190,3 +199,11 @@ index 10b16322a4a55f7c5d4459489a70347ee1debc4f..d626ab0c4dc4e99dbab171399f8b646d
    return loadInfo.forget();
  }
  
+@@ -2375,6 +2378,7 @@ bool DocumentLoadListener::MaybeTriggerProcessSwitch(
+ void DocumentLoadListener::TriggerProcessSwitch(
+     CanonicalBrowsingContext* aContext,
+     const NavigationIsolationOptions& aOptions, bool aIsNewTab) {
++  StealthNotifyNavigationMoved(aContext, mContentParent, mLoadIdentifier, mIsDocumentLoad, aIsNewTab);  // STEALTH-HOOK(automation/navigation)
+   MOZ_DIAGNOSTIC_ASSERT(aIsNewTab || aContext->IsOwnedByProcess(
+                                          GetContentProcessId(mContentParent)),
+                         "not owned by creator process anymore?");

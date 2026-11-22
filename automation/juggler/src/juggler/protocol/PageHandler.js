@@ -291,8 +291,10 @@ export class PageHandler {
         frameDocumentInserted: p => this._unlessDropped(p.frameId, () => this._frameNavigations.onDocumentInserted(p.frameId, p.url, p.name, p.navigationId), 'frameDocumentInserted', p),
         frameDocumentRestored: p => this._unlessDropped(p.frameId, () => this._frameNavigations.onDocumentRestored(p.frameId, p.url, p.name), 'frameDocumentRestored', p),
         frameKnown: p => this._unlessDropped(p.frameId, () => this._frameNavigations.onFrameKnown(p.frameId, p), 'frameKnown', p),
-        frameNavigationAborted: p => this._unlessDropped(p.frameId, () => this._frameNavigations.onNavigationAborted(p.frameId, p.navigationId, p.errorText), 'frameNavigationAborted', p),
+        frameNavigationAborted: p => this._unlessDropped(p.frameId, () => this._frameNavigations.onNavigationAborted(p.frameId, p.navigationId, p.errorText, p.reporter), 'frameNavigationAborted', p),
       }),
+      // The parent decided that a navigation leaves the docShell that started it: what that docShell says of it later is not its end.
+      helper.addObserver(this._onNavigationMoved.bind(this), 'juggler-navigation-moved'),
       helper.on(this._pageTarget, PageTarget.Events.Crashed, () => {
         this._session.emitEvent('Page.crashed', {});
       }),
@@ -381,9 +383,27 @@ export class PageHandler {
     helper.removeListeners(this._eventListeners);
   }
 
+  // The page is ready for the client AFTER everything its main frame said before: the content process says
+  // `frameDocumentInserted` and then `pageReady`, and the commit waits for the frame to be announced (or behind a
+  // name or a `load`) in _emitFrameKeyed. `Page.ready` goes the same way, under the key of the main frame the content
+  // process names, and is never lost (see _emitFrameKeyed). With no frame named it leaves at once.
   _onPageReady(event) {
+    const frameId = event && event.frameId;
+    if (frameId === undefined) {
+      this._leaveForTheClient('Page.ready', undefined);
+      return;
+    }
+    this._emitFrameKeyed('Page.ready', undefined, frameId);
+  }
+
+  // The one exit of the events of a frame towards the client: _emitFrameKeyed, the events that waited for their frame
+  // (_onFrameAttached) and what waited behind a name or a `load` all come out here. The page is ready, and the dialogs
+  // that were open are told, when `Page.ready` is WRITTEN, not when `pageReady` arrives.
+  _leaveForTheClient(protocolEventName, payload) {
+    this._session.emitEvent(protocolEventName, payload);
+    if (protocolEventName !== 'Page.ready')
+      return;
     this._isPageReady = true;
-    this._session.emitEvent('Page.ready');
     for (const dialog of this._pageTarget.dialogs())
       this._onDialogOpened(dialog);
   }
@@ -541,15 +561,18 @@ export class PageHandler {
       return;
     }
     if (frameId === undefined || this._reportedFrameIds.has(frameId))
-      return this._session.emitEvent(protocolEventName, payload);
+      return this._leaveForTheClient(protocolEventName, payload);
+    // The ready of the page is not an event that is dropped with the frame, nor kept out by a full queue: it leaves at once.
     if (this._droppedFrameIds.has(frameId))
-      return;
+      return protocolEventName === 'Page.ready' ? this._leaveForTheClient(protocolEventName, payload) : undefined;
     let queue = this._frameEventsBeforeFrame.get(frameId);
     if (!queue) {
       queue = [];
       this._frameEventsBeforeFrame.set(frameId, queue);
     }
     if (queue.length >= MAX_EVENTS_BEFORE_FRAME) {
+      if (protocolEventName === 'Page.ready')
+        return this._leaveForTheClient(protocolEventName, payload);
       dump(`WARNING: ${queue.length} events wait for frame ${frameId}, ${protocolEventName} is dropped\n`);
       return;
     }
@@ -616,7 +639,13 @@ export class PageHandler {
     if (!this._reportedFrameIds.has(frameId))
       this._droppedFrameIds.add(frameId);
     this._heldBackFrames.delete(frameId);
+    // The ready of the page that waited for the frame is not lost with it.
+    const waiting = this._frameEventsBeforeFrame.get(frameId) || [];
     this._frameEventsBeforeFrame.delete(frameId);
+    for (const {protocolEventName, payload} of waiting) {
+      if (protocolEventName === 'Page.ready')
+        this._leaveForTheClient(protocolEventName, payload);
+    }
     this._frameNavigations.forget(frameId);
     for (const contextId of this._contextsOfFrame.get(frameId) || [])
       this._contextFrame.delete(contextId);
@@ -636,6 +665,21 @@ export class PageHandler {
       tracePageHandler('page-handler', what, {payload, dropped});
     if (!dropped)
       return callback();
+  }
+
+  // The parent moves a navigation away from the docShell that started it (DocumentLoadListener::TriggerProcessSwitch).
+  // `browsingContext` is that docShell's browsing context, `data` "<load identifier> <child id of its process>". The registry
+  // keeps the decision, so that what the docShell says of the navigation afterwards is not taken for its end.
+  _onNavigationMoved(browsingContext, topic, data) {
+    // The browsing contexts of a page, its frames too, share the browser id.
+    const mine = this._pageTarget.linkedBrowser()?.browsingContext;
+    if (this._disposed || !mine || browsingContext.browserId !== mine.browserId)
+      return;
+    const [loadIdentifier, childId] = String(data).split(' ');
+    const frameId = helper.browsingContextToFrameId(browsingContext);
+    const origin = { browsingContextId: browsingContext.id, childId: +childId };
+    this._unlessDropped(frameId, () => this._frameNavigations.onNavigationMoved(frameId, helper.toProtocolNavigationId(loadIdentifier), origin),
+                        'navigationMoved', { frameId, navigationId: helper.toProtocolNavigationId(loadIdentifier), origin });
   }
 
   _onExecutionContextCreated(payload) {
@@ -918,7 +962,7 @@ export class PageHandler {
     const events = this._frameEventsBeforeFrame.get(frameId) || [];
     this._frameEventsBeforeFrame.delete(frameId);
     for (const {protocolEventName, payload} of events)
-      this._session.emitEvent(protocolEventName, payload);
+      this._leaveForTheClient(protocolEventName, payload);
     if (!this._restoreBeingSaid)
       this._tellWorkersNotToldYet();
   }
