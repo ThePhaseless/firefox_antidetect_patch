@@ -128,7 +128,9 @@
   "kind": "add",
   "form": "unknown",
   "line": "    static OWN_NAME_RESOLVED: AtomicBool = AtomicBool::new(false);",
-  "test": ""
+  "test": "cargo:mdns_service::tests::stealth_responder_on_the_loopback_hears_its_own_query",
+  "exception": "an anchor of one line is not possible: the join loop consumes `addrs` (its two lines iterate by reference so that the first address stays for the call after it), and moving the call before the loop inverts the order of two socket options (G18)",
+  "pm": "approvato"
  },
  {
   "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
@@ -136,7 +138,9 @@
   "kind": "add",
   "form": "unknown",
   "line": "    unsafe extern \"C\" fn own_name_resolved(_: *const c_void, _: *const c_char, _: *const c_char) -> () {",
-  "test": ""
+  "test": "cargo:mdns_service::tests::stealth_responder_on_the_loopback_hears_its_own_query",
+  "exception": "an anchor of one line is not possible: the join loop consumes `addrs` (its two lines iterate by reference so that the first address stays for the call after it), and moving the call before the loop inverts the order of two socket options (G18)",
+  "pm": "approvato"
  },
  {
   "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
@@ -144,7 +148,9 @@
   "kind": "add",
   "form": "unknown",
   "line": "        OWN_NAME_RESOLVED.store(true, Ordering::SeqCst);",
-  "test": ""
+  "test": "cargo:mdns_service::tests::stealth_responder_on_the_loopback_hears_its_own_query",
+  "exception": "an anchor of one line is not possible: the join loop consumes `addrs` (its two lines iterate by reference so that the first address stays for the call after it), and moving the call before the loop inverts the order of two socket options (G18)",
+  "pm": "approvato"
  },
  {
   "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
@@ -162,7 +168,9 @@
   "kind": "add",
   "form": "unknown",
   "line": "    unsafe extern \"C\" fn own_name_timedout(_: *const c_void, _: *const c_char) -> () {}",
-  "test": ""
+  "test": "cargo:mdns_service::tests::stealth_responder_on_the_loopback_hears_its_own_query",
+  "exception": "an anchor of one line is not possible: the join loop consumes `addrs` (its two lines iterate by reference so that the first address stays for the call after it), and moving the call before the loop inverts the order of two socket options (G18)",
+  "pm": "approvato"
  },
  {
   "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
@@ -170,7 +178,9 @@
   "kind": "add",
   "form": "unknown",
   "line": "    // The responder started on the loopback, as the parent starts it (the declared address is not the host's, so the loopback is the",
-  "test": ""
+  "test": "cargo:mdns_service::tests::stealth_responder_on_the_loopback_hears_its_own_query",
+  "exception": "an anchor of one line is not possible: the join loop consumes `addrs` (its two lines iterate by reference so that the first address stays for the call after it), and moving the call before the loop inverts the order of two socket options (G18)",
+  "pm": "approvato"
  },
  {
   "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
@@ -178,7 +188,9 @@
   "kind": "add",
   "form": "unknown",
   "line": "    // interface given): its join of the group and the multicast interface it sets on its socket are what bring a query it sends",
-  "test": ""
+  "test": "cargo:mdns_service::tests::stealth_responder_on_the_loopback_hears_its_own_query",
+  "exception": "an anchor of one line is not possible: the join loop consumes `addrs` (its two lines iterate by reference so that the first address stays for the call after it), and moving the call before the loop inverts the order of two socket options (G18)",
+  "pm": "approvato"
  },
  {
   "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
@@ -186,7 +198,9 @@
   "kind": "add",
   "form": "unknown",
   "line": "    // back to its own socket, which answers it for a name it registered. Without them the query leaves on the default multicast",
-  "test": ""
+  "test": "cargo:mdns_service::tests::stealth_responder_on_the_loopback_hears_its_own_query",
+  "exception": "an anchor of one line is not possible: the join loop consumes `addrs` (its two lines iterate by reference so that the first address stays for the call after it), and moving the call before the loop inverts the order of two socket options (G18)",
+  "pm": "approvato"
  },
  {
   "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
@@ -194,7 +208,9 @@
   "kind": "add",
   "form": "unknown",
   "line": "    // route and the name is not resolved (on Linux a join on 127.0.0.1 hears nothing without the interface).",
-  "test": ""
+  "test": "cargo:mdns_service::tests::stealth_responder_on_the_loopback_hears_its_own_query",
+  "exception": "an anchor of one line is not possible: the join loop consumes `addrs` (its two lines iterate by reference so that the first address stays for the call after it), and moving the call before the loop inverts the order of two socket options (G18)",
+  "pm": "approvato"
  },
  {
   "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
@@ -202,7 +218,9 @@
   "kind": "add",
   "form": "unknown",
   "line": "    #[test]",
-  "test": ""
+  "test": "cargo:mdns_service::tests::stealth_responder_on_the_loopback_hears_its_own_query",
+  "exception": "an anchor of one line is not possible: the join loop consumes `addrs` (its two lines iterate by reference so that the first address stays for the call after it), and moving the call before the loop inverts the order of two socket options (G18)",
+  "pm": "approvato"
  },
  {
   "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
@@ -210,7 +228,9 @@
   "kind": "add",
   "form": "unknown",
   "line": "    fn stealth_responder_on_the_loopback_hears_its_own_query() {",
-  "test": ""
+  "test": "cargo:mdns_service::tests::stealth_responder_on_the_loopback_hears_its_own_query",
+  "exception": "an anchor of one line is not possible: the join loop consumes `addrs` (its two lines iterate by reference so that the first address stays for the call after it), and moving the call before the loop inverts the order of two socket options (G18)",
+  "pm": "approvato"
  },
  {
   "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
@@ -218,7 +238,9 @@
   "kind": "add",
   "form": "unknown",
   "line": "        let mut service = MDNSService::new();",
-  "test": ""
+  "test": "cargo:mdns_service::tests::stealth_responder_on_the_loopback_hears_its_own_query",
+  "exception": "an anchor of one line is not possible: the join loop consumes `addrs` (its two lines iterate by reference so that the first address stays for the call after it), and moving the call before the loop inverts the order of two socket options (G18)",
+  "pm": "approvato"
  },
  {
   "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
@@ -226,7 +248,9 @@
   "kind": "add",
   "form": "unknown",
   "line": "        let addr = \"127.0.0.1\".parse().unwrap();",
-  "test": ""
+  "test": "cargo:mdns_service::tests::stealth_responder_on_the_loopback_hears_its_own_query",
+  "exception": "an anchor of one line is not possible: the join loop consumes `addrs` (its two lines iterate by reference so that the first address stays for the call after it), and moving the call before the loop inverts the order of two socket options (G18)",
+  "pm": "approvato"
  },
  {
   "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
@@ -234,7 +258,9 @@
   "kind": "add",
   "form": "unknown",
   "line": "        service.start(vec![addr]).unwrap();",
-  "test": ""
+  "test": "cargo:mdns_service::tests::stealth_responder_on_the_loopback_hears_its_own_query",
+  "exception": "an anchor of one line is not possible: the join loop consumes `addrs` (its two lines iterate by reference so that the first address stays for the call after it), and moving the call before the loop inverts the order of two socket options (G18)",
+  "pm": "approvato"
  },
  {
   "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
@@ -242,7 +268,9 @@
   "kind": "add",
   "form": "unknown",
   "line": "        let hostname = Uuid::new_v4().as_hyphenated().to_string() + \".local\";",
-  "test": ""
+  "test": "cargo:mdns_service::tests::stealth_responder_on_the_loopback_hears_its_own_query",
+  "exception": "an anchor of one line is not possible: the join loop consumes `addrs` (its two lines iterate by reference so that the first address stays for the call after it), and moving the call before the loop inverts the order of two socket options (G18)",
+  "pm": "approvato"
  },
  {
   "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
@@ -250,7 +278,9 @@
   "kind": "add",
   "form": "unknown",
   "line": "        service.register_hostname(&hostname, \"192.168.44.9\");",
-  "test": ""
+  "test": "cargo:mdns_service::tests::stealth_responder_on_the_loopback_hears_its_own_query",
+  "exception": "an anchor of one line is not possible: the join loop consumes `addrs` (its two lines iterate by reference so that the first address stays for the call after it), and moving the call before the loop inverts the order of two socket options (G18)",
+  "pm": "approvato"
  },
  {
   "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
@@ -258,7 +288,9 @@
   "kind": "add",
   "form": "unknown",
   "line": "        let callback = Callback {",
-  "test": ""
+  "test": "cargo:mdns_service::tests::stealth_responder_on_the_loopback_hears_its_own_query",
+  "exception": "an anchor of one line is not possible: the join loop consumes `addrs` (its two lines iterate by reference so that the first address stays for the call after it), and moving the call before the loop inverts the order of two socket options (G18)",
+  "pm": "approvato"
  },
  {
   "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
@@ -266,7 +298,9 @@
   "kind": "add",
   "form": "unknown",
   "line": "            data: 0 as *const c_void,",
-  "test": ""
+  "test": "cargo:mdns_service::tests::stealth_responder_on_the_loopback_hears_its_own_query",
+  "exception": "an anchor of one line is not possible: the join loop consumes `addrs` (its two lines iterate by reference so that the first address stays for the call after it), and moving the call before the loop inverts the order of two socket options (G18)",
+  "pm": "approvato"
  },
  {
   "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
@@ -274,7 +308,9 @@
   "kind": "add",
   "form": "unknown",
   "line": "            resolved: own_name_resolved,",
-  "test": ""
+  "test": "cargo:mdns_service::tests::stealth_responder_on_the_loopback_hears_its_own_query",
+  "exception": "an anchor of one line is not possible: the join loop consumes `addrs` (its two lines iterate by reference so that the first address stays for the call after it), and moving the call before the loop inverts the order of two socket options (G18)",
+  "pm": "approvato"
  },
  {
   "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
@@ -282,7 +318,9 @@
   "kind": "add",
   "form": "unknown",
   "line": "            timedout: own_name_timedout,",
-  "test": ""
+  "test": "cargo:mdns_service::tests::stealth_responder_on_the_loopback_hears_its_own_query",
+  "exception": "an anchor of one line is not possible: the join loop consumes `addrs` (its two lines iterate by reference so that the first address stays for the call after it), and moving the call before the loop inverts the order of two socket options (G18)",
+  "pm": "approvato"
  },
  {
   "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
@@ -290,7 +328,9 @@
   "kind": "add",
   "form": "unknown",
   "line": "        };",
-  "test": ""
+  "test": "cargo:mdns_service::tests::stealth_responder_on_the_loopback_hears_its_own_query",
+  "exception": "an anchor of one line is not possible: the join loop consumes `addrs` (its two lines iterate by reference so that the first address stays for the call after it), and moving the call before the loop inverts the order of two socket options (G18)",
+  "pm": "approvato"
  },
  {
   "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
@@ -298,7 +338,9 @@
   "kind": "add",
   "form": "unknown",
   "line": "        service.query_hostname(callback, &hostname);",
-  "test": ""
+  "test": "cargo:mdns_service::tests::stealth_responder_on_the_loopback_hears_its_own_query",
+  "exception": "an anchor of one line is not possible: the join loop consumes `addrs` (its two lines iterate by reference so that the first address stays for the call after it), and moving the call before the loop inverts the order of two socket options (G18)",
+  "pm": "approvato"
  },
  {
   "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
@@ -306,7 +348,9 @@
   "kind": "add",
   "form": "unknown",
   "line": "        let start = time::Instant::now();",
-  "test": ""
+  "test": "cargo:mdns_service::tests::stealth_responder_on_the_loopback_hears_its_own_query",
+  "exception": "an anchor of one line is not possible: the join loop consumes `addrs` (its two lines iterate by reference so that the first address stays for the call after it), and moving the call before the loop inverts the order of two socket options (G18)",
+  "pm": "approvato"
  },
  {
   "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
@@ -314,7 +358,9 @@
   "kind": "add",
   "form": "unknown",
   "line": "        while !OWN_NAME_RESOLVED.load(Ordering::SeqCst) && start.elapsed() < time::Duration::from_secs(3) {",
-  "test": ""
+  "test": "cargo:mdns_service::tests::stealth_responder_on_the_loopback_hears_its_own_query",
+  "exception": "an anchor of one line is not possible: the join loop consumes `addrs` (its two lines iterate by reference so that the first address stays for the call after it), and moving the call before the loop inverts the order of two socket options (G18)",
+  "pm": "approvato"
  },
  {
   "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
@@ -322,7 +368,9 @@
   "kind": "add",
   "form": "unknown",
   "line": "            thread::sleep(time::Duration::from_millis(10));",
-  "test": ""
+  "test": "cargo:mdns_service::tests::stealth_responder_on_the_loopback_hears_its_own_query",
+  "exception": "an anchor of one line is not possible: the join loop consumes `addrs` (its two lines iterate by reference so that the first address stays for the call after it), and moving the call before the loop inverts the order of two socket options (G18)",
+  "pm": "approvato"
  },
  {
   "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
@@ -340,7 +388,9 @@
   "kind": "add",
   "form": "unknown",
   "line": "        service.stop();",
-  "test": ""
+  "test": "cargo:mdns_service::tests::stealth_responder_on_the_loopback_hears_its_own_query",
+  "exception": "an anchor of one line is not possible: the join loop consumes `addrs` (its two lines iterate by reference so that the first address stays for the call after it), and moving the call before the loop inverts the order of two socket options (G18)",
+  "pm": "approvato"
  },
  {
   "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
@@ -348,7 +398,9 @@
   "kind": "add",
   "form": "unknown",
   "line": "        assert!(",
-  "test": ""
+  "test": "cargo:mdns_service::tests::stealth_responder_on_the_loopback_hears_its_own_query",
+  "exception": "an anchor of one line is not possible: the join loop consumes `addrs` (its two lines iterate by reference so that the first address stays for the call after it), and moving the call before the loop inverts the order of two socket options (G18)",
+  "pm": "approvato"
  },
  {
   "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
@@ -356,7 +408,9 @@
   "kind": "add",
   "form": "unknown",
   "line": "            OWN_NAME_RESOLVED.load(Ordering::SeqCst),",
-  "test": ""
+  "test": "cargo:mdns_service::tests::stealth_responder_on_the_loopback_hears_its_own_query",
+  "exception": "an anchor of one line is not possible: the join loop consumes `addrs` (its two lines iterate by reference so that the first address stays for the call after it), and moving the call before the loop inverts the order of two socket options (G18)",
+  "pm": "approvato"
  },
  {
   "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
@@ -364,7 +418,9 @@
   "kind": "add",
   "form": "unknown",
   "line": "            \"the query of the responder did not come back to its own socket\"",
-  "test": ""
+  "test": "cargo:mdns_service::tests::stealth_responder_on_the_loopback_hears_its_own_query",
+  "exception": "an anchor of one line is not possible: the join loop consumes `addrs` (its two lines iterate by reference so that the first address stays for the call after it), and moving the call before the loop inverts the order of two socket options (G18)",
+  "pm": "approvato"
  },
  {
   "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
@@ -372,7 +428,9 @@
   "kind": "add",
   "form": "unknown",
   "line": "        );",
-  "test": ""
+  "test": "cargo:mdns_service::tests::stealth_responder_on_the_loopback_hears_its_own_query",
+  "exception": "an anchor of one line is not possible: the join loop consumes `addrs` (its two lines iterate by reference so that the first address stays for the call after it), and moving the call before the loop inverts the order of two socket options (G18)",
+  "pm": "approvato"
  },
  {
   "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
