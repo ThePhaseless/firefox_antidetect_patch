@@ -868,15 +868,9 @@ jobs:
       - name: HOST GATE - the same on every host, retail's where the identity does not decide
         run: python scripts/ci_host_gate.py compare host-dump
 
-  # OUR XPCSHELL TESTS on the candidate's packaged binary (`firefox -xpcshell`), on each leg's native runner: xpcshell.yml, called with this gate's
-  # build_run_id so that it takes the candidate's asset-* artifacts as every job above does (never the published engine: that is its measurement
-  # on a push, and it has no build_run_id there). A reusable-workflow job has no timeout of its own: the legs' budget, 15 minutes, is in xpcshell.yml.
-  # Its verdict is a job of this gate: red when a test fails or is skipped, a declared file collects nothing, or the declared list and the xpcshell tests
-  # of ours that the series holds differ.
-  xpcshell:
-    name: xpcshell
-    permissions: { actions: read, contents: read }
-    uses: ./.github/workflows/xpcshell.yml
-    with:
-      build_run_id: ${{ inputs.build_run_id }}
-      wrapper_ref: ${{ inputs.wrapper_ref }}
+  # CARGO TESTS: the unit tests of OUR Rust code in WebRender (gfx/wr), which no other round runs. Beside the rest of the gate (no `needs`), on GitHub's
+  # runners, 15 minutes a leg (the timeout is on the job of cargo-tests.yml: a job that calls a workflow takes none). Red when none of ours ran.
+  cargo-tests:
+    name: cargo-tests
+    permissions: { contents: read }
+    uses: ./.github/workflows/cargo-tests.yml

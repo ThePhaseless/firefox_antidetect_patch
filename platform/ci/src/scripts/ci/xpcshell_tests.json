@@ -1,8 +1,0 @@
-{
- "files": [
-  "browser/components/tests/unit/test_stealth_launch_counter.js",
-  "toolkit/components/url-classifier/tests/unit/test_stealth_hashcompleter_context.js",
-  "toolkit/components/urlformatter/tests/unit/test_stealth_apikeys.js"
- ],
- "min_tests": 7
-}
