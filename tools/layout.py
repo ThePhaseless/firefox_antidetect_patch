@@ -167,6 +167,7 @@ OWN_FILES = [
     (r"^gfx/thebes/StealthFcFontList\.", "fingerprint/fonts/font-list"),
     (r"^dom/canvas/StealthWebGLReadback\.", "fingerprint/canvas/noise-projection"),
     (r"^dom/canvas/StealthWebGLParams\.", "fingerprint/webgl/parameters"),
+    (r"^dom/canvas/gtest/TestStealthWebGLParams\.cpp$", "fingerprint/webgl/parameters"),
     (r"^gfx/gl/StealthGLMultisample\.", "fingerprint/webgl/multisample"),
     (r"^gfx/gl/gtest/TestStealthGLMultisample\.cpp$", "fingerprint/webgl/multisample"),
     (r"^gfx/gl/StealthOwnGL\.", "fingerprint/webgl/own-gl"),
