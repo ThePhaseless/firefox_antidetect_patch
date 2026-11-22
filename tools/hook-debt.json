@@ -1,19 +1,5 @@
 [
  {
-  "key": "C11|fingerprint/input/latency|dom/webidl/Window.webidl|dictionary SynthesizeEventData {|27b6abc04560",
-  "rule": "C11",
-  "folder": "fingerprint/input/latency",
-  "file": "dom/webidl/Window.webidl",
-  "text": "unsigned long jugglerEventId = 0;"
- },
- {
-  "key": "C11|fingerprint/input/latency|dom/webidl/Window.webidl|dictionary SynthesizeEventData {|8c9841c275a2",
-  "rule": "C11",
-  "folder": "fingerprint/input/latency",
-  "file": "dom/webidl/Window.webidl",
-  "text": "double latency = 0;"
- },
- {
   "key": "C11|network/proxy-udp|netwerk/base/nsIProxyInfo.idl|interface nsIProxyInfo : nsISupports|68d373876411",
   "rule": "C11",
   "folder": "network/proxy-udp",
@@ -8743,13 +8729,6 @@
   "text": "-StaticPrefs::network_trr_async_connInfo()) { StaticPrefs::network_trr_async_connInfo() && StealthTRRContextOfSuffix(mOr"
  },
  {
-  "key": "C6|network/doh|netwerk/protocol/http/TLSTransportLayer.cpp|bool TLSTransportLayer::Init(const char* aTLSHost, int32_t aTLSPort) {|e74518281b29",
-  "rule": "C6",
-  "folder": "network/doh",
-  "file": "netwerk/protocol/http/TLSTransportLayer.cpp",
-  "text": "-PR_AF_INET, aTLSHost, aTLSPort, nullptr, OriginAttributes(), 0, 0, mFD, PR_AF_INET, aTLSHost, aTLSPort, nullptr, Stealt"
- },
- {
   "key": "C6|network/doh|netwerk/protocol/http/TRRServiceChannel.cpp|nsresult TRRServiceChannel::BeginConnect() {|cbaeed255a0f",
   "rule": "C6",
   "folder": "network/doh",
@@ -10701,13 +10680,6 @@
   "folder": "platform/repo",
   "file": ".gitignore",
   "text": "release-out/"
- },
- {
-  "key": "C9|platform/repo|CLAUDE.md||7aebdb17a9ed",
-  "rule": "C9",
-  "folder": "platform/repo",
-  "file": "CLAUDE.md",
-  "text": "# Questo albero non e' mozilla-central: e' il nostro Firefox patchato Ramo `stealth/157`. Le istruzioni di Mozilla qui s"
  },
  {
   "key": "C9|platform/startup-cache|startupcache/test/TestStartupCache.cpp|TEST_F(TestStartupCache, WriteObject) {|f12f5395ab1d",

@@ -8,11 +8,16 @@ comment, in one of these forms:
     notice            StealthX(this, aArg);                          first statement of a function
     wrap-expression   Mozilla's expression, unchanged, inside our call (one Mozilla line rewritten): the whole
                       expression, or a sub-expression of the line, with our extra leading arguments (`this, `)
+                      G53: or a multi-line expression: one line of ours added to open our call (marker on it), Mozilla's lines
+                      in between unchanged, the closing line Mozilla's plus our `)` and the marker
     wrap-call         G29: the one called identifier `Foo` of Mozilla's line becomes `StealthFoo`, same arguments;
                       G9: or one argument of ours (a Stealth call) is added to a call of Mozilla's line
     wrap-function     G1/G2: the signature or macro `Foo` renamed `Foo_Mozilla` (or by another suffix, `FooAsDrawn`),
                       one line rewritten; the one-line declarations and the internal calls rewritten to the same new name
-    declared-value    one Mozilla line rewritten with our value (a pref default)
+                      G29/G9: or the called function replaced and one to three plain arguments of ours added (`this`, a member),
+                      or one plain argument added in front of the closing line of a call that spans lines
+    declared-value    one Mozilla line rewritten with our value (a pref default, a name in place of a literal, a STEALTH_ macro
+                      in place of Mozilla's macro or `#ifdef`)
     registration      `#include "StealthX.h"` in a block of ours after Mozilla's, a moz.build
                       `VAR += [...]` after the closing `]`, one line in .ipdl/.webidl/components.conf/jar.mn,
                       G40: a forward declaration `class X;` or a file-scope declaration of a function of ours
@@ -216,6 +221,9 @@ INCLUDE_RES = [re.compile(p) for p in (
     r"^\s*use\s+[\w:{]", r"^\s*(extern\s+crate|mod)\s+\w",
     r"^\s*(const|let|var)\s+.*=\s*(ChromeUtils\.(importESModule|import)|require)\(")]
 PP_COND = re.compile(r"^\s*#\s*(if|ifdef|ifndef|else|elif|endif)\b")
+DOC_TYPES = {"md", "rst", "txt"}
+PP_FILE_TYPES = {"js", "json", "inc"}       # G50: preprocessed pref files and JSON, where a trailing comment is impossible
+PP_DIRECTIVE = re.compile(r"^\s*#\s*(include|if|ifdef|ifndef|else|elif|endif|define|undef|filter|expand)\b")
 CONTROL = re.compile(r"^(\}\s*)?(if|else|for|while|switch|do|try|catch|namespace|struct|class|enum|union|extern|case|default)\b")
 OPENERS = ("//", "/*", "<!--", "#", ";")
 CLOSERS = ("", "*/", "-->")
@@ -233,6 +241,7 @@ IDENT = re.compile(r"^[A-Za-z_]\w*$")
 FORWARD_DECL = re.compile(r"^(?:class|struct)\s+\w+\s*;$")
 OWN_DECL = re.compile(r"^(?:[\w:<>,\[\]]+[\s*&]+)+(?:[A-Za-z_]\w*::)*(?:nr_stealth_|Stealth|stealth_)\w*\s*\([^;{}]*\)\s*(?:const\s*)?;$")
 SHADOW = re.compile(r"^(?:const\s+)?(?:auto|[\w:<>,*]+)\s*&?\s*[A-Za-z_]\w*\s*=\s*(?:[A-Za-z_]\w*::)*(?:nr_stealth_|Stealth|stealth_)\w*\s*;$")
+CONST_LINE = re.compile(r"^\s*const\s")
 NUMBERED = re.compile(r"(=\s*(0x[0-9a-fA-F]+|\d+)\s*;)|(1\s*<<\s*\d+)")
 
 
@@ -306,6 +315,8 @@ def is_stealth_chain(chain: str) -> bool:
     return any(STEALTH_NAME.match(seg) for seg in re.split(r"::|\.|->", chain))
 
 
+MOZILLA_CALLS = {"MOZ_RELEASE_ASSERT", "ABORT", "NS_ENSURE_SUCCESS", "Services.prefs.getBoolPref",
+                 "ChromeUtils.importESModule"}
 KNOWN_NAMES_FILE = Path(__file__).with_name("hook-names.json")
 _known_names = None
 
@@ -380,7 +391,7 @@ def classify(ft: str, section: str, lines: list):
         return "unknown", False
     cs = [x.strip() for x in code]
     closing = nxt.startswith(("}", "]", ")"))
-    at_end = closing or eof
+    at_end = (closing or eof) and ft not in DOC_TYPES      # a Markdown line is not the last line of a block
     if ft in BUILDISH:
         if (list_item(cs[-1]) and (list_item(prev) or list_item(nxt) or prev.endswith(("[", "(")))) or \
            (list_item(prev) and nxt.startswith(("]", ")"))):
@@ -440,7 +451,7 @@ def _mozilla_expression(removed: str, code: str):
     return None
 
 
-TOKEN = re.compile(r"""\s*("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\w+|\S)""")
+TOKEN = re.compile(r"""\s*("(?:\\.|[^"\\])*"(?:_\w+)?|'(?:\\.|[^'\\])*'|\w+|\S)""")
 LITERAL = re.compile(r"""^("|'|\d|true$|false$|nullptr$|null$|None$|True$|False$)""")
 
 
@@ -450,7 +461,7 @@ def _value_change(removed: str, code: str) -> bool:
         return TOKEN.findall(re.sub(r"\s(//|#)\s.*$", "", t.strip()))
     r, c = toks(removed), toks(code)
     return len(r) == len(c) and any(x != y for x, y in zip(r, c)) and \
-        all(x == y or (LITERAL.match(x) and LITERAL.match(y)) for x, y in zip(r, c))
+        all(x == y or (LITERAL.match(x) and (LITERAL.match(y) or IDENT.match(y))) for x, y in zip(r, c))
 
 
 def _toks(t: str) -> list:
@@ -558,6 +569,8 @@ def _added_argument(removed: str, code: str):
 def renamed_identifier(removed: str, code: str):
     """G1/G2: the new name if the only token difference between Mozilla's line and ours is one identifier extended by
     a suffix and it is a function or macro (a `(` follows it, or the suffix is `_Mozilla`/`_MOZILLA`), else None."""
+    removed = re.sub(r"^(?:(?:static|inline)\s+)+", "", removed.strip())     # a definition made visible to our file
+    code = re.sub(r"^(?:(?:static|inline)\s+)+", "", code.strip())
     got = _one_identifier_differs(removed, code)
     if not got:
         return None
@@ -588,6 +601,77 @@ def called_replacement(removed: str, code: str):
     return name if STEALTH_CHAIN.fullmatch(name) else None
 
 
+def called_with_plain_arguments(removed: str, code: str):
+    """G29 + G9: the Stealth chain if our line is Mozilla's with the called function replaced by a Stealth-named one of the
+    same qualifier and one to three plain arguments of ours (`this`, a member or a parameter) added before or after
+    Mozilla's arguments, which stay as they are and in order; the rest of the line identical. Else None."""
+    want = removed.strip()
+    for rm in CALL.finditer(want):
+        r_chain = rm.group(1)
+        r_name = re.split(r"::|\.|->", r_chain)[-1]
+        ro = rm.end() - 1
+        rc = _close_paren(want, ro)
+        if rc < 0 or r_name in KEYWORDS or STEALTH_NAME.match(r_name):
+            continue
+        r_args = _args(want, ro + 1, rc)
+        r_prefix = r_chain[:len(r_chain) - len(r_name)]
+        for cm in CALL.finditer(code):
+            c_chain = cm.group(1)
+            c_name = re.split(r"::|\.|->", c_chain)[-1]
+            co = cm.end() - 1
+            cc = _close_paren(code, co)
+            if cc < 0 or not STEALTH_NAME.match(c_name) or c_chain[:len(c_chain) - len(c_name)] != r_prefix:
+                continue
+            if _toks(code[:cm.start()]) != _toks(want[:rm.start()]) or _toks(code[cc + 1:]) != _toks(want[rc + 1:]):
+                continue
+            c_args = _args(code, co + 1, cc)
+            m = len(r_args)
+            for k in range(0, len(c_args) - m + 1):
+                if [_toks(a) for a in c_args[k:k + m]] != [_toks(a) for a in r_args]:
+                    continue
+                extra = c_args[:k] + c_args[k + m:]
+                if 1 <= len(extra) <= 3 and all(SIMPLE_ARG.match(e) for e in extra):
+                    return c_chain
+    return None
+
+
+SIMPLE_ARG = re.compile(r"^(?:this|[A-Za-z_]\w*(?:(?:->|\.|::)[A-Za-z_]\w*)*)$")
+
+
+def _args(code: str, lo: int, hi: int) -> list:
+    """The top-level arguments of code[lo:hi], stripped ([] for an empty list)."""
+    if not code[lo:hi].strip():
+        return []
+    starts = _arg_starts(code, lo, hi) + [hi + 1]
+    return [code[a:b - 1].strip() for a, b in zip(starts, starts[1:])]
+
+
+def added_leading_argument(removed: str, code: str) -> bool:
+    """G9 on one physical line of a call that spans several: Mozilla's line closes or continues the argument list
+    (`aLastModified);`), ours is the same with one plain argument of ours in front (`this, aLastModified);`)."""
+    r = removed.strip()
+    if not r or (r.count(")") <= r.count("(") and not r.endswith(",")):
+        return False
+    m = re.match(r"^(this|[A-Za-z_]\w*)\s*,\s*(.+)$", code.strip())
+    return bool(m) and _toks(m.group(2)) == _toks(r)
+
+
+MACRO_VALUE = re.compile(r"^[A-Z][A-Z0-9_]*$")
+OUR_MACRO = re.compile(r"^STEALTH_[A-Z0-9_]+$")
+PP_IF = re.compile(r"^\s*#\s*(?:if|ifdef|ifndef)\b")
+PP_IF_OURS = re.compile(r"^\s*#\s*if\s+!?\s*STEALTH_[A-Z0-9_]+\s*$")
+
+
+def declared_by_macro(removed: str, code: str) -> bool:
+    """A value of Mozilla's given by a macro of ours: a preprocessor condition (`#ifdef XP_WIN`) that becomes `#if
+    STEALTH_NATIVE_EOL_IS_CRLF`, or one macro of Mozilla's in the line replaced by a STEALTH_ one."""
+    if PP_IF.match(removed) and PP_IF_OURS.match(code):
+        return True
+    r, c = _toks(removed), _toks(code)
+    diff = [(x, y) for x, y in zip(r, c) if x != y]
+    return len(r) == len(c) and len(diff) == 1 and bool(MACRO_VALUE.match(diff[0][0])) and bool(OUR_MACRO.match(diff[0][1]))
+
+
 def line_form(ft: str, base: str, code: str, removed: str, kind: str, placement: str, pair: bool, renames=()):
     """-> (form, remainder): the form of one added code line. remainder: for wrap-expression, the
     line without Mozilla's expression (what the logic and name rules look at), else the code.
@@ -600,9 +684,14 @@ def line_form(ft: str, base: str, code: str, removed: str, kind: str, placement:
         if removed and renamed_identifier(removed, code):
             return "wrap-function", code
         if pair and removed:
-            call = called_replacement(removed, code) or _added_argument(removed, code)
+            call = (called_replacement(removed, code) or _added_argument(removed, code)
+                    or called_with_plain_arguments(removed, code))
             if call:
                 return "wrap-call", call + "()"
+            if added_leading_argument(removed, code):
+                return "wrap-call", ""
+            if declared_by_macro(removed, code):
+                return "declared-value", ""
             got = _mozilla_expression(removed, code)
             if got and got[1].strip() not in ("", ";") and calls(got[1]):
                 return "wrap-expression", got[1]
@@ -610,9 +699,11 @@ def line_form(ft: str, base: str, code: str, removed: str, kind: str, placement:
             if sub:
                 return "wrap-expression", sub
             if _value_change(removed, code):
-                return "declared-value", code
+                # logic is judged in the part that is ours: the values that changed, not Mozilla's own text around them
+                r, c = _toks(removed), _toks(code)
+                return "declared-value", " ".join(y for x, y in zip(r, c) if x != y)
         return "unknown", code
-    if is_include(code):
+    if is_include(code) or (ft in PP_FILE_TYPES and PP_DIRECTIVE.match(code)):
         return "registration", code
     if ft in ("ipdl", "ipdlh", "webidl") or base in ("components.conf", "jar.mn"):
         return "registration", code
@@ -662,6 +753,13 @@ def _complete(ft: str, code: str) -> bool:
     if not c or not _balanced(c) or c[-1] in ",(+-*/&|=?:\\.<":
         return False
     return not INCOMPLETE_CONTROL.match(c)
+
+
+def _marker_before_directive(ft: str, run: list, codes: list) -> bool:
+    """G50: in a preprocessed pref file or a JSON file a marker comment alone on the line immediately before a
+    preprocessor directive line (`#include init/StealthPrefs.js`) forms one hook with it."""
+    return (ft in PP_FILE_TYPES and len(run) == 2 and codes[0][0] == "" and codes[0][1] is not None and not codes[0][2]
+            and bool(PP_DIRECTIVE.match(codes[1][0])) and codes[1][1] is None and run[1][0] == run[0][0] + 1)
 
 
 def _own_line(ft: str, code: str, marker) -> bool:
@@ -724,6 +822,47 @@ def _runs(nonblank: list) -> list:
     return runs
 
 
+def _closes_wrap(removed: str, code: str) -> bool:
+    """Our line is Mozilla's closing line with exactly one more `)` (the one that closes our opened call), nothing else."""
+    r, c = _toks(removed), _toks(code)
+    return len(c) == len(r) + 1 and any(t == ")" and c[:k] + c[k + 1:] == r for k, t in enumerate(c))
+
+
+def _wrap_roles(ft: str, blocks: list) -> dict:
+    """G53: a multi-line expression wrap. One line of ours is ADDED to open our call (`StealthX(a,  // STEALTH-HOOK(f)`,
+    marker on it), Mozilla's expression lines in between stay as they are (context), and only the closing line is
+    rewritten: Mozilla's closing text plus our `)` and the marker. -> {block index: "open" | "close"}. A wrap where a
+    middle line changes (another block between the two) or where a line lacks the marker is not recognised."""
+    roles = {}
+    if ft not in CLIKE:
+        return roles
+    for i in range(len(blocks) - 1):
+        a, z = blocks[i], blocks[i + 1]
+        if a["rem"] or len(a["add"]) != 1 or len(z["rem"]) != 1 or len(z["add"]) != 1 or i in roles:
+            continue
+        o_code, o_mk, o_extra = marker_split(a["add"][0].rstrip())
+        c_code, c_mk, c_extra = marker_split(z["add"][0].rstrip())
+        if o_mk is None or c_mk is None or o_extra or c_extra or is_comment_line(a["add"][0], ft):
+            continue
+        m = STEALTH_CALL.match(o_code)
+        if not m or _close_paren(o_code, m.end() - 1) >= 0 or not _balanced_open_one(o_code):
+            continue
+        if _closes_wrap(z["rem"][0], c_code):
+            roles[i], roles[i + 1] = "open", "close"
+    return roles
+
+
+def _balanced_open_one(code: str) -> bool:
+    """The brackets of `code` leave exactly one `(` open."""
+    depth = 0
+    for ch in _strip_literals(code):
+        if ch in "([{":
+            depth += 1
+        elif ch in ")]}":
+            depth -= 1
+    return depth == 1
+
+
 def hook_identity(h: Hook) -> tuple:
     """The identity of a hook (the one of its HOOKS.json entry): file, function, kind, line, removed line."""
     return (h.file, _squeeze(h.function), h.kind, norm(h.line), norm(h.removed))
@@ -767,7 +906,10 @@ def analyse_patch(folder: str, text: str):
         for hno, h in enumerate(f["hunks"], 1):
             lines, section = h["lines"], h["section"]
             new_side = [(t, x) for t, x in lines if t != "-"]
-            for b in _blocks(lines):
+            blocks = _blocks(lines)
+            roles = _wrap_roles(ft, blocks)
+            for bi, b in enumerate(blocks):
+                role = roles.get(bi)
                 rem, add = b["rem"], b["add"]
                 kind = "rewrite" if add and rem else ("add" if add else "delete")
                 # the block with its context: the changes of other blocks as the new side has them
@@ -789,6 +931,9 @@ def analyse_patch(folder: str, text: str):
                 forms, nb, block_hooks = [], 0, []
                 for run in _runs(nonblank):
                     codes = [marker_split(x) for _, x in run]
+                    if _marker_before_directive(ft, run, codes):
+                        # G50: the marker alone on the line before the directive is the marker of the directive: one hook
+                        run, codes = [run[1]], [(codes[1][0], codes[0][1], codes[1][2])]
                     run_text = "\n".join(x for _, x in run)
                     # one hook = one line, but two adjacent lines are two hooks when each has its marker and is complete
                     multi_ok = all(_own_line(ft, c, mk) for c, mk, _ in codes)
@@ -800,6 +945,8 @@ def analyse_patch(folder: str, text: str):
                             rm = rem[nb] if paired else ("\n".join(rem) if nb == 0 else "")
                         nb += 1
                         form, remainder = line_form(ft, base, code, rm, kind, placement, single_pair, renames)
+                        if role:            # G53: the two ends of a multi-line wrap of Mozilla's expression
+                            form, remainder = "wrap-expression", (code if role == "open" else ")")
                         if len(run) > 1 and not multi_ok:        # a form is the form of a one-line hook
                             form, remainder = "unknown", code
                         run_forms.append((form, remainder))
@@ -811,7 +958,8 @@ def analyse_patch(folder: str, text: str):
                             violate("C3", path, section, x, extra, [hk])
                         if is_comment_line(x, ft):
                             violate("C4", path, section, x, "", [hk])
-                        if ft in IDL and NUMBERED.search(x) and not is_comment_line(x, ft):
+                        if ft in IDL and NUMBERED.search(x) and not is_comment_line(x, ft) and not (
+                                ft == "webidl" and not CONST_LINE.match(x)):   # a dictionary member's default is no numbered space
                             violate("C11", path, section, x, "", [hk])
                         if kind == "add" and is_include(code):
                             at = b["ns"] + i
@@ -829,7 +977,8 @@ def analyse_patch(folder: str, text: str):
                                 or (form == "unknown" and any(is_stealth_chain(c) for c in calls(remainder))))                                 and has_logic(remainder, ft):
                             violate("C5", path, section, x, "", [hk])
                         if form in ("guard", "notice", "anchor", "wrap-expression"):
-                            cs = calls(remainder)
+                            # C10 is about the function of ours a hook calls: Mozilla's own macros and APIs are not read as it
+                            cs = [c for c in calls(remainder) if c not in MOZILLA_CALLS]
                             if cs and not is_stealth_chain(cs[0]) and not is_known_name(cs[0]):
                                 violate("C10", path, section, x, cs[0], [hk])
                 add_text = "\n".join(x for _, x in nonblank)
@@ -841,7 +990,7 @@ def analyse_patch(folder: str, text: str):
                     all_inc = all(is_include(marker_split(x)[0]) for _, x in nonblank)
                     # G30/G33: an anchor on the last line of a block or of a JS module is allowed (T2 asks for its why)
                     end_anchor = placement == "end_of_block" and bool(forms) and all(f_ == "anchor" for f_ in forms)
-                    if not all_inc and not end_anchor and not all(f_ == "wrap-function" for f_ in forms) and (
+                    if not role and not all_inc and not end_anchor and not all(f_ == "wrap-function" for f_ in forms) and (
                             placement in ("list_entry", "end_of_block")
                             or (at_end and placement not in ("include_block", "build_file"))):
                         violate("C9", path, section, add_text, "placement=%s at_block_end=%s" % (placement, at_end), block_hooks)
@@ -885,8 +1034,15 @@ def contract_violations(root) -> list:
     left out when every hook it concerns is one."""
     import hooks_list      # imports this module: loaded here, not at the top
     excepted = {(folder, hooks_list.identity(e)) for folder, e in hooks_list.declared_exceptions(Path(root))}
+    anchored = {(folder, hooks_list.identity(e)) for folder in hooks_list.folders(Path(root))
+                for e in hooks_list.expected(Path(root), folder) if e.get("anchor") and e.get("why")}
+
+    def end_anchor(v):      # G23/G30/G33: the last statement of a block, declared with its `anchor` and `why`
+        return (v.rule == "C9" and bool(v.ids) and re.search(r"placement=(end_of_block|function_top)", v.detail) is not None
+                and all((v.folder, i) in anchored for i in v.ids))
+
     kept = [v for v in _analyse(root)[1]
-            if not (v.ids and all((v.folder, i) in excepted for i in v.ids))]
+            if not (v.ids and all((v.folder, i) in excepted for i in v.ids)) and not end_anchor(v)]
     return sorted(kept + hooks_list.missing_test_violations(root), key=lambda v: v.key)
 
 

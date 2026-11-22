@@ -288,7 +288,7 @@ def test_wrap_call_g29_changes_only_the_called_name():
         assert rules(rewrite(removed, added)) == [], added
         assert forms_of(rewrite(removed, added)) == ["wrap-call"], added
     for removed, added in (("  MozFn(a, b);", "  StealthMozFn(a);"),                 # an argument gone
-                           ("  MozFn(a, b);", "  StealthMozFn(this, a, b);"),         # an argument added: not a call wrap
+                           ("  MozFn(a, b);", "  StealthMozFn(this, x, y, z, a, b);"),   # four arguments added: not a call wrap
                            ("  MozFn(a, b);", "  OtherFn(a, b);"),                    # not a Stealth name
                            ("  MozFn(a, b);", "  StealthA(a, StealthB(b));"),
                            ("  MozFn(a, b);", "  Stealth_x;")):
@@ -480,3 +480,122 @@ def test_c1_includes_and_build_additions_in_a_run_stay_fine():
     inc = patch("dom/Foo.cpp", [" #include \"a.h\"", " ", "+#include \"StealthX.h\"", "+#include \"StealthY.h\"", " ", " using namespace mozilla;", " ",
                                 " namespace x {"], section="")
     assert "C1" not in rules(inc)
+
+
+# --------------------------------------------------------------------------- the classifier gaps the pm ruled (G1, G9, G23, G30, G41, G50, G53)
+def test_g50_a_marker_alone_before_a_directive_of_a_preprocessed_file_is_one_hook():
+    def prefs(*lines, file="modules/libpref/greprefs.js"):
+        return patch(file, [" // Do not add anything else.", " ", " #include init/all.js", *lines], section="", start=3)
+    good = prefs("+// STEALTH-HOOK(platform/prefs)", "+#include init/StealthPrefs.js")
+    assert rules(good) == [] and forms_of(good) == ["registration"]
+    assert [h.line for h in hc.analyse_patch(FOLDER, good)[0]] == ["#include init/StealthPrefs.js"]
+    assert rules(prefs("+// STEALTH-HOOK(platform/prefs)", "+#include init/StealthPrefs.js", file="a.json")) == []
+    # red: the same two lines in a C++ file, a marker before a line that is not a directive, a note beside the marker
+    assert rules(prefs("+// STEALTH-HOOK(platform/prefs)", '+#include "StealthPrefs.h"', file="dom/A.cpp"))
+    assert rules(prefs("+// STEALTH-HOOK(platform/prefs)", '+pref("a.b", 1);'))
+    assert rules(prefs("+// STEALTH-HOOK(platform/prefs): our defaults", "+#include init/StealthPrefs.js"))
+    assert rules(prefs("+#include init/StealthPrefs.js"))      # no marker at all
+
+
+def test_g41_mozillas_own_macros_are_not_the_called_name_of_a_hook_and_the_known_names_are_known():
+    for call in ("MOZ_RELEASE_ASSERT(a == b);", "ABORT(a);", "NS_ENSURE_SUCCESS(rv, rv);"):
+        assert rules(top("  " + call + MARK)) == [], call
+    assert "C10" in rules(top("  OtherApi(a);" + MARK))
+    assert "C10" in rules(top("  MOZ_RELEASE_ASSERT(OtherApi(a));" + MARK))
+    for name in ("CSP_IsBypassedFor", "SessionSystemLocale", "SessionSystemLocales", "WorkerLocaleLanguage",
+                 "SeedDeclaredTimezoneAndLanguage", "SetDeclaredRealmTimeAndLanguage"):
+        assert hc.is_known_name(name), name
+        assert rules(top("  " + name + "(this);" + MARK)) == [], name
+
+
+def test_c11_a_webidl_dictionary_default_is_not_a_numbered_space():
+    def idl(line):
+        return patch("dom/webidl/Window.webidl", ["   // lead", "   dictionary D {", "+" + line + "  // STEALTH-HOOK(fingerprint/x)",
+                                                  "   };"], section="dictionary D {")
+    assert "C11" not in rules(idl("  unsigned long jugglerEventId = 0;"))
+    assert "C11" not in rules(idl("  double latency = 0;"))
+    assert "C11" in rules(idl("  const unsigned short FOO = 4;"))
+
+
+def test_c5_logic_is_judged_in_the_part_that_is_ours():
+    text = rewrite('  const char* f = a() ? a() : "debugger eval code";', '  const char* f = a() ? a() : "eval code";')
+    assert forms_of(text) == ["declared-value"] and rules(text) == []
+    text = rewrite("  x = Mozilla(a);", "  x = StealthWrap(a) ? Mozilla(a) : b;")
+    assert rules(text)          # a ternary of ours is still logic
+
+
+def test_g9_partial_line_of_a_multi_line_call_adds_one_plain_argument():
+    for removed, added in (("  aLastModified);", "  this, aLastModified);"), ("  mLastModified);", "  this, mLastModified);"),
+                           ("  aTime,", "  this, aTime,")):
+        text = rewrite(removed, added)
+        assert rules(text) == [] and forms_of(text) == ["wrap-call"], (added, rules(text), forms_of(text))
+    for removed, added in (("  aLastModified);", "  this, x, aLastModified);"),        # two arguments of ours
+                           ("  aLastModified);", "  this, bLastModified);"),            # Mozilla's text changed
+                           ("  Foo(aLastModified);", "  this, Foo(aLastModified);")):  # not the end of a call that spans lines
+        assert "C6" in rules(rewrite(removed, added)), added
+
+
+def test_g29_g9_the_called_function_replaced_and_plain_arguments_added():
+    ok = {"  const auto l = ShaderOutput(gl);": "  const auto l = StealthShaderOutputLanguage(gl, mStealthPerPage);",
+          "  status = PR_Connect(fd, &prAddr, T);": "  status = StealthConnect(mNetAddr, mProxyTransparent, mProxyHost, fd, &prAddr, T);",
+          "  MozFn(a, b);": "  StealthMozFn(this, a, b);",
+          "  rv = obj->MozFn(a);": "  rv = obj->StealthMozFn(a, mX);"}
+    for removed, added in ok.items():
+        text = rewrite(removed, added)
+        assert rules(text) == [] and forms_of(text) == ["wrap-call"], (added, rules(text), forms_of(text))
+    for removed, added in (("  MozFn(a, b);", "  StealthMozFn(w, x, y, z, a, b);"),    # four arguments of ours
+                           ("  MozFn(a, b);", "  StealthMozFn(this, b, a);"),           # reordered
+                           ("  MozFn(a, b);", "  StealthMozFn(this, x + 1, a, b);"),    # logic in one
+                           ("  MozFn(a, b);", "  StealthMozFn(this, G(), a, b);"),      # a call in one
+                           ("  MozFn(a, b);", "  StealthMozFn(this, a, c);"),           # Mozilla's argument changed
+                           ("  MozFn(a, b);", "  OtherFn(this, a, b);"),                # not a Stealth name
+                           ("  o->MozFn(a);", "  StealthMozFn(o, a);"),                 # the object is gone: not this form
+                           ("  MozFn(a, b);", "  StealthMozFn(this, a, b) + 1;")):      # the rest of the line changed
+        assert "C6" in rules(rewrite(removed, added)), added
+
+
+def test_g1_a_rename_on_a_definition_line_may_drop_static():
+    text = rewrite("static ShShaderOutput ShaderOutput(gl::GLContext* gl) {", "ShShaderOutput ShaderOutputPerIlDriver(gl::GLContext* gl) {")
+    assert forms_of(text) == ["wrap-function"] and rules(text) == []
+    assert "C6" in rules(rewrite("static ShShaderOutput ShaderOutput(gl::GLContext* gl) {",
+                                 "ShShaderOutput ShaderOutputPerIlDriver(gl::GLContext* gl, int x) {"))
+
+
+def test_a_value_given_through_a_macro_of_ours_or_a_name_in_place_of_a_literal_is_a_declared_value():
+    cases = {"#ifdef XP_WIN": "#if STEALTH_NATIVE_EOL_IS_CRLF",
+             "    aLineBreak.AssignLiteral(NS_ULINEBREAK);": "    aLineBreak.AssignLiteral(STEALTH_NATIVE_ULINEBREAK);",
+             '    rv = F(type, ""_ns, ""_ns, ""_ns, ""_ns,': '    rv = F(type, ""_ns, mUser, mPass, ""_ns,'}
+    for removed, added in cases.items():
+        text = rewrite(removed, added)
+        assert forms_of(text) == ["declared-value"] and rules(text) == [], (added, rules(text), forms_of(text))
+    for removed, added in (("#ifdef XP_WIN", "#if OTHER_MACRO"), ("#ifdef XP_WIN", "#if STEALTH_X && FOO"),
+                           ("    A(NS_ULINEBREAK);", "    A(OTHER_ULINEBREAK);"),
+                           ("    A(NS_ULINEBREAK, 1);", "    A(STEALTH_ULINEBREAK, 2);"),
+                           ("    rv = F(a, b);", "    rv = F(a, c);")):              # a name replaced by a name: not a value
+        assert "C6" in rules(rewrite(removed, added)), added
+
+
+G53_OPEN = "      StealthWithContentOrigin(aPresContext,  // STEALTH-HOOK(fingerprint/x)"
+G53_MID = ["      LayoutDevicePixel::ToAppUnits(", "          guiEvent->mWidget->TopLevelWidgetToScreenOffset(),"]
+G53_CLOSE_OLD = "          aPresContext->DeviceContext()->AppUnitsPerDevPixel()));"
+G53_CLOSE_NEW = "          aPresContext->DeviceContext()->AppUnitsPerDevPixel())));  // STEALTH-HOOK(fingerprint/x)"
+
+
+def g53(open_line=G53_OPEN, mid=G53_MID, close_new=G53_CLOSE_NEW, changed_mid=None):
+    lines = ["   const CSSPoint pt = CSSPixel::FromAppUnits(", "       topLevelPoint +", "+" + open_line, *[" " + m for m in mid]]
+    if changed_mid:
+        lines = lines[:-1] + ["-" + mid[-1], "+" + changed_mid]
+    lines += ["-" + G53_CLOSE_OLD, "+" + close_new, "   return Some(pt);"]
+    return patch("dom/events/Event.cpp", lines, section="Maybe<X> Event::GetScreenCoords(")
+
+
+def test_g53_a_multi_line_wrap_opened_by_an_added_line_and_closed_by_the_rewritten_last_line():
+    text = g53()
+    assert rules(text) == [] and forms_of(text) == ["wrap-expression", "wrap-expression"]
+    # red: the opener has no marker, the closer has none, a middle line of Mozilla's changes, the closer changes more
+    assert rules(g53(open_line="      StealthWithContentOrigin(aPresContext,"))
+    assert rules(g53(close_new="          aPresContext->DeviceContext()->AppUnitsPerDevPixel())));"))
+    assert "C6" in rules(g53(changed_mid="          guiEvent->mWidget->Other(),"))
+    assert "C6" in rules(g53(close_new=G53_CLOSE_NEW.replace("AppUnitsPerDevPixel()", "AppUnitsPerDevPixel(1)")))
+    assert "C6" in rules(g53(close_new=G53_CLOSE_NEW.replace("())));", "()));")))       # no `)` of ours: no wrap
+    assert "C6" in rules(g53(open_line="      OtherCall(aPresContext,  // STEALTH-HOOK(fingerprint/x)"))   # not our call

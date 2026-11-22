@@ -600,3 +600,67 @@ def test_an_approved_exception_covers_every_copy_of_a_repeated_violation(tmp_pat
         e.update(test="wrapper:tests/test_a.py::test_b", exception="the logic is a pref default", pm="approvato")
     commit_list(root, entries)
     assert [v for v in hc.contract_violations(root) if v.rule == "C5"] == []
+
+
+# --------------------------------------------------------------------------- C9 of a declared anchor, and the cargo reference
+def anchor_series(tmp_path, lines):
+    root = series(tmp_path, hunk("dom/A.cpp", lines))
+    entries = hl.expected(root, FOLDER)
+    for e in entries:
+        e["test"] = "wrapper:tests/test_a.py::test_b"
+    commit_list(root, entries)
+    return root, entries
+
+
+def test_c9_a_declared_anchor_at_the_end_of_a_block_or_of_a_constructor_is_allowed(tmp_path):
+    cases = {
+        "if-branch": ["   // lead", " " + FN, "   if (a) {", "     int x = 1;", "+    priv->x = options.x;" + MARK, "   }", "   return NS_OK;", " }"],
+        "constructor": ["   // lead", " Foo::Foo(const Foo& aRhs) {", "+  StealthCopied(this, aRhs);" + MARK, " }"],
+    }
+    for name, lines in cases.items():
+        root, entries = anchor_series(tmp_path / name, lines)
+        assert [v.rule for v in hc.contract_violations(root)] == ["C9"], name              # red: no anchor and why declared
+        for e in entries:
+            e.update(anchor="after the copy of the members", why="the last statement of the block: nothing follows to anchor to")
+        commit_list(root, entries)
+        assert hc.contract_violations(root) == [] and hl.problems(root) == [], name        # green, and the list is stable
+        hl.write_all(root)
+        assert [e.get("anchor") for e in read_list(root)] == ["after the copy of the members"], name
+    # a Mozilla list is not a block end: the declaration does not cover it
+    root, entries = anchor_series(tmp_path / "list", ["   // lead", "   static const int kA[] = {", "     1,", "     2,",
+                                                          "+    " + "3," + MARK, "   };"])
+    entries[0].update(anchor="a", why="b")
+    commit_list(root, entries)
+    assert [v.rule for v in hc.contract_violations(root)] == ["C9"]
+
+
+def test_a_markdown_line_before_agents_md_is_not_the_last_line_of_a_block(tmp_path):
+    md = patch_md("CLAUDE.md", ["+@STEALTH_CLAUDE.md <!-- STEALTH-HOOK(fingerprint/x) -->", " @AGENTS.md"])
+    root = series(tmp_path, md)
+    assert [v.rule for v in hc.contract_violations(root) if v.rule.startswith("C")] == []
+
+
+def patch_md(file, lines):
+    return ("diff --git a/%s b/%s\n--- a/%s\n+++ b/%s\n@@ -1 +1,2 @@\n%s\n" % (file, file, file, file, "\n".join(lines)))
+
+
+def test_a_cargo_reference_is_format_checked_and_run_by_a_cargo_test_step(tmp_path):
+    root = t3_series(tmp_path)
+    for ref in ("cargo:stealth-x::tests::it_works", "cargo:stealth_x::it_works"):
+        assert hl.reference_problem(root, ref) is None, ref
+    for ref in ("cargo:stealth_x", "cargo:::t", "cargo:stealth_x::", "cargo:stealth_x:it_works", "cargo:a b::t"):
+        assert hl.reference_problem(root, ref), ref
+    assert t3_rules(root, "cargo:stealth_x::tests::it_works") == ["T3"]          # red: no step runs cargo test
+    wf = root / "platform" / "ci" / "src" / ".github" / "workflows"
+    (wf / "cargo-tests.yml").write_text(
+        "jobs:\n  cargo:\n    steps:\n      # - run: cargo test -p commented_out\n"
+        "      - run: cargo test --locked -p stealth_x\n"
+        "      - run: |\n          cargo test \\\n            --package other-crate \\\n            -- --nocapture\n"
+        "      - run: cargo test --manifest-path rust/third/Cargo.toml\n", encoding="utf-8", newline="")
+    for ref in ("cargo:stealth_x::tests::it_works", "cargo:other-crate::t", "cargo:third::t"):
+        assert t3_rules(root, ref) == [], ref
+    for ref in ("cargo:stealth::t", "cargo:stealth_xy::t", "cargo:commented_out::t", "cargo:thir::t"):
+        assert t3_rules(root, ref) == ["T3"], ref
+    (wf / "cargo-tests.yml").write_text("jobs:\n  c:\n    steps:\n      - run: cargo test --workspace\n",
+                                       encoding="utf-8", newline="")
+    assert t3_rules(root, "cargo:anything::t") == []

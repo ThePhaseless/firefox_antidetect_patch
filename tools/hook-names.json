@@ -1,7 +1,13 @@
 [
+ "CSP_IsBypassedFor",
  "GdkIsX11Display",
  "NS_ENSURE_SUCCESS",
  "RefreshDocumentLanguage",
+ "SeedDeclaredTimezoneAndLanguage",
+ "SessionSystemLocale",
+ "SessionSystemLocales",
+ "SetDeclaredRealmTimeAndLanguage",
+ "WorkerLocaleLanguage",
  "WriteParam",
  "fonts.clear_namespace",
  "hb_font_destroy",

@@ -153,7 +153,7 @@
   "file": "netwerk/protocol/http/TLSTransportLayer.cpp",
   "function": "bool TLSTransportLayer::Init(const char* aTLSHost, int32_t aTLSPort) {",
   "kind": "rewrite",
-  "form": "unknown",
+  "form": "wrap-call",
   "line": "      PR_AF_INET, aTLSHost, aTLSPort, nullptr, StealthTransportContext(mSocketTransport), 0, 0, mFD,  // STEALTH-HOOK(network/doh)",
   "removed": "      PR_AF_INET, aTLSHost, aTLSPort, nullptr, OriginAttributes(), 0, 0, mFD,",
   "test": ""

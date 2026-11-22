@@ -38,6 +38,8 @@ Test references (the grammar of `test`; '' is allowed and is debt):
     py:<path>::case:<name>          and contains the name as a word (a string or an identifier), the same for a case name
     xpcshell:<path>#<test>          the same for an xpcshell test: the file exists and the title is in it (rule T3: no
                                     round runs xpcshell yet, so it is debt until a gate leg does)
+    cargo:<crate>::<test path>      a rust test of a crate of ours (`cargo:stealth_x::tests::it_works`): only the format is
+                                    checked here; a round must run `cargo test` for the crate (rule T3)
     wrapper:<path>::<test>          a test of the wrapper repository: only the format is checked here; <test> may be
                                     invariant:<name> or case:<name> for a check of a script that is not a test function
 
@@ -48,6 +50,8 @@ A test must also be RUN by a round (rule T3, G20), judged on the series' copy of
     node:<path>            the node job runs it: <path> matches a glob of a `node --test` line (juggler/tests/*.test.mjs)
     py:<path>::<name>      some step of a workflow runs the file, or it is a tree python test of the export gate
                            (modules/libpref/test/test_stealth_*.py)
+    cargo:<crate>          a step of a workflow runs `cargo test` for the crate (`-p <crate>`, `--package <crate>`, a
+                           `--manifest-path` of it, or `--workspace`/`--all`), as the cargo job of cargo-tests.yml does
     wrapper:               the wrapper's own rounds run it: format only
     xpcshell:              run by no round, until a workflow line runs that file with xpcshell
 
@@ -81,6 +85,7 @@ TREE_PY_TESTS = "modules/libpref/test/test_stealth_*.py"       # run by the expo
 GTEST_RE = re.compile(r"\bTEST(?:_F)?\s*\(\s*(\w+)\s*,\s*(\w+)\s*\)")
 GTEST_SUFFIXES = {".cpp", ".cc", ".cxx", ".h", ".hpp"}
 WRAPPER_RE = re.compile(r"^wrapper:[^\s:#]+::\S+$")
+CARGO_RE = re.compile(r"^cargo:([A-Za-z0-9_\-]+)::(\w+(?:::\w+)*)$")
 
 
 # --------------------------------------------------------------------------- the folders
@@ -132,6 +137,10 @@ def _with_hand_fields(e: dict, old: dict | None) -> dict:
     if e["form"] == "anchor":
         out["anchor"] = old.get("anchor", "")
         out["why"] = old.get("why", "")
+    if e["form"] != "anchor":        # an anchor declared on the last statement of a block (G23, G30): kept where written
+        for k in ("anchor", "why"):
+            if old.get(k):
+                out[k] = old[k]
     for k in ("exception", "untestable", "pm"):          # the pm's decisions (G35): only where they were written
         if k in old:
             out[k] = old[k]
@@ -263,7 +272,9 @@ def reference_problem(root: Path, ref: str, index: _Index | None = None) -> str 
         if colon and label in ("invariant", "case") and not bare:
             return "wrapper:<path>::%s:<name> expected" % label
         return None
-    return "unknown test reference %r: gtest:, node:, py:, xpcshell: or wrapper:" % ref
+    if kind == "cargo":
+        return None if CARGO_RE.match(ref) else "cargo:<crate>::<full test path> expected"
+    return "unknown test reference %r: gtest:, node:, py:, xpcshell:, cargo: or wrapper:" % ref
 
 
 # --------------------------------------------------------------------------- the check
@@ -385,7 +396,7 @@ class _Rounds:
     def __init__(self, root: Path):
         wf = Path(root) / WORKFLOWS
         self.known = (wf / CANDIDATE_WORKFLOW).is_file()
-        self.filter, self.node_globs, self.lines = "", [], []
+        self.filter, self.node_globs, self.lines, self.cargo_tests = "", [], [], []
         if not self.known:
             return
         cand = (wf / CANDIDATE_WORKFLOW).read_text(encoding="utf-8", errors="replace").split("\n")
@@ -399,8 +410,18 @@ class _Rounds:
                 except ValueError:
                     pass
         for p in sorted(wf.glob("*.yml")):
-            self.lines += [ln for ln in p.read_text(encoding="utf-8", errors="replace").split("\n")
-                           if not ln.lstrip().startswith("#")]
+            lines = [ln for ln in p.read_text(encoding="utf-8", errors="replace").split("\n")
+                     if not ln.lstrip().startswith("#")]
+            self.lines += lines
+            joined = ""             # a command continued with a backslash is one command
+            for ln in lines:
+                joined += ln.rstrip()
+                if joined.endswith("\\"):
+                    joined = joined[:-1] + " "
+                    continue
+                if re.search(r"\bcargo\s+(?:\+\S+\s+)?(?:test|nextest)\b", joined):
+                    self.cargo_tests.append(joined)
+                joined = ""
 
     @staticmethod
     def _gtest_filter(lines: list) -> str:
@@ -436,6 +457,16 @@ class _Rounds:
         pat = re.compile(r"(?<![\w.\-])%s(?![\w])" % re.escape(path))
         return any(pat.search(ln) for ln in self.lines)
 
+    def cargo_runs(self, crate: str) -> bool:
+        for cmd in self.cargo_tests:
+            if re.search(r"--workspace\b|--all\b", cmd):
+                return True
+            if re.search(r"(?:^|\s)(?:-p|--package)[\s=]+%s(?![\w\-])" % re.escape(crate), cmd):
+                return True
+            if re.search(r"--manifest-path[\s=]+\S*(?<![\w\-])%s/Cargo\.toml" % re.escape(crate), cmd):
+                return True
+        return False
+
     def xpcshell_runs(self, path: str) -> bool:
         pat = re.compile(r"(?<![\w.\-])%s(?![\w])" % re.escape(path))
         return any("xpcshell" in ln and pat.search(ln) for ln in self.lines)
@@ -458,6 +489,9 @@ class _Rounds:
         if kind == "py":
             path, sep, name = rest.partition("::")
             return self.py_runs(path) if path and sep and name else None
+        if kind == "cargo":
+            m = CARGO_RE.match(ref)
+            return self.cargo_runs(m.group(1)) if m else None
         return None
 
 
