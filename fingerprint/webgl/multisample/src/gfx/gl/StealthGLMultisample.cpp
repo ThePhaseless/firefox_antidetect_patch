@@ -25,4 +25,15 @@ bool StealthDeclaredMultisample(bool aDriverSupports) {
   return aDriverSupports && StaticPrefs::webgl_msaa_samples() > 0;
 }
 
+void StealthNoteReportedMultisample(const GLContext* aGl, bool& aReported) {
+  aReported = aGl->IsSupported(GLFeature::framebuffer_multisample);
+}
+
+void StealthRestoreMultisample(
+    std::bitset<size_t(GLFeature::EnumMax)>& aFeatures, bool aReported) {
+  if (StealthDeclaredMultisample(aReported)) {
+    aFeatures[size_t(GLFeature::framebuffer_multisample)] = true;
+  }
+}
+
 }  // namespace mozilla::gl

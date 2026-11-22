@@ -1,82 +1,28 @@
 [
  {
-  "file": "third_party/libwebrtc/modules/desktop_capture/cropping_window_capturer_win.cc",
-  "function": "bool CroppingWindowCapturerWin::ShouldUseScreenCapturer() {",
+  "file": "dom/media/webrtc/moz.build",
+  "function": "EXPORTS.mozilla.media.webrtc += [",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(platform/hidden-desktop)",
-  "test": ""
+  "form": "registration",
+  "line": "TEST_DIRS += [\"tests/gtest\"]  # STEALTH-HOOK(platform/hidden-desktop)",
+  "test": "gtest:StealthWindowInputDesktop.OnlyAWindowOfThisProcessOnAnotherDesktopIsOff"
  },
  {
   "file": "third_party/libwebrtc/modules/desktop_capture/cropping_window_capturer_win.cc",
-  "function": "bool CroppingWindowCapturerWin::ShouldUseScreenCapturer() {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  if (!window_capture_helper_.IsWindowOnInputDesktop(selected)) {",
-  "test": ""
- },
- {
-  "file": "third_party/libwebrtc/modules/desktop_capture/cropping_window_capturer_win.cc",
-  "function": "bool CroppingWindowCapturerWin::ShouldUseScreenCapturer() {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    return false;",
-  "test": ""
- },
- {
-  "file": "third_party/libwebrtc/modules/desktop_capture/cropping_window_capturer_win.cc",
-  "function": "bool CroppingWindowCapturerWin::ShouldUseScreenCapturer() {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  }",
-  "test": ""
- },
- {
-  "file": "third_party/libwebrtc/modules/desktop_capture/win/window_capture_utils.cc",
   "function": "",
   "kind": "add",
   "form": "registration",
   "line": "#include \"modules/desktop_capture/win/StealthWindowInputDesktop.h\"  // STEALTH-HOOK(platform/hidden-desktop)",
-  "test": ""
+  "test": "gtest:StealthWindowInputDesktop.OnlyAWindowOfThisProcessOnAnotherDesktopIsOff"
  },
  {
-  "file": "third_party/libwebrtc/modules/desktop_capture/win/window_capture_utils.cc",
-  "function": "bool WindowCaptureHelperWin::IsWindowVisibleOnCurrentDesktop(HWND hwnd) {",
+  "file": "third_party/libwebrtc/modules/desktop_capture/cropping_window_capturer_win.cc",
+  "function": "bool CroppingWindowCapturerWin::ShouldUseScreenCapturer() {",
   "kind": "add",
-  "form": "unknown",
-  "line": "bool WindowCaptureHelperWin::IsWindowOnInputDesktop(HWND hwnd) {  // STEALTH-HOOK(platform/hidden-desktop)",
-  "test": ""
- },
- {
-  "file": "third_party/libwebrtc/modules/desktop_capture/win/window_capture_utils.cc",
-  "function": "bool WindowCaptureHelperWin::IsWindowVisibleOnCurrentDesktop(HWND hwnd) {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  return StealthIsWindowOnInputDesktop(hwnd);",
-  "test": ""
- },
- {
-  "file": "third_party/libwebrtc/modules/desktop_capture/win/window_capture_utils.cc",
-  "function": "bool WindowCaptureHelperWin::IsWindowVisibleOnCurrentDesktop(HWND hwnd) {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "}",
-  "test": ""
- },
- {
-  "file": "third_party/libwebrtc/modules/desktop_capture/win/window_capture_utils.h",
-  "function": "class WindowCaptureHelperWin {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(platform/hidden-desktop)",
-  "test": ""
- },
- {
-  "file": "third_party/libwebrtc/modules/desktop_capture/win/window_capture_utils.h",
-  "function": "class WindowCaptureHelperWin {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  bool IsWindowOnInputDesktop(HWND hwnd);",
-  "test": ""
+  "form": "anchor",
+  "line": "  if (StealthIsOffInputDesktop(selected)) return false;  // STEALTH-HOOK(platform/hidden-desktop)",
+  "test": "gtest:StealthWindowInputDesktop.OnlyAWindowOfThisProcessOnAnotherDesktopIsOff",
+  "anchor": "if (!window_capture_helper_.IsWindowVisibleOnCurrentDesktop(selected)) { return false; }",
+  "why": "The hook needs `selected`, the local Mozilla computes from GetWindowToCapture() (private, not cheap to call again), and it must run after the visibility check and before the layered-window check so the order of the Windows calls is the one of today (G18). A guard in the head of the function cannot name `selected`; the function has several early returns, so a function wrap would not give the same order."
  }
 ]

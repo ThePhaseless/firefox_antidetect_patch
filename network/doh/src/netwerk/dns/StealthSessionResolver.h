@@ -79,6 +79,16 @@ nsIDNSService::DNSFlags StealthFlagsFollowSession(
     const nsACString& aHost, const OriginAttributes& aAttrs,
     nsIDNSService::DNSFlags aFlags);
 
+
+/**
+ * What nsHostResolver::ResolveHost and DetachCallback do first with the flags
+ * they were given: the lookup resolves by the proxy of its context
+ * (aFlags = StealthFlagsFollowSession(aHost, aAttrs, *aFlags)).
+ */
+void StealthApplySessionFlags(const nsACString& aHost,
+                              const OriginAttributes& aAttrs,
+                              nsIDNSService::DNSFlags* aFlags);
+
 }  // namespace mozilla::net
 
 #endif  // mozilla_net_StealthSessionResolver_h

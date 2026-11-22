@@ -1,99 +1,19 @@
 [
  {
   "file": "netwerk/protocol/http/nsHttpHandler.cpp",
-  "function": "nsresult nsHttpHandler::AddAcceptAndDictionaryHeaders(",
+  "function": "",
   "kind": "add",
-  "form": "unknown",
-  "line": "static nsresult PrepareAcceptLanguages(const char* i_AcceptLanguages,",
-  "test": ""
- },
- {
-  "file": "netwerk/protocol/http/nsHttpHandler.cpp",
-  "function": "nsresult nsHttpHandler::AddAcceptAndDictionaryHeaders(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "                                       nsACString& o_AcceptLanguages);",
-  "test": ""
- },
- {
-  "file": "netwerk/protocol/http/nsHttpHandler.cpp",
-  "function": "nsresult nsHttpHandler::AddStandardRequestHeaders(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    // STEALTH-HOOK(fingerprint/locale-time/accept-language)",
-  "test": ""
- },
- {
-  "file": "netwerk/protocol/http/nsHttpHandler.cpp",
-  "function": "nsresult nsHttpHandler::AddStandardRequestHeaders(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    // The override is a language list, prepared like intl.accept_languages.",
-  "test": ""
+  "form": "registration",
+  "line": "#include \"StealthAcceptLanguage.h\"  // STEALTH-HOOK(fingerprint/locale-time/accept-language)",
+  "test": "wrapper:tests/test_accept_language_on_the_wire_e2e.py::test_every_request_of_a_session_carries_the_retail_accept_language"
  },
  {
   "file": "netwerk/protocol/http/nsHttpHandler.cpp",
   "function": "nsresult nsHttpHandler::AddStandardRequestHeaders(",
   "kind": "rewrite",
-  "form": "unknown",
-  "line": "    rv = PrepareAcceptLanguages(aLanguageOverride.get(), acceptLanguage);",
-  "removed": "    acceptLanguage.Assign(aLanguageOverride.get());\n    rv = request->SetHeader(nsHttp::Accept_Language, acceptLanguage, false,\n                            nsHttpHeaderArray::eVarietyRequestOverride);",
-  "test": ""
- },
- {
-  "file": "netwerk/protocol/http/nsHttpHandler.cpp",
-  "function": "nsresult nsHttpHandler::AddStandardRequestHeaders(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    if (!acceptLanguage.IsEmpty()) {",
-  "test": ""
- },
- {
-  "file": "netwerk/protocol/http/nsHttpHandler.cpp",
-  "function": "nsresult nsHttpHandler::AddStandardRequestHeaders(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "      rv = request->SetHeader(nsHttp::Accept_Language, acceptLanguage, false,",
-  "test": ""
- },
- {
-  "file": "netwerk/protocol/http/nsHttpHandler.cpp",
-  "function": "nsresult nsHttpHandler::AddStandardRequestHeaders(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "                              nsHttpHeaderArray::eVarietyRequestOverride);",
-  "test": ""
- },
- {
-  "file": "netwerk/protocol/http/nsHttpHandler.cpp",
-  "function": "nsresult nsHttpHandler::AddStandardRequestHeaders(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "      if (NS_FAILED(rv)) return rv;",
-  "test": ""
- },
- {
-  "file": "netwerk/protocol/http/nsHttpHandler.cpp",
-  "function": "nsresult nsHttpHandler::AddStandardRequestHeaders(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    }",
-  "test": ""
- },
- {
-  "file": "netwerk/test/browser/browser.toml",
-  "function": "skip-if = [",
-  "kind": "add",
-  "form": "unknown",
-  "line": "# STEALTH-HOOK(fingerprint/locale-time/accept-language)",
-  "test": ""
- },
- {
-  "file": "netwerk/test/browser/browser.toml",
-  "function": "skip-if = [",
-  "kind": "add",
-  "form": "unknown",
-  "line": "[\"browser_stealth_accept_language_list.js\"]",
-  "test": ""
+  "form": "wrap-expression",
+  "line": "    acceptLanguage.Assign(StealthPrepareAcceptLanguages(aLanguageOverride.get()));  // STEALTH-HOOK(fingerprint/locale-time/accept-language)",
+  "removed": "    acceptLanguage.Assign(aLanguageOverride.get());",
+  "test": "wrapper:tests/test_accept_language_on_the_wire_e2e.py::test_every_request_of_a_session_carries_the_retail_accept_language"
  }
 ]

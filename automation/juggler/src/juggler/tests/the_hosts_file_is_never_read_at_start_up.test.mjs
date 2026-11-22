@@ -46,7 +46,7 @@ test('the hosts file is not read: the default of network.trr.exclude-etc-hosts i
   const lines = declaration('network.trr.exclude-etc-hosts').split('\n');
   const value = lines.filter(l => /^  value:/.test(l));
   assert.equal(value.length, 1);
-  assert.match(value[0], /^  value: false  # STEALTH-HOOK\(network\/doh\): /);
+  assert.match(value[0], /^  value: false  # STEALTH-HOOK\(network\/doh\)/);
 });
 
 test('the pref is declared nowhere else', () => {

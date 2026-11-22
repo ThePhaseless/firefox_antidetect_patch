@@ -44,6 +44,14 @@ inline bool StealthHostSpeakersRequested(bool aEnumerateAudioOutputs) {
   return asked;
 }
 
+// Stealthfox [B300]: the groupId correlation of a camera with the speakers
+// (MediaManager::EnumerateRawDevices) runs when Mozilla's own condition holds
+// (aSameBackend: the video backend is the real one) and the host's speakers
+// may be asked.
+inline bool StealthHostSpeakersForCorrelation(bool aSameBackend) {
+  return aSameBackend && StealthHostSpeakersMayBeAsked();
+}
+
 // Stealthfox [B300]: a declared enumeration takes the declared time, on every
 // host, instead of the host's speakers' time. The list is then kept as Firefox
 // keeps it, so only the first one of the session waits, as on a real machine.

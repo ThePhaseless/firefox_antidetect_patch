@@ -7,11 +7,13 @@
  *
  * Upstream le incideva a tempo di compilazione: configure leggeva tre keyfile e
  * sostituiva @MOZ_..._API_KEY@ dentro AppConstants.sys.mjs, che a runtime e' una
- * costante congelata. Quel percorso e' stato RIMOSSO per intero - le tre voci di
- * AppConstants.sys.mjs, i tre DEFINES di toolkit/modules/moz.build e le tre
- * --with-*-api-keyfile del .mozconfig non esistono piu' - perche' una copia
- * compilata nel motore e' una seconda fonte di verita': due numeri per la stessa
- * cosa, che divergono in silenzio il giorno in cui uno dei due cambia.
+ * costante congelata. Quel percorso c'e' ancora, com'e' nel tag: le tre voci di
+ * AppConstants.sys.mjs e i tre DEFINES di toolkit/modules/moz.build esistono, e
+ * la build li riempie coi segnaposto "no-...-api-key". Ma il motore non legge
+ * mai quelle costanti: una copia compilata nel motore sarebbe una seconda fonte
+ * di verita', due numeri per la stessa cosa, che divergono in silenzio il giorno
+ * in cui uno dei due cambia. StealthApplyApiKeys scrive la dichiarazione SOPRA i
+ * tre getter di Mozilla, che non vengono mai chiamati.
  *
  * Adesso il valore vive in UN SOLO posto, invisible_core, e arriva come pref.
  * Il dominio e' finito e noto - tre chiavi - quindi la regola 2 e' soddisfatta.
@@ -65,9 +67,10 @@ function stealthDeclaredApiKey(pref) {
 
 // ⛔ STEALTHFOX: dichiarate da invisible_core, non incise nella build.
 // I getter restano pigri: la pref si legge a ogni formatURL, non al caricamento.
-// stealthApplyApiKeyGetters, in fondo a URLFormatter.sys.mjs, li scrive SOPRA i
+// StealthApplyApiKeys, in fondo a URLFormatter.sys.mjs, li scrive SOPRA i
 // tre getter di Mozilla, che restano come Mozilla li ha scritti e leggono voci
-// di AppConstants che non esistono piu' (undefined): non vengono mai chiamati.
+// di AppConstants che la build riempie con i segnaposto "no-...-api-key": non
+// vengono mai chiamati.
 function stealthApiKeyGetters() {
   return {
     MOZILLA_API_KEY: () => stealthDeclaredApiKey(PREF_APIKEY_MOZILLA),
@@ -78,20 +81,17 @@ function stealthApiKeyGetters() {
   };
 }
 
-export function stealthApplyApiKeyGetters(aFormatterPrototype) {
-  Object.assign(aFormatterPrototype._defaults, stealthApiKeyGetters());
-}
-
 // ⛔ STEALTHFOX: legge le stesse DICHIARAZIONI dei getter qui sopra, non
 // piu' le costanti di AppConstants. Chiamata in testa a trimSensitiveURLs: il
-// codice di Mozilla che segue resta com'e' e, con quelle costanti undefined,
-// lascia il messaggio intatto. Se leggesse una fonte diversa da quella
+// codice di Mozilla che segue resta com'e' e vede solo i segnaposto
+// "no-...-api-key", che non compaiono mai in un messaggio, quindi lascia il
+// messaggio intatto. Se leggesse una fonte diversa da quella
 // che ha costruito la URL, questa redazione mancherebbe il bersaglio: e'
 // proprio il difetto delle due fonti di verita', qui in forma di chiave che
 // finisce nei log in chiaro. Passa da leggiChiaveSilenziosa, che NON registra
 // l'errore in console: questo e' il percorso dei log, e un log che si lamenta
 // mentre ripulisce un altro log e' rumore, non un segnale.
-export function stealthTrimApiKeys(aMsg) {
+export function StealthTrimApiKeys(aMsg) {
   const geoloc = leggiChiaveSilenziosa(PREF_APIKEY_GOOGLE_LOCATION);
   const sb = leggiChiaveSilenziosa(PREF_APIKEY_GOOGLE_SAFEBROWSING);
   aMsg = geoloc
@@ -100,4 +100,23 @@ export function stealthTrimApiKeys(aMsg) {
   return sb
     ? aMsg.replace(RegExp(sb, "g"), "[trimmed-google-api-key]")
     : aMsg;
+}
+
+// Chiamata in fondo a URLFormatter.sys.mjs, dopo la definizione di
+// nsURLFormatterService.prototype: scrive i tre getter sopra quelli di Mozilla.
+export function StealthApplyApiKeys(aFormatterPrototype) {
+  Object.assign(aFormatterPrototype._defaults, stealthApiKeyGetters());
+}
+
+// ⛔ STEALTHFOX: SafeBrowsing.init() gira all'avvio, ma sul percorso Playwright
+// le prefs del core arrivano dopo il lancio (Browser.enable le applica a
+// motore avviato). Senza questo osservatore la dichiarazione tardiva della
+// chiave di Safe Browsing non verrebbe mai riletta e il provider resterebbe
+// spento per sempre con la chiave presente: silenzioso e permanente. Il nome
+// osservato e' un ramo, non una chiave sola: observe() cade su readPrefs(), che
+// in coda rifa' controlUpdateChecking() e quindi updateProviderURLs() ->
+// checkGoogleSafeBrowsingKey(), e la chiave viene riletta da qualunque canale
+// arrivi. Il letterale resta intero (e' un gate, vedi sopra).
+export function StealthObserveApiKey(aSafeBrowsing) {
+  Services.prefs.addObserver("zoom.stealth.apikey", aSafeBrowsing);
 }

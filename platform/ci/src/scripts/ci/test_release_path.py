@@ -46,10 +46,13 @@ GREEN_FILTER = ("StealthGfxFeatureStatus.*:StealthWebGPUAdapter.*:StealthWebGPUD
                 "sUdpPool.*:TestStealthTRRContext.*:TestStealthSocksCredentials.*:TestStealthSessionResolver.*:StealthIceResolv"
                 "erContext.*:StealthUdpProxyBirth.*:StealthNrSocketBirth.*:StealthPcUdpProxyKinds.*:StealthTcpProxyRoad.*:Steal"
                 "thPcProxyConfig.*:StealthInputEventBirth.*:StealthKeyBirthScope.*:StealthBirthOrder.*:StealthFcBundleFonts.*:S"
-                "tealthAudioNoise.*:StealthBundledCollection.*:StealthBundledFamilyFilter.*:StealthCanvasProjection.*:StealthDo"
-                "cumentLanguage.*:StealthFallbackNames.*:StealthFcFontList.*:StealthFontList.*:StealthFontMetrics.*:StealthMedi"
-                "aDeclaration.*:StealthOwnBinaries.*:StealthQuotaEstimate.*:StealthTextQuality.*:StealthTtcFace.*:StealthWebGPU"
-                "ExternalTexture.*:Intl_Locale_StealthSystemLocales.*:Idwr.*:StartupCache.WritesNeverLowerIOPriority")
+                "tealthAudioNoise.*:StealthBundledCollection.*:StealthGlyphCoverage.*:StealthBundleHooks.*:StealthFontListHooks"
+                ".*:StealthDebugger.*:StealthWindowInputDesktop.*:StealthPrefSanitize.*:TestStealthLinkClickAfter.*:TestStealth"
+                "LoadInfo.*:TestStealthDocShellDefaults.*:StealthCanvasProjection.*:StealthDocumentLanguage.*:StealthFallbackNa"
+                "mes.*:StealthFcFontList.*:StealthFontList.*:StealthFontMetrics.*:StealthMediaDeclaration.*:StealthOwnBinaries."
+                "*:StealthQuotaEstimate.*:StealthTextQuality.*:StealthTtcFace.*:StealthWebGPUExternalTexture.*:Intl_Locale_Stea"
+                "lthSystemLocales.*:Idwr.*:"
+                "StealthBranding.*:StealthCanvasUtils.*:StealthDragGesture.*:StealthHttp3Socks.*:StealthJugglerCoalesce.*:StealthJugglerMouseAck.*:StealthMouseEventCopy.*:StealthMouseEventIPC.*:StealthNsProxyInfoKinds.*:StealthSocksUdpLayer.*:StealthStackFrames.*:StealthStartupCache.*:StealthTimezone.*")
 GTEST_JOBS = ("gtest-linux", "gtest-cross")
 COMPILE_ONLY_IF = "needs.plan.outputs.stop_after != 'objects'"
 # The steps of a build leg that come after the objects, and are for the browser's build and its package: a compile-only run (stop_after=objects) runs none.

@@ -4,9 +4,9 @@
   "function": "pref(\"startup.homepage_override_url\", \"\");",
   "kind": "rewrite",
   "form": "declared-value",
-  "line": "pref(\"app.update.interval\", 21600); // 6 hours, the release value  // STEALTH-HOOK(stillborn/updater)",
+  "line": "pref(\"app.update.interval\", 21600);  // STEALTH-HOOK(stillborn/updater)",
   "removed": "pref(\"app.update.interval\", 86400); // 24 hours",
-  "test": ""
+  "test": "node:juggler/tests/updater_refuses_what_follows_the_check.test.mjs#the update cadence is the release one"
  },
  {
   "file": "browser/branding/unofficial/pref/firefox-branding.js",
@@ -15,7 +15,7 @@
   "form": "declared-value",
   "line": "pref(\"app.update.promptWaitTime\", 691200);  // STEALTH-HOOK(stillborn/updater)",
   "removed": "pref(\"app.update.promptWaitTime\", 86400);",
-  "test": ""
+  "test": "node:juggler/tests/updater_refuses_what_follows_the_check.test.mjs#the update cadence is the release one"
  },
  {
   "file": "browser/branding/unofficial/pref/firefox-branding.js",
@@ -24,7 +24,7 @@
   "form": "declared-value",
   "line": "pref(\"app.update.url.manual\", \"https://www.mozilla.org/%LOCALE%/firefox/new?reason=manual-update\");  // STEALTH-HOOK(stillborn/updater)",
   "removed": "pref(\"app.update.url.manual\", \"https://nightly.mozilla.org\");",
-  "test": ""
+  "test": "node:juggler/tests/updater_refuses_what_follows_the_check.test.mjs#the update cadence is the release one"
  },
  {
   "file": "browser/branding/unofficial/pref/firefox-branding.js",
@@ -33,7 +33,7 @@
   "form": "declared-value",
   "line": "pref(\"app.update.url.details\", \"https://www.mozilla.org/%LOCALE%/firefox/notes\");  // STEALTH-HOOK(stillborn/updater)",
   "removed": "pref(\"app.update.url.details\", \"https://nightly.mozilla.org\");",
-  "test": ""
+  "test": "node:juggler/tests/updater_refuses_what_follows_the_check.test.mjs#the update cadence is the release one"
  },
  {
   "file": "browser/branding/unofficial/pref/firefox-branding.js",
@@ -42,7 +42,7 @@
   "form": "declared-value",
   "line": "pref(\"app.update.checkInstallTime.days\", 63);  // STEALTH-HOOK(stillborn/updater)",
   "removed": "pref(\"app.update.checkInstallTime.days\", 2);",
-  "test": ""
+  "test": "node:juggler/tests/updater_refuses_what_follows_the_check.test.mjs#the update cadence is the release one"
  },
  {
   "file": "browser/branding/unofficial/pref/firefox-branding.js",
@@ -51,47 +51,23 @@
   "form": "declared-value",
   "line": "pref(\"app.update.badgeWaitTime\", 345600);  // STEALTH-HOOK(stillborn/updater)",
   "removed": "pref(\"app.update.badgeWaitTime\", 0);",
-  "test": ""
+  "test": "node:juggler/tests/updater_refuses_what_follows_the_check.test.mjs#the update cadence is the release one"
  },
  {
   "file": "toolkit/mozapps/update/BackgroundUpdate.sys.mjs",
-  "function": "",
+  "function": "import { AppConstants } from \"resource://gre/modules/AppConstants.sys.mjs\";",
   "kind": "add",
   "form": "registration",
   "line": "import * as StealthUpdate from \"resource://gre/modules/StealthUpdate.sys.mjs\"; // STEALTH-HOOK(stillborn/updater)",
-  "test": ""
+  "test": "node:juggler/tests/updater_refuses_what_follows_the_check.test.mjs#the background update task is not registered, nothing of Mozilla's runs first"
  },
  {
   "file": "toolkit/mozapps/update/BackgroundUpdate.sys.mjs",
   "function": "export var BackgroundUpdate = {",
   "kind": "add",
-  "form": "unknown",
-  "line": "    // STEALTH-HOOK(stillborn/updater)",
-  "test": ""
- },
- {
-  "file": "toolkit/mozapps/update/BackgroundUpdate.sys.mjs",
-  "function": "export var BackgroundUpdate = {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    if (StealthUpdate.refusesHostTask()) {",
-  "test": ""
- },
- {
-  "file": "toolkit/mozapps/update/BackgroundUpdate.sys.mjs",
-  "function": "export var BackgroundUpdate = {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "      return null;",
-  "test": ""
- },
- {
-  "file": "toolkit/mozapps/update/BackgroundUpdate.sys.mjs",
-  "function": "export var BackgroundUpdate = {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    }",
-  "test": ""
+  "form": "guard",
+  "line": "    if (StealthUpdate.refusesHostTask()) return null;  // STEALTH-HOOK(stillborn/updater)",
+  "test": "node:juggler/tests/updater_refuses_what_follows_the_check.test.mjs#the background update task is not registered, nothing of Mozilla's runs first"
  },
  {
   "file": "toolkit/mozapps/update/UpdateService.sys.mjs",
@@ -99,39 +75,17 @@
   "kind": "add",
   "form": "registration",
   "line": "import * as StealthUpdate from \"resource://gre/modules/StealthUpdate.sys.mjs\"; // STEALTH-HOOK(stillborn/updater)",
-  "test": ""
+  "test": "node:juggler/tests/updater_refuses_what_follows_the_check.test.mjs#a download of an update is refused after Mozilla's null check, no update still throws"
  },
  {
   "file": "toolkit/mozapps/update/UpdateService.sys.mjs",
   "function": "export class UpdateService {",
   "kind": "add",
-  "form": "unknown",
-  "line": "    // STEALTH-HOOK(stillborn/updater)",
-  "test": ""
- },
- {
-  "file": "toolkit/mozapps/update/UpdateService.sys.mjs",
-  "function": "export class UpdateService {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    if (StealthUpdate.refusesDownload()) {",
-  "test": ""
- },
- {
-  "file": "toolkit/mozapps/update/UpdateService.sys.mjs",
-  "function": "export class UpdateService {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "      return Ci.nsIApplicationUpdateService.DOWNLOAD_FAILURE_GENERIC;",
-  "test": ""
- },
- {
-  "file": "toolkit/mozapps/update/UpdateService.sys.mjs",
-  "function": "export class UpdateService {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    }",
-  "test": ""
+  "form": "anchor",
+  "line": "    if (StealthUpdate.refusesDownload()) return Ci.nsIApplicationUpdateService.DOWNLOAD_FAILURE_GENERIC;  // STEALTH-HOOK(stillborn/updater)",
+  "test": "node:juggler/tests/updater_refuses_what_follows_the_check.test.mjs#a download of an update is refused after Mozilla's null check, no update still throws",
+  "anchor": "if (!update) { throw Components.Exception(\"\", Cr.NS_ERROR_NULL_POINTER); } (at the top of #downloadUpdate)",
+  "why": "the only statement between the head of the function and the hook reads the parameter and returns nothing the hook sets (G10, verified in the design); for a null update refusesDownload is false and the throw happens as before"
  },
  {
   "file": "toolkit/mozapps/update/UpdateService.sys.mjs",
@@ -139,7 +93,9 @@
   "kind": "add",
   "form": "unknown",
   "line": "    updates = StealthUpdate.noneOffered(updates); // STEALTH-HOOK(stillborn/updater)",
-  "test": ""
+  "test": "node:juggler/tests/updater_refuses_what_follows_the_check.test.mjs#whatever the answer offered, the check reports none",
+  "anchor": "the closing } of the try/catch of CheckerService.#updateCheck (updates = this.#parseUpdates(request);)",
+  "why": "updates is a local assigned inside the try; the hook needs the value Mozilla's parse produced and a catch handles parse errors, so it is a line after the catch (as before), not a guard or a wrap"
  },
  {
   "file": "toolkit/mozapps/update/moz.build",
@@ -147,6 +103,6 @@
   "kind": "add",
   "form": "registration",
   "line": "EXTRA_JS_MODULES += [\"StealthUpdate.sys.mjs\"]  # STEALTH-HOOK(stillborn/updater)",
-  "test": ""
+  "test": "node:juggler/tests/updater_refuses_what_follows_the_check.test.mjs#our functions: none offered, every download and task refused"
  }
 ]

@@ -95,18 +95,20 @@ bool StealthVoiceLang(const nsAString& aUri, nsAString& aOut) {
   return true;
 }
 
-Maybe<bool> StealthVoiceLocal(const nsAString& aUri) {
-  if (!IsStealthVoiceURI(aUri)) return Nothing();
+bool StealthVoiceLocal(const nsAString& aUri, bool* aOut) {
+  if (!IsStealthVoiceURI(aUri)) return false;
   nsAutoString field;
   GetStealthVoiceField(aUri, 3, field);
-  return Some(field.EqualsLiteral("1"));
+  *aOut = field.EqualsLiteral("1");
+  return true;
 }
 
-Maybe<bool> StealthVoiceDefault(const nsAString& aUri) {
-  if (!IsStealthVoiceURI(aUri)) return Nothing();
+bool StealthVoiceDefault(const nsAString& aUri, bool* aOut) {
+  if (!IsStealthVoiceURI(aUri)) return false;
   nsAutoString field;
   GetStealthVoiceField(aUri, 2, field);
-  return Some(field.EqualsLiteral("1"));
+  *aOut = field.EqualsLiteral("1");
+  return true;
 }
 
 }  // namespace mozilla::dom

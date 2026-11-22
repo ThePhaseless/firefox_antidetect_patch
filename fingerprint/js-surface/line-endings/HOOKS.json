@@ -1,77 +1,36 @@
 [
  {
   "file": "dom/file/BlobSet.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthNativeEOL.h\"  // STEALTH-HOOK(fingerprint/js-surface/line-endings)",
+  "test": "wrapper:tests/test_native_line_endings_are_windows_e2e.py::test_native_line_endings_are_windows"
+ },
+ {
+  "file": "dom/file/BlobSet.cpp",
   "function": "nsresult BlobSet::AppendUTF8String(const nsACString& aUTF8String,",
   "kind": "rewrite",
   "form": "unknown",
-  "line": "    // Native line endings are Windows' on every build: the browser this one",
+  "line": "#if STEALTH_NATIVE_EOL_IS_CRLF  // STEALTH-HOOK(fingerprint/js-surface/line-endings)",
   "removed": "#ifdef XP_WIN",
-  "test": ""
+  "test": "wrapper:tests/test_native_line_endings_are_windows_e2e.py::test_native_line_endings_are_windows"
  },
  {
-  "file": "dom/file/BlobSet.cpp",
-  "function": "nsresult BlobSet::AppendUTF8String(const nsACString& aUTF8String,",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    // stands for is a Windows Firefox, and a page reads the platform from",
-  "test": ""
- },
- {
-  "file": "dom/file/BlobSet.cpp",
-  "function": "nsresult BlobSet::AppendUTF8String(const nsACString& aUTF8String,",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    // new Blob(['\\n'], {endings: 'native'}).size, 2 there and 1 on Linux",
-  "test": ""
- },
- {
-  "file": "dom/file/BlobSet.cpp",
-  "function": "nsresult BlobSet::AppendUTF8String(const nsACString& aUTF8String,",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    // [B294].",
-  "test": ""
- },
- {
-  "file": "dom/file/BlobSet.cpp",
-  "function": "nsresult BlobSet::AppendUTF8String(const nsACString& aUTF8String,",
-  "kind": "delete",
-  "form": "unknown",
-  "line": "",
-  "removed": "#endif",
-  "test": ""
+  "file": "dom/serializers/nsPlainTextSerializer.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthPlainTextLineBreak.h\"  // STEALTH-HOOK(fingerprint/js-surface/line-endings)",
+  "test": "wrapper:tests/test_native_line_endings_are_windows_e2e.py::test_native_line_endings_are_windows"
  },
  {
   "file": "dom/serializers/nsPlainTextSerializer.cpp",
   "function": "static void DetermineLineBreak(const int32_t aFlags, nsAString& aLineBreak) {",
   "kind": "rewrite",
   "form": "unknown",
-  "line": "    // Platform/default, which is Windows' on every build: a page reads it",
-  "removed": "    // Platform/default\n    aLineBreak.AssignLiteral(NS_ULINEBREAK);",
-  "test": ""
- },
- {
-  "file": "dom/serializers/nsPlainTextSerializer.cpp",
-  "function": "static void DetermineLineBreak(const int32_t aFlags, nsAString& aLineBreak) {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    // from getSelection().toString() across two blocks, \"\\r\\n\" on a Windows",
-  "test": ""
- },
- {
-  "file": "dom/serializers/nsPlainTextSerializer.cpp",
-  "function": "static void DetermineLineBreak(const int32_t aFlags, nsAString& aLineBreak) {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    // Firefox and \"\\n\" on Linux [B294].",
-  "test": ""
- },
- {
-  "file": "dom/serializers/nsPlainTextSerializer.cpp",
-  "function": "static void DetermineLineBreak(const int32_t aFlags, nsAString& aLineBreak) {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    aLineBreak.AssignLiteral(u\"\\r\\n\");",
-  "test": ""
+  "line": "    aLineBreak.AssignLiteral(STEALTH_NATIVE_ULINEBREAK);  // STEALTH-HOOK(fingerprint/js-surface/line-endings)",
+  "removed": "    aLineBreak.AssignLiteral(NS_ULINEBREAK);",
+  "test": "wrapper:tests/test_native_line_endings_are_windows_e2e.py::test_native_line_endings_are_windows"
  }
 ]

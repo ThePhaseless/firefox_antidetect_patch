@@ -3,6 +3,7 @@
   "js/src/vm/SavedStacks.cpp"
  ],
  "added": {
+  "dom/base/test/gtest/TestStealthStackFrames.cpp": "100644",
   "js/src/vm/StealthStackFrames.h": "100644"
  },
  "inventory": [

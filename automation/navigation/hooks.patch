@@ -1,57 +1,46 @@
 diff --git a/docshell/base/CanonicalBrowsingContext.cpp b/docshell/base/CanonicalBrowsingContext.cpp
-index 86b2939a83873627e79ec19b87d13008e2e2109d..43a13ea77d87485291dc64c3d915307836fca307 100644
+index 86b2939a83873627e79ec19b87d13008e2e2109d..6ef207fb4a9a5ec3a85e5068c925f7479a0c5ea2 100644
 --- a/docshell/base/CanonicalBrowsingContext.cpp
 +++ b/docshell/base/CanonicalBrowsingContext.cpp
-@@ -9,6 +9,7 @@
- #include "ContentAnalysis.h"
- #include "ErrorList.h"
- #include "SessionHistoryEntry.h"
+@@ -75,6 +75,8 @@
+ #include "nsIOpenWindowInfo.h"
+ #include "nsOpenWindowInfo.h"
+ 
 +#include "StealthNavigationEvents.h"  // STEALTH-HOOK(automation/navigation)
- #include "mozilla/CheckedInt.h"
- #include "mozilla/Components.h"
- #include "mozilla/ErrorResult.h"
-@@ -2200,6 +2201,8 @@ void CanonicalBrowsingContext::LoadURI(nsIURI* aURI,
++
+ using namespace mozilla::ipc;
+ 
+ extern mozilla::LazyLogModule gAutoplayPermissionLog;
+@@ -2200,6 +2202,7 @@ void CanonicalBrowsingContext::LoadURI(nsIURI* aURI,
      (void)SetIsCaptivePortalTab(true);
    }
  
-+  // STEALTH-HOOK(automation/navigation)
-+  StealthNotifyNavigationStarted(this, loadState);
++  StealthNotifyNavigationStarted(this, loadState);  // STEALTH-HOOK(automation/navigation)
    LoadURI(loadState, true);
  }
  
-@@ -2225,6 +2228,8 @@ void CanonicalBrowsingContext::FixupAndLoadURIString(
+@@ -2225,6 +2228,7 @@ void CanonicalBrowsingContext::FixupAndLoadURIString(
      (void)SetIsCaptivePortalTab(true);
    }
  
-+  // STEALTH-HOOK(automation/navigation)
-+  StealthNotifyNavigationStarted(this, loadState);
++  StealthNotifyNavigationStarted(this, loadState);  // STEALTH-HOOK(automation/navigation)
    LoadURI(loadState, true);
  }
  
 diff --git a/docshell/base/nsDocShell.cpp b/docshell/base/nsDocShell.cpp
-index 9890b717e687329386006642e8c536f4dd094bd9..53b32e434f6550ebab025d122846c370d8088914 100644
+index 9890b717e687329386006642e8c536f4dd094bd9..9a33c70a5197c164ce4cf7ac27f00955df0774f0 100644
 --- a/docshell/base/nsDocShell.cpp
 +++ b/docshell/base/nsDocShell.cpp
-@@ -4,6 +4,8 @@
- 
- #include "nsDocShell.h"
+@@ -262,6 +262,8 @@
+ #include "nsIDocumentViewerPrint.h"
+ #include "nsIWebBrowserPrint.h"
  
 +#include "StealthNavigation.h"  // STEALTH-HOOK(automation/navigation)
 +
- #include <algorithm>
- #include "mozilla/CycleCollectedJSContext.h"
- #include "mozilla/dom/HTMLFormElement.h"
-@@ -365,6 +367,9 @@ nsDocShell::nsDocShell(BrowsingContext* aBrowsingContext,
-       mURIResultedInDocument(false),
-       mIsBeingDestroyed(false),
-       mIsExecutingOnLoadHandler(false),
-+      // STEALTH-HOOK(automation/docshell-attrs)
-+      mFileInputInterceptionEnabled(false),
-+      mBypassCSPEnabled(false),
-       mInvisible(false),
-       mHasLoadedNonBlankURI(false),
-       mHasStartedLoadingOtherThanInitialBlankURI(false),
-@@ -8999,6 +9004,7 @@ nsresult nsDocShell::InternalLoad(nsDocShellLoadState* aLoadState,
+ using namespace mozilla;
+ using namespace mozilla::dom;
+ using namespace mozilla::net;
+@@ -8999,6 +9001,7 @@ nsresult nsDocShell::InternalLoad(nsDocShellLoadState* aLoadState,
    attrs.SetFirstPartyDomain(isTopLevelDoc, aLoadState->URI());
  
    nsCOMPtr<nsIRequest> req;
@@ -59,7 +48,7 @@ index 9890b717e687329386006642e8c536f4dd094bd9..53b32e434f6550ebab025d122846c370
    rv = DoURILoad(aLoadState, aCacheKey, getter_AddRefs(req));
  
    if (NS_SUCCEEDED(rv)) {
-@@ -9008,6 +9014,7 @@ nsresult nsDocShell::InternalLoad(nsDocShellLoadState* aLoadState,
+@@ -9008,6 +9011,7 @@ nsresult nsDocShell::InternalLoad(nsDocShellLoadState* aLoadState,
    }
  
    if (NS_FAILED(rv)) {
@@ -67,36 +56,36 @@ index 9890b717e687329386006642e8c536f4dd094bd9..53b32e434f6550ebab025d122846c370
      nsCOMPtr<nsIChannel> chan(do_QueryInterface(req));
      UnblockEmbedderLoadEventForFailure();
  
-@@ -12113,9 +12120,12 @@ class OnLinkClickEvent : public CancelableRunnable, public SupportsWeakPtr {
+@@ -12113,9 +12117,12 @@ class OnLinkClickEvent : public CancelableRunnable, public SupportsWeakPtr {
        if (!mLoadState->HasSourceElement()) {
          mLoadState->SetSourceElement(mContent->AsElement());
        }
-+      mStealth.SetRunning(true);  // STEALTH-HOOK(automation/navigation)
++      mStealth.StealthSetRunning(true);  // STEALTH-HOOK(automation/navigation)
        mHandler->OnLinkClickSync(mContent, mLoadState, mNoOpenerImplied,
                                  mTriggeringPrincipal);
-+      mStealth.SetRunning(false);  // STEALTH-HOOK(automation/navigation)
++      mStealth.StealthSetRunning(false);  // STEALTH-HOOK(automation/navigation)
      }
 +    mStealth.Done(mContent);  // STEALTH-HOOK(automation/navigation)
      return NS_OK;
    }
  
-@@ -12124,6 +12134,7 @@ class OnLinkClickEvent : public CancelableRunnable, public SupportsWeakPtr {
+@@ -12124,6 +12131,7 @@ class OnLinkClickEvent : public CancelableRunnable, public SupportsWeakPtr {
      // Don't clear mLoadState, etc. here since this can be called
      // from the OnLinkClickSync() above, and we might be holding
      // the last references to them.
-+    mStealth.Cancelled(mContent);  // STEALTH-HOOK(automation/navigation)
++    mStealth.StealthCancelled(mContent);  // STEALTH-HOOK(automation/navigation)
      return NS_OK;
    }
  
-@@ -12134,6 +12145,7 @@ class OnLinkClickEvent : public CancelableRunnable, public SupportsWeakPtr {
+@@ -12133,6 +12141,7 @@ class OnLinkClickEvent : public CancelableRunnable, public SupportsWeakPtr {
+   RefPtr<nsDocShellLoadState> mLoadState;
    nsCOMPtr<nsIPrincipal> mTriggeringPrincipal;
    bool mNoOpenerImplied;
-   bool mCancelled = false;
 +  StealthLinkClickAfter mStealth;  // STEALTH-HOOK(automation/navigation)
+   bool mCancelled = false;
  };
  
- OnLinkClickEvent::OnLinkClickEvent(nsDocShell* aHandler, nsIContent* aContent,
-@@ -12174,6 +12186,7 @@ Result<RefPtr<OnLinkClickEvent>, nsresult> nsDocShell::OnLinkClickWithLoadState(
+@@ -12174,6 +12183,7 @@ Result<RefPtr<OnLinkClickEvent>, nsresult> nsDocShell::OnLinkClickWithLoadState(
    RefPtr<nsIRunnable> runnable = ev;
    nsresult rv = Dispatch(runnable.forget());
    NS_ENSURE_SUCCESS(rv, Err(rv));
@@ -104,55 +93,64 @@ index 9890b717e687329386006642e8c536f4dd094bd9..53b32e434f6550ebab025d122846c370
    return ev;
  }
  
+diff --git a/docshell/base/test/gtest/moz.build b/docshell/base/test/gtest/moz.build
+index aedd997bccbb025c0cb24e201c307058b7935a6d..8614ee3d2989b30617b4bc71eda82cb6af20bb19 100644
+--- a/docshell/base/test/gtest/moz.build
++++ b/docshell/base/test/gtest/moz.build
+@@ -5,5 +5,6 @@
+ UNIFIED_SOURCES += [
+     "TestFilterStatusForErrorPage.cpp",
+ ]
++include("stealth.build")  # STEALTH-HOOK(automation/navigation)
+ 
+ FINAL_LIBRARY = "xul-gtest"
 diff --git a/netwerk/base/LoadInfo.cpp b/netwerk/base/LoadInfo.cpp
-index 9d64a00363fcfcdd6f2d99c40b085b0651f7b0b7..1ff2a1f606fc9e883f1d2395d4bf4ac2a5bc39bb 100644
+index 9d64a00363fcfcdd6f2d99c40b085b0651f7b0b7..fc0743b96cadf81766bd6c314c9282b039f349bc 100644
 --- a/netwerk/base/LoadInfo.cpp
 +++ b/netwerk/base/LoadInfo.cpp
-@@ -759,7 +759,8 @@ LoadInfo::LoadInfo(const LoadInfo& rhs)
-       mInterceptionInfo(rhs.mInterceptionInfo),
+@@ -53,6 +53,8 @@
+ #include "nsRedirectHistoryEntry.h"
+ #include "nsSandboxFlags.h"
+ 
++#include "StealthLoadInfo.h"  // STEALTH-HOOK(automation/navigation)
++
+ using namespace mozilla::dom;
+ 
+ namespace mozilla::net {
+@@ -760,6 +762,7 @@ LoadInfo::LoadInfo(const LoadInfo& rhs)
        mSchemelessInput(rhs.mSchemelessInput),
        mUserNavigationInvolvement(rhs.mUserNavigationInvolvement),
--      mSkipHTTPSUpgrade(rhs.mSkipHTTPSUpgrade) {
-+      mSkipHTTPSUpgrade(rhs.mSkipHTTPSUpgrade),
-+      mJugglerLoadIdentifier(rhs.mJugglerLoadIdentifier) {
+       mSkipHTTPSUpgrade(rhs.mSkipHTTPSUpgrade) {
++  StealthLoadInfoCopied(this, rhs);  // STEALTH-HOOK(automation/navigation)
  }
  
  LoadInfo::LoadInfo(
-@@ -2141,4 +2142,16 @@ void LoadInfo::UpdateParentAddressSpaceInfo() {
-   }
- }
- 
-+NS_IMETHODIMP
-+LoadInfo::GetJugglerLoadIdentifier(uint64_t* aResult) {
-+  *aResult = mJugglerLoadIdentifier;
-+  return NS_OK;
-+}
-+
-+NS_IMETHODIMP
-+LoadInfo::SetJugglerLoadIdentifier(uint64_t aID) {
-+  mJugglerLoadIdentifier = aID;
-+  return NS_OK;
-+}
-+
- }  // namespace mozilla::net
 diff --git a/netwerk/base/LoadInfo.h b/netwerk/base/LoadInfo.h
-index a6a44ac715a637ddf1cc5c23ff0dd8440dd45eaf..1fbbf4dd7341f56fcecadf8a6c04de7b5a12f1e5 100644
+index a6a44ac715a637ddf1cc5c23ff0dd8440dd45eaf..c484cfb3a4ac79deac613c8c711b8b716ba33f91 100644
 --- a/netwerk/base/LoadInfo.h
 +++ b/netwerk/base/LoadInfo.h
-@@ -519,6 +519,8 @@ class LoadInfo final : public nsILoadInfo {
+@@ -517,6 +517,7 @@ class LoadInfo final : public nsILoadInfo {
+ 
+   dom::UserNavigationInvolvement mUserNavigationInvolvement =
        dom::UserNavigationInvolvement::None;
++  uint64_t mJugglerLoadIdentifier = 0;  // STEALTH-HOOK(automation/navigation)
  
    bool mSkipHTTPSUpgrade = false;
-+
-+  uint64_t mJugglerLoadIdentifier = 0;
  };
- // This is exposed solely for testing purposes and should not be used outside of
- // LoadInfo
 diff --git a/netwerk/base/TRRLoadInfo.cpp b/netwerk/base/TRRLoadInfo.cpp
-index 0cba54550072adc8a0ad11b1c9a502ff97a7bd7e..74127d3443a67707c13ac3f0441dc2fd6196c36d 100644
+index 0cba54550072adc8a0ad11b1c9a502ff97a7bd7e..5990180a7c1941856e09046861cb55411861c2af 100644
 --- a/netwerk/base/TRRLoadInfo.cpp
 +++ b/netwerk/base/TRRLoadInfo.cpp
-@@ -26,6 +26,7 @@ TRRLoadInfo::TRRLoadInfo(nsIURI* aResultPrincipalURI,
+@@ -11,6 +11,8 @@
+ #include "nsContentUtils.h"
+ #include "nsIRedirectHistoryEntry.h"
+ 
++#include "StealthLoadInfo.h"  // STEALTH-HOOK(network/doh)
++
+ using namespace mozilla::dom;
+ 
+ namespace mozilla {
+@@ -26,6 +28,7 @@ TRRLoadInfo::TRRLoadInfo(nsIURI* aResultPrincipalURI,
  already_AddRefed<nsILoadInfo> TRRLoadInfo::Clone() const {
    nsCOMPtr<nsILoadInfo> loadInfo =
        new TRRLoadInfo(mResultPrincipalURI, mInternalContentPolicyType);
@@ -160,52 +158,35 @@ index 0cba54550072adc8a0ad11b1c9a502ff97a7bd7e..74127d3443a67707c13ac3f0441dc2fd
  
    return loadInfo.forget();
  }
-@@ -302,7 +303,8 @@ nsresult TRRLoadInfo::GetOriginAttributes(
+@@ -302,6 +305,7 @@ nsresult TRRLoadInfo::GetOriginAttributes(
  
  nsresult TRRLoadInfo::SetOriginAttributes(
      const mozilla::OriginAttributes& aOriginAttributes) {
--  return NS_ERROR_NOT_IMPLEMENTED;
-+  mOriginAttributes = aOriginAttributes;  // STEALTH-HOOK(network/doh)
-+  return NS_OK;  // STEALTH-HOOK(network/doh)
- }
- 
- NS_IMETHODIMP
-@@ -571,5 +573,15 @@ TRRLoadInfo::GetFetchDestination(nsACString& aDestination) {
++  if (nsresult rv; StealthTRRSetOriginAttributes(mOriginAttributes, aOriginAttributes, &rv)) return rv;  // STEALTH-HOOK(network/doh)
    return NS_ERROR_NOT_IMPLEMENTED;
  }
  
-+NS_IMETHODIMP
-+TRRLoadInfo::GetJugglerLoadIdentifier(uint64_t* aResult) {
-+  return NS_ERROR_NOT_IMPLEMENTED;
-+}
-+
-+NS_IMETHODIMP
-+TRRLoadInfo::SetJugglerLoadIdentifier(uint64_t aResult) {
-+  return NS_ERROR_NOT_IMPLEMENTED;
-+}
-+
- }  // namespace net
- }  // namespace mozilla
 diff --git a/netwerk/base/nsILoadInfo.idl b/netwerk/base/nsILoadInfo.idl
-index a3e7384515b976681d9e12318cbc1156415a9a50..86327e3e8581acc004f53d5eecb5a45afccf97d2 100644
+index a3e7384515b976681d9e12318cbc1156415a9a50..58ff528d032b9da7fd40c0031e06a306b3786f87 100644
 --- a/netwerk/base/nsILoadInfo.idl
 +++ b/netwerk/base/nsILoadInfo.idl
-@@ -1748,4 +1748,6 @@ interface nsILoadInfo : nsISupports
-       return static_cast<mozilla::dom::UserNavigationInvolvement>(userNavigationInvolvement);
-     }
- %}
-+
-+  [infallible] attribute unsigned long long jugglerLoadIdentifier;
- };
+@@ -1734,6 +1734,7 @@ interface nsILoadInfo : nsISupports
+    * When true, this load will never be upgraded to HTTPS.
+    */
+   [infallible] attribute boolean skipHTTPSUpgrade;
++  [infallible] attribute unsigned long long jugglerLoadIdentifier;  // STEALTH-HOOK(automation/navigation)
+ 
+   /**
+    * see https://html.spec.whatwg.org/#user-navigation-involvement
 diff --git a/netwerk/ipc/DocumentLoadListener.cpp b/netwerk/ipc/DocumentLoadListener.cpp
-index 10b16322a4a55f7c5d4459489a70347ee1debc4f..fd059098be051b1b1dda0a0d15fedffe108311f7 100644
+index 10b16322a4a55f7c5d4459489a70347ee1debc4f..d626ab0c4dc4e99dbab171399f8b646d15231dae 100644
 --- a/netwerk/ipc/DocumentLoadListener.cpp
 +++ b/netwerk/ipc/DocumentLoadListener.cpp
-@@ -205,6 +205,7 @@ static auto CreateDocumentLoadInfo(CanonicalBrowsingContext* aBrowsingContext,
-       aLoadState->GetTextDirectiveUserActivation() ||
+@@ -206,6 +206,7 @@ static auto CreateDocumentLoadInfo(CanonicalBrowsingContext* aBrowsingContext,
        aLoadState->HasLoadFlags(nsIWebNavigation::LOAD_FLAGS_FROM_EXTERNAL));
    loadInfo->SetIsMetaRefresh(aLoadState->IsMetaRefresh());
-+  loadInfo->SetJugglerLoadIdentifier(aLoadState->GetLoadIdentifier());
  
++  loadInfo->SetJugglerLoadIdentifier(aLoadState->GetLoadIdentifier());  // STEALTH-HOOK(automation/navigation)
    return loadInfo.forget();
  }
+ 

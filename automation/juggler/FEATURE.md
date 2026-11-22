@@ -2,11 +2,11 @@
 
 Category: build
 Prefs: none read directly
-Test: TODO
+Test: wrapper:tests/test_fission_iframe_crash_e2e.py::test_the_crash_of_an_iframe_s_process_leaves_the_tab (the tab stays open after an iframe's process crashes; without the data the observer closes it); node `juggler/tests/crashed_iframe_keeps_the_tab.test.mjs`; gtest `StealthFrameCrash.*`; every wrapper e2e for the `/juggler` directory (without it the engine has no automation: all red)
 
 ## What it does
 
-TODO: one paragraph, from the notes below.
+Juggler is the automation protocol of the engine: the `/juggler` directory (parent and content scripts, the pipe, the screencast), driven by the wrapper. The engine gives it two things in Mozilla files: the directory in the `DIRS` of `toolkit.mozbuild`, and the id of the BrowsingContext that crashed in the notification `oop-frameloader-crashed` (the crash of an iframe's process does not close the tab). The rest is our own files, below.
 
 ## The proxy of the session (juggler/SessionRoute.js)
 
@@ -23,8 +23,9 @@ preemptive Basic `Proxy-Authorization` for the DoH CONNECT, and an isolation key
 ## Hooks in Mozilla files
 
 - `modules/libpref/moz.build` (pref_groups list, already-hook): Registers the 'juggler' pref group, so the juggler.* entries in StaticPrefList.yaml are built into the generated StaticPrefs headers. Pure registration.
-- `toolkit/toolkit.mozbuild` (if CONFIG["ENABLE_WEBDRIVER"]: DIRS list (hunk header line 152), already-hook): Registers the Juggler directory when ENABLE_WEBDRIVER is set. The /juggler directory is our own code and is not in this list; Verified: C:/ff/source/juggler exists (moz.build, TargetRegistry.js, SessionRoute.js, components/).
-- `dom/base/nsFrameLoader.cpp` (nsFrameLoader::MaybeNotifyCrashed, already-hook): the notification `oop-frameloader-crashed` carries the id of the BrowsingContext that crashed (`StealthCrashedContextData`, in our `dom/base/StealthFrameCrash.h`; null when the caller does not say). An out-of-process iframe's BrowserParent has the tab's owner element, so the notification's frameloader is the tab's for the crash of an iframe too, and TargetRegistry.js closed the tab for it; with the id it tells the two apart. 3 lines and the include.
+- `toolkit/toolkit.mozbuild` (registration): `DIRS += ["/juggler"]` after the closing `]` of the `DIRS` list under `if CONFIG["ENABLE_WEBDRIVER"]`, inside the same `if`. The directory is our own code (`juggler/moz.build`). Only the order of the directories in `DIRS` differs from before (juggler after the telemetry marionette tests instead of second); the build does not depend on it.
+- `dom/base/nsFrameLoader.cpp`, include: `#include "StealthFrameCrash.h"` in a block of ours after Mozilla's includes (registration).
+- `dom/base/nsFrameLoader.cpp`, `nsFrameLoader::MaybeNotifyCrashed` (wrap of an expression): Mozilla's `os->NotifyObservers(ToSupports(this), "oop-frameloader-crashed", nullptr);` with its last argument wrapped, `StealthCrashedContextScope(aBrowsingContext, nullptr)`. The scope (`dom/base/StealthFrameCrash.h`) is a temporary holding the digits of the crashed context's id in its own buffer (built by `StealthCrashedContextData`, which stays) and converting to `const char16_t*`; it gives back the argument Mozilla passes (`nullptr`) when the BrowsingContext is null (a frameloader that failed to build). The buffer lives to the end of the full expression, i.e. through the synchronous notification. An out-of-process iframe's BrowserParent has the tab's owner element, so the notification's frameloader is the tab's for the crash of an iframe too, and TargetRegistry.js closed the tab for it; with the id it tells the two apart. The `modules/libpref/moz.build` line of the series' earlier notes (pref group `juggler`) is not a file of this folder.
 
 ## One process per site (Fission)
 

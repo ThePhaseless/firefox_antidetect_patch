@@ -2,7 +2,7 @@
 
 Category: spoof
 Prefs: zoom.stealth.screen.width, zoom.stealth.screen.height (the fullscreen rectangle, through gfx::StealthDeclaredScreenRect); the window frame through StealthDeclarationGate
-Test: dom/events/test/gtest/TestStealthWindowGeometry.cpp (StealthWindowGeometry.FullscreenContentStartsAtTheScreenOrigin, StealthWindowGeometry.OutsideFullscreenNothingChanges); widget/tests/gtest/TestStealthFullscreen.cpp (StealthFullscreen.TheDeclaredScreenAtTheDeclaredScale, StealthFullscreen.PlacedOnTheScreenTheWindowIsOn, StealthFullscreen.NothingWithoutADeclaredScreenOrAScale); juggler/tests/fullscreen_releases_the_viewport.test.mjs; the fullscreen state of the host gate in the wrapper (scripts/ci_host_gate.py: geometry after a real click on requestFullscreen() and after exitFullscreen(), with its invariants) on every CI host, Linux under Xvfb without a window manager included; the g.fullscreen key of headless_probe.py. widget/tests/gtest/TestStealthFullscreen.cpp also holds StealthFullscreen.AFullscreenMoveAndResizeLandsOnTheDeclaredRect and StealthFullscreen.TheLargestSizeGrowsToTheDeclaredScreenInFullscreen (the Windows rules); the host gate invariant fullscreen_is_the_screen on win-x86_64 is their end-to-end proof.
+Test: dom/events/test/gtest/TestStealthWindowGeometry.cpp (StealthWindowGeometry.FullscreenContentStartsAtTheScreenOrigin, StealthWindowGeometry.OutsideFullscreenNothingChanges); widget/tests/gtest/TestStealthFullscreen.cpp (StealthFullscreen.TheDeclaredScreenAtTheDeclaredScale, StealthFullscreen.PlacedOnTheScreenTheWindowIsOn, StealthFullscreen.NothingWithoutADeclaredScreenOrAScale); juggler/tests/fullscreen_releases_the_viewport.test.mjs; the fullscreen state of the host gate in the wrapper (scripts/ci_host_gate.py: geometry after a real click on requestFullscreen() and after exitFullscreen(), with its invariants) on every CI host, Linux under Xvfb without a window manager included; the g.fullscreen key of headless_probe.py. widget/tests/gtest/TestStealthFullscreen.cpp also holds StealthFullscreen.AFullscreenMoveAndResizeLandsOnTheDeclaredRect and StealthFullscreen.TheLargestSizeGrowsToTheDeclaredScreenInFullscreen (the Windows rules); the host gate invariant fullscreen_is_the_screen on win-x86_64 is their end-to-end proof. Added: widget/tests/gtest/TestStealthFullscreen.cpp StealthFullscreen.TheRectOrTakesTheDeclaredScreenAndElseMozillas (the rectangle the widget moves to: declared, else Mozilla's); wrapper e2e (to be written) tests/test_popup_geometry_is_the_declared_frame_e2e.py::test_a_popup_is_its_inner_size_plus_the_declared_frame and tests/test_a_click_in_an_iframe_lands_at_the_frames_own_screen_origin_e2e.py::test_a_real_click_in_an_iframe_has_the_screen_origin_of_the_iframe, and tests/test_context_locale_e2e.py::test_intl_in_the_page_realm_follows_the_language_and_zone_of_its_context (the language and zone hook that stays in this file).
 
 ## What it does
 
@@ -36,14 +36,51 @@ onto the monitor's rect (bug 1482920), and DefWindowProc clamps the size to
 MINMAXINFO.ptMaxTrackSize, about the monitor's size. Both are answered from the
 declaration in fullscreen (widget/windows/StealthFullscreenWin.cpp, thin
 adapters over the pure rules StealthHeldFullscreenPosition and
-StealthFullscreenMaxTrackSize in widget/StealthFullscreen.cpp).
+StealthFullscreenMaxTrackSize in widget/StealthFullscreen.cpp). Both read the
+size mode from the widget themselves (nsWindow::SizeMode(), which is
+mFrameState->GetSizeMode()).
+
+nsWindow::OnWindowPosChanging (Mozilla's, signature as at the tag) holds the
+declared rectangle with one line, a pure addition between the forced-fullscreen
+block and the DWM block: StealthHoldDeclaredFullscreen(*this, info). The WM_GETMINMAXINFO
+hook has to follow Mozilla's four ptMinTrackSize/ptMaxTrackSize assignments (it
+takes the maximum of their result and the declared rectangle), so it stays
+the last statement of that case block.
+
+## The content origin
+
+dom/events/StealthScreenCoords.h holds StealthContentOriginShift, the ONE
+function that gives the declared content origin: mozInnerScreenX/Y
+(StealthWindowGeometry.h) and every mouse event (Event::GetScreenCoords, through
+StealthWithContentOrigin) both ask it, so event.screenX - event.clientX ==
+mozInnerScreenX holds in the main window, in popups and in out-of-process
+iframes (a subframe adds the shift to its OWN rectangle). It is arithmetic and
+widget queries only: Event::GetScreenCoords is the hot path of every trusted
+mouse and wheel event. The sum stays in integer app units, in Mozilla's order,
+and is converted to CSS pixels once, by Mozilla's FromAppUnits.
 
 ## Hooks in Mozilla files
 
-- `widget/nsIWidget.cpp` (include; nsIWidget::InfallibleMakeFullScreen before "Move to fill the screen", already-hook): the fullscreen rectangle is the declared screen (StealthDeclaredFullscreenRect); Mozilla's path with the engine off.
-- `widget/gtk/nsWindow.h` (after MakeFullScreen, already-hook): declares nsWindow::StealthMakeFullScreenWithoutWM.
-- `widget/gtk/nsWindow.cpp` (one line at the head of nsWindow::MakeFullScreen; the file belongs to fingerprint/screen-window/occlusion, whose hooks.patch carries this line): on X with no window manager the widget decides fullscreen itself.
-- `widget/moz.build`, `widget/gtk/moz.build` (SOURCES, X11 headers), `widget/tests/gtest/moz.build`, `dom/events/test/gtest/moz.build`: build our files and tests.
-- `dom/base/nsGlobalWindowOuter.cpp` (CreateNativeGlobalForInner; nsGlobalWindowOuter::GetOuterSize; nsGlobalWindowOuter::GetScreenXY; nsGlobalWindowOuter::StealthContentOriginShift (new); nsGlobalWindowOuter::IsInStealthPopup (new); nsGlobalWindowOuter::GetMozInnerScreenXOuter; nsGlobalWindowOuter::GetMozInnerScreenYOuter, movable): Mixed file. (1) language-declared and timezone-declared: CreateNativeGlobalForInner takes language and zone from the declared session (GetDeclaredLanguage/GetDeclaredTimezone in StealthSessionDeclaration) instead of Top()->GetLanguageOverride()/GetTimezoneOverride(). (2) window-geometry: GetOuterSize and GetScreenXY answer declared maximized-window or popup geometry. (3) window-geometry: StealthCo
-- `dom/base/nsGlobalWindowOuter.h` (nsGlobalWindowOuter (declarations next to GetInnerScreenRect), already-hook): Two declarations with Italian comments. Event.cpp includes this header only to call StealthContentOriginShift; if the function moves to our own file, this header change and that include can go.
-- `dom/events/Event.cpp` (Event::GetScreenCoords, movable): Adds the declared content origin to the screen coordinates computed in Event::GetScreenCoords, so event.screenX - event.clientX equals mozInnerScreenX. Hot path: the comment records that an earlier version with an extra layout query per event made the browser too slow, so keep it arithmetic-only. Includes nsGlobalWindowOuter.h only for one static call, which pulls a large header into Event.cpp. Ab
+Registration (an include in a block of ours after Mozilla's includes, or a moz.build line after the closing `]`):
+- `dom/base/nsGlobalWindowOuter.cpp`: `StealthWindowGeometry.h` (this folder) and `mozilla/dom/StealthSessionDeclaration.h` (marker of fingerprint/locale-time/session-declaration, which owns the function; the file is ours).
+- `dom/events/Event.cpp`: `StealthScreenCoords.h`. `widget/nsIWidget.cpp`: `StealthFullscreen.h`. `widget/windows/nsWindow.cpp`: `StealthFullscreenWin.h`.
+- `widget/moz.build`, `widget/gtk/moz.build` (SOURCES, X11 headers), `widget/windows/moz.build` (SOURCES, windows.h), `widget/tests/gtest/moz.build`, `dom/events/test/gtest/moz.build`: build our files and tests.
+
+Wrap of an expression (Mozilla's expression stays, inside our call):
+- `widget/nsIWidget.cpp`, nsIWidget::InfallibleMakeFullScreen: `doReposition(StealthFullscreenRectOr(*this, DesktopRect(screen->GetRectDisplayPix())))`. With the engine off, or without a declared screen, it is Mozilla's rectangle; otherwise doReposition receives the declared rectangle and Mozilla's next statement (save the new position) does what the old early return did by hand.
+- `dom/events/Event.cpp`, Event::GetScreenCoords: `... + StealthWithContentOrigin(aPresContext, <Mozilla's last summand>)` inside Mozilla's FromAppUnits: one added opening line and one Mozilla line rewritten (the last, which closes the call), the marker on it. Integer addition: A + (B + shift) is (A + B) + shift.
+
+Addition (a call between two Mozilla blocks):
+- `widget/windows/nsWindow.cpp`, nsWindow::OnWindowPosChanging: `mozilla::widget::StealthHoldDeclaredFullscreen(*this, info);` between the forced-fullscreen block and the DWM block; nsWindow.h is the tag's.
+
+Member:
+- `widget/gtk/nsWindow.h`: declares nsWindow::StealthMakeFullScreenWithoutWM (defined in widget/gtk/StealthFullscreenGtk.cpp). The call, `if (StealthMakeFullScreenWithoutWM(aFullScreen)) return NS_OK;` inside Mozilla's `if (GdkIsX11Display() && !IsFullscreenSupported(mShell)) {` block of `widget/gtk/nsWindow.cpp` (nsWindow::MakeFullScreen), is in this folder, byte for byte the form fingerprint/screen-window/occlusion carries too (G48).
+
+Anchors (a call right after a Mozilla statement, listed with their reason in HOOKS.json):
+- `dom/base/nsGlobalWindowOuter.cpp`: GetOuterSize and GetScreenXY after Mozilla's resistFingerprinting check (GetScreenXY after the tree-owner check too, passing its local), GetMozInnerScreenXOuter/YOuter after `nsRect r = GetInnerScreenRect();`. A guard at the head of these functions would answer before Mozilla's resistFingerprinting check, which the core only defaults to false (an extra_prefs overlay can turn it on), so they stay where they are.
+- `widget/windows/nsWindow.cpp`, case WM_GETMINMAXINFO: after the four ptMinTrackSize/ptMaxTrackSize assignments, the last statement of the block (the one exception of rule 5, G30).
+
+Not yet in a contract form (the function it needs belongs to another folder):
+- `dom/base/nsGlobalWindowOuter.cpp`, CreateNativeGlobalForInner: the two arguments `Top()->GetLanguageOverride()` / `GetTimezoneOverride()` are replaced by `GetDeclaredRealmLanguage(aDocument), GetDeclaredRealmTimezone(aDocument)` with a marker comment line of fingerprint/locale-time/session-declaration. The form designed for it (wrap of each argument by StealthRealmLanguage / StealthRealmTimezone, defined in that folder's StealthSessionDeclaration.h) waits for that folder's rework.
+
+`dom/base/nsGlobalWindowOuter.h` is the tag's again: StealthContentOriginShift is a free inline function in StealthScreenCoords.h.

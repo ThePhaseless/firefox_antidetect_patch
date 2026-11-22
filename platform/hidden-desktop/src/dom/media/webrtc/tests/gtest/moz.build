@@ -1,0 +1,11 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+# The hidden desktop's gtest (Windows only), registered by dom/media/webrtc/moz.build.
+
+if CONFIG["OS_TARGET"] == "WINNT":
+    UNIFIED_SOURCES += ["TestStealthWindowInputDesktop.cpp"]
+    LOCAL_INCLUDES += ["/third_party/libwebrtc/"]
+
+FINAL_LIBRARY = "xul-gtest"

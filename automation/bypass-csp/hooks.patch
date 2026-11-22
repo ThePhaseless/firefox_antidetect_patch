@@ -11,32 +11,27 @@ index faff244f374024a019ebc010b4c59efb4f4d2aa1..c9ff4739f97217dc98f07d0712f9040a
  include("/ipc/chromium/chromium-config.mozbuild")
  
 diff --git a/dom/security/nsCSPUtils.cpp b/dom/security/nsCSPUtils.cpp
-index 11de03cf6eaf8fa6fff602cc12a78acc08f2e25f..e9c92af9bb079c8b5fde621edab09d19141404ae 100644
+index 11de03cf6eaf8fa6fff602cc12a78acc08f2e25f..7fdd707bfb64b55d29894868da6e5f5969955be2 100644
 --- a/dom/security/nsCSPUtils.cpp
 +++ b/dom/security/nsCSPUtils.cpp
-@@ -134,6 +134,11 @@ void CSP_ApplyMetaCSPToDoc(mozilla::dom::Document& aDoc,
+@@ -134,6 +134,8 @@ void CSP_ApplyMetaCSPToDoc(mozilla::dom::Document& aDoc,
      return;
    }
  
-+  // STEALTH-HOOK(automation/bypass-csp)
-+  if (CSP_IsBypassedFor(aDoc)) {
-+    return;
-+  }
++  if (CSP_IsBypassedFor(aDoc)) return;  // STEALTH-HOOK(automation/bypass-csp)
 +
    nsAutoString policyStr(
        nsContentUtils::TrimWhitespace<nsContentUtils::IsHTMLWhitespace>(
            aPolicyStr));
 diff --git a/dom/security/nsCSPUtils.h b/dom/security/nsCSPUtils.h
-index ddc5b3eec628412c063e58c11edf6039fdc225bc..3aa85a604d5935becf6e4b6979858d2aefad0796 100644
+index ddc5b3eec628412c063e58c11edf6039fdc225bc..3f85fa502e78ae617859093381f5743f16a957c7 100644
 --- a/dom/security/nsCSPUtils.h
 +++ b/dom/security/nsCSPUtils.h
-@@ -216,6 +216,9 @@ bool CSP_ShouldURIInheritCSP(nsIURI* aURI);
+@@ -211,6 +211,7 @@ class nsCSPSrcVisitor;
+ 
+ void CSP_PercentDecodeStr(const nsAString& aEncStr, nsAString& outDecStr);
+ bool CSP_ShouldResponseInheritCSP(nsIChannel* aChannel);
++bool CSP_IsBypassedFor(const mozilla::dom::Document& aDoc);  // STEALTH-HOOK(automation/bypass-csp)
+ bool CSP_ShouldURIInheritCSP(nsIURI* aURI);
+ 
  void CSP_ApplyMetaCSPToDoc(mozilla::dom::Document& aDoc,
-                            const nsAString& aPolicyStr);
- 
-+// STEALTH-HOOK(automation/bypass-csp)
-+bool CSP_IsBypassedFor(const mozilla::dom::Document& aDoc);
-+
- // Checks if the URI is "chrome://browser/content/browser.xhtml"
- bool CSP_IsBrowserXHTML(nsIURI* aURI);
- 

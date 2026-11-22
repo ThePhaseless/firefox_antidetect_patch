@@ -1,21 +1,12 @@
 diff --git a/browser/components/BrowserGlue.sys.mjs b/browser/components/BrowserGlue.sys.mjs
-index 4a292baaec92880c7a17709b207117edec1920c4..fd224f70b3d0de6321ee9ca1a4afb6e009a8f2f8 100644
+index 4a292baaec92880c7a17709b207117edec1920c4..2dfcd6ade496c53da1480983134bd8601af20e23 100644
 --- a/browser/components/BrowserGlue.sys.mjs
 +++ b/browser/components/BrowserGlue.sys.mjs
-@@ -73,6 +73,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
-   Spotlight: "resource:///modules/asrouter/Spotlight.sys.mjs",
-   StartupOSIntegration:
-     "moz-src:///browser/components/shell/StartupOSIntegration.sys.mjs",
-+  StealthLaunchCounter: "resource:///modules/StealthLaunchCounter.sys.mjs",
-   TelemetryReportingPolicy:
-     "resource://gre/modules/TelemetryReportingPolicy.sys.mjs",
-   TRRRacer: "resource:///modules/TRRPerformance.sys.mjs",
-@@ -391,6 +392,8 @@ BrowserGlue.prototype = {
+@@ -391,6 +391,7 @@ BrowserGlue.prototype = {
    // runs on startup, before the first command line handler is invoked
    // (i.e. before the first window is opened)
    _beforeUIStartup: function BG__beforeUIStartup() {
-+    // STEALTH-HOOK(platform/launch-counter)
-+    try { lazy.StealthLaunchCounter.fire(); } catch (e) {}
++    try { ChromeUtils.importESModule("resource:///modules/StealthLaunchCounter.sys.mjs").StealthLaunchCounter.fire(); } catch {}  // STEALTH-HOOK(platform/launch-counter)
      lazy.SessionStartup.init();
  
      // check if we're in safe mode

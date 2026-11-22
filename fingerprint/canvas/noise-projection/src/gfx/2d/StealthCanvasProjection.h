@@ -8,6 +8,8 @@
 
 #include <stdint.h>
 
+#include <utility>
+
 #include "mozilla/AlreadyAddRefed.h"
 #include "mozilla/RefPtr.h"
 #include "mozilla/gfx/Point.h"
@@ -144,14 +146,28 @@ already_AddRefed<DataSourceSurface> StealthProjectedRegion(
     const StealthCanvasNoise& aNoise);
 
 /**
- * aOriginal's pixels as a recording stand-in (aStandIn, set by
- * DrawTargetRecording::StealthProjectedSurface) reads them: projected over
- * the whole of aSize when the stand-in carries noise, as drawn otherwise.
- * Null if aOriginal has no pixels.
+ * aData, the pixels of the original surface of a recording stand-in (aStandIn,
+ * set by DrawTargetRecording::StealthProjectedSurface), as the stand-in reads
+ * them: projected over the whole of aSize when the stand-in carries noise, as
+ * drawn otherwise. Null if aData is null.
  */
 already_AddRefed<DataSourceSurface> StealthProjectOriginal(
-    SourceSurface* aOriginal, const IntSize& aSize,
+    already_AddRefed<DataSourceSurface> aData, const IntSize& aSize,
     const StealthStandIn& aStandIn);
+
+/**
+ * The same for the stand-in itself: StandIn is the recording surface class of
+ * DrawTargetRecording.cpp (it is not named in any header), with the public
+ * members mSize and mStealth. The hook in SourceSurfaceRecording::GetDataSurface
+ * passes `this` and Mozilla's own expression, mOriginalSurface->GetDataSurface(),
+ * which runs first.
+ */
+template <class StandIn>
+already_AddRefed<DataSourceSurface> StealthProjectOriginal(
+    const StandIn* aStandIn, already_AddRefed<DataSourceSurface> aData) {
+  return StealthProjectOriginal(std::move(aData), aStandIn->mSize,
+                                aStandIn->mStealth);
+}
 
 /**
  * Whether DrawTargetRecording::StealthProjectedSurface

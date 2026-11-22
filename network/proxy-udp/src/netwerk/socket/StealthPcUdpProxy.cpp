@@ -5,15 +5,23 @@
 #include "StealthPcUdpProxy.h"
 
 #include "mozilla/net/ProxyConfigLookup.h"
+#include "mozilla/net/WebrtcProxyConfig.h"
 #include "mozilla/Maybe.h"
 #include "mozilla/net/NeckoChannelParams.h"
 #include "nsIProtocolProxyService.h"
 #include "nsIProxyInfo.h"
 #include "nsIURI.h"
 #include "nsNetUtil.h"
+#include "nsProxyInfo.h"
 #include "nsThreadUtils.h"
+#include "nsUDPSocket.h"
+#include "nsXULAppAPI.h"
 
 namespace mozilla::net {
+
+// These pointers are declared in nsProtocolProxyService.cpp; the type of an nsProxyInfo is compared by pointer (as nsProxyInfo.cpp does).
+extern const char kProxyType_SOCKS[];
+extern const char kProxyType_SOCKS5[];
 
 // static
 already_AddRefed<PcUdpProxy> PcUdpProxy::Known(Kind aKind, const Socks5Info& aInfo) {
@@ -119,6 +127,25 @@ void PcUdpProxy::WhenKnown(std::function<void()>&& aCallback) {
     }
   }
   aCallback();
+}
+
+void StealthPcUdpProxyLookup(RefPtr<PcUdpProxy>& aProxy, const WebrtcProxyConfig& aConfig) {
+  if (XRE_IsSocketProcess() || XRE_IsParentProcess()) {
+    aProxy = PcUdpProxy::Lookup(aConfig.loadInfoArgs());
+  }
+}
+
+// A SOCKS5 proxy: "socks" is SOCKS5 in Firefox's PAC and proxy-service strings, "socks5" is the same said out loud. Whether it carries
+// UDP is another question (the flag CARRIES_COHERENT_UDP); this is only the type.
+bool nsProxyInfo::IsSOCKS5() { return mType == kProxyType_SOCKS || mType == kProxyType_SOCKS5; }
+
+// The SOCKS5 proxy the datagrams of this socket go by (UDP ASSOCIATE), as the connection that owns it learned it: the SOCKS5 UDP layer
+// is put on the socket when it is opened (nsSOCKSUDPIOLayer.h, StealthSocksUdpLayerOn). Call before InitWithAddress. A proxy that is
+// not SOCKS5 is ignored by the layer. No proxy: the socket is a plain one.
+NS_IMETHODIMP nsUDPSocket::SetSocksProxy(nsIProxyInfo* aProxyInfo) {
+  NS_ENSURE_TRUE(mFD == nullptr, NS_ERROR_ALREADY_INITIALIZED);
+  mSocksProxy = aProxyInfo;
+  return NS_OK;
 }
 
 }  // namespace mozilla::net

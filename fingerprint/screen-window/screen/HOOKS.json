@@ -5,87 +5,47 @@
   "kind": "add",
   "form": "registration",
   "line": "#include \"StealthDeclarationGate.h\"  // STEALTH-HOOK(fingerprint/screen-window/screen)",
-  "test": ""
+  "test": "wrapper:tests/test_fingerprint_surface.py::test_a_declared_screen_that_no_runner_has_is_what_the_page_reads"
  },
  {
   "file": "dom/base/nsScreen.cpp",
   "function": "NS_IMPL_CYCLE_COLLECTION_INHERITED(nsScreen, DOMEventTargetHelper,",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/screen-window/screen)",
-  "test": ""
- },
- {
-  "file": "dom/base/nsScreen.cpp",
-  "function": "NS_IMPL_CYCLE_COLLECTION_INHERITED(nsScreen, DOMEventTargetHelper,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  if (int32_t declared = gfx::StealthDeclaredPixelDepth()) return declared;",
-  "test": ""
+  "form": "guard",
+  "line": "  if (int32_t declared = gfx::StealthDeclaredPixelDepth()) return declared;  // STEALTH-HOOK(fingerprint/screen-window/screen)",
+  "test": "wrapper:tests/test_fingerprint_surface.py::test_a_declared_screen_that_no_runner_has_is_what_the_page_reads"
  },
  {
   "file": "dom/base/nsScreen.cpp",
   "function": "nsDeviceContext* nsScreen::GetDeviceContext() const {",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/screen-window/screen)",
-  "test": ""
- },
- {
-  "file": "dom/base/nsScreen.cpp",
-  "function": "nsDeviceContext* nsScreen::GetDeviceContext() const {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  if (auto declared = gfx::StealthDeclaredScreenRect()) return *declared;",
-  "test": ""
+  "form": "guard",
+  "line": "  if (auto declared = gfx::StealthDeclaredScreenRect()) return *declared;  // STEALTH-HOOK(fingerprint/screen-window/screen)",
+  "test": "wrapper:tests/test_fingerprint_surface.py::test_a_declared_screen_that_no_runner_has_is_what_the_page_reads"
  },
  {
   "file": "dom/base/nsScreen.cpp",
   "function": "CSSIntRect nsScreen::GetRect() {",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/screen-window/screen)",
-  "test": ""
- },
- {
-  "file": "dom/base/nsScreen.cpp",
-  "function": "CSSIntRect nsScreen::GetRect() {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  if (auto declared = gfx::StealthDeclaredAvailRect()) return *declared;",
-  "test": ""
+  "form": "guard",
+  "line": "  if (auto declared = gfx::StealthDeclaredAvailRect()) return *declared;  // STEALTH-HOOK(fingerprint/screen-window/screen)",
+  "test": "wrapper:tests/test_fingerprint_surface.py::test_a_declared_screen_that_no_runner_has_is_what_the_page_reads"
  },
  {
   "file": "layout/base/nsPresContext.cpp",
   "function": "",
   "kind": "add",
   "form": "registration",
-  "line": "#include \"StealthDeclarationGate.h\"",
-  "test": ""
+  "line": "#include \"StealthInnerSizeSync.h\"  // STEALTH-HOOK(fingerprint/screen-window/screen)",
+  "test": "wrapper:tests/test_fingerprint_surface.py::test_the_inner_size_of_the_top_is_synced_with_the_engine_active_and_not_without"
  },
  {
   "file": "layout/base/nsPresContext.cpp",
   "function": "void nsPresContext::SetOverrideDPPX(float aDPPX) {",
   "kind": "rewrite",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/screen-window/screen): see FEATURE.md",
+  "form": "wrap-expression",
+  "line": "  if (!StealthRfpOrEngineActive(mDocument->ShouldResistFingerprinting(RFPTarget::WindowOuterSize)) ||  // STEALTH-HOOK(fingerprint/screen-window/screen)",
   "removed": "  if (!mDocument->ShouldResistFingerprinting(RFPTarget::WindowOuterSize) ||",
-  "test": ""
- },
- {
-  "file": "layout/base/nsPresContext.cpp",
-  "function": "void nsPresContext::SetOverrideDPPX(float aDPPX) {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  if ((!mDocument->ShouldResistFingerprinting(RFPTarget::WindowOuterSize) &&",
-  "test": ""
- },
- {
-  "file": "layout/base/nsPresContext.cpp",
-  "function": "void nsPresContext::SetOverrideDPPX(float aDPPX) {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "       !mozilla::gfx::StealthEngineActive()) ||",
-  "test": ""
+  "test": "wrapper:tests/test_fingerprint_surface.py::test_the_inner_size_of_the_top_is_synced_with_the_engine_active_and_not_without"
  }
 ]

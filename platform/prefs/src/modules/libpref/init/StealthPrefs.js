@@ -3,10 +3,11 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 // Our default prefs: only prefs that Mozilla does not declare, each declared
-// once. greprefs.js includes this file right after all.js. A Mozilla pref whose
-// value we change is changed where Mozilla declares it (all.js, firefox.js),
-// with a STEALTH-HOOK marker on the line; it is never declared again here.
-// modules/libpref/test/test_stealth_prefs_declared_once.py fails otherwise.
+// once. greprefs.js includes this file right after all.js, so our defaults win.
+// A Mozilla pref whose value we change is changed where Mozilla declares it
+// (all.js, firefox.js), with a STEALTH-HOOK marker on the line; it is never
+// declared again here. modules/libpref/test/test_stealth_prefs_declared_once.py
+// fails otherwise; test_stealth_prefs_final_values.py checks the final values.
 // Static prefs are in StealthPrefList.yaml.
 
 // STEALTH: pin the CSS system fonts to the Windows shell font, on EVERY host.

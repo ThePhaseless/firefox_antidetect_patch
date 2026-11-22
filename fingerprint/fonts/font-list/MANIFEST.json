@@ -1,6 +1,5 @@
 {
  "modified": [
-  "gfx/thebes/CoreTextFontList.cpp",
   "gfx/thebes/gfxDWriteFontList.cpp",
   "gfx/thebes/gfxFcPlatformFontList.cpp",
   "gfx/thebes/gfxPlatformFontList.cpp",
@@ -9,33 +8,14 @@
  "added": {
   "gfx/tests/gtest/TestStealthBundledCollection.cpp": "100644",
   "gfx/tests/gtest/TestStealthFcFontList.cpp": "100644",
+  "gfx/tests/gtest/TestStealthFontListHooks.h": "100644",
   "gfx/thebes/StealthFcFontList.cpp": "100644",
   "gfx/thebes/StealthFcFontList.h": "100644",
-  "gfx/thebes/StealthFcFontList.mozbuild": "100644"
+  "gfx/thebes/StealthFcFontList.mozbuild": "100644",
+  "gfx/thebes/StealthFontListHooks.cpp": "100644",
+  "gfx/thebes/StealthFontListHooks.h": "100644"
  },
  "inventory": [
-  {
-   "file": "gfx/thebes/CoreTextFontList.cpp",
-   "category": "spoof",
-   "feature": "font-list-bundle-only",
-   "prefs": [],
-   "added": 32,
-   "removed": 1,
-   "hunks": 7,
-   "inline_logic_lines": 67,
-   "hookable": "movable",
-   "anchor": "CTFontEntry::ReadCMAP; CoreTextFontList::AddFamily; CoreTextFontList::InitSharedFontListForPlatform; CoreTextFontList::CreateFontEntry; CoreTextFontList::GetFacesInitDataForFamily; CoreTextFontList::GetDefaultFontForPlatform",
-   "evidence": [
-    "+  if (mStealthBundleOnly && !mBundledFamilies.Contains(aFamilyName)) {",
-    "+    FontFamily f = FindFamily(aFontVisibilityProvider, \"Segoe UI\"_ns);",
-    "-    if (!IsUserFont() && mShmemFace && mShmemFamily) {"
-   ],
-   "notes": "Bundle-only on macOS: AddFamily drops every family not in the bundle (CoreText merges host and bundled fonts into one enumeration, so the filter is per family here); InitSharedFontListForPlatform builds the family list from the manifest; CreateFontEntry has a ~47-line branch that wraps the bundle bytes with CFDataCreateWithBytesNoCopy and picks the face by PostScript name. GetDefaultFontForPlatform returns 'Segoe UI' instead of the macOS UI font. ReadCMAP now uses ShouldPublishCharacterMap(). Movable: the CreateFontEntry branch can move into StealthBundleFontList behind a short hook. Not compiled or tested on macOS in this inventory.",
-   "verifier": {
-    "changed": [],
-    "why": "Checked category, feature, prefs, anchor, evidence and notes against the diff; no correction needed."
-   }
-  },
   {
    "file": "gfx/thebes/gfxDWriteFontList.cpp",
    "category": "spoof",

@@ -14,6 +14,7 @@
 #include "SharedFontList-impl.h"
 #include "StealthBundleFontList.h"
 #include "gfxFcPlatformFontList.h"
+#include "gfxFontUtils.h"
 #include "mozilla/RefPtr.h"
 #include "mozilla/StaticPrefs_zoom.h"
 #include "mozilla/gfx/2D.h"
@@ -76,6 +77,52 @@ hb_face_t* StealthBaseHBFaceRef(gfxFontEntry* aEntry) {
 
 uint32_t StealthTableFaceIndex(SharedFTFace* aFace) {
   return aFace ? uint32_t(aFace->GetFace()->face_index & 0x7FFF) : 0;
+}
+
+bool StealthFaceDataHasTable(gfxFontconfigFontEntry* aEntry,
+                             uint32_t aTableTag, bool* aResult) {
+  // A face of a .ttc made from data (the bundle's) answers for ITS face. Mozilla
+  // reads the table directory at the start of the data, which is face 0: for
+  // face 0 (and for a font that is not a collection) the guard says no and
+  // Mozilla's own line runs, on the same directory.
+  auto* ufd = aEntry->GetUserFontData();
+  if (!ufd) {
+    return false;
+  }
+  const uint32_t index = StealthTableFaceIndex(aEntry->GetFTFace());
+  if (!index) {
+    return false;
+  }
+  *aResult = !!gfxFontUtils::FindTableDirEntry(ufd->Data(), aTableTag, index);
+  return true;
+}
+
+bool StealthFaceDataTable(gfxFontconfigFontEntry* aEntry, uint32_t aTableTag,
+                          hb_blob_t** aResult) {
+  // As StealthFaceDataHasTable, for the blob of the table.
+  auto* ufd = aEntry->GetUserFontData();
+  if (!ufd) {
+    return false;
+  }
+  const uint32_t index = StealthTableFaceIndex(aEntry->GetFTFace());
+  if (!index) {
+    return false;
+  }
+  *aResult = gfxFontUtils::GetTableFromFontData(ufd->Data(), aTableTag, index);
+  return true;
+}
+
+bool StealthDropPatternWithoutFamily(
+    const RefPtr<gfxFontconfigFontFamily>& aFamily) {
+  // Bundle-only: drop every pattern that arrives while aFontFamily is still
+  // null (see the comment of the header: AddPatternToFontList).
+  return !aFamily;
+}
+
+bool StealthSkipsSystemFontSetCore(bool aBundleOnly) { return aBundleOnly; }
+
+bool StealthSkipsSystemFontSet(const gfxPlatformFontList* aList) {
+  return StealthSkipsSystemFontSetCore(aList->StealthBundleOnly());
 }
 
 hb_blob_t* StealthHBFaceTable(gfxFontEntry* aEntry, uint32_t aTableTag) {
@@ -186,6 +233,11 @@ void StealthPreferFileUnscaledFont(
   StealthFcAccess::AddUnscaledFont(aEntry, aFont);
 }
 
+bool StealthPopulateSharedList(gfxFcPlatformFontList* aList) {
+  return aList->StealthBundleOnly() &&
+         StealthPopulateSharedList(aList->SharedFontList());
+}
+
 bool StealthPopulateSharedList(fontlist::FontList* aList) {
   // Uniform bundle: build the shared family list + faces from our manifest,
   // skipping the fontconfig enumeration (host fonts never enter). Linux builds
@@ -203,6 +255,12 @@ bool StealthPopulateSharedList(fontlist::FontList* aList) {
     fam.AddFaces(aList, faceData);
   }
   return true;
+}
+
+already_AddRefed<gfxFontEntry> StealthCreateBundleFontEntry(
+    gfxFcPlatformFontList* aList, fontlist::Face* aFace,
+    const fontlist::Family* aFamily) {
+  return StealthCreateBundleFontEntry(aFace, aFamily, aList->SharedFontList());
 }
 
 already_AddRefed<gfxFontEntry> StealthCreateBundleFontEntry(

@@ -1,30 +1,25 @@
 # fingerprint/canvas/text-metrics
 
 Category: spoof
-Prefs: none read directly
-Test: TODO
+Prefs: none read directly (the engine gate `StealthEngineActive()` reads `zoom.stealth.fpp.hw_seed`)
+Test: wrapper `tests/test_canvas_measure_text_metrics_e2e.py::test_measure_text_vertical_metrics_are_whole_and_retail`, `tests/test_canvas_create_pattern_projection_e2e.py::test_create_pattern_from_a_webgl_canvas_carries_the_projection`, `tests/test_canvas_create_pattern_projection_e2e.py::test_create_pattern_from_an_offscreen_webgl_canvas_carries_the_projection` (to be written, green on firefox-68 first); history: measureText additivity (the sum of the parts equals the whole)
 
 ## What it does
 
-TODO: one paragraph, from the notes below.
+With the engine on, `measureText` on a horizontal run answers its vertical metrics from the bundled font's own OS/2 table, rounded the way a Windows Firefox rounds them (`usWinAscent`/`usWinDescent` rounded, the em box split in the ratio of the rounded pair), so every vertical field is whole and equal across hosts for a given bundled font and size. The four `actualBoundingBox*` values stay the real ink box computed by Mozilla (the glyph outlines of the bundled fonts are identical on every host). Vertical text and a font without a usable OS/2 table stay on Mozilla's native path (since Firefox 157 `fontMetrics` is not host-engine for vertical runs). With the engine off the stock `TextMetrics` is built.
+
+The logic is `StealthHostIndepTextMetrics` in `dom/canvas/StealthCanvasTextMetrics.h`, header-only on purpose: its one includer is `CanvasRenderingContext2D.cpp`, so nothing is registered in `dom/canvas/moz.build` (bug 1745384: the unified chunks of this directory must not be disturbed) and the function compiles in the translation unit the stock code did. It mirrors the `baselineAnchor` switch of `DrawOrMeasureText` case for case (the copy already cost one bug: the Hanging and Ideographic cases come from HarfBuzz, not from the em box). Making `fontMetrics` host independent instead would move `fillText` positions (`baselineAnchor` reads `emAscent`/`emDescent`), so it is not an option.
+
+`createPattern` of a canvas source reads the snapshot through the element (`HTMLCanvasElement::GetSurfaceSnapshot`, `OffscreenCanvas::GetSurfaceSnapshot`) instead of the rendering context: that is where `fingerprint/canvas/noise-projection` projects the declared noise on WebGL and WebGPU canvases (a 2D canvas comes back as drawn). Called on the context, a pattern made from a WebGL canvas would carry the raw pixels. For a 2D context without a draw target the element path (`GetOptimizedSnapshot(nullptr, ...)`) and the context's `GetSurfaceSnapshot` give the same surface.
+
+History: the per-run advance jitter was REMOVED 2026-08-08. It was the one thing a public fingerprinting test page ever caught this build doing (measureText reported as carrying metric noise), both detectable and unrealistic. DETECTABLE by addition: the offset was added to the LAST glyph of every shaped run, so measuring a string in pieces accumulated one offset per piece (50 characters at 72px Arial, summed singly against whole: this build +2.449982 px, retail FF 152 +0.000069 px; a real Firefox is additive to within seven hundred-thousandths of a pixel). UNREALISTIC: two real Windows machines with the same fonts measure the same string identically, text width is not a per-machine quantity; per-identity uniqueness comes from the canvas pixel path, the GPU persona and the screen. The v2 this replaced was a reduction of a v1 that perturbed every glyph and moved a long string by ~2.8px, which a commercial fingerprinting service's machine-learning check scored as tampering.
 
 ## Hooks in Mozilla files
 
-- `dom/canvas/CanvasRenderingContext2D.cpp` (CanvasRenderingContext2D::DrawOrMeasureText (TextMetrics return); also CreatePattern (2 hunks) and a comment-only block near GetImageBuffer, movable): The DrawOrMeasureText hunk is about 45 logic lines (vertical metrics rounding, baseline switch, MakeUnique call). It can move into an own file taking a small input struct, leaving a one-line hook that returns a Maybe<TextMetrics>. The CreatePattern hunks (source snapshot read through the element) belong to canvas-noise-projection, not to text metrics. The 30-line comment block 'a 2D canvas reads b
+All in `dom/canvas/CanvasRenderingContext2D.cpp`:
 
-## History: the removed per-run advance offset
+- Registration: `#include "StealthCanvasTextMetrics.h"` in a block of ours after Mozilla's includes (before the `#undef DrawText` comment).
+- Anchor (guard-anchor, one line, `CanvasRenderingContext2D::DrawOrMeasureText`, MEASURE branch, after `double actualBoundingBoxDescent = ...;`): `if (auto m = StealthHostIndepTextMetrics(font, fontOrientation, state.textBaseline, totalWidth, {the four actualBoundingBox values})) return m;`. It needs six locals that exist only there (font, fontOrientation, totalWidth, the four values): a guard at the top finds them unborn, wrapping Mozilla's `MakeUnique<TextMetrics>` would build and discard it and still need the locals.
+- Two rewritten lines in `CanvasRenderingContext2D::CreatePattern` (HTMLCanvasElement and OffscreenCanvas branches): `RefPtr<SourceSurface> srcSurf = canvas->GetSurfaceSnapshot();` / `offscreenCanvas->GetSurfaceSnapshot();` instead of `srcCanvas->GetSurfaceSnapshot();`. They belong to the noise projection rather than to text metrics (noise-projection owns `StealthPageSnapshot`).
 
-The per-run advance jitter was REMOVED 2026-08-08. It is the one thing a public fingerprinting test page ever caught this build doing (the single entry in its list of detected lies: measureText reported as carrying metric noise), and it was both detectable and unrealistic.
-
-DETECTABLE, by addition and nothing else. The offset was added to the LAST glyph of every shaped run, so measuring a string in pieces accumulated one offset per piece while measuring it whole accumulated one. Measured at 72px in Arial, 50 identical characters summed singly against the same 50 as one string:
-
-    this build      +2.449982 px
-    retail FF 152   +0.000069 px
-
-A real Firefox is additive to within seven hundred-thousandths of a pixel; we were off by a factor of 35000. The test needs no reference values, no second machine and no knowledge of our fonts - just add the parts.
-
-UNREALISTIC, which is the better reason. Two real Windows machines with the same fonts measure the same string identically; text width is not a per-machine quantity. Making every identity unique in it manufactured a variation the population being imitated does not have. Per-identity uniqueness still comes from the canvas PIXEL path, from the GPU persona and from the screen - none of which had to lie about a font metric to get it.
-
-The v2 this replaces was itself a reduction of a v1 that perturbed every glyph and moved a long string by ~2.8px, which was scored as tampering by a commercial fingerprinting service's machine-learning check. Halving a tell twice is not the same as removing it.
-
-Test: measureText additivity (the sum of the parts equals the whole).
+Port note: if Mozilla changes the MEASURE branch the anchor needs the six locals above; if it changes `CreatePattern` the receiver swap is the signal.

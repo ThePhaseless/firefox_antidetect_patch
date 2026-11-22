@@ -34,16 +34,18 @@ CLANG = " 0:45.12 %s/dom/base/Foo.cpp:12:3: error: use of undeclared identifier 
 CLANG_CL = "gfx/thebes/Bar.cpp(7,2): error: no member named 'baz' in 'Qux'"
 FATAL = "%s/netwerk/test/gtest/TestStealthX.cpp:3:10: fatal error: 'Missing.h' file not found" % ROOT
 
-# Every suite of our own files, from `git grep -hoE "TEST(_F)?\((Stealth...|Idwr...|...Stealth...)," release/firefox-69` and the one of ours inside a
-# Mozilla file (startupcache/test/TestStartupCache.cpp): the candidate's filter must run all of them.
-OUR_SUITES = """Idwr Intl_Locale_StealthSystemLocales StealthAudioNoise StealthBirthOrder StealthBundledCollection StealthBundledFamilyFilter
-StealthCanvasProjection StealthDeclaredNetwork StealthDocumentLanguage StealthFallbackNames StealthFcBundleFonts StealthFcFontList StealthFontList
-StealthFontMetrics StealthFrameCrash StealthFullscreen StealthGLMultisample StealthGfxFeatureStatus StealthIceResolverContext StealthInputEventBirth
-StealthJugglerEventId StealthKeyBirthScope StealthMediaDeclaration StealthNrSocketBirth StealthOwnBinaries StealthPcProxyConfig
-StealthPcUdpProxyKinds StealthQuotaEstimate StealthScaleDeclaration StealthSessionUdpProxy StealthSocksUdpPool StealthTcpProxyRoad
-StealthTextQuality StealthTtcFace StealthUdpProxyBirth StealthWebGPUAdapter StealthWebGPUBundledVulkan StealthWebGPUDeclaration
-StealthWebGPUExternalTexture StealthWebGPUInstanceEnv StealthWindowGeometry TestStealthSessionResolver TestStealthSocksCredentials
-TestStealthTRRContext""".split()
+# Every suite of our own files, from `git grep -hoE "TEST(_F)?\((Stealth...|Idwr...|...Stealth...)," release/firefox-69` and the ones of ours in a
+# Mozilla directory's gtest (StealthStartupCache, TestStealthStartupCache.cpp): the candidate's filter must run all of them.
+OUR_SUITES = """Idwr Intl_Locale_StealthSystemLocales StealthAudioNoise StealthBirthOrder StealthBundleHooks StealthBundledCollection StealthCanvasProjection
+StealthDebugger StealthDeclaredNetwork StealthDocumentLanguage StealthFallbackNames StealthFcBundleFonts StealthFcFontList StealthFontList
+StealthFontListHooks StealthFontMetrics StealthFrameCrash StealthFullscreen StealthGLMultisample StealthGfxFeatureStatus StealthGlyphCoverage
+StealthIceResolverContext StealthInputEventBirth StealthJugglerEventId StealthKeyBirthScope StealthMediaDeclaration StealthNrSocketBirth
+StealthOwnBinaries StealthPcProxyConfig StealthPcUdpProxyKinds StealthPrefSanitize StealthQuotaEstimate StealthScaleDeclaration StealthSessionUdpProxy
+StealthSocksUdpPool StealthTcpProxyRoad StealthTextQuality StealthTtcFace StealthUdpProxyBirth StealthWebGPUAdapter StealthWebGPUBundledVulkan
+StealthWebGPUDeclaration StealthWebGPUExternalTexture StealthWebGPUInstanceEnv StealthWindowGeometry StealthWindowInputDesktop
+StealthBranding StealthCanvasUtils StealthDragGesture StealthHttp3Socks StealthJugglerCoalesce StealthJugglerMouseAck StealthMouseEventCopy
+StealthMouseEventIPC StealthNsProxyInfoKinds StealthSocksUdpLayer StealthStackFrames StealthStartupCache StealthTimezone
+TestStealthDocShellDefaults TestStealthLinkClickAfter TestStealthLoadInfo TestStealthSessionResolver TestStealthSocksCredentials TestStealthTRRContext""".split()
 
 
 # ── 1. the errors ───────────────────────────────────────────────────────────────────────────
@@ -282,8 +284,7 @@ def test_annotations_are_warnings_when_the_step_does_not_fail():
 def test_every_suite_of_ours_is_in_the_candidates_filter():
     named = set(release_plan.DEFAULT_GTEST_FILTER.split(":"))
     assert [s for s in OUR_SUITES if "%s.*" % s not in named] == []
-    assert "StartupCache.WritesNeverLowerIOPriority" in named
-    assert not any(n.startswith("StealthStartupCache") for n in named), "there is no such suite: the filter would name one that is not there"
+    assert "StealthStartupCache.*" in named and "StartupCache.WritesNeverLowerIOPriority" not in named
 
 
 def test_suites_of_one_platform_are_not_missing_on_the_other():

@@ -3,49 +3,25 @@
   "file": "dom/base/nsDOMWindowUtils.cpp",
   "function": "",
   "kind": "add",
-  "form": "unknown",
-  "line": "// STEALTH-HOOK(fingerprint/canvas/as-drawn)",
-  "test": ""
+  "form": "registration",
+  "line": "#include \"StealthCanvasAsDrawn.h\"  // STEALTH-HOOK(fingerprint/canvas/as-drawn)",
+  "test": "wrapper:tests/test_canvas_reads_as_drawn.py::test_random_pixels_read_back_as_drawn"
  },
  {
   "file": "dom/base/nsDOMWindowUtils.cpp",
   "function": "",
   "kind": "add",
-  "form": "unknown",
-  "line": "#include \"StealthCanvasAsDrawn.h\"",
-  "test": ""
+  "form": "registration",
+  "line": "#include \"StealthInputEventBirth.h\"  // STEALTH-HOOK(fingerprint/input/event-birth)",
+  "test": "wrapper:tests/test_input_is_born_before_the_page_sees_it_e2e.py::test_every_key_and_move_is_born_before_its_handler_runs"
  },
  {
   "file": "dom/base/nsDOMWindowUtils.cpp",
   "function": "",
   "kind": "add",
-  "form": "unknown",
-  "line": "// STEALTH-HOOK(fingerprint/input/event-birth)",
-  "test": ""
- },
- {
-  "file": "dom/base/nsDOMWindowUtils.cpp",
-  "function": "",
-  "kind": "add",
-  "form": "unknown",
-  "line": "#include \"StealthInputEventBirth.h\"",
-  "test": ""
- },
- {
-  "file": "dom/base/nsDOMWindowUtils.cpp",
-  "function": "",
-  "kind": "add",
-  "form": "unknown",
-  "line": "// STEALTH-HOOK(automation/input)",
-  "test": ""
- },
- {
-  "file": "dom/base/nsDOMWindowUtils.cpp",
-  "function": "",
-  "kind": "add",
-  "form": "unknown",
-  "line": "#include \"StealthJugglerInput.h\"",
-  "test": ""
+  "form": "registration",
+  "line": "#include \"StealthJugglerInput.h\"  // STEALTH-HOOK(automation/input)",
+  "test": "wrapper:tests/test_a_pointer_event_is_handled_before_the_call_returns_e2e.py::test_each_pointer_call_answers_after_the_page_handled_its_event"
  },
  {
   "file": "dom/base/nsDOMWindowUtils.cpp",
@@ -54,144 +30,76 @@
   "form": "unknown",
   "line": "                                 nsISynthesizedEventCallback* aCallback,",
   "removed": "                                 nsISynthesizedEventCallback* aCallback) {",
-  "test": ""
+  "test": "wrapper:tests/test_input_is_born_before_the_page_sees_it_e2e.py::test_every_key_and_move_is_born_before_its_handler_runs",
+  "exception": "G35, approved in PM-DECISIONS (automation/input): aLatency is a parameter of ours in the signature of a Mozilla method; the C++ signature of an XPIDL method is generated from the IDL, so the IDL line and this one are one change; it is the interface that Juggler and the minimal driver use",
+  "pm": "approvato"
  },
  {
   "file": "dom/base/nsDOMWindowUtils.cpp",
   "function": "nsDOMWindowUtils::SendWheelEvent(float aX, float aY, double aDeltaX,",
   "kind": "rewrite",
   "form": "unknown",
-  "line": "                                 double aLatency) {",
-  "test": ""
+  "line": "                                 double aLatency) {  // STEALTH-HOOK(fingerprint/input/event-birth)",
+  "test": "wrapper:tests/test_input_is_born_before_the_page_sees_it_e2e.py::test_every_key_and_move_is_born_before_its_handler_runs",
+  "exception": "G35, approved in PM-DECISIONS (automation/input): aLatency is a parameter of ours in the signature of a Mozilla method; the C++ signature of an XPIDL method is generated from the IDL, so the IDL line and this one are one change; it is the interface that Juggler and the minimal driver use",
+  "pm": "approvato"
  },
  {
   "file": "dom/base/nsDOMWindowUtils.cpp",
   "function": "nsDOMWindowUtils::SendWheelEvent(float aX, float aY, double aDeltaX,",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/input/event-birth)",
-  "test": ""
- },
- {
-  "file": "dom/base/nsDOMWindowUtils.cpp",
-  "function": "nsDOMWindowUtils::SendWheelEvent(float aX, float aY, double aDeltaX,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  StealthSetInputEventBirth(wheelEvent, aLatency, GetDocument());",
-  "test": ""
+  "form": "anchor",
+  "line": "  StealthSetInputEventBirth(wheelEvent, aLatency, GetDocument());  // STEALTH-HOOK(fingerprint/input/event-birth)",
+  "test": "wrapper:tests/test_input_is_born_before_the_page_sees_it_e2e.py::test_every_key_and_move_is_born_before_its_handler_runs",
+  "anchor": "wheelEvent.mFlags.mIsSynthesizedForTests = true;",
+  "why": "the hook stamps the local wheelEvent, which exists only inside SendWheelEvent: a guard at the top has nothing to stamp, a function wrap cannot reach a local, and the event is a constructor declaration, not an expression to wrap; GetDocument() is a protected member of this, so the template cannot take this"
  },
  {
   "file": "dom/base/nsDOMWindowUtils.cpp",
   "function": "nsDOMWindowUtils::NodesFromRect(float aX, float aY, float aTopSize,",
   "kind": "rewrite",
   "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/canvas/as-drawn)",
+  "line": "  SurfaceFromElementResult result = StealthSurfaceFromCanvasAsDrawn(aCanvas);  // STEALTH-HOOK(fingerprint/canvas/as-drawn)",
   "removed": "  SurfaceFromElementResult result = nsLayoutUtils::SurfaceFromElement(aCanvas);",
-  "test": ""
+  "test": "wrapper:tests/test_canvas_reads_as_drawn.py::test_random_pixels_read_back_as_drawn",
+  "exception": "G29 (PM-DECISIONS 22/11 morning, read by the pm against the tag): one Mozilla line, only the called function changes",
+  "pm": "approvato"
  },
  {
-  "file": "dom/base/nsDOMWindowUtils.cpp",
-  "function": "nsDOMWindowUtils::NodesFromRect(float aX, float aY, float aTopSize,",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  SurfaceFromElementResult result = StealthSurfaceFromCanvasAsDrawn(aCanvas);",
-  "test": ""
+  "file": "dom/events/EventStateManager.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthDragGesture.h\"  // STEALTH-HOOK(automation/input)",
+  "test": "gtest:StealthDragGesture.ThePressOfJugglerDecidesWhichMovesContinueTheGesture"
  },
  {
   "file": "dom/events/EventStateManager.cpp",
   "function": "void EventStateManager::BeginTrackingDragGesture(",
   "kind": "add",
-  "form": "unknown",
-  "line": "  mGestureDownFromJuggler = aMouseDownOrTouchDragEvent.mJugglerEventId != 0;",
-  "test": ""
+  "form": "anchor",
+  "line": "  StealthDragGestureBegin(mGestureDownFromJuggler, aMouseDownOrTouchDragEvent);  // STEALTH-HOOK(automation/input)",
+  "test": "gtest:StealthDragGesture.ThePressOfJugglerDecidesWhichMovesContinueTheGesture",
+  "anchor": "mGestureDownButton = aMouseDownOrTouchDragEvent.mButton;",
+  "why": "a notice at the top would also run when the early return on a null mWidget leaves without starting a gesture, and would overwrite the flag of a gesture already being tracked; the flag belongs with the gesture fields set after that return"
  },
  {
   "file": "dom/events/EventStateManager.cpp",
   "function": "void EventStateManager::GenerateDragGesture(",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(automation/input): B288, see FEATURE.md",
-  "test": ""
- },
- {
-  "file": "dom/events/EventStateManager.cpp",
-  "function": "void EventStateManager::GenerateDragGesture(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  if (const WidgetMouseEvent* mouseEvent =",
-  "test": ""
- },
- {
-  "file": "dom/events/EventStateManager.cpp",
-  "function": "void EventStateManager::GenerateDragGesture(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "          aMouseOrTouchOrPointerEvent.AsMouseEvent()) {",
-  "test": ""
- },
- {
-  "file": "dom/events/EventStateManager.cpp",
-  "function": "void EventStateManager::GenerateDragGesture(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    if ((mouseEvent->mJugglerEventId != 0) != mGestureDownFromJuggler) {",
-  "test": ""
- },
- {
-  "file": "dom/events/EventStateManager.cpp",
-  "function": "void EventStateManager::GenerateDragGesture(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "      return;",
-  "test": ""
- },
- {
-  "file": "dom/events/EventStateManager.cpp",
-  "function": "void EventStateManager::GenerateDragGesture(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    }",
-  "test": ""
- },
- {
-  "file": "dom/events/EventStateManager.cpp",
-  "function": "void EventStateManager::GenerateDragGesture(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  }",
-  "test": ""
+  "form": "anchor",
+  "line": "  if (StealthSkipDragGesture(mGestureDownFromJuggler, aMouseOrTouchOrPointerEvent)) return;  // STEALTH-HOOK(automation/input)",
+  "test": "gtest:StealthDragGesture.ThePressOfJugglerDecidesWhichMovesContinueTheGesture",
+  "anchor": "if (!IsTrackingDragGesture()) { return; }",
+  "why": "the decision applies only while a gesture is tracked: a guard at the top would decide before the IsTrackingDragGesture check, and the return comes from the middle of the function"
  },
  {
   "file": "dom/events/EventStateManager.h",
   "function": "class EventStateManager : public nsSupportsWeakReference, public nsIObserver {",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // Stealthfox [B288]: whether the press that started the gesture came from",
-  "test": ""
- },
- {
-  "file": "dom/events/EventStateManager.h",
-  "function": "class EventStateManager : public nsSupportsWeakReference, public nsIObserver {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  // Juggler (nsIDOMWindowUtils.jugglerSendMouseEvent). Only moves of the same",
-  "test": ""
- },
- {
-  "file": "dom/events/EventStateManager.h",
-  "function": "class EventStateManager : public nsSupportsWeakReference, public nsIObserver {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  // origin continue it; see GenerateDragGesture.",
-  "test": ""
- },
- {
-  "file": "dom/events/EventStateManager.h",
-  "function": "class EventStateManager : public nsSupportsWeakReference, public nsIObserver {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  bool mGestureDownFromJuggler = false;",
-  "test": ""
+  "form": "member",
+  "line": "  bool mGestureDownFromJuggler = false;  // STEALTH-HOOK(automation/input)",
+  "test": "gtest:StealthDragGesture.ThePressOfJugglerDecidesWhichMovesContinueTheGesture"
  },
  {
   "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
@@ -200,223 +108,69 @@
   "form": "unknown",
   "line": "                      [optional] in nsISynthesizedEventCallback aCallback,",
   "removed": "                      [optional] in nsISynthesizedEventCallback aCallback);",
-  "test": ""
+  "test": "wrapper:tests/test_input_is_born_before_the_page_sees_it_e2e.py::test_every_key_and_move_is_born_before_its_handler_runs",
+  "exception": "G35, approved in PM-DECISIONS (automation/input): aLatency is a parameter of ours in the signature of a Mozilla method; the C++ signature of an XPIDL method is generated from the IDL, so the IDL line and this one are one change; it is the interface that Juggler and the minimal driver use",
+  "pm": "approvato"
  },
  {
   "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
   "function": "interface nsIDOMWindowUtils : nsISupports {",
   "kind": "rewrite",
   "form": "unknown",
-  "line": "                      [optional] in double aLatency);",
-  "test": ""
+  "line": "                      [optional] in double aLatency);  // STEALTH-HOOK(fingerprint/input/event-birth)",
+  "test": "wrapper:tests/test_input_is_born_before_the_page_sees_it_e2e.py::test_every_key_and_move_is_born_before_its_handler_runs",
+  "exception": "G35, approved in PM-DECISIONS (automation/input): aLatency is a parameter of ours in the signature of a Mozilla method; the C++ signature of an XPIDL method is generated from the IDL, so the IDL line and this one are one change; it is the interface that Juggler and the minimal driver use",
+  "pm": "approvato"
  },
  {
   "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
   "function": "interface nsIDOMWindowUtils : nsISupports {",
   "kind": "add",
-  "form": "unknown",
-  "line": "  /** Playwright: synthetic mouse event, returns an event id; documented at JugglerSendMouseEvent in dom/base/StealthJugglerInput.h. */",
-  "test": ""
+  "form": "member",
+  "line": "  [can_run_script] unsigned long jugglerSendMouseEvent(in AString aType, in float aX, in float aY, in long aButton, in long aClickCount, in long aModifiers, in boolean aIgnoreRootScrollFrame, in float aPressure, in unsigned short aInputSourceArg, in boolean aIsDOMEventSynthesized, in boolean aIsWidgetEventSynthesized, in long aButtons, in unsigned long aIdentifier, in double aLatency);  // STEALTH-HOOK(automation/input)",
+  "test": "wrapper:tests/test_a_pointer_event_is_handled_before_the_call_returns_e2e.py::test_each_pointer_call_answers_after_the_page_handled_its_event"
  },
  {
   "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
   "function": "interface nsIDOMWindowUtils : nsISupports {",
   "kind": "add",
-  "form": "unknown",
-  "line": "  [can_run_script]",
-  "test": ""
+  "form": "member",
+  "line": "  [can_run_script] void jugglerSendDragEvent(in AString aType, in float aX, in float aY, in long aModifiers);  // STEALTH-HOOK(automation/input)",
+  "test": "wrapper:tests/test_a_pointer_event_is_handled_before_the_call_returns_e2e.py::test_each_pointer_call_answers_after_the_page_handled_its_event"
  },
  {
-  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
-  "function": "interface nsIDOMWindowUtils : nsISupports {",
+  "file": "dom/ipc/CoalescedMouseData.cpp",
+  "function": "",
   "kind": "add",
-  "form": "unknown",
-  "line": "  unsigned long jugglerSendMouseEvent(in AString aType,",
-  "test": ""
- },
- {
-  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
-  "function": "interface nsIDOMWindowUtils : nsISupports {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "                         in float aX,",
-  "test": ""
- },
- {
-  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
-  "function": "interface nsIDOMWindowUtils : nsISupports {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "                         in float aY,",
-  "test": ""
- },
- {
-  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
-  "function": "interface nsIDOMWindowUtils : nsISupports {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "                         in long aButton,",
-  "test": ""
- },
- {
-  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
-  "function": "interface nsIDOMWindowUtils : nsISupports {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "                         in long aClickCount,",
-  "test": ""
- },
- {
-  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
-  "function": "interface nsIDOMWindowUtils : nsISupports {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "                         in long aModifiers,",
-  "test": ""
- },
- {
-  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
-  "function": "interface nsIDOMWindowUtils : nsISupports {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "                         in boolean aIgnoreRootScrollFrame,",
-  "test": ""
- },
- {
-  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
-  "function": "interface nsIDOMWindowUtils : nsISupports {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "                         in float aPressure,",
-  "test": ""
- },
- {
-  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
-  "function": "interface nsIDOMWindowUtils : nsISupports {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "                         in unsigned short aInputSourceArg,",
-  "test": ""
- },
- {
-  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
-  "function": "interface nsIDOMWindowUtils : nsISupports {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "                         in boolean aIsDOMEventSynthesized,",
-  "test": ""
- },
- {
-  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
-  "function": "interface nsIDOMWindowUtils : nsISupports {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "                         in boolean aIsWidgetEventSynthesized,",
-  "test": ""
- },
- {
-  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
-  "function": "interface nsIDOMWindowUtils : nsISupports {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "                         in long aButtons,",
-  "test": ""
- },
- {
-  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
-  "function": "interface nsIDOMWindowUtils : nsISupports {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "                         in unsigned long aIdentifier,",
-  "test": ""
- },
- {
-  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
-  "function": "interface nsIDOMWindowUtils : nsISupports {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "                         in double aLatency);",
-  "test": ""
- },
- {
-  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
-  "function": "interface nsIDOMWindowUtils : nsISupports {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  /** Stealthfox: synthetic DRAG event; documented at JugglerSendDragEvent in dom/base/StealthJugglerInput.h. */",
-  "test": ""
- },
- {
-  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
-  "function": "interface nsIDOMWindowUtils : nsISupports {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  [can_run_script]",
-  "test": ""
- },
- {
-  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
-  "function": "interface nsIDOMWindowUtils : nsISupports {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  void jugglerSendDragEvent(in AString aType,",
-  "test": ""
- },
- {
-  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
-  "function": "interface nsIDOMWindowUtils : nsISupports {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "                            in float aX,",
-  "test": ""
- },
- {
-  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
-  "function": "interface nsIDOMWindowUtils : nsISupports {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "                            in float aY,",
-  "test": ""
- },
- {
-  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
-  "function": "interface nsIDOMWindowUtils : nsISupports {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "                            in long aModifiers);",
-  "test": ""
+  "form": "registration",
+  "line": "#include \"StealthJugglerCoalesce.h\"  // STEALTH-HOOK(automation/input)",
+  "test": "gtest:StealthJugglerCoalesce.TheLastIdFoldedInWins"
  },
  {
   "file": "dom/ipc/CoalescedMouseData.cpp",
   "function": "void CoalescedMouseData::Coalesce(const WidgetMouseEvent& aMouseOrPointerEvent,",
   "kind": "add",
-  "form": "unknown",
-  "line": "    // Stealthfox [B217]: the coalesced event acks the LAST id folded into it,",
-  "test": ""
+  "form": "anchor",
+  "line": "    StealthCoalesceJugglerEventId(*mCoalescedInputEvent, aMouseOrPointerEvent);  // STEALTH-HOOK(automation/input)",
+  "test": "gtest:StealthJugglerCoalesce.TheLastIdFoldedInWins",
+  "anchor": "mCoalescedInputEvent->mPressure = aMouseOrPointerEvent.mPressure;",
+  "why": "only the else branch has a coalesced event: a call at the top would dereference null on the first event of a run"
  },
  {
-  "file": "dom/ipc/CoalescedMouseData.cpp",
-  "function": "void CoalescedMouseData::Coalesce(const WidgetMouseEvent& aMouseOrPointerEvent,",
+  "file": "dom/ipc/gtest/moz.build",
+  "function": "UNIFIED_SOURCES += [",
   "kind": "add",
-  "form": "unknown",
-  "line": "    // which is the one a caller waiting on \"has my move landed\" holds.",
-  "test": ""
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"TestStealthDragGesture.cpp\", \"TestStealthJugglerCoalesce.cpp\", \"TestStealthMouseEventIPC.cpp\"]  # STEALTH-HOOK(automation/input)",
+  "test": "gtest:StealthDragGesture.ThePressOfJugglerDecidesWhichMovesContinueTheGesture"
  },
  {
-  "file": "dom/ipc/CoalescedMouseData.cpp",
-  "function": "void CoalescedMouseData::Coalesce(const WidgetMouseEvent& aMouseOrPointerEvent,",
+  "file": "dom/ipc/gtest/moz.build",
+  "function": "FINAL_LIBRARY = \"xul-gtest\"",
   "kind": "add",
-  "form": "unknown",
-  "line": "    mCoalescedInputEvent->mJugglerEventId =",
-  "test": ""
- },
- {
-  "file": "dom/ipc/CoalescedMouseData.cpp",
-  "function": "void CoalescedMouseData::Coalesce(const WidgetMouseEvent& aMouseOrPointerEvent,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "        aMouseOrPointerEvent.mJugglerEventId;",
-  "test": ""
+  "form": "registration",
+  "line": "LOCAL_INCLUDES += [\"/dom/events\"]  # STEALTH-HOOK(automation/input)",
+  "test": "gtest:StealthDragGesture.ThePressOfJugglerDecidesWhichMovesContinueTheGesture"
  },
  {
   "file": "layout/base/PresShell.cpp",
@@ -424,57 +178,49 @@
   "kind": "add",
   "form": "registration",
   "line": "#include \"StealthJugglerAck.h\"  // STEALTH-HOOK(automation/input)",
-  "test": ""
+  "test": "gtest:StealthJugglerMouseAck.AnEventWithAnIdIsAckedOnceWhenTheScopeEnds"
  },
  {
   "file": "layout/base/PresShell.cpp",
   "function": "nsresult PresShell::HandleEvent(nsIFrame* aFrameForPresShell,",
   "kind": "add",
   "form": "unknown",
-  "line": "  // STEALTH-HOOK(automation/input)",
-  "test": ""
+  "line": "  StealthJugglerMouseAck jugglerMouseAck(aGUIEvent);  // STEALTH-HOOK(automation/input)",
+  "test": "gtest:StealthJugglerMouseAck.AnEventWithAnIdIsAckedOnceWhenTheScopeEnds"
  },
  {
-  "file": "layout/base/PresShell.cpp",
-  "function": "nsresult PresShell::HandleEvent(nsIFrame* aFrameForPresShell,",
+  "file": "layout/base/gtest/moz.build",
+  "function": "UNIFIED_SOURCES += [",
   "kind": "add",
-  "form": "unknown",
-  "line": "  StealthJugglerMouseAck jugglerMouseAck(aGUIEvent);",
-  "test": ""
- },
- {
-  "file": "widget/MouseEvents.h",
-  "function": "class WidgetMouseEventBase : public WidgetInputEvent {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(automation/input): B217, see FEATURE.md",
-  "test": ""
- },
- {
-  "file": "widget/MouseEvents.h",
-  "function": "class WidgetMouseEventBase : public WidgetInputEvent {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  uint32_t mJugglerEventId = 0;",
-  "test": ""
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"TestStealthJugglerMouseAck.cpp\"]  # STEALTH-HOOK(automation/input)",
+  "test": "gtest:StealthJugglerMouseAck.AnEventWithAnIdIsAckedOnceWhenTheScopeEnds"
  },
  {
   "file": "widget/MouseEvents.h",
   "function": "class WidgetMouseEventBase : public WidgetInputEvent {",
   "kind": "add",
   "form": "member",
-  "line": "    mJugglerEventId = aEvent.mJugglerEventId;",
-  "test": ""
+  "line": "  uint32_t mJugglerEventId = 0;  // STEALTH-HOOK(automation/input)",
+  "test": "gtest:StealthMouseEventIPC.TheIdSurvivesTheMessage"
+ },
+ {
+  "file": "widget/MouseEvents.h",
+  "function": "class WidgetMouseEventBase : public WidgetInputEvent {",
+  "kind": "add",
+  "form": "member",
+  "line": "    mJugglerEventId = aEvent.mJugglerEventId;  // STEALTH-HOOK(automation/input)",
+  "test": "gtest:StealthMouseEventCopy.DuplicateKeepsTheId"
  },
  {
   "file": "widget/nsGUIEventIPC.h",
   "function": "struct ParamTraits<mozilla::WidgetMouseEventBase> {",
   "kind": "add",
   "form": "anchor",
-  "line": "    WriteParam(aWriter, aParam.mJugglerEventId);",
-  "test": "",
-  "anchor": "",
-  "why": ""
+  "line": "    WriteParam(aWriter, aParam.mJugglerEventId);  // STEALTH-HOOK(automation/input)",
+  "test": "gtest:StealthMouseEventIPC.TheIdSurvivesTheMessage",
+  "anchor": "WriteParam(aWriter, aParam.mInputSource);",
+  "why": "the id is written after the last field of the block (G30: the last line of a block): at the head it would move in the stream, and the reader of ReadForDerivedClass reads it last"
  },
  {
   "file": "widget/nsGUIEventIPC.h",
@@ -483,31 +229,27 @@
   "form": "unknown",
   "line": "           ReadParam(aReader, &aResult->mInputSource) &&",
   "removed": "           ReadParam(aReader, &aResult->mInputSource);",
-  "test": ""
+  "test": "gtest:StealthMouseEventIPC.TheIdSurvivesTheMessage",
+  "exception": "G44 (approved in PM-DECISIONS): the read of the id must be the last link of the && chain of ReadForDerivedClass, a single return expression; a read at the head would not match the write and would move the id in the stream",
+  "pm": "approvato"
  },
  {
   "file": "widget/nsGUIEventIPC.h",
   "function": "struct ParamTraits<mozilla::WidgetMouseEventBase> {",
   "kind": "rewrite",
   "form": "unknown",
-  "line": "           ReadParam(aReader, &aResult->mJugglerEventId);",
-  "test": ""
+  "line": "           ReadParam(aReader, &aResult->mJugglerEventId);  // STEALTH-HOOK(automation/input)",
+  "test": "gtest:StealthMouseEventIPC.TheIdSurvivesTheMessage",
+  "exception": "G44 (approved in PM-DECISIONS): the read of the id must be the last link of the && chain of ReadForDerivedClass, a single return expression; a read at the head would not match the write and would move the id in the stream",
+  "pm": "approvato"
  },
  {
   "file": "xpcom/reflect/xptinfo/xptinfo.h",
   "function": "static_assert(sizeof(nsXPTMethodInfo) == 8, \"wrong size\");",
   "kind": "rewrite",
-  "form": "unknown",
-  "line": "// Stealthfox: bumped 14 -> 15 for jugglerSendMouseEvent (15 args).",
+  "form": "declared-value",
+  "line": "#  define PARAM_BUFFER_COUNT 15  // STEALTH-HOOK(automation/input)",
   "removed": "#  define PARAM_BUFFER_COUNT 14",
-  "test": ""
- },
- {
-  "file": "xpcom/reflect/xptinfo/xptinfo.h",
-  "function": "static_assert(sizeof(nsXPTMethodInfo) == 8, \"wrong size\");",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "#  define PARAM_BUFFER_COUNT 15",
-  "test": ""
+  "test": "wrapper:tests/test_a_pointer_event_is_handled_before_the_call_returns_e2e.py::test_each_pointer_call_answers_after_the_page_handled_its_event"
  }
 ]

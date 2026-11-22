@@ -3,181 +3,77 @@
   "file": "dom/canvas/WebGLContext.cpp",
   "function": "webgl::CompileResult WebGLContext::GetCompileResult(",
   "kind": "rewrite",
-  "form": "unknown",
-  "line": "    // STEALTH-HOOK(fingerprint/webgl/shader-language)",
+  "form": "wrap-expression",
+  "line": "    ret.translatedSource = ToCString(StealthPageObjectCode(shader, info->mObjectCode));  // STEALTH-HOOK(fingerprint/webgl/shader-language)",
   "removed": "    ret.translatedSource = ToCString(info->mObjectCode);",
-  "test": ""
- },
- {
-  "file": "dom/canvas/WebGLContext.cpp",
-  "function": "webgl::CompileResult WebGLContext::GetCompileResult(",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    const auto& perLaPagina = shader.ObjectCodePerLaPagina();",
-  "test": ""
- },
- {
-  "file": "dom/canvas/WebGLContext.cpp",
-  "function": "webgl::CompileResult WebGLContext::GetCompileResult(",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    ret.translatedSource = ToCString(",
-  "test": ""
- },
- {
-  "file": "dom/canvas/WebGLContext.cpp",
-  "function": "webgl::CompileResult WebGLContext::GetCompileResult(",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "        perLaPagina.empty() ? info->mObjectCode : perLaPagina);",
-  "test": ""
+  "test": "wrapper:tests/test_webgl_shader_language_e2e.py::test_get_translated_shader_source_is_in_the_declared_language_and_the_driver_still_compiles"
  },
  {
   "file": "dom/canvas/WebGLContext.h",
   "function": "class WebGLContext : public VRefCounted, public SupportsWeakPtr {",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/webgl/shader-language)",
-  "test": ""
- },
- {
-  "file": "dom/canvas/WebGLContext.h",
-  "function": "class WebGLContext : public VRefCounted, public SupportsWeakPtr {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "      GLenum shaderType, bool aPerLaPagina = false) const;",
-  "removed": "      GLenum shaderType) const;",
-  "test": ""
+  "form": "member",
+  "line": "  bool mStealthPerPage = false;  // STEALTH-HOOK(fingerprint/webgl/shader-language)",
+  "test": "wrapper:tests/test_webgl_shader_language_e2e.py::test_get_translated_shader_source_is_in_the_declared_language_and_the_driver_still_compiles"
  },
  {
   "file": "dom/canvas/WebGLShader.cpp",
   "function": "void WebGLShader::CompileShader() {",
   "kind": "add",
   "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/webgl/shader-language)",
-  "test": ""
- },
- {
-  "file": "dom/canvas/WebGLShader.cpp",
-  "function": "void WebGLShader::CompileShader() {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  mObjectCodePerLaPagina = StealthPerPageObjectCode(success);",
-  "test": ""
+  "line": "  mObjectCodePerLaPagina = StealthPerPageObjectCode(success);  // STEALTH-HOOK(fingerprint/webgl/shader-language)",
+  "test": "wrapper:tests/test_webgl_shader_language_e2e.py::test_get_translated_shader_source_is_in_the_declared_language_and_the_driver_still_compiles",
+  "anchor": "the `if (kDumpShaders) [[unlikely]] {...}` block that follows `const auto& success = mCompileResults->mValid;`",
+  "why": "the hook needs `success`, the validation result Mozilla has just computed, and must run at the same moment as today (after the dump block, before `if (!success) return;`): a guard at the top has no `success`, a wrap-expression alters no value Mozilla uses, a function wrap would run the second translation after fCompileShader (G28)"
  },
  {
   "file": "dom/canvas/WebGLShader.h",
   "function": "class WebGLShader final : public WebGLContextBoundObject {",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/webgl/shader-language)",
-  "test": ""
+  "form": "member",
+  "line": "  const std::string& ObjectCodePerLaPagina() const;  // STEALTH-HOOK(fingerprint/webgl/shader-language)",
+  "test": "wrapper:tests/test_webgl_shader_language_e2e.py::test_get_translated_shader_source_is_in_the_declared_language_and_the_driver_still_compiles"
  },
  {
   "file": "dom/canvas/WebGLShader.h",
   "function": "class WebGLShader final : public WebGLContextBoundObject {",
   "kind": "add",
-  "form": "unknown",
-  "line": "  const std::string& ObjectCodePerLaPagina() const;",
-  "test": ""
+  "form": "member",
+  "line": "  std::string StealthPerPageObjectCode(bool aValid);  // STEALTH-HOOK(fingerprint/webgl/shader-language)",
+  "test": "wrapper:tests/test_webgl_shader_language_e2e.py::test_get_translated_shader_source_is_in_the_declared_language_and_the_driver_still_compiles"
  },
  {
   "file": "dom/canvas/WebGLShader.h",
   "function": "class WebGLShader final : public WebGLContextBoundObject {",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/webgl/shader-language)",
-  "test": ""
- },
- {
-  "file": "dom/canvas/WebGLShader.h",
-  "function": "class WebGLShader final : public WebGLContextBoundObject {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  std::string StealthPerPageObjectCode(bool aValid);",
-  "test": ""
- },
- {
-  "file": "dom/canvas/WebGLShader.h",
-  "function": "class WebGLShader final : public WebGLContextBoundObject {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  std::string mObjectCodePerLaPagina;",
-  "test": ""
+  "form": "member",
+  "line": "  std::string mObjectCodePerLaPagina;  // STEALTH-HOOK(fingerprint/webgl/shader-language)",
+  "test": "wrapper:tests/test_webgl_shader_language_e2e.py::test_get_translated_shader_source_is_in_the_declared_language_and_the_driver_still_compiles"
  },
  {
   "file": "dom/canvas/WebGLShaderValidator.cpp",
   "function": "static ShCompileOptions ChooseValidatorCompileOptions(",
   "kind": "rewrite",
   "form": "unknown",
-  "line": "// STEALTH-HOOK(fingerprint/webgl/shader-language)",
+  "line": "ShShaderOutput ShaderOutputPerIlDriver(gl::GLContext* gl) {  // STEALTH-HOOK(fingerprint/webgl/shader-language)",
   "removed": "static ShShaderOutput ShaderOutput(gl::GLContext* gl) {",
-  "test": ""
- },
- {
-  "file": "dom/canvas/WebGLShaderValidator.cpp",
-  "function": "static ShCompileOptions ChooseValidatorCompileOptions(",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "ShShaderOutput webgl::ShaderOutputPerIlDriver(gl::GLContext* gl) {",
-  "test": ""
+  "test": "wrapper:tests/test_webgl_shader_language_e2e.py::test_get_translated_shader_source_is_in_the_declared_language_and_the_driver_still_compiles"
  },
  {
   "file": "dom/canvas/WebGLShaderValidator.cpp",
   "function": "static ShShaderOutput ShaderOutput(gl::GLContext* gl) {",
   "kind": "rewrite",
   "form": "unknown",
-  "line": "    // STEALTH-HOOK(fingerprint/webgl/shader-language)",
-  "removed": "    GLenum shaderType) const {",
-  "test": ""
- },
- {
-  "file": "dom/canvas/WebGLShaderValidator.cpp",
-  "function": "static ShShaderOutput ShaderOutput(gl::GLContext* gl) {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    GLenum shaderType, bool aPerLaPagina) const {",
-  "test": ""
- },
- {
-  "file": "dom/canvas/WebGLShaderValidator.cpp",
-  "function": "static ShShaderOutput ShaderOutput(gl::GLContext* gl) {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/webgl/shader-language)",
+  "line": "  const auto outputLanguage = StealthShaderOutputLanguage(gl, mStealthPerPage);  // STEALTH-HOOK(fingerprint/webgl/shader-language)",
   "removed": "  const auto outputLanguage = ShaderOutput(gl);",
-  "test": ""
- },
- {
-  "file": "dom/canvas/WebGLShaderValidator.cpp",
-  "function": "static ShShaderOutput ShaderOutput(gl::GLContext* gl) {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  const auto outputLanguage =",
-  "test": ""
- },
- {
-  "file": "dom/canvas/WebGLShaderValidator.cpp",
-  "function": "static ShShaderOutput ShaderOutput(gl::GLContext* gl) {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "      webgl::StealthShaderOutputLanguage(gl, aPerLaPagina);",
-  "test": ""
+  "test": "wrapper:tests/test_webgl_shader_language_e2e.py::test_get_translated_shader_source_is_in_the_declared_language_and_the_driver_still_compiles"
  },
  {
   "file": "dom/canvas/WebGLShaderValidator.h",
   "function": "",
   "kind": "add",
-  "form": "unknown",
-  "line": "// STEALTH-HOOK(fingerprint/webgl/shader-language)",
-  "test": ""
- },
- {
-  "file": "dom/canvas/WebGLShaderValidator.h",
-  "function": "",
-  "kind": "add",
-  "form": "unknown",
-  "line": "#include \"StealthWebGLShaderLanguage.h\"",
-  "test": ""
+  "form": "registration",
+  "line": "#include \"StealthWebGLShaderLanguage.h\"  // STEALTH-HOOK(fingerprint/webgl/shader-language)",
+  "test": "wrapper:tests/test_webgl_shader_language_e2e.py::test_get_translated_shader_source_is_in_the_declared_language_and_the_driver_still_compiles"
  }
 ]

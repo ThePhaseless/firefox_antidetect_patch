@@ -1,0 +1,124 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# cargo-tests.yml — the unit tests of OUR Rust code in WebRender (gfx/wr), on a GitHub runner, never on the Latitude node.
+#
+# Our Rust sits in a few Mozilla files, with #[cfg(test)] modules of our own: the shared fonts a namespace leaves behind when its window is gone
+# (webrender/src/render_backend/stealth_shared_fonts.rs, mod tests). The gtests are the C++ ones and no other round ran these. Only ours run: libtest's filters
+# by module name, never the whole of WebRender's tests (a cold build of those is another job). scripts/ci/cargo_oracles.py is the verdict: red unless every
+# module of ours reported its floor of tests, all ok (a filter that matches nothing is a green for cargo).
+#
+# THE TREE: the same as every job that reads it, `tools/engine.py materialize` (the Mozilla tag + the series, the tree checked against UPSTREAM.json),
+# but into a repository whose sparse checkout is set first: only gfx/wr, scripts and browser/config are written to disk, not the 300,000 files of
+# Firefox. The fetch of the tag is the whole of it, as in `checks`.
+# THE RUST: the retail's release for this tree (scripts/upstream_toolchain.py), as the build's, never the runner's.
+# THE CRATES: crates.io (Cargo's registry, with the sparse index) and github.com for the one git crate of gfx/wr/Cargo.toml's [patch], at the versions
+# of gfx/wr/Cargo.lock. The vendored crates of third_party/rust belong to Gecko's own lock and are not in the sparse tree; nothing else is fetched.
+# THE DEV-DEPENDENCIES the tests never use are dropped from the runner's copy of two manifests: mozangle (builds ANGLE's C++, for webrender/tests/
+# angle_shader_validation.rs) and glutin/winit (the examples of wr_glyph_rasterizer). Cargo builds every dev-dependency for any test target, `--lib`
+# included, and none of ours reads them.
+# THE CACHE: none. A cache of target/ is a gigabyte per entry, and the compile cache of release.yml is what the repository's quota is for.
+# THE BUDGET: 15 minutes a leg (the job's timeout). The measured time of each step is in the run's summary.
+# Called by gate.yml (so it runs beside the rest of the gate) and on a push to latitude/*-oracles, for a run of its own.
+# ─────────────────────────────────────────────────────────────────────────────
+name: cargo-tests
+
+on:
+  workflow_call:
+    inputs:
+      series_ref:
+        description: the commit of the series (this repository) the tree is made from; empty, the caller's commit
+        type: string
+        default: ''
+  push:
+    branches: ['latitude/*-oracles']
+    paths-ignore: ['**.md']
+
+permissions: { contents: read }
+
+# A newer push to the branch replaces the older run; a called run, or any other event, has a group of its own.
+concurrency:
+  group: cargo-tests-${{ github.event_name == 'push' && github.workflow == 'cargo-tests' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'push' && github.workflow == 'cargo-tests' }}
+
+jobs:
+  cargo-tests:
+    name: cargo-tests-${{ matrix.leg }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { leg: linux-x86_64, runner: ubuntu-24.04 }
+          - { leg: win-x86_64, runner: windows-latest }
+    env:
+      # TEMP and TMP on D:\a\_temp on Windows (scripts/ci/test_gate_windows_temp.py); /tmp is what Linux uses anyway.
+      TEMP: ${{ startsWith(matrix.runner, 'windows') && 'D:\a\_temp' || '/tmp' }}
+      TMP: ${{ startsWith(matrix.runner, 'windows') && 'D:\a\_temp' || '/tmp' }}
+      # Git Bash on Windows rewrites an argument that starts with a slash into a path: the sparse patterns below start with one.
+      MSYS_NO_PATHCONV: '1'
+      # A cold build, once: no incremental state, no debug info (compiling and linking both faster), no colours in the log the verdict reads.
+      CARGO_INCREMENTAL: '0'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      CARGO_PROFILE_TEST_DEBUG: '0'
+      CARGO_TERM_COLOR: never
+      CARGO_NET_RETRY: '10'
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: The series (this repository, this commit)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with: { path: .series, fetch-depth: 1, ref: '${{ inputs.series_ref }}' }
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with: { python-version: '3.11' }
+      - name: The source tree, sparse (the Mozilla tag with our series applied, only gfx/wr, scripts and browser/config on disk)
+        run: |
+          set -e
+          date +%s > .t0
+          git config --global core.longpaths true
+          git init -q .
+          git sparse-checkout set --no-cone '/gfx/wr/' '/scripts/' '/browser/config/'
+          python .series/tools/engine.py materialize --into .
+          test -f gfx/wr/Cargo.lock
+          echo "tree: $(( $(date +%s) - $(cat .t0) )) s" | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Rust, the retail's release for this tree
+        run: |
+          set -e
+          RUST="$(python scripts/upstream_toolchain.py --leg ${{ matrix.leg }} rust-version)"
+          rustup toolchain install "$RUST" --profile minimal
+          rustup default "$RUST"
+          rustc --version
+          cargo --version
+      - name: Drop the dev-dependencies the tests never read (ANGLE's C++ and the windowing crates of the examples)
+        working-directory: gfx/wr
+        run: |
+          set -e
+          sed -i '/^mozangle = /d' webrender/Cargo.toml
+          sed -i '/^glutin = /d;/^glutin-winit = /d;/^winit = /d' wr_glyph_rasterizer/Cargo.toml
+          if grep -n '^mozangle = \|^glutin\|^winit' webrender/Cargo.toml wr_glyph_rasterizer/Cargo.toml; then
+            echo "ERROR: a dev-dependency is still there"; exit 1
+          fi
+      # Only the modules of ours (scripts/ci/cargo_oracles.py: FILTERS). The log is the verdict's input; cargo's own exit code is this step's.
+      - name: The unit tests of our Rust in WebRender (webrender lib tests, our module stealth_shared_fonts only)
+        id: cargo
+        working-directory: gfx/wr
+        run: |
+          set -o pipefail
+          date +%s > ../../.t1
+          cargo test -p webrender --lib -- render_backend::stealth_shared_fonts::tests 2>&1 | tee cargo-test.log
+      - name: Verdict - the tests of ours ran, every one passed, none below its floor
+        if: always()
+        run: |
+          if [ -f .t1 ]; then echo "cargo test: $(( $(date +%s) - $(cat .t1) )) s" | tee -a "$GITHUB_STEP_SUMMARY"; fi
+          [ -f gfx/wr/cargo-test.log ] || { echo "RED: cargo wrote no log"; exit 1; }
+          python scripts/ci/cargo_oracles.py verdict gfx/wr/cargo-test.log | tee -a "$GITHUB_STEP_SUMMARY"
+          exit "${PIPESTATUS[0]}"
+      - name: Keep the log
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: cargo-tests-${{ matrix.leg }}
+          path: gfx/wr/cargo-test.log
+          if-no-files-found: ignore
+          retention-days: 14

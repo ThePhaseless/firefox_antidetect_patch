@@ -3,11 +3,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-// Definitions of the two canvas-noise entry points declared in CanvasUtils.h
+// Definitions of the canvas-noise entry points declared in StealthCanvasUtils.h
 // (their contract is documented below, at the definitions). Kept out of
-// CanvasUtils.cpp so that file stays identical to Mozilla's.
+// CanvasUtils.cpp and CanvasUtils.h so that those files stay identical to
+// Mozilla's.
 
-#include "CanvasUtils.h"
+#include "mozilla/dom/StealthCanvasUtils.h"
 
 #include "StealthDeclarationGate.h"
 #include "mozilla/AlreadyAddRefed.h"
@@ -17,6 +18,7 @@
 #include "mozilla/gfx/Point.h"
 #include "mozilla/gfx/Rect.h"
 #include "mozilla/gfx/StealthCanvasProjection.h"
+#include "nsICanvasRenderingContextInternal.h"
 #include "nsIPrincipal.h"
 
 namespace mozilla::CanvasUtils {
@@ -66,6 +68,21 @@ already_AddRefed<gfx::SourceSurface> StealthProjectSnapshot(
     result = projected;
   }
   return result.forget();
+}
+
+// toDataURL/toBlob of a WebGPU canvas (CanvasContext::GetImageBuffer and
+// GetInputStream): the canvas noise, as every reader of a canvas reads it. The
+// alpha type is premultiplied (passed as true) and the principal is the
+// context's. A null snapshot comes back null without asking for the noise, as
+// the two readers return before projecting.
+already_AddRefed<gfx::SourceSurface> StealthProjectWebGPUSnapshot(
+    nsICanvasRenderingContextInternal* aContext,
+    already_AddRefed<gfx::SourceSurface> aSnapshot) {
+  RefPtr<gfx::SourceSurface> snapshot = aSnapshot;
+  if (!snapshot) {
+    return nullptr;
+  }
+  return StealthProjectSnapshot(snapshot, true, aContext->PrincipalOrNull());
 }
 
 }  // namespace mozilla::CanvasUtils

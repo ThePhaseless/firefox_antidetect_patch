@@ -1,318 +1,86 @@
 [
  {
-  "file": "dom/canvas/CanvasUtils.h",
-  "function": "",
+  "file": "dom/canvas/ClientWebGLContext.h",
+  "function": "class ClientWebGLContext final : public nsICanvasRenderingContextInternal,",
   "kind": "add",
-  "form": "registration",
-  "line": "#include \"mozilla/AlreadyAddRefed.h\"",
-  "test": ""
- },
- {
-  "file": "dom/canvas/CanvasUtils.h",
-  "function": "",
-  "kind": "add",
-  "form": "registration",
-  "line": "#include \"mozilla/gfx/StealthCanvasProjection.h\"",
-  "test": ""
- },
- {
-  "file": "dom/canvas/CanvasUtils.h",
-  "function": "",
-  "kind": "add",
-  "form": "unknown",
-  "line": "namespace gfx {",
-  "test": ""
- },
- {
-  "file": "dom/canvas/CanvasUtils.h",
-  "function": "",
-  "kind": "add",
-  "form": "unknown",
-  "line": "class SourceSurface;",
-  "test": ""
- },
- {
-  "file": "dom/canvas/CanvasUtils.h",
-  "function": "",
-  "kind": "add",
-  "form": "unknown",
-  "line": "}  // namespace gfx",
-  "test": ""
- },
- {
-  "file": "dom/canvas/CanvasUtils.h",
-  "function": "void DashArrayToJSVal(nsTArray<T>& dashes, JSContext* cx,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "// STEALTH-HOOK(fingerprint/canvas/noise-projection)",
-  "test": ""
- },
- {
-  "file": "dom/canvas/CanvasUtils.h",
-  "function": "void DashArrayToJSVal(nsTArray<T>& dashes, JSContext* cx,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "gfx::StealthCanvasNoise StealthNoise(nsIPrincipal* aCanvasPrincipal);",
-  "test": ""
- },
- {
-  "file": "dom/canvas/CanvasUtils.h",
-  "function": "void DashArrayToJSVal(nsTArray<T>& dashes, JSContext* cx,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "// STEALTH-HOOK(fingerprint/canvas/noise-projection)",
-  "test": ""
- },
- {
-  "file": "dom/canvas/CanvasUtils.h",
-  "function": "void DashArrayToJSVal(nsTArray<T>& dashes, JSContext* cx,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "inline bool StealthProjectsContextType(dom::CanvasContextType aType) {",
-  "test": ""
- },
- {
-  "file": "dom/canvas/CanvasUtils.h",
-  "function": "void DashArrayToJSVal(nsTArray<T>& dashes, JSContext* cx,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  return aType == dom::CanvasContextType::WebGL1 ||",
-  "test": ""
- },
- {
-  "file": "dom/canvas/CanvasUtils.h",
-  "function": "void DashArrayToJSVal(nsTArray<T>& dashes, JSContext* cx,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "         aType == dom::CanvasContextType::WebGL2 ||",
-  "test": ""
- },
- {
-  "file": "dom/canvas/CanvasUtils.h",
-  "function": "void DashArrayToJSVal(nsTArray<T>& dashes, JSContext* cx,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "         aType == dom::CanvasContextType::WebGPU;",
-  "test": ""
- },
- {
-  "file": "dom/canvas/CanvasUtils.h",
-  "function": "void DashArrayToJSVal(nsTArray<T>& dashes, JSContext* cx,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "}",
-  "test": ""
- },
- {
-  "file": "dom/canvas/CanvasUtils.h",
-  "function": "void DashArrayToJSVal(nsTArray<T>& dashes, JSContext* cx,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "// STEALTH-HOOK(fingerprint/canvas/noise-projection)",
-  "test": ""
- },
- {
-  "file": "dom/canvas/CanvasUtils.h",
-  "function": "void DashArrayToJSVal(nsTArray<T>& dashes, JSContext* cx,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "already_AddRefed<gfx::SourceSurface> StealthProjectSnapshot(",
-  "test": ""
- },
- {
-  "file": "dom/canvas/CanvasUtils.h",
-  "function": "void DashArrayToJSVal(nsTArray<T>& dashes, JSContext* cx,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    gfx::SourceSurface* aSnapshot, bool aPremultiplied,",
-  "test": ""
- },
- {
-  "file": "dom/canvas/CanvasUtils.h",
-  "function": "void DashArrayToJSVal(nsTArray<T>& dashes, JSContext* cx,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    nsIPrincipal* aCanvasPrincipal);",
-  "test": ""
+  "form": "member",
+  "line": "  friend struct StealthWebGLReadback;  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
+  "test": "wrapper:tests/test_webgl_noise_active.py::test_a_realistic_webgl_render_reads_differently_per_seed"
  },
  {
   "file": "dom/canvas/ClientWebGLContext.h",
   "function": "class ClientWebGLContext final : public nsICanvasRenderingContextInternal,",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
-  "test": ""
- },
- {
-  "file": "dom/canvas/ClientWebGLContext.h",
-  "function": "class ClientWebGLContext final : public nsICanvasRenderingContextInternal,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  friend struct StealthWebGLReadback;",
-  "test": ""
- },
- {
-  "file": "dom/canvas/ClientWebGLContext.h",
-  "function": "class ClientWebGLContext final : public nsICanvasRenderingContextInternal,",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
-  "removed": "  [[nodiscard]] bool DoReadPixels(const webgl::ReadPixelsDesc&,\n                                  Span<uint8_t>) const;",
-  "test": ""
- },
- {
-  "file": "dom/canvas/ClientWebGLContext.h",
-  "function": "class ClientWebGLContext final : public nsICanvasRenderingContextInternal,",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  [[nodiscard]] bool DoReadPixels(",
-  "test": ""
- },
- {
-  "file": "dom/canvas/ClientWebGLContext.h",
-  "function": "class ClientWebGLContext final : public nsICanvasRenderingContextInternal,",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "      const webgl::ReadPixelsDesc&, Span<uint8_t>,",
-  "test": ""
- },
- {
-  "file": "dom/canvas/ClientWebGLContext.h",
-  "function": "class ClientWebGLContext final : public nsICanvasRenderingContextInternal,",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "      webgl::ReadPixelsResult* aWritten = nullptr) const;",
-  "test": ""
+  "form": "member",
+  "line": "  mutable webgl::ReadPixelsResult mStealthReadPixelsResult;  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
+  "test": "wrapper:tests/test_webgl_noise_active.py::test_readpixels_of_a_partial_rectangle_projects_only_what_was_written"
  },
  {
   "file": "dom/canvas/OffscreenCanvas.cpp",
-  "function": "",
-  "kind": "add",
-  "form": "registration",
-  "line": "#include \"StealthOffscreenSnapshot.h\"  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
-  "test": ""
- },
- {
-  "file": "dom/canvas/OffscreenCanvas.cpp",
-  "function": "already_AddRefed<gfx::SourceSurface> OffscreenCanvas::GetSurfaceSnapshot(",
+  "function": "already_AddRefed<Promise> OffscreenCanvas::ToBlob(JSContext* aCx,",
   "kind": "rewrite",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
-  "removed": "  return mCurrentContext->GetSurfaceSnapshot(aOutAlphaType);",
-  "test": ""
+  "form": "wrap-function",
+  "line": "already_AddRefed<gfx::SourceSurface> OffscreenCanvas::GetSurfaceSnapshotAsDrawn(  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
+  "removed": "already_AddRefed<gfx::SourceSurface> OffscreenCanvas::GetSurfaceSnapshot(",
+  "test": "wrapper:tests/test_every_reader_of_a_webgl_canvas_agrees_e2e.py::test_an_offscreen_webgl_canvas_reads_as_its_element_does"
  },
  {
-  "file": "dom/canvas/OffscreenCanvas.cpp",
-  "function": "already_AddRefed<gfx::SourceSurface> OffscreenCanvas::GetSurfaceSnapshot(",
+  "file": "dom/canvas/OffscreenCanvas.h",
+  "function": "class OffscreenCanvas final : public DOMEventTargetHelper,",
+  "kind": "add",
+  "form": "wrap-function",
+  "line": "  already_AddRefed<gfx::SourceSurface> GetSurfaceSnapshotAsDrawn(gfxAlphaType* aOutAlphaType = nullptr);  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
+  "test": "wrapper:tests/test_every_reader_of_a_webgl_canvas_agrees_e2e.py::test_an_offscreen_webgl_canvas_reads_as_its_element_does"
+ },
+ {
+  "file": "dom/canvas/OffscreenCanvasDisplayHelper.cpp",
+  "function": "OffscreenCanvasDisplayHelper::TransformSurface(gfx::SourceSurface* aSurface,",
   "kind": "rewrite",
-  "form": "unknown",
-  "line": "  return CanvasUtils::StealthOffscreenSnapshot(this, aOutAlphaType);",
-  "test": ""
- },
- {
-  "file": "dom/canvas/OffscreenCanvasDisplayHelper.cpp",
-  "function": "OffscreenCanvasDisplayHelper::TransformSurface(gfx::SourceSurface* aSurface,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
-  "test": ""
- },
- {
-  "file": "dom/canvas/OffscreenCanvasDisplayHelper.cpp",
-  "function": "OffscreenCanvasDisplayHelper::TransformSurface(gfx::SourceSurface* aSurface,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  return StealthPageSnapshot();",
-  "test": ""
- },
- {
-  "file": "dom/canvas/OffscreenCanvasDisplayHelper.cpp",
-  "function": "OffscreenCanvasDisplayHelper::TransformSurface(gfx::SourceSurface* aSurface,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "}",
-  "test": ""
- },
- {
-  "file": "dom/canvas/OffscreenCanvasDisplayHelper.cpp",
-  "function": "OffscreenCanvasDisplayHelper::TransformSurface(gfx::SourceSurface* aSurface,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "already_AddRefed<gfx::SourceSurface>",
-  "test": ""
- },
- {
-  "file": "dom/canvas/OffscreenCanvasDisplayHelper.cpp",
-  "function": "OffscreenCanvasDisplayHelper::TransformSurface(gfx::SourceSurface* aSurface,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "OffscreenCanvasDisplayHelper::GetSurfaceSnapshotAsDrawn() {",
-  "test": ""
- },
- {
-  "file": "dom/canvas/OffscreenCanvasDisplayHelper.cpp",
-  "function": "OffscreenCanvasDisplayHelper::TransformSurface(gfx::SourceSurface* aSurface,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  MOZ_ASSERT(NS_IsMainThread());",
-  "test": ""
+  "form": "wrap-function",
+  "line": "OffscreenCanvasDisplayHelper::GetSurfaceSnapshotAsDrawn() {  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
+  "removed": "OffscreenCanvasDisplayHelper::GetSurfaceSnapshot() {",
+  "test": "wrapper:tests/test_every_reader_of_a_webgl_canvas_agrees_e2e.py::test_a_transferred_placeholder_reads_noised_like_its_worker"
  },
  {
   "file": "dom/canvas/OffscreenCanvasDisplayHelper.cpp",
   "function": "OffscreenCanvasDisplayHelper::GetSurfaceSnapshot() {",
   "kind": "rewrite",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
+  "form": "wrap-function",
+  "line": "  RefPtr<gfx::SourceSurface> surface = GetSurfaceSnapshotAsDrawn();  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
   "removed": "  RefPtr<gfx::SourceSurface> surface = GetSurfaceSnapshot();",
-  "test": ""
- },
- {
-  "file": "dom/canvas/OffscreenCanvasDisplayHelper.cpp",
-  "function": "OffscreenCanvasDisplayHelper::GetSurfaceSnapshot() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  RefPtr<gfx::SourceSurface> surface = GetSurfaceSnapshotAsDrawn();",
-  "test": ""
+  "test": "wrapper:tests/test_every_reader_of_a_webgl_canvas_agrees_e2e.py::test_a_transferred_placeholder_reads_noised_like_its_worker"
  },
  {
   "file": "dom/canvas/OffscreenCanvasDisplayHelper.h",
   "function": "class OffscreenCanvasDisplayHelper final {",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
-  "test": ""
+  "form": "wrap-function",
+  "line": "  already_AddRefed<mozilla::gfx::SourceSurface> GetSurfaceSnapshotAsDrawn();  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
+  "test": "wrapper:tests/test_every_reader_of_a_webgl_canvas_agrees_e2e.py::test_a_transferred_placeholder_reads_noised_like_its_worker"
  },
  {
-  "file": "dom/canvas/OffscreenCanvasDisplayHelper.h",
-  "function": "class OffscreenCanvasDisplayHelper final {",
+  "file": "dom/canvas/moz.build",
+  "function": "EXPORTS.mozilla.dom += [",
   "kind": "add",
-  "form": "unknown",
-  "line": "  already_AddRefed<mozilla::gfx::SourceSurface> GetSurfaceSnapshotAsDrawn();",
-  "test": ""
- },
- {
-  "file": "dom/canvas/OffscreenCanvasDisplayHelper.h",
-  "function": "class OffscreenCanvasDisplayHelper final {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
-  "test": ""
- },
- {
-  "file": "dom/canvas/OffscreenCanvasDisplayHelper.h",
-  "function": "class OffscreenCanvasDisplayHelper final {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  already_AddRefed<gfx::SourceSurface> StealthPageSnapshot();",
-  "test": ""
+  "form": "registration",
+  "line": "EXPORTS.mozilla.dom += [\"StealthCanvasUtils.h\"]  # STEALTH-HOOK(fingerprint/canvas/noise-projection)",
+  "test": "gtest:StealthCanvasUtils.ProjectsOnlyWebGLAndWebGPU"
  },
  {
   "file": "dom/canvas/moz.build",
   "function": "SOURCES += [",
   "kind": "add",
   "form": "registration",
-  "line": "SOURCES += [\"StealthCanvasNoise.cpp\", \"StealthOffscreenSnapshot.cpp\"]  # STEALTH-HOOK(fingerprint/canvas/noise-projection)",
-  "test": ""
+  "line": "SOURCES += [\"StealthCanvasNoise.cpp\"]  # STEALTH-HOOK(fingerprint/canvas/noise-projection)",
+  "test": "wrapper:tests/test_webgl_noise_active.py::test_a_realistic_webgl_render_reads_differently_per_seed"
+ },
+ {
+  "file": "dom/canvas/moz.build",
+  "function": "SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "SOURCES += [\"StealthOffscreenSnapshot.cpp\"]  # STEALTH-HOOK(fingerprint/canvas/noise-projection)",
+  "test": "wrapper:tests/test_every_reader_of_a_webgl_canvas_agrees_e2e.py::test_an_offscreen_webgl_canvas_reads_as_its_element_does"
  },
  {
   "file": "dom/canvas/moz.build",
@@ -320,7 +88,7 @@
   "kind": "add",
   "form": "registration",
   "line": "UNIFIED_SOURCES += [\"StealthWebGLParams.cpp\"]  # STEALTH-HOOK(fingerprint/webgl/parameters)",
-  "test": ""
+  "test": "wrapper:tests/test_a_declared_webgl_extension_survives_its_use_e2e.py::test_every_declared_extension_can_be_called_and_the_page_still_answers"
  },
  {
   "file": "dom/canvas/moz.build",
@@ -328,104 +96,33 @@
   "kind": "add",
   "form": "registration",
   "line": "UNIFIED_SOURCES += [\"StealthWebGLShaderLanguage.cpp\"]  # STEALTH-HOOK(fingerprint/webgl/shader-language)",
-  "test": ""
- },
- {
-  "file": "dom/html/HTMLCanvasElement.cpp",
-  "function": "",
-  "kind": "add",
-  "form": "registration",
-  "line": "#include \"StealthCanvasSnapshot.h\"",
-  "test": ""
- },
- {
-  "file": "dom/html/HTMLCanvasElement.cpp",
-  "function": "void HTMLCanvasElement::SetFrameCapture(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
-  "test": ""
- },
- {
-  "file": "dom/html/HTMLCanvasElement.cpp",
-  "function": "void HTMLCanvasElement::SetFrameCapture(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  return StealthPageSnapshot(this, aOutAlphaType, aTarget);",
-  "test": ""
- },
- {
-  "file": "dom/html/HTMLCanvasElement.cpp",
-  "function": "void HTMLCanvasElement::SetFrameCapture(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "}",
-  "test": ""
- },
- {
-  "file": "dom/html/HTMLCanvasElement.cpp",
-  "function": "void HTMLCanvasElement::SetFrameCapture(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "// STEALTH-HOOK(fingerprint/canvas/noise-projection): Mozilla's body, renamed.",
-  "test": ""
- },
- {
-  "file": "dom/html/HTMLCanvasElement.cpp",
-  "function": "void HTMLCanvasElement::SetFrameCapture(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "already_AddRefed<SourceSurface> HTMLCanvasElement::GetSurfaceSnapshotAsDrawn(",
-  "test": ""
- },
- {
-  "file": "dom/html/HTMLCanvasElement.cpp",
-  "function": "void HTMLCanvasElement::SetFrameCapture(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    gfxAlphaType* const aOutAlphaType, DrawTarget* aTarget) {",
-  "test": ""
+  "test": "wrapper:tests/test_webgl_shader_language_e2e.py::test_get_translated_shader_source_is_in_the_declared_language_and_the_driver_still_compiles"
  },
  {
   "file": "dom/html/HTMLCanvasElement.cpp",
   "function": "void HTMLCanvasElement::SetFrameCapture(",
   "kind": "rewrite",
   "form": "wrap-function",
-  "line": "    return mOffscreenDisplay->GetSurfaceSnapshotAsDrawn();",
+  "line": "already_AddRefed<SourceSurface> HTMLCanvasElement::GetSurfaceSnapshotAsDrawn(  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
+  "removed": "already_AddRefed<SourceSurface> HTMLCanvasElement::GetSurfaceSnapshot(",
+  "test": "wrapper:tests/test_every_reader_of_a_webgl_canvas_agrees_e2e.py::test_every_reader_of_a_webgl_canvas_element_reads_the_same_bytes"
+ },
+ {
+  "file": "dom/html/HTMLCanvasElement.cpp",
+  "function": "void HTMLCanvasElement::SetFrameCapture(",
+  "kind": "rewrite",
+  "form": "wrap-function",
+  "line": "    return mOffscreenDisplay->GetSurfaceSnapshotAsDrawn();  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
   "removed": "    return mOffscreenDisplay->GetSurfaceSnapshot();",
-  "test": ""
+  "test": "wrapper:tests/test_every_reader_of_a_webgl_canvas_agrees_e2e.py::test_a_transferred_placeholder_reads_noised_like_its_worker"
  },
  {
   "file": "dom/html/HTMLCanvasElement.h",
   "function": "class HTMLCanvasElement final : public nsGenericHTMLElement,",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
-  "test": ""
- },
- {
-  "file": "dom/html/HTMLCanvasElement.h",
-  "function": "class HTMLCanvasElement final : public nsGenericHTMLElement,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  already_AddRefed<gfx::SourceSurface> GetSurfaceSnapshotAsDrawn(",
-  "test": ""
- },
- {
-  "file": "dom/html/HTMLCanvasElement.h",
-  "function": "class HTMLCanvasElement final : public nsGenericHTMLElement,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "      gfxAlphaType* aOutAlphaType = nullptr,",
-  "test": ""
- },
- {
-  "file": "dom/html/HTMLCanvasElement.h",
-  "function": "class HTMLCanvasElement final : public nsGenericHTMLElement,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "      gfx::DrawTarget* aTarget = nullptr);",
-  "test": ""
+  "form": "wrap-function",
+  "line": "  already_AddRefed<gfx::SourceSurface> GetSurfaceSnapshotAsDrawn(gfxAlphaType* aOutAlphaType = nullptr, gfx::DrawTarget* aTarget = nullptr);  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
+  "test": "wrapper:tests/test_every_reader_of_a_webgl_canvas_agrees_e2e.py::test_every_reader_of_a_webgl_canvas_element_reads_the_same_bytes"
  },
  {
   "file": "dom/html/moz.build",
@@ -433,240 +130,105 @@
   "kind": "add",
   "form": "registration",
   "line": "UNIFIED_SOURCES += [\"StealthCanvasSnapshot.cpp\"]  # STEALTH-HOOK(fingerprint/canvas/noise-projection)",
-  "test": ""
+  "test": "wrapper:tests/test_every_reader_of_a_webgl_canvas_agrees_e2e.py::test_every_reader_of_a_webgl_canvas_element_reads_the_same_bytes"
+ },
+ {
+  "file": "dom/webgpu/CanvasContext.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/dom/StealthCanvasUtils.h\"  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
+  "test": "wrapper:tests/test_webgpu_canvas_readback_is_noised_e2e.py::test_a_webgpu_canvas_reads_noised_through_todataurl_and_toblob"
  },
  {
   "file": "dom/webgpu/CanvasContext.cpp",
   "function": "mozilla::UniquePtr<uint8_t[]> CanvasContext::GetImageBuffer(",
   "kind": "add",
   "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
-  "test": ""
- },
- {
-  "file": "dom/webgpu/CanvasContext.cpp",
-  "function": "mozilla::UniquePtr<uint8_t[]> CanvasContext::GetImageBuffer(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  snapshot = CanvasUtils::StealthProjectSnapshot(snapshot, true,",
-  "test": ""
- },
- {
-  "file": "dom/webgpu/CanvasContext.cpp",
-  "function": "mozilla::UniquePtr<uint8_t[]> CanvasContext::GetImageBuffer(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "                                                 PrincipalOrNull());",
-  "test": ""
+  "line": "  snapshot = CanvasUtils::StealthProjectWebGPUSnapshot(this, snapshot.forget());  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
+  "test": "wrapper:tests/test_webgpu_canvas_readback_is_noised_e2e.py::test_a_webgpu_canvas_reads_noised_through_todataurl_and_toblob",
+  "anchor": "the check `if (!snapshot) { return ...; }` of Mozilla",
+  "why": "the hook receives the local `snapshot` that Mozilla has just checked; a pure addition as on the baseline"
  },
  {
   "file": "dom/webgpu/CanvasContext.cpp",
   "function": "NS_IMETHODIMP CanvasContext::GetInputStream(",
   "kind": "add",
   "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
-  "test": ""
- },
- {
-  "file": "dom/webgpu/CanvasContext.cpp",
-  "function": "NS_IMETHODIMP CanvasContext::GetInputStream(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  snapshot = CanvasUtils::StealthProjectSnapshot(snapshot, true,",
-  "test": ""
- },
- {
-  "file": "dom/webgpu/CanvasContext.cpp",
-  "function": "NS_IMETHODIMP CanvasContext::GetInputStream(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "                                                 PrincipalOrNull());",
-  "test": ""
+  "line": "  snapshot = CanvasUtils::StealthProjectWebGPUSnapshot(this, snapshot.forget());  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
+  "test": "wrapper:tests/test_webgpu_canvas_readback_is_noised_e2e.py::test_a_webgpu_canvas_reads_noised_through_todataurl_and_toblob",
+  "anchor": "the check `if (!snapshot) { return ...; }` of Mozilla",
+  "why": "the hook receives the local `snapshot` that Mozilla has just checked; a pure addition as on the baseline"
  },
  {
   "file": "gfx/2d/DrawTargetRecording.cpp",
   "function": "class SourceSurfaceRecording final : public SourceSurface {",
   "kind": "rewrite",
-  "form": "unknown",
-  "line": "      // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
+  "form": "wrap-expression",
+  "line": "      return StealthProjectOriginal(this, mOriginalSurface->GetDataSurface());  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
   "removed": "      return mOriginalSurface->GetDataSurface();",
-  "test": ""
- },
- {
-  "file": "gfx/2d/DrawTargetRecording.cpp",
-  "function": "class SourceSurfaceRecording final : public SourceSurface {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "      return StealthProjectOriginal(mOriginalSurface.get(), mSize, mStealth);",
-  "test": ""
+  "test": "gtest:StealthCanvasProjection.StandInReadsProjected"
  },
  {
   "file": "gfx/2d/DrawTargetRecording.cpp",
   "function": "class SourceSurfaceRecording final : public SourceSurface {",
   "kind": "add",
   "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
-  "test": ""
+  "line": "  StealthStandIn mStealth;  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
+  "test": "gtest:StealthCanvasProjection.StandInReadsProjected"
  },
  {
   "file": "gfx/2d/DrawTargetRecording.cpp",
   "function": "class SourceSurfaceRecording final : public SourceSurface {",
   "kind": "add",
-  "form": "unknown",
-  "line": "  StealthStandIn mStealth;",
-  "test": ""
- },
- {
-  "file": "gfx/2d/DrawTargetRecording.cpp",
-  "function": "already_AddRefed<SourceSurface> DrawTargetRecording::OptimizeSourceSurface(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "already_AddRefed<SourceSurface> DrawTargetRecording::StealthProjectedSurface(",
-  "test": ""
- },
- {
-  "file": "gfx/2d/DrawTargetRecording.cpp",
-  "function": "already_AddRefed<SourceSurface> DrawTargetRecording::OptimizeSourceSurface(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    SourceSurface* aSurface, bool aPremultiplied,",
-  "test": ""
- },
- {
-  "file": "gfx/2d/DrawTargetRecording.cpp",
-  "function": "already_AddRefed<SourceSurface> DrawTargetRecording::OptimizeSourceSurface(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    const StealthCanvasNoise& aNoise) {",
-  "test": ""
- },
- {
-  "file": "gfx/2d/DrawTargetRecording.cpp",
-  "function": "already_AddRefed<SourceSurface> DrawTargetRecording::OptimizeSourceSurface(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
-  "test": ""
- },
- {
-  "file": "gfx/2d/DrawTargetRecording.cpp",
-  "function": "already_AddRefed<SourceSurface> DrawTargetRecording::OptimizeSourceSurface(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  return StealthProjectedStandIn<SourceSurfaceRecording>(",
-  "test": ""
- },
- {
-  "file": "gfx/2d/DrawTargetRecording.cpp",
-  "function": "already_AddRefed<SourceSurface> DrawTargetRecording::OptimizeSourceSurface(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "      this, mRecorder.get(), aSurface, aPremultiplied, aNoise);",
-  "test": ""
- },
- {
-  "file": "gfx/2d/DrawTargetRecording.cpp",
-  "function": "already_AddRefed<SourceSurface> DrawTargetRecording::OptimizeSourceSurface(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "}",
-  "test": ""
+  "form": "registration",
+  "line": "#include \"StealthRecordingProjectedSurface.inc.h\"  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
+  "test": "gtest:StealthCanvasProjection.ProjectedSurfaceRecordsOneEvent",
+  "anchor": "the closing `};` of class SourceSurfaceRecording",
+  "why": "G4: the definition of DrawTargetRecording::StealthProjectedSurface has to see SourceSurfaceRecording, a class local to this .cpp; no macro, no copy: an include in position of a file of ours"
  },
  {
   "file": "gfx/2d/DrawTargetRecording.h",
   "function": "",
   "kind": "add",
   "form": "registration",
-  "line": "#include \"StealthCanvasProjection.h\"",
-  "test": ""
+  "line": "#include \"StealthCanvasProjection.h\"  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
+  "test": "gtest:StealthCanvasProjection.RefusesARecordingWithoutNoise"
  },
  {
   "file": "gfx/2d/DrawTargetRecording.h",
   "function": "class DrawTargetRecording final : public DrawTarget {",
   "kind": "add",
-  "form": "unknown",
-  "line": " public:",
-  "test": ""
- },
- {
-  "file": "gfx/2d/DrawTargetRecording.h",
-  "function": "class DrawTargetRecording final : public DrawTarget {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
-  "test": ""
- },
- {
-  "file": "gfx/2d/DrawTargetRecording.h",
-  "function": "class DrawTargetRecording final : public DrawTarget {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  already_AddRefed<SourceSurface> StealthProjectedSurface(",
-  "test": ""
- },
- {
-  "file": "gfx/2d/DrawTargetRecording.h",
-  "function": "class DrawTargetRecording final : public DrawTarget {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "      SourceSurface* aSurface, bool aPremultiplied,",
-  "test": ""
- },
- {
-  "file": "gfx/2d/DrawTargetRecording.h",
-  "function": "class DrawTargetRecording final : public DrawTarget {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "      const StealthCanvasNoise& aNoise);",
-  "test": ""
- },
- {
-  "file": "gfx/2d/DrawTargetRecording.h",
-  "function": "class DrawTargetRecording final : public DrawTarget {",
-  "kind": "add",
-  "form": "unknown",
-  "line": " private:",
-  "test": ""
+  "form": "member",
+  "line": "  already_AddRefed<SourceSurface> StealthProjectedSurface(SourceSurface* aSurface, bool aPremultiplied, const StealthCanvasNoise& aNoise);  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
+  "test": "gtest:StealthCanvasProjection.ProjectedSurfaceRecordsOneEvent"
  },
  {
   "file": "gfx/2d/RecordedEvent.h",
   "function": "class RecordedEvent {",
   "kind": "add",
   "form": "member",
-  "line": "    STEALTHPROJECTSURFACE,",
-  "test": ""
+  "line": "    STEALTHPROJECTSURFACE,  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
+  "test": "gtest:StealthCanvasProjection.RecordedEventRoundTrip",
+  "anchor": "ACCESSIBLEID, the last enumerator of Mozilla before LAST",
+  "why": "G3: an enumerator without a value of ours, numbered by the compiler, right before the sentinel LAST; recorded events travel only between processes of the same build"
  },
  {
   "file": "gfx/2d/RecordedEventImpl.h",
   "function": "",
   "kind": "add",
-  "form": "unknown",
-  "line": "// STEALTH-HOOK(fingerprint/canvas/noise-projection)",
-  "test": ""
- },
- {
-  "file": "gfx/2d/RecordedEventImpl.h",
-  "function": "",
-  "kind": "add",
-  "form": "unknown",
-  "line": "#include \"StealthRecordedProjection.h\"",
-  "test": ""
+  "form": "registration",
+  "line": "#include \"StealthRecordedProjection.h\"  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
+  "test": "gtest:StealthCanvasProjection.RecordedEventRoundTrip"
  },
  {
   "file": "gfx/2d/RecordedEventImpl.h",
   "function": "inline void RecordedAccessibleId::OutputSimpleEventInfo(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "// STEALTH-HOOK(fingerprint/canvas/noise-projection): event entry",
-  "test": ""
- },
- {
-  "file": "gfx/2d/RecordedEventImpl.h",
-  "function": "inline void RecordedAccessibleId::OutputSimpleEventInfo(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  f(STEALTHPROJECTSURFACE, RecordedStealthProjectSurface);         \\",
-  "test": ""
+  "kind": "rewrite",
+  "form": "wrap-function",
+  "line": "#define FOR_EACH_EVENT_MOZILLA(f) /* STEALTH-HOOK(fingerprint/canvas/noise-projection) */ \\",
+  "removed": "#define FOR_EACH_EVENT(f)                                          \\",
+  "test": "gtest:StealthCanvasProjection.RecordedEventRoundTrip"
  },
  {
   "file": "gfx/2d/moz.build",
@@ -674,7 +236,15 @@
   "kind": "add",
   "form": "registration",
   "line": "EXPORTS.mozilla.gfx += [\"StealthCanvasProjection.h\"]  # STEALTH-HOOK(fingerprint/canvas/noise-projection)",
-  "test": ""
+  "test": "gtest:StealthCanvasProjection.IsAProjection"
+ },
+ {
+  "file": "gfx/2d/moz.build",
+  "function": "EXPORTS.mozilla.gfx += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "EXPORTS.mozilla.gfx += [\"StealthRecordedProjection.h\"]  # STEALTH-HOOK(fingerprint/canvas/noise-projection)",
+  "test": "gtest:StealthCanvasProjection.RecordedEventRoundTrip"
  },
  {
   "file": "gfx/2d/moz.build",
@@ -682,7 +252,7 @@
   "kind": "add",
   "form": "registration",
   "line": "EXPORTS.mozilla.gfx += [\"StealthGlyphCoverage.h\"]  # STEALTH-HOOK(fingerprint/fonts/metrics)",
-  "test": ""
+  "test": "gtest:StealthGlyphCoverage.A8MaskIsOnTheLadder"
  },
  {
   "file": "gfx/2d/moz.build",
@@ -690,7 +260,7 @@
   "kind": "add",
   "form": "registration",
   "line": "EXPORTS.mozilla.gfx += [\"StealthRefuse.h\"]  # STEALTH-HOOK(platform/declaration-gate)",
-  "test": ""
+  "test": "gtest:StealthGfxFeatureStatus.EveryLiveFeatureAnswersFromTheDeclaration"
  },
  {
   "file": "gfx/2d/moz.build",
@@ -698,7 +268,7 @@
   "kind": "add",
   "form": "registration",
   "line": "UNIFIED_SOURCES += [\"StealthCanvasProjection.cpp\"]  # STEALTH-HOOK(fingerprint/canvas/noise-projection)",
-  "test": ""
+  "test": "gtest:StealthCanvasProjection.IsAProjection"
  },
  {
   "file": "gfx/2d/moz.build",
@@ -706,7 +276,7 @@
   "kind": "add",
   "form": "registration",
   "line": "UNIFIED_SOURCES += [\"StealthGlyphCoverage.cpp\"]  # STEALTH-HOOK(fingerprint/fonts/metrics)",
-  "test": ""
+  "test": "gtest:StealthGlyphCoverage.A8MaskIsOnTheLadder"
  },
  {
   "file": "gfx/tests/gtest/moz.build",
@@ -714,7 +284,7 @@
   "kind": "add",
   "form": "registration",
   "line": "UNIFIED_SOURCES += [\"TestStealthCanvasProjection.cpp\"]  # STEALTH-HOOK(fingerprint/canvas/noise-projection)",
-  "test": ""
+  "test": "gtest:StealthCanvasProjection.IsAProjection"
  },
  {
   "file": "gfx/tests/gtest/moz.build",
@@ -722,7 +292,7 @@
   "kind": "add",
   "form": "registration",
   "line": "UNIFIED_SOURCES += [\"TestStealthWebGPUDeclaration.cpp\"]  # STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
-  "test": ""
+  "test": "gtest:StealthWebGPUDeclaration.EveryLimitIsSetFromTheDeclaration"
  },
  {
   "file": "gfx/tests/gtest/moz.build",
@@ -730,7 +300,7 @@
   "kind": "add",
   "form": "registration",
   "line": "UNIFIED_SOURCES += [\"TestStealthWebGPUExternalTexture.cpp\"]  # STEALTH-HOOK(fingerprint/webgpu/external-texture-vulkan)",
-  "test": ""
+  "test": "gtest:StealthWebGPUExternalTexture.SampledLoadedQueriedThroughAParameter"
  },
  {
   "file": "gfx/tests/gtest/moz.build",
@@ -738,70 +308,54 @@
   "kind": "add",
   "form": "unknown",
   "line": "if CONFIG[\"MOZ_WIDGET_TOOLKIT\"] == \"gtk\":  # STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": ""
+  "test": "gtest:StealthFcFontList.DeclareFontFile"
  },
  {
   "file": "gfx/tests/gtest/moz.build",
   "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
   "kind": "add",
   "form": "unknown",
-  "line": "    UNIFIED_SOURCES += [\"TestStealthFcFontList.cpp\", \"TestStealthFontMetrics.cpp\"]",
-  "test": ""
+  "line": "    UNIFIED_SOURCES += [\"TestStealthFcFontList.cpp\"]  # STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "gtest:StealthFcFontList.DeclareFontFile"
  },
  {
   "file": "gfx/tests/gtest/moz.build",
   "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
   "kind": "add",
   "form": "unknown",
-  "line": "    CXXFLAGS += CONFIG[\"CAIRO_FT_CFLAGS\"]",
-  "test": ""
+  "line": "    UNIFIED_SOURCES += [\"TestStealthFontMetrics.cpp\"]  # STEALTH-HOOK(fingerprint/fonts/metrics)",
+  "test": "gtest:StealthFontMetrics.ClearTypeTakesTheOS2AverageUnrounded"
  },
  {
   "file": "gfx/tests/gtest/moz.build",
   "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
   "kind": "add",
   "form": "unknown",
-  "line": "if CONFIG[\"OS_TARGET\"] == \"WINNT\":",
-  "test": ""
+  "line": "    CXXFLAGS += CONFIG[\"CAIRO_FT_CFLAGS\"]  # STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "gtest:StealthFcFontList.DeclareFontFile"
  },
  {
   "file": "gfx/tests/gtest/moz.build",
   "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
   "kind": "add",
   "form": "unknown",
-  "line": "    # gfxDWriteFonts' text quality and ClearType parameters, Windows only.",
-  "test": ""
+  "line": "if CONFIG[\"OS_TARGET\"] == \"WINNT\":  # STEALTH-HOOK(fingerprint/fonts/bundle)",
+  "test": "gtest:StealthBundledCollection.ContentProcessUnderBundleOnlyBuildsNone"
  },
  {
   "file": "gfx/tests/gtest/moz.build",
   "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
   "kind": "add",
   "form": "unknown",
-  "line": "    UNIFIED_SOURCES += [",
-  "test": ""
+  "line": "    UNIFIED_SOURCES += [\"TestStealthBundledCollection.cpp\"]  # STEALTH-HOOK(fingerprint/fonts/bundle)",
+  "test": "gtest:StealthBundledCollection.ContentProcessUnderBundleOnlyBuildsNone"
  },
  {
   "file": "gfx/tests/gtest/moz.build",
   "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
   "kind": "add",
   "form": "unknown",
-  "line": "        \"TestStealthBundledCollection.cpp\",",
-  "test": ""
- },
- {
-  "file": "gfx/tests/gtest/moz.build",
-  "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
-  "kind": "add",
-  "form": "unknown",
-  "line": "        \"TestStealthTextQuality.cpp\",",
-  "test": ""
- },
- {
-  "file": "gfx/tests/gtest/moz.build",
-  "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    ]",
-  "test": ""
+  "line": "    UNIFIED_SOURCES += [\"TestStealthTextQuality.cpp\"]  # STEALTH-HOOK(fingerprint/fonts/metrics)",
+  "test": "gtest:StealthTextQuality.TheDeclarationIsReadAndTheHostIsNot"
  }
 ]

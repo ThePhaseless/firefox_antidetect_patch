@@ -7,6 +7,7 @@
 // asynchronous route (APZ) and the data of the notification of a crashed frame.
 
 #include <limits>
+#include <type_traits>
 
 #include "StealthFrameCrash.h"
 #include "StealthInputEventBirth.h"
@@ -14,8 +15,12 @@
 #include "gtest/gtest.h"
 #include "mozilla/BasicEvents.h"
 #include "mozilla/MouseEvents.h"
+#include "mozilla/RefPtr.h"
 #include "mozilla/TextEvents.h"
+#include "mozilla/TextInputProcessor.h"
 #include "mozilla/TimeStamp.h"
+#include "mozilla/dom/ScriptSettings.h"
+#include "xpcpublic.h"
 
 using namespace mozilla;
 
@@ -411,4 +416,90 @@ TEST(StealthInputEventBirth, ThePageIsFoundFromTheDocumentOrThePresShellAtHand)
   StealthSetInputEventBirth(fromDocument, 5, &document);
   StealthSetInputEventBirth(fromShell, 4000, &shell);
   EXPECT_TRUE(fromShell.mTimeStamp >= fromDocument.mTimeStamp);
+}
+
+// The hook of the mouse path reads the latency from the data of the call ([B299] [B301]): a mouse event is stamped
+// with the latency the caller declared in the data, and an event with no latency keeps the stamp of its construction.
+namespace {
+struct FakeMouseEventData {
+  double mLatency = 0;
+};
+}  // namespace
+
+TEST(StealthInputEventBirth, TheMouseHookReadsTheLatencyOfTheDataAndStampsTheEvent)
+{
+  FakeDocument document;
+  FakePresShell shell;
+  shell.mDocument = &document;
+
+  WidgetEventTime none;
+  const TimeStamp before = none.mTimeStamp;
+  StealthSetMouseEventBirth(none, FakeMouseEventData{}, &shell);
+  EXPECT_TRUE(none.mTimeStamp == before);  // the negative control: no latency declared, nothing stamped
+
+  const TimeStamp start = TimeStamp::Now();
+  WidgetEventTime declared;
+  StealthSetMouseEventBirth(declared, FakeMouseEventData{45}, &shell);
+  EXPECT_TRUE(declared.mTimeStamp <= TimeStamp::Now() - TimeDuration::FromMilliseconds(44));
+  EXPECT_TRUE(declared.mTimeStamp >= start - TimeDuration::FromMilliseconds(45));
+}
+
+// A real nsITextInputProcessor ([B299]): the field its hooks pass to the scope is private, so the test reaches it by the
+// explicit-instantiation access (a member pointer named in an explicit instantiation is not access-checked); the field
+// is read where the hooks of TextInputProcessor.cpp read it.
+namespace {
+auto& StealthTipBirthField(TextInputProcessor&);
+template <auto Member>
+struct StealthTipBirthAccess {
+  friend auto& StealthTipBirthField(TextInputProcessor& aTip) { return aTip.*Member; }
+};
+template struct StealthTipBirthAccess<&TextInputProcessor::mStealthKeyBirth>;
+}  // namespace
+
+TEST(StealthKeyBirthScope, TheMemberOfTheProcessorHasTheShapeOfTheDeclaration)
+{
+  RefPtr<TextInputProcessor> tip = new TextInputProcessor();
+  auto& field = StealthTipBirthField(*tip);
+  // the anonymous struct of the header (kept free of an include) and StealthKeyBirth must not drift apart: the scope
+  // takes any struct with these two members, so a rename or a change of type fails here at compile time
+  static_assert(std::is_same_v<decltype(field.mLatencyMs), double>);
+  static_assert(std::is_same_v<decltype(field.mPageId), uint64_t>);
+  static_assert(sizeof(field) == sizeof(StealthKeyBirth));
+  static_assert(std::is_standard_layout_v<std::remove_reference_t<decltype(field)>>);
+  EXPECT_EQ(field.mLatencyMs, 0.0);
+  EXPECT_EQ(field.mPageId, 0u);
+}
+
+TEST(StealthKeyBirthScope, SetNextKeyLatencyOfARealProcessorDeclaresTheNextKeyAndTheScopeTakesIt)
+{
+  dom::AutoJSAPI jsapi;
+  ASSERT_TRUE(jsapi.Init(xpc::PrivilegedJunkScope()));  // a chrome caller, as setNextKeyLatency asks
+  RefPtr<TextInputProcessor> tip = new TextInputProcessor();
+  auto& field = StealthTipBirthField(*tip);
+
+  ASSERT_EQ(tip->SetNextKeyLatency(60, 341), NS_OK);
+  EXPECT_EQ(field.mLatencyMs, 60.0);
+  EXPECT_EQ(field.mPageId, 341u);
+
+  WidgetKeyboardEvent event(true, eKeyDown, nullptr);
+  const TimeStamp now = event.mTimeStamp;
+  {
+    StealthKeyBirthScope scope(field);  // what keydown(), keyup() and commitCompositionWith() open
+    EXPECT_EQ(field.mLatencyMs, 0.0);   // the member is cleared: the next key declares its own
+    EXPECT_EQ(field.mPageId, 0u);
+    StealthKeyBirthScope::Stamp(event);
+  }
+  EXPECT_TRUE(event.mTimeStamp < now);
+  EXPECT_TRUE(event.mTimeStamp >= now - TimeDuration::FromMilliseconds(61));
+
+  // the negative control: nothing declared (or taken back with 0) is no birth
+  ASSERT_EQ(tip->SetNextKeyLatency(60, 341), NS_OK);
+  ASSERT_EQ(tip->SetNextKeyLatency(0, 0), NS_OK);
+  WidgetKeyboardEvent plain(true, eKeyDown, nullptr);
+  const TimeStamp stamp = plain.mTimeStamp;
+  {
+    StealthKeyBirthScope scope(field);
+    StealthKeyBirthScope::Stamp(plain);
+  }
+  EXPECT_TRUE(plain.mTimeStamp == stamp);
 }

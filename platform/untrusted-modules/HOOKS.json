@@ -5,7 +5,7 @@
   "kind": "add",
   "form": "registration",
   "line": "#include \"StealthOwnBinaries.h\"  // STEALTH-HOOK(platform/untrusted-modules)",
-  "test": ""
+  "test": "gtest:StealthOwnBinaries.StealthSkipsSignatureLookup"
  },
  {
   "file": "toolkit/xre/dllservices/UntrustedModulesData.cpp",
@@ -13,7 +13,9 @@
   "kind": "add",
   "form": "unknown",
   "line": "  ModuleVersionInfo verInfo;",
-  "test": ""
+  "test": "gtest:StealthOwnBinaries.StealthSkipsSignatureLookup",
+  "exception": "option C (PM-DECISIONS platform/untrusted-modules hunk 2, PM-VERDICT 21/11): the five lines of GetVersionAndVendorInfo stay as on the base",
+  "pm": "approvato"
  },
  {
   "file": "toolkit/xre/dllservices/UntrustedModulesData.cpp",
@@ -21,7 +23,9 @@
   "kind": "add",
   "form": "unknown",
   "line": "  const bool hasVersion = verInfo.GetFromImage(aPath);",
-  "test": ""
+  "test": "gtest:StealthOwnBinaries.StealthSkipsSignatureLookup",
+  "exception": "option C (PM-DECISIONS platform/untrusted-modules hunk 2, PM-VERDICT 21/11): the five lines of GetVersionAndVendorInfo stay as on the base",
+  "pm": "approvato"
  },
  {
   "file": "toolkit/xre/dllservices/UntrustedModulesData.cpp",
@@ -30,7 +34,9 @@
   "form": "unknown",
   "line": "  UniquePtr<wchar_t[]> signedBy(",
   "removed": "  UniquePtr<wchar_t[]> signedBy(dllSvc->GetBinaryOrgName(\n      PromiseFlatString(aPath).get(), &hasNestedMicrosoftSignature,\n      AuthenticodeFlags::SkipTrustVerification));",
-  "test": ""
+  "test": "gtest:StealthOwnBinaries.StealthSkipsSignatureLookup",
+  "exception": "option C (PM-DECISIONS platform/untrusted-modules hunk 2, PM-VERDICT 21/11): the five lines of GetVersionAndVendorInfo stay as on the base",
+  "pm": "approvato"
  },
  {
   "file": "toolkit/xre/dllservices/UntrustedModulesData.cpp",
@@ -38,7 +44,10 @@
   "kind": "rewrite",
   "form": "unknown",
   "line": "      // STEALTH-HOOK(platform/untrusted-modules)",
-  "test": ""
+  "test": "gtest:StealthOwnBinaries.StealthSkipsSignatureLookup",
+  "why": "design row 2 (risk pm): the 5-line rewrite of GetVersionAndVendorInfo is left as it is today; the design's question (options A-D, recommended B) is not answered in PM-DECISIONS. The gtest exercises the decision function, not the line",
+  "exception": "option C (PM-DECISIONS platform/untrusted-modules hunk 2, PM-VERDICT 21/11): the five lines of GetVersionAndVendorInfo stay as on the base",
+  "pm": "approvato"
  },
  {
   "file": "toolkit/xre/dllservices/UntrustedModulesData.cpp",
@@ -46,7 +55,9 @@
   "kind": "rewrite",
   "form": "unknown",
   "line": "      StealthSkipsSignatureLookup(aPath, verInfo, hasVersion)",
-  "test": ""
+  "test": "gtest:StealthOwnBinaries.StealthSkipsSignatureLookup",
+  "exception": "option C (PM-DECISIONS platform/untrusted-modules hunk 2, PM-VERDICT 21/11): the five lines of GetVersionAndVendorInfo stay as on the base",
+  "pm": "approvato"
  },
  {
   "file": "toolkit/xre/dllservices/UntrustedModulesData.cpp",
@@ -54,7 +65,9 @@
   "kind": "rewrite",
   "form": "unknown",
   "line": "          ? nullptr",
-  "test": ""
+  "test": "gtest:StealthOwnBinaries.StealthSkipsSignatureLookup",
+  "exception": "option C (PM-DECISIONS platform/untrusted-modules hunk 2, PM-VERDICT 21/11): the five lines of GetVersionAndVendorInfo stay as on the base",
+  "pm": "approvato"
  },
  {
   "file": "toolkit/xre/dllservices/UntrustedModulesData.cpp",
@@ -62,7 +75,9 @@
   "kind": "rewrite",
   "form": "unknown",
   "line": "          : dllSvc->GetBinaryOrgName(PromiseFlatString(aPath).get(),",
-  "test": ""
+  "test": "gtest:StealthOwnBinaries.StealthSkipsSignatureLookup",
+  "exception": "option C (PM-DECISIONS platform/untrusted-modules hunk 2, PM-VERDICT 21/11): the five lines of GetVersionAndVendorInfo stay as on the base",
+  "pm": "approvato"
  },
  {
   "file": "toolkit/xre/dllservices/UntrustedModulesData.cpp",
@@ -70,7 +85,9 @@
   "kind": "rewrite",
   "form": "unknown",
   "line": "                                     &hasNestedMicrosoftSignature,",
-  "test": ""
+  "test": "gtest:StealthOwnBinaries.StealthSkipsSignatureLookup",
+  "exception": "option C (PM-DECISIONS platform/untrusted-modules hunk 2, PM-VERDICT 21/11): the five lines of GetVersionAndVendorInfo stay as on the base",
+  "pm": "approvato"
  },
  {
   "file": "toolkit/xre/dllservices/UntrustedModulesData.cpp",
@@ -78,7 +95,9 @@
   "kind": "rewrite",
   "form": "unknown",
   "line": "                                     AuthenticodeFlags::SkipTrustVerification));",
-  "test": ""
+  "test": "gtest:StealthOwnBinaries.StealthSkipsSignatureLookup",
+  "exception": "option C (PM-DECISIONS platform/untrusted-modules hunk 2, PM-VERDICT 21/11): the five lines of GetVersionAndVendorInfo stay as on the base",
+  "pm": "approvato"
  },
  {
   "file": "toolkit/xre/dllservices/UntrustedModulesData.cpp",
@@ -87,31 +106,9 @@
   "form": "unknown",
   "line": "  if (!hasVersion) {",
   "removed": "  ModuleVersionInfo verInfo;\n  if (!verInfo.GetFromImage(aPath)) {",
-  "test": ""
- },
- {
-  "file": "toolkit/xre/dllservices/UntrustedModulesData.h",
-  "function": "class ModuleRecord final {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(platform/untrusted-modules)",
-  "test": ""
- },
- {
-  "file": "toolkit/xre/dllservices/UntrustedModulesData.h",
-  "function": "class ModuleRecord final {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  static bool IsInDirectoryOf(const nsAString& aDllPath,",
-  "test": ""
- },
- {
-  "file": "toolkit/xre/dllservices/UntrustedModulesData.h",
-  "function": "class ModuleRecord final {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "                              const nsAString& aExePath);",
-  "test": ""
+  "test": "gtest:StealthOwnBinaries.StealthSkipsSignatureLookup",
+  "exception": "option C (PM-DECISIONS platform/untrusted-modules hunk 2, PM-VERDICT 21/11): the five lines of GetVersionAndVendorInfo stay as on the base",
+  "pm": "approvato"
  },
  {
   "file": "toolkit/xre/dllservices/moz.build",
@@ -119,7 +116,7 @@
   "kind": "add",
   "form": "registration",
   "line": "UNIFIED_SOURCES += [\"StealthOwnBinaries.cpp\"]  # STEALTH-HOOK(platform/untrusted-modules)",
-  "test": ""
+  "test": "gtest:StealthOwnBinaries.StealthSkipsSignatureLookup"
  },
  {
   "file": "toolkit/xre/dllservices/tests/gtest/moz.build",
@@ -127,6 +124,6 @@
   "kind": "add",
   "form": "registration",
   "line": "UNIFIED_SOURCES += [\"TestStealthOwnBinaries.cpp\"]  # STEALTH-HOOK(platform/untrusted-modules)",
-  "test": ""
+  "test": "gtest:StealthOwnBinaries.BesideTheExeAndBelowIt"
  }
 ]

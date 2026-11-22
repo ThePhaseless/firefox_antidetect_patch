@@ -4,284 +4,124 @@
   "function": "",
   "kind": "add",
   "form": "registration",
-  "line": "#include \"StealthWebGLParams.h\"    // STEALTH-HOOK(fingerprint/webgl/parameters)",
-  "test": ""
+  "line": "#include \"StealthWebGLParams.h\"  // STEALTH-HOOK(fingerprint/webgl/parameters)",
+  "test": "wrapper:tests/test_webgl_declared_parameters_e2e.py::test_declared_numeric_parameters_replace_the_hosts_and_webgl2_only_names_stay_null_on_webgl1"
  },
  {
   "file": "dom/canvas/ClientWebGLContext.cpp",
   "function": "",
   "kind": "add",
   "form": "registration",
-  "line": "#include \"StealthWebGLReadback.h\"  // STEALTH-HOOK(fingerprint/webgl/parameters)",
-  "test": ""
+  "line": "#include \"StealthWebGLReadback.h\"  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
+  "test": "wrapper:tests/test_webgl_noise_active.py::test_readpixels_of_a_partial_rectangle_projects_only_what_was_written"
  },
  {
   "file": "dom/canvas/ClientWebGLContext.cpp",
   "function": "UniquePtr<uint8_t[]> ClientWebGLContext::GetImageBuffer(",
   "kind": "add",
   "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/webgl/parameters)",
-  "test": ""
- },
- {
-  "file": "dom/canvas/ClientWebGLContext.cpp",
-  "function": "UniquePtr<uint8_t[]> ClientWebGLContext::GetImageBuffer(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  snapshot = StealthWebGLReadback::ProjectReaderSnapshot(*this, snapshot, any);",
-  "test": ""
+  "line": "  snapshot = StealthWebGLProjectReaderSnapshot(*this, snapshot, any);  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
+  "test": "wrapper:tests/test_canvas_reads_as_drawn.py::test_a_non_premultiplied_webgl_canvas_reads_the_same_through_todataurl_and_toblob",
+  "anchor": "the check `if (!snapshot) return ...;` of Mozilla",
+  "why": "the hook receives the locals `snapshot` and `any` (the alpha type Mozilla computed); a pure addition as on the baseline"
  },
  {
   "file": "dom/canvas/ClientWebGLContext.cpp",
   "function": "ClientWebGLContext::GetInputStream(",
   "kind": "add",
   "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/webgl/parameters)",
-  "test": ""
- },
- {
-  "file": "dom/canvas/ClientWebGLContext.cpp",
-  "function": "ClientWebGLContext::GetInputStream(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  snapshot = StealthWebGLReadback::ProjectReaderSnapshot(*this, snapshot, any);",
-  "test": ""
+  "line": "  snapshot = StealthWebGLProjectReaderSnapshot(*this, snapshot, any);  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
+  "test": "wrapper:tests/test_canvas_reads_as_drawn.py::test_a_non_premultiplied_webgl_canvas_reads_the_same_through_todataurl_and_toblob",
+  "anchor": "the check `if (!snapshot) return ...;` of Mozilla",
+  "why": "the hook receives the locals `snapshot` and `any` (the alpha type Mozilla computed); a pure addition as on the baseline"
  },
  {
   "file": "dom/canvas/ClientWebGLContext.cpp",
   "function": "void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,",
   "kind": "add",
   "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/webgl/parameters)",
-  "test": ""
+  "line": "  const StealthWebGLParameterAnswer stealthAnswer(*this, cx, pname, retval, rv);  // STEALTH-HOOK(fingerprint/webgl/parameters)",
+  "test": "wrapper:tests/test_webgl_declared_parameters_e2e.py::test_declared_numeric_parameters_replace_the_hosts_and_webgl2_only_names_stay_null_on_webgl1",
+  "anchor": "`const auto& state = State();` of ClientWebGLContext::GetParameter",
+  "why": "the RAII object replaces the host's number when the function leaves, inside FuncScope; it is the baseline hook, back as a pure addition (G23/G51)"
  },
  {
   "file": "dom/canvas/ClientWebGLContext.cpp",
   "function": "void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,",
   "kind": "add",
   "form": "unknown",
-  "line": "  const StealthWebGLParameterAnswer stealthAnswer(*this, cx, pname, retval, rv);",
-  "test": ""
+  "line": "        if (StealthWebGLRendererOverride(ret)) break;  // STEALTH-HOOK(fingerprint/webgl/parameters)",
+  "test": "wrapper:tests/test_webgl_declared_parameters_e2e.py::test_declared_renderer_and_vendor_are_read_in_every_form",
+  "anchor": "case LOCAL_GL_RENDERER: {",
+  "why": "G28: answered by a pre-step of the GetParameter wrapper it would run before Mozilla computes the string, an order change of a value a page reads; the hook passes the local `ret`, so it stays where it is today"
  },
  {
   "file": "dom/canvas/ClientWebGLContext.cpp",
   "function": "void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,",
   "kind": "add",
   "form": "unknown",
-  "line": "        // STEALTH-HOOK(fingerprint/webgl/parameters)",
-  "test": ""
+  "line": "            if (StealthWebGLUnmaskedRendererOverride(ret)) break;  // STEALTH-HOOK(fingerprint/webgl/parameters)",
+  "test": "wrapper:tests/test_webgl_declared_parameters_e2e.py::test_declared_renderer_and_vendor_are_read_in_every_form",
+  "anchor": "case dom::WEBGL_debug_renderer_info_Binding::UNMASKED_RENDERER_WEBGL:",
+  "why": "G28: a pre-step would have to redo Mozilla's check that the extension is enabled (the error path is Mozilla's); the hook passes the local `ret`, so it stays where it is today"
  },
  {
   "file": "dom/canvas/ClientWebGLContext.cpp",
   "function": "void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,",
   "kind": "add",
   "form": "unknown",
-  "line": "        if (StealthWebGLRendererOverride(ret)) break;",
-  "test": ""
- },
- {
-  "file": "dom/canvas/ClientWebGLContext.cpp",
-  "function": "void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "            // STEALTH-HOOK(fingerprint/webgl/parameters)",
-  "test": ""
- },
- {
-  "file": "dom/canvas/ClientWebGLContext.cpp",
-  "function": "void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "            if (StealthWebGLUnmaskedRendererOverride(ret)) break;",
-  "test": ""
- },
- {
-  "file": "dom/canvas/ClientWebGLContext.cpp",
-  "function": "void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "            // STEALTH-HOOK(fingerprint/webgl/parameters)",
-  "test": ""
- },
- {
-  "file": "dom/canvas/ClientWebGLContext.cpp",
-  "function": "void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "            if (StealthWebGLUnmaskedVendorOverride(ret)) break;",
-  "test": ""
+  "line": "            if (StealthWebGLUnmaskedVendorOverride(ret)) break;  // STEALTH-HOOK(fingerprint/webgl/parameters)",
+  "test": "wrapper:tests/test_webgl_declared_parameters_e2e.py::test_declared_renderer_and_vendor_are_read_in_every_form",
+  "anchor": "case dom::WEBGL_debug_renderer_info_Binding::UNMASKED_VENDOR_WEBGL:",
+  "why": "G28: as UNMASKED_RENDERER_WEBGL: it would redo Mozilla's extension check and run before Mozilla's computation; stays where it is today"
  },
  {
   "file": "dom/canvas/ClientWebGLContext.cpp",
   "function": "ClientWebGLContext::GetShaderPrecisionFormat(const GLenum shadertype,",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/webgl/parameters)",
-  "test": ""
- },
- {
-  "file": "dom/canvas/ClientWebGLContext.cpp",
-  "function": "ClientWebGLContext::GetShaderPrecisionFormat(const GLenum shadertype,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  if (const auto fake = StealthWebGLShaderPrecision(shadertype, precisiontype))",
-  "test": ""
- },
- {
-  "file": "dom/canvas/ClientWebGLContext.cpp",
-  "function": "ClientWebGLContext::GetShaderPrecisionFormat(const GLenum shadertype,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    return AsAddRefed(new WebGLShaderPrecisionFormatJS(*fake));",
-  "test": ""
+  "form": "anchor",
+  "line": "  if (already_AddRefed<WebGLShaderPrecisionFormatJS> rv; StealthWebGLShaderPrecisionFormat(shadertype, precisiontype, &rv)) return rv;  // STEALTH-HOOK(fingerprint/webgl/parameters)",
+  "test": "wrapper:tests/test_webgl_declared_parameters_e2e.py::test_declared_shader_precision_replaces_the_hosts_and_a_bad_pair_still_errors",
+  "anchor": "the lost-context check `if (!notLost) { return nullptr; }` of ClientWebGLContext::GetShaderPrecisionFormat",
+  "why": "G49: the baseline hook answered before Mozilla reads the precisions the host reported (`*notLost->info.shaderPrecisions`); a wrap of MaybeFind would read them and then replace; the guard must sit before that read, after the lost check"
  },
  {
   "file": "dom/canvas/ClientWebGLContext.cpp",
   "function": "void ClientWebGLContext::ReadPixels(GLint x, GLint y, GLsizei width,",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/webgl/parameters)",
-  "test": ""
- },
- {
-  "file": "dom/canvas/ClientWebGLContext.cpp",
-  "function": "void ClientWebGLContext::ReadPixels(GLint x, GLint y, GLsizei width,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  StealthWebGLReadback::ProjectReadPixelsPbo(*this, desc, offset);",
-  "test": ""
+  "form": "anchor",
+  "line": "  StealthWebGLReadback::ProjectReadPixelsPbo(*this, desc, offset);  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
+  "test": "wrapper:tests/test_webgl_noise_active.py::test_readpixels_into_a_pixel_pack_buffer_reads_as_into_an_array",
+  "anchor": "Run<RPROC(ReadPixelsPbo)>(desc, static_cast<uint64_t>(offset));",
+  "why": "G30: it needs the read to have been sent and `desc`, which Mozilla builds from the validated parameters and the pack state; a post-step of a wrapper would run after the validation returns and would have to validate again; it is the last line of the function, the one exception of rule 5"
  },
  {
   "file": "dom/canvas/ClientWebGLContext.cpp",
   "function": "void ClientWebGLContext::ReadPixels(GLint x, GLint y, GLsizei width,",
   "kind": "rewrite",
-  "form": "unknown",
-  "line": "    // STEALTH-HOOK(fingerprint/webgl/parameters)",
+  "form": "wrap-expression",
+  "line": "    bool succeeded = StealthWebGLProjectReadPixels(*this, desc, *range, DoReadPixels(desc, *range));  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
   "removed": "    bool succeeded = DoReadPixels(desc, *range);",
-  "test": ""
- },
- {
-  "file": "dom/canvas/ClientWebGLContext.cpp",
-  "function": "void ClientWebGLContext::ReadPixels(GLint x, GLint y, GLsizei width,",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    bool succeeded = StealthWebGLReadback::ReadPixels(*this, desc, *range);",
-  "test": ""
- },
- {
-  "file": "dom/canvas/ClientWebGLContext.cpp",
-  "function": "void ClientWebGLContext::ReadPixels(GLint x, GLint y, GLsizei width,",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "// STEALTH-HOOK(fingerprint/webgl/parameters)",
-  "removed": "bool ClientWebGLContext::DoReadPixels(const webgl::ReadPixelsDesc& desc,\n                                      const Span<uint8_t> dest) const {",
-  "test": ""
- },
- {
-  "file": "dom/canvas/ClientWebGLContext.cpp",
-  "function": "void ClientWebGLContext::ReadPixels(GLint x, GLint y, GLsizei width,",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "bool ClientWebGLContext::DoReadPixels(",
-  "test": ""
- },
- {
-  "file": "dom/canvas/ClientWebGLContext.cpp",
-  "function": "void ClientWebGLContext::ReadPixels(GLint x, GLint y, GLsizei width,",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    const webgl::ReadPixelsDesc& desc, const Span<uint8_t> dest,",
-  "test": ""
- },
- {
-  "file": "dom/canvas/ClientWebGLContext.cpp",
-  "function": "void ClientWebGLContext::ReadPixels(GLint x, GLint y, GLsizei width,",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    webgl::ReadPixelsResult* const aWritten) const {",
-  "test": ""
+  "test": "wrapper:tests/test_webgl_noise_active.py::test_readpixels_of_a_partial_rectangle_projects_only_what_was_written"
  },
  {
   "file": "dom/canvas/ClientWebGLContext.cpp",
   "function": "bool ClientWebGLContext::DoReadPixels(const webgl::ReadPixelsDesc& desc,",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/webgl/parameters)",
-  "test": ""
- },
- {
-  "file": "dom/canvas/ClientWebGLContext.cpp",
-  "function": "bool ClientWebGLContext::DoReadPixels(const webgl::ReadPixelsDesc& desc,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  if (aWritten) *aWritten = webgl::ReadPixelsResult{subrect, byteStride};",
-  "test": ""
- },
- {
-  "file": "dom/canvas/ClientWebGLContext.cpp",
-  "function": "ClientWebGLContext::DoReadPixelsAsync() {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/webgl/parameters)",
-  "test": ""
- },
- {
-  "file": "dom/canvas/ClientWebGLContext.cpp",
-  "function": "ClientWebGLContext::DoReadPixelsAsync() {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  const bool premultiplied = !options.alpha || options.premultipliedAlpha;",
-  "test": ""
+  "form": "anchor",
+  "line": "  StealthWebGLReadback::NoteReadPixels(*this, subrect, byteStride);  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
+  "test": "wrapper:tests/test_webgl_noise_active.py::test_readpixels_of_a_partial_rectangle_projects_only_what_was_written",
+  "anchor": "the loop `for (const auto i : IntegerRange(subrect.height))` that copies the rows into the destination",
+  "why": "G5: subrect and byteStride are locals of Mozilla's body that the projection needs after the call returns; they go into the private field mStealthReadPixelsResult, and the signature of DoReadPixels is Mozilla's again; no zeroing before the call is needed on the readPixels(array) road: the field is written at the only `return true` and taken only after a success, on the same thread, with no event-loop turn in between"
  },
  {
   "file": "dom/canvas/ClientWebGLContext.cpp",
   "function": "ClientWebGLContext::DoReadPixelsAsync() {",
   "kind": "rewrite",
-  "form": "unknown",
-  "line": "       expectedSize, premultiplied](",
-  "removed": "       expectedSize](webgl::ReadPixelsResultIpc&& aReply) mutable {",
-  "test": ""
- },
- {
-  "file": "dom/canvas/ClientWebGLContext.cpp",
-  "function": "ClientWebGLContext::DoReadPixelsAsync() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "          webgl::ReadPixelsResultIpc&& aReply) mutable {",
-  "test": ""
- },
- {
-  "file": "dom/canvas/ClientWebGLContext.cpp",
-  "function": "ClientWebGLContext::DoReadPixelsAsync() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "        // STEALTH-HOOK(fingerprint/webgl/parameters)",
+  "form": "wrap-expression",
+  "line": "        promise->Resolve(StealthWebGLProjectAsyncSnapshot(*self, std::move(sourceSurface)), __func__);  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
   "removed": "        promise->Resolve(std::move(sourceSurface), __func__);",
-  "test": ""
- },
- {
-  "file": "dom/canvas/ClientWebGLContext.cpp",
-  "function": "ClientWebGLContext::DoReadPixelsAsync() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "        promise->Resolve(StealthWebGLReadback::ProjectAsyncSnapshot(",
-  "test": ""
- },
- {
-  "file": "dom/canvas/ClientWebGLContext.cpp",
-  "function": "ClientWebGLContext::DoReadPixelsAsync() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "                             *self, sourceSurface, premultiplied),",
-  "test": ""
- },
- {
-  "file": "dom/canvas/ClientWebGLContext.cpp",
-  "function": "ClientWebGLContext::DoReadPixelsAsync() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "                         __func__);",
-  "test": ""
+  "test": "wrapper:tests/test_webgl_noise_active.py::test_a_capturestream_frame_reads_as_todataurl"
  },
  {
   "file": "dom/canvas/WebGLContextExtensions.cpp",
@@ -289,135 +129,103 @@
   "kind": "add",
   "form": "registration",
   "line": "#include \"StealthWebGLParams.h\"  // STEALTH-HOOK(fingerprint/webgl/parameters)",
-  "test": ""
+  "test": "wrapper:tests/test_a_declared_webgl_extension_survives_its_use_e2e.py::test_every_declared_extension_can_be_called_and_the_page_still_answers"
  },
  {
   "file": "dom/canvas/WebGLContextExtensions.cpp",
   "function": "bool WebGLContext::IsExtensionSupported(WebGLExtensionID ext) const {",
   "kind": "add",
-  "form": "unknown",
-  "line": "      // STEALTH-HOOK(fingerprint/webgl/parameters): declared to the page, so served wherever the GL can",
-  "test": ""
- },
- {
-  "file": "dom/canvas/WebGLContextExtensions.cpp",
-  "function": "bool WebGLContext::IsExtensionSupported(WebGLExtensionID ext) const {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "      if (StealthWebGLExtensionVerdict(IsWebGL2(), ext) == Some(true)) return true;",
-  "test": ""
+  "form": "anchor",
+  "line": "      if (StealthWebGLExtensionServed(this, ext)) return true;  // STEALTH-HOOK(fingerprint/webgl/parameters)",
+  "test": "wrapper:tests/test_a_declared_webgl_extension_survives_its_use_e2e.py::test_every_declared_extension_can_be_called_and_the_page_still_answers",
+  "anchor": "the check `if (!gl->IsSupported(gl::GLFeature::provoking_vertex)) return false;` of the case WEBGL_provoking_vertex",
+  "why": "the baseline position: after Mozilla's GL check, so the GL check is not copied into our function (G16)"
  },
  {
   "file": "dom/canvas/WebGLContextExtensions.cpp",
   "function": "void WebGLContext::RequestExtension(const WebGLExtensionID ext,",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/webgl/parameters): declared but not served: harmless",
-  "test": ""
+  "form": "anchor",
+  "line": "  if (StealthWebGLExtensionUnserved(this, ext)) return;  // STEALTH-HOOK(fingerprint/webgl/parameters)",
+  "test": "wrapper:tests/test_a_declared_webgl_extension_survives_its_use_e2e.py::test_every_declared_extension_can_be_called_and_the_page_still_answers",
+  "anchor": "if (!limits.supportedExtensions[ext]) return;",
+  "why": "G28: a guard in the head of RequestExtension would run before the limits check; it stays where it is today, with its condition in our function"
  },
  {
-  "file": "dom/canvas/WebGLContextExtensions.cpp",
-  "function": "void WebGLContext::RequestExtension(const WebGLExtensionID ext,",
+  "file": "dom/canvas/WebGLContextFramebufferOperations.cpp",
+  "function": "",
   "kind": "add",
-  "form": "unknown",
-  "line": "  if (!IsExtensionSupported(ext)) return;",
-  "test": ""
+  "form": "registration",
+  "line": "#include \"StealthWebGLParams.h\"  // STEALTH-HOOK(fingerprint/webgl/parameters)",
+  "test": "wrapper:tests/test_a_declared_webgl_extension_survives_its_use_e2e.py::test_every_declared_extension_can_be_called_and_the_page_still_answers"
  },
  {
   "file": "dom/canvas/WebGLContextFramebufferOperations.cpp",
   "function": "void WebGLContext::ColorMask(const Maybe<GLuint> i, const uint8_t mask) {",
   "kind": "add",
-  "form": "unknown",
-  "line": "    // STEALTH-HOOK(fingerprint/webgl/parameters): declared to the page, maybe not enabled here",
-  "test": ""
+  "form": "anchor",
+  "line": "    if (StealthWebGLDrawBuffersIndexedMissing(this)) return;  // STEALTH-HOOK(fingerprint/webgl/parameters)",
+  "test": "wrapper:tests/test_a_declared_webgl_extension_survives_its_use_e2e.py::test_every_declared_extension_can_be_called_and_the_page_still_answers",
+  "anchor": "`if (i) {` of WebGLContext::ColorMask",
+  "why": "a guard in the head would run before IsContextLost(), which has a side effect (HandlePendingContextLoss); the line must sit inside `if (i)` where only the indexed variant needs the extension"
  },
  {
-  "file": "dom/canvas/WebGLContextFramebufferOperations.cpp",
-  "function": "void WebGLContext::ColorMask(const Maybe<GLuint> i, const uint8_t mask) {",
+  "file": "dom/canvas/WebGLContextGL.cpp",
+  "function": "",
   "kind": "add",
-  "form": "unknown",
-  "line": "    if (!IsExtensionEnabled(WebGLExtensionID::OES_draw_buffers_indexed)) return;",
-  "test": ""
+  "form": "registration",
+  "line": "#include \"StealthWebGLParams.h\"  // STEALTH-HOOK(fingerprint/webgl/parameters)",
+  "test": "wrapper:tests/test_a_declared_webgl_extension_survives_its_use_e2e.py::test_every_declared_extension_can_be_called_and_the_page_still_answers"
  },
  {
   "file": "dom/canvas/WebGLContextGL.cpp",
   "function": "void WebGLContext::BlendEquationSeparate(Maybe<GLuint> i, GLenum modeRGB,",
   "kind": "add",
-  "form": "unknown",
-  "line": "    // STEALTH-HOOK(fingerprint/webgl/parameters): declared to the page, maybe not enabled here",
-  "test": ""
- },
- {
-  "file": "dom/canvas/WebGLContextGL.cpp",
-  "function": "void WebGLContext::BlendEquationSeparate(Maybe<GLuint> i, GLenum modeRGB,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    if (!IsExtensionEnabled(WebGLExtensionID::OES_draw_buffers_indexed)) return;",
-  "test": ""
+  "form": "anchor",
+  "line": "    if (StealthWebGLDrawBuffersIndexedMissing(this)) return;  // STEALTH-HOOK(fingerprint/webgl/parameters)",
+  "test": "wrapper:tests/test_a_declared_webgl_extension_survives_its_use_e2e.py::test_every_declared_extension_can_be_called_and_the_page_still_answers",
+  "anchor": "`if (i) {` of WebGLContext::BlendFuncSeparate, after Mozilla's validation of the enums",
+  "why": "a guard in the head would run before the validation of the blend enums, whose errors a page reads, and before IsContextLost()"
  },
  {
   "file": "dom/canvas/WebGLContextGL.cpp",
   "function": "void WebGLContext::BlendFuncSeparate(Maybe<GLuint> i, GLenum srcRGB,",
   "kind": "add",
-  "form": "unknown",
-  "line": "    // STEALTH-HOOK(fingerprint/webgl/parameters): declared to the page, maybe not enabled here",
-  "test": ""
- },
- {
-  "file": "dom/canvas/WebGLContextGL.cpp",
-  "function": "void WebGLContext::BlendFuncSeparate(Maybe<GLuint> i, GLenum srcRGB,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    if (!IsExtensionEnabled(WebGLExtensionID::OES_draw_buffers_indexed)) return;",
-  "test": ""
+  "form": "anchor",
+  "line": "    if (StealthWebGLDrawBuffersIndexedMissing(this)) return;  // STEALTH-HOOK(fingerprint/webgl/parameters)",
+  "test": "wrapper:tests/test_a_declared_webgl_extension_survives_its_use_e2e.py::test_every_declared_extension_can_be_called_and_the_page_still_answers",
+  "anchor": "`if (i) {` of WebGLContext::BlendFuncSeparate, after Mozilla's validation of the enums",
+  "why": "a guard in the head would run before the validation of the blend enums, whose errors a page reads, and before IsContextLost()"
  },
  {
   "file": "dom/canvas/WebGLContextGL.cpp",
   "function": "void WebGLContext::PolygonOffsetClampEXT(const GLfloat factor,",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/webgl/parameters): declared to the page, maybe not enabled here",
-  "test": ""
+  "form": "anchor",
+  "line": "  if (StealthWebGLPolygonOffsetClampMissing(this)) return;  // STEALTH-HOOK(fingerprint/webgl/parameters)",
+  "test": "wrapper:tests/test_a_declared_webgl_extension_survives_its_use_e2e.py::test_every_declared_extension_can_be_called_and_the_page_still_answers",
+  "anchor": "`if (IsContextLost()) return;` of WebGLContext::PolygonOffsetClampEXT",
+  "why": "IsContextLost() has a side effect (HandlePendingContextLoss) that must run first"
  },
  {
   "file": "dom/canvas/WebGLContextGL.cpp",
   "function": "void WebGLContext::PolygonOffsetClampEXT(const GLfloat factor,",
   "kind": "add",
-  "form": "unknown",
-  "line": "  if (!IsExtensionEnabled(WebGLExtensionID::EXT_polygon_offset_clamp)) return;",
-  "test": ""
- },
- {
-  "file": "dom/canvas/WebGLContextGL.cpp",
-  "function": "void WebGLContext::PolygonOffsetClampEXT(const GLfloat factor,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/webgl/parameters): declared to the page, maybe not enabled here",
-  "test": ""
- },
- {
-  "file": "dom/canvas/WebGLContextGL.cpp",
-  "function": "void WebGLContext::PolygonOffsetClampEXT(const GLfloat factor,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  if (!IsExtensionEnabled(WebGLExtensionID::WEBGL_provoking_vertex)) return;",
-  "test": ""
+  "form": "anchor",
+  "line": "  if (StealthWebGLProvokingVertexMissing(this)) return;  // STEALTH-HOOK(fingerprint/webgl/parameters)",
+  "test": "wrapper:tests/test_a_declared_webgl_extension_survives_its_use_e2e.py::test_every_declared_extension_can_be_called_and_the_page_still_answers",
+  "anchor": "`if (IsContextLost()) return;` of WebGLContext::ProvokingVertex",
+  "why": "IsContextLost() has a side effect (HandlePendingContextLoss) that must run first"
  },
  {
   "file": "dom/canvas/WebGLContextGL.cpp",
   "function": "void WebGLContext::SampleCoverage(GLclampf value, WebGLboolean invert) {",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/webgl/parameters): declared to the page, maybe not enabled here",
-  "test": ""
- },
- {
-  "file": "dom/canvas/WebGLContextGL.cpp",
-  "function": "void WebGLContext::SampleCoverage(GLclampf value, WebGLboolean invert) {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  if (!IsExtensionEnabled(WebGLExtensionID::EXT_clip_control)) return;",
-  "test": ""
+  "form": "anchor",
+  "line": "  if (StealthWebGLClipControlMissing(this)) return;  // STEALTH-HOOK(fingerprint/webgl/parameters)",
+  "test": "wrapper:tests/test_a_declared_webgl_extension_survives_its_use_e2e.py::test_every_declared_extension_can_be_called_and_the_page_still_answers",
+  "anchor": "`if (IsContextLost()) return;` of WebGLContext::ClipControlEXT",
+  "why": "IsContextLost() has a side effect (HandlePendingContextLoss) that must run first"
  },
  {
   "file": "dom/canvas/WebGLContextValidate.cpp",
@@ -425,32 +233,26 @@
   "kind": "add",
   "form": "registration",
   "line": "#include \"StealthWebGLParams.h\"  // STEALTH-HOOK(fingerprint/webgl/parameters)",
-  "test": ""
+  "test": "wrapper:tests/test_webgl_declared_parameters_e2e.py::test_the_declared_extension_list_is_read_in_firefoxs_order"
  },
  {
   "file": "dom/canvas/WebGLContextValidate.cpp",
   "function": "static webgl::Limits MakeLimits(const WebGLContext& webgl) {",
   "kind": "add",
   "form": "anchor",
-  "line": "  StealthDeclareExtensions(webgl.IsWebGL2(), limits.supportedExtensions);  // STEALTH-HOOK(fingerprint/webgl/parameters)",
-  "test": "",
-  "anchor": "",
-  "why": ""
+  "line": "  StealthDeclareLimits(webgl, &limits);  // STEALTH-HOOK(fingerprint/webgl/parameters)",
+  "test": "wrapper:tests/test_webgl_declared_parameters_e2e.py::test_the_declared_extension_list_is_read_in_firefoxs_order",
+  "anchor": "the last statement of MakeLimits before `return limits;`",
+  "why": "G30-like: it must run after Mozilla derived every limit from the GL; a pure addition on the baseline, `return limits;` is the tag's"
  },
  {
   "file": "dom/canvas/WebGLContextValidate.cpp",
   "function": "bool WebGLContext::InitAndValidateGL(FailureReason* const out_failReason) {",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/webgl/parameters): the masks start at all ones as under ANGLE, not at the driver's stencil bits (Mesa: 255)",
-  "test": ""
- },
- {
-  "file": "dom/canvas/WebGLContextValidate.cpp",
-  "function": "bool WebGLContext::InitAndValidateGL(FailureReason* const out_failReason) {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  mStencilValueMaskFront = mStencilValueMaskBack = mStencilWriteMaskFront = mStencilWriteMaskBack = UINT32_MAX;",
-  "test": ""
+  "form": "anchor",
+  "line": "  StealthInitStencilMasks(mStencilValueMaskFront, mStencilValueMaskBack, mStencilWriteMaskFront, mStencilWriteMaskBack);  // STEALTH-HOOK(fingerprint/webgl/parameters)",
+  "test": "wrapper:tests/test_webgl_declared_parameters_e2e.py::test_the_stencil_masks_start_at_all_ones",
+  "anchor": "the last `AssertUintParamCorrect(gl, LOCAL_GL_STENCIL_BACK_WRITEMASK, mStencilWriteMaskBack);` of WebGLContext::InitAndValidateGL",
+  "why": "the hook needs the four masks Mozilla has just read from the driver and asserted, so it cannot be a guard in the head; the four private fields travel as arguments, so no friend line in WebGLContext.h (a file of fingerprint/webgl/shader-language) is needed"
  }
 ]

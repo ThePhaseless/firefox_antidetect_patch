@@ -1,160 +1,104 @@
-diff --git a/dom/canvas/CanvasUtils.h b/dom/canvas/CanvasUtils.h
-index ff8d4fd4c236caede353ccd6d5280982c91b140f..e19e774a92a591a0dc703b2c29dd30c73389d758 100644
---- a/dom/canvas/CanvasUtils.h
-+++ b/dom/canvas/CanvasUtils.h
-@@ -9,13 +9,19 @@
- #include "js/Array.h"               // JS::GetArrayLength
- #include "js/PropertyAndElement.h"  // JS_GetElement
- #include "jsapi.h"
-+#include "mozilla/AlreadyAddRefed.h"
- #include "mozilla/CheckedInt.h"
- #include "mozilla/dom/ToJSValue.h"
-+#include "mozilla/gfx/StealthCanvasProjection.h"
- 
- class nsIPrincipal;
- 
- namespace mozilla {
- 
-+namespace gfx {
-+class SourceSurface;
-+}  // namespace gfx
-+
- namespace dom {
- class Document;
- class HTMLCanvasElement;
-@@ -209,6 +215,21 @@ void DashArrayToJSVal(nsTArray<T>& dashes, JSContext* cx,
- bool CheckWriteOnlySecurity(bool aCORSUsed, nsIPrincipal* aPrincipal,
-                             bool aHadCrossOriginRedirects);
- 
-+// STEALTH-HOOK(fingerprint/canvas/noise-projection)
-+gfx::StealthCanvasNoise StealthNoise(nsIPrincipal* aCanvasPrincipal);
-+
-+// STEALTH-HOOK(fingerprint/canvas/noise-projection)
-+inline bool StealthProjectsContextType(dom::CanvasContextType aType) {
-+  return aType == dom::CanvasContextType::WebGL1 ||
-+         aType == dom::CanvasContextType::WebGL2 ||
-+         aType == dom::CanvasContextType::WebGPU;
-+}
-+
-+// STEALTH-HOOK(fingerprint/canvas/noise-projection)
-+already_AddRefed<gfx::SourceSurface> StealthProjectSnapshot(
-+    gfx::SourceSurface* aSnapshot, bool aPremultiplied,
-+    nsIPrincipal* aCanvasPrincipal);
-+
- }  // namespace CanvasUtils
- }  // namespace mozilla
- 
 diff --git a/dom/canvas/ClientWebGLContext.h b/dom/canvas/ClientWebGLContext.h
-index 6996d25296b650e8890abb18269801073b3f6140..9bdd0566324424bc26431e192d82d337ef551356 100644
+index 6996d25296b650e8890abb18269801073b3f6140..0eef26194822dff18e0e4f22a6ce78a1a07da1bc 100644
 --- a/dom/canvas/ClientWebGLContext.h
 +++ b/dom/canvas/ClientWebGLContext.h
-@@ -743,6 +743,8 @@ class ClientWebGLContext final : public nsICanvasRenderingContextInternal,
+@@ -741,6 +741,7 @@ class ClientWebGLContext final : public nsICanvasRenderingContextInternal,
+                                  public nsWrapperCache {
+   friend class webgl::AvailabilityRunnable;
    friend class webgl::ObjectJS;
++  friend struct StealthWebGLReadback;  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
    friend class webgl::ProgramKeepAlive;
    friend class webgl::ShaderKeepAlive;
-+  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
-+  friend struct StealthWebGLReadback;
  
-   // ----------------------------- Lifetime and DOM ---------------------------
-  public:
-@@ -1119,8 +1121,10 @@ class ClientWebGLContext final : public nsICanvasRenderingContextInternal,
- 
-  private:
+@@ -1121,6 +1122,7 @@ class ClientWebGLContext final : public nsICanvasRenderingContextInternal,
    RefPtr<gfx::DataSourceSurface> BackBufferSnapshot();
--  [[nodiscard]] bool DoReadPixels(const webgl::ReadPixelsDesc&,
--                                  Span<uint8_t>) const;
-+  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
-+  [[nodiscard]] bool DoReadPixels(
-+      const webgl::ReadPixelsDesc&, Span<uint8_t>,
-+      webgl::ReadPixelsResult* aWritten = nullptr) const;
+   [[nodiscard]] bool DoReadPixels(const webgl::ReadPixelsDesc&,
+                                   Span<uint8_t>) const;
++  mutable webgl::ReadPixelsResult mStealthReadPixelsResult;  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
  
    RefPtr<dom::HTMLCanvasElement::SurfaceSnapshotPromise>
    BackBufferSnapshotAsync();
 diff --git a/dom/canvas/OffscreenCanvas.cpp b/dom/canvas/OffscreenCanvas.cpp
-index 8250ac8f6d466422b965fe62d4051a30d8efbe03..a052e1ec489a38cf88e4b700c9059504f04caf64 100644
+index 8250ac8f6d466422b965fe62d4051a30d8efbe03..81ef0a19f5270aeac925587c2afe4b5ee515c9d4 100644
 --- a/dom/canvas/OffscreenCanvas.cpp
 +++ b/dom/canvas/OffscreenCanvas.cpp
-@@ -11,6 +11,7 @@
- #include "GLScreenBuffer.h"
- #include "ImageBitmap.h"
- #include "ImageBitmapRenderingContext.h"
-+#include "StealthOffscreenSnapshot.h"  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
- #include "WebGLChild.h"
- #include "mozilla/Atomics.h"
- #include "mozilla/CheckedInt.h"
-@@ -594,7 +595,8 @@ already_AddRefed<gfx::SourceSurface> OffscreenCanvas::GetSurfaceSnapshot(
-     return nullptr;
-   }
- 
--  return mCurrentContext->GetSurfaceSnapshot(aOutAlphaType);
-+  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
-+  return CanvasUtils::StealthOffscreenSnapshot(this, aOutAlphaType);
+@@ -588,7 +588,7 @@ already_AddRefed<Promise> OffscreenCanvas::ToBlob(JSContext* aCx,
+   return promise.forget();
  }
  
- void OffscreenCanvas::SetWriteOnly(RefPtr<nsIPrincipal>&& aExpandedReader) {
+-already_AddRefed<gfx::SourceSurface> OffscreenCanvas::GetSurfaceSnapshot(
++already_AddRefed<gfx::SourceSurface> OffscreenCanvas::GetSurfaceSnapshotAsDrawn(  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
+     gfxAlphaType* const aOutAlphaType) {
+   if (!mCurrentContext) {
+     return nullptr;
+diff --git a/dom/canvas/OffscreenCanvas.h b/dom/canvas/OffscreenCanvas.h
+index 7e72f30fcb4629fb9eb0d1fde016a880ada93763..f2592cfe45851023ea9903d44147316be356c6b8 100644
+--- a/dom/canvas/OffscreenCanvas.h
++++ b/dom/canvas/OffscreenCanvas.h
+@@ -123,6 +123,7 @@ class OffscreenCanvas final : public DOMEventTargetHelper,
+ 
+   already_AddRefed<gfx::SourceSurface> GetSurfaceSnapshot(
+       gfxAlphaType* aOutAlphaType = nullptr);
++  already_AddRefed<gfx::SourceSurface> GetSurfaceSnapshotAsDrawn(gfxAlphaType* aOutAlphaType = nullptr);  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
+ 
+   static already_AddRefed<OffscreenCanvas> CreateFromCloneData(
+       nsIGlobalObject* aGlobal, OffscreenCanvasCloneData* aData);
 diff --git a/dom/canvas/OffscreenCanvasDisplayHelper.cpp b/dom/canvas/OffscreenCanvasDisplayHelper.cpp
-index cc5c8ad787a58f3763a10d029b984ceb3a3f07e0..9cb0bbad450f246ac761151f6b9c6dcf67b98a41 100644
+index cc5c8ad787a58f3763a10d029b984ceb3a3f07e0..58e72743cfad042aaa85af4fc29714558fc05acd 100644
 --- a/dom/canvas/OffscreenCanvasDisplayHelper.cpp
 +++ b/dom/canvas/OffscreenCanvasDisplayHelper.cpp
-@@ -526,6 +526,13 @@ OffscreenCanvasDisplayHelper::TransformSurface(gfx::SourceSurface* aSurface,
+@@ -524,7 +524,7 @@ OffscreenCanvasDisplayHelper::TransformSurface(gfx::SourceSurface* aSurface,
+ }
+ 
  already_AddRefed<gfx::SourceSurface>
- OffscreenCanvasDisplayHelper::GetSurfaceSnapshot() {
+-OffscreenCanvasDisplayHelper::GetSurfaceSnapshot() {
++OffscreenCanvasDisplayHelper::GetSurfaceSnapshotAsDrawn() {  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
    MOZ_ASSERT(NS_IsMainThread());
-+  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
-+  return StealthPageSnapshot();
-+}
-+
-+already_AddRefed<gfx::SourceSurface>
-+OffscreenCanvasDisplayHelper::GetSurfaceSnapshotAsDrawn() {
-+  MOZ_ASSERT(NS_IsMainThread());
  
    class SnapshotWorkerRunnable final : public MainThreadWorkerRunnable {
-    public:
-@@ -632,7 +639,8 @@ OffscreenCanvasDisplayHelper::GetSurfaceSnapshot() {
+@@ -632,7 +632,7 @@ OffscreenCanvasDisplayHelper::GetSurfaceSnapshot() {
  already_AddRefed<layers::Image> OffscreenCanvasDisplayHelper::GetAsImage() {
    MOZ_ASSERT(NS_IsMainThread());
  
 -  RefPtr<gfx::SourceSurface> surface = GetSurfaceSnapshot();
-+  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
-+  RefPtr<gfx::SourceSurface> surface = GetSurfaceSnapshotAsDrawn();
++  RefPtr<gfx::SourceSurface> surface = GetSurfaceSnapshotAsDrawn();  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
    if (!surface) {
      return nullptr;
    }
 diff --git a/dom/canvas/OffscreenCanvasDisplayHelper.h b/dom/canvas/OffscreenCanvasDisplayHelper.h
-index f7db258e2e1ac8ad40966f0ed3931cc3f189635a..ac9eedb9eb94785e6a07261e47f453c69c0ad45e 100644
+index f7db258e2e1ac8ad40966f0ed3931cc3f189635a..fb777ab3ce6191111fcd7db68ad2381328bc88a9 100644
 --- a/dom/canvas/OffscreenCanvasDisplayHelper.h
 +++ b/dom/canvas/OffscreenCanvasDisplayHelper.h
-@@ -79,6 +79,8 @@ class OffscreenCanvasDisplayHelper final {
+@@ -79,6 +79,7 @@ class OffscreenCanvasDisplayHelper final {
    bool UsingElementCaptureStream() const;
  
    already_AddRefed<mozilla::gfx::SourceSurface> GetSurfaceSnapshot();
-+  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
-+  already_AddRefed<mozilla::gfx::SourceSurface> GetSurfaceSnapshotAsDrawn();
++  already_AddRefed<mozilla::gfx::SourceSurface> GetSurfaceSnapshotAsDrawn();  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
    already_AddRefed<mozilla::layers::Image> GetAsImage();
    UniquePtr<uint8_t[]> GetImageBuffer(
        CanvasUtils::ImageExtraction aExtractionBehavior, int32_t* aOutFormat,
-@@ -95,6 +97,8 @@ class OffscreenCanvasDisplayHelper final {
-   already_AddRefed<gfx::SourceSurface> TransformSurface(
-       gfx::SourceSurface* aSurface, bool aHasAlpha, bool aIsAlphaPremult,
-       gl::OriginPos aOriginPos) const;
-+  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
-+  already_AddRefed<gfx::SourceSurface> StealthPageSnapshot();
- 
-   mutable Mutex mMutex;
-   HTMLCanvasElement* MOZ_NON_OWNING_REF mCanvasElement MOZ_GUARDED_BY(mMutex);
 diff --git a/dom/canvas/moz.build b/dom/canvas/moz.build
-index b5809a1fca1bed238396bfdac6dec054a7a72a4d..8a18cd7b103b5c6df534789290005c9f6ea9da0a 100644
+index b5809a1fca1bed238396bfdac6dec054a7a72a4d..a72e9efd8b1851e1772a8d12b18b9f90eea3e82b 100644
 --- a/dom/canvas/moz.build
 +++ b/dom/canvas/moz.build
-@@ -108,6 +108,7 @@ SOURCES += [
+@@ -74,6 +74,7 @@ EXPORTS.mozilla.dom += [
+     "XRWebGLLayer.h",
+ ]
+ # XRWebGLLayer.h must be exported for use by the generated WebXRBinding.h
++EXPORTS.mozilla.dom += ["StealthCanvasUtils.h"]  # STEALTH-HOOK(fingerprint/canvas/noise-projection)
+ 
+ EXPORTS.mozilla.gfx += [
+     "DrawTargetWebgl.h",
+@@ -108,6 +109,8 @@ SOURCES += [
      "OffscreenCanvasRenderingContext2D.cpp",  # See bug 1745384
      "SourceSurfaceWebgl.cpp",
  ]
-+SOURCES += ["StealthCanvasNoise.cpp", "StealthOffscreenSnapshot.cpp"]  # STEALTH-HOOK(fingerprint/canvas/noise-projection)
++SOURCES += ["StealthCanvasNoise.cpp"]  # STEALTH-HOOK(fingerprint/canvas/noise-projection)
++SOURCES += ["StealthOffscreenSnapshot.cpp"]  # STEALTH-HOOK(fingerprint/canvas/noise-projection)
  
  # WebGL Sources
  UNIFIED_SOURCES += [
-@@ -164,6 +165,8 @@ UNIFIED_SOURCES += [
+@@ -164,6 +167,8 @@ UNIFIED_SOURCES += [
      "WebGLVertexArrayFake.cpp",
      "WebGLVertexArrayGL.cpp",
  ]
@@ -164,48 +108,33 @@ index b5809a1fca1bed238396bfdac6dec054a7a72a4d..8a18cd7b103b5c6df534789290005c9f
  SOURCES += [
      "MurmurHash3.cpp",
 diff --git a/dom/html/HTMLCanvasElement.cpp b/dom/html/HTMLCanvasElement.cpp
-index e40c9fef90e5a0b4a6df73a5d7a2ed74304ecdaa..faeffb750fb375f95aa1a13de226b28b8a8e1428 100644
+index e40c9fef90e5a0b4a6df73a5d7a2ed74304ecdaa..3863517363d150e611aed0bbc0c51e29e50c2598 100644
 --- a/dom/html/HTMLCanvasElement.cpp
 +++ b/dom/html/HTMLCanvasElement.cpp
-@@ -9,6 +9,7 @@
- #include "ClientWebGLContext.h"
- #include "ImageEncoder.h"
- #include "MediaTrackGraph.h"
-+#include "StealthCanvasSnapshot.h"
- #include "VRManagerChild.h"
- #include "WindowRenderer.h"
- #include "jsapi.h"
-@@ -1560,10 +1561,17 @@ void HTMLCanvasElement::SetFrameCapture(
+@@ -1558,12 +1558,12 @@ void HTMLCanvasElement::SetFrameCapture(
+   }
+ }
  
- already_AddRefed<SourceSurface> HTMLCanvasElement::GetSurfaceSnapshot(
+-already_AddRefed<SourceSurface> HTMLCanvasElement::GetSurfaceSnapshot(
++already_AddRefed<SourceSurface> HTMLCanvasElement::GetSurfaceSnapshotAsDrawn(  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
      gfxAlphaType* const aOutAlphaType, DrawTarget* aTarget) {
-+  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
-+  return StealthPageSnapshot(this, aOutAlphaType, aTarget);
-+}
-+
-+// STEALTH-HOOK(fingerprint/canvas/noise-projection): Mozilla's body, renamed.
-+already_AddRefed<SourceSurface> HTMLCanvasElement::GetSurfaceSnapshotAsDrawn(
-+    gfxAlphaType* const aOutAlphaType, DrawTarget* aTarget) {
    if (mCurrentContext) {
      return mCurrentContext->GetOptimizedSnapshot(aTarget, aOutAlphaType);
    } else if (mOffscreenDisplay) {
 -    return mOffscreenDisplay->GetSurfaceSnapshot();
-+    return mOffscreenDisplay->GetSurfaceSnapshotAsDrawn();
++    return mOffscreenDisplay->GetSurfaceSnapshotAsDrawn();  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
    }
    return nullptr;
  }
 diff --git a/dom/html/HTMLCanvasElement.h b/dom/html/HTMLCanvasElement.h
-index 4280abcde7c0449e3c6ce5ddd5b4e6664dc0c628..7b37a3533dda97cc71b4ffbc06a678825888da29 100644
+index 4280abcde7c0449e3c6ce5ddd5b4e6664dc0c628..5b0a7ac4c8c17c79caa251ee901cfe0295c3058b 100644
 --- a/dom/html/HTMLCanvasElement.h
 +++ b/dom/html/HTMLCanvasElement.h
-@@ -225,6 +225,11 @@ class HTMLCanvasElement final : public nsGenericHTMLElement,
+@@ -225,6 +225,8 @@ class HTMLCanvasElement final : public nsGenericHTMLElement,
        gfxAlphaType* aOutAlphaType = nullptr,
        gfx::DrawTarget* aTarget = nullptr);
  
-+  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
-+  already_AddRefed<gfx::SourceSurface> GetSurfaceSnapshotAsDrawn(
-+      gfxAlphaType* aOutAlphaType = nullptr,
-+      gfx::DrawTarget* aTarget = nullptr);
++  already_AddRefed<gfx::SourceSurface> GetSurfaceSnapshotAsDrawn(gfxAlphaType* aOutAlphaType = nullptr, gfx::DrawTarget* aTarget = nullptr);  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
 +
    using SurfaceSnapshotPromise =
        MozPromise<RefPtr<gfx::SourceSurface>, nsresult, true>;
@@ -223,151 +152,133 @@ index 0a91baabcbd50ca9c178e4d9fb20560833f9bbb0..92d1bc0454b051d6db2d77e806b7f1fd
  include("/ipc/chromium/chromium-config.mozbuild")
  
 diff --git a/dom/webgpu/CanvasContext.cpp b/dom/webgpu/CanvasContext.cpp
-index cfe0e7a9e405f6dbbf3b62761cea64dc2c32ef43..96443109047b9494e22c599b7ffeec3ef07fbff3 100644
+index cfe0e7a9e405f6dbbf3b62761cea64dc2c32ef43..97937fd580ea8cead7c80c8295e0f76003ee27ef 100644
 --- a/dom/webgpu/CanvasContext.cpp
 +++ b/dom/webgpu/CanvasContext.cpp
-@@ -347,6 +347,9 @@ mozilla::UniquePtr<uint8_t[]> CanvasContext::GetImageBuffer(
+@@ -26,6 +26,8 @@
+ #include "mozilla/layers/WebRenderCanvasRenderer.h"
+ #include "nsDisplayList.h"
+ 
++#include "mozilla/dom/StealthCanvasUtils.h"  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
++
+ namespace mozilla {
+ 
+ inline void ImplCycleCollectionTraverse(
+@@ -347,6 +349,7 @@ mozilla::UniquePtr<uint8_t[]> CanvasContext::GetImageBuffer(
    if (!snapshot) {
      return nullptr;
    }
-+  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
-+  snapshot = CanvasUtils::StealthProjectSnapshot(snapshot, true,
-+                                                 PrincipalOrNull());
++  snapshot = CanvasUtils::StealthProjectWebGPUSnapshot(this, snapshot.forget());  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
  
    RefPtr<gfx::DataSourceSurface> dataSurface = snapshot->GetDataSurface();
    *out_imageSize = dataSurface->GetSize();
-@@ -372,6 +375,9 @@ NS_IMETHODIMP CanvasContext::GetInputStream(
+@@ -372,6 +375,7 @@ NS_IMETHODIMP CanvasContext::GetInputStream(
    if (!snapshot) {
      return NS_ERROR_FAILURE;
    }
-+  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
-+  snapshot = CanvasUtils::StealthProjectSnapshot(snapshot, true,
-+                                                 PrincipalOrNull());
++  snapshot = CanvasUtils::StealthProjectWebGPUSnapshot(this, snapshot.forget());  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
  
    RefPtr<gfx::DataSourceSurface> dataSurface = snapshot->GetDataSurface();
  
 diff --git a/gfx/2d/DrawTargetRecording.cpp b/gfx/2d/DrawTargetRecording.cpp
-index 1f8ad9ea5b574077c71c84bf21d9f7ef04c90506..a3d5e6b9a867db1ade142d2efc072d5e31ba7045 100644
+index 1f8ad9ea5b574077c71c84bf21d9f7ef04c90506..5123cd14ace35fe274ed7a90a6b347f4ebe27932 100644
 --- a/gfx/2d/DrawTargetRecording.cpp
 +++ b/gfx/2d/DrawTargetRecording.cpp
-@@ -106,7 +106,8 @@ class SourceSurfaceRecording final : public SourceSurface {
+@@ -106,7 +106,7 @@ class SourceSurfaceRecording final : public SourceSurface {
    SurfaceFormat GetFormat() const override { return mFormat; }
    already_AddRefed<DataSourceSurface> GetDataSurface() override {
      if (mOriginalSurface) {
 -      return mOriginalSurface->GetDataSurface();
-+      // STEALTH-HOOK(fingerprint/canvas/noise-projection)
-+      return StealthProjectOriginal(mOriginalSurface.get(), mSize, mStealth);
++      return StealthProjectOriginal(this, mOriginalSurface->GetDataSurface());  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
      }
  
      return nullptr;
-@@ -121,6 +122,8 @@ class SourceSurfaceRecording final : public SourceSurface {
+@@ -116,12 +116,14 @@ class SourceSurfaceRecording final : public SourceSurface {
+ 
+   IntSize mSize;
+   SurfaceFormat mFormat;
++  StealthStandIn mStealth;  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
+   RefPtr<DrawEventRecorderPrivate> mRecorder;
+   // If a SourceSurfaceRecording is returned from an OptimizeSourceSurface call
    // we need GetDataSurface to work, so we hold the original surface we
    // optimized to return its GetDataSurface.
    RefPtr<SourceSurface> mOriginalSurface;
-+  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
-+  StealthStandIn mStealth;
  };
++#include "StealthRecordingProjectedSurface.inc.h"  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
  
  class GradientStopsRecording : public GradientStops {
-@@ -869,6 +872,14 @@ already_AddRefed<SourceSurface> DrawTargetRecording::OptimizeSourceSurface(
-   return retSurf.forget();
- }
- 
-+already_AddRefed<SourceSurface> DrawTargetRecording::StealthProjectedSurface(
-+    SourceSurface* aSurface, bool aPremultiplied,
-+    const StealthCanvasNoise& aNoise) {
-+  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
-+  return StealthProjectedStandIn<SourceSurfaceRecording>(
-+      this, mRecorder.get(), aSurface, aPremultiplied, aNoise);
-+}
-+
- already_AddRefed<SourceSurface>
- DrawTargetRecording::CreateSourceSurfaceFromNativeSurface(
-     const NativeSurface& aSurface) const {
+  public:
 diff --git a/gfx/2d/DrawTargetRecording.h b/gfx/2d/DrawTargetRecording.h
-index 557a7493342e27a30a023549e9219094585e40ec..881fe1fe06556fda516586ecce89aa954b69582c 100644
+index 557a7493342e27a30a023549e9219094585e40ec..08bcd3e4ee20946fe264ecc361633276afdc62cf 100644
 --- a/gfx/2d/DrawTargetRecording.h
 +++ b/gfx/2d/DrawTargetRecording.h
-@@ -6,6 +6,7 @@
- #define MOZILLA_GFX_DRAWTARGETRECORDING_H_
- 
+@@ -8,6 +8,8 @@
  #include "2D.h"
-+#include "StealthCanvasProjection.h"
  #include "DrawEventRecorder.h"
  
++#include "StealthCanvasProjection.h"  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
++
  class nsICanvasRenderingContextInternal;
-@@ -427,6 +428,14 @@ class DrawTargetRecording final : public DrawTarget {
-   already_AddRefed<SourceSurface> CreateExternalSourceSurface(
-       const IntSize& aSize, SurfaceFormat aFormat);
  
-+ public:
-+  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
-+  already_AddRefed<SourceSurface> StealthProjectedSurface(
-+      SourceSurface* aSurface, bool aPremultiplied,
-+      const StealthCanvasNoise& aNoise);
-+
-+ private:
-+
-   friend class ::nsICanvasRenderingContextInternal;
+ namespace mozilla {
+@@ -320,6 +322,7 @@ class DrawTargetRecording final : public DrawTarget {
+    */
+   virtual already_AddRefed<SourceSurface> OptimizeSourceSurface(
+       SourceSurface* aSurface) const override;
++  already_AddRefed<SourceSurface> StealthProjectedSurface(SourceSurface* aSurface, bool aPremultiplied, const StealthCanvasNoise& aNoise);  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
  
-   already_AddRefed<SourceSurface> SnapshotExternalCanvas(
+   /*
+    * Create a SourceSurface for a type of NativeSurface. This may fail if the
 diff --git a/gfx/2d/RecordedEvent.h b/gfx/2d/RecordedEvent.h
-index a3a81b300c734c78b002f66cec48853d3590e6c4..931105de0f818657e2b9a92f8e1fe05e65816536 100644
+index a3a81b300c734c78b002f66cec48853d3590e6c4..1e011590620f7d9aea60f9a29517c6eff29c6356 100644
 --- a/gfx/2d/RecordedEvent.h
 +++ b/gfx/2d/RecordedEvent.h
-@@ -439,6 +439,7 @@ class RecordedEvent {
-     FLUSH,
-     DETACHALLSNAPSHOTS,
-     OPTIMIZESOURCESURFACE,
-+    STEALTHPROJECTSURFACE,
+@@ -442,6 +442,7 @@ class RecordedEvent {
      LINK,
      DESTINATION,
      ACCESSIBLEID,
++    STEALTHPROJECTSURFACE,  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
+     LAST,
+   };
+ 
 diff --git a/gfx/2d/RecordedEventImpl.h b/gfx/2d/RecordedEventImpl.h
-index 88ec520156fcf4d84098f546286aeb2ca138729f..a34337b63bed9f5f9365dbba82a6b9a441c603fa 100644
+index 88ec520156fcf4d84098f546286aeb2ca138729f..d61bfc6172ab08e20ee6391caf0a48f0eb4d23c2 100644
 --- a/gfx/2d/RecordedEventImpl.h
 +++ b/gfx/2d/RecordedEventImpl.h
-@@ -18,6 +18,9 @@
+@@ -18,6 +18,8 @@
  #include "mozilla/layers/BuildConstants.h"
  #include "mozilla/layers/LayersSurfaces.h"
  
-+// STEALTH-HOOK(fingerprint/canvas/noise-projection)
-+#include "StealthRecordedProjection.h"
++#include "StealthRecordedProjection.h"  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
 +
  namespace mozilla {
  namespace gfx {
  
-@@ -4713,6 +4716,7 @@ inline void RecordedAccessibleId::OutputSimpleEventInfo(
+@@ -4713,7 +4715,7 @@ inline void RecordedAccessibleId::OutputSimpleEventInfo(
    aStringStream << "AccessibleId [" << mInnerWindowId << ", " << mAccId << "]";
  }
  
-+// STEALTH-HOOK(fingerprint/canvas/noise-projection): event entry
- #define FOR_EACH_EVENT(f)                                          \
+-#define FOR_EACH_EVENT(f)                                          \
++#define FOR_EACH_EVENT_MOZILLA(f) /* STEALTH-HOOK(fingerprint/canvas/noise-projection) */ \
    f(DRAWTARGETCREATION, RecordedDrawTargetCreation);               \
    f(DRAWTARGETDESTRUCTION, RecordedDrawTargetDestruction);         \
-@@ -4772,6 +4776,7 @@ inline void RecordedAccessibleId::OutputSimpleEventInfo(
-   f(FLUSH, RecordedFlush);                                         \
-   f(DETACHALLSNAPSHOTS, RecordedDetachAllSnapshots);               \
-   f(OPTIMIZESOURCESURFACE, RecordedOptimizeSourceSurface);         \
-+  f(STEALTHPROJECTSURFACE, RecordedStealthProjectSurface);         \
-   f(LINK, RecordedLink);                                           \
-   f(ACCESSIBLEID, RecordedAccessibleId);                           \
-   f(DESTINATION, RecordedDestination);
+   f(SETCURRENTDRAWTARGET, RecordedSetCurrentDrawTarget);           \
 diff --git a/gfx/2d/moz.build b/gfx/2d/moz.build
-index 2abc9c45814d6931ad1edcb9daacab750909d597..ca8e9958f4f62d70ca5936614b73f95f1e7228df 100644
+index 2abc9c45814d6931ad1edcb9daacab750909d597..ff5ac016d4024828019006727a67a415e0acce9d 100644
 --- a/gfx/2d/moz.build
 +++ b/gfx/2d/moz.build
-@@ -60,6 +60,9 @@ EXPORTS.mozilla.gfx += [
+@@ -60,6 +60,10 @@ EXPORTS.mozilla.gfx += [
      "Types.h",
      "UserData.h",
  ]
 +EXPORTS.mozilla.gfx += ["StealthCanvasProjection.h"]  # STEALTH-HOOK(fingerprint/canvas/noise-projection)
++EXPORTS.mozilla.gfx += ["StealthRecordedProjection.h"]  # STEALTH-HOOK(fingerprint/canvas/noise-projection)
 +EXPORTS.mozilla.gfx += ["StealthGlyphCoverage.h"]  # STEALTH-HOOK(fingerprint/fonts/metrics)
 +EXPORTS.mozilla.gfx += ["StealthRefuse.h"]  # STEALTH-HOOK(platform/declaration-gate)
  
  if CONFIG["MOZ_WIDGET_TOOLKIT"] in ("cocoa", "uikit"):
      EXPORTS.mozilla.gfx += [
-@@ -170,6 +173,8 @@ UNIFIED_SOURCES += [
+@@ -170,6 +174,8 @@ UNIFIED_SOURCES += [
      "Swizzle.cpp",
      "Types.cpp",
  ]
@@ -377,7 +288,7 @@ index 2abc9c45814d6931ad1edcb9daacab750909d597..ca8e9958f4f62d70ca5936614b73f95f
  SOURCES += [
      "InlineTranslator.cpp",
 diff --git a/gfx/tests/gtest/moz.build b/gfx/tests/gtest/moz.build
-index ec00ffc43e7dc3dcd8ea8f224969feb9b977e7b8..904b2b045324c1fc85076c7926789acbb0f0d4d0 100644
+index ec00ffc43e7dc3dcd8ea8f224969feb9b977e7b8..35f2722898200dfeff59d8cc65dac3551dfe3d21 100644
 --- a/gfx/tests/gtest/moz.build
 +++ b/gfx/tests/gtest/moz.build
 @@ -32,6 +32,9 @@ UNIFIED_SOURCES += [
@@ -390,19 +301,17 @@ index ec00ffc43e7dc3dcd8ea8f224969feb9b977e7b8..904b2b045324c1fc85076c7926789acb
  
  SOURCES += [
      "SwizzleGeneric.cpp",
-@@ -42,6 +45,16 @@ if CONFIG["OS_TARGET"] != "Android":
+@@ -42,6 +45,14 @@ if CONFIG["OS_TARGET"] != "Android":
          "TestRect.cpp",
      ]
  
 +if CONFIG["MOZ_WIDGET_TOOLKIT"] == "gtk":  # STEALTH-HOOK(fingerprint/fonts/font-list)
-+    UNIFIED_SOURCES += ["TestStealthFcFontList.cpp", "TestStealthFontMetrics.cpp"]
-+    CXXFLAGS += CONFIG["CAIRO_FT_CFLAGS"]
-+if CONFIG["OS_TARGET"] == "WINNT":
-+    # gfxDWriteFonts' text quality and ClearType parameters, Windows only.
-+    UNIFIED_SOURCES += [
-+        "TestStealthBundledCollection.cpp",
-+        "TestStealthTextQuality.cpp",
-+    ]
++    UNIFIED_SOURCES += ["TestStealthFcFontList.cpp"]  # STEALTH-HOOK(fingerprint/fonts/font-list)
++    UNIFIED_SOURCES += ["TestStealthFontMetrics.cpp"]  # STEALTH-HOOK(fingerprint/fonts/metrics)
++    CXXFLAGS += CONFIG["CAIRO_FT_CFLAGS"]  # STEALTH-HOOK(fingerprint/fonts/font-list)
++if CONFIG["OS_TARGET"] == "WINNT":  # STEALTH-HOOK(fingerprint/fonts/bundle)
++    UNIFIED_SOURCES += ["TestStealthBundledCollection.cpp"]  # STEALTH-HOOK(fingerprint/fonts/bundle)
++    UNIFIED_SOURCES += ["TestStealthTextQuality.cpp"]  # STEALTH-HOOK(fingerprint/fonts/metrics)
 +
  if CONFIG["OS_TARGET"] == "Darwin":
      # Not in UNIFIED_SOURCES: MacIOSurface.h includes Carbon headers (MacTypes.h)

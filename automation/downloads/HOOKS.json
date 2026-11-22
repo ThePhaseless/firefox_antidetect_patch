@@ -5,7 +5,7 @@
   "kind": "add",
   "form": "registration",
   "line": "XPIDL_SOURCES += [\"StealthDownloadInterceptor.idl\"]  # STEALTH-HOOK(automation/downloads)",
-  "test": ""
+  "test": "node:juggler/tests/download_complete_follows_the_idl.test.mjs#onDownloadComplete takes as many arguments as the IDL gives"
  },
  {
   "file": "uriloader/exthandler/moz.build",
@@ -13,7 +13,7 @@
   "kind": "add",
   "form": "registration",
   "line": "UNIFIED_SOURCES += [\"StealthDownloadIntercept.cpp\"]  # STEALTH-HOOK(automation/downloads)",
-  "test": ""
+  "test": "wrapper:tests/test_download_is_intercepted_e2e.py::test_a_clicked_download_is_reported_and_saved"
  },
  {
   "file": "uriloader/exthandler/nsExternalHelperAppService.cpp",
@@ -21,71 +21,17 @@
   "kind": "add",
   "form": "registration",
   "line": "#include \"StealthDownloadIntercept.h\"  // STEALTH-HOOK(automation/downloads)",
-  "test": ""
- },
- {
-  "file": "uriloader/exthandler/nsExternalHelperAppService.cpp",
-  "function": "NS_IMETHODIMP nsExternalHelperAppService::GetPreferredDownloadsDirectory(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "// STEALTH-HOOK(automation/downloads)",
-  "test": ""
- },
- {
-  "file": "uriloader/exthandler/nsExternalHelperAppService.cpp",
-  "function": "NS_IMETHODIMP nsExternalHelperAppService::GetPreferredDownloadsDirectory(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "NS_IMETHODIMP nsExternalHelperAppService::SetDownloadInterceptor(",
-  "test": ""
- },
- {
-  "file": "uriloader/exthandler/nsExternalHelperAppService.cpp",
-  "function": "NS_IMETHODIMP nsExternalHelperAppService::GetPreferredDownloadsDirectory(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    nsIDownloadInterceptor* interceptor) {",
-  "test": ""
- },
- {
-  "file": "uriloader/exthandler/nsExternalHelperAppService.cpp",
-  "function": "NS_IMETHODIMP nsExternalHelperAppService::GetPreferredDownloadsDirectory(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  mInterceptor = interceptor;",
-  "test": ""
- },
- {
-  "file": "uriloader/exthandler/nsExternalHelperAppService.cpp",
-  "function": "NS_IMETHODIMP nsExternalHelperAppService::GetPreferredDownloadsDirectory(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  return NS_OK;",
-  "test": ""
- },
- {
-  "file": "uriloader/exthandler/nsExternalHelperAppService.cpp",
-  "function": "NS_IMETHODIMP nsExternalHelperAppService::GetPreferredDownloadsDirectory(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "}",
-  "test": ""
+  "test": "wrapper:tests/test_download_is_intercepted_e2e.py::test_a_clicked_download_is_reported_and_saved"
  },
  {
   "file": "uriloader/exthandler/nsExternalHelperAppService.cpp",
   "function": "NS_IMETHODIMP nsExternalAppHandler::OnStartRequest(nsIRequest* request) {",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(automation/downloads): the interceptor may own the download.",
-  "test": ""
- },
- {
-  "file": "uriloader/exthandler/nsExternalHelperAppService.cpp",
-  "function": "NS_IMETHODIMP nsExternalAppHandler::OnStartRequest(nsIRequest* request) {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  if (StealthDownloadIntercept::Start(this, request)) return NS_OK;",
-  "test": ""
+  "form": "anchor",
+  "line": "  if (StealthDownloadIntercept::Start(this, request)) return NS_OK;  // STEALTH-HOOK(automation/downloads)",
+  "test": "wrapper:tests/test_download_is_intercepted_e2e.py::test_a_clicked_download_is_reported_and_saved",
+  "anchor": "if (XRE_IsContentProcess()) { return NS_OK; }",
+  "why": "Start reads mSourceUrl and mBrowsingContext, which OnStartRequest sets up above (GetURI, MaybeCloseWindow), and must come after the early returns (spam, forbidden download, content process): at the head of the function none of that exists yet; wrapping SetUpTempFile cannot skip the dialog and transfer code after it"
  },
  {
   "file": "uriloader/exthandler/nsExternalHelperAppService.cpp",
@@ -93,9 +39,9 @@
   "kind": "add",
   "form": "anchor",
   "line": "  StealthDownloadIntercept::Complete(this, aStatus);  // STEALTH-HOOK(automation/downloads)",
-  "test": "",
-  "anchor": "",
-  "why": ""
+  "test": "wrapper:tests/test_download_is_intercepted_e2e.py::test_a_clicked_download_is_reported_and_saved",
+  "anchor": "NotifyTransfer(aStatus); (the last Mozilla statement of the work of nsExternalAppHandler::OnSaveComplete)",
+  "why": "the interceptor is told of the completion after Mozilla has notified the transfer and before the final `return NS_OK;`: G30, the last line of the function's work"
  },
  {
   "file": "uriloader/exthandler/nsExternalHelperAppService.cpp",
@@ -103,49 +49,33 @@
   "kind": "add",
   "form": "anchor",
   "line": "  StealthDownloadIntercept::Complete(this, aReason);  // STEALTH-HOOK(automation/downloads)",
-  "test": "",
-  "anchor": "",
-  "why": ""
+  "test": "wrapper:tests/test_download_is_intercepted_e2e.py::test_a_canceled_download_reports_once_as_canceled",
+  "anchor": "mDialogProgressListener = nullptr; (the last Mozilla statement of nsExternalAppHandler::Cancel)",
+  "why": "the interceptor is told of the cancellation after Mozilla has released the dialog listener and before the final `return NS_OK;`: G30, the last line of the function's work"
  },
  {
   "file": "uriloader/exthandler/nsExternalHelperAppService.h",
   "function": "class nsExternalHelperAppService : public nsIExternalHelperAppService,",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // Stealthfox: our automation's download interceptor (set via",
-  "test": ""
+  "form": "member",
+  "line": "  nsCOMPtr<nsIDownloadInterceptor> mInterceptor;  // STEALTH-HOOK(automation/downloads)",
+  "test": "wrapper:tests/test_download_is_intercepted_e2e.py::test_a_clicked_download_is_reported_and_saved"
  },
  {
   "file": "uriloader/exthandler/nsExternalHelperAppService.h",
   "function": "class nsExternalHelperAppService : public nsIExternalHelperAppService,",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // setDownloadInterceptor). When non-null, StealthDownloadIntercept::Start",
-  "test": ""
- },
- {
-  "file": "uriloader/exthandler/nsExternalHelperAppService.h",
-  "function": "class nsExternalHelperAppService : public nsIExternalHelperAppService,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  // asks it to redirect each download into the automation's downloads folder.",
-  "test": ""
- },
- {
-  "file": "uriloader/exthandler/nsExternalHelperAppService.h",
-  "function": "class nsExternalHelperAppService : public nsIExternalHelperAppService,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  nsCOMPtr<nsIDownloadInterceptor> mInterceptor;",
-  "test": ""
- },
- {
-  "file": "uriloader/exthandler/nsExternalHelperAppService.h",
-  "function": "class nsExternalHelperAppService : public nsIExternalHelperAppService,",
-  "kind": "add",
-  "form": "unknown",
+  "form": "member",
   "line": "  friend class StealthDownloadIntercept;  // STEALTH-HOOK(automation/downloads)",
-  "test": ""
+  "test": "wrapper:tests/test_download_is_intercepted_e2e.py::test_a_clicked_download_is_reported_and_saved"
+ },
+ {
+  "file": "uriloader/exthandler/nsExternalHelperAppService.h",
+  "function": "class nsExternalAppHandler final : public nsIStreamListener,",
+  "kind": "add",
+  "form": "member",
+  "line": "  bool mStealthIntercepted = false;  // STEALTH-HOOK(automation/downloads)",
+  "test": "wrapper:tests/test_download_is_intercepted_e2e.py::test_a_clicked_download_is_reported_and_saved"
  },
  {
   "file": "uriloader/exthandler/nsExternalHelperAppService.h",
@@ -153,15 +83,7 @@
   "kind": "add",
   "form": "member",
   "line": "  friend class StealthDownloadIntercept;  // STEALTH-HOOK(automation/downloads)",
-  "test": ""
- },
- {
-  "file": "uriloader/exthandler/nsExternalHelperAppService.h",
-  "function": "class nsExternalAppHandler final : public nsIStreamListener,",
-  "kind": "add",
-  "form": "member",
-  "line": "  bool mStealthIntercepted = false;       // STEALTH-HOOK(automation/downloads)",
-  "test": ""
+  "test": "wrapper:tests/test_download_is_intercepted_e2e.py::test_a_clicked_download_is_reported_and_saved"
  },
  {
   "file": "uriloader/exthandler/nsIExternalHelperAppService.idl",
@@ -169,7 +91,7 @@
   "kind": "add",
   "form": "registration",
   "line": "#include \"StealthDownloadInterceptor.idl\" // STEALTH-HOOK(automation/downloads)",
-  "test": ""
+  "test": "node:juggler/tests/download_complete_follows_the_idl.test.mjs#onDownloadComplete takes as many arguments as the IDL gives"
  },
  {
   "file": "uriloader/exthandler/nsIExternalHelperAppService.idl",
@@ -177,6 +99,6 @@
   "kind": "add",
   "form": "member",
   "line": "  void setDownloadInterceptor(in nsIDownloadInterceptor interceptor); // STEALTH-HOOK(automation/downloads)",
-  "test": ""
+  "test": "wrapper:tests/test_download_is_intercepted_e2e.py::test_a_clicked_download_is_reported_and_saved"
  }
 ]

@@ -4,97 +4,39 @@
   "function": "",
   "kind": "add",
   "form": "registration",
-  "line": "#include \"StealthCanvasTextMetrics.h\"",
-  "test": ""
+  "line": "#include \"StealthCanvasTextMetrics.h\"  // STEALTH-HOOK(fingerprint/canvas/text-metrics)",
+  "test": "wrapper:tests/test_canvas_measure_text_metrics_e2e.py::test_measure_text_vertical_metrics_are_whole_and_retail"
  },
  {
   "file": "dom/canvas/CanvasRenderingContext2D.cpp",
   "function": "already_AddRefed<CanvasPattern> CanvasRenderingContext2D::CreatePattern(",
   "kind": "rewrite",
   "form": "unknown",
-  "line": "      // STEALTH-HOOK(fingerprint/canvas/text-metrics)",
+  "line": "      RefPtr<SourceSurface> srcSurf = canvas->GetSurfaceSnapshot();  // STEALTH-HOOK(fingerprint/canvas/text-metrics)",
   "removed": "      RefPtr<SourceSurface> srcSurf = srcCanvas->GetSurfaceSnapshot();",
-  "test": ""
+  "test": "wrapper:tests/test_canvas_create_pattern_projection_e2e.py::test_create_pattern_from_a_webgl_canvas_carries_the_projection",
+  "exception": "the receiver of Mozilla's call is replaced (srcCanvas->GetSurfaceSnapshot() on the context -> the element's own GetSurfaceSnapshot, where canvas/noise-projection projects the noise on WebGL/WebGPU canvases); no wrap keeps Mozilla's expression without evaluating it (a raw WebGL readback thrown away per call)",
+  "pm": "approvato"
  },
  {
   "file": "dom/canvas/CanvasRenderingContext2D.cpp",
   "function": "already_AddRefed<CanvasPattern> CanvasRenderingContext2D::CreatePattern(",
   "kind": "rewrite",
   "form": "unknown",
-  "line": "      RefPtr<SourceSurface> srcSurf = canvas->GetSurfaceSnapshot();",
-  "test": ""
- },
- {
-  "file": "dom/canvas/CanvasRenderingContext2D.cpp",
-  "function": "already_AddRefed<CanvasPattern> CanvasRenderingContext2D::CreatePattern(",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "      // STEALTH-HOOK(fingerprint/canvas/text-metrics)",
+  "line": "      RefPtr<SourceSurface> srcSurf = offscreenCanvas->GetSurfaceSnapshot();  // STEALTH-HOOK(fingerprint/canvas/text-metrics)",
   "removed": "      RefPtr<SourceSurface> srcSurf = srcCanvas->GetSurfaceSnapshot();",
-  "test": ""
- },
- {
-  "file": "dom/canvas/CanvasRenderingContext2D.cpp",
-  "function": "already_AddRefed<CanvasPattern> CanvasRenderingContext2D::CreatePattern(",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "      RefPtr<SourceSurface> srcSurf = offscreenCanvas->GetSurfaceSnapshot();",
-  "test": ""
+  "test": "wrapper:tests/test_canvas_create_pattern_projection_e2e.py::test_create_pattern_from_an_offscreen_webgl_canvas_carries_the_projection",
+  "exception": "the receiver of Mozilla's call is replaced (srcCanvas->GetSurfaceSnapshot() on the context -> the element's own GetSurfaceSnapshot, where canvas/noise-projection projects the noise on WebGL/WebGPU canvases); no wrap keeps Mozilla's expression without evaluating it (a raw WebGL readback thrown away per call)",
+  "pm": "approvato"
  },
  {
   "file": "dom/canvas/CanvasRenderingContext2D.cpp",
   "function": "UniquePtr<TextMetrics> CanvasRenderingContext2D::DrawOrMeasureText(",
   "kind": "add",
-  "form": "unknown",
-  "line": "    // STEALTH-HOOK(fingerprint/canvas/text-metrics)",
-  "test": ""
- },
- {
-  "file": "dom/canvas/CanvasRenderingContext2D.cpp",
-  "function": "UniquePtr<TextMetrics> CanvasRenderingContext2D::DrawOrMeasureText(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    if (auto m = StealthHostIndepTextMetrics(",
-  "test": ""
- },
- {
-  "file": "dom/canvas/CanvasRenderingContext2D.cpp",
-  "function": "UniquePtr<TextMetrics> CanvasRenderingContext2D::DrawOrMeasureText(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "            font, fontOrientation, state.textBaseline, totalWidth,",
-  "test": ""
- },
- {
-  "file": "dom/canvas/CanvasRenderingContext2D.cpp",
-  "function": "UniquePtr<TextMetrics> CanvasRenderingContext2D::DrawOrMeasureText(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "            {actualBoundingBoxLeft, actualBoundingBoxRight,",
-  "test": ""
- },
- {
-  "file": "dom/canvas/CanvasRenderingContext2D.cpp",
-  "function": "UniquePtr<TextMetrics> CanvasRenderingContext2D::DrawOrMeasureText(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "             actualBoundingBoxAscent, actualBoundingBoxDescent})) {",
-  "test": ""
- },
- {
-  "file": "dom/canvas/CanvasRenderingContext2D.cpp",
-  "function": "UniquePtr<TextMetrics> CanvasRenderingContext2D::DrawOrMeasureText(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "      return m;",
-  "test": ""
- },
- {
-  "file": "dom/canvas/CanvasRenderingContext2D.cpp",
-  "function": "UniquePtr<TextMetrics> CanvasRenderingContext2D::DrawOrMeasureText(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    }",
-  "test": ""
+  "form": "anchor",
+  "line": "    if (auto m = StealthHostIndepTextMetrics(font, fontOrientation, state.textBaseline, totalWidth, {actualBoundingBoxLeft, actualBoundingBoxRight, actualBoundingBoxAscent, actualBoundingBoxDescent})) return m;  // STEALTH-HOOK(fingerprint/canvas/text-metrics)",
+  "test": "wrapper:tests/test_canvas_measure_text_metrics_e2e.py::test_measure_text_vertical_metrics_are_whole_and_retail",
+  "anchor": "double actualBoundingBoxDescent =\n        processor.mBoundingBox.YMost() + baselineAnchor;",
+  "why": "the call replaces the function's return value and needs six locals that exist only inside DrawOrMeasureText (font, fontOrientation, totalWidth and the four actualBoundingBox values); a guard at the top finds them unborn, a wrap of MakeUnique<TextMetrics> would build and discard it and still needs the locals, copying the baseline switch already cost one bug (see StealthCanvasTextMetrics.h)"
  }
 ]

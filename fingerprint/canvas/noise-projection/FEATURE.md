@@ -1,67 +1,57 @@
 # fingerprint/canvas/noise-projection
 
 Category: build, spoof
-Prefs: none read directly
-Test: TODO
+Prefs: none read directly (the seed and the edge tolerance come from the declaration, `StealthCanvasNoiseDeclared()` in gfx/thebes/StealthDeclarationGate.h)
+Test: gtest:StealthCanvasProjection.* (gfx/tests/gtest/TestStealthCanvasProjection.cpp: the function, the recording decision, `StandInReadsProjected`, `RecordedEventRoundTrip`, `ProjectedSurfaceRecordsOneEvent`), gtest:StealthCanvasUtils.ProjectsOnlyWebGLAndWebGPU, wrapper:tests/test_webgl_noise_active.py (readPixels, and `test_readpixels_of_a_partial_rectangle_projects_only_what_was_written`: a rectangle partly outside the framebuffer, skipPixels/skipRows), wrapper:tests/test_canvas_reads_as_drawn.py (2D and offscreen 2D read as drawn), wrapper:tests/test_every_reader_of_a_webgl_canvas_agrees_e2e.py (every reader of an element, an OffscreenCanvas and a transferred placeholder; 2D control), wrapper:tests/test_webgpu_canvas_readback_is_noised_e2e.py (toDataURL and toBlob of a WebGPU canvas)
 
 ## What it does
 
-TODO: one paragraph, from the notes below.
+Every road by which a page reads the pixels of a WebGL or WebGPU canvas goes through one pure function, `gfx::StealthProjectPixels` (gfx/2d/StealthCanvasProjection.h): the element's snapshot, an OffscreenCanvas, the placeholder of `transferControlToOffscreen`, `toDataURL`/`toBlob` of a WebGPU canvas, and a canvas drawn onto a canvas that records for the GPU process. A 2D or bitmaprenderer canvas reads as drawn, as on retail.
+
+The polarity of the readers: Mozilla's name `GetSurfaceSnapshot` is the reader of a PAGE, so a reader Mozilla adds later is projected by default. Mozilla's body is kept under the name `GetSurfaceSnapshotAsDrawn` (the hook is on its signature), which is the reader for the browser's own consumers that show the canvas and never hand its bytes to a page: the screen (`OffscreenCanvasDisplayHelper::GetAsImage`), `-moz-element`, the drag image, the taskbar preview (layout/base, widget). The `GetSurfaceSnapshot` of each of `HTMLCanvasElement`, `OffscreenCanvas` and `OffscreenCanvasDisplayHelper` is ours and calls the as-drawn one first.
 
 ## Hooks in Mozilla files
 
-- `dom/canvas/CanvasUtils.cpp` (mozilla::CanvasUtils::StealthNoise and StealthProjectSnapshot (new free functions, placed before CheckWriteOnlySecurity), movable): Both functions are plain logic defined in a Mozilla file; their definitions can move into an own .cpp, keeping only the declarations in CanvasUtils.h. StealthNoise returns no noise for system, chrome and resource principals (automation screenshots); that exemption is decided by the principal of the canvas, so a page cannot opt out. Includes are the only other change. The diff reads no pref itself;
-- `dom/canvas/CanvasUtils.h` (namespace mozilla::CanvasUtils (StealthNoise decl, inline StealthProjectsContextType, StealthProjectSnapshot decl), already-hook): The only inline logic is the 4-line body of StealthProjectsContextType; it could move to StealthCanvasProjection.h so this header holds declarations only. Adds two includes (AlreadyAddRefed.h, StealthCanvasProjection.h) to a widely included header, which costs compile time. Also forward-declares gfx::SourceSurface inside mozilla::gfx.
-- `dom/canvas/ClientWebGLContext.h` (ClientWebGLContext private section: DoReadPixels, StealthProjectReadPixels, StealthProjectReadPixelsPbo, BufferParameter, already-hook): Declarations only. DoReadPixels changes its return type from bool to Maybe<webgl::ReadPixelsResult>, a signature change every caller must follow. All of it belongs to the readPixels projection (BufferParameter is a refactor the PBO projection needs); the matching .cpp is multi-feature, so these declarations stay with the projection if that .cpp is split.
-- `dom/canvas/OffscreenCanvas.cpp` (OffscreenCanvas::GetSurfaceSnapshot, movable): This is the page-facing reader of an OffscreenCanvas; the drawn variant is used by the browser's own readers elsewhere. The alpha type is copied into a local because aOutAlphaType may be null. The 7 logic lines can move into one helper in CanvasUtils (context, type, global object), reducing the hook to a single return.
-- `dom/canvas/OffscreenCanvasDisplayHelper.cpp` (OffscreenCanvasDisplayHelper::GetSurfaceSnapshot (split), new GetSurfaceSnapshotAsDrawn, GetAsImage, movable): The page-facing wrapper reads mType and mCanvasElement under mMutex, so moving its logic to an own file needs an accessor or a friend declaration. GetAsImage (the screen copy) uses the drawn variant by design. The old body is now GetSurfaceSnapshotAsDrawn, so git blame will show a rename.
-- `dom/canvas/OffscreenCanvasDisplayHelper.h` (class OffscreenCanvasDisplayHelper (GetSurfaceSnapshot, GetSurfaceSnapshotAsDrawn), already-hook): Declaration and comments only.
-- `dom/html/HTMLCanvasElement.cpp` (HTMLCanvasElement::GetSurfaceSnapshot (page-facing wrapper), new HTMLCanvasElement::GetSurfaceSnapshotAsDrawn, movable): BUG (CONFIRMED, dom/html/HTMLCanvasElement.cpp:1554 tests drawn->GetType() == SurfaceType::RECORDING; gfx/layers/ipc/CanvasChild.cpp:139 returns CANVAS_RECORDING from GetType() and its GetUnderlyingType() returns mRecordedSurface->GetType(); the sibling test at gfx/2d/DrawTargetRecording.cpp:883 uses GetUnderlyingType(), and upstream uses GetUnderlyingType() == RECORDING for the same surfaces at :
-- `dom/html/HTMLCanvasElement.h` (class HTMLCanvasElement (GetSurfaceSnapshot, GetSurfaceSnapshotAsDrawn, GetSurfaceSnapshotAsync doc comments), already-hook): Declaration plus doc comments that state a contract: GetSurfaceSnapshot is the page reader, GetSurfaceSnapshotAsDrawn is for browser readers, and the async snapshot is projected inside the context (ClientWebGLContext::DoReadPixelsAsync). The comments must stay aligned with those files.
-- `dom/webgpu/CanvasContext.cpp` (CanvasContext::GetImageBuffer, CanvasContext::GetInputStream, already-hook): Premultiplied is hard-coded to true in both places. The WebGPU snapshot's real alpha type was not checked here; ClientWebGLContext derives it from the context options. The diff adds no CanvasUtils.h include; this is fine because the file already uses CanvasUtils::ImageExtraction in Mozilla code at dom/webgpu/CanvasContext.cpp:340.
-- `gfx/2d/DrawTargetRecording.cpp` (SourceSurfaceRecording::GetDataSurface, DrawTargetRecording::StealthProjectedSurface (new), movable): StealthProjectedSurface is about 12 logic lines and can move into an own file behind a one-line hook. The GetDataSurface change re-projects on every call, with no cache, so each read of the stand-in recomputes the noise. It tests GetUnderlyingType(), which is the right test; the HTMLCanvasElement.cpp check is not (see that file).
-- `gfx/2d/DrawTargetRecording.h` (class DrawTargetRecording (new public StealthProjectedSurface declaration), already-hook): Declarations only. Adds a public section for the new method and a private section again before friend, with an empty line after the private label. The method is public because HTMLCanvasElement calls it.
-- `gfx/2d/RecordedEvent.h` (enum of RecordedEvent event types (after OPTIMIZESOURCESURFACE), already-hook): Inserting the tag in the middle of the list renumbers LINK, DESTINATION, ACCESSIBLEID and every later tag. Content and GPU processes exchange these numbers, so both must come from the same tree (true for our build, not for a mixed pair). Appending the tag at the end would avoid the renumbering. Must match the X-macro entry in RecordedEventImpl.h.
-- `gfx/2d/RecordedEventImpl.h` (RecordedStealthProjectSurface (class, PlayEvent, Record, stream constructor) and the RECORDED_EVENT X-macro list, movable): The class and its templated Record and stream constructor must be visible where the X-macro expands. They can move to an own header included just above the macro, leaving the include and the f(...) line here. The seed and edge tolerance travel inside the recording as int32 values. If the source cannot be read on the GPU side the event fails, and the surface is not drawn unprojected.
-- `gfx/2d/moz.build` (EXPORTS.mozilla.gfx and UNIFIED_SOURCES of gfx/2d, already-hook): Registers StealthCanvasProjection.h/.cpp (canvas-noise-projection), StealthGlyphCoverage.h/.cpp (glyph-coverage-quantise) and exports StealthRefuse.h. StealthRefuse.h is header-only (gfx/2d has no StealthRefuse.cpp) and is the startup refusal helper included by gfx/thebes/StealthDeclarationGate.cpp, StealthBundleFontList.cpp and gfxDWriteFonts.cpp, i.e. a different feature than the one named here.
-- `gfx/tests/gtest/moz.build` (UNIFIED_SOURCES of gfx/tests/gtest and a WINNT-only block, already-hook): The WINNT block registers TestStealthTextQuality.cpp for the DirectWrite text quality and ClearType parameters, which is not canvas noise; its feature is outside this group. Build registration only.
+All hooks are one line with the marker on the line.
+
+- `dom/canvas/OffscreenCanvas.cpp`: wrap-function. The first line of the signature of Mozilla's `GetSurfaceSnapshot` names it `GetSurfaceSnapshotAsDrawn`; the rest of Mozilla's body is untouched. `OffscreenCanvas::GetSurfaceSnapshot` is defined in dom/canvas/StealthOffscreenSnapshot.cpp. Declared in `OffscreenCanvas.h` (member, after `GetSurfaceSnapshot`).
+- `dom/canvas/OffscreenCanvasDisplayHelper.cpp`: wrap-function on the second line of the signature (`...::GetSurfaceSnapshotAsDrawn() {`), and the call in `GetAsImage` (the screen's copy) renamed to the as-drawn reader. Declared in `OffscreenCanvasDisplayHelper.h`. `GetSurfaceSnapshot()` is defined in StealthOffscreenSnapshot.cpp as a member, so it reads `mType` and `mCanvasElement` under `mMutex` without an accessor.
+- `dom/html/HTMLCanvasElement.cpp`: wrap-function on the first line of the signature of `GetSurfaceSnapshot` (renamed `GetSurfaceSnapshotAsDrawn`) and the call of the display helper inside it, which must stay the as-drawn one or the non-page readers would see a projected placeholder. `HTMLCanvasElement::GetSurfaceSnapshot` is defined in dom/html/StealthCanvasSnapshot.cpp. Declared in `HTMLCanvasElement.h`.
+- `dom/webgpu/CanvasContext.cpp`: `GetImageBuffer` and `GetInputStream` get one added line after Mozilla's `if (!snapshot)` check: `snapshot = CanvasUtils::StealthProjectWebGPUSnapshot(this, snapshot.forget());` (alpha premultiplied, the context's principal). Mozilla's `GetSurfaceSnapshot(&any)` line is the tag's. The include of `mozilla/dom/StealthCanvasUtils.h` is in a block of ours.
+- `dom/canvas/ClientWebGLContext.h`: `friend struct StealthWebGLReadback;` (member line, after `webgl::ObjectJS`) and `mutable webgl::ReadPixelsResult mStealthReadPixelsResult;` (member line, after the declaration of `DoReadPixels`, which is Mozilla's text again, two parameters). The field is the way out of `DoReadPixels` for what Mozilla's body computes and a page's projection needs (G5): an anchor in the body of `ClientWebGLContext::DoReadPixels` (dom/canvas/ClientWebGLContext.cpp, fingerprint/webgl/parameters), right after the loop that copies the rows and before `return true;`, calls `StealthWebGLReadback::NoteReadPixels(*this, subrect, byteStride)`, which stores the part of the requested rectangle that lies inside the framebuffer and the row stride. Conditions: `StealthWebGLReadback::DoReadPixelsNoted` zeroes the field before every call and copies it out right after the call, on the same thread; the projection reads again (a wider rectangle), so no one else reads the field. The field needs no zeroing before the call on the readPixels(array) road: it is written at the only `return true` of `DoReadPixels` and taken only after a success, on the same thread, with no event-loop turn in between. The anchor is the one change of two folders: the field and the declaration are here, the anchor is in fingerprint/webgl/parameters. 
+- `gfx/2d/DrawTargetRecording.cpp`: in `SourceSurfaceRecording::GetDataSurface` Mozilla's `mOriginalSurface->GetDataSurface()` runs first, inside `StealthProjectOriginal(this, ...)` (the template in StealthCanvasProjection.h reads the stand-in's public `mSize` and `mStealth`); `StealthStandIn mStealth;` is a member line after `mFormat`; `#include "StealthRecordingProjectedSurface.inc.h"` right after the closing `};` of `SourceSurfaceRecording` (G4, an include in position: the definition of `DrawTargetRecording::StealthProjectedSurface` has to see that class, which is local to the .cpp; the included file is ours and holds only that definition). `gfx/2d/DrawTargetRecording.h`: the include of `StealthCanvasProjection.h` in a block of ours and the declaration of `StealthProjectedSurface` (member, after `OptimizeSourceSurface`, in the public section; the `protected` section of Mozilla is back as it was).
+- `gfx/2d/RecordedEvent.h`: `STEALTHPROJECTSURFACE,` after `ACCESSIBLEID` and before `LAST` (G3: an enumerator without a value of ours; the compiler numbers it; recorded events travel only between processes of the same build, never to disk or between versions; the canvas events numbered from `LAST` on, and `LAST_CANVAS_EVENT_TYPE` that bounds them in CanvasTranslator.cpp, follow it).
+- `gfx/2d/RecordedEventImpl.h`: the include of `StealthRecordedProjection.h` in a block of ours, and the first line of Mozilla's event list macro renamed `FOR_EACH_EVENT_MOZILLA` (G2: the marker sits in a block comment before the continuation backslash). Our `FOR_EACH_EVENT`, in `StealthRecordedProjection.h`, expands Mozilla's list and then our event; `DoWithEvent` uses it unchanged. The cases of its switch are distinct constants, so the order of the list does not matter.
+- Registrations: `dom/canvas/moz.build` (two `SOURCES +=` lines and `EXPORTS.mozilla.dom += ["StealthCanvasUtils.h"]`), `dom/html/moz.build`, `gfx/2d/moz.build` (`StealthCanvasProjection.h/.cpp`, and `StealthRecordedProjection.h` exported for the gtest), `gfx/tests/gtest/moz.build` (`TestStealthCanvasProjection.cpp`).
+- `dom/canvas/CanvasUtils.h` is Mozilla's again: the declarations moved to our header `dom/canvas/StealthCanvasUtils.h`.
 
 ## Our own files
 
-- `gfx/2d/StealthCanvasProjection.cpp`
-- `gfx/2d/StealthCanvasProjection.h`
-- `gfx/tests/gtest/TestStealthCanvasProjection.cpp`
+- `dom/canvas/StealthCanvasUtils.h` (exported as `mozilla/dom/StealthCanvasUtils.h`): `CanvasUtils::StealthNoise`, `StealthProjectsContextType` (inline), `StealthProjectSnapshot`, `StealthProjectWebGPUSnapshot`.
+- `dom/canvas/StealthCanvasNoise.cpp`: the definitions of the three functions, with their contract.
+- `dom/canvas/StealthOffscreenSnapshot.cpp`: `OffscreenCanvas::GetSurfaceSnapshot` and `OffscreenCanvasDisplayHelper::GetSurfaceSnapshot`, with the contract of the two readers of each.
+- `dom/html/StealthCanvasSnapshot.cpp`: `HTMLCanvasElement::GetSurfaceSnapshot`.
+- `dom/canvas/StealthWebGLReadback.h`: the readPixels, PBO and async-snapshot roads, the anchor `NoteReadPixels`, `TakeReadPixelsResult` and `DoReadPixelsNoted`, and the three free functions `StealthWebGLProjectReaderSnapshot`, `StealthWebGLProjectAsyncSnapshot`, `StealthWebGLProjectReadPixels` that the hooks in dom/canvas/ClientWebGLContext.cpp (fingerprint/webgl/parameters) call where they wrap one of Mozilla's expressions (the callee of a hook is named Stealth<What>).
+- `gfx/2d/StealthRecordingProjectedSurface.inc.h`: the definition of `DrawTargetRecording::StealthProjectedSurface`, included in position by DrawTargetRecording.cpp.
+- `gfx/2d/StealthCanvasProjection.cpp/.h`, `gfx/2d/StealthRecordedProjection.h`: the function, the stand-in, the recorded event.
+- `gfx/tests/gtest/TestStealthCanvasProjection.cpp`.
 
-## dom/canvas/CanvasUtils.h: StealthProjectsContextType
+## dom/canvas/StealthCanvasUtils.h: StealthProjectsContextType
 
-Whether a canvas of this context type goes through the canvas noise at all:
-WebGL and WebGPU only. A 2D canvas, on the page or offscreen, and a
-bitmaprenderer read back exactly as drawn, as on retail; a bitmap taken from
-a WebGL canvas was already projected when it was taken.
+Whether a canvas of this context type goes through the canvas noise at all: WebGL and WebGPU only. A 2D canvas, on the page or offscreen, and a bitmaprenderer read back exactly as drawn, as on retail; a bitmap taken from a WebGL canvas was already projected when it was taken.
 
-(The other two declarations in that header, StealthNoise and
-StealthProjectSnapshot, are defined in dom/canvas/StealthCanvasNoise.cpp, where
-their contract is written.)
+(The other declarations of that header are defined in dom/canvas/StealthCanvasNoise.cpp, where their contract is written. `StealthNoise` returns no noise for system, chrome and resource principals, the automation's own canvases, decided by the canvas that holds the pixels so a page cannot opt out.)
 
 ## dom/html/HTMLCanvasElement.h: GetSurfaceSnapshotAsync
 
-The async twin of GetSurfaceSnapshot; captureStream reads the canvas
-through it, so it is a PAGE reader too and what it resolves with must
-carry the same canvas noise. A context that reports SupportAsyncSnapshot()
-(WebGL with a child actor) answers it itself and never reaches
-GetSurfaceSnapshot, so the projection has to be applied to that result
-where it is returned: inside the context, in ClientWebGLContext::DoReadPixelsAsync
-(through StealthWebGLReadback::ProjectAsyncSnapshot), once, on the stored
-pixels. HTMLCanvasElement::GetSurfaceSnapshotAsync, in HTMLCanvasElement.cpp,
-only forwards that result and must not project it again; for a context that does
-not support the async snapshot it goes through GetSurfaceSnapshot, which projects.
+The async twin of GetSurfaceSnapshot; captureStream reads the canvas through it, so it is a PAGE reader too and what it resolves with must carry the same canvas noise. A context that reports SupportAsyncSnapshot() (WebGL with a child actor) answers it itself and never reaches GetSurfaceSnapshot, so the projection has to be applied to that result where it is returned: inside the context, in ClientWebGLContext::DoReadPixelsAsync (through StealthWebGLReadback::ProjectAsyncSnapshot), once, on the stored pixels. HTMLCanvasElement::GetSurfaceSnapshotAsync, in HTMLCanvasElement.cpp, only forwards that result and must not project it again; for a context that does not support the async snapshot it goes through GetSurfaceSnapshot, which projects.
 
-(The contract of GetSurfaceSnapshot and of GetSurfaceSnapshotAsDrawn is in
-dom/html/StealthCanvasSnapshot.h.)
+(The contract of GetSurfaceSnapshot and of GetSurfaceSnapshotAsDrawn of the element is in dom/html/StealthCanvasSnapshot.cpp, of the OffscreenCanvas and the placeholder in dom/canvas/StealthOffscreenSnapshot.cpp.)
 
 ## dom/webgpu/CanvasContext.cpp: CanvasContext::GetImageBuffer and CanvasContext::GetInputStream
 
-toDataURL/toBlob: the canvas noise, as every reader of a canvas reads it.
-Both functions apply CanvasUtils::StealthProjectSnapshot to the snapshot (alpha
-type premultiplied, passed as true, and the context's PrincipalOrNull()) before
-taking its data surface.
+toDataURL/toBlob: the canvas noise, as every reader of a canvas reads it. Both functions pass the snapshot through `CanvasUtils::StealthProjectWebGPUSnapshot` (alpha premultiplied, passed as true, and the context's PrincipalOrNull()) before taking its data surface. The WebGPU snapshot's real alpha type is not looked at (ClientWebGLContext derives it from the context options).
+
+## gfx/2d: the recording stand-in
+
+A canvas drawn onto a canvas that records for the GPU process stays on the GPU: the projection is recorded (`RecordedStealthProjectSurface`) and runs there, where the pixels are, and the stand-in (`SourceSurfaceRecording` with `mStealth`) reads back as projected here too (`StealthProjectOriginal`). The decision tests `GetUnderlyingType() == RECORDING`, not `GetType()`: since 157 a canvas recording's snapshot answers CANVAS_RECORDING to GetType(). The events travel with the seed and the edge tolerance as int32 values; if the source cannot be read on the GPU side the event fails and the surface is not drawn unprojected. The enum tag is an enumerator without a value right before `LAST` and the `FOR_EACH_EVENT` entry is at the end of the list (see the hooks): LINK, DESTINATION and ACCESSIBLEID keep their numbers of Mozilla's tag, and the numbers from `LAST` on move by one; the content and GPU processes must come from the same tree (true for our build).

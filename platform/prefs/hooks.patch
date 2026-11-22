@@ -1,5 +1,5 @@
 diff --git a/browser/app/profile/firefox.js b/browser/app/profile/firefox.js
-index 0f4b2915ad211349c424d1db2bd91c38f140782f..880a0bce7895a6022c46f8c97d61a799a2fcacbb 100644
+index 0f4b2915ad211349c424d1db2bd91c38f140782f..28730fbfacb63722bb2bbd733a2d4e72f3e96fbb 100644
 --- a/browser/app/profile/firefox.js
 +++ b/browser/app/profile/firefox.js
 @@ -2633,11 +2633,11 @@ pref("media.contextmenu.video-overlay-detection", true);
@@ -7,36 +7,45 @@ index 0f4b2915ad211349c424d1db2bd91c38f140782f..880a0bce7895a6022c46f8c97d61a799
  // Enable Firefox translations powered by the Bergamot translations
  // engine https://browser.mt/.
 -pref("browser.translations.enable", true);
-+// STEALTH-HOOK(platform/prefs): browser.translations.enable stays all.js's false
++pref("browser.translations.enable", false);  // STEALTH-HOOK(platform/prefs)
  
  // Enable Firefox Select translations powered by Bergamot translations
  // engine https://browser.mt/.
 -pref("browser.translations.select.enable", true);
-+// STEALTH-HOOK(platform/prefs): browser.translations.select.enable stays all.js's false
++pref("browser.translations.select.enable", false);  // STEALTH-HOOK(platform/prefs)
  
  // Enable the Translations QuickAction in the URL bar.
  pref("browser.translations.quickAction.enabled", true);
 diff --git a/modules/libpref/Preferences.cpp b/modules/libpref/Preferences.cpp
-index deb6f79258a66279f16a97b76a5903ba91bfd631..e7f1b1231841cbbb359ac721afd1229b104f0808 100644
+index deb6f79258a66279f16a97b76a5903ba91bfd631..e2ee91daa8a5c5a3468115a377e6e0f4cbd78859 100644
 --- a/modules/libpref/Preferences.cpp
 +++ b/modules/libpref/Preferences.cpp
-@@ -7302,6 +7302,7 @@ static const PrefListEntry sOverrideRestrictionsList[]{
- // StaticPrefList) and would normally by blocklisted but we allow them through
- // anyway, so this override list acts as an allowlist
- static const PrefListEntry sDynamicPrefOverrideList[]{
-+    PREF_LIST_ENTRY("zoom.stealth."),  // Stealth: allow string prefs in content processes
-     PREF_LIST_ENTRY("accessibility.tabfocus"),
-     PREF_LIST_ENTRY("app.update.channel"),
-     PREF_LIST_ENTRY("apz.subtest"),
+@@ -119,6 +119,8 @@
+ #  include "ChannelPrefsUtil.h"
+ #endif
+ 
++#include "StealthPrefSanitize.h"  // STEALTH-HOOK(platform/prefs)
++
+ using namespace mozilla;
+ 
+ using dom::Promise;
+@@ -7368,6 +7370,7 @@ static bool ShouldSanitizePreference(const Pref* const aPref) {
+   // In the parent process, we use a heuristic to decide if a pref
+   // value should be sanitized before sending to subprocesses.
+   MOZ_DIAGNOSTIC_ASSERT(XRE_IsParentProcess());
++  if (StealthPrefAllowedInContent(aPref->Name())) return false;  // STEALTH-HOOK(platform/prefs)
+ 
+   const char* prefName = aPref->Name();
+ 
 diff --git a/modules/libpref/greprefs.js b/modules/libpref/greprefs.js
-index c18e30b24e407fe97518150b004b7291de392c2a..d964a823ed12cc9ff84158354f3954aa6c20cb11 100644
+index c18e30b24e407fe97518150b004b7291de392c2a..bdf50e8590bffcb4ba45dd83429b7c50640a374c 100644
 --- a/modules/libpref/greprefs.js
 +++ b/modules/libpref/greprefs.js
 @@ -3,3 +3,5 @@
  // Do not add anything else to this file. Additions should go in all.js.
  
  #include init/all.js
-+// STEALTH-HOOK(platform/prefs): our defaults, after all.js so they win.
++// STEALTH-HOOK(platform/prefs)
 +#include init/StealthPrefs.js
 diff --git a/modules/libpref/init/all.js b/modules/libpref/init/all.js
 index 26753001966ab944c524b4ede79d58afe3b4f4de..352bfe577470e4137262e0c791b6f1e3d3761482 100644
@@ -100,18 +109,23 @@ index 26753001966ab944c524b4ede79d58afe3b4f4de..352bfe577470e4137262e0c791b6f1e3
    // Timeout to wait before sending the location request.
    pref("geo.provider.network.timeToWaitBeforeSending", 5000);
 diff --git a/modules/libpref/moz.build b/modules/libpref/moz.build
-index 2c8b218c618f8fa73ab4b21f4155d5f063bc1bb4..4d265ca09a7d9ab5fb429b13007993d3c89b0406 100644
+index 2c8b218c618f8fa73ab4b21f4155d5f063bc1bb4..6d2097721b47abb9a683d252d9d96d73404b3292 100644
 --- a/modules/libpref/moz.build
 +++ b/modules/libpref/moz.build
-@@ -54,6 +54,7 @@ pref_groups = [
-     "image",
-     "intl",
-     "javascript",
-+    "juggler",
-     "layers",
-     "layout",
-     "logging",
-@@ -133,6 +134,7 @@ UNIFIED_SOURCES += [
+@@ -92,6 +92,7 @@ pref_groups = [
+     "widget",
+     "zoom",
+ ]
++pref_groups += ["juggler"]  # STEALTH-HOOK(platform/prefs)
+ if CONFIG["OS_TARGET"] == "Android":
+     pref_groups += [
+         "android",
+@@ -129,10 +130,12 @@ UNIFIED_SOURCES += [
+     "Preferences.cpp",
+     "SharedPrefMap.cpp",
+ ]
++UNIFIED_SOURCES += ["StealthPrefSanitize.cpp"]  # STEALTH-HOOK(platform/prefs)
+ 
  gen_all_tuple = tuple(gen_h + gen_cpp + gen_rs)
  
  gen_inputs = ["init/StaticPrefList.yaml"]
@@ -119,3 +133,15 @@ index 2c8b218c618f8fa73ab4b21f4155d5f063bc1bb4..4d265ca09a7d9ab5fb429b13007993d3
  if CONFIG["MOZ_THUNDERBIRD"]:
      gen_inputs += ["/comm/mail/app/StaticPrefList.yaml"]
  GeneratedFile(
+diff --git a/modules/libpref/test/gtest/moz.build b/modules/libpref/test/gtest/moz.build
+index 1f5835376f35127043cd639dd1928afbc21b2621..7eae03629fc5b9d73a34ae54dbf3e7eb0557c689 100644
+--- a/modules/libpref/test/gtest/moz.build
++++ b/modules/libpref/test/gtest/moz.build
+@@ -13,6 +13,7 @@ UNIFIED_SOURCES = [
+     "Bench.cpp",
+     "Parser.cpp",
+ ]
++UNIFIED_SOURCES += ["TestStealthPrefSanitize.cpp"]  # STEALTH-HOOK(platform/prefs)
+ 
+ # THE MOCK_METHOD2 macro from gtest triggers this clang warning and it's hard
+ # to work around, so we just ignore it.

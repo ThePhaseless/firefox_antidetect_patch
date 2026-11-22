@@ -5,7 +5,7 @@
   "kind": "add",
   "form": "registration",
   "line": "UNIFIED_SOURCES += [\"JugglerWindowSize.cpp\"]  # STEALTH-HOOK(automation/window-size)",
-  "test": ""
+  "test": "node:juggler/tests/explicit_size_flag_is_free.test.mjs#the C++ and the JS side use the same bit"
  },
  {
   "file": "toolkit/components/windowwatcher/moz.build",
@@ -13,6 +13,6 @@
   "kind": "add",
   "form": "registration",
   "line": "UNIFIED_SOURCES += [\"StealthWindowPlacement.cpp\"]  # STEALTH-HOOK(fingerprint/screen-window/popup-position)",
-  "test": ""
+  "test": "wrapper:tests/test_popup_geometry_is_the_declared_frame_e2e.py::test_a_popup_is_its_inner_size_plus_the_declared_frame"
  }
 ]

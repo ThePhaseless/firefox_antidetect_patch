@@ -1,52 +1,64 @@
 diff --git a/toolkit/components/url-classifier/SafeBrowsing.sys.mjs b/toolkit/components/url-classifier/SafeBrowsing.sys.mjs
-index fd8285620dd9e56deab8f3a80a10cd7f09188a4a..05ae33284e42ad7b3b51da6cd12722c555c08820 100644
+index fd8285620dd9e56deab8f3a80a10cd7f09188a4a..2ed2ec309e153e02cd146f1b7ebd45fb7dc57f20 100644
 --- a/toolkit/components/url-classifier/SafeBrowsing.sys.mjs
 +++ b/toolkit/components/url-classifier/SafeBrowsing.sys.mjs
-@@ -360,6 +360,8 @@ export var SafeBrowsing = {
+@@ -2,6 +2,8 @@
+  * License, v. 2.0. If a copy of the MPL was not distributed with this
+  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+ 
++import { StealthObserveApiKey } from "resource://gre/modules/StealthApiKeys.sys.mjs";  // STEALTH-HOOK(stillborn/api-keys)
++
+ const PREF_DEBUG_ENABLED = "browser.safebrowsing.debug";
+ let loggingEnabled = false;
+ 
+@@ -360,6 +362,7 @@ export var SafeBrowsing = {
      Services.prefs.addObserver("browser.safebrowsing", this);
      Services.prefs.addObserver("privacy.trackingprotection", this);
      Services.prefs.addObserver("urlclassifier", this);
-+    // STEALTH-HOOK(stillborn/api-keys): see FEATURE.md
-+    Services.prefs.addObserver("zoom.stealth.apikey", this);
++    StealthObserveApiKey(this);  // STEALTH-HOOK(stillborn/api-keys)
  
      this.readPrefs();
  
 diff --git a/toolkit/components/urlformatter/URLFormatter.sys.mjs b/toolkit/components/urlformatter/URLFormatter.sys.mjs
-index 0485032ec57bee64f638c89f9314e75696563581..c7ab06fc08c4b7124c0b94dce5831f0a56f8b2df 100644
+index 0485032ec57bee64f638c89f9314e75696563581..1caa16f70b44d92c36f9520aafc3685d92db47d8 100644
 --- a/toolkit/components/urlformatter/URLFormatter.sys.mjs
 +++ b/toolkit/components/urlformatter/URLFormatter.sys.mjs
-@@ -14,6 +14,11 @@
-  */
+@@ -15,6 +15,8 @@
  
  import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
-+// STEALTH-HOOK(stillborn/api-keys)
-+import {
-+  stealthApplyApiKeyGetters,
-+  stealthTrimApiKeys,
-+} from "resource://gre/modules/StealthApiKeys.sys.mjs";
  
++import { StealthApplyApiKeys, StealthTrimApiKeys } from "resource://gre/modules/StealthApiKeys.sys.mjs";  // STEALTH-HOOK(stillborn/api-keys)
++
  const PREF_APP_DISTRIBUTION = "distribution.id";
  const PREF_APP_DISTRIBUTION_VERSION = "distribution.version";
-@@ -178,6 +183,7 @@ nsURLFormatterService.prototype = {
+ 
+@@ -178,6 +180,7 @@ nsURLFormatterService.prototype = {
    },
  
    trimSensitiveURLs: function uf_trimSensitiveURLs(aMsg) {
-+    aMsg = stealthTrimApiKeys(aMsg); // STEALTH-HOOK(stillborn/api-keys)
++    aMsg = StealthTrimApiKeys(aMsg);  // STEALTH-HOOK(stillborn/api-keys)
      // Only the google API keys is sensitive for now.
      aMsg = AppConstants.MOZ_GOOGLE_LOCATION_SERVICE_API_KEY
        ? aMsg.replace(
-@@ -193,3 +199,6 @@ nsURLFormatterService.prototype = {
+@@ -193,3 +196,5 @@ nsURLFormatterService.prototype = {
        : aMsg;
    },
  };
 +
-+// STEALTH-HOOK(stillborn/api-keys)
-+stealthApplyApiKeyGetters(nsURLFormatterService.prototype);
++StealthApplyApiKeys(nsURLFormatterService.prototype);  // STEALTH-HOOK(stillborn/api-keys)
 diff --git a/toolkit/components/urlformatter/moz.build b/toolkit/components/urlformatter/moz.build
-index ffc01ed8b6ebf20eab576e8c5928d33934e9e64c..1a38f6df3aa7d42983a10c76ceca4123b76abb84 100644
+index ffc01ed8b6ebf20eab576e8c5928d33934e9e64c..ee87a0cdab8a2b67c3a003ef1d88b0c2c34bfb69 100644
 --- a/toolkit/components/urlformatter/moz.build
 +++ b/toolkit/components/urlformatter/moz.build
-@@ -16,6 +16,7 @@ XPIDL_MODULE = "urlformatter"
+@@ -6,6 +6,7 @@ with Files("**"):
+     BUG_COMPONENT = ("Toolkit", "General")
+ 
+ XPCSHELL_TESTS_MANIFESTS += ["tests/unit/xpcshell.toml"]
++XPCSHELL_TESTS_MANIFESTS += ["tests/unit/xpcshell-stealth.toml"]  # STEALTH-HOOK(stillborn/api-keys)
+ 
+ XPIDL_SOURCES += [
+     "nsIURLFormatter.idl",
+@@ -16,6 +17,7 @@ XPIDL_MODULE = "urlformatter"
  EXTRA_JS_MODULES += [
      "URLFormatter.sys.mjs",
  ]
@@ -54,62 +66,3 @@ index ffc01ed8b6ebf20eab576e8c5928d33934e9e64c..1a38f6df3aa7d42983a10c76ceca4123
  
  XPCOM_MANIFESTS += [
      "components.conf",
-diff --git a/toolkit/components/urlformatter/tests/unit/xpcshell.toml b/toolkit/components/urlformatter/tests/unit/xpcshell.toml
-index 1a2f345622d4b51905ac5ece503176964068faea..088506eb25090fe1a9f38ed69989f32016dbdd06 100644
---- a/toolkit/components/urlformatter/tests/unit/xpcshell.toml
-+++ b/toolkit/components/urlformatter/tests/unit/xpcshell.toml
-@@ -5,3 +5,4 @@ skip-if = [
- ]
- 
- ["test_urlformatter.js"]
-+["test_stealth_apikeys.js"]
-diff --git a/toolkit/modules/AppConstants.sys.mjs b/toolkit/modules/AppConstants.sys.mjs
-index 9dc427fd61aea11b6839d542af39c4b887b52b6f..a334aa4f35fd73fd720082f41cd5c9e6ee9b67ec 100644
---- a/toolkit/modules/AppConstants.sys.mjs
-+++ b/toolkit/modules/AppConstants.sys.mjs
-@@ -179,11 +179,7 @@ export var AppConstants = Object.freeze({
- 
-   MOZ_BING_API_CLIENTID: "@MOZ_BING_API_CLIENTID@",
-   MOZ_BING_API_KEY: "@MOZ_BING_API_KEY@",
--#if !defined(MOZ_WIDGET_ANDROID) && !defined(XP_WIN)
--  MOZ_GOOGLE_LOCATION_SERVICE_API_KEY: "@MOZ_GOOGLE_LOCATION_SERVICE_API_KEY@",
--#endif
--  MOZ_GOOGLE_SAFEBROWSING_API_KEY: "@MOZ_GOOGLE_SAFEBROWSING_API_KEY@",
--  MOZ_MOZILLA_API_KEY: "@MOZ_MOZILLA_API_KEY@",
-+  // STEALTH-HOOK(stillborn/api-keys): three API keys removed, see FEATURE.md
- 
-   BROWSER_CHROME_URL: "@BROWSER_CHROME_URL@",
- 
-diff --git a/toolkit/modules/moz.build b/toolkit/modules/moz.build
-index 852e9b0bb590e8376ebda3fd6b49d5c3fa374994..de1207f708232358aa93ed6195150091a6d9cad7 100644
---- a/toolkit/modules/moz.build
-+++ b/toolkit/modules/moz.build
-@@ -277,10 +277,10 @@ if "Android" != CONFIG["OS_TARGET"]:
-         "subprocess",
-     ]
- 
--if CONFIG["OS_TARGET"] not in ("Android", "WINNT"):
--    DEFINES["MOZ_GOOGLE_LOCATION_SERVICE_API_KEY"] = (
--        CONFIG["MOZ_GOOGLE_LOCATION_SERVICE_API_KEY"] or ""
--    )
-+# ⛔ STEALTHFOX: qui stava il DEFINES di MOZ_GOOGLE_LOCATION_SERVICE_API_KEY,
-+# tolto insieme agli altri due nel blocco `for var` qui sotto. Le tre chiavi
-+# non sono piu' incise nella build: le dichiara invisible_core e arrivano
-+# come pref (URLFormatter.sys.mjs, stealthDeclaredApiKey).
- 
- if CONFIG["MOZ_WIDGET_TOOLKIT"] == "windows":
-     EXTRA_JS_MODULES += [
-@@ -296,10 +296,11 @@ for var in (
-     "MOZ_BACKGROUNDTASK_ACTIVATABLE_CLASS_ID",
-     "MOZ_BING_API_CLIENTID",
-     "MOZ_BING_API_KEY",
--    "MOZ_GOOGLE_SAFEBROWSING_API_KEY",
-+    # ⛔ STEALTHFOX: MOZ_GOOGLE_SAFEBROWSING_API_KEY e MOZ_MOZILLA_API_KEY
-+    # stavano qui, in ordine alfabetico fra le due righe accanto. Tolte: le tre
-+    # chiavi le dichiara invisible_core, non le incide piu' la compilazione.
-     "MOZ_MACBUNDLE_ID",
-     "MOZ_MACBUNDLE_NAME",
--    "MOZ_MOZILLA_API_KEY",
-     "MOZ_WIDGET_TOOLKIT",
-     "DLL_PREFIX",
-     "DLL_SUFFIX",

@@ -1,109 +1,74 @@
 [
  {
   "file": "python/mozbuild/mozbuild/backend/recursivemake.py",
+  "function": "from ..util import FileAvoidWrite, ensureParentDir, pairwise",
+  "kind": "add",
+  "form": "registration",
+  "line": "from mozbuild.stealth_build_tools import stealth_absolute_object_path  # STEALTH-HOOK(platform/build-tools)",
+  "test": "py:scripts/ci/test_stealth_build_tools.py::test_the_link_rule_lists_the_absolute_path_not_the_relative_one"
+ },
+ {
+  "file": "python/mozbuild/mozbuild/backend/recursivemake.py",
   "function": "class RecursiveMakeBackend(MakeBackend):",
   "kind": "rewrite",
-  "form": "unknown",
-  "line": "        # Stealthfox fix: use absolute paths for obj dependencies. mozmake 4.4.1",
+  "form": "wrap-expression",
+  "line": "        objs_ref = \" \\\\\\n    \".join(stealth_absolute_object_path(o, os.path.relpath(o, obj.objdir)) for o in objs)  # STEALTH-HOOK(platform/build-tools)",
   "removed": "        objs_ref = \" \\\\\\n    \".join(os.path.relpath(o, obj.objdir) for o in objs)",
-  "test": ""
- },
- {
-  "file": "python/mozbuild/mozbuild/backend/recursivemake.py",
-  "function": "class RecursiveMakeBackend(MakeBackend):",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "        # Win32 fails on relative paths > ~150 chars (libwebrtc deeply nested).",
-  "test": ""
- },
- {
-  "file": "python/mozbuild/mozbuild/backend/recursivemake.py",
-  "function": "class RecursiveMakeBackend(MakeBackend):",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "        # Absolute paths bypass the bug; linker accepts them either way.",
-  "test": ""
- },
- {
-  "file": "python/mozbuild/mozbuild/backend/recursivemake.py",
-  "function": "class RecursiveMakeBackend(MakeBackend):",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "        objs_ref = \" \\\\\\n    \".join(o for o in objs)",
-  "test": ""
+  "test": "py:scripts/ci/test_stealth_build_tools.py::test_the_link_rule_lists_the_absolute_path_not_the_relative_one"
  },
  {
   "file": "python/mozbuild/mozbuild/frontend/data.py",
   "function": "class UnifiedSources(BaseSources):",
   "kind": "rewrite",
   "form": "unknown",
-  "line": "            if len(unified_prefix) > 30:",
-  "removed": "            if len(unified_prefix) > 20:\n                unified_prefix = unified_prefix[-20:].split(\"/\", 1)[-1]",
-  "test": ""
+  "line": "            if len(unified_prefix) > 30:  # STEALTH-HOOK(platform/build-tools)",
+  "removed": "            if len(unified_prefix) > 20:",
+  "test": "py:scripts/ci/test_stealth_build_tools.py::test_two_directories_that_collided_at_20_characters_get_two_names",
+  "exception": "a declared value (20 -> 30) that Mozilla writes on two adjacent lines: no wrap or guard expresses it; it concerns only the build (G35, PM-DECISIONS platform/build-tools)",
+  "pm": "approvato"
  },
  {
   "file": "python/mozbuild/mozbuild/frontend/data.py",
   "function": "class UnifiedSources(BaseSources):",
   "kind": "rewrite",
   "form": "unknown",
-  "line": "                # STEALTH-HOOK(platform/build-tools)",
-  "test": ""
+  "line": "                unified_prefix = unified_prefix[-30:].split(\"/\", 1)[-1]  # STEALTH-HOOK(platform/build-tools)",
+  "removed": "                unified_prefix = unified_prefix[-20:].split(\"/\", 1)[-1]",
+  "test": "py:scripts/ci/test_stealth_build_tools.py::test_two_directories_that_collided_at_20_characters_get_two_names",
+  "exception": "a declared value (20 -> 30) that Mozilla writes on two adjacent lines: no wrap or guard expresses it; it concerns only the build (G35, PM-DECISIONS platform/build-tools)",
+  "pm": "approvato"
  },
  {
-  "file": "python/mozbuild/mozbuild/frontend/data.py",
-  "function": "class UnifiedSources(BaseSources):",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "                unified_prefix = unified_prefix[-30:].split(\"/\", 1)[-1]",
-  "test": ""
+  "file": "python/mozbuild/mozbuild/jar.py",
+  "function": "from mozbuild.action.buildlist import addEntriesToListFile",
+  "kind": "add",
+  "form": "registration",
+  "line": "from mozbuild.stealth_build_tools import stealth_long_path  # STEALTH-HOOK(platform/build-tools)",
+  "test": "py:scripts/ci/test_stealth_build_tools.py::test_the_removal_takes_the_path_mozilla_computed_and_the_open_takes_the_hooked_one"
  },
  {
   "file": "python/mozbuild/mozbuild/jar.py",
   "function": "class JarMaker:",
   "kind": "add",
   "form": "unknown",
-  "line": "            # STEALTH-HOOK(platform/build-tools)",
-  "test": ""
- },
- {
-  "file": "python/mozbuild/mozbuild/jar.py",
-  "function": "class JarMaker:",
-  "kind": "add",
-  "form": "unknown",
-  "line": "            if os.name == \"nt\":",
-  "test": ""
- },
- {
-  "file": "python/mozbuild/mozbuild/jar.py",
-  "function": "class JarMaker:",
-  "kind": "add",
-  "form": "unknown",
-  "line": "                out = \"\\\\\\\\?\\\\\" + os.path.abspath(out).replace(\"/\", \"\\\\\")",
-  "test": ""
+  "line": "            out = stealth_long_path(out)  # STEALTH-HOOK(platform/build-tools)",
+  "test": "py:scripts/ci/test_stealth_build_tools.py::test_the_removal_takes_the_path_mozilla_computed_and_the_open_takes_the_hooked_one"
  },
  {
   "file": "third_party/python/vsdownload/vsdownload.py",
-  "function": "import tempfile",
+  "function": "import urllib.request",
   "kind": "add",
   "form": "registration",
   "line": "from stealth_download_watchdog import stealth_urlretrieve  # STEALTH-HOOK(platform/build-tools)",
-  "test": ""
+  "test": "py:scripts/ci/test_stealth_download_watchdog.py::test_the_call_passed_as_download_is_the_one_guarded"
  },
  {
   "file": "third_party/python/vsdownload/vsdownload.py",
   "function": "def _downloadPayload(payload, destname, fileid, allowHashMismatch):",
   "kind": "rewrite",
-  "form": "unknown",
-  "line": "            # STEALTH-HOOK(platform/build-tools): per-file download watchdog, logic in stealth_download_watchdog.py",
+  "form": "wrap-expression",
+  "line": "            stealth_urlretrieve(payload, destname, fileid, download=lambda: urllib.request.urlretrieve(payload[\"url\"], destname))  # STEALTH-HOOK(platform/build-tools)",
   "removed": "            urllib.request.urlretrieve(payload[\"url\"], destname)",
-  "test": ""
- },
- {
-  "file": "third_party/python/vsdownload/vsdownload.py",
-  "function": "def _downloadPayload(payload, destname, fileid, allowHashMismatch):",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "            stealth_urlretrieve(payload, destname, fileid)",
-  "test": ""
+  "test": "py:scripts/ci/test_stealth_download_watchdog.py::test_the_call_passed_as_download_is_the_one_guarded"
  }
 ]

@@ -7,6 +7,7 @@ include("/dom/media/webrtc/transport/common.build")
 
 # STEALTH-HOOK(fingerprint/webrtc/declared-network)
 SOURCES += ["TestStealthDeclaredNetwork.cpp"]
+SOURCES += ["TestStealthDeclaredNetworkBirth.cpp"]
 SOURCES += ["TestStealthIceResolverContext.cpp"]  # STEALTH-HOOK(network/doh)
 
 # STEALTH-HOOK(network/proxy-udp)

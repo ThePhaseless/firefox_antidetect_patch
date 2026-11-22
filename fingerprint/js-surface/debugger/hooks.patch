@@ -1,89 +1,83 @@
 diff --git a/devtools/server/actors/thread.js b/devtools/server/actors/thread.js
-index 6363c0c5110d30071e9b18a25e4500dd290570b6..f094e08498f50b329c52a9da8512334925c8d683 100644
+index 6363c0c5110d30071e9b18a25e4500dd290570b6..4db243f105a0708a2ae59a4ea87d7f5841f4d6df 100644
 --- a/devtools/server/actors/thread.js
 +++ b/devtools/server/actors/thread.js
-@@ -390,7 +390,8 @@ class ThreadActor extends Actor {
+@@ -388,6 +388,7 @@ class ThreadActor extends Actor {
+ 
+   // Request handlers
    attach(options) {
++    if (Services.prefs.getBoolPref("zoom.stealth.debugger.force_detach", false)) return;  // STEALTH-HOOK(fingerprint/js-surface/debugger)
      // Note that the client avoids trying to call attach if already attached.
      // But just in case, avoid any possible duplicate call to attach.
--    if (this.alreadyAttached) {
-+    let forceDetach = Services.prefs.getBoolPref("zoom.stealth.debugger.force_detach", false);
-+    if (this.alreadyAttached || forceDetach) {
-       return;
-     }
+     if (this.alreadyAttached) {
+diff --git a/devtools/shared/heapsnapshot/tests/gtest/moz.build b/devtools/shared/heapsnapshot/tests/gtest/moz.build
+index c02913fac9def98eb43df329bd7d5d62c2597ea8..2a8b7f7d0f5e22186e323f8ce0dd19c09021696c 100644
+--- a/devtools/shared/heapsnapshot/tests/gtest/moz.build
++++ b/devtools/shared/heapsnapshot/tests/gtest/moz.build
+@@ -29,3 +29,5 @@ if CONFIG["CC_TYPE"] == "clang":
+     CXXFLAGS += ["-Wno-inconsistent-missing-override"]
  
+ FINAL_LIBRARY = "xul-gtest"
++
++UNIFIED_SOURCES += ["TestStealthDebugger.cpp"]  # STEALTH-HOOK(fingerprint/js-surface/debugger)
 diff --git a/js/src/debugger/Debugger.cpp b/js/src/debugger/Debugger.cpp
-index 734904920529c1a426772aae5513b37c7d5b76e7..3e85d4ab2d35377aa38c8455b3efcb1556e40483 100644
+index 734904920529c1a426772aae5513b37c7d5b76e7..e5a207edf847d98e52c690213d87b7e67166c09a 100644
 --- a/js/src/debugger/Debugger.cpp
 +++ b/js/src/debugger/Debugger.cpp
-@@ -40,6 +40,7 @@
- #include "debugger/Object.h"              // for DebuggerObject
- #include "debugger/Script.h"              // for DebuggerScript
- #include "debugger/Source.h"              // for DebuggerSource
+@@ -134,6 +134,8 @@
+ #include "vm/Stack-inl.h"             // for AbstractFramePtr::script
+ #include "wasm/WasmInstance-inl.h"    // for Instance::codeMeta()
+ 
 +#include "debugger/StealthDebugger.h"  // STEALTH-HOOK(fingerprint/js-surface/debugger)
- #include "frontend/CompilationStencil.h"  // for CompilationStencil
- #include "frontend/FrontendContext.h"     // for AutoReportFrontendContext
- #include "frontend/Parser.h"              // for Parser
-@@ -5093,16 +5094,21 @@ bool Debugger::addDebuggeeGlobal(JSContext* cx, Handle<GlobalObject*> global) {
++
+ namespace js {
+ 
+ namespace frontend {
+@@ -5093,16 +5095,17 @@ bool Debugger::addDebuggeeGlobal(JSContext* cx, Handle<GlobalObject*> global) {
      return false;
    }
  
-+  // STEALTH-HOOK(fingerprint/js-surface/debugger)
-+  const bool isStealth = StealthDebuggerReadMode(cx, object);
-+  invisibleDebuggee_ = isStealth;
++  StealthDebuggerReadMode(cx, object, &invisibleDebuggee_);  // STEALTH-HOOK(fingerprint/js-surface/debugger)
    // There can be no GC past this point.
    JS::AutoAssertNoGC nogc;
  
    // (1)
    auto& globalDebuggers = global->getDebuggers(nogc);
 -  if (!globalDebuggers.append(Realm::DebuggerVectorEntry(this, debuggeeLink))) {
-+  // STEALTH-HOOK(fingerprint/js-surface/debugger)
-+  if (!isStealth && !globalDebuggers.append(Realm::DebuggerVectorEntry(this, debuggeeLink))) {
++  if (!invisibleDebuggee_ && !globalDebuggers.append(Realm::DebuggerVectorEntry(this, debuggeeLink))) {  // STEALTH-HOOK(fingerprint/js-surface/debugger)
      ReportOutOfMemory(cx);
      return false;
    }
 -  auto globalDebuggersGuard = MakeScopeExit([&] { globalDebuggers.popBack(); });
-+  // STEALTH-HOOK(fingerprint/js-surface/debugger)
-+  auto globalDebuggersGuard = MakeScopeExit([&] { if (!isStealth) { globalDebuggers.popBack(); } });
++  auto globalDebuggersGuard = MakeScopeExit([&] { if (!invisibleDebuggee_) { globalDebuggers.popBack(); } });  // STEALTH-HOOK(fingerprint/js-surface/debugger)
  
    // (2)
    if (!debuggees.put(global)) {
-@@ -5124,6 +5130,11 @@ bool Debugger::addDebuggeeGlobal(JSContext* cx, Handle<GlobalObject*> global) {
+@@ -5124,6 +5127,7 @@ bool Debugger::addDebuggeeGlobal(JSContext* cx, Handle<GlobalObject*> global) {
      }
    });
  
-+  // STEALTH-HOOK(fingerprint/js-surface/debugger)
-+  if (isStealth) {
-+    StealthDebuggerReleaseGuards(globalDebuggersGuard, debuggeesGuard, debuggeeZonesGuard);
-+    return true;
-+  }
++  if (invisibleDebuggee_) return StealthDebuggerReleaseGuards(globalDebuggersGuard, debuggeesGuard, debuggeeZonesGuard);  // STEALTH-HOOK(fingerprint/js-surface/debugger)
    // (4)
    if (trackingAllocationSites) {
      Debugger::addAllocationsTracking(cx, global);
-@@ -5226,8 +5237,11 @@ void Debugger::removeDebuggeeGlobal(JS::GCContext* gcx, GlobalObject* global,
+@@ -5226,6 +5230,7 @@ void Debugger::removeDebuggeeGlobal(JS::GCContext* gcx, GlobalObject* global,
    // the same zone. If after recomputing the debuggee zone set, this global's
    // zone is not in the set, then we must remove ourselves from the zone's
    // vector of observing debuggers.
--  globalDebuggersVector.erase(
--      findDebuggerInVector(this, &globalDebuggersVector));
-+  // STEALTH-HOOK(fingerprint/js-surface/debugger)
-+  if (!invisibleDebuggee_) {
-+    globalDebuggersVector.erase(
-+        findDebuggerInVector(this, &globalDebuggersVector));
-+  }
++  if (!invisibleDebuggee_)  // STEALTH-HOOK(fingerprint/js-surface/debugger)
+   globalDebuggersVector.erase(
+       findDebuggerInVector(this, &globalDebuggersVector));
  
-   if (debugIter) {
-     debugIter->remove();
 diff --git a/js/src/debugger/Debugger.h b/js/src/debugger/Debugger.h
-index 50438c8f63bbb278d665ad9d4c9975486a537b05..0606bd9c993df5a05b7896138b5c8a7a38eb9a97 100644
+index 50438c8f63bbb278d665ad9d4c9975486a537b05..f1f2d12e55bfbd3c0518502c0852e577f8b2ec31 100644
 --- a/js/src/debugger/Debugger.h
 +++ b/js/src/debugger/Debugger.h
-@@ -691,6 +691,8 @@ class Debugger : private mozilla::LinkedListElement<Debugger> {
+@@ -691,6 +691,7 @@ class Debugger : private mozilla::LinkedListElement<Debugger> {
    using AllocationsLog = js::TraceableFifo<AllocationsLogEntry>;
  
    AllocationsLog allocationsLog;
-+  // STEALTH-HOOK(fingerprint/js-surface/debugger)
-+  bool invisibleDebuggee_ = false;
++  bool invisibleDebuggee_ = false;  // STEALTH-HOOK(fingerprint/js-surface/debugger)
    bool trackingAllocationSites;
    double allocationSamplingProbability;
    size_t maxAllocationsLogLength;

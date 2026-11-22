@@ -1,38 +1,25 @@
 diff --git a/toolkit/components/telemetry/app/TelemetrySend.sys.mjs b/toolkit/components/telemetry/app/TelemetrySend.sys.mjs
-index 2ebae13763c51cad5e8652e9ab4a66907197099f..1e48d9bdbf07d1ad493f0f8725fa48391c4c2dcb 100644
+index 2ebae13763c51cad5e8652e9ab4a66907197099f..9ff7e71702bbc0d46eb28a0d440325c6d7737262 100644
 --- a/toolkit/components/telemetry/app/TelemetrySend.sys.mjs
 +++ b/toolkit/components/telemetry/app/TelemetrySend.sys.mjs
-@@ -17,6 +17,8 @@ import { ServiceRequest } from "resource://gre/modules/ServiceRequest.sys.mjs";
- 
+@@ -18,6 +18,8 @@ import { ServiceRequest } from "resource://gre/modules/ServiceRequest.sys.mjs";
  import { TelemetryUtils } from "resource://gre/modules/TelemetryUtils.sys.mjs";
  import { clearTimeout, setTimeout } from "resource://gre/modules/Timer.sys.mjs";
-+import * as StealthPingsender from "resource://gre/modules/StealthPingsender.sys.mjs"; // STEALTH-HOOK(stillborn/telemetry)
-+export { PINGSENDER_ROUTE_ENV } from "resource://gre/modules/StealthPingsender.sys.mjs"; // STEALTH-HOOK(stillborn/telemetry)
  
++import * as StealthPingsender from "resource://gre/modules/StealthPingsender.sys.mjs"; // STEALTH-HOOK(stillborn/telemetry)
++
  const lazy = {};
  
-@@ -201,13 +203,19 @@ export function gzipCompressString(string) {
- 
- const STANDALONE_PING_TIMEOUT = 30 * 1000; // 30 seconds
- 
--export function sendStandalonePing(endpoint, payload, extraHeaders = {}) {
-+export function sendStandalonePing(
-+  endpoint,
-+  payload,
-+  extraHeaders = {},
-+  notificationCallbacks = null // STEALTH-HOOK(stillborn/telemetry)
-+) {
-   return new Promise((resolve, reject) => {
-     let request = new ServiceRequest({ mozAnon: true });
-     request.mozBackgroundRequest = true;
+ ChromeUtils.defineESModuleGetters(lazy, {
+@@ -208,6 +210,7 @@ export function sendStandalonePing(endpoint, payload, extraHeaders = {}) {
      request.timeout = STANDALONE_PING_TIMEOUT;
  
      request.open("POST", endpoint, true);
-+    StealthPingsender.attachCallbacks(request, notificationCallbacks); // STEALTH-HOOK(stillborn/telemetry)
++    StealthPingsender.attachRoute(request, endpoint); // STEALTH-HOOK(stillborn/telemetry)
      request.overrideMimeType("text/plain");
      request.setRequestHeader("Content-Type", "application/json; charset=UTF-8");
      request.setRequestHeader("Content-Encoding", "gzip");
-@@ -1702,6 +1710,7 @@ export var TelemetrySendImpl = {
+@@ -1702,6 +1705,7 @@ export var TelemetrySendImpl = {
          (AppConstants.platform === "win" ? ".exe" : "");
        params = ["--backgroundtask", "pingsender"];
      }
@@ -40,7 +27,7 @@ index 2ebae13763c51cad5e8652e9ab4a66907197099f..1e48d9bdbf07d1ad493f0f8725fa4839
  
      this._log.info(
        `Invoking '${exeName}${params.length ? " " + params.join(" ") : ""} ...'`
-@@ -1717,6 +1726,6 @@ export var TelemetrySendImpl = {
+@@ -1717,6 +1721,6 @@ export var TelemetrySendImpl = {
      process.init(exe);
      process.startHidden = true;
      process.noShell = true;
@@ -66,26 +53,17 @@ index c3eb89d261283faa22884f415aef71b8a65a3b36..cbe13ff8b787b146ea3fe6e922ebdad0
  if CONFIG["OS_ARCH"] == "WINNT":
      EXTRA_JS_MODULES += [
 diff --git a/toolkit/components/telemetry/pings/BackgroundTask_pingsender.sys.mjs b/toolkit/components/telemetry/pings/BackgroundTask_pingsender.sys.mjs
-index 89915ba3c31d2f89867473b808d692b3bcf78864..c6cd6d5e83ba12c3368bc6039ce257a8baba740d 100644
+index 89915ba3c31d2f89867473b808d692b3bcf78864..2327254b7972e94b9c7913613abbe2fa1567f088 100644
 --- a/toolkit/components/telemetry/pings/BackgroundTask_pingsender.sys.mjs
 +++ b/toolkit/components/telemetry/pings/BackgroundTask_pingsender.sys.mjs
-@@ -3,8 +3,10 @@
-  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+@@ -4,7 +4,10 @@
  
  import { sendStandalonePing } from "resource://gre/modules/TelemetrySend.sys.mjs";
-+import * as StealthRoute from "resource://gre/modules/backgroundtasks/StealthPingsenderRoute.sys.mjs"; // STEALTH-HOOK(stillborn/telemetry)
  
++import * as StealthRoute from "resource://gre/modules/backgroundtasks/StealthPingsenderRoute.sys.mjs"; // STEALTH-HOOK(stillborn/telemetry)
++
  export async function runBackgroundTask(commandLine) {
 +  StealthRoute.takeSessionRoute(); // STEALTH-HOOK(stillborn/telemetry)
    let sends = [];
    for (let i = 0; i < commandLine.length; i += 2) {
      sends.push(
-@@ -34,7 +36,7 @@ async function sendPing(endpoint, path) {
-   await sendStandalonePing(endpoint, json, {
-     "User-Agent": "pingsender/2.0",
-     "X-PingSender-Version": "2.0",
--  });
-+  }, StealthRoute.pingAuthFor(hostname)); // STEALTH-HOOK(stillborn/telemetry)
- 
-   return IOUtils.remove(path);
- }

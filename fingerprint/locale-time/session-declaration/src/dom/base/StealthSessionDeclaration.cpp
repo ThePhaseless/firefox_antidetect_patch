@@ -22,6 +22,7 @@
 #include "nsLanguageAtomService.h"
 #include "nsPresContext.h"
 #include "nsPIDOMWindow.h"
+#include "nsPIDOMWindowInlines.h"
 #include "nsString.h"
 #include "nsTArray.h"
 #include "nsUnicharUtils.h"
@@ -46,6 +47,20 @@ void GetDeclaredLanguage(BrowsingContext* aContext, nsACString& aLanguage) {
     aLanguage = aContext->Top()->GetLanguageOverride();
   }
   intl::OrSessionLanguage(aLanguage);
+}
+
+nsCString StealthLanguageOrSession(const nsCString& aOverride) {
+  MOZ_ASSERT(NS_IsMainThread());
+  nsCString language(aOverride);
+  intl::OrSessionLanguage(language);
+  return language;
+}
+
+nsString StealthTimezoneOrSession(const nsString& aOverride) {
+  MOZ_ASSERT(NS_IsMainThread());
+  nsString zone(aOverride);
+  intl::OrSessionTimezone(zone);
+  return zone;
 }
 
 // The context a document belongs to: its own, or that of the window it is
@@ -144,6 +159,34 @@ void SetRealmDeclaredLocale(JS::Realm* aRealm, const nsACString& aLanguage) {
   }
 }
 
+StealthRealmLocale::StealthRealmLocale(JS::Realm* aRealm,
+                                       const nsACString& aLanguage)
+    : mRealm(aRealm) {
+  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(!aLanguage.IsEmpty());
+  intl::PrimaryLanguageTag(aLanguage, mTag);
+}
+
+StealthRealmLocale::~StealthRealmLocale() {
+  // The document of this window caches the language of its text with no
+  // `lang`: it follows its context when the context's language changes. Mozilla's
+  // JS::SetRealmLocaleOverride, in the statement that holds this object, has run.
+  if (!mRealm) {
+    return;
+  }
+  if (nsGlobalWindowInner* window = xpc::WindowOrNull(JS::GetRealmGlobalOrNull(mRealm))) {
+    if (Document* document = window->GetExtantDoc()) {
+      RefreshDocumentLanguage(document);
+    }
+  }
+}
+
+void StealthDocumentContainerSet(Document* aDocument, nsDocShell* aContainer) {
+  if (aContainer) {
+    RefreshDocumentLanguage(aDocument);
+  }
+}
+
 void SetDeclaredRealmTimeAndLanguage(JS::RealmOptions& aOptions,
                                      bool aForceUTC, bool aLocaleEnUS,
                                      const nsACString& aLanguage,
@@ -176,6 +219,46 @@ void ExplodeLocalTime(PRTime aTime, const Document* aDocument,
   MOZ_ASSERT(aDocument);
   if (aDocument->ShouldResistFingerprinting(RFPTarget::JSDateTimeUTC)) {
     PR_ExplodeTime(aTime, PR_GMTParameters, aExploded);
+    return;
+  }
+  nsAutoString declared;
+  GetDeclaredTimezone(aDocument, declared);
+  if (declared.IsEmpty()) {
+    PR_ExplodeTime(aTime, PR_LocalTimeParameters, aExploded);
+    return;
+  }
+  NS_ConvertUTF16toUTF8 zone(declared);
+  int32_t offsetMs = 0;
+  int32_t dstMs = 0;
+  auto created = intl::TimeZone::TryCreate(
+      Some(Span<const char>(zone.get(), zone.Length())));
+  if (created.isOk()) {
+    UniquePtr<intl::TimeZone> timeZone = created.unwrap();
+    const int64_t utcMs = aTime / PR_USEC_PER_MSEC;
+    auto offset = timeZone->GetOffsetMs(utcMs);
+    auto dst = timeZone->GetDSTOffsetMs(utcMs);
+    if (offset.isOk() && dst.isOk()) {
+      offsetMs = offset.unwrap();
+      dstMs = dst.unwrap();
+    }
+  }
+  // The wall clock of the zone is UTC moved by the zone's whole offset at
+  // that instant. The parameters split that offset into standard time and
+  // daylight saving, as PR_LocalTimeParameters does; EXSLT's date prints
+  // their sum.
+  PR_ExplodeTime(aTime + PRTime(offsetMs) * PR_USEC_PER_MSEC, PR_GMTParameters,
+                 aExploded);
+  aExploded->tm_params.tp_gmt_offset = (offsetMs - dstMs) / 1000;
+  aExploded->tm_params.tp_dst_offset = dstMs / 1000;
+}
+
+void StealthExplodeTime(const Document* aDocument, PRTime aTime,
+                        PRTimeParamFn aParams, PRExplodedTime* aExploded) {
+  MOZ_ASSERT(aDocument);
+  // UTC, asked by resistFingerprinting through Mozilla's own choice of parameters:
+  // the declared zone is not consulted.
+  if (aParams != PR_LocalTimeParameters) {
+    PR_ExplodeTime(aTime, aParams, aExploded);
     return;
   }
   nsAutoString declared;

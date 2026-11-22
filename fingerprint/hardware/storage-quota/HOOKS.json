@@ -5,24 +5,16 @@
   "kind": "add",
   "form": "registration",
   "line": "#include \"StealthQuotaEstimate.h\"  // STEALTH-HOOK(fingerprint/hardware/storage-quota)",
-  "test": ""
+  "test": "wrapper:tests/test_hardware_values_are_declared_e2e.py::test_the_storage_quota_is_the_declared_megabytes"
  },
  {
   "file": "dom/quota/OriginOperations.cpp",
   "function": "void EstimateOp::GetResponse(RequestResponse& aResponse) {",
   "kind": "rewrite",
-  "form": "unknown",
-  "line": "  estimateResponse.limit() =",
+  "form": "wrap-expression",
+  "line": "  estimateResponse.limit() = StealthEstimateLimit(mScope, mUsageAndLimit.second);  // STEALTH-HOOK(fingerprint/hardware/storage-quota)",
   "removed": "  estimateResponse.limit() = mUsageAndLimit.second;",
-  "test": ""
- },
- {
-  "file": "dom/quota/OriginOperations.cpp",
-  "function": "void EstimateOp::GetResponse(RequestResponse& aResponse) {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "      StealthEstimateLimit(mUsageAndLimit.second, mScope == Scope::Origin);  // STEALTH-HOOK(fingerprint/hardware/storage-quota)",
-  "test": ""
+  "test": "wrapper:tests/test_hardware_values_are_declared_e2e.py::test_the_storage_quota_is_the_declared_megabytes"
  },
  {
   "file": "dom/quota/test/gtest/moz.build",
@@ -30,6 +22,6 @@
   "kind": "add",
   "form": "registration",
   "line": "UNIFIED_SOURCES += [\"TestStealthQuotaEstimate.cpp\"]  # STEALTH-HOOK(fingerprint/hardware/storage-quota)",
-  "test": ""
+  "test": "gtest:StealthQuotaEstimate.OriginScopeReportsThePrefInBytes"
  }
 ]

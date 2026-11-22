@@ -17,6 +17,7 @@ class nsIProxyInfo;
 namespace mozilla::net {
 
 class LoadInfoArgs;
+class WebrtcProxyConfig;
 
 // The proxy of a SOCKS5 answer, as the nsIProxyInfo of the lookup says it.
 struct PcUdpSocks5Info {
@@ -73,6 +74,14 @@ class PcUdpProxy final {
   Socks5Info mInfo;
   nsTArray<std::function<void()>> mWaiting;
 };
+
+/**
+ * NrSocketProxyConfig::NrSocketProxyConfig: the proxy the UDP of this PeerConnection leaves by (what Firefox answers for its
+ * document), asked when the config is made, before the ICE gather asks for the first socket. The sockets of the gather are made in
+ * the socket process (or in the parent), so only there is a lookup started; in a content process no UDP socket of the PeerConnection
+ * is made (NrSocketBase::CreateSocket refuses it), and aProxy stays null. Read back by NrSocketProxyConfig::UdpProxy.
+ */
+void StealthPcUdpProxyLookup(RefPtr<PcUdpProxy>& aProxy, const WebrtcProxyConfig& aConfig);
 
 }  // namespace mozilla::net
 

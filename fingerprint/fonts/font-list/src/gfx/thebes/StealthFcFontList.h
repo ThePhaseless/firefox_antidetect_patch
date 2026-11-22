@@ -11,11 +11,11 @@
 // file unchanged. The bundle itself (manifest, mapped files) is
 // StealthBundleFontList.
 //
-// Hooks that stay inline in gfxFcPlatformFontList.cpp, because each is a
-// condition on a Mozilla member and there is nothing to move. Their comments,
-// which used to sit in that file, are here:
+// Hooks of gfxFcPlatformFontList.cpp that are a condition on a Mozilla member
+// (each is one line there, a call to a function declared below). Their
+// comments, which used to sit in that file, are here:
 //
-//  - AddPatternToFontList: `if (!aFontFamily) return;`
+//  - AddPatternToFontList: StealthDropPatternWithoutFamily(aFontFamily)
 //
 //    Stealth bundle-only: drop every pattern that arrives while aFontFamily is
 //    still null. aFontFamily is null only while the first patterns of an
@@ -32,14 +32,14 @@
 //    differs from lastFamilyName), so the sentence is replaced by the one
 //    above.
 //
-//  - InitFontListForPlatform: `if (mStealthBundleOnly) return NS_OK;`
+//  - InitFontListForPlatform: StealthSkipsSystemFontSet(this)
 //
 //    Stealth bundle-only: skip the host system-font enumeration entirely; only
 //    the app-bundled set (processed just before the hook) populates the list,
 //    so no host font enters.
 //
-//  - FindAndAddFamiliesLocked: `if (mStealthBundleOnly)` and the call to the
-//    base class.
+//  - FindAndAddFamiliesLocked: StealthBundleOnly() and the call to the base
+//    class.
 //
 //    STEALTH: no host fontconfig in name resolution, at all.
 //
@@ -76,7 +76,7 @@
 //    the tree; StealthDeclaredGenericFont is the function that does what the
 //    sentence describes.)
 //
-//  - AddGenericFonts: `usePrefFontList || mStealthBundleOnly`
+//  - AddGenericFonts: StealthUsePrefFontList(this, usePrefFontList)
 //
 //    when pref fonts exist, use standard pref font lookup. Stealth: also force
 //    this path when bundle-only, so the CSS generics resolve via the base-class
@@ -91,6 +91,7 @@
 #include <string>
 
 #include "SharedFontList.h"
+#include "StealthFontListHooks.h"
 #include "gfxFcPlatformFontList.h"
 #include "mozilla/AlreadyAddRefed.h"
 
@@ -122,6 +123,27 @@ hb_blob_t* StealthHBFaceTable(gfxFontEntry* aEntry, uint32_t aTableTag);
 // Must run before PrepareFontOptions.
 void StealthDeclareTextOptions(FcPattern* aPattern);
 
+// Called at the top of gfxFontconfigFontEntry::HasFontTableInternal and
+// GetFontTableInternal. For a face of a .ttc made from data, at a face index
+// above 0, answers for THAT face (the table directory of the face, not the one
+// at the start of the file) and returns true with the answer in *aResult.
+// Otherwise returns false and Mozilla's own lines run (face 0 and the fonts
+// that are not collections: the same directory).
+bool StealthFaceDataHasTable(gfxFontconfigFontEntry* aEntry,
+                             uint32_t aTableTag, bool* aResult);
+bool StealthFaceDataTable(gfxFontconfigFontEntry* aEntry, uint32_t aTableTag,
+                          hb_blob_t** aResult);
+
+// AddPatternToFontList: true when the pattern arrives with no family (see the
+// comment above). InitFontListForPlatform: true under bundle-only, when only
+// the app-bundled set (processed just before the hook) populates the list.
+// The Core takes the flag as a value so a test can see the answer of stock
+// Firefox.
+bool StealthDropPatternWithoutFamily(
+    const RefPtr<gfxFontconfigFontFamily>& aFamily);
+bool StealthSkipsSystemFontSetCore(bool aBundleOnly);
+bool StealthSkipsSystemFontSet(const gfxPlatformFontList* aList);
+
 // Called in gfxFontconfigFontEntry::CreateFontInstance right after Mozilla's
 // `if (!face->GetFontData())` block. When that block left aFile empty (a face made
 // from data) and the PATTERN names a file (FC_FILE and FC_INDEX), sets aFile
@@ -146,11 +168,23 @@ void StealthPreferFileUnscaledFont(
 // the null test, as the code it replaces did.
 bool StealthPopulateSharedList(mozilla::fontlist::FontList* aList);
 
+// The hook of InitSharedFontListForPlatform: under bundle-only, the bundle is
+// shown to fontconfig first (the parent), and a screenshot remakes its fonts
+// from the path; when the list is built, returns true and the function
+// returns.
+bool StealthPopulateSharedList(gfxFcPlatformFontList* aList);
+
 // Bundle-only CreateFontEntry: instantiates the face from its bundle file via
 // FreeType and wires it back to its shared-list face. Null when the file cannot
 // be read or the face cannot be opened.
 already_AddRefed<gfxFontEntry> StealthCreateBundleFontEntry(
     mozilla::fontlist::Face* aFace, const mozilla::fontlist::Family* aFamily,
     mozilla::fontlist::FontList* aList);
+
+// The hook of gfxFcPlatformFontList::CreateFontEntry: the same, with the list
+// read from the font list.
+already_AddRefed<gfxFontEntry> StealthCreateBundleFontEntry(
+    gfxFcPlatformFontList* aList, mozilla::fontlist::Face* aFace,
+    const mozilla::fontlist::Family* aFamily);
 
 #endif  // GFX_STEALTHFCFONTLIST_H

@@ -9,7 +9,9 @@
 
 #include "mozilla/Maybe.h"
 #include "mozilla/OriginAttributes.h"
+#include "nsCOMPtr.h"
 #include "nsError.h"
+#include "nsILoadInfo.h"
 #include "nsStringFwd.h"
 
 class nsIChannel;
@@ -39,6 +41,12 @@ Maybe<OriginAttributes> StealthTRRContextOfSuffix(
  * thread). Nothing for the default context.
  */
 Maybe<OriginAttributes> StealthTRRContextOfLoadInfo(nsILoadInfo* aLoadInfo);
+
+/**
+ * The same from a channel (TRRServiceChannel::ResolveProxy passes itself): the
+ * context of its load info.
+ */
+Maybe<OriginAttributes> StealthTRRContextOf(nsIChannel* aChannel);
 
 /**
  * Gives a load info the context. Nothing: left as it is. A context that cannot
@@ -73,6 +81,24 @@ void StealthKeepRequestContext(const OriginAttributes& aPage,
  * is no transport.
  */
 OriginAttributes StealthTransportContext(nsISocketTransport* aTransport);
+
+/**
+ * The same, as a value for the argument of Mozilla's call: aUpstream is the
+ * attributes Mozilla's code passes (the default ones), kept when there is no
+ * transport or it has none. TLSTransportLayer::Init passes itself, which
+ * forwards GetOriginAttributes to the transport it layers over.
+ */
+OriginAttributes StealthTransportContext(nsISocketTransport* aTransport,
+                                         const OriginAttributes& aUpstream);
+
+/**
+ * The attributes of the connection info of the DoH request carried by aChannel
+ * (TRRServiceChannel::BeginConnect): the context of its load info, so the
+ * tunnel is not shared between credentials of different contexts; aUpstream
+ * (the default attributes Mozilla's code passes) for the default context.
+ */
+OriginAttributes StealthTRRConnectionAttributes(
+    nsIChannel* aChannel, const OriginAttributes& aUpstream);
 
 /**
  * Fail closed. When the proxy of a DoH request could not be learned, upstream
@@ -171,6 +197,67 @@ bool StealthTRRProxyAnswerRefused(nsIProxyInfo* aProxyInfo);
  */
 nsresult StealthTRRProxyAnswer(nsresult aStatus, nsIProxyInfo* aProxyInfo,
                                bool aIsTRRServiceChannel);
+
+/**
+ * The hooks of the two channel classes, as the values their calls take.
+ *
+ * Proxy lookup (MaybeResolveProxyAndBeginConnect): aLookup is what
+ * ResolveProxy() returned. A failed lookup that must fail closed ends the
+ * channel (above) and gives NS_OK, which makes the caller return as it does for
+ * a lookup that went well; any other result is aLookup, unchanged. The
+ * TRRServiceChannel form is for a channel that is one by construction (the
+ * start of the request has no cancellation to consult); the nsHttpChannel form
+ * makes the proxy mandatory when its context has one.
+ *
+ * Proxy answer (OnProxyAvailable): the answer of the lookup as the channel
+ * receives it. True: the channel was ended and the caller returns NS_OK at
+ * once; false: nothing was done. The cancellation, the kind of channel and its
+ * load info are read through the public members of the channel.
+ */
+template <typename ServiceChannelT>
+nsresult StealthTRRServiceProxyLookup(ServiceChannelT* aChannel,
+                                      nsresult aLookup) {
+  return StealthTRRServiceFailClosed(aChannel, aLookup, false) ? NS_OK
+                                                               : aLookup;
+}
+
+template <typename ServiceChannelT>
+bool StealthTRRServiceOnProxyAnswer(ServiceChannelT* aChannel,
+                                    nsresult aStatus,
+                                    nsIProxyInfo* aProxyInfo) {
+  bool canceled = false;
+  (void)aChannel->GetCanceled(&canceled);
+  return StealthTRRServiceFailClosed(
+      aChannel, StealthTRRProxyAnswer(aStatus, aProxyInfo, true), canceled);
+}
+
+template <typename ChannelT>
+nsresult StealthChannelProxyLookup(ChannelT* aChannel, nsresult aLookup) {
+  if (NS_SUCCEEDED(aLookup)) return aLookup;
+  bool isTRR = false;
+  (void)aChannel->GetIsTRRServiceChannel(&isTRR);
+  bool canceled = false;
+  (void)aChannel->GetCanceled(&canceled);
+  nsCOMPtr<nsILoadInfo> loadInfo = aChannel->LoadInfo();
+  return StealthTRRFailClosed(aChannel, aLookup,
+                              StealthProxyIsMandatory(isTRR, loadInfo.get()),
+                              canceled)
+             ? NS_OK
+             : aLookup;
+}
+
+template <typename ChannelT>
+bool StealthChannelOnProxyAnswer(ChannelT* aChannel, nsresult aStatus,
+                                 nsIProxyInfo* aProxyInfo) {
+  bool isTRR = false;
+  (void)aChannel->GetIsTRRServiceChannel(&isTRR);
+  bool canceled = false;
+  (void)aChannel->GetCanceled(&canceled);
+  nsCOMPtr<nsILoadInfo> loadInfo = aChannel->LoadInfo();
+  return StealthTRRFailClosed(
+      aChannel, StealthTRRProxyAnswer(aStatus, aProxyInfo, isTRR),
+      StealthProxyIsMandatory(isTRR, loadInfo.get()), canceled);
+}
 
 /**
  * The Safe Browsing completion (gethash) of a page load is requested in the

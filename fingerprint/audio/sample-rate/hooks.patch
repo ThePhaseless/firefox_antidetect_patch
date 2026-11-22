@@ -1,24 +1,21 @@
 diff --git a/dom/media/CubebUtils.cpp b/dom/media/CubebUtils.cpp
-index 72551b795af37c5a0a89fff1a579efe2a519e1e6..526903617b178653002763c017a14a30efb147ed 100644
+index 72551b795af37c5a0a89fff1a579efe2a519e1e6..8430abd750f05b7caeccce235d01bd1a100f5afb 100644
 --- a/dom/media/CubebUtils.cpp
 +++ b/dom/media/CubebUtils.cpp
-@@ -46,6 +46,7 @@
- #include "audioipc2_client_ffi_generated.h"
- #include "audioipc2_server_ffi_generated.h"
- #include "mozilla/StaticPrefs_media.h"
-+#include "mozilla/StaticPrefs_zoom.h"
+@@ -52,6 +52,8 @@
+ #  include "MockCubeb.h"
+ #endif
  
- #if defined(ENABLE_TESTS) || defined(FUZZING)
- #  define ENABLE_MOCK_CUBEB 1
-@@ -501,6 +502,11 @@ uint32_t PreferredSampleRate(bool aShouldResistFingerprinting) {
++#include "StealthSampleRate.h"  // STEALTH-HOOK(fingerprint/audio/sample-rate)
++
+ #define AUDIOIPC_STACK_SIZE_DEFAULT (64 * 4096)
+ 
+ #define PREF_VOLUME_SCALE "media.volume_scale"
+@@ -501,6 +503,7 @@ uint32_t PreferredSampleRate(bool aShouldResistFingerprinting) {
    if (sCubebForcedSampleRate) {
      return sCubebForcedSampleRate;
    }
-+  // STEALTH-HOOK(fingerprint/audio/sample-rate)
-+  {
-+    int32_t rate = mozilla::StaticPrefs::zoom_stealth_audio_sample_rate();
-+    if (rate > 0) return (uint32_t)rate;
-+  }
++  if (uint32_t stealth; StealthDeclaredSampleRate(&stealth)) return stealth;  // STEALTH-HOOK(fingerprint/audio/sample-rate)
    if (aShouldResistFingerprinting) {
      return 44100;
    }

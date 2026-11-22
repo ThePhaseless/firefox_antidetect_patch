@@ -16,6 +16,8 @@
 #include "mozilla/Preferences.h"
 #include "mozilla/gfx/gfxVars.h"
 
+#include "StealthTextQuality.h"
+
 using mozilla::Preferences;
 using mozilla::gfx::gfxVars;
 
@@ -72,4 +74,50 @@ TEST(StealthTextQuality, WithTheEngineOffTheHostDecides)
   Preferences::SetInt("zoom.stealth.text.system_quality", 4);
   gfxDWriteFont::UpdateSystemTextVars();
   EXPECT_EQ(stock, gfxVars::SystemTextQuality());
+}
+
+namespace {
+
+// A factory that counts the calls that reach it, standing for the host's
+// DirectWrite.
+struct CountingFactory {
+  HRESULT CreateRenderingParams(IDWriteRenderingParams** aParams) {
+    ++mCalls;
+    *aParams = nullptr;
+    return S_OK;
+  }
+  int mCalls = 0;
+};
+
+}  // namespace
+
+// The call that reads the host's DirectWrite defaults is not made with the
+// engine on: the answer is E_FAIL, which UpdateClearTypeVars handles as a failed
+// factory (declared values only). With the engine off the call reaches the
+// factory as in stock Firefox. The ClearType prefs block applies whatever the
+// declared quality, and only with the engine on.
+TEST(StealthTextQuality, TheRenderingParamsAreNotAskedOfTheHost)
+{
+  gfxPlatform::GetPlatform();
+  RestoreStock restore;
+  CountingFactory factory;
+  RefPtr<IDWriteRenderingParams> params;
+
+  // Engine off (the negative control).
+  HRESULT hr = mozilla::gfx::StealthDWriteFactory(&factory)
+                   ->CreateRenderingParams(getter_AddRefs(params));
+  EXPECT_EQ(S_OK, hr);
+  EXPECT_EQ(1, factory.mCalls);
+  EXPECT_FALSE(mozilla::gfx::StealthClearTypeParamsApply(false));
+  EXPECT_TRUE(mozilla::gfx::StealthClearTypeParamsApply(true));
+
+  // Engine on.
+  Preferences::SetInt("zoom.stealth.fpp.hw_seed", 7);
+  factory.mCalls = 0;
+  hr = mozilla::gfx::StealthDWriteFactory(&factory)
+           ->CreateRenderingParams(getter_AddRefs(params));
+  EXPECT_EQ(E_FAIL, hr);
+  EXPECT_EQ(0, factory.mCalls);
+  EXPECT_TRUE(mozilla::gfx::StealthClearTypeParamsApply(false));
+  EXPECT_TRUE(mozilla::gfx::StealthClearTypeParamsApply(true));
 }

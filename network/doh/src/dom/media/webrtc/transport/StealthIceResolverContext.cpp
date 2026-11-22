@@ -24,6 +24,7 @@
 #include "mozilla/net/WebrtcProxyConfig.h"
 #include "nr_socket_proxy_config.h"
 #include "nr_stealth_network.h"
+#include "nriceresolver.h"
 #include "nsCOMPtr.h"
 #include "nsDebug.h"
 #include "nsIContentPolicy.h"
@@ -49,6 +50,35 @@ OriginAttributes StealthIceResolverAttributes(
     const NrSocketProxyConfig& aConfig) {
   return StealthIceResolverAttributes(
       aConfig.GetConfig().loadInfoArgs().originAttributes());
+}
+
+void StealthIceResolverSetContext(const RefPtr<NrIceResolver>& aResolver,
+                                  const NrSocketProxyConfig& aConfig) {
+  StealthIceResolverSetContext(
+      aResolver, aConfig.GetConfig().loadInfoArgs().originAttributes());
+}
+
+void StealthIceResolverSetContext(const RefPtr<NrIceResolver>& aResolver,
+                                  const OriginAttributes& aPeerConnection) {
+  if (aResolver) {
+    aResolver->SetOriginAttributes(
+        StealthIceResolverAttributes(aPeerConnection));
+  }
+}
+
+void StealthIceResolverLookupAttributes(const NrIceResolver* aResolver,
+                                        OriginAttributes* aAttrs) {
+  if (aResolver) {
+    *aAttrs = aResolver->GetOriginAttributes();
+  }
+}
+
+void NrIceResolver::SetOriginAttributes(const OriginAttributes& aAttrs) {
+  mAttrs = aAttrs;
+}
+
+const OriginAttributes& NrIceResolver::GetOriginAttributes() const {
+  return mAttrs;
 }
 
 void StealthTcpNameContext(nsISocketTransport* aTransport,

@@ -63,7 +63,7 @@ void StealthLinkClickBefore(nsIContent* aContent);
 class StealthLinkClickAfter final {
  public:
   // Run() brackets OnLinkClickSync with these.
-  void SetRunning(bool aRunning) { mRunning = aRunning; }
+  void StealthSetRunning(bool aRunning) { mRunning = aRunning; }
 
   // Cancel(): Mozilla's comment there says it can be called from
   // OnLinkClickSync(); it is, for a form: InternalLoad stops this docshell's
@@ -71,7 +71,7 @@ class StealthLinkClickAfter final {
   // here - before the navigation is announced. While Run is inside
   // OnLinkClickSync it says "after" itself once the navigation has started,
   // so Cancel stays silent then.
-  void Cancelled(nsIContent* aContent) {
+  void StealthCancelled(nsIContent* aContent) {
     if (!mRunning) {
       Done(aContent);
     }

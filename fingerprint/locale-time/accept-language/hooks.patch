@@ -1,48 +1,22 @@
 diff --git a/netwerk/protocol/http/nsHttpHandler.cpp b/netwerk/protocol/http/nsHttpHandler.cpp
-index c35867b90d600ce2259456663894b640453591e0..dd65bca2318a5d2d72b7328f63c9f193db76af2a 100644
+index c35867b90d600ce2259456663894b640453591e0..ba205451294f40e4c77c69ed6e4e61c27d676bec 100644
 --- a/netwerk/protocol/http/nsHttpHandler.cpp
 +++ b/netwerk/protocol/http/nsHttpHandler.cpp
-@@ -746,6 +746,9 @@ nsresult nsHttpHandler::AddAcceptAndDictionaryHeaders(
-   return rv;
- }
+@@ -112,6 +112,8 @@
+ //-----------------------------------------------------------------------------
+ #include "mozilla/net/HttpChannelChild.h"
  
-+static nsresult PrepareAcceptLanguages(const char* i_AcceptLanguages,
-+                                       nsACString& o_AcceptLanguages);
++#include "StealthAcceptLanguage.h"  // STEALTH-HOOK(fingerprint/locale-time/accept-language)
 +
- nsresult nsHttpHandler::AddStandardRequestHeaders(
-     nsHttpRequestHead* request, nsIURI* aURI, bool aIsHTTPS,
-     ExtContentPolicyType aContentPolicyType, bool aShouldResistFingerprinting,
-@@ -784,11 +787,16 @@ nsresult nsHttpHandler::AddStandardRequestHeaders(
-   if (NS_FAILED(rv)) return rv;
+ #define UA_PREF_PREFIX "general.useragent."
+ #ifdef XP_WIN
+ #  define UA_SPARE_PLATFORM
+@@ -785,7 +787,7 @@ nsresult nsHttpHandler::AddStandardRequestHeaders(
  
    if (!aLanguageOverride.IsEmpty()) {
-+    // STEALTH-HOOK(fingerprint/locale-time/accept-language)
-+    // The override is a language list, prepared like intl.accept_languages.
      nsAutoCString acceptLanguage;
 -    acceptLanguage.Assign(aLanguageOverride.get());
--    rv = request->SetHeader(nsHttp::Accept_Language, acceptLanguage, false,
--                            nsHttpHeaderArray::eVarietyRequestOverride);
-+    rv = PrepareAcceptLanguages(aLanguageOverride.get(), acceptLanguage);
++    acceptLanguage.Assign(StealthPrepareAcceptLanguages(aLanguageOverride.get()));  // STEALTH-HOOK(fingerprint/locale-time/accept-language)
+     rv = request->SetHeader(nsHttp::Accept_Language, acceptLanguage, false,
+                             nsHttpHeaderArray::eVarietyRequestOverride);
      if (NS_FAILED(rv)) return rv;
-+    if (!acceptLanguage.IsEmpty()) {
-+      rv = request->SetHeader(nsHttp::Accept_Language, acceptLanguage, false,
-+                              nsHttpHeaderArray::eVarietyRequestOverride);
-+      if (NS_FAILED(rv)) return rv;
-+    }
-   } else {
-     // Add the "Accept-Language" header.  This header is also exposed to the
-     // service worker.
-diff --git a/netwerk/test/browser/browser.toml b/netwerk/test/browser/browser.toml
-index 4f7dd3a7a4a5e82b697e98efb416ad378f861050..64e95db92463fc322b0ccae88bd2032f7f17cdf4 100644
---- a/netwerk/test/browser/browser.toml
-+++ b/netwerk/test/browser/browser.toml
-@@ -227,6 +227,9 @@ skip-if = [
- 
- ["browser_speculative_connection_link_header.js"]
- 
-+# STEALTH-HOOK(fingerprint/locale-time/accept-language)
-+["browser_stealth_accept_language_list.js"]
-+
- ["browser_test_data_channel_observer.js"]
- 
- ["browser_test_favicon.js"]

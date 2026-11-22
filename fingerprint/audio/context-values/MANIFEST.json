@@ -2,7 +2,9 @@
  "modified": [
   "dom/media/webaudio/AudioContext.cpp"
  ],
- "added": {},
+ "added": {
+  "dom/media/webaudio/StealthAudioContextValues.h": "100644"
+ },
  "inventory": [
   {
    "file": "dom/media/webaudio/AudioContext.cpp",

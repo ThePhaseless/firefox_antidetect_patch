@@ -467,7 +467,7 @@ def group_watch_and_stop(doc, jobs, build, steps) -> list:
                 core_ref["default"] == "" and "firefox-157" not in core_ref["description"]
                 and text.count("inputs.core_ref") == 1 and "github.event.inputs" not in text
                 and text.count("needs.plan.outputs.core_ref") >= 4))
-    guide = HERE.parent.parent / "CLAUDE.md"
+    guide = HERE.parent.parent / "STEALTH_CLAUDE.md"
     if guide.exists():
         guide_text = guide.read_text(encoding="utf-8")
         out.append(("guide: says what the plan and publish.yml do: releases use the cache, core_ref has no branch of its own",

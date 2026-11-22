@@ -2,7 +2,7 @@
 
 Category: juggler
 Prefs: none read directly
-Test: juggler/tests/download_complete_follows_the_idl.test.mjs; end to end in the wrapper (tests/test_download_is_intercepted_e2e.py)
+Test: juggler/tests/download_complete_follows_the_idl.test.mjs; end to end in the wrapper (tests/test_download_is_intercepted_e2e.py: test_a_clicked_download_is_reported_and_saved, test_a_navigation_that_ends_in_a_download_is_reported, test_a_canceled_download_reports_once_as_canceled, test_a_context_without_download_options_is_left_to_firefox)
 
 ## What it does
 
@@ -13,21 +13,38 @@ asks it; when it takes the download, the saver writes straight to the file it
 chose, with no nsITransfer and no downloads UI, and exactly one
 onDownloadComplete follows (OnSaveComplete or Cancel; empty error name on
 success). No interceptor, or one that declines or throws: stock Firefox.
-Until 2026-10-30 only the setter existed and nothing read it, so no download
-event ever reached the client. Hook ceilings went up for it then:
-nsExternalHelperAppService.cpp 7 -> 13, .h 5 -> 9, moz.build 1 -> 2.
+
+Juggler installs the interceptor at startup with
+nsIExternalHelperAppService.setDownloadInterceptor (declared in
+nsIExternalHelperAppService.idl, because an XPIDL method can only be declared
+inside its own interface; the interface nsIDownloadInterceptor is in our
+StealthDownloadInterceptor.idl). The setter only stores it in
+nsExternalHelperAppService::mInterceptor; Start asks it on each download and
+Complete tells it when the download ended.
+
+## Our files
+
+- `uriloader/exthandler/StealthDownloadInterceptor.idl`: nsIDownloadInterceptor
+  (interceptDownloadRequest, onDownloadComplete(aHandler, aErrorName)).
+- `uriloader/exthandler/StealthDownloadIntercept.h/.cpp`: Start, Complete, the
+  saver setup and the definition of `nsExternalHelperAppService::SetDownloadInterceptor`.
 
 ## Hooks in Mozilla files
 
-- `uriloader/exthandler/nsExternalHelperAppService.cpp` (new method nsExternalHelperAppService::SetDownloadInterceptor, inserted after GetPreferredDownloadsDirectory (line 387), already-hook): Dead storage: mInterceptor is assigned here and never read in this file or the header; the comment says the intercept dispatch in CreateSaverForTempFile is not implemented. The setter does nothing else. The comment names a product (Playwright) in code: check against the no-vendor-names rule. Verified: git grep of the whole tree finds mInterceptor only at nsExternalHelperAppService.cpp:403 (write) 
-- `uriloader/exthandler/nsExternalHelperAppService.h` (class nsExternalHelperAppService, new member after the last declared member (hunk header line 302), already-hook): Member is never read (see the .cpp entry). Remove together with the setter if the feature is not finished. Verified by whole-tree git grep (only uriloader/exthandler/nsExternalHelperAppService.cpp:403 writes it).
-- `uriloader/exthandler/nsIExternalHelperAppService.idl` (file level: new interface nsIDownloadInterceptor (hunk 1, before the nsIExternalHelperAppService comment); interface nsIExternalHelperAppService, new method setDownloadInterceptor (hunk 2), movable): The interface body can move to our own .idl registered by our own moz.build, leaving one method line in Mozilla's file. The uuid is hard-coded and was copied from an earlier patch series; uniqueness was not checked. The comment says it was restored from an FF146 series. Nothing in this list calls onDownloadComplete or the interceptor. Verified: the IDL onDownloadComplete(aHandler, aErrorName) has 
+- `uriloader/exthandler/moz.build`: registration of StealthDownloadInterceptor.idl (XPIDL_SOURCES) and StealthDownloadIntercept.cpp (UNIFIED_SOURCES), after the closing `]` of each list.
+- `uriloader/exthandler/nsExternalHelperAppService.cpp`:
+  - registration: `#include "StealthDownloadIntercept.h"` in a block of ours after Mozilla's includes.
+  - anchor in nsExternalAppHandler::OnStartRequest: `if (StealthDownloadIntercept::Start(this, request)) return NS_OK;` right after the `if (XRE_IsContentProcess()) { return NS_OK; }` block. It cannot sit at the head of the function: Start reads mSourceUrl and mBrowsingContext, which OnStartRequest sets up above (GetURI, MaybeCloseWindow), and must come after the early returns (spam, forbidden download, content process). Wrapping SetUpTempFile would not skip the dialog and the transfer that follow.
+  - pure additions, one line each, at the end of the two blocks: `StealthDownloadIntercept::Complete(this, aStatus);` as the last statement of `nsExternalAppHandler::OnSaveComplete` before its final `return NS_OK`, and `StealthDownloadIntercept::Complete(this, aReason);` as the last statement of `nsExternalAppHandler::Cancel` before its final `return NS_OK` (G30). The signatures of both functions are Mozilla's, unchanged.
+- `uriloader/exthandler/nsExternalHelperAppService.h`: members `mInterceptor` (nsExternalHelperAppService), `mStealthIntercepted` (nsExternalAppHandler), and `friend class StealthDownloadIntercept` in both classes. Each after an existing member, none last in its block.
+- `uriloader/exthandler/nsIExternalHelperAppService.idl`: `#include "StealthDownloadInterceptor.idl"` in a block of ours after Mozilla's include, and the method `setDownloadInterceptor` right after applyDecodingForExtension.
 
-## uriloader/exthandler/nsExternalHelperAppService.cpp: nsExternalHelperAppService::SetDownloadInterceptor
+## Why the hooks give the same result as before
 
-Stealthfox: install/replace the Juggler-side download interceptor.
-Storage only; the actual intercept dispatch in CreateSaverForTempFile is
-not implemented in this minimal port — Juggler's interceptor receives
-constructor wiring but downloads still flow through the default save
-path. Sufficient to satisfy juggler/TargetRegistry.js startup; download
-intercept-and-redirect feature itself remains TODO.
+The two `Complete` lines are the ones of the base, unchanged: no function is renamed or wrapped. Each runs as the last statement of its block, as before.
+- Complete reports once per intercepted download: it clears mStealthIntercepted first.
+
+## Tests
+
+- juggler/tests/download_complete_follows_the_idl.test.mjs: onDownloadComplete takes the arguments the IDL gives.
+- Wrapper e2e (tests/test_download_is_intercepted_e2e.py): a clicked download and a navigation that ends in a download are reported and saved by Start and Complete; a canceled download reports once, as canceled (the Cancel hook); a context without setDownloadOptions gets no event and the file goes the stock Firefox way (negative control of every hook).

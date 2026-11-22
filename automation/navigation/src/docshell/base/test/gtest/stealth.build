@@ -1,0 +1,15 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+# The gtests of the engine's own navigation code: the state of a planned
+# navigation's "after", the load identifier a LoadInfo and its copies carry, and
+# the attributes of a fresh docshell. One line in moz.build includes this file.
+
+SOURCES += [
+    "TestStealthNavigation.cpp",
+]
+
+LOCAL_INCLUDES += [
+    "/docshell/base",
+]

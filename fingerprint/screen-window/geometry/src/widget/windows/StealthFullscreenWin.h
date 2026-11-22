@@ -12,7 +12,11 @@
 // DefWindowProc clamps the size to MINMAXINFO.ptMaxTrackSize, about the
 // monitor's size. Both decide from the host; in fullscreen the window is the
 // declared screen instead. Each does nothing with the engine off or outside
-// fullscreen. Included by nsWindow.cpp only.
+// fullscreen, and reads the size mode from the widget itself. Included by
+// nsWindow.cpp.
+//
+// nsWindow::OnWindowPosChanging calls the hold between Mozilla's fullscreen
+// block and the DWM block.
 
 #include <windows.h>
 
@@ -20,10 +24,9 @@ class nsIWidget;
 
 namespace mozilla::widget {
 
-void StealthHoldDeclaredFullscreen(nsIWidget& aWidget, bool aFullscreen,
-                                   WINDOWPOS* aPos);
-void StealthDeclaredFullscreenTrackSize(nsIWidget& aWidget, bool aFullscreen,
-                                        MINMAXINFO* aInfo);
+void StealthHoldDeclaredFullscreen(nsIWidget& aWidget, WINDOWPOS* aPos);
+// aLParam is the lParam of WM_GETMINMAXINFO: a MINMAXINFO*.
+void StealthDeclaredFullscreenTrackSize(nsIWidget& aWidget, LPARAM aLParam);
 
 }  // namespace mozilla::widget
 

@@ -1,33 +1,29 @@
 diff --git a/layout/style/nsMediaFeatures.cpp b/layout/style/nsMediaFeatures.cpp
-index 1f9613b8cd936fa9d884be010a8dd6167251faa6..6ca2a7bf05a29ac677016c886f94b978974b1955 100644
+index 1f9613b8cd936fa9d884be010a8dd6167251faa6..d8e17d6494da1bf93c721400c105b1053ceaab78 100644
 --- a/layout/style/nsMediaFeatures.cpp
 +++ b/layout/style/nsMediaFeatures.cpp
-@@ -5,6 +5,7 @@
- /* the features that media queries can test */
+@@ -29,6 +29,8 @@
+ #include "nsPresContext.h"
+ #include "nsStyleConsts.h"
  
- #include "PreferenceSheet.h"
 +#include "StealthMediaFeatures.h"  // STEALTH-HOOK(fingerprint/screen-window/css-media)
- #include "mozilla/GeckoBindings.h"
- #include "mozilla/LookAndFeel.h"
- #include "mozilla/RelativeLuminanceUtils.h"
-@@ -58,6 +59,8 @@ static nsSize GetSize(const Document& aDocument) {
++
+ using namespace mozilla;
+ using mozilla::dom::DisplayMode;
+ using mozilla::dom::Document;
+@@ -58,6 +60,7 @@ static nsSize GetSize(const Document& aDocument) {
  
  // A helper for three features below.
  static nsSize GetDeviceSize(const Document& aDocument) {
-+  // STEALTH-HOOK(fingerprint/screen-window/css-media)
-+  if (Maybe<nsSize> declared = StealthDeclaredDeviceSize()) return *declared;
++  if (nsSize stealth; StealthDeclaredDeviceSize(&stealth)) return stealth;  // STEALTH-HOOK(fingerprint/screen-window/css-media)
    if (aDocument.ShouldResistFingerprinting(RFPTarget::CSSDeviceSize)) {
      return GetSize(aDocument);
    }
-@@ -411,6 +414,11 @@ static PointerCapabilities GetPointerCapabilities(const Document* aDocument,
+@@ -410,6 +413,7 @@ static PointerCapabilities GetPointerCapabilities(const Document* aDocument,
+       return PointerCapabilities::Coarse;
      }
    }
++  if (PointerCapabilities stealth; StealthDeclaredPointerCapabilities(aID, &stealth)) return stealth;  // STEALTH-HOOK(fingerprint/screen-window/css-media)
  
-+  // STEALTH-HOOK(fingerprint/screen-window/css-media)
-+  if (Maybe<int32_t> declared = StealthDeclaredPointerCapabilities(aID)) {
-+    return static_cast<PointerCapabilities>(*declared);
-+  }
-+
    // The default value for Desktop is mouse-type pointer, and for Android
    // a coarse pointer.
-   const PointerCapabilities kDefaultCapabilities =

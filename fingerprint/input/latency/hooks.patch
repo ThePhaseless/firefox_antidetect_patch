@@ -1,14 +1,15 @@
 diff --git a/dom/webidl/Window.webidl b/dom/webidl/Window.webidl
-index 36207ca9965b2e5ce7ee74776f84d43a08cbb6d9..6cd349fe9c6f80198c197976ced63bfec6be4626 100644
+index 36207ca9965b2e5ce7ee74776f84d43a08cbb6d9..ccd60e3d8fcfa06685e7d6e36d4df1636c4e54b1 100644
 --- a/dom/webidl/Window.webidl
 +++ b/dom/webidl/Window.webidl
-@@ -383,6 +383,9 @@ dictionary SynthesizeEventData {
- 
- // Mozilla-specific stuff
- dictionary SynthesizeMouseEventData : SynthesizeEventData {
-+  // STEALTH-HOOK(fingerprint/input/latency): members are ordered by name, not here.
-+  unsigned long jugglerEventId = 0;
-+  double latency = 0;
-   // Indicates which mouse button is pressed/released when a mouse event is triggered.
-   long button = 0;
-   // Indicates which mouse buttons are pressed when a mouse event is triggered.
+@@ -394,8 +394,10 @@ dictionary SynthesizeMouseEventData : SynthesizeEventData {
+   long clickCount;
+   // Input source, see MouseEvent for values. Defaults to MouseEvent.MOZ_SOURCE_MOUSE.
+   short inputSource = 1;
++  double latency = 0;  // STEALTH-HOOK(fingerprint/input/latency)
+   // Modifiers pressed, using constants defined as MODIFIER_* in nsIDOMWindowUtils.
+   long modifiers = 0;
++  unsigned long jugglerEventId = 0;  // STEALTH-HOOK(fingerprint/input/latency)
+   // Raw movement delta, standing in for the raw delta a platform widget
+   // reports while the native pointer is locked. Must be specified together.
+   long movementX;

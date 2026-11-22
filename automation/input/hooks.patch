@@ -1,93 +1,88 @@
 diff --git a/dom/base/nsDOMWindowUtils.cpp b/dom/base/nsDOMWindowUtils.cpp
-index b39212b1c9710b3530502c8a39932f0523f46875..2a3c0883874453558c538b08caf8834a5b934168 100644
+index b39212b1c9710b3530502c8a39932f0523f46875..c17c662b141613658b2ebe2defb090ad047c2535 100644
 --- a/dom/base/nsDOMWindowUtils.cpp
 +++ b/dom/base/nsDOMWindowUtils.cpp
-@@ -62,6 +62,12 @@
- #include "nsGlobalWindowInner.h"
- #include "nsGlobalWindowOuter.h"
- #include "nsIDocShell.h"
-+// STEALTH-HOOK(fingerprint/canvas/as-drawn)
-+#include "StealthCanvasAsDrawn.h"
-+// STEALTH-HOOK(fingerprint/input/event-birth)
-+#include "StealthInputEventBirth.h"
-+// STEALTH-HOOK(automation/input)
-+#include "StealthJugglerInput.h"
- #include "nsIFrame.h"
- #include "nsIObjectLoadingContent.h"
- #include "nsIWidget.h"
-@@ -723,7 +729,8 @@ nsDOMWindowUtils::SendWheelEvent(float aX, float aY, double aDeltaX,
+@@ -145,6 +145,10 @@
+ #  undef GetClassName
+ #endif
+ 
++#include "StealthCanvasAsDrawn.h"  // STEALTH-HOOK(fingerprint/canvas/as-drawn)
++#include "StealthInputEventBirth.h"  // STEALTH-HOOK(fingerprint/input/event-birth)
++#include "StealthJugglerInput.h"  // STEALTH-HOOK(automation/input)
++
+ using namespace mozilla;
+ using namespace mozilla::dom;
+ using namespace mozilla::ipc;
+@@ -723,7 +727,8 @@ nsDOMWindowUtils::SendWheelEvent(float aX, float aY, double aDeltaX,
                                   uint32_t aDeltaMode, int32_t aModifiers,
                                   int32_t aLineOrPageDeltaX,
                                   int32_t aLineOrPageDeltaY, uint32_t aOptions,
 -                                 nsISynthesizedEventCallback* aCallback) {
 +                                 nsISynthesizedEventCallback* aCallback,
-+                                 double aLatency) {
++                                 double aLatency) {  // STEALTH-HOOK(fingerprint/input/event-birth)
    if (XRE_IsContentProcess() && aCallback &&
        ((aOptions & WHEEL_EVENT_ASYNC_ENABLED) ||
         StaticPrefs::test_events_async_enabled())) {
-@@ -758,6 +765,8 @@ nsDOMWindowUtils::SendWheelEvent(float aX, float aY, double aDeltaX,
+@@ -758,6 +763,7 @@ nsDOMWindowUtils::SendWheelEvent(float aX, float aY, double aDeltaX,
    wheelEvent.mCallbackId = notifier.SaveCallback();
    wheelEvent.mFlags.mIsSynthesizedForTests = true;
  
-+  // STEALTH-HOOK(fingerprint/input/event-birth)
-+  StealthSetInputEventBirth(wheelEvent, aLatency, GetDocument());
++  StealthSetInputEventBirth(wheelEvent, aLatency, GetDocument());  // STEALTH-HOOK(fingerprint/input/event-birth)
    nsPresContext* presContext = GetPresContext();
    NS_ENSURE_TRUE(presContext, NS_ERROR_FAILURE);
  
-@@ -1403,7 +1412,8 @@ nsDOMWindowUtils::NodesFromRect(float aX, float aY, float aTopSize,
+@@ -1403,7 +1409,7 @@ nsDOMWindowUtils::NodesFromRect(float aX, float aY, float aTopSize,
  static already_AddRefed<DataSourceSurface> CanvasToDataSourceSurface(
      HTMLCanvasElement* aCanvas) {
    MOZ_ASSERT(aCanvas);
 -  SurfaceFromElementResult result = nsLayoutUtils::SurfaceFromElement(aCanvas);
-+  // STEALTH-HOOK(fingerprint/canvas/as-drawn)
-+  SurfaceFromElementResult result = StealthSurfaceFromCanvasAsDrawn(aCanvas);
++  SurfaceFromElementResult result = StealthSurfaceFromCanvasAsDrawn(aCanvas);  // STEALTH-HOOK(fingerprint/canvas/as-drawn)
    const RefPtr<SourceSurface> surf = result.GetSourceSurface();
    if (!surf) {
      return nullptr;
 diff --git a/dom/events/EventStateManager.cpp b/dom/events/EventStateManager.cpp
-index 294b486e9666fce45bcb2bc13231441ede997784..bb6cf3cee68f451f5a88e94d3a778e2b717b339a 100644
+index 294b486e9666fce45bcb2bc13231441ede997784..bde71517f79693408dcf86d76c89cf5d564d8fbb 100644
 --- a/dom/events/EventStateManager.cpp
 +++ b/dom/events/EventStateManager.cpp
-@@ -2672,6 +2672,7 @@ void EventStateManager::BeginTrackingDragGesture(
+@@ -131,6 +131,8 @@
+ #  import <ApplicationServices/ApplicationServices.h>
+ #endif
+ 
++#include "StealthDragGesture.h"  // STEALTH-HOOK(automation/input)
++
+ namespace mozilla {
+ 
+ using namespace dom;
+@@ -2672,6 +2674,7 @@ void EventStateManager::BeginTrackingDragGesture(
    mGestureModifiers = aMouseDownOrTouchDragEvent.mModifiers;
    mGestureDownButtons = aMouseDownOrTouchDragEvent.mButtons;
    mGestureDownButton = aMouseDownOrTouchDragEvent.mButton;
-+  mGestureDownFromJuggler = aMouseDownOrTouchDragEvent.mJugglerEventId != 0;
++  StealthDragGestureBegin(mGestureDownFromJuggler, aMouseDownOrTouchDragEvent);  // STEALTH-HOOK(automation/input)
  
    if (aMouseDownOrTouchDragEvent.mMessage != eMouseTouchDrag &&
        StaticPrefs::ui_click_hold_context_menus()) {
-@@ -2826,6 +2827,14 @@ void EventStateManager::GenerateDragGesture(
+@@ -2825,6 +2828,7 @@ void EventStateManager::GenerateDragGesture(
+   if (!IsTrackingDragGesture()) {
      return;
    }
++  if (StealthSkipDragGesture(mGestureDownFromJuggler, aMouseOrTouchOrPointerEvent)) return;  // STEALTH-HOOK(automation/input)
  
-+  // STEALTH-HOOK(automation/input): B288, see FEATURE.md
-+  if (const WidgetMouseEvent* mouseEvent =
-+          aMouseOrTouchOrPointerEvent.AsMouseEvent()) {
-+    if ((mouseEvent->mJugglerEventId != 0) != mGestureDownFromJuggler) {
-+      return;
-+    }
-+  }
-+
    AutoWeakFrame targetFrameBefore = mCurrentTarget;
    auto autoRestore = MakeScopeExit([&] { mCurrentTarget = targetFrameBefore; });
- 
 diff --git a/dom/events/EventStateManager.h b/dom/events/EventStateManager.h
-index 24bd0f5c5a37d74c6199fea58c0d6f537813d90e..d5d175fe2a1dfded9007dfb371ed7cd8ac3d2a30 100644
+index 24bd0f5c5a37d74c6199fea58c0d6f537813d90e..e25176704061718872a14a4ddc7f709760ee5824 100644
 --- a/dom/events/EventStateManager.h
 +++ b/dom/events/EventStateManager.h
-@@ -1469,6 +1469,10 @@ class EventStateManager : public nsSupportsWeakReference, public nsIObserver {
+@@ -1469,6 +1469,7 @@ class EventStateManager : public nsSupportsWeakReference, public nsIObserver {
    Modifiers mGestureModifiers;
    uint16_t mGestureDownButtons;
    int16_t mGestureDownButton;
-+  // Stealthfox [B288]: whether the press that started the gesture came from
-+  // Juggler (nsIDOMWindowUtils.jugglerSendMouseEvent). Only moves of the same
-+  // origin continue it; see GenerateDragGesture.
-+  bool mGestureDownFromJuggler = false;
++  bool mGestureDownFromJuggler = false;  // STEALTH-HOOK(automation/input)
  
    LastMouseButtonPressInfo mLastPrimaryButtonPressInfo;
    LastMouseButtonPressInfo mLastMiddleButtonPressInfo;
 diff --git a/dom/interfaces/base/nsIDOMWindowUtils.idl b/dom/interfaces/base/nsIDOMWindowUtils.idl
-index 400fb84ffc63b2a328d75a0e49779bd5f1194a01..78e7696bf551060e277db23a9f6f05564ac2311b 100644
+index 400fb84ffc63b2a328d75a0e49779bd5f1194a01..897223e2cf219e4c8c8b4d10c93d51a048c6174a 100644
 --- a/dom/interfaces/base/nsIDOMWindowUtils.idl
 +++ b/dom/interfaces/base/nsIDOMWindowUtils.idl
 @@ -381,7 +381,8 @@ interface nsIDOMWindowUtils : nsISupports {
@@ -96,108 +91,125 @@ index 400fb84ffc63b2a328d75a0e49779bd5f1194a01..78e7696bf551060e277db23a9f6f0556
                        in unsigned long aOptions,
 -                      [optional] in nsISynthesizedEventCallback aCallback);
 +                      [optional] in nsISynthesizedEventCallback aCallback,
-+                      [optional] in double aLatency);
++                      [optional] in double aLatency);  // STEALTH-HOOK(fingerprint/input/event-birth)
  
    /**
     * Native modifiers for sendNativeKeyEvent and sendNativeMouseEvent.
-@@ -455,6 +456,30 @@ interface nsIDOMWindowUtils : nsISupports {
+@@ -455,11 +456,14 @@ interface nsIDOMWindowUtils : nsISupports {
                              in Element aElementOnWidget,
                              [optional] in nsISynthesizedEventCallback aCallback);
  
-+  /** Playwright: synthetic mouse event, returns an event id; documented at JugglerSendMouseEvent in dom/base/StealthJugglerInput.h. */
-+  [can_run_script]
-+  unsigned long jugglerSendMouseEvent(in AString aType,
-+                         in float aX,
-+                         in float aY,
-+                         in long aButton,
-+                         in long aClickCount,
-+                         in long aModifiers,
-+                         in boolean aIgnoreRootScrollFrame,
-+                         in float aPressure,
-+                         in unsigned short aInputSourceArg,
-+                         in boolean aIsDOMEventSynthesized,
-+                         in boolean aIsWidgetEventSynthesized,
-+                         in long aButtons,
-+                         in unsigned long aIdentifier,
-+                         in double aLatency);
-+
-+  /** Stealthfox: synthetic DRAG event; documented at JugglerSendDragEvent in dom/base/StealthJugglerInput.h. */
-+  [can_run_script]
-+  void jugglerSendDragEvent(in AString aType,
-+                            in float aX,
-+                            in float aY,
-+                            in long aModifiers);
++  [can_run_script] unsigned long jugglerSendMouseEvent(in AString aType, in float aX, in float aY, in long aButton, in long aClickCount, in long aModifiers, in boolean aIgnoreRootScrollFrame, in float aPressure, in unsigned short aInputSourceArg, in boolean aIsDOMEventSynthesized, in boolean aIsWidgetEventSynthesized, in long aButtons, in unsigned long aIdentifier, in double aLatency);  // STEALTH-HOOK(automation/input)
 +
    /**
     * Suppress animations that are applied to a window by OS when
     * resizing, moving, changing size mode, ...
+    */
+   void suppressAnimation(in boolean aSuppress);
++  [can_run_script] void jugglerSendDragEvent(in AString aType, in float aX, in float aY, in long aModifiers);  // STEALTH-HOOK(automation/input)
+ 
+   /**
+    * The values for sendNativeMouseScrollEvent's aAdditionalFlags.
 diff --git a/dom/ipc/CoalescedMouseData.cpp b/dom/ipc/CoalescedMouseData.cpp
-index ac5a2b05026352ad1d6a4cb7c80c6e65e88e7b45..a26a3773a1500d68762371fca0d8e8689eec3369 100644
+index ac5a2b05026352ad1d6a4cb7c80c6e65e88e7b45..f884d73917e038cfb86123f1c2e1907a910b38c4 100644
 --- a/dom/ipc/CoalescedMouseData.cpp
 +++ b/dom/ipc/CoalescedMouseData.cpp
-@@ -47,6 +47,10 @@ void CoalescedMouseData::Coalesce(const WidgetMouseEvent& aMouseOrPointerEvent,
+@@ -9,6 +9,8 @@
+ #include "mozilla/StaticPrefs_dom.h"
+ #include "nsRefreshDriver.h"
+ 
++#include "StealthJugglerCoalesce.h"  // STEALTH-HOOK(automation/input)
++
+ using namespace mozilla;
+ using namespace mozilla::dom;
+ 
+@@ -47,6 +49,7 @@ void CoalescedMouseData::Coalesce(const WidgetMouseEvent& aMouseOrPointerEvent,
      mCoalescedInputEvent->mTimeStamp = aMouseOrPointerEvent.mTimeStamp;
      mCoalescedInputEvent->mRefPoint = aMouseOrPointerEvent.mRefPoint;
      mCoalescedInputEvent->mPressure = aMouseOrPointerEvent.mPressure;
-+    // Stealthfox [B217]: the coalesced event acks the LAST id folded into it,
-+    // which is the one a caller waiting on "has my move landed" holds.
-+    mCoalescedInputEvent->mJugglerEventId =
-+        aMouseOrPointerEvent.mJugglerEventId;
++    StealthCoalesceJugglerEventId(*mCoalescedInputEvent, aMouseOrPointerEvent);  // STEALTH-HOOK(automation/input)
      mCoalescedInputEvent->AssignPointerHelperData(aMouseOrPointerEvent);
      // Accumulate motion across coalesced events. Without this,
      // the dispatched event would report only the first motion,
+diff --git a/dom/ipc/gtest/moz.build b/dom/ipc/gtest/moz.build
+index da147bc747b8672d8af11e8b5881f24e798eb819..fd9919b6446e27a69fbc2e84904967d91802185a 100644
+--- a/dom/ipc/gtest/moz.build
++++ b/dom/ipc/gtest/moz.build
+@@ -7,6 +7,7 @@ UNIFIED_SOURCES += [
+     "ProcessIsolationTest.cpp",
+     "RemoteTypeTest.cpp",
+ ]
++UNIFIED_SOURCES += ["TestStealthDragGesture.cpp", "TestStealthJugglerCoalesce.cpp", "TestStealthMouseEventIPC.cpp"]  # STEALTH-HOOK(automation/input)
+ 
+ include("/ipc/chromium/chromium-config.mozbuild")
+ 
+@@ -15,3 +16,4 @@ FINAL_LIBRARY = "xul-gtest"
+ LOCAL_INCLUDES += [
+     "/xpcom/components",
+ ]
++LOCAL_INCLUDES += ["/dom/events"]  # STEALTH-HOOK(automation/input)
 diff --git a/layout/base/PresShell.cpp b/layout/base/PresShell.cpp
-index ca58605fd207e17050ead0f37bd63aa3f7edb7e7..961a007e277359133546d135d591953384347ea6 100644
+index ca58605fd207e17050ead0f37bd63aa3f7edb7e7..3f6314fab50536cc78fcdd688fb3814bba9969a2 100644
 --- a/layout/base/PresShell.cpp
 +++ b/layout/base/PresShell.cpp
-@@ -17,6 +17,7 @@
- #include "PositionedEventTargeting.h"
- #include "PresShellWidgetListener.h"
- #include "ScrollSnap.h"
+@@ -228,6 +228,8 @@
+ // relative to the max screen height/width
+ #define RELATIVE_SCALEFACTOR 0.0925f
+ 
 +#include "StealthJugglerAck.h"  // STEALTH-HOOK(automation/input)
- #include "StickyScrollContainer.h"
- #include "Units.h"
- #include "VisualViewport.h"
-@@ -7372,6 +7373,8 @@ nsresult PresShell::HandleEvent(nsIFrame* aFrameForPresShell,
++
+ using namespace mozilla;
+ using namespace mozilla::css;
+ using namespace mozilla::dom;
+@@ -7369,6 +7371,7 @@ nsresult PresShell::HandleEvent(nsIFrame* aFrameForPresShell,
+                                 WidgetGUIEvent* aGUIEvent,
+                                 bool aDontRetargetEvents,
+                                 nsEventStatus* aEventStatus) {
++  StealthJugglerMouseAck jugglerMouseAck(aGUIEvent);  // STEALTH-HOOK(automation/input)
    MOZ_ASSERT(aGUIEvent);
  
    RecordModifiers(aGUIEvent);
-+  // STEALTH-HOOK(automation/input)
-+  StealthJugglerMouseAck jugglerMouseAck(aGUIEvent);
+diff --git a/layout/base/gtest/moz.build b/layout/base/gtest/moz.build
+index 9e7558fe897f28502c58901995b39609067d20ef..44f6c56d852b2d71f49830627837f750fd922634 100644
+--- a/layout/base/gtest/moz.build
++++ b/layout/base/gtest/moz.build
+@@ -8,6 +8,7 @@ UNIFIED_SOURCES += [
+     "TestAccessibleCaretManager.cpp",
+     "TestUniqueOrNonOwningPtr.cpp",
+ ]
++UNIFIED_SOURCES += ["TestStealthJugglerMouseAck.cpp"]  # STEALTH-HOOK(automation/input)
  
-   AutoWeakFrame weakFrameForPresShell(aFrameForPresShell);
- 
+ # THE MOCK_METHOD2 macro from gtest triggers this clang warning and it's hard
+ # to work around, so we just ignore it.
 diff --git a/widget/MouseEvents.h b/widget/MouseEvents.h
-index e0e3b70f718140d313bb5d54fdc9679a42804df6..aa297e09d3c6f091980b8866917d5eb7f7b913c3 100644
+index e0e3b70f718140d313bb5d54fdc9679a42804df6..6f046cc3615773e1aa5c02d11f1823f02812d303 100644
 --- a/widget/MouseEvents.h
 +++ b/widget/MouseEvents.h
-@@ -239,6 +239,9 @@ class WidgetMouseEventBase : public WidgetInputEvent {
+@@ -238,6 +238,7 @@ class WidgetMouseEventBase : public WidgetInputEvent {
+ 
    // Possible values a in MouseEvent
    uint16_t mInputSource;
++  uint32_t mJugglerEventId = 0;  // STEALTH-HOOK(automation/input)
  
-+  // STEALTH-HOOK(automation/input): B217, see FEATURE.md
-+  uint32_t mJugglerEventId = 0;
-+
    bool IsLeftButtonPressed() const {
      return !!(mButtons & MouseButtonsFlag::ePrimaryFlag);
-   }
-@@ -263,6 +266,7 @@ class WidgetMouseEventBase : public WidgetInputEvent {
-     mButtons = aEvent.mButtons;
-     mPressure = aEvent.mPressure;
-     mInputSource = aEvent.mInputSource;
-+    mJugglerEventId = aEvent.mJugglerEventId;
-   }
+@@ -257,6 +258,7 @@ class WidgetMouseEventBase : public WidgetInputEvent {
  
-   /**
+   void AssignMouseEventBaseData(const WidgetMouseEventBase& aEvent,
+                                 bool aCopyTargets) {
++    mJugglerEventId = aEvent.mJugglerEventId;  // STEALTH-HOOK(automation/input)
+     AssignInputEventData(aEvent, aCopyTargets);
+ 
+     mButton = aEvent.mButton;
 diff --git a/widget/nsGUIEventIPC.h b/widget/nsGUIEventIPC.h
-index 2ecd78035575b074f6b2ac798162188c4d02e0d5..f852c75ab65a16e58c53c22c1a8ab8271ccb2912 100644
+index 2ecd78035575b074f6b2ac798162188c4d02e0d5..3b1b623e902d0a923a6560f7f1bedac85aa5ed96 100644
 --- a/widget/nsGUIEventIPC.h
 +++ b/widget/nsGUIEventIPC.h
 @@ -165,6 +165,7 @@ struct ParamTraits<mozilla::WidgetMouseEventBase> {
      WriteParam(aWriter, aParam.mButtons);
      WriteParam(aWriter, aParam.mPressure);
      WriteParam(aWriter, aParam.mInputSource);
-+    WriteParam(aWriter, aParam.mJugglerEventId);
++    WriteParam(aWriter, aParam.mJugglerEventId);  // STEALTH-HOOK(automation/input)
    }
  
    static bool ReadForDerivedClass(MessageReader* aReader,
@@ -207,21 +219,20 @@ index 2ecd78035575b074f6b2ac798162188c4d02e0d5..f852c75ab65a16e58c53c22c1a8ab827
             ReadParam(aReader, &aResult->mPressure) &&
 -           ReadParam(aReader, &aResult->mInputSource);
 +           ReadParam(aReader, &aResult->mInputSource) &&
-+           ReadParam(aReader, &aResult->mJugglerEventId);
++           ReadParam(aReader, &aResult->mJugglerEventId);  // STEALTH-HOOK(automation/input)
    }
  };
  
 diff --git a/xpcom/reflect/xptinfo/xptinfo.h b/xpcom/reflect/xptinfo/xptinfo.h
-index 7b1d918e86af55b5f961d839ca5009335b56d88b..b99db2437222030c8a6f26ae0a560a36ce8c7af8 100644
+index 7b1d918e86af55b5f961d839ca5009335b56d88b..8f342175a4f139db38799d7cf1ce21146ef074c3 100644
 --- a/xpcom/reflect/xptinfo/xptinfo.h
 +++ b/xpcom/reflect/xptinfo/xptinfo.h
-@@ -504,7 +504,8 @@ static_assert(sizeof(nsXPTMethodInfo) == 8, "wrong size");
+@@ -504,7 +504,7 @@ static_assert(sizeof(nsXPTMethodInfo) == 8, "wrong size");
  #if defined(MOZ_THUNDERBIRD) || defined(MOZ_SUITE)
  #  define PARAM_BUFFER_COUNT 18
  #else
 -#  define PARAM_BUFFER_COUNT 14
-+// Stealthfox: bumped 14 -> 15 for jugglerSendMouseEvent (15 args).
-+#  define PARAM_BUFFER_COUNT 15
++#  define PARAM_BUFFER_COUNT 15  // STEALTH-HOOK(automation/input)
  #endif
  
  /**

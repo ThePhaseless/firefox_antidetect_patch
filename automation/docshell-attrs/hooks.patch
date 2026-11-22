@@ -12,32 +12,37 @@ index 72a86ad9f248aa366dee072569d35c8509944b84..ad4e0ce200ecc5cf0407de06c5fbf63e
  TEST_DIRS += ["test/gtest"]
  
 diff --git a/docshell/base/nsDocShell.h b/docshell/base/nsDocShell.h
-index 27d9e920d135d8f94971cf303ef7ba3bfe4d512e..8c4740b678c6eb6d898ec061e233540b52c9e674 100644
+index 27d9e920d135d8f94971cf303ef7ba3bfe4d512e..1ee87e30b5fb1d855ac0987f9125bc8e11f6b6b4 100644
 --- a/docshell/base/nsDocShell.h
 +++ b/docshell/base/nsDocShell.h
-@@ -1359,6 +1359,10 @@ class nsDocShell final : public nsDocLoader,
+@@ -1358,8 +1358,10 @@ class nsDocShell final : public nsDocLoader,
+   bool mIsBeingDestroyed : 1;
  
    bool mIsExecutingOnLoadHandler : 1;
++  bool mFileInputInterceptionEnabled : 1 = false;  // STEALTH-HOOK(automation/docshell-attrs)
  
-+  // STEALTH-HOOK(automation/docshell-attrs)
-+  bool mFileInputInterceptionEnabled : 1;
-+  bool mBypassCSPEnabled : 1;
-+
    bool mInvisible : 1;
++  bool mBypassCSPEnabled : 1 = false;  // STEALTH-HOOK(automation/docshell-attrs)
  
    // There has been an OnStartRequest for a non-about:blank URI
+   bool mHasLoadedNonBlankURI : 1;
 diff --git a/docshell/base/nsIDocShell.idl b/docshell/base/nsIDocShell.idl
-index 264a665f8f08dd480b8bb9f1a5969ae55cc4a439..6fbdcc08feee4ff6310d5399c73d1f22292c0b72 100644
+index 264a665f8f08dd480b8bb9f1a5969ae55cc4a439..4ab2230c3eb4e5bc7288c9e43da73fb0da948f5e 100644
 --- a/docshell/base/nsIDocShell.idl
 +++ b/docshell/base/nsIDocShell.idl
-@@ -685,6 +685,10 @@ interface nsIDocShell : nsIDocShellTreeItem
+@@ -684,6 +684,7 @@ interface nsIDocShell : nsIDocShellTreeItem
+    * @see nsISHEntry synchronizeLayoutHistoryState().
     */
    void synchronizeLayoutHistoryState();
++  attribute boolean fileInputInterceptionEnabled;  // STEALTH-HOOK(automation/docshell-attrs)
  
-+  // STEALTH-HOOK(automation/docshell-attrs): see FEATURE.md
-+  attribute boolean fileInputInterceptionEnabled;
-+  attribute boolean bypassCSPEnabled;
-+
    /**
     * This attempts to save any applicable layout history state (like
-    * scroll position) in the nsISHEntry. This is normally done
+@@ -694,6 +695,7 @@ interface nsIDocShell : nsIDocShellTreeItem
+    * until session history state is moved into the parent process.
+    */
+   void persistLayoutHistoryState();
++  attribute boolean bypassCSPEnabled;  // STEALTH-HOOK(automation/docshell-attrs)
+ 
+   /**
+    * Cancels the planned form submission navigation, if there is any.

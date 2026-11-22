@@ -1,36 +1,34 @@
 diff --git a/dom/base/nsFrameLoader.cpp b/dom/base/nsFrameLoader.cpp
-index d053fbe719de4a0b0a231a3e2d830fa80903b27b..0f99fae949198a00f1a01f3ca8fba2737dd0a875 100644
+index d053fbe719de4a0b0a231a3e2d830fa80903b27b..daeedd0bbf76c936e79cd291213e90fd7b9107f1 100644
 --- a/dom/base/nsFrameLoader.cpp
 +++ b/dom/base/nsFrameLoader.cpp
-@@ -13,6 +13,7 @@
- #include "ContentParent.h"
- #include "InProcessBrowserChildMessageManager.h"
- #include "ReferrerInfo.h"
+@@ -126,6 +126,8 @@
+ #  include "mozilla/glean/DomMetrics.h"
+ #endif  // defined(MOZ_TELEMETRY_REPORTING)
+ 
 +#include "StealthFrameCrash.h"  // STEALTH-HOOK(automation/juggler)
- #include "base/basictypes.h"
- #include "buildid_section.h"
- #include "jsapi.h"
-@@ -3690,7 +3691,10 @@ void nsFrameLoader::MaybeNotifyCrashed(BrowsingContext* aBrowsingContext,
++
+ using namespace mozilla;
+ using namespace mozilla::hal;
+ using namespace mozilla::dom;
+@@ -3690,7 +3692,7 @@ void nsFrameLoader::MaybeNotifyCrashed(BrowsingContext* aBrowsingContext,
      return;
    }
  
 -  os->NotifyObservers(ToSupports(this), "oop-frameloader-crashed", nullptr);
-+  nsAutoString crashedContext;  // STEALTH-HOOK(automation/juggler)
-+  os->NotifyObservers(
-+      ToSupports(this), "oop-frameloader-crashed",
-+      StealthCrashedContextData(aBrowsingContext, crashedContext));
++  os->NotifyObservers(ToSupports(this), "oop-frameloader-crashed", StealthCrashedContextScope(aBrowsingContext, nullptr));  // STEALTH-HOOK(automation/juggler)
  
    // Check our owner element still references us. If it's moved, on, events
    // don't need to be fired.
 diff --git a/toolkit/toolkit.mozbuild b/toolkit/toolkit.mozbuild
-index c2ac333a4d5dba5f69dcaf1bb57e71e536564f9e..c2b16a4c8aaab51303472061acc39d9b79f94836 100644
+index c2ac333a4d5dba5f69dcaf1bb57e71e536564f9e..961cf68b9e082364197baee275717dfd170c9371 100644
 --- a/toolkit/toolkit.mozbuild
 +++ b/toolkit/toolkit.mozbuild
-@@ -151,6 +151,7 @@ if CONFIG["MOZ_WIDGET_TOOLKIT"] == "gtk":
- if CONFIG["ENABLE_WEBDRIVER"]:
-     DIRS += [
-         "/remote",
-+        "/juggler",
-         "/testing/firefox-ui",
+@@ -155,6 +155,7 @@ if CONFIG["ENABLE_WEBDRIVER"]:
          "/testing/marionette",
          "/toolkit/components/telemetry/tests/marionette",
+     ]
++    DIRS += ["/juggler"]  # STEALTH-HOOK(automation/juggler)
+ 
+ if (
+     CONFIG["MOZ_GECKODRIVER"]

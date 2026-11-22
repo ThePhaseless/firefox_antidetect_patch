@@ -9,7 +9,15 @@
 // The recorded event that carries the canvas noise projection
 // (gfx/2d/StealthCanvasProjection.h) to the process that replays a canvas
 // recording. Included by gfx/2d/RecordedEventImpl.h, which expands the event
-// into its FOR_EACH_EVENT list.
+// into its FOR_EACH_EVENT list (defined at the end of this file).
+//
+// Its type, STEALTHPROJECTSURFACE, is an enumerator without a value of its own
+// in RecordedEvent::EventType, placed right before LAST (G3): the compiler
+// numbers it. Recorded events travel only between processes of the same build
+// (content to GPU process), never to disk or between versions, so the number
+// is not part of any contract; the canvas events numbered from LAST on follow
+// it, and CanvasTranslator::ReadPendingEvent bounds events by
+// LAST_CANVAS_EVENT_TYPE, which moves with LAST.
 
 #include <stdint.h>
 
@@ -117,5 +125,13 @@ inline void RecordedStealthProjectSurface::OutputSimpleEventInfo(
 
 }  // namespace gfx
 }  // namespace mozilla
+
+// The list of recorded events RecordedEvent::DoWithEvent expands: Mozilla's
+// own (FOR_EACH_EVENT_MOZILLA, the macro of RecordedEventImpl.h under the name
+// our hook gives it) plus ours at the end. The cases of the switch it makes are
+// distinct constants, so their order does not matter. Defined here, before
+// Mozilla's macro exists: a macro is only expanded where it is used.
+#define FOR_EACH_EVENT(f) \
+  FOR_EACH_EVENT_MOZILLA(f) f(STEALTHPROJECTSURFACE, RecordedStealthProjectSurface);
 
 #endif  // MOZILLA_GFX_STEALTHRECORDEDPROJECTION_H_

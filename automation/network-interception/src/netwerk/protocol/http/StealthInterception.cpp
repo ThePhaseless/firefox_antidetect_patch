@@ -17,10 +17,10 @@
 // could answer is offered to the worker first: the driver calls
 // InterceptAfterServiceWorkerResets() to be called again if the worker lets
 // the request through. ResetInterception() (InterceptedHttpChannel.cpp, one
-// STEALTH-HOOK) then hands the channel back to the driver's interceptor
-// (StealthInterceptAgain) instead of going on, and keeps the bypass the worker
-// asked for in mServiceWorkerResetBypass. The driver finally resumes the
-// request with ResetInterceptionWithURI().
+// STEALTH-HOOK, after Mozilla's debug line) then hands the channel back to the
+// driver's interceptor (StealthInterceptAgain) instead of going on, and keeps
+// the bypass the worker asked for in mServiceWorkerResetBypass. The
+// driver finally resumes the request with ResetInterceptionWithURI().
 //
 // State, declared in InterceptedHttpChannel.h:
 //  - mInterceptAfterServiceWorkerResets: after resetInterception is called,
@@ -62,6 +62,12 @@ InterceptedHttpChannel::ResetInterceptionWithURI(nsIURI* aURI) {
   // did not answer, so with Juggler attached no page was ever controlled by
   // its service worker, route or not.
   return ResetInterception(mServiceWorkerResetBypass);
+}
+
+// Whether InterceptAfterServiceWorkerResets() was called before: the hook in
+// ResetInterception() then hands the channel to StealthInterceptAgain().
+bool InterceptedHttpChannel::StealthOwnsInterception() {
+  return mInterceptAfterServiceWorkerResets;
 }
 
 // Called by ResetInterception() when InterceptAfterServiceWorkerResets() was

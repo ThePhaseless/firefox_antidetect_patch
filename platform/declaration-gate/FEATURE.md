@@ -2,7 +2,7 @@
 
 Category: spoof
 Prefs: zoom.stealth.gfx.feature_status (and the gate's list of required declarations in StealthDeclarationGate.cpp)
-Test: gfx/thebes/gtest/TestStealthGfxFeatureStatus.cpp (StealthGfxFeatureStatus.TheMeasuredRetailDeclarationsParse, EveryBrokenRuleIsRefused, WebglOpenglGatesTheWebglPathOfThisPlatform, EveryLiveFeatureAnswersFromTheDeclaration, TheDownloadedBlocklistLeavesTheProfileAlone, NoSuggestedDriverVersionWhileDeclared); gtest filter StealthGfxFeatureStatus.* gfx/thebes/gtest/TestStealthScaleDeclaration.cpp (StealthScaleDeclaration.TheScaleTheDeclarationWasMadeAt, StealthScaleDeclaration.AnyOtherScaleIsAnIdentityNoMachineHas).
+Test: gfx/thebes/gtest/TestStealthGfxFeatureStatus.cpp (StealthGfxFeatureStatus.TheMeasuredRetailDeclarationsParse, EveryBrokenRuleIsRefused, WebglOpenglGatesTheWebglPathOfThisPlatform, EveryLiveFeatureAnswersFromTheDeclaration, TheDownloadedBlocklistLeavesTheProfileAlone, NoSuggestedDriverVersionWhileDeclared, ARetiredFeatureIsRefusedAndALiveOneAnswers, TheHostIsNotProbedWhileDeclared on GTK); gtest filter StealthGfxFeatureStatus.* gfx/thebes/gtest/TestStealthScaleDeclaration.cpp (StealthScaleDeclaration.TheScaleTheDeclarationWasMadeAt, StealthScaleDeclaration.AnyOtherScaleIsAnIdentityNoMachineHas).
 
 ## What it does
 
@@ -37,7 +37,8 @@ host's own). Run 41325657085 forced 1.5 over a 100% persona and read innerWidth
 
 ## Hooks in Mozilla files
 
-- `widget/GfxInfoBase.cpp` (after #include "GfxInfoBase.h"; GetFeatureStatus right after the retired-feature check; the top of GetFeatureSuggestedDriverVersion; the top of EvaluateDownloadedBlocklist, already-hook): every graphics feature decision answers from the declared retail statuses (StealthGfxFeatureStatus.cpp).
+- `widget/GfxInfoBase.cpp`: our include in a block of ours after Mozilla's (registration); `GfxInfoBase::GetFeatureStatus`, a one-line guard right after Mozilla's retired-feature check (a retired feature returns from Mozilla's check as before; StealthGfxDeclaredStatus answers only live features); `GetFeatureSuggestedDriverVersion` and `EvaluateDownloadedBlocklist`, guards as the first statement. Every graphics feature decision answers from the declared retail statuses (StealthGfxFeatureStatus.cpp).
+- `widget/gtk/GfxInfo.cpp`: our include in a block of ours (registration); `GfxInfo::FireGLXTestProcess`, a guard as the first statement (glxtest is never spawned, which also covers the early fire in XRE_mainStartup); `GfxInfo::GetData`, an anchor guard right after `GfxInfoBase::GetData();` that fills the test type, glxtest error, adapter RAM and the display-protocol flags from StealthFillGtkGfxInfoWithoutHost, passed as the five fields (the statements above it, mInitialized and the base GetData, must still run).
 
 ## Our own files
 

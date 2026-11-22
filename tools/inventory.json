@@ -1,30 +1,10 @@
 [
  {
-  "file": ".gitignore",
-  "category": "build",
-  "feature": "release-output-ignore",
-  "prefs": [],
-  "added": 1,
-  "removed": 0,
-  "hunks": 1,
-  "inline_logic_lines": 0,
-  "hookable": "already-hook",
-  "anchor": "(top-level ignore rules)",
-  "evidence": [
-   "+release-out/"
-  ],
-  "notes": "Ignores the local release output directory. Repo hygiene only; no Firefox code affected.",
-  "verifier": {
-   "changed": [],
-   "why": "Checked against the diff; no correction needed."
-  }
- },
- {
   "file": "CLAUDE.md",
   "category": "other",
   "feature": "agent-instructions-fork",
   "prefs": [],
-  "added": 76,
+  "added": 1,
   "removed": 0,
   "hunks": 1,
   "inline_logic_lines": 0,
@@ -48,9 +28,9 @@
   "category": "other",
   "feature": "readme-fork-disclosure",
   "prefs": [],
-  "added": 94,
-  "removed": 3,
-  "hunks": 2,
+  "added": 2,
+  "removed": 0,
+  "hunks": 1,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
   "anchor": "(top-level document)",
@@ -171,7 +151,7 @@
   "category": "juggler",
   "feature": "juggler-pipe-handles",
   "prefs": [],
-  "added": 4,
+  "added": 3,
   "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 14,
@@ -198,9 +178,9 @@
    "invisible_firefox.usage_ping.enabled",
    "invisible_firefox.usage_ping.url"
   ],
-  "added": 3,
+  "added": 1,
   "removed": 0,
-  "hunks": 2,
+  "hunks": 1,
   "inline_logic_lines": 8,
   "hookable": "movable",
   "anchor": "BrowserGlue.prototype._beforeUIStartup (before lazy.SessionStartup.init())",
@@ -275,26 +255,6 @@
   }
  },
  {
-  "file": "browser/installer/package-manifest.in",
-  "category": "build",
-  "feature": "bundled-fonts-macos",
-  "prefs": [],
-  "added": 1,
-  "removed": 1,
-  "hunks": 1,
-  "inline_logic_lines": 0,
-  "hookable": "already-hook",
-  "anchor": "(packaging manifest, fonts entry)",
-  "evidence": [
-   "+#if defined(XP_WIN) || defined(MOZ_WIDGET_GTK) || defined(XP_MACOSX)"
-  ],
-  "notes": "Packages @RESPATH@/fonts/* on macOS as well (upstream: Windows and GTK only). Packaging condition only; supports the bundled font set on every host.",
-  "verifier": {
-   "changed": [],
-   "why": "Checked against the diff; no correction needed."
-  }
- },
- {
   "file": "chrome/nsChromeRegistry.cpp",
   "category": "spoof",
   "feature": "stealth-branding-redirect",
@@ -325,7 +285,7 @@
   "category": "spoof",
   "feature": "stealth-branding-redirect",
   "prefs": [],
-  "added": 4,
+  "added": 3,
   "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 1,
@@ -347,7 +307,7 @@
   "category": "spoof",
   "feature": "stealth-branding-redirect",
   "prefs": [],
-  "added": 6,
+  "added": 4,
   "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 2,
@@ -371,8 +331,8 @@
   "prefs": [
    "zoom.stealth.debugger.force_detach"
   ],
-  "added": 2,
-  "removed": 1,
+  "added": 1,
+  "removed": 0,
   "hunks": 1,
   "inline_logic_lines": 2,
   "hookable": "already-hook",
@@ -397,8 +357,8 @@
    "juggler.timezone.override",
    "juggler.locale.override"
   ],
-  "added": 11,
-  "removed": 4,
+  "added": 6,
+  "removed": 3,
   "hunks": 5,
   "inline_logic_lines": 25,
   "hookable": "movable",
@@ -421,7 +381,7 @@
   "category": "juggler",
   "feature": "juggler-navigation-events",
   "prefs": [],
-  "added": 5,
+  "added": 4,
   "removed": 0,
   "hunks": 3,
   "inline_logic_lines": 20,
@@ -461,9 +421,9 @@
   "category": "juggler",
   "feature": "juggler-link-click-events",
   "prefs": [],
-  "added": 13,
+  "added": 10,
   "removed": 0,
-  "hunks": 8,
+  "hunks": 7,
   "inline_logic_lines": 45,
   "hookable": "movable",
   "anchor": "nsDocShell::nsDocShell (constructor); nsDocShell::Get/SetFileInputInterceptionEnabled; nsDocShell::Get/SetBypassCSPEnabled; nsDocShell::InternalLoad; NotifyJugglerLinkClick (static); OnLinkClickEvent::Run / Cancel / NotifyJugglerDone; nsDocShell::OnLinkClickWithLoadState",
@@ -485,7 +445,7 @@
   "category": "juggler",
   "feature": "juggler-docshell-attrs",
   "prefs": [],
-  "added": 4,
+  "added": 2,
   "removed": 0,
   "hunks": 1,
   "inline_logic_lines": 2,
@@ -506,9 +466,9 @@
   "category": "juggler",
   "feature": "juggler-docshell-attrs",
   "prefs": [],
-  "added": 4,
+  "added": 2,
   "removed": 0,
-  "hunks": 1,
+  "hunks": 2,
   "inline_logic_lines": 2,
   "hookable": "already-hook",
   "anchor": "interface nsIDocShell (after synchronizeLayoutHistoryState)",
@@ -529,8 +489,8 @@
   "category": "spoof",
   "feature": "timezone-declared",
   "prefs": [],
-  "added": 10,
-  "removed": 9,
+  "added": 9,
+  "removed": 4,
   "hunks": 7,
   "inline_logic_lines": 6,
   "hookable": "already-hook",
@@ -599,7 +559,7 @@
   "category": "juggler",
   "feature": "shadow-root-sandbox-access",
   "prefs": [],
-  "added": 2,
+  "added": 1,
   "removed": 1,
   "hunks": 1,
   "inline_logic_lines": 1,
@@ -625,9 +585,9 @@
    "zoom.stealth.hw_concurrency",
    "zoom.stealth.max_touch_points"
   ],
-  "added": 15,
+  "added": 5,
   "removed": 0,
-  "hunks": 4,
+  "hunks": 3,
   "inline_logic_lines": 6,
   "hookable": "already-hook",
   "anchor": "Navigator::HardwareConcurrency; Navigator::MaxTouchPoints",
@@ -647,7 +607,7 @@
   "category": "build",
   "feature": "session-declaration",
   "prefs": [],
-  "added": 2,
+  "added": 3,
   "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 0,
@@ -692,7 +652,7 @@
   "category": "juggler",
   "feature": "juggler-input-dispatch",
   "prefs": [],
-  "added": 12,
+  "added": 8,
   "removed": 2,
   "hunks": 4,
   "inline_logic_lines": 80,
@@ -716,9 +676,9 @@
   "category": "spoof",
   "feature": "window-geometry",
   "prefs": [],
-  "added": 22,
+  "added": 10,
   "removed": 2,
-  "hunks": 7,
+  "hunks": 6,
   "inline_logic_lines": 66,
   "hookable": "movable",
   "anchor": "CreateNativeGlobalForInner; nsGlobalWindowOuter::GetOuterSize; nsGlobalWindowOuter::GetScreenXY; nsGlobalWindowOuter::StealthContentOriginShift (new); nsGlobalWindowOuter::IsInStealthPopup (new); nsGlobalWindowOuter::GetMozInnerScreenXOuter; nsGlobalWindowOuter::GetMozInnerScreenYOuter",
@@ -734,27 +694,6 @@
   }
  },
  {
-  "file": "dom/base/nsGlobalWindowOuter.h",
-  "category": "spoof",
-  "feature": "window-geometry",
-  "prefs": [],
-  "added": 3,
-  "removed": 0,
-  "hunks": 1,
-  "inline_logic_lines": 3,
-  "hookable": "already-hook",
-  "anchor": "nsGlobalWindowOuter (declarations next to GetInnerScreenRect)",
-  "evidence": [
-   "+  static mozilla::Maybe<nsPoint> StealthContentOriginShift(",
-   "+  bool IsInStealthPopup() const;"
-  ],
-  "notes": "Two declarations with Italian comments. Event.cpp includes this header only to call StealthContentOriginShift; if the function moves to our own file, this header change and that include can go.",
-  "verifier": {
-   "changed": [],
-   "why": "Checked against the diff and source; no correction needed."
-  }
- },
- {
   "file": "dom/base/nsScreen.cpp",
   "category": "spoof",
   "feature": "screen-metrics",
@@ -764,7 +703,7 @@
    "zoom.stealth.screen.height",
    "zoom.stealth.screen.taskbar_px"
   ],
-  "added": 7,
+  "added": 5,
   "removed": 0,
   "hunks": 4,
   "inline_logic_lines": 12,
@@ -789,7 +728,7 @@
   "category": "build",
   "feature": "worker-locale-timezone",
   "prefs": [],
-  "added": 3,
+  "added": 2,
   "removed": 0,
   "hunks": 1,
   "inline_logic_lines": 0,
@@ -807,7 +746,7 @@
   "category": "build",
   "feature": "input-event-birth",
   "prefs": [],
-  "added": 1,
+  "added": 4,
   "removed": 0,
   "hunks": 1,
   "inline_logic_lines": 0,
@@ -825,7 +764,7 @@
   "category": "spoof",
   "feature": "canvas-2d-text-metrics",
   "prefs": [],
-  "added": 12,
+  "added": 5,
   "removed": 2,
   "hunks": 4,
   "inline_logic_lines": 45,
@@ -846,28 +785,6 @@
   }
  },
  {
-  "file": "dom/canvas/CanvasUtils.h",
-  "category": "spoof",
-  "feature": "canvas-noise-projection",
-  "prefs": [],
-  "added": 21,
-  "removed": 0,
-  "hunks": 2,
-  "inline_logic_lines": 5,
-  "hookable": "already-hook",
-  "anchor": "namespace mozilla::CanvasUtils (StealthNoise decl, inline StealthProjectsContextType, StealthProjectSnapshot decl)",
-  "evidence": [
-   "+inline bool StealthProjectsContextType(dom::CanvasContextType aType) {",
-   "+  return aType == dom::CanvasContextType::WebGL1 ||",
-   "+gfx::StealthCanvasNoise StealthNoise(nsIPrincipal* aCanvasPrincipal);"
-  ],
-  "notes": "The only inline logic is the 4-line body of StealthProjectsContextType; it could move to StealthCanvasProjection.h so this header holds declarations only. Adds two includes (AlreadyAddRefed.h, StealthCanvasProjection.h) to a widely included header, which costs compile time. Also forward-declares gfx::SourceSurface inside mozilla::gfx.",
-  "verifier": {
-   "changed": [],
-   "why": "Checked against the diff; no correction needed."
-  }
- },
- {
   "file": "dom/canvas/ClientWebGLContext.cpp",
   "category": "spoof",
   "feature": "webgl-parameters",
@@ -882,9 +799,9 @@
    "zoom.stealth.webgl2.extensions",
    "webgl.sanitize-unmasked-renderer"
   ],
-  "added": 35,
-  "removed": 5,
-  "hunks": 15,
+  "added": 14,
+  "removed": 2,
+  "hunks": 12,
   "inline_logic_lines": 300,
   "hookable": "movable",
   "anchor": "ClientWebGLContext::GetParameter, GetShaderPrecisionFormat, ReadPixels (both forms), DoReadPixels, DoReadPixelsAsync, IsSupported, GetSupportedExtensions, BufferParameter; static LookupStealthParamEntry and GetStealthExtensionWhitelist; GetImageBuffer and GetInputStream (toDataURL/toBlob projection); comment-only hunk in GetSurfaceSnapshot",
@@ -907,8 +824,8 @@
   "category": "spoof",
   "feature": "canvas-noise-projection",
   "prefs": [],
-  "added": 6,
-  "removed": 2,
+  "added": 2,
+  "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
@@ -932,9 +849,9 @@
   "category": "spoof",
   "feature": "canvas-noise-projection",
   "prefs": [],
-  "added": 3,
+  "added": 1,
   "removed": 1,
-  "hunks": 2,
+  "hunks": 1,
   "inline_logic_lines": 7,
   "hookable": "movable",
   "anchor": "OffscreenCanvas::GetSurfaceSnapshot",
@@ -954,8 +871,8 @@
   "category": "spoof",
   "feature": "canvas-noise-projection",
   "prefs": [],
-  "added": 9,
-  "removed": 1,
+  "added": 2,
+  "removed": 2,
   "hunks": 2,
   "inline_logic_lines": 10,
   "hookable": "movable",
@@ -976,9 +893,9 @@
   "category": "spoof",
   "feature": "canvas-noise-projection",
   "prefs": [],
-  "added": 4,
+  "added": 1,
   "removed": 0,
-  "hunks": 2,
+  "hunks": 1,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
   "anchor": "class OffscreenCanvasDisplayHelper (GetSurfaceSnapshot, GetSurfaceSnapshotAsDrawn)",
@@ -996,7 +913,7 @@
   "category": "spoof",
   "feature": "webgl-shader-output-language",
   "prefs": [],
-  "added": 4,
+  "added": 1,
   "removed": 1,
   "hunks": 1,
   "inline_logic_lines": 2,
@@ -1018,8 +935,8 @@
   "category": "spoof",
   "feature": "webgl-shader-output-language",
   "prefs": [],
-  "added": 2,
-  "removed": 1,
+  "added": 1,
+  "removed": 0,
   "hunks": 1,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
@@ -1059,7 +976,7 @@
   "category": "spoof",
   "feature": "webgl-shader-output-language",
   "prefs": [],
-  "added": 2,
+  "added": 1,
   "removed": 0,
   "hunks": 1,
   "inline_logic_lines": 14,
@@ -1084,7 +1001,7 @@
   "category": "spoof",
   "feature": "webgl-shader-output-language",
   "prefs": [],
-  "added": 5,
+  "added": 3,
   "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 1,
@@ -1107,8 +1024,8 @@
   "prefs": [
    "zoom.stealth.webgl.shader_output_language"
   ],
-  "added": 7,
-  "removed": 3,
+  "added": 2,
+  "removed": 2,
   "hunks": 2,
   "inline_logic_lines": 16,
   "hookable": "movable",
@@ -1153,9 +1070,9 @@
   "category": "build",
   "feature": "canvas-noise-projection",
   "prefs": [],
-  "added": 3,
+  "added": 5,
   "removed": 0,
-  "hunks": 2,
+  "hunks": 3,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
   "anchor": "hook added by the 2026-10-29 move to our files",
@@ -1193,9 +1110,9 @@
   "category": "juggler",
   "feature": "juggler-drag-gesture",
   "prefs": [],
-  "added": 9,
+  "added": 4,
   "removed": 0,
-  "hunks": 2,
+  "hunks": 3,
   "inline_logic_lines": 5,
   "hookable": "already-hook",
   "anchor": "EventStateManager::BeginTrackingDragGesture; EventStateManager::GenerateDragGesture",
@@ -1217,7 +1134,7 @@
   "category": "juggler",
   "feature": "juggler-drag-gesture",
   "prefs": [],
-  "added": 4,
+  "added": 1,
   "removed": 0,
   "hunks": 1,
   "inline_logic_lines": 1,
@@ -1237,9 +1154,9 @@
   "category": "spoof",
   "feature": "blob-native-endings",
   "prefs": [],
-  "added": 4,
-  "removed": 2,
-  "hunks": 1,
+  "added": 3,
+  "removed": 1,
+  "hunks": 2,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
   "anchor": "BlobSet::AppendUTF8String",
@@ -1258,9 +1175,9 @@
   "category": "spoof",
   "feature": "canvas-noise-projection",
   "prefs": [],
-  "added": 9,
-  "removed": 1,
-  "hunks": 2,
+  "added": 2,
+  "removed": 2,
+  "hunks": 1,
   "inline_logic_lines": 18,
   "hookable": "movable",
   "anchor": "HTMLCanvasElement::GetSurfaceSnapshot (page-facing wrapper), new HTMLCanvasElement::GetSurfaceSnapshotAsDrawn",
@@ -1282,7 +1199,7 @@
   "category": "spoof",
   "feature": "canvas-noise-projection",
   "prefs": [],
-  "added": 5,
+  "added": 2,
   "removed": 0,
   "hunks": 1,
   "inline_logic_lines": 0,
@@ -1303,7 +1220,7 @@
   "category": "juggler",
   "feature": "file-chooser-intercept",
   "prefs": [],
-  "added": 10,
+  "added": 4,
   "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 5,
@@ -1345,7 +1262,7 @@
   "category": "juggler",
   "feature": "juggler-input-dispatch",
   "prefs": [],
-  "added": 26,
+  "added": 5,
   "removed": 1,
   "hunks": 2,
   "inline_logic_lines": 0,
@@ -1369,9 +1286,9 @@
   "category": "juggler",
   "feature": "juggler-event-id",
   "prefs": [],
-  "added": 4,
+  "added": 3,
   "removed": 0,
-  "hunks": 1,
+  "hunks": 2,
   "inline_logic_lines": 2,
   "hookable": "already-hook",
   "anchor": "CoalescedMouseData::Coalesce",
@@ -1392,7 +1309,7 @@
   "prefs": [
    "zoom.stealth.audio.sample_rate"
   ],
-  "added": 6,
+  "added": 3,
   "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 2,
@@ -1417,8 +1334,8 @@
   "prefs": [
    "zoom.stealth.media.enumeration_ms"
   ],
-  "added": 27,
-  "removed": 13,
+  "added": 20,
+  "removed": 12,
   "hunks": 6,
   "inline_logic_lines": 23,
   "hookable": "movable",
@@ -1460,7 +1377,7 @@
   "category": "spoof",
   "feature": "media-decode-declaration",
   "prefs": [],
-  "added": 6,
+  "added": 4,
   "removed": 0,
   "hunks": 3,
   "inline_logic_lines": 41,
@@ -1505,7 +1422,7 @@
   "category": "spoof",
   "feature": "media-decode-declaration",
   "prefs": [],
-  "added": 9,
+  "added": 4,
   "removed": 0,
   "hunks": 3,
   "inline_logic_lines": 8,
@@ -1532,7 +1449,7 @@
    "zoom.stealth.fpp.hw_seed",
    "zoom.stealth.audio.fp_noise"
   ],
-  "added": 5,
+  "added": 4,
   "removed": 0,
   "hunks": 3,
   "inline_logic_lines": 16,
@@ -1560,7 +1477,7 @@
    "zoom.stealth.audio.output_latency_ms",
    "zoom.stealth.audio.max_channel_count"
   ],
-  "added": 11,
+  "added": 4,
   "removed": 0,
   "hunks": 3,
   "inline_logic_lines": 4,
@@ -1584,7 +1501,7 @@
    "zoom.stealth.fpp.hw_seed",
    "zoom.stealth.audio.fp_noise"
   ],
-  "added": 4,
+  "added": 3,
   "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 16,
@@ -1611,7 +1528,7 @@
    "zoom.stealth.fpp.hw_seed",
    "zoom.stealth.audio.fp_noise"
   ],
-  "added": 4,
+  "added": 3,
   "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 6,
@@ -1652,7 +1569,7 @@
   "prefs": [],
   "added": 2,
   "removed": 0,
-  "hunks": 2,
+  "hunks": 1,
   "inline_logic_lines": 1,
   "hookable": "already-hook",
   "anchor": "transport_lcppsrcs (source list)",
@@ -1670,7 +1587,7 @@
   "category": "other",
   "feature": "proxy-udp-egress",
   "prefs": [],
-  "added": 62,
+  "added": 18,
   "removed": 4,
   "hunks": 11,
   "inline_logic_lines": 35,
@@ -1688,35 +1605,13 @@
   }
  },
  {
-  "file": "dom/media/webrtc/transport/third_party/nICEr/nicer.gyp",
-  "category": "build",
-  "feature": "webrtc-declared-network",
-  "prefs": [],
-  "added": 3,
-  "removed": 7,
-  "hunks": 2,
-  "inline_logic_lines": 1,
-  "hookable": "already-hook",
-  "anchor": "include_dirs of the nICEr target; the stun source list",
-  "evidence": [
-   "+              # transport dir — for nr_stealth_network.h",
-   "+              '../..',",
-   "+"
-  ],
-  "notes": "Adds the transport directory so nICEr sources can include nr_stealth_network.h, and drops the OS enumerators (addrs-bsd, addrs-netlink, addrs-netlink-wireless, addrs-win32) from the sources.",
-  "verifier": {
-   "changed": [],
-   "why": "Written from the diff against the tag."
-  }
- },
- {
   "file": "dom/media/webrtc/transport/third_party/nICEr/src/ice/ice_ctx.cpp",
   "category": "spoof",
   "feature": "webrtc-declared-network",
   "prefs": [],
-  "added": 13,
-  "removed": 89,
-  "hunks": 3,
+  "added": 4,
+  "removed": 0,
+  "hunks": 2,
   "inline_logic_lines": 5,
   "hookable": "movable",
   "anchor": "include of nr_stealth_network.h; nr_ice_get_default_local_address; nr_ice_set_local_addresses (no default address)",
@@ -1737,7 +1632,7 @@
   "feature": "webrtc-declared-network",
   "prefs": [],
   "added": 3,
-  "removed": 9,
+  "removed": 1,
   "hunks": 2,
   "inline_logic_lines": 1,
   "hookable": "already-hook",
@@ -1760,7 +1655,7 @@
   "prefs": [
    "zoom.stealth.voices.list"
   ],
-  "added": 5,
+  "added": 3,
   "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 24,
@@ -1784,7 +1679,7 @@
   "category": "spoof",
   "feature": "speech-voices-declared",
   "prefs": [],
-  "added": 12,
+  "added": 7,
   "removed": 0,
   "hunks": 5,
   "inline_logic_lines": 42,
@@ -1809,24 +1704,6 @@
   "feature": "speech-voices-declared",
   "prefs": [],
   "added": 1,
-  "removed": 0,
-  "hunks": 1,
-  "inline_logic_lines": 0,
-  "hookable": "already-hook",
-  "anchor": "hook added by the 2026-10-29 move to our files",
-  "evidence": [],
-  "notes": "Hook registering or calling our own code.",
-  "verifier": {
-   "changed": [],
-   "why": "Added with the 2026-10-29 hook move."
-  }
- },
- {
-  "file": "dom/media/webspeech/synth/test/mochitest.toml",
-  "category": "build",
-  "feature": "speech-voices-declared",
-  "prefs": [],
-  "added": 2,
   "removed": 0,
   "hunks": 1,
   "inline_logic_lines": 0,
@@ -1903,7 +1780,7 @@
   "category": "juggler",
   "feature": "bypass-csp",
   "prefs": [],
-  "added": 5,
+  "added": 2,
   "removed": 0,
   "hunks": 1,
   "inline_logic_lines": 8,
@@ -1927,7 +1804,7 @@
   "category": "juggler",
   "feature": "bypass-csp",
   "prefs": [],
-  "added": 3,
+  "added": 1,
   "removed": 0,
   "hunks": 1,
   "inline_logic_lines": 0,
@@ -1947,9 +1824,9 @@
   "category": "spoof",
   "feature": "plaintext-linebreak",
   "prefs": [],
-  "added": 4,
-  "removed": 2,
-  "hunks": 1,
+  "added": 3,
+  "removed": 1,
+  "hunks": 2,
   "inline_logic_lines": 1,
   "hookable": "already-hook",
   "anchor": "DetermineLineBreak(const int32_t aFlags, nsAString& aLineBreak)",
@@ -2012,9 +1889,9 @@
   "category": "spoof",
   "feature": "canvas-noise-projection",
   "prefs": [],
-  "added": 6,
+  "added": 4,
   "removed": 0,
-  "hunks": 2,
+  "hunks": 3,
   "inline_logic_lines": 2,
   "hookable": "already-hook",
   "anchor": "CanvasContext::GetImageBuffer, CanvasContext::GetInputStream",
@@ -2034,7 +1911,7 @@
   "category": "juggler",
   "feature": "closed-shadowroot-automation-access",
   "prefs": [],
-  "added": 4,
+  "added": 1,
   "removed": 1,
   "hunks": 1,
   "inline_logic_lines": 0,
@@ -2059,7 +1936,7 @@
   "category": "spoof",
   "feature": "synthetic-input-latency",
   "prefs": [],
-  "added": 3,
+  "added": 2,
   "removed": 0,
   "hunks": 1,
   "inline_logic_lines": 0,
@@ -2085,7 +1962,7 @@
   "prefs": [
    "zoom.stealth.hw_concurrency"
   ],
-  "added": 7,
+  "added": 3,
   "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 2,
@@ -2108,7 +1985,7 @@
   "category": "spoof",
   "feature": "worker-locale-timezone",
   "prefs": [],
-  "added": 9,
+  "added": 5,
   "removed": 1,
   "hunks": 4,
   "inline_logic_lines": 11,
@@ -2133,7 +2010,7 @@
   "category": "spoof",
   "feature": "worker-locale-timezone",
   "prefs": [],
-  "added": 5,
+  "added": 3,
   "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 4,
@@ -2157,7 +2034,7 @@
   "category": "spoof",
   "feature": "worker-locale-timezone",
   "prefs": [],
-  "added": 5,
+  "added": 3,
   "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 2,
@@ -2178,9 +2055,9 @@
   "category": "spoof",
   "feature": "worker-locale-timezone",
   "prefs": [],
-  "added": 7,
+  "added": 4,
   "removed": 0,
-  "hunks": 2,
+  "hunks": 3,
   "inline_logic_lines": 4,
   "hookable": "already-hook",
   "anchor": "class WorkletLoadInfo (accessors and members)",
@@ -2199,9 +2076,9 @@
   "category": "spoof",
   "feature": "xslt-date-timezone",
   "prefs": [],
-  "added": 4,
-  "removed": 6,
-  "hunks": 3,
+  "added": 3,
+  "removed": 1,
+  "hunks": 2,
   "inline_logic_lines": 1,
   "hookable": "already-hook",
   "anchor": "txEXSLTFunctionCall::evaluate (date:date-time branch)",
@@ -2222,9 +2099,9 @@
   "category": "other",
   "feature": "font-bundle-borrow",
   "prefs": [],
-  "added": 10,
+  "added": 5,
   "removed": 1,
-  "hunks": 2,
+  "hunks": 1,
   "inline_logic_lines": 2,
   "hookable": "already-hook",
   "anchor": "class FontData (Borrowed constructor, destructor, member mBorrowed)",
@@ -2244,9 +2121,9 @@
   "category": "spoof",
   "feature": "canvas-noise-projection",
   "prefs": [],
-  "added": 12,
+  "added": 3,
   "removed": 1,
-  "hunks": 3,
+  "hunks": 2,
   "inline_logic_lines": 14,
   "hookable": "movable",
   "anchor": "SourceSurfaceRecording::GetDataSurface, DrawTargetRecording::StealthProjectedSurface (new)",
@@ -2266,7 +2143,7 @@
   "category": "spoof",
   "feature": "canvas-noise-projection",
   "prefs": [],
-  "added": 9,
+  "added": 3,
   "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 0,
@@ -2310,9 +2187,9 @@
   "category": "spoof",
   "feature": "canvas-noise-projection",
   "prefs": [],
-  "added": 5,
-  "removed": 0,
-  "hunks": 3,
+  "added": 3,
+  "removed": 1,
+  "hunks": 2,
   "inline_logic_lines": 45,
   "hookable": "movable",
   "anchor": "RecordedStealthProjectSurface (class, PlayEvent, Record, stream constructor) and the RECORDED_EVENT X-macro list",
@@ -2332,7 +2209,7 @@
   "category": "other",
   "feature": "font-bundle-file-path",
   "prefs": [],
-  "added": 8,
+  "added": 1,
   "removed": 0,
   "hunks": 1,
   "inline_logic_lines": 5,
@@ -2375,8 +2252,8 @@
   "category": "other",
   "feature": "font-bundle-file-path",
   "prefs": [],
-  "added": 7,
-  "removed": 2,
+  "added": 4,
+  "removed": 0,
   "hunks": 3,
   "inline_logic_lines": 4,
   "hookable": "already-hook",
@@ -2396,7 +2273,7 @@
   "category": "build",
   "feature": "canvas-noise-projection",
   "prefs": [],
-  "added": 5,
+  "added": 6,
   "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 0,
@@ -2420,7 +2297,7 @@
   "category": "spoof",
   "feature": "glyph-coverage-quantise",
   "prefs": [],
-  "added": 10,
+  "added": 4,
   "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 4,
@@ -2444,7 +2321,7 @@
   "category": "build",
   "feature": "canvas-noise-projection",
   "prefs": [],
-  "added": 13,
+  "added": 11,
   "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 0,
@@ -2462,35 +2339,13 @@
   }
  },
  {
-  "file": "gfx/thebes/CoreTextFontList.cpp",
-  "category": "spoof",
-  "feature": "font-list-bundle-only",
-  "prefs": [],
-  "added": 32,
-  "removed": 1,
-  "hunks": 7,
-  "inline_logic_lines": 67,
-  "hookable": "movable",
-  "anchor": "CTFontEntry::ReadCMAP; CoreTextFontList::AddFamily; CoreTextFontList::InitSharedFontListForPlatform; CoreTextFontList::CreateFontEntry; CoreTextFontList::GetFacesInitDataForFamily; CoreTextFontList::GetDefaultFontForPlatform",
-  "evidence": [
-   "+  if (mStealthBundleOnly && !mBundledFamilies.Contains(aFamilyName)) {",
-   "+    FontFamily f = FindFamily(aFontVisibilityProvider, \"Segoe UI\"_ns);",
-   "-    if (!IsUserFont() && mShmemFace && mShmemFamily) {"
-  ],
-  "notes": "Bundle-only on macOS: AddFamily drops every family not in the bundle (CoreText merges host and bundled fonts into one enumeration, so the filter is per family here); InitSharedFontListForPlatform builds the family list from the manifest; CreateFontEntry has a ~47-line branch that wraps the bundle bytes with CFDataCreateWithBytesNoCopy and picks the face by PostScript name. GetDefaultFontForPlatform returns 'Segoe UI' instead of the macOS UI font. ReadCMAP now uses ShouldPublishCharacterMap(). Movable: the CreateFontEntry branch can move into StealthBundleFontList behind a short hook. Not compiled or tested on macOS in this inventory.",
-  "verifier": {
-   "changed": [],
-   "why": "Checked category, feature, prefs, anchor, evidence and notes against the diff; no correction needed."
-  }
- },
- {
   "file": "gfx/thebes/gfxDWriteFontList.cpp",
   "category": "spoof",
   "feature": "font-list-bundle-only",
   "prefs": [],
-  "added": 55,
-  "removed": 12,
-  "hunks": 13,
+  "added": 20,
+  "removed": 6,
+  "hunks": 14,
   "inline_logic_lines": 75,
   "hookable": "movable",
   "anchor": "gfxDWriteFontEntry::ReadCMAP; gfxDWriteFontEntry::CreateFontInstance; gfxDWriteFontEntry::CreateFontFace; gfxDWriteFontList::CreateFontEntry; gfxDWriteFontList::GetFacesInitDataForFamily; gfxDWriteFontList::ReadFaceNames; gfxDWriteFontList::ReadFaceNamesForFamily; gfxDWriteFontList::InitSharedFontListForPlatform; gfxDWriteFontList::InitFontListForPlatform; gfxDWriteFontList::CreateBundledFontsCollection",
@@ -2512,7 +2367,7 @@
   "category": "other",
   "feature": "font-bundle-file-path",
   "prefs": [],
-  "added": 9,
+  "added": 6,
   "removed": 0,
   "hunks": 3,
   "inline_logic_lines": 2,
@@ -2535,8 +2390,8 @@
   "prefs": [
    "zoom.stealth.text.system_quality"
   ],
-  "added": 11,
-  "removed": 3,
+  "added": 5,
+  "removed": 2,
   "hunks": 4,
   "inline_logic_lines": 14,
   "hookable": "movable",
@@ -2559,8 +2414,8 @@
   "category": "spoof",
   "feature": "font-design-metrics",
   "prefs": [],
-  "added": 6,
-  "removed": 1,
+  "added": 5,
+  "removed": 0,
   "hunks": 4,
   "inline_logic_lines": 27,
   "hookable": "movable",
@@ -2584,8 +2439,8 @@
    "zoom.stealth.text.freetype_hintstyle",
    "zoom.stealth.text.freetype_antialias"
   ],
-  "added": 42,
-  "removed": 6,
+  "added": 16,
+  "removed": 4,
   "hunks": 15,
   "inline_logic_lines": 86,
   "hookable": "movable",
@@ -2630,7 +2485,7 @@
   "category": "spoof",
   "feature": "font-metrics-declared",
   "prefs": [],
-  "added": 3,
+  "added": 4,
   "removed": 0,
   "hunks": 3,
   "inline_logic_lines": 0,
@@ -2654,7 +2509,7 @@
   "category": "spoof",
   "feature": "font-metrics-declared",
   "prefs": [],
-  "added": 4,
+  "added": 2,
   "removed": 0,
   "hunks": 1,
   "inline_logic_lines": 2,
@@ -2670,32 +2525,11 @@
   }
  },
  {
-  "file": "gfx/thebes/gfxFontEntry.cpp",
-  "category": "other",
-  "feature": "font-cmap-publish",
-  "prefs": [],
-  "added": 6,
-  "removed": 0,
-  "hunks": 2,
-  "inline_logic_lines": 8,
-  "hookable": "movable",
-  "anchor": "gfxFontEntry::ShouldPublishCharacterMap (new, placed before gfxFontEntry::TrySetShmemCharacterMap)",
-  "evidence": [
-   "+bool gfxFontEntry::ShouldPublishCharacterMap() const {",
-   "+  return gfxPlatformFontList::PlatformFontList()->StealthBundleOnly();"
-  ],
-  "notes": "One predicate replaces the four copies of '!IsUserFont() && mShmemFace' in the ReadCMAP paths (CoreText, DirectWrite, FreeType, fontconfig). It returns false for a non-shared-list face and for local() borrows, true for installed system faces, and for data faces only under bundle-only. Movable: the 8 logic lines can move into a free function in our own file.",
-  "verifier": {
-   "changed": [],
-   "why": "Checked category, feature, prefs, anchor, evidence and notes against the diff; no correction needed."
-  }
- },
- {
   "file": "gfx/thebes/gfxFontEntry.h",
   "category": "other",
   "feature": "hb-face-lifetime",
   "prefs": [],
-  "added": 6,
+  "added": 3,
   "removed": 1,
   "hunks": 2,
   "inline_logic_lines": 3,
@@ -2718,8 +2552,8 @@
   "category": "other",
   "feature": "font-ttc-face-index",
   "prefs": [],
-  "added": 11,
-  "removed": 4,
+  "added": 3,
+  "removed": 1,
   "hunks": 2,
   "inline_logic_lines": 22,
   "hookable": "movable",
@@ -2740,8 +2574,8 @@
   "category": "other",
   "feature": "font-ttc-face-index",
   "prefs": [],
-  "added": 8,
-  "removed": 2,
+  "added": 3,
+  "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 5,
   "hookable": "already-hook",
@@ -2760,9 +2594,9 @@
   "category": "spoof",
   "feature": "font-design-metrics",
   "prefs": [],
-  "added": 1,
+  "added": 3,
   "removed": 0,
-  "hunks": 1,
+  "hunks": 2,
   "inline_logic_lines": 49,
   "hookable": "movable",
   "anchor": "gfxHarfBuzzShaper::~gfxHarfBuzzShaper; gfxHarfBuzzShaper::GetDesignFont (new); gfxHarfBuzzShaper::GetDesignGlyphExtents (new); gfxHarfBuzzShaper::GetDesignAdvance (new); gfxHarfBuzzShaper::ShapeText (comment only)",
@@ -2782,7 +2616,7 @@
   "category": "spoof",
   "feature": "font-design-metrics",
   "prefs": [],
-  "added": 10,
+  "added": 2,
   "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 6,
@@ -2806,9 +2640,9 @@
    "zoom.stealth.fonts.generics",
    "gfx.font_rendering.fallback.async"
   ],
-  "added": 31,
-  "removed": 6,
-  "hunks": 11,
+  "added": 11,
+  "removed": 2,
+  "hunks": 10,
   "inline_logic_lines": 147,
   "hookable": "movable",
   "anchor": "gfxPlatformFontList::MemoryReporter::CollectReports; gfxPlatformFontList::gfxPlatformFontList (constructor); gfxPlatformFontList::RecordFaceNamesFromTable (new); gfxPlatformFontList::ReadFaceNamesForFamily (new); gfxPlatformFontList::ReadFaceNames (new); gfxPlatformFontList::CommonFontFallback; gfxPlatformFontList::GlobalFontFallback; gfxPlatformFontList::FindAndAddFamiliesLocked; gfxPlatformFontList::MayDeferCmapLoading (new); gfxPlatformFontList::InitializeFamily; GetSystemUIFontFamilies; StealthDeclaredGenericFont (new static); gfxPlatformFontList::ResolveGenericFontNames; gfxPlatformFontList::ResolveEmojiFontNames",
@@ -2830,9 +2664,9 @@
   "category": "spoof",
   "feature": "font-list-bundle-only",
   "prefs": [],
-  "added": 13,
-  "removed": 4,
-  "hunks": 4,
+  "added": 9,
+  "removed": 1,
+  "hunks": 5,
   "inline_logic_lines": 10,
   "hookable": "movable",
   "anchor": "gfxPlatformFontList class: MayDeferCmapLoading and StealthBundleOnly declarations; ReadFaceNames and ReadFaceNamesForFamily (now real virtuals, previously no-ops); RecordFaceNamesFromTable declaration; mStealthBundleOnly member",
@@ -2875,9 +2709,9 @@
   "category": "spoof",
   "feature": "font-fallback-bundle",
   "prefs": [],
-  "added": 2,
-  "removed": 3,
-  "hunks": 1,
+  "added": 3,
+  "removed": 1,
+  "hunks": 2,
   "inline_logic_lines": 1,
   "hookable": "already-hook",
   "anchor": "gfxFontGroup::FindFallbackFaceForChar",
@@ -2916,7 +2750,7 @@
   "category": "spoof",
   "feature": "session-language-declared",
   "prefs": [],
-  "added": 6,
+  "added": 4,
   "removed": 4,
   "hunks": 3,
   "inline_logic_lines": 10,
@@ -2962,7 +2796,7 @@
   "category": "spoof",
   "feature": "session-language-declared",
   "prefs": [],
-  "added": 5,
+  "added": 4,
   "removed": 0,
   "hunks": 3,
   "inline_logic_lines": 6,
@@ -2987,7 +2821,7 @@
   "category": "spoof",
   "feature": "session-declaration",
   "prefs": [],
-  "added": 5,
+  "added": 4,
   "removed": 0,
   "hunks": 3,
   "inline_logic_lines": 2,
@@ -3008,7 +2842,7 @@
   "category": "build",
   "feature": "session-declaration",
   "prefs": [],
-  "added": 1,
+  "added": 2,
   "removed": 0,
   "hunks": 1,
   "inline_logic_lines": 0,
@@ -3026,8 +2860,8 @@
   "category": "spoof",
   "feature": "debugger-invisible-attach",
   "prefs": [],
-  "added": 18,
-  "removed": 4,
+  "added": 7,
+  "removed": 2,
   "hunks": 4,
   "inline_logic_lines": 35,
   "hookable": "hard",
@@ -3051,7 +2885,7 @@
   "category": "spoof",
   "feature": "debugger-invisible-attach",
   "prefs": [],
-  "added": 2,
+  "added": 1,
   "removed": 0,
   "hunks": 1,
   "inline_logic_lines": 1,
@@ -3071,7 +2905,7 @@
   "category": "spoof",
   "feature": "eval-introduction-name",
   "prefs": [],
-  "added": 5,
+  "added": 2,
   "removed": 2,
   "hunks": 1,
   "inline_logic_lines": 2,
@@ -3092,7 +2926,7 @@
   "category": "spoof",
   "feature": "stack-hide-juggler-frames",
   "prefs": [],
-  "added": 6,
+  "added": 3,
   "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 22,
@@ -3114,7 +2948,7 @@
   "category": "other",
   "feature": "script-cache-adopt-written",
   "prefs": [],
-  "added": 5,
+  "added": 4,
   "removed": 0,
   "hunks": 3,
   "inline_logic_lines": 90,
@@ -3136,9 +2970,9 @@
   "category": "other",
   "feature": "script-cache-adopt-written",
   "prefs": [],
-  "added": 8,
+  "added": 3,
   "removed": 0,
-  "hunks": 2,
+  "hunks": 3,
   "inline_logic_lines": 11,
   "hookable": "hard",
   "anchor": "ScriptPreloader::CachedStencil (AdoptMappedRange, inline); class ScriptPreloader (WalkCacheHeader and AdoptWrittenCache declarations; mWrittenCacheData member)",
@@ -3158,9 +2992,9 @@
   "category": "juggler",
   "feature": "hybrid-xrays",
   "prefs": [],
-  "added": 22,
-  "removed": 2,
-  "hunks": 8,
+  "added": 13,
+  "removed": 3,
+  "hunks": 7,
   "inline_logic_lines": 22,
   "hookable": "movable",
   "anchor": "SandboxProxyHandler::getPropertyDescriptorImpl; xpc::CreateSandboxObject; SandboxOptions::Parse",
@@ -3178,31 +3012,11 @@
   }
  },
  {
-  "file": "js/xpconnect/src/XPCJSRuntime.cpp",
-  "category": "juggler",
-  "feature": "hybrid-xrays",
-  "prefs": [],
-  "added": 1,
-  "removed": 0,
-  "hunks": 1,
-  "inline_logic_lines": 1,
-  "hookable": "already-hook",
-  "anchor": "CompartmentPrivate::CompartmentPrivate",
-  "evidence": [
-   "+      hybridXrays(false),"
-  ],
-  "notes": "Initialiser for the new CompartmentPrivate member. It must stay in declaration order (right after wantXrays in xpcprivate.h), or the compiler warns about reordered initialisers.",
-  "verifier": {
-   "changed": [],
-   "why": "Checked against the diff and tree: category, feature, prefs, anchor, counts and evidence hold."
-  }
- },
- {
   "file": "js/xpconnect/src/nsXPConnect.cpp",
   "category": "spoof",
   "feature": "timezone-locale-override",
   "prefs": [],
-  "added": 4,
+  "added": 3,
   "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 2,
@@ -3224,9 +3038,9 @@
   "category": "juggler",
   "feature": "hybrid-xrays",
   "prefs": [],
-  "added": 7,
-  "removed": 1,
-  "hunks": 4,
+  "added": 4,
+  "removed": 0,
+  "hunks": 3,
   "inline_logic_lines": 1,
   "hookable": "already-hook",
   "anchor": "SandboxOptions::SandboxOptions (constructor); class SandboxOptions (member); CompartmentPrivate::CanShareCompartmentWith; class CompartmentPrivate (member)",
@@ -3246,8 +3060,8 @@
   "category": "spoof",
   "feature": "hybrid-xrays",
   "prefs": [],
-  "added": 18,
-  "removed": 7,
+  "added": 11,
+  "removed": 4,
   "hunks": 6,
   "inline_logic_lines": 80,
   "hookable": "hard",
@@ -3270,9 +3084,9 @@
   "category": "juggler",
   "feature": "hybrid-xrays",
   "prefs": [],
-  "added": 4,
+  "added": 1,
   "removed": 0,
-  "hunks": 2,
+  "hunks": 1,
   "inline_logic_lines": 20,
   "hookable": "movable",
   "anchor": "class XrayWrapper (new protected constructor); new class HybridXrayWrapper; free functions IsHybridXrayWrapper and HybridXrayGetBareName (declarations)",
@@ -3336,7 +3150,7 @@
   "category": "spoof",
   "feature": "canvas-as-drawn-readers",
   "prefs": [],
-  "added": 2,
+  "added": 3,
   "removed": 1,
   "hunks": 2,
   "inline_logic_lines": 2,
@@ -3360,7 +3174,7 @@
   "category": "spoof",
   "feature": "screen-metrics",
   "prefs": [],
-  "added": 5,
+  "added": 3,
   "removed": 1,
   "hunks": 2,
   "inline_logic_lines": 2,
@@ -3412,7 +3226,7 @@
    "zoom.stealth.pointer.primary",
    "zoom.stealth.pointer.all"
   ],
-  "added": 8,
+  "added": 4,
   "removed": 0,
   "hunks": 3,
   "inline_logic_lines": 11,
@@ -3439,9 +3253,9 @@
   "prefs": [
    "zoom.stealth."
   ],
-  "added": 1,
+  "added": 3,
   "removed": 0,
-  "hunks": 1,
+  "hunks": 2,
   "inline_logic_lines": 1,
   "hookable": "already-hook",
   "anchor": "sDynamicPrefOverrideList (static array)",
@@ -3659,7 +3473,7 @@
   "category": "build",
   "feature": "stealth-pref-declarations",
   "prefs": [],
-  "added": 2,
+  "added": 3,
   "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 0,
@@ -3679,8 +3493,8 @@
   "category": "juggler",
   "feature": "juggler-load-identifier",
   "prefs": [],
-  "added": 14,
-  "removed": 1,
+  "added": 3,
+  "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 5,
   "hookable": "already-hook",
@@ -3700,7 +3514,7 @@
   "category": "juggler",
   "feature": "juggler-load-identifier",
   "prefs": [],
-  "added": 2,
+  "added": 1,
   "removed": 0,
   "hunks": 1,
   "inline_logic_lines": 0,
@@ -3720,8 +3534,8 @@
   "category": "juggler",
   "feature": "juggler-load-identifier",
   "prefs": [],
-  "added": 13,
-  "removed": 1,
+  "added": 4,
+  "removed": 0,
   "hunks": 3,
   "inline_logic_lines": 9,
   "hookable": "movable",
@@ -3744,7 +3558,7 @@
   "category": "build",
   "feature": "socks-credentials",
   "prefs": [],
-  "added": 2,
+  "added": 3,
   "removed": 0,
   "hunks": 1,
   "inline_logic_lines": 0,
@@ -3762,7 +3576,7 @@
   "category": "juggler",
   "feature": "juggler-load-identifier",
   "prefs": [],
-  "added": 2,
+  "added": 1,
   "removed": 0,
   "hunks": 1,
   "inline_logic_lines": 0,
@@ -3784,7 +3598,7 @@
   "category": "juggler",
   "feature": "juggler-interception",
   "prefs": [],
-  "added": 4,
+  "added": 2,
   "removed": 0,
   "hunks": 1,
   "inline_logic_lines": 0,
@@ -3810,8 +3624,8 @@
    "network.proxy.socks_username",
    "network.proxy.socks_password"
   ],
-  "added": 8,
-  "removed": 3,
+  "added": 4,
+  "removed": 1,
   "hunks": 3,
   "inline_logic_lines": 11,
   "hookable": "movable",
@@ -3854,9 +3668,9 @@
   "category": "other",
   "feature": "proxy-udp-egress",
   "prefs": [],
-  "added": 17,
+  "added": 6,
   "removed": 0,
-  "hunks": 5,
+  "hunks": 4,
   "inline_logic_lines": 7,
   "hookable": "movable",
   "anchor": "includes; nsUDPSocket::InitWithAddress after PR_OpenUDPSocket and after PR_Bind; nsUDPSocket::SetSocksProxy",
@@ -3896,7 +3710,7 @@
   "category": "other",
   "feature": "proxy-udp-egress",
   "prefs": [],
-  "added": 8,
+  "added": 5,
   "removed": 1,
   "hunks": 2,
   "inline_logic_lines": 1,
@@ -3918,9 +3732,9 @@
   "category": "other",
   "feature": "proxy-udp-egress",
   "prefs": [],
-  "added": 2,
+  "added": 3,
   "removed": 1,
-  "hunks": 1,
+  "hunks": 2,
   "inline_logic_lines": 1,
   "hookable": "already-hook",
   "anchor": "AltSvcCache::UpdateAltServiceMapping",
@@ -3940,9 +3754,9 @@
   "category": "other",
   "feature": "proxy-udp-egress",
   "prefs": [],
-  "added": 5,
+  "added": 4,
   "removed": 2,
-  "hunks": 2,
+  "hunks": 3,
   "inline_logic_lines": 3,
   "hookable": "movable",
   "anchor": "DnsAndConnectSocket constructor; CheckProxyConfig",
@@ -3964,7 +3778,7 @@
   "prefs": [],
   "added": 3,
   "removed": 1,
-  "hunks": 1,
+  "hunks": 2,
   "inline_logic_lines": 2,
   "hookable": "already-hook",
   "anchor": "HttpBaseChannel (the proxy test of the h3 decision)",
@@ -3984,7 +3798,7 @@
   "category": "juggler",
   "feature": "juggler-service-worker-intercept",
   "prefs": [],
-  "added": 4,
+  "added": 1,
   "removed": 0,
   "hunks": 1,
   "inline_logic_lines": 18,
@@ -4011,7 +3825,7 @@
   "prefs": [],
   "added": 4,
   "removed": 0,
-  "hunks": 1,
+  "hunks": 2,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
   "anchor": "InterceptedHttpChannel class members (after mInterceptionReset)",
@@ -4032,7 +3846,7 @@
   "category": "other",
   "feature": "proxy-udp-egress",
   "prefs": [],
-  "added": 1,
+  "added": 2,
   "removed": 0,
   "hunks": 1,
   "inline_logic_lines": 0,
@@ -4052,8 +3866,8 @@
   "category": "spoof",
   "feature": "accept-language-override-list",
   "prefs": [],
-  "added": 11,
-  "removed": 3,
+  "added": 3,
+  "removed": 1,
   "hunks": 2,
   "inline_logic_lines": 5,
   "hookable": "already-hook",
@@ -4074,9 +3888,9 @@
   "category": "spoof",
   "feature": "stealth-branding-redirect",
   "prefs": [],
-  "added": 9,
+  "added": 1,
   "removed": 1,
-  "hunks": 3,
+  "hunks": 1,
   "inline_logic_lines": 4,
   "hookable": "already-hook",
   "anchor": "SubstitutingProtocolHandler::ResolveURI",
@@ -4099,7 +3913,7 @@
   "category": "build",
   "feature": "stealth-branding-redirect",
   "prefs": [],
-  "added": 2,
+  "added": 4,
   "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 0,
@@ -4137,24 +3951,6 @@
   }
  },
  {
-  "file": "netwerk/test/browser/browser.toml",
-  "category": "build",
-  "feature": "accept-language-override-list",
-  "prefs": [],
-  "added": 3,
-  "removed": 0,
-  "hunks": 1,
-  "inline_logic_lines": 0,
-  "hookable": "already-hook",
-  "anchor": "hook added by the 2026-10-29 move to our files",
-  "evidence": [],
-  "notes": "Hook registering or calling our own code.",
-  "verifier": {
-   "changed": [],
-   "why": "Added with the 2026-10-29 hook move."
-  }
- },
- {
   "file": "netwerk/test/gtest/moz.build",
   "category": "build",
   "feature": "socks-credentials",
@@ -4180,9 +3976,9 @@
   "category": "build",
   "feature": "win-long-build-paths",
   "prefs": [],
-  "added": 4,
+  "added": 3,
   "removed": 1,
-  "hunks": 1,
+  "hunks": 2,
   "inline_logic_lines": 1,
   "hookable": "already-hook",
   "anchor": "class RecursiveMakeBackend, the objs_ref assignment near line 1607 (enclosing def name not extracted)",
@@ -4203,7 +3999,7 @@
   "category": "port-fix",
   "feature": "win-long-build-paths",
   "prefs": [],
-  "added": 3,
+  "added": 2,
   "removed": 2,
   "hunks": 1,
   "inline_logic_lines": 2,
@@ -4227,7 +4023,7 @@
   "prefs": [],
   "added": 3,
   "removed": 0,
-  "hunks": 1,
+  "hunks": 2,
   "inline_logic_lines": 2,
   "hookable": "already-hook",
   "anchor": "JarMaker.getOutput (def getOutput(self, name, mode=\"wb\"), line 557)",
@@ -4247,7 +4043,7 @@
   "category": "juggler",
   "feature": "juggler-element-atoms",
   "prefs": [],
-  "added": 5,
+  "added": 2,
   "removed": 0,
   "hunks": 1,
   "inline_logic_lines": 1,
@@ -4270,7 +4066,7 @@
   "category": "stillborn",
   "feature": "security-state-declared",
   "prefs": [],
-  "added": 3,
+  "added": 1,
   "removed": 0,
   "hunks": 1,
   "inline_logic_lines": 0,
@@ -4306,7 +4102,7 @@
   "category": "juggler",
   "feature": "juggler-ignore-https-errors",
   "prefs": [],
-  "added": 6,
+  "added": 3,
   "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 7,
@@ -4328,7 +4124,7 @@
   "category": "other",
   "feature": "stealth-branding-redirect",
   "prefs": [],
-  "added": 10,
+  "added": 3,
   "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 5,
@@ -4373,40 +4169,12 @@
   "category": "other",
   "feature": "startup-cache-foreground-writes",
   "prefs": [],
-  "added": 1,
+  "added": 3,
   "removed": 1,
-  "hunks": 1,
+  "hunks": 2,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
   "anchor": "StartupCache::MaybeWriteOffMainThread",
-  "evidence": [],
-  "notes": "Fix of a 157 priority inversion (commit 044fdc985f): StartupCache writes no longer take nsAutoLowPriorityIO, whose THREAD_MODE_BACKGROUND_BEGIN starved the writer while it held mTableLock and so the main thread in GetBuffer() (7-27 s stalls with eleven browsers). 151 had no lowered priority here."
- },
- {
-  "file": "startupcache/StartupCache.h",
-  "category": "other",
-  "feature": "startup-cache-foreground-writes",
-  "prefs": [],
-  "added": 3,
-  "removed": 0,
-  "hunks": 1,
-  "inline_logic_lines": 1,
-  "hookable": "already-hook",
-  "anchor": "StartupCache::WritesMayLowerIOPriority (new)",
-  "evidence": [],
-  "notes": "Fix of a 157 priority inversion (commit 044fdc985f): StartupCache writes no longer take nsAutoLowPriorityIO, whose THREAD_MODE_BACKGROUND_BEGIN starved the writer while it held mTableLock and so the main thread in GetBuffer() (7-27 s stalls with eleven browsers). 151 had no lowered priority here."
- },
- {
-  "file": "startupcache/test/TestStartupCache.cpp",
-  "category": "other",
-  "feature": "startup-cache-foreground-writes",
-  "prefs": [],
-  "added": 6,
-  "removed": 0,
-  "hunks": 1,
-  "inline_logic_lines": 0,
-  "hookable": "already-hook",
-  "anchor": "TEST(StartupCache, WritesNeverLowerIOPriority) (new)",
   "evidence": [],
   "notes": "Fix of a 157 priority inversion (commit 044fdc985f): StartupCache writes no longer take nsAutoLowPriorityIO, whose THREAD_MODE_BACKGROUND_BEGIN starved the writer while it held mTableLock and so the main thread in GetBuffer() (7-27 s stalls with eleven browsers). 151 had no lowered priority here."
  },
@@ -4415,9 +4183,9 @@
   "category": "other",
   "feature": "hidden-desktop-window-capture",
   "prefs": [],
-  "added": 5,
+  "added": 4,
   "removed": 0,
-  "hunks": 1,
+  "hunks": 2,
   "inline_logic_lines": 2,
   "hookable": "already-hook",
   "anchor": "CroppingWindowCapturerWin::ShouldUseScreenCapturer",
@@ -4426,48 +4194,6 @@
    "+    return false;"
   ],
   "notes": "Vendored libwebrtc file. The hook is 2 logic lines; most of the 13 added lines are a comment block that can be shortened or moved to the commit message. Depends on IsWindowOnInputDesktop (window_capture_utils.h in this group). The comment carries a measurement date; keep that in the commit, not the code.",
-  "verifier": {
-   "changed": [],
-   "why": "all fields checked against the diff; no change"
-  }
- },
- {
-  "file": "third_party/libwebrtc/modules/desktop_capture/win/window_capture_utils.cc",
-  "category": "other",
-  "feature": "hidden-desktop-window-capture",
-  "prefs": [],
-  "added": 5,
-  "removed": 0,
-  "hunks": 2,
-  "inline_logic_lines": 18,
-  "hookable": "movable",
-  "anchor": "WindowCaptureHelperWin::IsWindowOnInputDesktop (new)",
-  "evidence": [
-   "+bool WindowCaptureHelperWin::IsWindowOnInputDesktop(HWND hwnd) {",
-   "+  HDESK window_desktop = GetThreadDesktop(thread_id);",
-   "+  return _wcsicmp(window_desktop_name, input_desktop_name.c_str()) == 0;"
-  ],
-  "notes": "The whole new function (18 logic lines) sits in a vendored libwebrtc file. Move it to our own .cc (registered in the libwebrtc build) and keep only the member declaration in the header. Behaviour: returns true (treated as on the input desktop) for windows of other processes, for a null thread id and on any API failure, so only this process's windows on another desktop are excluded. Names are compared case-insensitively. The GetThreadDesktop handle is not closed, which is correct. Adds includes desktop.h, <memory>, <string>.",
-  "verifier": {
-   "changed": [],
-   "why": "all fields checked against the diff; no change"
-  }
- },
- {
-  "file": "third_party/libwebrtc/modules/desktop_capture/win/window_capture_utils.h",
-  "category": "other",
-  "feature": "hidden-desktop-window-capture",
-  "prefs": [],
-  "added": 2,
-  "removed": 0,
-  "hunks": 1,
-  "inline_logic_lines": 0,
-  "hookable": "already-hook",
-  "anchor": "WindowCaptureHelperWin (class declaration)",
-  "evidence": [
-   "+  bool IsWindowOnInputDesktop(HWND hwnd);"
-  ],
-  "notes": "Declaration and comment only (0 logic lines). The only Mozilla-side piece of the hidden-desktop feature; the definition is in window_capture_utils.cc.",
   "verifier": {
    "changed": [],
    "why": "all fields checked against the diff; no change"
@@ -4500,8 +4226,8 @@
   "category": "stillborn",
   "feature": "pingsender-session-route",
   "prefs": [],
-  "added": 11,
-  "removed": 2,
+  "added": 5,
+  "removed": 1,
   "hunks": 4,
   "inline_logic_lines": 27,
   "hookable": "movable",
@@ -4544,8 +4270,8 @@
   "feature": "pingsender-session-route",
   "prefs": [],
   "added": 3,
-  "removed": 1,
-  "hunks": 2,
+  "removed": 0,
+  "hunks": 1,
   "inline_logic_lines": 36,
   "hookable": "movable",
   "anchor": "runBackgroundTask (export async function, hunk 1); sendPing (module-level async function, hunks 2 and 3); new takeSessionRoute() at file level",
@@ -4571,9 +4297,9 @@
   "prefs": [
    "zoom.stealth.apikey"
   ],
-  "added": 2,
+  "added": 3,
   "removed": 0,
-  "hunks": 1,
+  "hunks": 2,
   "inline_logic_lines": 1,
   "hookable": "already-hook",
   "anchor": "SafeBrowsing.init() (line 354)",
@@ -4595,7 +4321,7 @@
    "zoom.stealth.apikey.google_location_service",
    "zoom.stealth.apikey.google_safebrowsing"
   ],
-  "added": 9,
+  "added": 5,
   "removed": 0,
   "hunks": 3,
   "inline_logic_lines": 22,
@@ -4617,27 +4343,9 @@
   "category": "build",
   "feature": "api-keys-declared",
   "prefs": [],
-  "added": 1,
+  "added": 2,
   "removed": 0,
-  "hunks": 1,
-  "inline_logic_lines": 0,
-  "hookable": "already-hook",
-  "anchor": "hook added by the 2026-10-29 move to our files",
-  "evidence": [],
-  "notes": "Hook registering or calling our own code.",
-  "verifier": {
-   "changed": [],
-   "why": "Added with the 2026-10-29 hook move."
-  }
- },
- {
-  "file": "toolkit/components/urlformatter/tests/unit/xpcshell.toml",
-  "category": "build",
-  "feature": "api-keys-declared",
-  "prefs": [],
-  "added": 1,
-  "removed": 0,
-  "hunks": 1,
+  "hunks": 2,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
   "anchor": "hook added by the 2026-10-29 move to our files",
@@ -4671,7 +4379,7 @@
   "category": "spoof",
   "feature": "popup-default-position",
   "prefs": [],
-  "added": 12,
+  "added": 9,
   "removed": 2,
   "hunks": 4,
   "inline_logic_lines": 19,
@@ -4689,50 +4397,6 @@
     "notes"
    ],
    "why": "Verified StealthDeclarationGate.h exists."
-  }
- },
- {
-  "file": "toolkit/modules/AppConstants.sys.mjs",
-  "category": "other",
-  "feature": "api-keys-declared",
-  "prefs": [],
-  "added": 1,
-  "removed": 5,
-  "hunks": 1,
-  "inline_logic_lines": 0,
-  "hookable": "already-hook",
-  "anchor": "AppConstants object literal (module scope), keys near line 179",
-  "evidence": [
-   "-  MOZ_MOZILLA_API_KEY: \"@MOZ_MOZILLA_API_KEY@\",",
-   "+  // ⛔ STEALTHFOX: QUI STAVANO LE TRE CHIAVI API, E SONO STATE TOLTE."
-  ],
-  "notes": "Removes three build-time constants and the #if around the location-service key. About 20 comment lines are added to a Mozilla file: move the explanation out and keep only the removals. A grep of toolkit/modules, url-classifier, urlformatter and telemetry found no remaining reader (comments only); git grep of the whole tracked tree (excluding third_party) finds no reader or definer of the three keys except python/mozbuild/mozbuild/test/configure/test_checks_configure.py:944,996,1011,1026 (configure test of the keyfile helper, unrelated to this file).",
-  "verifier": {
-   "changed": [
-    "notes"
-   ],
-   "why": "Whole-tree grep completed."
-  }
- },
- {
-  "file": "toolkit/modules/moz.build",
-  "category": "build",
-  "feature": "api-keys-declared",
-  "prefs": [],
-  "added": 7,
-  "removed": 6,
-  "hunks": 2,
-  "inline_logic_lines": 0,
-  "hookable": "already-hook",
-  "anchor": "module level, the OS_TARGET block (hunk 1, line 277) and the for var tuple of DEFINES (hunk 2, line 296)",
-  "evidence": [
-   "-    DEFINES[\"MOZ_GOOGLE_LOCATION_SERVICE_API_KEY\"] = (",
-   "-    \"MOZ_MOZILLA_API_KEY\","
-  ],
-  "notes": "Removes the DEFINES that fed the three keys. Must move together with the AppConstants.sys.mjs removal, otherwise the preprocessor fails. Only comments were added in the middle of the tuple.",
-  "verifier": {
-   "changed": [],
-   "why": "Checked against the diff and tree; no correction needed."
   }
  },
  {
@@ -4762,26 +4426,12 @@
   "category": "other",
   "feature": "untrusted-modules-own-binaries",
   "prefs": [],
-  "added": 12,
+  "added": 13,
   "removed": 5,
   "hunks": 2,
   "inline_logic_lines": 25,
   "hookable": "movable",
   "anchor": "ModuleRecord::GetVersionAndVendorInfo; ModuleRecord::IsInDirectoryOf (new); IsOwnUnsignedBinary (new)",
-  "evidence": [],
-  "notes": "Performance fix (commit 26e54ca1b1): the Untrusted Modules processor skips the Authenticode lookup for this build's own unsigned binaries (beside firefox.exe and with its version), which always fell through to the catalog search: 1.26 s of CPU per launch. Classification unchanged (FirefoxDirectory + version). IsOwnUnsignedBinary is inline logic that can move to an own file."
- },
- {
-  "file": "toolkit/xre/dllservices/UntrustedModulesData.h",
-  "category": "other",
-  "feature": "untrusted-modules-own-binaries",
-  "prefs": [],
-  "added": 4,
-  "removed": 0,
-  "hunks": 1,
-  "inline_logic_lines": 0,
-  "hookable": "already-hook",
-  "anchor": "ModuleRecord::IsInDirectoryOf (new)",
   "evidence": [],
   "notes": "Performance fix (commit 26e54ca1b1): the Untrusted Modules processor skips the Authenticode lookup for this build's own unsigned binaries (beside firefox.exe and with its version), which always fell through to the catalog search: 1.26 s of CPU per launch. Classification unchanged (FirefoxDirectory + version). IsOwnUnsignedBinary is inline logic that can move to an own file."
  },
@@ -4822,7 +4472,7 @@
   "category": "juggler",
   "feature": "juggler-pipe-stdio",
   "prefs": [],
-  "added": 2,
+  "added": 3,
   "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 12,
@@ -4861,9 +4511,9 @@
   "category": "juggler",
   "feature": "juggler-download-interceptor",
   "prefs": [],
-  "added": 13,
+  "added": 6,
   "removed": 0,
-  "hunks": 5,
+  "hunks": 4,
   "inline_logic_lines": 4,
   "hookable": "already-hook",
   "anchor": "new method nsExternalHelperAppService::SetDownloadInterceptor, inserted after GetPreferredDownloadsDirectory (line 387)",
@@ -4884,7 +4534,7 @@
   "category": "juggler",
   "feature": "juggler-download-interceptor",
   "prefs": [],
-  "added": 9,
+  "added": 4,
   "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 1,
@@ -4906,7 +4556,7 @@
   "category": "juggler",
   "feature": "juggler-download-interceptor",
   "prefs": [],
-  "added": 2,
+  "added": 3,
   "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 7,
@@ -4930,7 +4580,7 @@
   "category": "juggler",
   "feature": "juggler-mouse-event-id",
   "prefs": [],
-  "added": 4,
+  "added": 2,
   "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 2,
@@ -4977,7 +4627,7 @@
   "category": "other",
   "feature": "canvas-snapshot-readback",
   "prefs": [],
-  "added": 2,
+  "added": 1,
   "removed": 1,
   "hunks": 1,
   "inline_logic_lines": 1,
@@ -5021,7 +4671,7 @@
   "category": "other",
   "feature": "canvas-snapshot-readback",
   "prefs": [],
-  "added": 2,
+  "added": 1,
   "removed": 1,
   "hunks": 1,
   "inline_logic_lines": 1,
@@ -5044,7 +4694,7 @@
   "category": "juggler",
   "feature": "juggler-param-buffer",
   "prefs": [],
-  "added": 2,
+  "added": 1,
   "removed": 1,
   "hunks": 1,
   "inline_logic_lines": 1,
@@ -5069,7 +4719,7 @@
   "prefs": [
    "zoom.stealth.focus.ignore_os_deactivation"
   ],
-  "added": 12,
+  "added": 4,
   "removed": 0,
   "hunks": 3,
   "inline_logic_lines": 6,
@@ -5094,7 +4744,7 @@
   "category": "stillborn",
   "feature": "updater-refuses",
   "prefs": [],
-  "added": 6,
+  "added": 4,
   "removed": 0,
   "hunks": 3,
   "inline_logic_lines": 0,
@@ -5112,7 +4762,7 @@
   "category": "stillborn",
   "feature": "updater-refuses",
   "prefs": [],
-  "added": 5,
+  "added": 3,
   "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 0,
@@ -5177,7 +4827,7 @@
    "zoom.stealth.webgpu.features",
    "zoom.stealth.webgpu.limits"
   ],
-  "added": 11,
+  "added": 7,
   "removed": 0,
   "hunks": 5,
   "inline_logic_lines": 0,
@@ -5199,7 +4849,7 @@
    "zoom.stealth.webgpu.features",
    "zoom.stealth.webgpu.limits"
   ],
-  "added": 7,
+  "added": 4,
   "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 0,
@@ -5256,7 +4906,7 @@
    "dom.webgpu.external-texture.enabled",
    "zoom.stealth.fpp.hw_seed"
   ],
-  "added": 3,
+  "added": 4,
   "removed": 1,
   "hunks": 2,
   "inline_logic_lines": 0,
@@ -5874,7 +5524,7 @@
    "zoom.stealth.media.decode_support",
    "zoom.stealth.media.encode_support"
   ],
-  "added": 3,
+  "added": 4,
   "removed": 0,
   "hunks": 3,
   "inline_logic_lines": 1,
@@ -5919,7 +5569,7 @@
   "prefs": [
    "webgl.msaa-samples"
   ],
-  "added": 3,
+  "added": 4,
   "removed": 0,
   "hunks": 3,
   "inline_logic_lines": 0,
@@ -6006,8 +5656,8 @@
    "zoom.stealth.screen.width",
    "zoom.stealth.screen.height"
   ],
-  "added": 5,
-  "removed": 0,
+  "added": 3,
+  "removed": 1,
   "hunks": 2,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
@@ -6120,7 +5770,7 @@
   "prefs": [
    "zoom.stealth.gfx.feature_status"
   ],
-  "added": 4,
+  "added": 5,
   "removed": 0,
   "hunks": 4,
   "inline_logic_lines": 0,
@@ -6142,7 +5792,7 @@
   "prefs": [
    "zoom.stealth.gfx.feature_status"
   ],
-  "added": 3,
+  "added": 4,
   "removed": 0,
   "hunks": 3,
   "inline_logic_lines": 0,
@@ -6165,9 +5815,9 @@
   "prefs": [
    "zoom.stealth.fpp.hw_seed"
   ],
-  "added": 2,
+  "added": 6,
   "removed": 0,
-  "hunks": 2,
+  "hunks": 3,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
   "anchor": "after the instance_flags statement of wgpu_server_new (with_env), and after the Windows compositor-LUID block of Message::RequestAdapter; each line declares, in its own block, the path module it calls",
@@ -6188,9 +5838,9 @@
   "prefs": [
    "zoom.stealth.fpp.hw_seed"
   ],
-  "added": 1,
+  "added": 3,
   "removed": 0,
-  "hunks": 1,
+  "hunks": 2,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
   "anchor": "top of wgpu_parent_get_compositor_device_luid",
@@ -6234,7 +5884,7 @@
    "zoom.stealth.screen.width",
    "zoom.stealth.screen.height"
   ],
-  "added": 3,
+  "added": 4,
   "removed": 0,
   "hunks": 3,
   "inline_logic_lines": 0,
@@ -6257,7 +5907,7 @@
    "zoom.stealth.webgl.extensions",
    "zoom.stealth.webgl2.extensions"
   ],
-  "added": 5,
+  "added": 4,
   "removed": 0,
   "hunks": 3,
   "inline_logic_lines": 1,
@@ -6277,9 +5927,9 @@
   "category": "spoof",
   "feature": "webgl-parameters",
   "prefs": [],
-  "added": 10,
+  "added": 7,
   "removed": 0,
-  "hunks": 5,
+  "hunks": 6,
   "inline_logic_lines": 5,
   "hookable": "already-hook",
   "anchor": "WebGLContext::BlendEquationSeparate / BlendFuncSeparate (indexed), PolygonOffsetClampEXT, ProvokingVertex, ClipControlEXT",
@@ -6297,9 +5947,9 @@
   "category": "spoof",
   "feature": "webgl-parameters",
   "prefs": [],
-  "added": 2,
+  "added": 3,
   "removed": 0,
-  "hunks": 1,
+  "hunks": 2,
   "inline_logic_lines": 1,
   "hookable": "already-hook",
   "anchor": "WebGLContext::ColorMask (indexed, OES_draw_buffers_indexed)",
@@ -6317,7 +5967,7 @@
   "category": "spoof",
   "feature": "webgl-own-gl",
   "prefs": [],
-  "added": 3,
+  "added": 4,
   "removed": 0,
   "hunks": 3,
   "inline_logic_lines": 0,
@@ -6338,7 +5988,7 @@
   "category": "spoof",
   "feature": "webgl-own-gl",
   "prefs": [],
-  "added": 2,
+  "added": 3,
   "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 0,
@@ -6358,9 +6008,9 @@
   "category": "other",
   "feature": "wr-shared-fonts-cleared-with-namespace",
   "prefs": [],
-  "added": 75,
-  "removed": 6,
-  "hunks": 7,
+  "added": 6,
+  "removed": 0,
+  "hunks": 5,
   "inline_logic_lines": 60,
   "hookable": "movable",
   "anchor": "RenderBackend (the shared font resources are kept in the backend; clear_namespace clears them whether or not the window is still registered)",
@@ -6375,72 +6025,11 @@
   }
  },
  {
-  "file": "gfx/wr/webrender/src/render_backend_pool.rs",
-  "category": "other",
-  "feature": "wr-shared-fonts-cleared-with-namespace",
-  "prefs": [],
-  "added": 2,
-  "removed": 0,
-  "hunks": 2,
-  "inline_logic_lines": 2,
-  "hookable": "already-hook",
-  "anchor": "RenderBackendPool::new (the font resources cloned for the scene builder are cloned once more for the render backend)",
-  "evidence": [
-   "+        let rb_fonts = fonts.clone();",
-   "+                rb_fonts,"
-  ],
-  "notes": "Hands the shared font resources to the render backend, which clears them for a namespace whose window left.",
-  "verifier": {
-   "changed": [],
-   "why": "Checked category, feature, prefs, anchor, evidence and notes against the diff; no correction needed."
-  }
- },
- {
-  "file": "gfx/wr/webrender/src/resource_cache.rs",
-  "category": "other",
-  "feature": "wr-shared-fonts-cleared-with-namespace",
-  "prefs": [],
-  "added": 11,
-  "removed": 14,
-  "hunks": 1,
-  "inline_logic_lines": 11,
-  "hookable": "movable",
-  "anchor": "ResourceCache::clear_namespace (the font resources are cleared through SharedFontResources::clear_namespace)",
-  "evidence": [
-   "+        let cleared = self.resources.fonts.clear_namespace(namespace);"
-  ],
-  "notes": "The font part of clear_namespace is one call that returns what was cleared, so the backend and the cache clear the same way. Replaces 14 lines of Mozilla's that did the same steps one by one.",
-  "verifier": {
-   "changed": [],
-   "why": "Checked category, feature, prefs, anchor, evidence and notes against the diff; no correction needed."
-  }
- },
- {
-  "file": "gfx/wr/wr_glyph_rasterizer/src/rasterizer.rs",
-  "category": "other",
-  "feature": "wr-shared-fonts-cleared-with-namespace",
-  "prefs": [],
-  "added": 93,
-  "removed": 0,
-  "hunks": 3,
-  "inline_logic_lines": 60,
-  "hookable": "movable",
-  "anchor": "SharedFontResources::clear_namespace and the type it returns (new), with a unit test",
-  "evidence": [
-   "+    pub fn clear_namespace(&mut self, namespace: IdNamespace) -> ClearedFonts {"
-  ],
-  "notes": "SharedFontResources::clear_namespace returns the local font keys, the shared instance keys and the shared font keys it removed; a unit test fails when a closed window's shared fonts stay in the pool.",
-  "verifier": {
-   "changed": [],
-   "why": "Checked category, feature, prefs, anchor, evidence and notes against the diff; no correction needed."
-  }
- },
- {
   "file": "dom/base/nsFrameLoader.cpp",
   "category": "juggler",
   "feature": "juggler-frame-crash-context",
   "prefs": [],
-  "added": 5,
+  "added": 3,
   "removed": 1,
   "hunks": 2,
   "inline_logic_lines": 1,
@@ -6462,7 +6051,7 @@
   "category": "other",
   "feature": "proxy-udp-egress",
   "prefs": [],
-  "added": 2,
+  "added": 3,
   "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 0,
@@ -6483,7 +6072,7 @@
   "category": "other",
   "feature": "doh-trr-context",
   "prefs": [],
-  "added": 2,
+  "added": 3,
   "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 0,
@@ -6504,7 +6093,7 @@
   "category": "other",
   "feature": "doh-trr-context",
   "prefs": [],
-  "added": 2,
+  "added": 3,
   "removed": 1,
   "hunks": 2,
   "inline_logic_lines": 0,
@@ -6521,32 +6110,11 @@
   }
  },
  {
-  "file": "toolkit/profile/nsProfileLock.cpp",
-  "category": "other",
-  "feature": "doh-trr-context",
-  "prefs": [],
-  "added": 2,
-  "removed": 0,
-  "hunks": 2,
-  "inline_logic_lines": 0,
-  "hookable": "movable",
-  "anchor": "nsProfileLock::LockWithSymlink, the address in the signature of the symlink lock (Unix)",
-  "evidence": [
-   "+#    if 0  // STEALTH-HOOK(network/doh): the host's own name is never looked up; the signature keeps 127.0.0.1",
-   "+#    endif  // STEALTH-HOOK(network/doh)"
-  ],
-  "notes": "Mozilla resolves the machine's own host name with PR_GetHostByName at start-up, before any proxy is decided, through the system resolver, unless MOZ_PROXY_BYPASS_PROTECTION is set. The block is compiled out so the signature keeps 127.0.0.1, as that build does; nothing else of that build is taken. Windows takes another lock and makes no lookup.",
-  "verifier": {
-   "changed": [],
-   "why": "Written from the diff against the tag."
-  }
- },
- {
   "file": "toolkit/components/url-classifier/UrlClassifierHashCompleter.sys.mjs",
   "category": "other",
   "feature": "doh-trr-context",
   "prefs": [],
-  "added": 7,
+  "added": 4,
   "removed": 0,
   "hunks": 3,
   "inline_logic_lines": 0,
@@ -6608,7 +6176,7 @@
   "category": "other",
   "feature": "doh-trr-context",
   "prefs": [],
-  "added": 4,
+  "added": 5,
   "removed": 0,
   "hunks": 3,
   "inline_logic_lines": 0,
@@ -6713,9 +6281,9 @@
   "category": "other",
   "feature": "proxy-udp-egress",
   "prefs": [],
-  "added": 17,
-  "removed": 42,
-  "hunks": 6,
+  "added": 11,
+  "removed": 8,
+  "hunks": 4,
   "inline_logic_lines": 9,
   "hookable": "movable",
   "anchor": "WebrtcTCPSocket::DoProxyConfigLookup and OpenWithHttpProxy (the channel of the proxy lookup and of the HTTP tunnel)",
@@ -6735,8 +6303,8 @@
   "category": "other",
   "feature": "proxy-udp-egress",
   "prefs": [],
-  "added": 8,
-  "removed": 1,
+  "added": 4,
+  "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 3,
   "hookable": "movable",
@@ -6757,7 +6325,7 @@
   "category": "other",
   "feature": "proxy-udp-egress",
   "prefs": [],
-  "added": 14,
+  "added": 8,
   "removed": 1,
   "hunks": 2,
   "inline_logic_lines": 9,
@@ -6779,8 +6347,8 @@
   "category": "other",
   "feature": "proxy-udp-egress",
   "prefs": [],
-  "added": 5,
-  "removed": 1,
+  "added": 4,
+  "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 1,
   "hookable": "already-hook",
@@ -6801,7 +6369,7 @@
   "category": "other",
   "feature": "proxy-udp-egress",
   "prefs": [],
-  "added": 8,
+  "added": 4,
   "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 2,
@@ -6839,28 +6407,6 @@
   }
  },
  {
-  "file": "netwerk/base/nsProxyInfo.cpp",
-  "category": "other",
-  "feature": "proxy-udp-egress",
-  "prefs": [],
-  "added": 5,
-  "removed": 0,
-  "hunks": 1,
-  "inline_logic_lines": 3,
-  "hookable": "movable",
-  "anchor": "nsProxyInfo::IsSOCKS5",
-  "evidence": [
-   "+// STEALTH-HOOK(network/proxy-udp)",
-   "+bool nsProxyInfo::IsSOCKS5() {",
-   "+  return mType == kProxyType_SOCKS || mType == kProxyType_SOCKS5;"
-  ],
-  "notes": "A SOCKS5 proxy (type socks or socks5): the only one that carries UDP.",
-  "verifier": {
-   "changed": [],
-   "why": "Written from the diff against the tag."
-  }
- },
- {
   "file": "netwerk/base/nsUDPSocket.h",
   "category": "other",
   "feature": "proxy-udp-egress",
@@ -6885,7 +6431,7 @@
   "category": "other",
   "feature": "proxy-udp-egress",
   "prefs": [],
-  "added": 11,
+  "added": 12,
   "removed": 2,
   "hunks": 3,
   "inline_logic_lines": 2,
@@ -6907,7 +6453,7 @@
   "category": "other",
   "feature": "proxy-udp-egress",
   "prefs": [],
-  "added": 21,
+  "added": 22,
   "removed": 6,
   "hunks": 3,
   "inline_logic_lines": 10,
@@ -6929,7 +6475,7 @@
   "category": "other",
   "feature": "proxy-udp-egress",
   "prefs": [],
-  "added": 4,
+  "added": 5,
   "removed": 1,
   "hunks": 2,
   "inline_logic_lines": 1,
@@ -6973,7 +6519,7 @@
   "category": "other",
   "feature": "proxy-udp-egress",
   "prefs": [],
-  "added": 6,
+  "added": 7,
   "removed": 1,
   "hunks": 3,
   "inline_logic_lines": 1,
@@ -7083,9 +6629,9 @@
   "category": "other",
   "feature": "proxy-udp-egress",
   "prefs": [],
-  "added": 5,
+  "added": 4,
   "removed": 0,
-  "hunks": 1,
+  "hunks": 2,
   "inline_logic_lines": 3,
   "hookable": "movable",
   "anchor": "HttpConnectionUDP::InitCommon",
@@ -7105,7 +6651,7 @@
   "category": "other",
   "feature": "proxy-udp-egress",
   "prefs": [],
-  "added": 4,
+  "added": 5,
   "removed": 1,
   "hunks": 3,
   "inline_logic_lines": 0,
@@ -7167,7 +6713,7 @@
   "category": "spoof",
   "feature": "webrtc-declared-network",
   "prefs": [],
-  "added": 6,
+  "added": 3,
   "removed": 15,
   "hunks": 2,
   "inline_logic_lines": 1,
@@ -7189,9 +6735,9 @@
   "category": "spoof",
   "feature": "webrtc-declared-network",
   "prefs": [],
-  "added": 11,
+  "added": 46,
   "removed": 2,
-  "hunks": 1,
+  "hunks": 3,
   "inline_logic_lines": 7,
   "hookable": "movable",
   "anchor": "MDNSService::new, after the join_multicast_v4 loop",
@@ -7211,7 +6757,7 @@
   "category": "spoof",
   "feature": "webrtc-declared-network",
   "prefs": [],
-  "added": 9,
+  "added": 4,
   "removed": 0,
   "hunks": 3,
   "inline_logic_lines": 1,
@@ -7233,9 +6779,9 @@
   "category": "spoof",
   "feature": "webrtc-declared-network",
   "prefs": [],
-  "added": 22,
-  "removed": 2,
-  "hunks": 3,
+  "added": 1,
+  "removed": 1,
+  "hunks": 1,
   "inline_logic_lines": 15,
   "hookable": "movable",
   "anchor": "include of RandomNum.h; NrIceCtx constructor (host_ports_); nr_socket_local_create",
@@ -7255,9 +6801,9 @@
   "category": "other",
   "feature": "webrtc-declared-network",
   "prefs": [],
-  "added": 8,
+  "added": 4,
   "removed": 0,
-  "hunks": 1,
+  "hunks": 2,
   "inline_logic_lines": 5,
   "hookable": "movable",
   "anchor": "MtransportTest::SetUp, before the env vars of the tests",
@@ -7267,28 +6813,6 @@
    "+    std::string declared;"
   ],
   "notes": "The mtransport unit tests gather on a declared adapter (STEALTHFOX_WEBRTC_NETWORK is set when the environment has none), as the browser does.",
-  "verifier": {
-   "changed": [],
-   "why": "Written from the diff against the tag."
-  }
- },
- {
-  "file": "dom/media/webrtc/transport/third_party/nICEr/moz.yaml",
-  "category": "build",
-  "feature": "webrtc-declared-network",
-  "prefs": [],
-  "added": 0,
-  "removed": 6,
-  "hunks": 1,
-  "inline_logic_lines": 0,
-  "hookable": "already-hook",
-  "anchor": "vendoring: exclude list",
-  "evidence": [
-   "-    - src/stun/addrs-bsd.c",
-   "-    - src/stun/addrs-bsd.h",
-   "-    - src/stun/addrs-netlink.c"
-  ],
-  "notes": "The OS enumerators of the interfaces (addrs-bsd, addrs-netlink, addrs-win32) are no longer in the files we keep.",
   "verifier": {
    "changed": [],
    "why": "Written from the diff against the tag."
@@ -7321,7 +6845,7 @@
   "category": "other",
   "feature": "doh-trr-context",
   "prefs": [],
-  "added": 9,
+  "added": 7,
   "removed": 4,
   "hunks": 6,
   "inline_logic_lines": 10,
@@ -7339,187 +6863,11 @@
   }
  },
  {
-  "file": "netwerk/protocol/http/Http3ConnectUDPStream.cpp",
-  "category": "other",
-  "feature": "proxy-udp-egress",
-  "prefs": [],
-  "added": 6,
-  "removed": 0,
-  "hunks": 1,
-  "inline_logic_lines": 3,
-  "hookable": "movable",
-  "anchor": "Http3ConnectUDPStream::SetSocksProxy",
-  "evidence": [
-   "+// STEALTH-HOOK(network/proxy-udp): nsIUDPSocket.setSocksProxy is for the sockets that leave by a SOCKS5 proxy; this stream",
-   "+// goes by its own HTTP proxy (CONNECT-UDP).",
-   "+NS_IMETHODIMP Http3ConnectUDPStream::SetSocksProxy(nsIProxyInfo* aProxyInfo) {"
-  ],
-  "notes": "nsIUDPSocket.setSocksProxy is for the sockets that leave by a SOCKS5 proxy; the CONNECT-UDP stream goes by its own HTTP proxy, so it answers not implemented.",
-  "verifier": {
-   "changed": [],
-   "why": "Written from the diff against the tag."
-  }
- },
- {
-  "file": "dom/media/webrtc/transport/third_party/nICEr/src/stun/addrs-bsd.cpp",
-  "category": "spoof",
-  "feature": "webrtc-declared-network",
-  "prefs": [],
-  "added": 0,
-  "removed": 110,
-  "hunks": 1,
-  "inline_logic_lines": 0,
-  "hookable": "already-hook",
-  "anchor": "whole file (deleted)",
-  "evidence": [
-   "-/* This Source Code Form is subject to the terms of the Mozilla Public",
-   "- * License, v. 2.0. If a copy of the MPL was not distributed with this file,",
-   "- * You can obtain one at http://mozilla.org/MPL/2.0/. */"
-  ],
-  "notes": "The OS enumerator of the host's interfaces is not built and not in the tree: the interfaces are declared, never read from the host.",
-  "verifier": {
-   "changed": [],
-   "why": "Written from the diff against the tag."
-  }
- },
- {
-  "file": "dom/media/webrtc/transport/third_party/nICEr/src/stun/addrs-bsd.h",
-  "category": "spoof",
-  "feature": "webrtc-declared-network",
-  "prefs": [],
-  "added": 0,
-  "removed": 13,
-  "hunks": 1,
-  "inline_logic_lines": 0,
-  "hookable": "already-hook",
-  "anchor": "whole file (deleted)",
-  "evidence": [
-   "-/* This Source Code Form is subject to the terms of the Mozilla Public",
-   "- * License, v. 2.0. If a copy of the MPL was not distributed with this file,",
-   "- * You can obtain one at http://mozilla.org/MPL/2.0/. */"
-  ],
-  "notes": "The OS enumerator of the host's interfaces is not built and not in the tree: the interfaces are declared, never read from the host.",
-  "verifier": {
-   "changed": [],
-   "why": "Written from the diff against the tag."
-  }
- },
- {
-  "file": "dom/media/webrtc/transport/third_party/nICEr/src/stun/addrs-netlink-wireless.cpp",
-  "category": "spoof",
-  "feature": "webrtc-declared-network",
-  "prefs": [],
-  "added": 0,
-  "removed": 65,
-  "hunks": 1,
-  "inline_logic_lines": 0,
-  "hookable": "already-hook",
-  "anchor": "whole file (deleted)",
-  "evidence": [
-   "-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */",
-   "-/* vim: set ts=2 et sw=2 tw=80: */",
-   "-/* This Source Code Form is subject to the terms of the Mozilla Public"
-  ],
-  "notes": "The OS enumerator of the host's interfaces is not built and not in the tree: the interfaces are declared, never read from the host.",
-  "verifier": {
-   "changed": [],
-   "why": "Written from the diff against the tag."
-  }
- },
- {
-  "file": "dom/media/webrtc/transport/third_party/nICEr/src/stun/addrs-netlink.cpp",
-  "category": "spoof",
-  "feature": "webrtc-declared-network",
-  "prefs": [],
-  "added": 0,
-  "removed": 282,
-  "hunks": 1,
-  "inline_logic_lines": 0,
-  "hookable": "already-hook",
-  "anchor": "whole file (deleted)",
-  "evidence": [
-   "-/*",
-   "-Copyright (c) 2011, The WebRTC project authors. All rights reserved.",
-   "-"
-  ],
-  "notes": "The OS enumerator of the host's interfaces is not built and not in the tree: the interfaces are declared, never read from the host.",
-  "verifier": {
-   "changed": [],
-   "why": "Written from the diff against the tag."
-  }
- },
- {
-  "file": "dom/media/webrtc/transport/third_party/nICEr/src/stun/addrs-netlink.h",
-  "category": "spoof",
-  "feature": "webrtc-declared-network",
-  "prefs": [],
-  "added": 0,
-  "removed": 45,
-  "hunks": 1,
-  "inline_logic_lines": 0,
-  "hookable": "already-hook",
-  "anchor": "whole file (deleted)",
-  "evidence": [
-   "-/*",
-   "-Copyright (c) 2011, The WebRTC project authors. All rights reserved.",
-   "-"
-  ],
-  "notes": "The OS enumerator of the host's interfaces is not built and not in the tree: the interfaces are declared, never read from the host.",
-  "verifier": {
-   "changed": [],
-   "why": "Written from the diff against the tag."
-  }
- },
- {
-  "file": "dom/media/webrtc/transport/third_party/nICEr/src/stun/addrs-win32.cpp",
-  "category": "spoof",
-  "feature": "webrtc-declared-network",
-  "prefs": [],
-  "added": 0,
-  "removed": 139,
-  "hunks": 1,
-  "inline_logic_lines": 0,
-  "hookable": "already-hook",
-  "anchor": "whole file (deleted)",
-  "evidence": [
-   "-/* This Source Code Form is subject to the terms of the Mozilla Public",
-   "- * License, v. 2.0. If a copy of the MPL was not distributed with this file,",
-   "- * You can obtain one at http://mozilla.org/MPL/2.0/. */"
-  ],
-  "notes": "The OS enumerator of the host's interfaces is not built and not in the tree: the interfaces are declared, never read from the host.",
-  "verifier": {
-   "changed": [],
-   "why": "Written from the diff against the tag."
-  }
- },
- {
-  "file": "dom/media/webrtc/transport/third_party/nICEr/src/stun/addrs-win32.h",
-  "category": "spoof",
-  "feature": "webrtc-declared-network",
-  "prefs": [],
-  "added": 0,
-  "removed": 13,
-  "hunks": 1,
-  "inline_logic_lines": 0,
-  "hookable": "already-hook",
-  "anchor": "whole file (deleted)",
-  "evidence": [
-   "-/* This Source Code Form is subject to the terms of the Mozilla Public",
-   "- * License, v. 2.0. If a copy of the MPL was not distributed with this file,",
-   "- * You can obtain one at http://mozilla.org/MPL/2.0/. */"
-  ],
-  "notes": "The OS enumerator of the host's interfaces is not built and not in the tree: the interfaces are declared, never read from the host.",
-  "verifier": {
-   "changed": [],
-   "why": "Written from the diff against the tag."
-  }
- },
- {
   "file": "toolkit/components/parentalcontrols/nsParentalControlsServiceWin.cpp",
   "category": "other",
   "feature": "doh-trr-context",
   "prefs": [],
-  "added": 2,
+  "added": 3,
   "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 3,
@@ -7537,35 +6885,13 @@
   }
  },
  {
-  "file": "toolkit/components/parentalcontrols/nsParentalControlsServiceDefault.cpp",
-  "category": "other",
-  "feature": "doh-trr-context",
-  "prefs": [],
-  "added": 2,
-  "removed": 0,
-  "hunks": 1,
-  "inline_logic_lines": 3,
-  "hookable": "movable",
-  "anchor": "include of StealthParentalControls.h; the nsParentalControlsService constructor",
-  "evidence": [
-   "+#include \"StealthParentalControls.h\"  // STEALTH-HOOK(network/doh)",
-   "+  // STEALTH-HOOK(network/doh): declared, the OS is never read.",
-   "+  if (StealthParentalControlsDeclared(&mEnabled)) {"
-  ],
-  "notes": "The constructor takes the declared value (off), as the other implementations.",
-  "verifier": {
-   "changed": [],
-   "why": "Written from the diff against the tag."
-  }
- },
- {
   "file": "netwerk/protocol/http/nsHttpChannel.cpp",
   "category": "other",
   "feature": "doh-trr-context",
   "prefs": [],
-  "added": 5,
+  "added": 4,
   "removed": 1,
-  "hunks": 4,
+  "hunks": 3,
   "inline_logic_lines": 12,
   "hookable": "movable",
   "anchor": "include of StealthTRRContext.h; nsHttpChannel::MaybeResolveProxyAndBeginConnect; nsHttpChannel::OnProxyAvailable",
@@ -7585,7 +6911,7 @@
   "category": "spoof",
   "feature": "webrtc-declared-network",
   "prefs": [],
-  "added": 3,
+  "added": 4,
   "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 1,
@@ -7608,7 +6934,7 @@
   "prefs": [],
   "added": 3,
   "removed": 1,
-  "hunks": 1,
+  "hunks": 2,
   "inline_logic_lines": 1,
   "hookable": "already-hook",
   "anchor": "Http3Session::Init (mUseNSPRForIO)",
@@ -7627,7 +6953,7 @@
   "category": "other",
   "feature": "ipv6-literal-connect",
   "prefs": [],
-  "added": 2,
+  "added": 3,
   "removed": 1,
   "hunks": 2,
   "inline_logic_lines": 1,
@@ -7652,7 +6978,7 @@
    "geo.provider.network.url",
    "geo.provider.network.scan"
   ],
-  "added": 5,
+  "added": 3,
   "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 3,
@@ -7674,7 +7000,7 @@
   "category": "other",
   "feature": "doh-trr-context",
   "prefs": [],
-  "added": 2,
+  "added": 4,
   "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 0,
@@ -7696,7 +7022,7 @@
   "feature": "doh-trr-context",
   "prefs": [],
   "added": 1,
-  "removed": 1,
+  "removed": 0,
   "hunks": 1,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
@@ -7740,7 +7066,7 @@
    "geo.provider.network.url",
    "geo.provider.network.scan"
   ],
-  "added": 5,
+  "added": 3,
   "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 3,
@@ -7758,379 +7084,11 @@
   }
  },
  {
-  "file": "dom/system/windows/PWindowsUtils.ipdl",
-  "category": "spoof",
-  "feature": "geolocation-no-host-provider",
-  "prefs": [
-   "geo.provider.network.url",
-   "geo.provider.network.scan"
-  ],
-  "added": 0,
-  "removed": 7,
-  "hunks": 1,
-  "inline_logic_lines": 0,
-  "hookable": "already-hook",
-  "anchor": "PWindowsUtils protocol",
-  "evidence": [
-   "(file deleted)"
-  ],
-  "notes": "The Windows location provider is out of the tree: its messages leave the protocol.",
-  "verifier": {
-   "changed": [],
-   "why": "Written from the diff against the tag."
-  }
- },
- {
-  "file": "dom/system/windows/WindowsUtilsChild.cpp",
-  "category": "spoof",
-  "feature": "geolocation-no-host-provider",
-  "prefs": [
-   "geo.provider.network.url",
-   "geo.provider.network.scan"
-  ],
-  "added": 1,
-  "removed": 24,
-  "hunks": 1,
-  "inline_logic_lines": 1,
-  "hookable": "already-hook",
-  "anchor": "WindowsUtilsChild",
-  "evidence": [
-   "+namespace mozilla::dom {}  // namespace mozilla::dom"
-  ],
-  "notes": "The Windows location provider is out of the tree: its child actor factory is removed.",
-  "verifier": {
-   "changed": [],
-   "why": "Written from the diff against the tag."
-  }
- },
- {
-  "file": "dom/system/windows/WindowsUtilsChild.h",
-  "category": "spoof",
-  "feature": "geolocation-no-host-provider",
-  "prefs": [
-   "geo.provider.network.url",
-   "geo.provider.network.scan"
-  ],
-  "added": 0,
-  "removed": 4,
-  "hunks": 2,
-  "inline_logic_lines": 0,
-  "hookable": "already-hook",
-  "anchor": "WindowsUtilsChild",
-  "evidence": [
-   "(file deleted)"
-  ],
-  "notes": "The Windows location provider is out of the tree: its child actor factory is removed.",
-  "verifier": {
-   "changed": [],
-   "why": "Written from the diff against the tag."
-  }
- },
- {
-  "file": "dom/system/windows/location/PWindowsLocation.ipdl",
-  "category": "spoof",
-  "feature": "geolocation-no-host-provider",
-  "prefs": [
-   "geo.provider.network.url",
-   "geo.provider.network.scan"
-  ],
-  "added": 0,
-  "removed": 36,
-  "hunks": 1,
-  "inline_logic_lines": 0,
-  "hookable": "already-hook",
-  "anchor": "(whole file deleted)",
-  "evidence": [
-   "(file deleted)"
-  ],
-  "notes": "The Windows location provider is out of the tree: Mozilla's file is deleted, nothing reads the host location.",
-  "verifier": {
-   "changed": [],
-   "why": "Written from the diff against the tag."
-  }
- },
- {
-  "file": "dom/system/windows/location/WindowsLegacyLocationChild.cpp",
-  "category": "spoof",
-  "feature": "geolocation-no-host-provider",
-  "prefs": [
-   "geo.provider.network.url",
-   "geo.provider.network.scan"
-  ],
-  "added": 0,
-  "removed": 289,
-  "hunks": 1,
-  "inline_logic_lines": 0,
-  "hookable": "already-hook",
-  "anchor": "(whole file deleted)",
-  "evidence": [
-   "(file deleted)"
-  ],
-  "notes": "The Windows location provider is out of the tree: Mozilla's file is deleted, nothing reads the host location.",
-  "verifier": {
-   "changed": [],
-   "why": "Written from the diff against the tag."
-  }
- },
- {
-  "file": "dom/system/windows/location/WindowsLegacyLocationChild.h",
-  "category": "spoof",
-  "feature": "geolocation-no-host-provider",
-  "prefs": [
-   "geo.provider.network.url",
-   "geo.provider.network.scan"
-  ],
-  "added": 0,
-  "removed": 42,
-  "hunks": 1,
-  "inline_logic_lines": 0,
-  "hookable": "already-hook",
-  "anchor": "(whole file deleted)",
-  "evidence": [
-   "(file deleted)"
-  ],
-  "notes": "The Windows location provider is out of the tree: Mozilla's file is deleted, nothing reads the host location.",
-  "verifier": {
-   "changed": [],
-   "why": "Written from the diff against the tag."
-  }
- },
- {
-  "file": "dom/system/windows/location/WindowsLocationChild.cpp",
-  "category": "spoof",
-  "feature": "geolocation-no-host-provider",
-  "prefs": [
-   "geo.provider.network.url",
-   "geo.provider.network.scan"
-  ],
-  "added": 0,
-  "removed": 25,
-  "hunks": 1,
-  "inline_logic_lines": 0,
-  "hookable": "already-hook",
-  "anchor": "(whole file deleted)",
-  "evidence": [
-   "(file deleted)"
-  ],
-  "notes": "The Windows location provider is out of the tree: Mozilla's file is deleted, nothing reads the host location.",
-  "verifier": {
-   "changed": [],
-   "why": "Written from the diff against the tag."
-  }
- },
- {
-  "file": "dom/system/windows/location/WindowsLocationChild.h",
-  "category": "spoof",
-  "feature": "geolocation-no-host-provider",
-  "prefs": [
-   "geo.provider.network.url",
-   "geo.provider.network.scan"
-  ],
-  "added": 0,
-  "removed": 33,
-  "hunks": 1,
-  "inline_logic_lines": 0,
-  "hookable": "already-hook",
-  "anchor": "(whole file deleted)",
-  "evidence": [
-   "(file deleted)"
-  ],
-  "notes": "The Windows location provider is out of the tree: Mozilla's file is deleted, nothing reads the host location.",
-  "verifier": {
-   "changed": [],
-   "why": "Written from the diff against the tag."
-  }
- },
- {
-  "file": "dom/system/windows/location/WindowsLocationParent.cpp",
-  "category": "spoof",
-  "feature": "geolocation-no-host-provider",
-  "prefs": [
-   "geo.provider.network.url",
-   "geo.provider.network.scan"
-  ],
-  "added": 0,
-  "removed": 35,
-  "hunks": 1,
-  "inline_logic_lines": 0,
-  "hookable": "already-hook",
-  "anchor": "(whole file deleted)",
-  "evidence": [
-   "(file deleted)"
-  ],
-  "notes": "The Windows location provider is out of the tree: Mozilla's file is deleted, nothing reads the host location.",
-  "verifier": {
-   "changed": [],
-   "why": "Written from the diff against the tag."
-  }
- },
- {
-  "file": "dom/system/windows/location/WindowsLocationParent.h",
-  "category": "spoof",
-  "feature": "geolocation-no-host-provider",
-  "prefs": [
-   "geo.provider.network.url",
-   "geo.provider.network.scan"
-  ],
-  "added": 0,
-  "removed": 50,
-  "hunks": 1,
-  "inline_logic_lines": 0,
-  "hookable": "already-hook",
-  "anchor": "(whole file deleted)",
-  "evidence": [
-   "(file deleted)"
-  ],
-  "notes": "The Windows location provider is out of the tree: Mozilla's file is deleted, nothing reads the host location.",
-  "verifier": {
-   "changed": [],
-   "why": "Written from the diff against the tag."
-  }
- },
- {
-  "file": "dom/system/windows/location/WindowsLocationProvider.cpp",
-  "category": "spoof",
-  "feature": "geolocation-no-host-provider",
-  "prefs": [
-   "geo.provider.network.url",
-   "geo.provider.network.scan"
-  ],
-  "added": 0,
-  "removed": 274,
-  "hunks": 1,
-  "inline_logic_lines": 0,
-  "hookable": "already-hook",
-  "anchor": "(whole file deleted)",
-  "evidence": [
-   "(file deleted)"
-  ],
-  "notes": "The Windows location provider is out of the tree: Mozilla's file is deleted, nothing reads the host location.",
-  "verifier": {
-   "changed": [],
-   "why": "Written from the diff against the tag."
-  }
- },
- {
-  "file": "dom/system/windows/location/WindowsLocationProvider.h",
-  "category": "spoof",
-  "feature": "geolocation-no-host-provider",
-  "prefs": [
-   "geo.provider.network.url",
-   "geo.provider.network.scan"
-  ],
-  "added": 0,
-  "removed": 69,
-  "hunks": 1,
-  "inline_logic_lines": 0,
-  "hookable": "already-hook",
-  "anchor": "(whole file deleted)",
-  "evidence": [
-   "(file deleted)"
-  ],
-  "notes": "The Windows location provider is out of the tree: Mozilla's file is deleted, nothing reads the host location.",
-  "verifier": {
-   "changed": [],
-   "why": "Written from the diff against the tag."
-  }
- },
- {
-  "file": "dom/system/windows/location/WindowsRuntimeLocationChild.cpp",
-  "category": "spoof",
-  "feature": "geolocation-no-host-provider",
-  "prefs": [
-   "geo.provider.network.url",
-   "geo.provider.network.scan"
-  ],
-  "added": 0,
-  "removed": 336,
-  "hunks": 1,
-  "inline_logic_lines": 0,
-  "hookable": "already-hook",
-  "anchor": "(whole file deleted)",
-  "evidence": [
-   "(file deleted)"
-  ],
-  "notes": "The Windows location provider is out of the tree: Mozilla's file is deleted, nothing reads the host location.",
-  "verifier": {
-   "changed": [],
-   "why": "Written from the diff against the tag."
-  }
- },
- {
-  "file": "dom/system/windows/location/WindowsRuntimeLocationChild.h",
-  "category": "spoof",
-  "feature": "geolocation-no-host-provider",
-  "prefs": [
-   "geo.provider.network.url",
-   "geo.provider.network.scan"
-  ],
-  "added": 0,
-  "removed": 54,
-  "hunks": 1,
-  "inline_logic_lines": 0,
-  "hookable": "already-hook",
-  "anchor": "(whole file deleted)",
-  "evidence": [
-   "(file deleted)"
-  ],
-  "notes": "The Windows location provider is out of the tree: Mozilla's file is deleted, nothing reads the host location.",
-  "verifier": {
-   "changed": [],
-   "why": "Written from the diff against the tag."
-  }
- },
- {
-  "file": "dom/system/windows/location/moz.build",
-  "category": "spoof",
-  "feature": "geolocation-no-host-provider",
-  "prefs": [
-   "geo.provider.network.url",
-   "geo.provider.network.scan"
-  ],
-  "added": 0,
-  "removed": 33,
-  "hunks": 1,
-  "inline_logic_lines": 0,
-  "hookable": "already-hook",
-  "anchor": "(whole file deleted)",
-  "evidence": [
-   "(file deleted)"
-  ],
-  "notes": "The Windows location provider is out of the tree: Mozilla's file is deleted, nothing reads the host location.",
-  "verifier": {
-   "changed": [],
-   "why": "Written from the diff against the tag."
-  }
- },
- {
-  "file": "dom/system/windows/moz.build",
-  "category": "spoof",
-  "feature": "geolocation-no-host-provider",
-  "prefs": [
-   "geo.provider.network.url",
-   "geo.provider.network.scan"
-  ],
-  "added": 0,
-  "removed": 6,
-  "hunks": 1,
-  "inline_logic_lines": 0,
-  "hookable": "already-hook",
-  "anchor": "moz.build",
-  "evidence": [
-   "(file deleted)"
-  ],
-  "notes": "The Windows location provider is out of the tree: the sub-directory and the IPDL file are no longer built.",
-  "verifier": {
-   "changed": [],
-   "why": "Written from the diff against the tag."
-  }
- },
- {
   "file": "netwerk/base/nsIProxyInfo.idl",
   "category": "other",
   "feature": "proxy-udp-egress",
   "prefs": [],
-  "added": 8,
+  "added": 1,
   "removed": 0,
   "hunks": 1,
   "inline_logic_lines": 6,
@@ -8172,7 +7130,7 @@
   "category": "other",
   "feature": "doh-trr-context",
   "prefs": [],
-  "added": 5,
+  "added": 4,
   "removed": 0,
   "hunks": 3,
   "inline_logic_lines": 1,
@@ -8190,33 +7148,11 @@
   }
  },
  {
-  "file": "netwerk/ipc/SocketProcessChild.cpp",
-  "category": "other",
-  "feature": "proxy-udp-egress",
-  "prefs": [],
-  "added": 8,
-  "removed": 0,
-  "hunks": 2,
-  "inline_logic_lines": 1,
-  "hookable": "already-hook",
-  "anchor": "SocketProcessChild::RecvStealthWarmSocksUdp (after RecvNotifyObserver)",
-  "evidence": [
-   "+#include \"nsSOCKSUDPIOLayer.h\"  // STEALTH-HOOK(network/proxy-udp)",
-   "+mozilla::ipc::IPCResult SocketProcessChild::RecvStealthWarmSocksUdp(const nsACString& aHost, const int32_t& aPort,",
-   "+  nsSOCKSUDPIOLayerWarm(aHost, aPort, aUser, aPass);"
-  ],
-  "notes": "Receiver of PSocketProcess::StealthWarmSocksUdp: the pool of UDP associations is warmed in the socket process, where the sockets of the PeerConnections are made. The body is one call.",
-  "verifier": {
-   "changed": [],
-   "why": "Written from the diff against the tag."
-  }
- },
- {
   "file": "netwerk/ipc/SocketProcessChild.h",
   "category": "other",
   "feature": "proxy-udp-egress",
   "prefs": [],
-  "added": 4,
+  "added": 2,
   "removed": 0,
   "hunks": 1,
   "inline_logic_lines": 0,
@@ -8242,7 +7178,7 @@
   ],
   "added": 4,
   "removed": 0,
-  "hunks": 1,
+  "hunks": 2,
   "inline_logic_lines": 2,
   "hookable": "already-hook",
   "anchor": "XREMain::XRE_mainRun after InitializeUserPrefs",
@@ -8263,9 +7199,9 @@
    "geo.provider.network.url",
    "geo.provider.network.scan"
   ],
-  "added": 6,
-  "removed": 10,
-  "hunks": 4,
+  "added": 3,
+  "removed": 0,
+  "hunks": 2,
   "inline_logic_lines": 3,
   "hookable": "movable",
   "anchor": "GeolocationService::Init",
@@ -8289,8 +7225,8 @@
    "geo.provider.network.scan"
   ],
   "added": 4,
-  "removed": 4,
-  "hunks": 3,
+  "removed": 0,
+  "hunks": 2,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
   "anchor": "moz.build after the closing bracket",
@@ -8303,6 +7239,323 @@
   "verifier": {
    "changed": [],
    "why": "Written from the diff against the tag."
+  }
+ },
+ {
+  "file": "js/xpconnect/tests/unit/xpcshell.toml",
+  "category": "juggler",
+  "feature": "hybrid-xrays",
+  "prefs": [],
+  "added": 2,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "[\"test_scriptable_nsIClassInfo.js\"]",
+  "evidence": [
+   "+[\"test_stealth_hybrid_xrays_options.js\"]  # STEALTH-HOOK(automation/hybrid-xrays)"
+  ],
+  "notes": "Registration of our xpcshell test of the hybridXrays option of Cu.Sandbox (js/xpconnect/tests/unit/test_stealth_hybrid_xrays_options.js).",
+  "verifier": {
+   "changed": [],
+   "why": "Checked against the diff; one registration line and its blank line."
+  }
+ },
+ {
+  "file": "dom/ipc/gtest/moz.build",
+  "category": "juggler",
+  "feature": "juggler-input-dispatch",
+  "prefs": [],
+  "added": 2,
+  "removed": 0,
+  "hunks": 2,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "after the UNIFIED_SOURCES list (RemoteTypeTest.cpp); after the LOCAL_INCLUDES list",
+  "evidence": [
+   "+UNIFIED_SOURCES += [\"TestStealthDragGesture.cpp\", \"TestStealthJugglerCoalesce.cpp\", \"TestStealthMouseEventIPC.cpp\"]  # STEALTH-HOOK(automation/input)",
+   "+LOCAL_INCLUDES += [\"/dom/events\"]  # STEALTH-HOOK(automation/input)"
+  ],
+  "notes": "Builds the gtests of the drag decision, the id through IPC and copy, and the coalescing of the Juggler id; /dom/events is where StealthDragGesture.h is.",
+  "verifier": {
+   "changed": [],
+   "why": "Written with the hook, 2026-11-21."
+  }
+ },
+ {
+  "file": "layout/base/gtest/moz.build",
+  "category": "juggler",
+  "feature": "juggler-input-dispatch",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "after the UNIFIED_SOURCES list (TestUniqueOrNonOwningPtr.cpp)",
+  "evidence": [
+   "+UNIFIED_SOURCES += [\"TestStealthJugglerMouseAck.cpp\"]  # STEALTH-HOOK(automation/input)"
+  ],
+  "notes": "Builds the gtest of StealthJugglerMouseAck (layout/base is already in its local includes).",
+  "verifier": {
+   "changed": [],
+   "why": "Written with the hook, 2026-11-21."
+  }
+ },
+ {
+  "file": "docshell/base/test/gtest/moz.build",
+  "category": "build",
+  "feature": "juggler-navigation-events",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "after the closing bracket of UNIFIED_SOURCES",
+  "evidence": [
+   "+include(\"stealth.build\")  # STEALTH-HOOK(automation/navigation)"
+  ],
+  "notes": "One line includes docshell/base/test/gtest/stealth.build, our file, which lists TestStealthNavigation.cpp and the local include of docshell/base.",
+  "verifier": {
+   "changed": [],
+   "why": "Written from the diff against the tag."
+  }
+ },
+ {
+  "file": "dom/canvas/OffscreenCanvas.h",
+  "category": "spoof",
+  "feature": "canvas-noise-projection",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "class OffscreenCanvas, after GetSurfaceSnapshot (declaration of the as-drawn reader)",
+  "evidence": [
+   "+  already_AddRefed<gfx::SourceSurface> GetSurfaceSnapshotAsDrawn(gfxAlphaType* aOutAlphaType = nullptr);  // STEALTH-HOOK(fingerprint/canvas/noise-projection)"
+  ],
+  "notes": "Member declaration of Mozilla's GetSurfaceSnapshot body, renamed in OffscreenCanvas.cpp; OffscreenCanvas::GetSurfaceSnapshot is defined in dom/canvas/StealthOffscreenSnapshot.cpp.",
+  "verifier": {
+   "changed": [],
+   "why": "Written by the hook-rework executor of this folder."
+  }
+ },
+ {
+  "file": "netwerk/protocol/res/SubstitutingProtocolHandler.h",
+  "category": "spoof",
+  "feature": "stealth-branding-redirect",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "class SubstitutingProtocolHandler, after NS_DECL_NON_VIRTUAL_NSISUBSTITUTINGPROTOCOLHANDLER",
+  "evidence": [
+   "+  nsresult ResolveURI_Mozilla(nsIURI* aResURI, nsACString& aResult);  // STEALTH-HOOK(fingerprint/js-surface/branding)"
+  ],
+  "notes": "Declaration of Mozilla's ResolveURI body under its new name (function wrap): ResolveURI itself is ours, defined in netwerk/protocol/res/StealthBranding.cpp, and redirects every successful resolution to the declared branding archive.",
+  "verifier": {
+   "changed": [],
+   "why": "written by the hook rework, not by the first inventory"
+  }
+ },
+ {
+  "file": "security/sandbox/linux/gtest/moz.build",
+  "category": "build",
+  "feature": "stealth-branding-redirect",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "UNIFIED_SOURCES list of the sandbox gtests",
+  "evidence": [
+   "+UNIFIED_SOURCES += [\"TestStealthBrandingPolicy.cpp\"]  # STEALTH-HOOK(fingerprint/js-surface/branding)"
+  ],
+  "notes": "Registers our gtest of the content sandbox's branding read rule, after the closing bracket of Mozilla's list.",
+  "verifier": {
+   "changed": [],
+   "why": "written by the hook rework, not by the first inventory"
+  }
+ },
+ {
+  "file": "devtools/shared/heapsnapshot/tests/gtest/moz.build",
+  "category": "build",
+  "feature": "debugger-invisible-attach",
+  "prefs": [],
+  "added": 2,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "UNIFIED_SOURCES += [\"TestStealthDebugger.cpp\"] after FINAL_LIBRARY",
+  "evidence": [
+   "+UNIFIED_SOURCES += [\"TestStealthDebugger.cpp\"]  # STEALTH-HOOK(fingerprint/js-surface/debugger)"
+  ],
+  "notes": "Registers the gtest suite StealthDebugger.* of this folder in the existing heapsnapshot gtest library (xul-gtest); the test uses the DevTools.h fixture of that directory.",
+  "verifier": {
+   "changed": [],
+   "why": "Written by the hook-rework executor of this folder."
+  }
+ },
+ {
+  "file": "gfx/gl/GLContext.h",
+  "category": "spoof",
+  "feature": "webgl-multisample",
+  "prefs": [
+   "webgl.msaa-samples"
+  ],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "after the mAvailableFeatures member of GLContext",
+  "evidence": [
+   "+  bool mStealthReportedMultisample = false;  // STEALTH-HOOK(fingerprint/webgl/multisample)"
+  ],
+  "notes": "The field that carries the feature as the driver reports it from after InitFeatures() to after the driver-workaround block in GLContext::InitImpl (G5/G22).",
+  "verifier": {
+   "changed": [],
+   "why": "Written with the hook, 2026-11-21."
+  }
+ },
+ {
+  "file": "toolkit/profile/moz.build",
+  "category": "build",
+  "feature": "doh-trr-context",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "moz.build after the closing bracket of UNIFIED_SOURCES",
+  "evidence": [
+   "+DEFINES[\"MOZ_PROXY_BYPASS_PROTECTION\"] = True  # STEALTH-HOOK(network/doh)"
+  ],
+  "notes": "Defines MOZ_PROXY_BYPASS_PROTECTION for the sources of toolkit/profile, so nsProfileLock.cpp (Mozilla's, unchanged) drops the lookup of the machine's own host name in the Unix symlink lock, which sits under #ifndef MOZ_PROXY_BYPASS_PROTECTION; the signature keeps 127.0.0.1. Only nsProfileLock.cpp reads the symbol in that directory. The global configure option (which also changes network.proxy.allow_bypass and the file picker) is not taken. nsProfileLock.cpp and nsParentalControlsServiceDefault.cpp leave this folder (identical to the tag).",
+  "verifier": {
+   "changed": [],
+   "why": "Written from the diff against the tag."
+  }
+ },
+ {
+  "file": "dom/media/webrtc/transport/ipc/WebrtcTCPSocket.h",
+  "category": "other",
+  "feature": "proxy-udp-egress",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "WebrtcTCPSocket, after the constructor line",
+  "evidence": [
+   "+  friend struct StealthWebrtcTcpSocketAccess;  // STEALTH-HOOK(network/proxy-udp)"
+  ],
+  "notes": "The one friend of the class: the three functions of StealthWebrtcTcpSocket.h read mURI, mProxyConfig, mTransport, mLocalAddress and mLocalPort and call CloseWithReason (several fields, so a friend and not a passed field).",
+  "verifier": {
+   "changed": [],
+   "why": "Written from the diff against the tag."
+  }
+ },
+ {
+  "file": "toolkit/xre/moz.build",
+  "category": "other",
+  "feature": "proxy-udp-egress",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "after the closing bracket of the UNIFIED_SOURCES list that ends with nsXREDirProvider.cpp",
+  "evidence": [
+   "+UNIFIED_SOURCES += [\"StealthIcePrefs.cpp\"]  # STEALTH-HOOK(network/proxy-udp)"
+  ],
+  "notes": "Registers toolkit/xre/StealthIcePrefs.cpp (the lock of the two ICE prefs).",
+  "verifier": {
+   "changed": [],
+   "why": "Written from the diff against the tag."
+  }
+ },
+ {
+  "file": "dom/media/webrtc/moz.build",
+  "category": "build",
+  "feature": "hidden-desktop-window-capture",
+  "prefs": [],
+  "added": 2,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "after the closing ] of EXPORTS.mozilla.media.webrtc, before the chromium-config include",
+  "evidence": [
+   "+TEST_DIRS += [\"tests/gtest\"]  # STEALTH-HOOK(platform/hidden-desktop)"
+  ],
+  "notes": "Registers the Windows gtest of the hidden-desktop capture rule (dom/media/webrtc/tests/gtest, which has sources only when OS_TARGET is WINNT).",
+  "verifier": {
+   "changed": [],
+   "why": "Written with the hook, 2026-11-21."
+  }
+ },
+ {
+  "file": "modules/libpref/test/gtest/moz.build",
+  "category": "build",
+  "feature": "stealth-pref-declarations",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "hook added by the 2026-11 hook rework (registration of our own file)",
+  "evidence": [],
+  "notes": "Hook registering our own code (minimal record added by the objects-all integration).",
+  "verifier": {
+   "changed": [],
+   "why": "Added by the hook rework of platform/prefs."
+  }
+ },
+ {
+  "file": "startupcache/moz.build",
+  "category": "build",
+  "feature": "startup-cache-foreground-writes",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "hook added by the 2026-11 hook rework (registration of our own file)",
+  "evidence": [],
+  "notes": "Hook registering our own code (minimal record added by the objects-all integration).",
+  "verifier": {
+   "changed": [],
+   "why": "Added by the hook rework of platform/startup-cache."
+  }
+ },
+ {
+  "file": "startupcache/test/moz.build",
+  "category": "build",
+  "feature": "startup-cache-foreground-writes",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "hook added by the 2026-11 hook rework (registration of our own file)",
+  "evidence": [],
+  "notes": "Hook registering our own code (minimal record added by the objects-all integration).",
+  "verifier": {
+   "changed": [],
+   "why": "Added by the hook rework of platform/startup-cache."
   }
  }
 ]

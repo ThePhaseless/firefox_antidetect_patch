@@ -2,43 +2,19 @@
  {
   "file": "js/src/debugger/Frame.cpp",
   "function": "static bool EvaluateInEnv(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  // Stealth: use generic filename instead of \"debugger eval code\" to prevent",
-  "test": ""
- },
- {
-  "file": "js/src/debugger/Frame.cpp",
-  "function": "static bool EvaluateInEnv(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  // a commercial fingerprinting service from detecting automation via",
-  "test": ""
- },
- {
-  "file": "js/src/debugger/Frame.cpp",
-  "function": "static bool EvaluateInEnv(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  // Error.stack analysis.",
-  "test": ""
- },
- {
-  "file": "js/src/debugger/Frame.cpp",
-  "function": "static bool EvaluateInEnv(",
   "kind": "rewrite",
   "form": "declared-value",
-  "line": "      evalOptions.filename() ? evalOptions.filename() : \"eval code\";",
+  "line": "      evalOptions.filename() ? evalOptions.filename() : \"eval code\";  // STEALTH-HOOK(fingerprint/js-surface/eval-name)",
   "removed": "      evalOptions.filename() ? evalOptions.filename() : \"debugger eval code\";",
-  "test": ""
+  "test": "wrapper:tests/test_the_evaluated_code_has_no_debugger_name_e2e.py::test_the_evaluated_code_has_no_debugger_name"
  },
  {
   "file": "js/src/debugger/Frame.cpp",
   "function": "static bool EvaluateInEnv(",
   "kind": "rewrite",
   "form": "declared-value",
-  "line": "      .setIntroductionType(\"eval\")",
+  "line": "      .setIntroductionType(\"eval\")  // STEALTH-HOOK(fingerprint/js-surface/eval-name)",
   "removed": "      .setIntroductionType(\"debugger eval\")",
-  "test": ""
+  "test": "wrapper:tests/test_the_evaluated_code_has_no_debugger_name_e2e.py::test_the_evaluated_code_has_no_debugger_name"
  }
 ]

@@ -104,10 +104,10 @@ on:
         default: false
       gtest_filter:
         # What the last green gtests ran (run 41402916724), and the suites of ours added since: EVERY suite of our own files is here (the
-        # list of them: git grep for TEST(Stealth*, TEST(Idwr, and the one of ours inside a Mozilla file, StartupCache.WritesNeverLowerIOPriority).
+        # list of them: git grep for TEST(Stealth*, TEST(Idwr, and every suite of ours that sits in a Mozilla directory's gtest: StealthStartupCache).
         # A suite that exists on one platform only is named all the same: scripts/ci/gtest_run.py knows which (NOT_ON). * has never gone green here.
         description: "gtests=true only: which, as mach gtest takes them; * is all, and unproven"
-        default: 'StealthGfxFeatureStatus.*:StealthWebGPUAdapter.*:StealthWebGPUDeclaration.*:StealthWebGPUBundledVulkan.*:StealthWebGPUInstanceEnv.*:StealthFullscreen.*:StealthScaleDeclaration.*:StealthWindowGeometry.*:StealthGLMultisample.*:StealthFrameCrash.*:StealthJugglerEventId.*:StealthSessionUdpProxy.*:StealthDeclaredNetwork.*:StealthSocksUdpPool.*:TestStealthTRRContext.*:TestStealthSocksCredentials.*:TestStealthSessionResolver.*:StealthIceResolverContext.*:StealthUdpProxyBirth.*:StealthNrSocketBirth.*:StealthPcUdpProxyKinds.*:StealthTcpProxyRoad.*:StealthPcProxyConfig.*:StealthInputEventBirth.*:StealthKeyBirthScope.*:StealthBirthOrder.*:StealthFcBundleFonts.*:StealthAudioNoise.*:StealthBundledCollection.*:StealthBundledFamilyFilter.*:StealthCanvasProjection.*:StealthDocumentLanguage.*:StealthFallbackNames.*:StealthFcFontList.*:StealthFontList.*:StealthFontMetrics.*:StealthMediaDeclaration.*:StealthOwnBinaries.*:StealthQuotaEstimate.*:StealthTextQuality.*:StealthTtcFace.*:StealthWebGPUExternalTexture.*:Intl_Locale_StealthSystemLocales.*:Idwr.*:StartupCache.WritesNeverLowerIOPriority'
+        default: 'StealthGfxFeatureStatus.*:StealthWebGPUAdapter.*:StealthWebGPUDeclaration.*:StealthWebGPUBundledVulkan.*:StealthWebGPUInstanceEnv.*:StealthFullscreen.*:StealthScaleDeclaration.*:StealthWindowGeometry.*:StealthGLMultisample.*:StealthFrameCrash.*:StealthJugglerEventId.*:StealthSessionUdpProxy.*:StealthDeclaredNetwork.*:StealthSocksUdpPool.*:TestStealthTRRContext.*:TestStealthSocksCredentials.*:TestStealthSessionResolver.*:StealthIceResolverContext.*:StealthUdpProxyBirth.*:StealthNrSocketBirth.*:StealthPcUdpProxyKinds.*:StealthTcpProxyRoad.*:StealthPcProxyConfig.*:StealthInputEventBirth.*:StealthKeyBirthScope.*:StealthBirthOrder.*:StealthFcBundleFonts.*:StealthAudioNoise.*:StealthBundledCollection.*:StealthGlyphCoverage.*:StealthBundleHooks.*:StealthFontListHooks.*:StealthDebugger.*:StealthWindowInputDesktop.*:StealthPrefSanitize.*:TestStealthLinkClickAfter.*:TestStealthLoadInfo.*:TestStealthDocShellDefaults.*:StealthCanvasProjection.*:StealthDocumentLanguage.*:StealthFallbackNames.*:StealthFcFontList.*:StealthFontList.*:StealthFontMetrics.*:StealthMediaDeclaration.*:StealthOwnBinaries.*:StealthQuotaEstimate.*:StealthTextQuality.*:StealthTtcFace.*:StealthWebGPUExternalTexture.*:Intl_Locale_StealthSystemLocales.*:Idwr.*:StealthBranding.*:StealthCanvasUtils.*:StealthDragGesture.*:StealthHttp3Socks.*:StealthJugglerCoalesce.*:StealthJugglerMouseAck.*:StealthMouseEventCopy.*:StealthMouseEventIPC.*:StealthNsProxyInfoKinds.*:StealthSocksUdpLayer.*:StealthStackFrames.*:StealthStartupCache.*:StealthTimezone.*'
       relaunch_of:
         description: >
           Set by the watch of a run whose machine was lost, to that run's id: this run
@@ -239,6 +239,8 @@ jobs:
           python3 scripts/ci/test_stealth_download_watchdog.py
           # The compile-only step's list of directories, its errors and its fallback to one directory at a time.
           python3 scripts/ci/test_objects_first.py
+          # The build tools' hooks (python/mozbuild), through the host line of jar.py.
+          python3 scripts/ci/test_stealth_build_tools.py
           echo "matrix=$(python3 scripts/ci matrix)" | tee -a "$GITHUB_OUTPUT"
 
   # Everything that does not depend on the binary, BEFORE a node is turned on: a server is an hour paid whatever it does, and a run whose
@@ -1147,7 +1149,7 @@ jobs:
           retention-days: ${{ needs.plan.outputs.kind == 'release' && 14 || 2 }}
 
       # The engine's own tests, on request (input gtests): the stealth hooks each
-      # have one (StartupCache.WritesNeverLowerIOPriority, the bundled-font and
+      # have one (StealthStartupCache, the bundled-font and
       # own-binary rules) and nothing else runs them. After the package and the
       # symbols, so what ships is already built and checked when the second
       # libxul is linked. A phase, so the report has its row.

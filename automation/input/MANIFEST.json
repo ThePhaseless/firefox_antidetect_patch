@@ -5,7 +5,9 @@
   "dom/events/EventStateManager.h",
   "dom/interfaces/base/nsIDOMWindowUtils.idl",
   "dom/ipc/CoalescedMouseData.cpp",
+  "dom/ipc/gtest/moz.build",
   "layout/base/PresShell.cpp",
+  "layout/base/gtest/moz.build",
   "widget/MouseEvents.h",
   "widget/nsGUIEventIPC.h",
   "xpcom/reflect/xptinfo/xptinfo.h"
@@ -13,7 +15,13 @@
  "added": {
   "dom/base/StealthJugglerEventId.h": "100644",
   "dom/base/StealthJugglerInput.h": "100644",
-  "layout/base/StealthJugglerAck.h": "100644"
+  "dom/events/StealthDragGesture.h": "100644",
+  "dom/ipc/StealthJugglerCoalesce.h": "100644",
+  "dom/ipc/gtest/TestStealthDragGesture.cpp": "100644",
+  "dom/ipc/gtest/TestStealthJugglerCoalesce.cpp": "100644",
+  "dom/ipc/gtest/TestStealthMouseEventIPC.cpp": "100644",
+  "layout/base/StealthJugglerAck.h": "100644",
+  "layout/base/gtest/TestStealthJugglerMouseAck.cpp": "100644"
  },
  "inventory": [
   {
@@ -130,6 +138,27 @@
    }
   },
   {
+   "file": "dom/ipc/gtest/moz.build",
+   "category": "juggler",
+   "feature": "juggler-input-dispatch",
+   "prefs": [],
+   "added": 2,
+   "removed": 0,
+   "hunks": 2,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "after the UNIFIED_SOURCES list (RemoteTypeTest.cpp); after the LOCAL_INCLUDES list",
+   "evidence": [
+    "+UNIFIED_SOURCES += [\"TestStealthDragGesture.cpp\", \"TestStealthJugglerCoalesce.cpp\", \"TestStealthMouseEventIPC.cpp\"]  # STEALTH-HOOK(automation/input)",
+    "+LOCAL_INCLUDES += [\"/dom/events\"]  # STEALTH-HOOK(automation/input)"
+   ],
+   "notes": "Builds the gtests of the drag decision, the id through IPC and copy, and the coalescing of the Juggler id; /dom/events is where StealthDragGesture.h is.",
+   "verifier": {
+    "changed": [],
+    "why": "Written with the hook, 2026-11-21."
+   }
+  },
+  {
    "file": "layout/base/PresShell.cpp",
    "category": "juggler",
    "feature": "juggler-mouse-event-id",
@@ -153,6 +182,26 @@
      "notes"
     ],
     "why": "Feature renamed to match widget/MouseEvents.h and nsGUIEventIPC.h; recount; resolved the include and field questions."
+   }
+  },
+  {
+   "file": "layout/base/gtest/moz.build",
+   "category": "juggler",
+   "feature": "juggler-input-dispatch",
+   "prefs": [],
+   "added": 1,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "after the UNIFIED_SOURCES list (TestUniqueOrNonOwningPtr.cpp)",
+   "evidence": [
+    "+UNIFIED_SOURCES += [\"TestStealthJugglerMouseAck.cpp\"]  # STEALTH-HOOK(automation/input)"
+   ],
+   "notes": "Builds the gtest of StealthJugglerMouseAck (layout/base is already in its local includes).",
+   "verifier": {
+    "changed": [],
+    "why": "Written with the hook, 2026-11-21."
    }
   },
   {

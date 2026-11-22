@@ -24,18 +24,18 @@ const read = rel => fs.readFileSync(path.join(TREE, rel), 'utf8');
 const T = 'dom/media/webrtc/transport/';
 const PC = 'dom/media/webrtc/jsapi/PeerConnectionImpl.cpp';
 
-test('the config the PeerConnection gives its ICE context goes through our function, in one tagged line', () => {
+test('the only config the PeerConnection gives its ICE context is what GetProxyConfig() gives, through our function', () => {
   const text = read(PC);
-  // Mozilla's line stays as it is; ours is beside it, right after, and before the config is tested and used.
+  // The only entry: one call of GetProxyConfig() in the file, and the statement after it hands its result to our function (one call
+  // of ours). A second place that asks GetProxyConfig() for a config, or a second call of ours, fails here.
+  assert.equal(text.match(/StealthProxyConfigOf\(/g).length, 1);
+  assert.equal(text.match(/[^:\w]GetProxyConfig\(\)/g).length, 1, 'a second use of GetProxyConfig()');
   const call = '  auto proxyConfig = GetProxyConfig();\n' +
       '  proxyConfig = StealthProxyConfigOf(std::move(proxyConfig), mWindow.get(), mForceProxy);  // STEALTH-HOOK(network/proxy-udp)\n';
-  assert.ok(text.includes(call), 'SetConfiguration still uses GetProxyConfig() alone');
-  assert.equal(text.match(/StealthProxyConfigOf\(/g).length, 1);
+  assert.ok(text.includes(call), 'SetConfiguration does not give the config of Mozilla to our function');
   // The null config is still tested, after the hook: nothing is sent to the transport without one.
   assert.ok(text.slice(text.indexOf(call) + call.length).startsWith('  if (proxyConfig) {'));
   assert.match(text, /\n#include "transport\/StealthIceResolverContext\.h"  \/\/ STEALTH-HOOK\(network\/proxy-udp\)\n/);
-  // The new entry: two tagged lines, the include and the call.
-  assert.equal(text.split('\n').filter(l => /STEALTH-HOOK\(/.test(l)).length, 2);
 });
 
 test('GetProxyConfig is as Mozilla wrote it: the fix is at the call, not in the function', () => {

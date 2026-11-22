@@ -10,14 +10,13 @@
   "netwerk/protocol/http/TRRServiceChannel.cpp",
   "netwerk/protocol/http/nsHttpChannel.cpp",
   "security/manager/ssl/nsNSSCallbacks.cpp",
-  "toolkit/components/parentalcontrols/nsParentalControlsServiceDefault.cpp",
   "toolkit/components/parentalcontrols/nsParentalControlsServiceWin.cpp",
   "toolkit/components/url-classifier/UrlClassifierHashCompleter.sys.mjs",
   "toolkit/components/url-classifier/moz.build",
   "toolkit/components/url-classifier/nsIUrlClassifierHashCompleter.idl",
   "toolkit/components/url-classifier/nsUrlClassifierDBService.cpp",
   "toolkit/components/url-classifier/tests/unit/xpcshell.toml",
-  "toolkit/profile/nsProfileLock.cpp"
+  "toolkit/profile/moz.build"
  ],
  "added": {
   "dom/media/webrtc/transport/StealthIceResolverContext.cpp": "100644",
@@ -26,7 +25,6 @@
   "juggler/EarlyProxyHold.js": "100644",
   "juggler/TrrPrefs.js": "100644",
   "juggler/tests/dns_has_no_gate_of_ours.test.mjs": "100644",
-  "juggler/tests/doh_hooks_stay_small.test.mjs": "100644",
   "juggler/tests/doh_never_goes_direct_when_its_proxy_is_lost.test.mjs": "100644",
   "juggler/tests/doh_request_carries_the_context_of_its_lookup.test.mjs": "100644",
   "juggler/tests/doh_request_on_the_main_thread_fails_closed.test.mjs": "100644",
@@ -44,6 +42,8 @@
   "juggler/tests/warnings_reach_a_sink_that_is_not_gated.test.mjs": "100644",
   "netwerk/dns/StealthSessionResolver.cpp": "100644",
   "netwerk/dns/StealthSessionResolver.h": "100644",
+  "netwerk/dns/StealthTRRRequest.cpp": "100644",
+  "netwerk/dns/StealthTRRRequest.h": "100644",
   "netwerk/ipc/StealthTRRContext.cpp": "100644",
   "netwerk/ipc/StealthTRRContext.h": "100644",
   "netwerk/test/gtest/TestStealthSessionResolver.cpp": "100644",
@@ -267,28 +267,6 @@
    }
   },
   {
-   "file": "toolkit/components/parentalcontrols/nsParentalControlsServiceDefault.cpp",
-   "category": "other",
-   "feature": "doh-trr-context",
-   "prefs": [],
-   "added": 2,
-   "removed": 0,
-   "hunks": 1,
-   "inline_logic_lines": 3,
-   "hookable": "movable",
-   "anchor": "include of StealthParentalControls.h; the nsParentalControlsService constructor",
-   "evidence": [
-    "+#include \"StealthParentalControls.h\"  // STEALTH-HOOK(network/doh)",
-    "+  // STEALTH-HOOK(network/doh): declared, the OS is never read.",
-    "+  if (StealthParentalControlsDeclared(&mEnabled)) {"
-   ],
-   "notes": "The constructor takes the declared value (off), as the other implementations.",
-   "verifier": {
-    "changed": [],
-    "why": "Written from the diff against the tag."
-   }
-  },
-  {
    "file": "toolkit/components/parentalcontrols/nsParentalControlsServiceWin.cpp",
    "category": "other",
    "feature": "doh-trr-context",
@@ -416,21 +394,20 @@
    }
   },
   {
-   "file": "toolkit/profile/nsProfileLock.cpp",
-   "category": "other",
+   "file": "toolkit/profile/moz.build",
+   "category": "build",
    "feature": "doh-trr-context",
    "prefs": [],
-   "added": 2,
+   "added": 1,
    "removed": 0,
-   "hunks": 2,
+   "hunks": 1,
    "inline_logic_lines": 0,
-   "hookable": "movable",
-   "anchor": "nsProfileLock::LockWithSymlink, the address in the signature of the symlink lock (Unix)",
+   "hookable": "already-hook",
+   "anchor": "moz.build after the closing bracket of UNIFIED_SOURCES",
    "evidence": [
-    "+#    if 0  // STEALTH-HOOK(network/doh): the host's own name is never looked up; the signature keeps 127.0.0.1",
-    "+#    endif  // STEALTH-HOOK(network/doh)"
+    "+DEFINES[\"MOZ_PROXY_BYPASS_PROTECTION\"] = True  # STEALTH-HOOK(network/doh)"
    ],
-   "notes": "Mozilla resolves the machine's own host name with PR_GetHostByName at start-up, before any proxy is decided, through the system resolver, unless MOZ_PROXY_BYPASS_PROTECTION is set. The block is compiled out so the signature keeps 127.0.0.1, as that build does; nothing else of that build is taken. Windows takes another lock and makes no lookup.",
+   "notes": "Defines MOZ_PROXY_BYPASS_PROTECTION for the sources of toolkit/profile, so nsProfileLock.cpp (Mozilla's, unchanged) drops the lookup of the machine's own host name in the Unix symlink lock, which sits under #ifndef MOZ_PROXY_BYPASS_PROTECTION; the signature keeps 127.0.0.1. Only nsProfileLock.cpp reads the symbol in that directory. The global configure option (which also changes network.proxy.allow_bypass and the file picker) is not taken. nsProfileLock.cpp and nsParentalControlsServiceDefault.cpp leave this folder (identical to the tag).",
    "verifier": {
     "changed": [],
     "why": "Written from the diff against the tag."

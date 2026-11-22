@@ -28,6 +28,14 @@ constexpr uint32_t kJugglerWindowExplicitSize = 1u << 1;
  */
 uint32_t JugglerPopupChromeFlags(const dom::WindowFeatures& aFeatures);
 
+/**
+ * The same, for a caller that already holds Mozilla's popup flags: returns
+ * aPopupFlags, plus kJugglerWindowExplicitSize when the features give a size.
+ * For the same aPopupFlags the result is the same as the overload above.
+ */
+uint32_t JugglerPopupChromeFlags(const dom::WindowFeatures& aFeatures,
+                                 uint32_t aPopupFlags);
+
 }  // namespace mozilla
 
 #endif  // TOOLKIT_COMPONENTS_WINDOWWATCHER_JUGGLERWINDOWSIZE_H_

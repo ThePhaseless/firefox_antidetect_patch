@@ -2,7 +2,9 @@
  "modified": [
   "dom/workers/WorkerNavigator.cpp"
  ],
- "added": {},
+ "added": {
+  "dom/workers/StealthHardwareConcurrency.h": "100644"
+ },
  "inventory": [
   {
    "file": "dom/workers/WorkerNavigator.cpp",

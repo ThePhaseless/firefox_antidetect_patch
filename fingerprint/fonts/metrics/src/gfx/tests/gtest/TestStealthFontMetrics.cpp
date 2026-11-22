@@ -20,16 +20,23 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <algorithm>
 #include <utility>
 
 #include "FontData.h"
+#include "StealthDesignFontAccess.h"
+#include "gfxFT2FontBase.h"
 #include "gfxFont.h"
 #include "gfxFontEntry.h"
 #include "gfxPlatform.h"
 #include "gfxPlatformFontList.h"
+#include "gfxRect.h"
+#include "harfbuzz/hb-ot.h"
+#include "harfbuzz/hb.h"
 #include "mozilla/FontPropertyTypes.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/ScopeExit.h"
+#include "mozilla/gfx/StealthGlyphCoverage.h"
 #include "nsCOMPtr.h"
 #include "nsDirectoryServiceDefs.h"
 #include "nsDirectoryServiceUtils.h"
@@ -153,6 +160,27 @@ nscoord StealthNsFontMetricsAveCharWidth(gfxFloat aAveCharWidth) {
   return nscoord(ceil(aAveCharWidth * kStealthAppUnitsPerDevPixel));
 }
 
+// A fresh font of the bundled Consolas at aSize, on a FreeType backend (null
+// if none could be made): its glyph metrics are computed under the prefs set
+// when it is first asked.
+RefPtr<gfxFont> StealthMakeConsolasFont(FontData* aData, double aSize) {
+  RefPtr<gfxFontEntry> fe = StealthMakeConsolasEntry(aData);
+  if (!fe) {
+    return nullptr;
+  }
+  gfxFontStyle style;
+  style.size = aSize;
+  RefPtr<gfxFont> font = fe->FindOrMakeFont(&style);
+  if (!font || !font->Valid() || font->GetType() != gfxFont::FONT_TYPE_FT2) {
+    return nullptr;
+  }
+  return font;
+}
+
+// A size that is not a whole number of pixels: FreeType takes its ppem from it
+// rounded, DirectWrite scales by it as it is.
+constexpr double kStealthFractionalSize = 13.383333;
+
 class StealthFontMetrics : public ::testing::Test {
  protected:
   static void SetUpTestSuite() {
@@ -257,4 +285,162 @@ TEST_F(StealthFontMetrics, MetricsOffTheMainThreadReadTheDeclaration)
     EXPECT_TRUE(offMainThread);
     EXPECT_EQ(round.mExpected, ave) << round.mRenderingMode;
   }
+}
+
+// The advance of a glyph is its DESIGN advance times the size as asked for
+// (1126 font units for every Consolas glyph, on a 2048 em), the way DirectWrite
+// scales it, not the one FreeType reaches through its integer ppem. 16.16, as
+// gfxFont::GetGlyphWidth speaks.
+TEST_F(StealthFontMetrics, DesignAdvanceAtAFractionalSize)
+{
+  int32_t stock = 0;
+  {
+    // Engine off: FreeType's own value (the negative control).
+    RefPtr<gfxFont> font =
+        StealthMakeConsolasFont(mData, kStealthFractionalSize);
+    ASSERT_TRUE(font);
+    stock = static_cast<gfxFT2FontBase*>(font.get())
+                ->GetGlyphWidth(uint16_t(font->GetGlyph('x', 0)));
+  }
+  DeclareEngine(5, 0);
+  RefPtr<gfxFont> font = StealthMakeConsolasFont(mData, kStealthFractionalSize);
+  ASSERT_TRUE(font);
+  const uint16_t gid = uint16_t(font->GetGlyph('x', 0));
+  ASSERT_NE(0, gid);
+  const int32_t declared =
+      static_cast<gfxFT2FontBase*>(font.get())->GetGlyphWidth(gid);
+  EXPECT_EQ(
+      NS_lround(double(1126) * kStealthFractionalSize * 65536.0 / 2048.0),
+      declared);
+  EXPECT_NE(stock, declared);
+}
+
+// The ink box of a glyph is the font's own bounding box scaled by size / upem,
+// with no hinting: read here straight from HarfBuzz, in the order of
+// operations gfxDWriteFont::GetGlyphBounds uses (units first, then the float
+// factor), and compared exactly.
+TEST_F(StealthFontMetrics, DesignGlyphBoundsAreTheDesignBox)
+{
+  gfxRect stock;
+  {
+    // Engine off: FreeType's hinted bounds (the negative control).
+    RefPtr<gfxFont> font =
+        StealthMakeConsolasFont(mData, kStealthFractionalSize);
+    ASSERT_TRUE(font);
+    ASSERT_TRUE(static_cast<gfxFT2FontBase*>(font.get())
+                    ->GetGlyphBounds(uint16_t(font->GetGlyph('x', 0)), &stock,
+                                     true));
+  }
+  DeclareEngine(5, 0);
+  RefPtr<gfxFont> font = StealthMakeConsolasFont(mData, kStealthFractionalSize);
+  ASSERT_TRUE(font);
+  const uint16_t gid = uint16_t(font->GetGlyph('x', 0));
+  ASSERT_NE(0, gid);
+  gfxFontEntry* fe = font->GetFontEntry();
+  const uint16_t upem = fe->UnitsPerEm();
+  ASSERT_NE(0, upem);
+
+  hb_glyph_extents_t ext;
+  {
+    const auto face(fe->GetHBFace());
+    hb_face_t* hbFace = face;
+    ASSERT_NE(nullptr, hbFace);
+    hb_font_t* hbFont = hb_font_create(hbFace);
+    ASSERT_TRUE(hbFont);
+    hb_ot_font_set_funcs(hbFont);
+    hb_font_set_scale(hbFont, upem, upem);
+    hb_font_set_ppem(hbFont, 0, 0);
+    const hb_bool_t ok = hb_font_get_glyph_extents(hbFont, gid, &ext);
+    hb_font_destroy(hbFont);
+    ASSERT_TRUE(ok);
+  }
+  // HarfBuzz's y_bearing is the top measured upward and its height is
+  // negative: both are negated to reach gfxRect's y-down box.
+  gfxRect expected(double(ext.x_bearing), double(-ext.y_bearing),
+                   double(ext.width), double(-ext.height));
+  expected.Scale(float(kStealthFractionalSize / gfxFloat(upem)));
+
+  gfxRect declared;
+  ASSERT_TRUE(static_cast<gfxFT2FontBase*>(font.get())
+                  ->GetGlyphBounds(gid, &declared, true));
+  EXPECT_EQ(expected.X(), declared.X());
+  EXPECT_EQ(expected.Y(), declared.Y());
+  EXPECT_EQ(expected.Width(), declared.Width());
+  EXPECT_EQ(expected.Height(), declared.Height());
+  EXPECT_FALSE(stock.X() == declared.X() && stock.Y() == declared.Y() &&
+               stock.Width() == declared.Width() &&
+               stock.Height() == declared.Height());
+}
+
+// The design font is released from the shaper's destructor through
+// StealthReleaseDesignFont: it drops the font's reference on the face, so a face
+// kept alive only by that font is destroyed. Negative control: before the
+// release the face is still alive.
+TEST_F(StealthFontMetrics, TheDesignFontReleaseDropsItsFaceReference)
+{
+  static hb_user_data_key_t key;
+  int destroyed = 0;
+  hb_face_t* face = hb_face_create(hb_blob_get_empty(), 0);
+  ASSERT_NE(nullptr, face);
+  hb_face_set_user_data(
+      face, &key, &destroyed,
+      [](void* aData) { ++*static_cast<int*>(aData); }, true);
+  hb_font_t* font = hb_font_create(face);
+  hb_face_destroy(face);  // only the font's reference is left
+  EXPECT_EQ(0, destroyed);
+  StealthReleaseDesignFont(font);
+  EXPECT_EQ(1, destroyed);
+  StealthReleaseDesignFont(nullptr);  // as hb_font_destroy: null is fine
+}
+
+namespace {
+
+constexpr char kStealthCoverageLadderPref[] =
+    "zoom.stealth.text.coverage_ladder";
+
+struct RestoreStealthCoverageLadder {
+  ~RestoreStealthCoverageLadder() {
+    mozilla::Preferences::ClearUser(kStealthCoverageLadderPref);
+  }
+};
+
+}  // namespace
+
+// The coverage of an A8 glyph mask is snapped to the declared ladder
+// (SkScalerContext::getImage reaches this through the SkGlyph overload, which
+// only adds the kA8 check): a mask with every one of the 256 levels ends with
+// only the ladder's levels, each the nearest one, and 0 and 255 do not move.
+// With the ladder empty (not declared) the mask is the rasteriser's own.
+TEST(StealthGlyphCoverage, A8MaskIsOnTheLadder)
+{
+  RestoreStealthCoverageLadder restore;
+  uint8_t original[256];
+  for (int i = 0; i < 256; ++i) {
+    original[i] = uint8_t(i);
+  }
+
+  // Negative control: nothing declared, the mask stays as it is.
+  uint8_t mask[256];
+  memcpy(mask, original, sizeof(mask));
+  mozilla::gfx::StealthQuantiseGlyphCoverage(mask, 16, 16, 16);
+  EXPECT_EQ(0, memcmp(mask, original, sizeof(mask)));
+
+  mozilla::Preferences::SetCString(kStealthCoverageLadderPref,
+                                   "0,85,170,255"_ns);
+  const uint8_t ladder[] = {0, 85, 170, 255};
+  mozilla::gfx::StealthQuantiseGlyphCoverage(mask, 16, 16, 16);
+  for (int i = 0; i < 256; ++i) {
+    int nearest = 256;
+    for (uint8_t level : ladder) {
+      nearest = std::min(nearest, abs(i - int(level)));
+    }
+    EXPECT_EQ(nearest, abs(i - int(mask[i]))) << i;
+    bool onLadder = false;
+    for (uint8_t level : ladder) {
+      onLadder = onLadder || mask[i] == level;
+    }
+    EXPECT_TRUE(onLadder) << i;
+  }
+  EXPECT_EQ(0, mask[0]);
+  EXPECT_EQ(255, mask[255]);
 }

@@ -3,7 +3,9 @@
   "dom/base/nsScreen.cpp",
   "layout/base/nsPresContext.cpp"
  ],
- "added": {},
+ "added": {
+  "layout/base/StealthInnerSizeSync.h": "100644"
+ },
  "inventory": [
   {
    "file": "dom/base/nsScreen.cpp",

@@ -5,82 +5,50 @@
   "kind": "add",
   "form": "registration",
   "line": "#include \"StealthShadowRoot.h\"  // STEALTH-HOOK(automation/shadow-root)",
-  "test": ""
+  "test": "wrapper:tests/test_ua_widget_not_selectable.py::test_an_author_closed_shadow_root_is_still_reachable"
  },
  {
   "file": "dom/base/Element.cpp",
   "function": "void Element::SetSlot(const nsAString& aName, ErrorResult& aError) {",
   "kind": "rewrite",
   "form": "unknown",
-  "line": "ShadowRoot* Element::GetShadowRootForBindings(nsIPrincipal& aSubject) const {",
+  "line": "ShadowRoot* Element::GetShadowRootForBindings(nsIPrincipal& aSubject) const {  // STEALTH-HOOK(automation/shadow-root)",
   "removed": "ShadowRoot* Element::GetShadowRootForBindings() const {",
-  "test": ""
+  "test": "wrapper:tests/test_ua_widget_not_selectable.py::test_an_author_closed_shadow_root_is_still_reachable",
+  "exception": "a parameter of ours in a Mozilla signature: the getter needs the caller's principal and the design that moved it to a member behind BinaryName was refused (the closed-root/no-root timing ratio, which a page measures, would move)",
+  "pm": "approvato"
  },
  {
   "file": "dom/base/Element.cpp",
   "function": "void Element::SetSlot(const nsAString& aName, ErrorResult& aError) {",
   "kind": "rewrite",
   "form": "unknown",
-  "line": "    // STEALTH-HOOK(automation/shadow-root)",
+  "line": "    return StealthClosedShadowRootForBindings(shadowRoot, aSubject);  // STEALTH-HOOK(automation/shadow-root)",
   "removed": "    return nullptr;",
-  "test": ""
- },
- {
-  "file": "dom/base/Element.cpp",
-  "function": "void Element::SetSlot(const nsAString& aName, ErrorResult& aError) {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    return StealthClosedShadowRootForBindings(shadowRoot, aSubject);",
-  "test": ""
+  "test": "wrapper:tests/test_ua_widget_not_selectable.py::test_the_page_itself_still_sees_null_on_both_kinds_of_closed_root",
+  "exception": "the value born in this block (null or closed root) is replaced by the answer of our function; same decision as the PM-DECISIONS ruling for automation/shadow-root",
+  "pm": "approvato"
  },
  {
   "file": "dom/base/Element.h",
   "function": "class Element : public FragmentOrElement {",
   "kind": "rewrite",
   "form": "unknown",
-  "line": "  // STEALTH-HOOK(automation/shadow-root): the subject tells the sandbox apart",
+  "line": "  ShadowRoot* GetShadowRootForBindings(nsIPrincipal& aSubject) const;  // STEALTH-HOOK(automation/shadow-root)",
   "removed": "  ShadowRoot* GetShadowRootForBindings() const;",
-  "test": ""
- },
- {
-  "file": "dom/base/Element.h",
-  "function": "class Element : public FragmentOrElement {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  ShadowRoot* GetShadowRootForBindings(nsIPrincipal& aSubject) const;",
-  "test": ""
+  "test": "wrapper:tests/test_ua_widget_not_selectable.py::test_an_author_closed_shadow_root_is_still_reachable",
+  "exception": "a parameter of ours in a Mozilla signature: the getter needs the caller's principal and the design that moved it to a member behind BinaryName was refused (the closed-root/no-root timing ratio, which a page measures, would move)",
+  "pm": "approvato"
  },
  {
   "file": "dom/webidl/Element.webidl",
   "function": "partial interface Element {",
   "kind": "rewrite",
   "form": "unknown",
-  "line": "  // STEALTH: NeedsSubjectPrincipal only. Same attribute, same name, same",
+  "line": "  [NeedsSubjectPrincipal, BinaryName=\"shadowRootForBindings\"]  // STEALTH-HOOK(automation/shadow-root)",
   "removed": "  [BinaryName=\"shadowRootForBindings\"]",
-  "test": ""
- },
- {
-  "file": "dom/webidl/Element.webidl",
-  "function": "partial interface Element {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  // spec answer for the page - nothing new appears on Element.prototype, which",
-  "test": ""
- },
- {
-  "file": "dom/webidl/Element.webidl",
-  "function": "partial interface Element {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  // is what makes this invisible where a new accessor would be the tell.",
-  "test": ""
- },
- {
-  "file": "dom/webidl/Element.webidl",
-  "function": "partial interface Element {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  [NeedsSubjectPrincipal, BinaryName=\"shadowRootForBindings\"]",
-  "test": ""
+  "test": "wrapper:tests/test_ua_widget_not_selectable.py::test_an_author_closed_shadow_root_is_still_reachable",
+  "exception": "NeedsSubjectPrincipal on the existing attribute: the binding passes the caller's principal to the getter above",
+  "pm": "approvato"
  }
 ]

@@ -2,7 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-import { PINGSENDER_ROUTE_ENV } from "resource://gre/modules/TelemetrySend.sys.mjs";
+import {
+  PINGSENDER_ROUTE_ENV,
+  useCallbacksFrom,
+} from "resource://gre/modules/StealthPingsender.sys.mjs";
 
 const { newProxyInfoFor, proxyAuthCallbacks, proxyForHost } =
   ChromeUtils.importESModule("resource://gre/modules/juggler/SessionRoute.js");
@@ -17,7 +20,7 @@ let sessionProxy = null;
  * Take the road of the session that started this task, and return its proxy
  * record (or null for the default road).
  *
- * The browser hands it over in `PINGSENDER_ROUTE_ENV` (TelemetrySend.sys.mjs):
+ * The browser hands it over in `PINGSENDER_ROUTE_ENV` (StealthPingsender.sys.mjs):
  * its prefs.js, read here so this empty profile carries the session's network
  * prefs, and the proxy record that governed the session's own requests, which
  * a channel filter applies here with the very functions the browser's filter
@@ -60,14 +63,17 @@ export function takeSessionRoute() {
       0
     );
   sessionProxy = proxy;
+  // From here a ping of this task carries the callbacks of its host's road:
+  // sendStandalonePing asks for them (attachRoute) between open() and send.
+  useCallbacksFrom(pingAuthFor);
   return proxy;
 }
 
 /**
  * The notification callbacks that answer an HTTP proxy's 407 for a ping sent
  * to `hostname`, or null when the ping takes the default road (no proxy, or
- * the host matches the record's bypass list). The 4th argument of
- * sendStandalonePing (TelemetrySend.sys.mjs).
+ * the host matches the record's bypass list). What sendStandalonePing attaches
+ * to the channel of a ping (StealthPingsender.attachRoute).
  */
 export function pingAuthFor(hostname) {
   const record = proxyForHost(sessionProxy, hostname);

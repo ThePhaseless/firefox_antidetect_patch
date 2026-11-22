@@ -230,6 +230,43 @@ TEST(StealthGfxFeatureStatus, EveryLiveFeatureAnswersFromTheDeclaration)
   EXPECT_EQ(status, int32_t(nsIGfxInfo::FEATURE_STATUS_OK));
 }
 
+// A retired feature is refused before anything answers: Mozilla's retired
+// check runs ahead of the declaration, with the engine on as with it off, and
+// writes nothing. (The refusal is a debug assertion in a debug build, so the
+// retired half runs on opt builds only.) A live feature answers from the
+// declaration, which is the control.
+TEST(StealthGfxFeatureStatus, ARetiredFeatureIsRefusedAndALiveOneAnswers)
+{
+  Declared declared(kUhd620);
+  nsCOMPtr<nsIGfxInfo> gfxInfo = components::GfxInfo::Service();
+  ASSERT_TRUE(gfxInfo);
+
+  bool sawRetired = false;
+  bool sawLive = false;
+  for (int32_t id = nsIGfxInfo::FEATURE_START; id < nsIGfxInfo::FEATURE_COUNT;
+       ++id) {
+    nsAutoCString failure;
+    failure.AssignLiteral("untouched");
+    int32_t status = 12345;
+    if (LiveFeature(id)) {
+      sawLive = true;
+      ASSERT_EQ(gfxInfo->GetFeatureStatus(id, failure, &status), NS_OK) << id;
+      EXPECT_NE(status, 12345) << id;
+      continue;
+    }
+    sawRetired = true;
+#ifndef DEBUG
+    EXPECT_EQ(gfxInfo->GetFeatureStatus(id, failure, &status),
+              NS_ERROR_INVALID_ARG)
+        << id;
+    EXPECT_EQ(status, 12345) << id;
+    EXPECT_TRUE(failure.EqualsLiteral("untouched")) << id;
+#endif
+  }
+  EXPECT_TRUE(sawRetired);
+  EXPECT_TRUE(sawLive);
+}
+
 // The downloadable blocklist is evaluated against the host's adapter and
 // written into the profile as gfx.blacklist.* prefs. While declared it is not
 // evaluated: the profile is left as it was.

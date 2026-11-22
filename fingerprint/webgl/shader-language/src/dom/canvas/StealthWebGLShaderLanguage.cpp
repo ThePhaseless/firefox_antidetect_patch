@@ -6,10 +6,11 @@
 // PAGINA (getTranslatedShaderSource), nella lingua dichiarata da
 // `zoom.stealth.webgl.shader_output_language`. Gancio in
 // WebGLShader::CompileShader (WebGLShader.cpp); lettore in
-// WebGLContext::GetCompileResult (WebGLContext.cpp). Also the reader of the
-// declaration itself (StealthDeclaredShaderOutput) and the choice of the
-// language to compile with (StealthShaderOutputLanguage), called from
-// WebGLContext::CreateShaderValidator (WebGLShaderValidator.cpp).
+// WebGLContext::GetCompileResult (WebGLContext.cpp, StealthPageObjectCode).
+// Also the reader of the declaration itself (StealthDeclaredShaderOutput) and
+// the choice of the language to compile with (StealthShaderOutputLanguage),
+// called from WebGLContext::CreateShaderValidator (WebGLShaderValidator.cpp),
+// which takes the one bit it needs from WebGLContext::mStealthPerPage.
 
 #include <string>
 
@@ -54,18 +55,18 @@ Maybe<ShShaderOutput> StealthDeclaredShaderOutput() {
   return Nothing();
 }
 
+}  // namespace webgl
+
 ShShaderOutput StealthShaderOutputLanguage(gl::GLContext* gl,
                                            bool aPerLaPagina) {
   // Letta sempre, anche per il driver: l'avviso per un nome sconosciuto parte
   // a ogni costruzione del validatore.
-  const auto dichiarata = StealthDeclaredShaderOutput();
+  const auto dichiarata = webgl::StealthDeclaredShaderOutput();
   if (aPerLaPagina && dichiarata) {
     return *dichiarata;
   }
   return ShaderOutputPerIlDriver(gl);
 }
-
-}  // namespace webgl
 
 // Quello che la PAGINA legge (WebGLContext::GetCompileResult), quando la
 // lingua e' dichiarata e non coincide con quella del contesto GL. Il driver ha
@@ -86,6 +87,17 @@ ShShaderOutput StealthShaderOutputLanguage(gl::GLContext* gl,
 // infinito e una tabella sarebbe vietata.
 const std::string& WebGLShader::ObjectCodePerLaPagina() const {
   return mObjectCodePerLaPagina;
+}
+
+// Cio' che `WebGLContext::GetCompileResult` mette in `translatedSource`: la
+// resa per la PAGINA quando lo shader ne ha una (non vuota), altrimenti la
+// traduzione che il validatore ha fatto per il driver. E' la scelta che il
+// gancio faceva inline; l'espressione di Mozilla (`info->mObjectCode`) arriva
+// come secondo argomento, valutata una volta.
+const std::string& StealthPageObjectCode(const WebGLShader& aShader,
+                                         const std::string& aDriverObjectCode) {
+  const auto& perLaPagina = aShader.ObjectCodePerLaPagina();
+  return perLaPagina.empty() ? aDriverObjectCode : perLaPagina;
 }
 
 // Chiamata da WebGLShader::CompileShader con l'esito della validazione per il
@@ -123,11 +135,26 @@ std::string WebGLShader::StealthPerPageObjectCode(const bool aValid) {
   // e' vero.
   gl::GLContext* const gl = mContext->gl;
   const auto dichiarata = webgl::StealthDeclaredShaderOutput();
-  if (!dichiarata || *dichiarata == webgl::ShaderOutputPerIlDriver(gl)) {
+  if (!dichiarata || *dichiarata == ShaderOutputPerIlDriver(gl)) {
     return {};
   }
 
-  const auto perLaPagina = mContext->CreateShaderValidator(mType, true);
+  // Il bit "questa e' la traduzione per la pagina" viaggia in un campo del
+  // contesto (WebGLContext::mStealthPerPage), vero solo attorno a questa
+  // chiamata sincrona, sul thread del contesto: ogni altro validatore (quello
+  // del driver, in CompileShader) lo vede falso e si costruisce come prima.
+  // La guardia lo rimette falso a ogni uscita.
+  struct PerPageScope {
+    bool& mFlag;
+    explicit PerPageScope(bool& aFlag) : mFlag(aFlag) { mFlag = true; }
+    ~PerPageScope() { mFlag = false; }
+  };
+  std::unique_ptr<webgl::ShaderValidator> perLaPagina;
+  {
+    bool& flag = mContext->mStealthPerPage;
+    PerPageScope scope(flag);
+    perLaPagina = mContext->CreateShaderValidator(mType);
+  }
   if (!perLaPagina) {
     return {};
   }

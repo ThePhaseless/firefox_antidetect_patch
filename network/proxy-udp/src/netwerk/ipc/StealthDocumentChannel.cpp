@@ -17,8 +17,7 @@ namespace mozilla::net {
 
 nsresult StealthNewChannelOfLoadInfo(nsIURI* aURI, uint32_t aProxyResolveFlags,
                                      const LoadInfoArgs& aLoadInfoArgs,
-                                     nsIChannel** aResult,
-                                     nsILoadInfo** aLoadInfoOut) {
+                                     nsIChannel** aResult) {
   MOZ_ASSERT(NS_IsMainThread());
   nsresult rv;
   nsCOMPtr<nsIIOService> ioService = components::IO::Service(&rv);
@@ -39,9 +38,6 @@ nsresult StealthNewChannelOfLoadInfo(nsIURI* aURI, uint32_t aProxyResolveFlags,
       nsILoadInfo::SEC_ALLOW_CROSS_ORIGIN_SEC_CONTEXT_IS_NULL,
       nsIContentPolicy::TYPE_PROXIED_WEBRTC_MEDIA, aResult);
   NS_ENSURE_SUCCESS(rv, rv);
-  if (aLoadInfoOut) {
-    loadInfo.forget(aLoadInfoOut);
-  }
   return NS_OK;
 }
 

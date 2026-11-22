@@ -3,88 +3,58 @@
   "file": "netwerk/base/nsINetworkInterceptController.idl",
   "function": "interface nsIInterceptedChannel : nsISupports",
   "kind": "add",
-  "form": "unknown",
-  "line": "    // STEALTH-HOOK(automation/network-interception): see FEATURE.md",
-  "test": ""
+  "form": "member",
+  "line": "    void resetInterceptionWithURI(in nsIURI aURI);  // STEALTH-HOOK(automation/network-interception)",
+  "test": "wrapper:tests/test_service_worker_controller_e2e.py::test_a_reloaded_page_is_controlled_by_its_service_worker"
  },
  {
   "file": "netwerk/base/nsINetworkInterceptController.idl",
   "function": "interface nsIInterceptedChannel : nsISupports",
   "kind": "add",
-  "form": "unknown",
-  "line": "    void resetInterceptionWithURI(in nsIURI aURI);",
-  "test": ""
- },
- {
-  "file": "netwerk/base/nsINetworkInterceptController.idl",
-  "function": "interface nsIInterceptedChannel : nsISupports",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    void interceptAfterServiceWorkerResets();",
-  "test": ""
+  "form": "member",
+  "line": "    void interceptAfterServiceWorkerResets();  // STEALTH-HOOK(automation/network-interception)",
+  "test": "wrapper:tests/test_service_worker_controller_e2e.py::test_a_reloaded_page_is_controlled_by_its_service_worker"
  },
  {
   "file": "netwerk/protocol/http/InterceptedHttpChannel.cpp",
   "function": "NS_IMETHODIMP",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(automation/network-interception)",
-  "test": ""
- },
- {
-  "file": "netwerk/protocol/http/InterceptedHttpChannel.cpp",
-  "function": "NS_IMETHODIMP",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  if (mInterceptAfterServiceWorkerResets) {",
-  "test": ""
- },
- {
-  "file": "netwerk/protocol/http/InterceptedHttpChannel.cpp",
-  "function": "NS_IMETHODIMP",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    return StealthInterceptAgain(aBypass);",
-  "test": ""
- },
- {
-  "file": "netwerk/protocol/http/InterceptedHttpChannel.cpp",
-  "function": "NS_IMETHODIMP",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  }",
-  "test": ""
+  "form": "anchor",
+  "line": "  if (StealthOwnsInterception()) return StealthInterceptAgain(aBypass);  // STEALTH-HOOK(automation/network-interception)",
+  "test": "wrapper:tests/test_service_worker_controller_e2e.py::test_a_reloaded_page_is_controlled_by_its_service_worker",
+  "anchor": "INTERCEPTED_LOG((\"InterceptedHttpChannel::ResetInterception ...\")); (the first statement of ResetInterception)",
+  "why": "the intercept-again branch must return after Mozilla's log line so that the log module prints what it prints today (G36); a guard before the log would drop it, and a function wrap would need the private state in the wrapper"
  },
  {
   "file": "netwerk/protocol/http/InterceptedHttpChannel.h",
   "function": "class InterceptedHttpChannel final",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(automation/network-interception)",
-  "test": ""
+  "form": "member",
+  "line": "  bool StealthOwnsInterception();  // STEALTH-HOOK(automation/network-interception)",
+  "test": "wrapper:tests/test_service_worker_controller_e2e.py::test_a_reloaded_page_is_controlled_by_its_service_worker"
  },
  {
   "file": "netwerk/protocol/http/InterceptedHttpChannel.h",
   "function": "class InterceptedHttpChannel final",
   "kind": "add",
-  "form": "unknown",
-  "line": "  bool mInterceptAfterServiceWorkerResets{false};",
-  "test": ""
+  "form": "member",
+  "line": "  nsresult StealthInterceptAgain(bool aBypass);  // STEALTH-HOOK(automation/network-interception)",
+  "test": "wrapper:tests/test_service_worker_controller_e2e.py::test_a_reloaded_page_is_controlled_by_its_service_worker"
  },
  {
   "file": "netwerk/protocol/http/InterceptedHttpChannel.h",
   "function": "class InterceptedHttpChannel final",
   "kind": "add",
-  "form": "unknown",
-  "line": "  bool mServiceWorkerResetBypass{true};",
-  "test": ""
+  "form": "member",
+  "line": "  bool mServiceWorkerResetBypass{true};  // STEALTH-HOOK(automation/network-interception)",
+  "test": "wrapper:tests/test_service_worker_controller_e2e.py::test_a_reloaded_page_is_controlled_by_its_service_worker"
  },
  {
   "file": "netwerk/protocol/http/InterceptedHttpChannel.h",
   "function": "class InterceptedHttpChannel final",
   "kind": "add",
-  "form": "unknown",
-  "line": "  nsresult StealthInterceptAgain(bool aBypass);",
-  "test": ""
+  "form": "member",
+  "line": "  bool mInterceptAfterServiceWorkerResets{false};  // STEALTH-HOOK(automation/network-interception)",
+  "test": "wrapper:tests/test_service_worker_controller_e2e.py::test_a_reloaded_page_is_controlled_by_its_service_worker"
  }
 ]

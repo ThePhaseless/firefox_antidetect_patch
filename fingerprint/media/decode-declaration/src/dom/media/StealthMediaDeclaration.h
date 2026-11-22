@@ -17,6 +17,7 @@
 namespace mozilla {
 
 class EncoderConfig;
+struct SupportDecoderParams;
 
 /**
  * What this build reports it can decode, DECLARED by invisible_core instead of
@@ -125,6 +126,32 @@ bool StealthDeclaredDecodeSupport(const nsACString& aTrackMimeType,
  */
 Maybe<media::DecodeSupportSet> StealthDeclaredDecodeSupportSet(
     const nsACString& aTrackMimeType);
+
+/**
+ * The hook of PDMFactory::Supports: true, with the declared set in *aOut, when
+ * StealthDeclaredDecodeSupportSet declares the track mime type of aParams
+ * (an empty set is an answer and is returned as it is); false when it does not
+ * and Mozilla's code (EME, then the platform module) answers. It stands where
+ * the first statement of Supports has always stood, so neither the EME module
+ * nor the host's module is asked for a declared type.
+ */
+bool StealthDeclaredDecodeSupportFor(const SupportDecoderParams& aParams,
+                                     media::DecodeSupportSet* aOut);
+
+// The same type as PDMSupportsDecoderPromise (PlatformDecoderModule::
+// SupportsDecoderPromise), named here so this header does not pull the decoder
+// module in (asserted in the .cpp).
+using StealthDecodeSupportPromise =
+    MozPromise<media::DecodeSupportSet, nsresult, /* IsExclusive = */ true>;
+
+/**
+ * The hook of PDMFactory::SupportsAsync: a promise already resolved with the
+ * declared set when the track mime type of aParams is declared, nullptr when it
+ * is not (Mozilla's code then answers). Same declaration and same first place
+ * as the synchronous road, so the two agree.
+ */
+RefPtr<StealthDecodeSupportPromise> StealthDeclaredDecodeSupportAsyncFor(
+    const SupportDecoderParams& aParams);
 
 /**
  * Declared mediaCapabilities.decodingInfo answer, keyed by container mime type
@@ -237,6 +264,13 @@ RefPtr<StealthEncodeSupportPromise> StealthDeclaredWebrtcEncodeSupport(
  * whether H.264 is enabled, only the hardware flag the codec carries.
  */
 Maybe<bool> StealthDeclaredSoftwareH264();
+
+/**
+ * The form the two hooks of DefaultCodecPreferences call: true, with the
+ * answer in *aOut, when StealthDeclaredSoftwareH264 declares it; false when it
+ * does not and Mozilla's plugin check decides.
+ */
+bool StealthDeclaredSoftwareH264(bool* aOut);
 
 /**
  * The core count the encodingInfo "smooth" estimate uses: the declared

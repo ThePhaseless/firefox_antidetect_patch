@@ -1,38 +1,38 @@
 diff --git a/browser/app/winlauncher/LauncherProcessWin.cpp b/browser/app/winlauncher/LauncherProcessWin.cpp
-index 3734e1d3eba29d4e939bce3346a9e8e7590420ce..5392564e861c10059375ada2bac97bf05e319934 100644
+index 3734e1d3eba29d4e939bce3346a9e8e7590420ce..290eb45bea074fb2e303a3114e4b86d712e33de4 100644
 --- a/browser/app/winlauncher/LauncherProcessWin.cpp
 +++ b/browser/app/winlauncher/LauncherProcessWin.cpp
-@@ -31,6 +31,8 @@
- #include "ErrorHandler.h"
- #include "LaunchUnelevated.h"
+@@ -33,6 +33,8 @@
  #include "ProcThreadAttributes.h"
-+// STEALTH-HOOK(automation/pipe)
-+#include "StealthJugglerPipe.h"
  #include "../BrowserDefines.h"
  
++#include "StealthJugglerPipe.h"  // STEALTH-HOOK(automation/pipe)
++
  #if defined(MOZ_LAUNCHER_PROCESS)
-@@ -579,6 +581,8 @@ Maybe<int> LauncherMain(int& argc, wchar_t* argv[]) {
+ #  include "mozilla/LauncherRegistryInfo.h"
+ #  include "SameBinary.h"
+@@ -579,6 +581,7 @@ Maybe<int> LauncherMain(int& argc, wchar_t* argv[]) {
                           ::GetStdHandle(STD_ERROR_HANDLE)};
  
    attrs.AddInheritableHandles(stdHandles);
-+  // STEALTH-HOOK(automation/pipe)
-+  StealthAddJugglerPipeHandles(argc, argv, attrs);
++  StealthAddJugglerPipeHandles(argc, argv, attrs);  // STEALTH-HOOK(automation/pipe)
  
    DWORD creationFlags = CREATE_SUSPENDED | CREATE_UNICODE_ENVIRONMENT;
  
 diff --git a/toolkit/xre/nsWindowsWMain.cpp b/toolkit/xre/nsWindowsWMain.cpp
-index b7c376eadc1460b0f4e378ca3047eb82a079c19c..38a2654d26f71e3c7891fe9c6972fbb6d2417d75 100644
+index b7c376eadc1460b0f4e378ca3047eb82a079c19c..50b22586b93b1eb29c1d2d669140cb5cf12f8b27 100644
 --- a/toolkit/xre/nsWindowsWMain.cpp
 +++ b/toolkit/xre/nsWindowsWMain.cpp
-@@ -14,6 +14,7 @@
- #endif
- 
- #include "mozilla/Char16.h"
-+#include "StealthPipeStdio.h"  // STEALTH-HOOK(automation/pipe)
- #include "nsUTF8Utils.h"
+@@ -18,6 +18,8 @@
  
  #include <windows.h>
-@@ -114,6 +115,7 @@ static void FreeAllocStrings(int argc, char** argv) {
+ 
++#include "StealthPipeStdio.h"  // STEALTH-HOOK(automation/pipe)
++
+ #ifdef __MINGW32__
+ 
+ /* MingW currently does not implement a wide version of the
+@@ -114,6 +116,7 @@ static void FreeAllocStrings(int argc, char** argv) {
  int wmain(int argc, WCHAR** argv) {
    SanitizeEnvironmentVariables();
    SetDllDirectoryW(L"");

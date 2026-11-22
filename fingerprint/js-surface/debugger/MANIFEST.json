@@ -1,11 +1,14 @@
 {
  "modified": [
   "devtools/server/actors/thread.js",
+  "devtools/shared/heapsnapshot/tests/gtest/moz.build",
   "js/src/debugger/Debugger.cpp",
   "js/src/debugger/Debugger.h"
  ],
  "added": {
-  "js/src/debugger/StealthDebugger.h": "100644"
+  "devtools/shared/heapsnapshot/tests/gtest/TestStealthDebugger.cpp": "100644",
+  "js/src/debugger/StealthDebugger.h": "100644",
+  "juggler/tests/a_forced_detach_returns_before_the_thread_attaches.test.mjs": "100644"
  },
  "inventory": [
   {
@@ -31,6 +34,26 @@
      "notes"
     ],
     "why": "Added verification of the no-other-reader and no-StaticPrefList claims."
+   }
+  },
+  {
+   "file": "devtools/shared/heapsnapshot/tests/gtest/moz.build",
+   "category": "build",
+   "feature": "debugger-invisible-attach",
+   "prefs": [],
+   "added": 2,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "UNIFIED_SOURCES += [\"TestStealthDebugger.cpp\"] after FINAL_LIBRARY",
+   "evidence": [
+    "+UNIFIED_SOURCES += [\"TestStealthDebugger.cpp\"]  # STEALTH-HOOK(fingerprint/js-surface/debugger)"
+   ],
+   "notes": "Registers the gtest suite StealthDebugger.* of this folder in the existing heapsnapshot gtest library (xul-gtest); the test uses the DevTools.h fixture of that directory.",
+   "verifier": {
+    "changed": [],
+    "why": "Written by the hook-rework executor of this folder."
    }
   },
   {

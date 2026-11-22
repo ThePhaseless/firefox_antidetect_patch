@@ -125,6 +125,29 @@ TEST(StealthGLMultisample, BasicRenderDriverBlendsIntoAMultisampledTarget)
   gl->fDeleteShader(fs);
 }
 
+// The negative control of the hooks in GLContext::InitImpl: with nothing
+// declared, Mozilla's workaround for 978966 fires and the feature stays off, so
+// the feature of the test above is the declaration's doing and not the device's.
+TEST(StealthGLMultisample, BasicRenderDriverDropsMultisampleWhenNothingIsDeclared)
+{
+  gfxPlatform::GetPlatform();
+  auto restore = MakeScopeExit([] {
+    Preferences::ClearUser(kSamplesPref);
+    Preferences::ClearUser("webgl.angle.force-warp");
+  });
+  Preferences::SetBool("webgl.angle.force-warp", true);
+  Preferences::SetUint(kSamplesPref, 0);
+
+  nsCString failureId;
+  const RefPtr<GLContext> gl = GLContextProviderEGL::CreateHeadless(
+      {CreateContextFlags::PREFER_ES3}, &failureId);
+  ASSERT_TRUE(gl)
+  << failureId.get();
+  ASSERT_TRUE(gl->MakeCurrent());
+  ASSERT_EQ(gl->Renderer(), GLRenderer::MicrosoftBasicRenderDriver);
+  EXPECT_FALSE(gl->IsSupported(GLFeature::framebuffer_multisample));
+}
+
 #endif  // XP_WIN
 
 }  // namespace mozilla::gl
