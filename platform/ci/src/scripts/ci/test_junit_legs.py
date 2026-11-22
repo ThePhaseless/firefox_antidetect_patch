@@ -135,13 +135,36 @@ def cases() -> list:
         and "scripts/ci/py_junit.py list --series .series --tree ." in tree_tests[0]["run"] and "--rootdir=." in tree_tests[0]["run"]
         and "--junitxml=junit-py/checks/" in tree_tests[0]["run"])
     keep = [s for s in checks if (s.get("with") or {}).get("name") == "junitpart-py-checks"]
-    add("checks: its part is junitpart-py-checks, uploaded whatever happened (if: always()), right after the tests, from junit-py (files under checks/)",
-        len(keep) == 1 and always(keep[0]) and keep[0]["with"]["path"] == "junit-py" and checks.index(keep[0]) == checks.index(tree_tests[0]) + 1)
+    add("checks: its part is junitpart-py-checks, uploaded whatever happened (if: always()), after the tests and the `ran` step, from junit-py (files under checks/)",
+        len(keep) == 1 and always(keep[0]) and keep[0]["with"]["path"] == "junit-py" and checks.index(keep[0]) == checks.index(tree_tests[0]) + 2)
+    ran_step = [s for s in checks if "py_junit.py ran junit-py/checks/tree-tests.xml" in str(s.get("run", ""))]
+    add("checks: a junit with no test that ran is a red step: `py_junit.py ran` on tree-tests.xml, right after the pytest step, before the upload, "
+        "not continue-on-error (the upload is if: always(), so the junit is kept)",
+        len(ran_step) == 1 and checks.index(ran_step[0]) == checks.index(tree_tests[0]) + 1 and checks.index(ran_step[0]) < checks.index(keep[0])
+        and "continue-on-error" not in ran_step[0] and not ran_step[0].get("if"))
+    add("checks: fonttools is pinned to one exact version, written once, in the pytest step (the tree and the CI pin none)",
+        len(tree_tests) == 1 and tree_tests[0]["run"].count("fonttools==4.51.0") == 1
+        and sum(str(s.get("run", "")).count("fonttools") for s in checks) == 1)
     parts_py = [str((s.get("with") or {}).get("name", "")) for wf in (gate, release, load("package-ab.yml")) for job in wf["jobs"].values() for s in uploads(job)
                 if str((s.get("with") or {}).get("name", "")).startswith("junitpart-py-")]
     add("python parts: one per job and named by it (junitpart-py-<job>), the three there are, none twice: checks, package-ab, and the gate's "
         "security-state step, one per leg (junitpart-py-security-state-<leg>)",
         sorted(parts_py) == ["junitpart-py-checks", "junitpart-py-package-ab", "junitpart-py-security-state-${{ matrix.leg }}"])
+    add("checks: pytest does not stop at a file that cannot be imported (--continue-on-collection-errors: run 45025164169 had one collection error, "
+        "fontTools missing for scripts/test_gen_bundle_font_manifest.py, and no test of the tree wrote a result), and the step installs fonttools",
+        len(tree_tests) == 1 and "--continue-on-collection-errors" in tree_tests[0]["run"] and "fonttools" in tree_tests[0]["run"])
+    plan = release["jobs"]["plan"]["steps"]
+    plain = ("scripts/ci/test_ci.py", "scripts/ci/test_stealth_download_watchdog.py", "scripts/ci/test_objects_first.py", "scripts/ci/test_stealth_build_tools.py",
+             "scripts/test_release_plan.py")
+    bare = {n: [s for s in plan if "python3 " + n in str(s.get("run", ""))] for n in plain}
+    add("plan: no pip install and no junit step (nothing in the plan installs), and the verdict is unchanged: test_ci.py, the watchdog, objects_first, build_tools and "
+        "test_release_plan.py still run as plain scripts, once each, with no continue-on-error",
+        not any("pip" in str(s.get("run", "")) or "pytest" in str(s.get("run", "")) or "junit" in str(s.get("name", "")).lower() for s in plan)
+        and all(len(v) == 1 and "continue-on-error" not in v[0] for v in bare.values()))
+    add("checks: the pytest line names the plan's four tests that hooks name (scripts/ci/ is left out of py_junit's list), in the same session as the tree's tests",
+        len(tree_tests) == 1 and all(n in tree_tests[0]["run"] for n in ("scripts/ci/test_stealth_build_tools.py", "scripts/ci/test_stealth_download_watchdog.py",
+                                                                      "scripts/ci/test_objects_first.py", "scripts/test_release_plan.py"))
+        and tree_tests[0]["run"].index("scripts/ci/test_stealth_build_tools.py") < tree_tests[0]["run"].index("python3 -m pytest $FILES"))
     merge = release["jobs"].get("junit-py") or {}
     dl, up = downloads(merge), uploads(merge)
     add("junit-py: one job puts every junitpart-py-* together (merged) after checks and both gates, whatever they said, and uploads the one artifact junit-py",

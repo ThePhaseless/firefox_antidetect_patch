@@ -63,6 +63,16 @@ index 0eb6421cfc024e377d4e4ce1ad69959a9bab45c5..633236aa045e7a5f6ccf86403afe090c
    mozilla::UniquePtr<PackageEntry> entry = mozilla::MakeUnique<PackageEntry>();
    entry->flags = aPackage.flags;
    entry->contentBaseURI = std::move(content);
+diff --git a/chrome/test/moz.build b/chrome/test/moz.build
+index ce61f87f901e725ca147187f549db85ea6ce8951..0da9d381c7785fa110ad0e3a55cd8e08bf018c55 100644
+--- a/chrome/test/moz.build
++++ b/chrome/test/moz.build
+@@ -6,3 +6,5 @@ XPCSHELL_TESTS_MANIFESTS += [
+     "unit/xpcshell.toml",
+     "unit_ipc/xpcshell.toml",
+ ]
++
++XPCSHELL_TESTS_MANIFESTS += ["unit/xpcshell-stealth.toml"]  # STEALTH-HOOK(fingerprint/js-surface/branding)
 diff --git a/netwerk/protocol/res/SubstitutingProtocolHandler.cpp b/netwerk/protocol/res/SubstitutingProtocolHandler.cpp
 index 0a89a2eb98c19f1c971bf463d90dc51e11d868d7..e26c764d3a47f780982513bbc69bb9aafc10b192 100644
 --- a/netwerk/protocol/res/SubstitutingProtocolHandler.cpp

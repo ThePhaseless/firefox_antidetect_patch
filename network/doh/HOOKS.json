@@ -292,7 +292,7 @@
   "kind": "add",
   "form": "member",
   "line": "  readonly attribute uint32_t userContextId;  // STEALTH-HOOK(network/doh)",
-  "test": "node:juggler/tests/the_safebrowsing_completion_keeps_the_context_of_the_page.test.mjs#the interface of the completion callback gives the context, one line beside Mozilla"
+  "test": "node:juggler/tests/the_safebrowsing_completion_keeps_the_context_of_the_page.test.mjs#the interface of the completion callback gives the context, one line beside the lines of Mozilla"
  },
  {
   "file": "toolkit/components/url-classifier/nsUrlClassifierDBService.cpp",

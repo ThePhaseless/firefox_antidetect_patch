@@ -52,6 +52,13 @@ WINDOWS_ONLY = {"StealthBundledCollection", "StealthFallbackNames", "StealthFont
 LINUX_ONLY = {"StealthFcFontList", "StealthFontMetrics", "StealthGlyphCoverage"}
 NOT_ON = {"linux": {"StealthWebGPUAdapter", "StealthWebGPUInstanceEnv"} | WINDOWS_ONLY,
           "win": {"StealthWebGPUBundledVulkan", "StealthFcBundleFonts"} | LINUX_ONLY}
+# Single tests that exist on one platform only inside a suite that exists on both ("Suite.Name"), read by the named hook tests judge
+# (tools/hook_tests_judge.py) and by nothing else here: NOT_ON above stays the table of suites. Each is under a platform condition in its source:
+# TheHostIsNotProbedWhileDeclared under #ifdef MOZ_WIDGET_GTK (gfx/thebes/gtest/TestStealthGfxFeatureStatus.cpp), SandboxPolicyAllowsTheDeclaredArchive
+# in security/sandbox/linux/gtest (built only where security/sandbox/moz.build has OS_ARCH == "Linux"), the multisample one under #ifdef XP_WIN
+# (gfx/gl/gtest/TestStealthGLMultisample.cpp). An entry for a test that ran on that platform makes the judge red.
+NOT_ON_TESTS = {"linux": {"StealthGLMultisample.BasicRenderDriverBlendsIntoAMultisampledTarget"},
+                "win": {"StealthGfxFeatureStatus.TheHostIsNotProbedWhileDeclared", "StealthBranding.SandboxPolicyAllowsTheDeclaredArchive"}}
 
 
 def suite_names(listing: str) -> list:

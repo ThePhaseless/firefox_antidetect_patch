@@ -57,6 +57,32 @@ def cases() -> list:
         with contextlib.redirect_stderr(io.StringIO()):
             code = pj.main(["list", "--series", str(Path(tmp) / "series"), "--tree", str(Path(tmp))])
         add("a series with no python test of ours exits 1 (a step with no test is not green)", code == 1)
+
+    # --- `ran`: the junit of the checks' pytest holds a test that ran
+    def junit(body: str) -> str:
+        return '<?xml version="1.0"?><testsuites><testsuite name="pytest">%s</testsuite></testsuites>' % body
+
+    err = '<testcase classname="" name="scripts.test_a"><error message="collection failure">ModuleNotFoundError: No module named fontTools</error></testcase>'
+    passed = '<testcase classname="scripts.test_b" name="test_x"/>'
+    failed = '<testcase classname="scripts.test_b" name="test_y"><failure message="assert 1 == 2">boom</failure></testcase>'
+    with tempfile.TemporaryDirectory() as tmp:
+        def run(body=None):
+            path = Path(tmp) / "t.xml"
+            if path.exists():
+                path.unlink()
+            if body is not None:
+                path.write_text(junit(body), encoding="utf-8")
+            err_out = io.StringIO()
+            with contextlib.redirect_stderr(err_out):
+                code = pj.main(["ran", str(path)])
+            return code, err_out.getvalue()
+
+        code, msg = run(err + err.replace("test_a", "test_c"))
+        add("ran: only collection errors is red, and the message names them", code == 1 and "scripts.test_a" in msg and "scripts.test_c" in msg and "fontTools" in msg)
+        add("ran: a junit with no testcase is red", run("")[0] == 1)
+        add("ran: one passed test among the errors is green", run(err + passed)[0] == 0)
+        add("ran: a failed test is green, it ran (its verdict is the judge's)", run(failed)[0] == 0 and run(err + failed)[0] == 0)
+        add("ran: a missing file is red", run(None)[0] == 1)
     return out
 
 

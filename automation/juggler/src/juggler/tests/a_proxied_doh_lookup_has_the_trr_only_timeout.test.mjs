@@ -73,7 +73,7 @@ test('the single request timeout of a proxied lookup is the TRR-only one', () =>
   assert.ok(valueOf('network.trr.request_timeout_ms') >= 30000);
 });
 
-test('the hook is on the value line of Mozilla\'s pref, which is declared nowhere else', () => {
+test('the hook is on the value line of the pref of Mozilla, which is declared nowhere else', () => {
   assert.match(valueLine('network.trr.request_timeout_ms'), /# STEALTH-HOOK\(network\/doh\)$/);
   const pref = /network\.trr\.request_timeout_ms/;
   for (const file of ['modules/libpref/init/StealthPrefs.js', 'modules/libpref/init/StealthPrefList.yaml'])

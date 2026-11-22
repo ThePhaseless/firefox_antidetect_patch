@@ -37,7 +37,7 @@ const TAG = 'STEALTH-HOOK(network/doh)';
 const count = (text, needle) => text.split(needle).length - 1;
 const lines = text => text.split(/\r?\n/);
 
-test('the interface of the completion callback gives the context, one line beside Mozilla\'s', () => {
+test('the interface of the completion callback gives the context, one line beside the lines of Mozilla', () => {
   const text = read(IDL);
   const hook = '  readonly attribute uint32_t userContextId;  // ' + TAG + '\n';
   assert.equal(count(text, hook), 1);

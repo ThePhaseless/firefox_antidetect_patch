@@ -11,6 +11,7 @@
  "chrome/nsChromeRegistry.cpp": 3,
  "chrome/nsChromeRegistryChrome.cpp": 3,
  "chrome/nsChromeRegistryContent.cpp": 4,
+ "chrome/test/moz.build": 2,
  "devtools/server/actors/thread.js": 1,
  "devtools/shared/heapsnapshot/tests/gtest/moz.build": 2,
  "docshell/base/BrowsingContext.cpp": 6,

@@ -272,9 +272,16 @@ jobs:
         shell: bash
         run: |
           mkdir -p junit-py/checks
-          python3 -m pip install --quiet pytest pyyaml
+          python3 -m pip install --quiet pytest pyyaml fonttools==4.51.0
           FILES="$(python3 scripts/ci/py_junit.py list --series .series --tree .)"
-          python3 -m pytest $FILES -q -p no:cacheprovider -o addopts='' -o junit_family=xunit2 --rootdir=. --junitxml=junit-py/checks/tree-tests.xml
+          # The plan's own tests that hooks name (scripts/ci/ is left out of the list above): the plan runs them as plain scripts, its verdict; here they
+          # are the record, in this junit, and the `ran` step below covers them.
+          FILES="$FILES scripts/ci/test_stealth_build_tools.py scripts/ci/test_stealth_download_watchdog.py scripts/ci/test_objects_first.py scripts/test_release_plan.py"
+          python3 -m pytest $FILES -q -p no:cacheprovider -o addopts='' -o junit_family=xunit2 --rootdir=. --continue-on-collection-errors --junitxml=junit-py/checks/tree-tests.xml
+      # A junit with no test that ran (every case a collection error, or none) is a red step, here and not at the judge: nobody would read it from 200 lines
+      # of missing tests. Not continue-on-error; the upload below runs whatever this said. A test that failed ran, and its verdict is the judge's.
+      - name: The junit holds a test that ran
+        run: python3 scripts/ci/py_junit.py ran junit-py/checks/tree-tests.xml
       - name: Keep the junit (the part of this job, junitpart-py-checks)
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

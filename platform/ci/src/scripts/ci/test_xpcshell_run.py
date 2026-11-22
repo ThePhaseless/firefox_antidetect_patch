@@ -420,10 +420,11 @@ def cases() -> list:
     declared = x.load_list(x.LIST)
     lock = x.load_lock(x.LOCK)
     folders = {Path(f).parent.as_posix() for f in declared["files"]}
-    add("the declared list has our six xpcshell tests of the line and the minimum is their ten tasks (the launch counter's four, the api keys' two and its observer's one, the hash completer's one, the hybrid xrays option's run_test, and the generate mode's one)",
-        len(declared["files"]) == 6 and declared["min_tests"] == 10 and all(Path(f).name.startswith("test_stealth_") for f in declared["files"]))
+    add("the declared list has our seven xpcshell tests of the line and the minimum is their thirteen tasks (the launch counter's four, the branding chrome registry's three, the api keys' two and its observer's one, the hash completer's one, the hybrid xrays option's run_test, and the generate mode's one)",
+        len(declared["files"]) == 7 and declared["min_tests"] == 13 and all(Path(f).name.startswith("test_stealth_") for f in declared["files"]))
     # every xpcshell test that a HOOKS.json names (`"test": "xpcshell:<path>#<test>"`, read by tools/hook_tests_judge.py of main) has its file in the list
-    hook_tests = ["js/xpconnect/tests/unit/test_stealth_hybrid_xrays_options.js#run_test",
+    hook_tests = ["chrome/test/unit/test_stealth_branding_chrome_registry.js#test_chrome_registry_serves_the_declared_branding_jar",
+                  "js/xpconnect/tests/unit/test_stealth_hybrid_xrays_options.js#run_test",
                   "toolkit/components/urlformatter/tests/unit/test_stealth_apikeys.js#test_declared_keys",
                   "toolkit/components/urlformatter/tests/unit/test_stealth_apikeys_observer.js#test_declaration_after_init_enables_the_provider"]
     add("every xpcshell test a hook names is in the declared list (a file the leg does not run leaves the judge with no case, which is red)",

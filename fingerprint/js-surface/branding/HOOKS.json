@@ -14,7 +14,7 @@
   "form": "wrap-expression",
   "line": "  return mozilla::net::StealthBrandingChromeURL(NS_NewURI(aResult, path, nullptr, baseURI), aResult);  // STEALTH-HOOK(fingerprint/js-surface/branding)",
   "removed": "  return NS_NewURI(aResult, path, nullptr, baseURI);",
-  "test": "gtest:StealthBranding.TheChromeRegistryServesTheDeclaredJarWhenItHasBranding"
+  "test": "xpcshell:chrome/test/unit/test_stealth_branding_chrome_registry.js#test_chrome_registry_serves_the_declared_branding_jar"
  },
  {
   "file": "chrome/nsChromeRegistryChrome.cpp",
@@ -22,7 +22,7 @@
   "kind": "add",
   "form": "registration",
   "line": "#include \"mozilla/net/StealthBranding.h\"  // STEALTH-HOOK(fingerprint/js-surface/branding)",
-  "test": "gtest:StealthBranding.TheChromeRegistryServesTheDeclaredJarWhenItHasBranding"
+  "test": "xpcshell:chrome/test/unit/test_stealth_branding_chrome_registry.js#test_chrome_registry_serves_the_declared_branding_jar"
  },
  {
   "file": "chrome/nsChromeRegistryChrome.cpp",
@@ -30,7 +30,7 @@
   "kind": "add",
   "form": "anchor",
   "line": "  mozilla::net::StealthBrandingRegisterPackage(packageName, entry->baseURI);  // STEALTH-HOOK(fingerprint/js-surface/branding)",
-  "test": "gtest:StealthBranding.TheChromeRegistryServesTheDeclaredJarWhenItHasBranding",
+  "test": "xpcshell:chrome/test/unit/test_stealth_branding_chrome_registry.js#test_chrome_registry_serves_the_declared_branding_jar",
   "anchor": "`entry->flags = flags;` in nsChromeRegistryChrome::ManifestContent",
   "why": "it needs entry->baseURI, which the two statements above produce ('resolved' is moved into the entry): a guard in the head or a wrap of the function cannot see it, and the hook only observes"
  },
@@ -51,6 +51,14 @@
   "test": "gtest:StealthBranding.ThePackageRegistrationKeepsOnlyBrandingWithADirectory",
   "anchor": "the `if (NS_FAILED(rv)) return;` block of the skin base URI in nsChromeRegistryContent::RegisterPackage (the line before MakeUnique<PackageEntry>)",
   "why": "it needs the local `content` URI the three NS_NewURI blocks above produce, before it is moved into the entry; no argument of the function carries it"
+ },
+ {
+  "file": "chrome/test/moz.build",
+  "function": "XPCSHELL_TESTS_MANIFESTS += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "XPCSHELL_TESTS_MANIFESTS += [\"unit/xpcshell-stealth.toml\"]  # STEALTH-HOOK(fingerprint/js-surface/branding)",
+  "test": "xpcshell:chrome/test/unit/test_stealth_branding_chrome_registry.js#test_chrome_registry_serves_the_declared_branding_jar"
  },
  {
   "file": "netwerk/protocol/res/SubstitutingProtocolHandler.cpp",

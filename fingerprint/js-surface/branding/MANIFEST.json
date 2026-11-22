@@ -3,6 +3,7 @@
   "chrome/nsChromeRegistry.cpp",
   "chrome/nsChromeRegistryChrome.cpp",
   "chrome/nsChromeRegistryContent.cpp",
+  "chrome/test/moz.build",
   "netwerk/protocol/res/SubstitutingProtocolHandler.cpp",
   "netwerk/protocol/res/SubstitutingProtocolHandler.h",
   "netwerk/protocol/res/moz.build",
@@ -11,6 +12,8 @@
   "security/sandbox/win/src/sandboxbroker/sandboxBroker.cpp"
  ],
  "added": {
+  "chrome/test/unit/test_stealth_branding_chrome_registry.js": "100644",
+  "chrome/test/unit/xpcshell-stealth.toml": "100644",
   "netwerk/protocol/res/StealthBranding.cpp": "100644",
   "netwerk/protocol/res/StealthBranding.h": "100644",
   "netwerk/protocol/res/gtest/TestStealthBranding.cpp": "100644",
@@ -88,6 +91,28 @@
      "feature"
     ],
     "why": "Feature renamed to match the other files of the same feature."
+   }
+  },
+  {
+   "file": "chrome/test/moz.build",
+   "category": "spoof",
+   "feature": "stealth-branding-redirect",
+   "prefs": [
+    "zoom.stealth.branding.archive"
+   ],
+   "added": 2,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "after the XPCSHELL_TESTS_MANIFESTS list (unit_ipc/xpcshell.toml)",
+   "evidence": [
+    "+XPCSHELL_TESTS_MANIFESTS += [\"unit/xpcshell-stealth.toml\"]  # STEALTH-HOOK(fingerprint/js-surface/branding)"
+   ],
+   "notes": "Registers the xpcshell test that the chrome registry serves the declared branding jar, on the packaged binary.",
+   "verifier": {
+    "changed": [],
+    "why": "Written with the hook, 2026-11-22."
    }
   },
   {

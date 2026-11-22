@@ -19,7 +19,6 @@
 #include "mozilla/net/StealthBranding.h"
 #include "mozilla/net/SubstitutingProtocolHandler.h"
 #include "nsCOMPtr.h"
-#include "nsIChromeRegistry.h"
 #include "nsIURI.h"
 #include "nsNetUtil.h"
 #include "nsReadableUtils.h"
@@ -212,41 +211,6 @@ TEST(StealthBranding, TheChromeRegistryWrapKeepsOrRebuildsTheResolvedUri)
               StealthBrandingChromeURL(NS_ERROR_FILE_NOT_FOUND, &out));
     EXPECT_FALSE(out);
   }
-}
-
-TEST(StealthBranding, TheChromeRegistryServesTheDeclaredJarWhenItHasBranding)
-{
-  nsCOMPtr<nsIChromeRegistry> registry =
-      do_GetService("@mozilla.org/chrome/chrome-registry;1");
-  ASSERT_TRUE(registry);
-  nsCOMPtr<nsIURI> chrome;
-  ASSERT_EQ(NS_OK, NS_NewURI(getter_AddRefs(chrome),
-                             "chrome://branding/content/icon.png"_ns));
-  // Engine off: the build's own URI, if this binary registers a branding
-  // package at all.
-  nsCOMPtr<nsIURI> resolved;
-  if (NS_FAILED(registry->ConvertChromeURL(chrome, getter_AddRefs(resolved)))) {
-    GTEST_SKIP() << "this test binary has no branding package";
-  }
-  nsAutoCString stock;
-  ASSERT_EQ(NS_OK, resolved->GetSpec(stock));
-
-  // The registries recorded the package's directory when they read its
-  // manifest (nsChromeRegistryChrome::ManifestContent): what is served with the
-  // engine on is the declared jar, with no help from the test.
-  nsAutoCString recorded;
-  ASSERT_TRUE(StealthBrandingRecordedDirectory(recorded))
-      << "the chrome registry recorded no branding directory";
-  EXPECT_TRUE(StringBeginsWith(stock, recorded)) << stock.get();
-
-  EngineOn on;
-  nsCOMPtr<nsIURI> declared;
-  ASSERT_EQ(NS_OK,
-            registry->ConvertChromeURL(chrome, getter_AddRefs(declared)));
-  nsAutoCString spec;
-  ASSERT_EQ(NS_OK, declared->GetSpec(spec));
-  EXPECT_TRUE(spec.Equals(InJar("icon.png"))) << spec.get();
-  EXPECT_FALSE(spec.Equals(stock)) << "the engine on must differ from the build";
 }
 
 TEST(StealthBranding, TheResourceWayAndTheChromeWayGiveTheSameJar)
