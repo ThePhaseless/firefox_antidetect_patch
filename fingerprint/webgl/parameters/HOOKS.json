@@ -254,5 +254,13 @@
   "test": "wrapper:tests/test_webgl_declared_parameters_e2e.py::test_the_stencil_masks_start_at_all_ones",
   "anchor": "the last `AssertUintParamCorrect(gl, LOCAL_GL_STENCIL_BACK_WRITEMASK, mStencilWriteMaskBack);` of WebGLContext::InitAndValidateGL",
   "why": "the hook needs the four masks Mozilla has just read from the driver and asserted, so it cannot be a guard in the head; the four private fields travel as arguments, so no friend line in WebGLContext.h (a file of fingerprint/webgl/shader-language) is needed"
+ },
+ {
+  "file": "dom/canvas/gtest/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"TestStealthWebGLParams.cpp\"]  # STEALTH-HOOK(fingerprint/webgl/parameters)",
+  "test": "gtest:StealthWebGLParams.DeclaredShaderPrecisionObjectIsHeldByItsReferences"
  }
 ]

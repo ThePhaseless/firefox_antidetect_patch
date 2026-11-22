@@ -171,7 +171,11 @@ RefPtr<gfxFont> StealthMakeConsolasFont(FontData* aData, double aSize) {
   gfxFontStyle style;
   style.size = aSize;
   RefPtr<gfxFont> font = fe->FindOrMakeFont(&style);
-  if (!font || !font->Valid() || font->GetType() != gfxFont::FONT_TYPE_FT2) {
+  // On Linux the font is a gfxFontconfigFont, which says FONT_TYPE_FONTCONFIG;
+  // gfxFT2Font says FONT_TYPE_FT2. Both are gfxFT2FontBase.
+  if (!font || !font->Valid() ||
+      (font->GetType() != gfxFont::FONT_TYPE_FT2 &&
+       font->GetType() != gfxFont::FONT_TYPE_FONTCONFIG)) {
     return nullptr;
   }
   return font;

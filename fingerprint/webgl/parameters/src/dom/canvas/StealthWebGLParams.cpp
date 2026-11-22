@@ -13,6 +13,7 @@
 #include "GLContext.h"
 #include "WebGLContext.h"
 #include "js/Value.h"
+#include "mozilla/RefPtr.h"
 #include "mozilla/StaticPrefs_webgl.h"
 #include "mozilla/StaticPrefs_zoom.h"
 #include "mozilla/dom/TypedArray.h"
@@ -257,8 +258,9 @@ bool StealthWebGLShaderPrecisionFormat(
   if (!fake) {
     return false;
   }
-  *aOut = already_AddRefed<WebGLShaderPrecisionFormatJS>(
-      new WebGLShaderPrecisionFormatJS(*fake));
+  // Born with its reference (a RefCounted starts at 0): wrapped without one,
+  // the binding's first release frees it under the JS reflector.
+  *aOut = MakeAndAddRef<WebGLShaderPrecisionFormatJS>(*fake);
   return true;
 }
 

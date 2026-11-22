@@ -437,6 +437,13 @@ TEST(StealthInputEventBirth, TheMouseHookReadsTheLatencyOfTheDataAndStampsTheEve
   StealthSetMouseEventBirth(none, FakeMouseEventData{}, &shell);
   EXPECT_TRUE(none.mTimeStamp == before);  // the negative control: no latency declared, nothing stamped
 
+  // The fake document has no browsing context, so this is the stream of page 0, which the tests before stamped a few
+  // milliseconds ago: its births never go back, and a birth 45 ms in the past would be held to theirs. A fake cannot
+  // give a page of its own (StealthPageIdOf takes a real dom::BrowsingContext), so page 0 is given a new order the way
+  // the order says it gets one: 16 other pages (the slots) take every slot, and the page that lost its slot starts anew.
+  for (uint64_t page = 900001; page <= 900016; ++page) {
+    StealthInputEventBirth(1, page);
+  }
   const TimeStamp start = TimeStamp::Now();
   WidgetEventTime declared;
   StealthSetMouseEventBirth(declared, FakeMouseEventData{45}, &shell);

@@ -52,6 +52,7 @@
  "dom/canvas/WebGLShader.h": 3,
  "dom/canvas/WebGLShaderValidator.cpp": 2,
  "dom/canvas/WebGLShaderValidator.h": 2,
+ "dom/canvas/gtest/moz.build": 1,
  "dom/canvas/moz.build": 5,
  "dom/events/Event.cpp": 4,
  "dom/events/EventStateManager.cpp": 4,

@@ -234,3 +234,15 @@ index 2d8a66a1f8cddcbb238c7ee83da65089f03f625c..2c4fdcf80065e634bf6ac28340052bff
  
    // Bindings, etc.
  
+diff --git a/dom/canvas/gtest/moz.build b/dom/canvas/gtest/moz.build
+index e1fd0c7e9f8d4e9d0f7b8e6c430ce5b8a4679e5a..854117a6517c3eb7d87b17cd62c32b58dcb233dc 100644
+--- a/dom/canvas/gtest/moz.build
++++ b/dom/canvas/gtest/moz.build
+@@ -12,6 +12,7 @@ UNIFIED_SOURCES += [
+     "TestSanitizeRenderer.cpp",
+     "TestWebGLTextureUploadInit.cpp",
+ ]
++UNIFIED_SOURCES += ["TestStealthWebGLParams.cpp"]  # STEALTH-HOOK(fingerprint/webgl/parameters)
+ 
+ include("/ipc/chromium/chromium-config.mozbuild")
+ 

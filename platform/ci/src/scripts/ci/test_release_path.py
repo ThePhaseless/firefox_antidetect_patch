@@ -42,7 +42,7 @@ WORKFLOW = ROOT / ".github" / "workflows" / "release.yml"
 # The filter of run 41402916724, from its log, with the suites added to the default since (StealthSessionUdpProxy, StealthDeclaredNetwork, StealthSocksUdpPool, TestStealthTRRContext, TestStealthSocksCredentials, TestStealthSessionResolver, StealthIceResolverContext, StealthUdpProxyBirth).
 GREEN_FILTER = ("StealthGfxFeatureStatus.*:StealthWebGPUAdapter.*:StealthWebGPUDeclaration.*:StealthWebGPUBundledVulkan.*:Steal"
                 "thWebGPUInstanceEnv.*:StealthFullscreen.*:StealthScaleDeclaration.*:StealthWindowGeometry.*:StealthGLMultisamp"
-                "le.*:StealthFrameCrash.*:StealthJugglerEventId.*:StealthSessionUdpProxy.*:StealthDeclaredNetwork.*:StealthSock"
+                "le.*:StealthWebGLParams.*:StealthFrameCrash.*:StealthJugglerEventId.*:StealthSessionUdpProxy.*:StealthDeclaredNetwork.*:StealthSock"
                 "sUdpPool.*:TestStealthTRRContext.*:TestStealthSocksCredentials.*:TestStealthSessionResolver.*:StealthIceResolv"
                 "erContext.*:StealthUdpProxyBirth.*:StealthNrSocketBirth.*:StealthPcUdpProxyKinds.*:StealthTcpProxyRoad.*:Steal"
                 "thPcProxyConfig.*:StealthInputEventBirth.*:StealthKeyBirthScope.*:StealthBirthOrder.*:StealthFcBundleFonts.*:S"

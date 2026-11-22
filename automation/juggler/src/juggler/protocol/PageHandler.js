@@ -981,12 +981,42 @@ export class PageHandler {
     // The workers of the frame end with it, then its contexts, then the frame: the order the content process kept
     // when it was the only voice. If the process says it later, what it says finds nothing to end.
     this._releaseFrame(frameId, {tellClient: live});
-    if (live)
+    if (live) {
+      // The queue behind the `load` of this frame goes with it, but a request the client heard of must not stay open for
+      // ever: the network ends held in that queue (and the responses held with them) leave before the frame does.
+      this._tellNetworkEndsHeldBehindLoad(frameId);
       this._session.emitEvent('Page.frameDetached', {frameId});
+    }
     // A frame that goes holds no `load` above it any more; nor does a frame whose own `load` waited.
     this._behindFirstDocuments?.delete(frameId);
     if (this._behindFirstDocuments?.size)
       this._releaseLoadsBehindFirstDocuments();
+  }
+
+  // What the queue behind the `load` of a frame that detaches holds of the network: each `Network.requestFinished` and
+  // `Network.requestFailed`, in order, and the `Network.responseReceived` of those requests when it is held too, but only
+  // for a request whose start the client was told. A request whose `Network.requestWillBeSent` is held in the same queue was
+  // never heard of: it is dropped whole, so no end goes out without its start. The rest of the queue is dropped with the
+  // frame, as it always was.
+  _tellNetworkEndsHeldBehindLoad(frameId) {
+    const queue = this._behindFirstDocuments?.get(frameId);
+    if (!queue)
+      return;
+    const isEnd = name => name === 'Network.requestFinished' || name === 'Network.requestFailed';
+    const startHeld = new Set();
+    for (const [protocolEventName, payload] of queue) {
+      if (protocolEventName === 'Network.requestWillBeSent')
+        startHeld.add(payload.requestId);
+    }
+    const ended = new Set();
+    for (const [protocolEventName, payload] of queue) {
+      if (isEnd(protocolEventName) && !startHeld.has(payload.requestId))
+        ended.add(payload.requestId);
+    }
+    for (const [protocolEventName, payload] of queue) {
+      if ((isEnd(protocolEventName) || protocolEventName === 'Network.responseReceived') && ended.has(payload.requestId))
+        this._leaveForTheClient(protocolEventName, payload);
+    }
   }
 
   // The frames below `frameId`, as the handler holds them (announced or held back), ended with it.

@@ -263,7 +263,7 @@ export class FrameTree {
     // (and its contexts are made by the announcement: they are not made twice).
     if (this._announceIfLocal(frame))
       return;
-    frame._onGlobalObjectCleared();
+    frame._onGlobalCreated();
   }
 
   // The docShell settings (bypassCSP, interceptFileChooser) of every docShell of this tree that is here
@@ -1001,6 +1001,7 @@ class Frame {
         this._runtime.destroyExecutionContext(context);
     } finally {
       this._worldNameToContext.clear();
+      this._contextsOfGlobal = null;
       // la sandbox di serializzazione appartiene al documento, come i contesti
       this._serializationSandbox = null;
       this._textInputProcessor = null;
@@ -1046,6 +1047,9 @@ class Frame {
     // principal the page's additions disappear, with the page's principal and
     // no Xrays its replacements stay in the way.
     this._createWorldContext('', 'main');
+    // The global these contexts belong to, and the scripts that ran on it: _onGlobalCreated reads it.
+    const made = {innerWindowId: dw.windowGlobalChild.innerWindowId, document: dw.document, scriptsRun: 0};
+    this._contextsOfGlobal = made;
     for (const [name, world] of this._frameTree._isolatedWorlds) {
       if (name)
         this._createIsolatedContext(name);
@@ -1053,10 +1057,54 @@ class Frame {
       // Add bindings before evaluating scripts.
       for (const [name, script] of world._bindings)
         executionContext.addBinding(name, script);
-      for (const script of world._scriptsToEvaluateOnNewDocument)
+      for (const script of world._scriptsToEvaluateOnNewDocument) {
+        made.scriptsRun++;
         executionContext.evaluateScriptSafely(script);
+      }
     }
 
+    this._commitInitialBlank();
+  }
+
+  // The notification that a window was created (`content-document-global-created`, once per inner window). The
+  // contexts this frame made for THIS window before it (the tree is born while the first window of a root is, and
+  // makes its contexts then) are in the process and have been said to the parent, and nobody has used them: the
+  // notification completes them instead of replacing them. Each world that has no context gets it with its bindings,
+  // and the init scripts of every world run, once, where they ran before: here, after the bindings and before any
+  // script of the page. A destroyed context was announced before anyone could use it: the client woke on the first
+  // announcement and evaluated in a context that was gone. Only when the contexts are of this inner window and this
+  // document, and no script has run on them; in every other case the contexts are made again.
+  _onGlobalCreated() {
+    const dw = this.domWindow();
+    const made = this._contextsOfGlobal;
+    if (!made || !dw || !dw.windowGlobalChild || !this._worldNameToContext.has('') ||
+        made.innerWindowId !== dw.windowGlobalChild.innerWindowId || made.document !== dw.document ||
+        made.scriptsRun !== 0) {
+      this._onGlobalObjectCleared();
+      return;
+    }
+    traceFrameTree('frame-tree', 'contexts kept for their window', {
+      frameId: this._frameId,
+      innerWindowId: made.innerWindowId,
+      worlds: [...this._worldNameToContext.keys()],
+    });
+    for (const [name, world] of this._frameTree._isolatedWorlds) {
+      let executionContext = this._worldNameToContext.get(name);
+      if (!executionContext) {
+        // A world declared that has no context here: it gets its bindings with it. The contexts that exist have theirs.
+        executionContext = this._createIsolatedContext(name);
+        for (const [bindingName, script] of world._bindings)
+          executionContext.addBinding(bindingName, script);
+      }
+      for (const script of world._scriptsToEvaluateOnNewDocument) {
+        made.scriptsRun++;
+        executionContext.evaluateScriptSafely(script);
+      }
+    }
+    this._commitInitialBlank();
+  }
+
+  _commitInitialBlank() {
     const url = this.domWindow().location?.href;
     if (url === 'about:blank' && !this._url) {
       // Sometimes FrameTree is created too early, before the location has been set.
