@@ -494,6 +494,15 @@ jobs:
           # the fontconfig suite traces the opens of the browser: strace is not in the runner image (setsid is, util-linux).
           # The parts of the whole e2e suite carry the fontconfig e2e files too, and e2e.yml installs it for every Linux run.
           case "${{ matrix.suite }}" in wrapper.e2e.fontconfig|wrapper.e2e.suite.*) sudo apt-get install -y strace;; esac
+          # TEMPORARY: remove after the pm judged the trace of the -11 at exit.
+          # tests/test_security_state_engine_e2e.py, on a crash of the engine in generate mode: a core file where kernel.core_pattern says, and gdb to read it (the test
+          # deletes the core and saves stderr and the backtrace in $RUNNER_TEMP/invpw-evidence/security-state-generate/, which "Keep what the tests saved" uploads).
+          case "${{ matrix.suite }}" in wrapper.e2e.securitystate)
+            sudo apt-get install -y gdb
+            mkdir -p "$RUNNER_TEMP/invpw-cores"
+            sudo sysctl -w kernel.core_pattern="$RUNNER_TEMP/invpw-cores/core.%e.%p"
+            echo "INVPW_CORE_DIR=$RUNNER_TEMP/invpw-cores" >> "$GITHUB_ENV";;
+          esac
           python -m pip install --quiet "playwright==$(cat scripts/playwright_pin.txt)"
           sudo "$(which python)" -m playwright install-deps firefox
       - name: Extract + locate firefox binary
