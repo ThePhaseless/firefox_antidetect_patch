@@ -1,0 +1,33 @@
+{
+ "mozilla_tag": "FIREFOX_159_0_RELEASE",
+ "files": {
+  "browser/components/tests/unit/head.js": "7a99eb26f0b480aa6e9780f529a82d69a92a35c9f53bd12e2560ae238f5e54ed",
+  "browser/components/tests/unit/xpcshell.toml": "751c179a695cd7a1401f2b5aac35489e61d39e1cfb08bdf23b3cc00c405fde66",
+  "js/xpconnect/tests/unit/head.js": "bb488bec7a7dc6b8062f271e4f32d7a44cf312c958a8131c3079456d0b1ff06c",
+  "js/xpconnect/tests/unit/xpcshell.toml": "ad644ed97a28c7b0c4aa1324e10d832fced8f6cef675ddbd716f3157ce2c3438",
+  "netwerk/test/httpserver/httpd.sys.mjs": "410c595cbdbd1c45b26988500bcd92ffd9ff0622157e9ee34b87f4d6813ad8e3",
+  "testing/modules/AppData.sys.mjs": "60c334c25dcbfebb3910897b12c7bee537c193b9d6051d85601750d959bdb7bf",
+  "testing/modules/AppInfo.sys.mjs": "f32e53c6c553fc667aaf133584352df9b392f715fad71e092ad33dcaa9da05e0",
+  "testing/modules/Assert.sys.mjs": "d3f362af4e30dc7c7c2714d9478d52fb807ae480e2a1da611ddfa71bf4f75adc",
+  "testing/modules/FileTestUtils.sys.mjs": "73a559c9ff0a018c466db4ad38ee44b17be8b3ecff78dc03e0ddec9dc296786f",
+  "testing/modules/ImageTestUtils.sys.mjs": "b68128ecb66db23c6a4cd695d6475f5175b06528128cbffdef0c46e205b89f41",
+  "testing/modules/Mochia.js": "61a040bbee1730409f31dadbb6b79460b0d6a8689557e9d21efad79f488d8ef1",
+  "testing/modules/MockRegistrar.sys.mjs": "80578dc18e70e2d9c07c514bbc4da49cb25dfe26b09c4495f40dbbcf6d38ab3c",
+  "testing/modules/MockRegistry.sys.mjs": "3b4c1ef3d805d96a9c8c97d3267e453eecde0d767ff1185c7799913d2631f700",
+  "testing/modules/Sinon.sys.mjs": "8602e33f1de2d9106f74ee3f1867f913af6009cdeba4b26eb862656411466414",
+  "testing/modules/StructuredLog.sys.mjs": "0416a36a194482afd467ead83789269c59a31a07d36c6ca4c6bc18f1fdb40ad7",
+  "testing/modules/TestProfilerArtifact.sys.mjs": "295187839a7ea369c45e56bdc30be1040c4a978ed8780b228b77bf15be178ebc",
+  "testing/modules/TestUtils.sys.mjs": "a3e103dd520862366d039442839930017debfff6112c8d359cd13bfcb6a2ea48",
+  "testing/modules/XPCShellContentUtils.sys.mjs": "fc627f2ee364ac06f2c87d969d7cab243028892c2e0d6c8f9dc434a5347ce5d5",
+  "testing/modules/sinon-7.2.7.js": "00a186d2bdd0417f5edefd779d3f2f12c4aa91a9c5cda68bd4b5c3db9348fb91",
+  "testing/profiles/base/user.js": "81563a0bd651a139286d61b4623ed16e290d4884f8d45113d2c63f8bf7c3365c",
+  "testing/profiles/profiles.json": "0a402bd731b9740c5750e8d9bc250f62ba97e42c2268d988fbaa1dfec5b04eab",
+  "testing/profiles/xpcshell/user.js": "f58771b841c0958dd879d671fe8138f8c73a76a176bb30c777fcadf0b4f49d29",
+  "testing/xpcshell/head.js": "7183adfdba72b4d8508208215ddddc6573f0105f1b5a6ebeb3bc5ad11a13b81e",
+  "toolkit/components/url-classifier/tests/unit/head_urlclassifier.js": "e22ad0ea02ea5702dadbb82dbd995e563687c5d6a30df197a98d9f5f98ca96ed",
+  "toolkit/components/url-classifier/tests/unit/xpcshell.toml": "81851af9178dbc7247bda4a4634c8f64ba475ba7c2192e3e6fd111f1c1851953",
+  "toolkit/components/urlformatter/tests/unit/head_urlformatter.js": "b07a355f8acf0fd72b82f1d83b7955b7ffb554363b7f2c923eda5fe3b0aad5f2",
+  "toolkit/modules/tests/modules/PromiseTestUtils.sys.mjs": "475436ab24bf05a91bdf0c53507b578d2d433b8234a06201903831e9f738bf2e",
+  "tools/code-coverage/PerTestCoverageUtils.sys.mjs": "2b99eee2c309a47cc01d7ba14300a65a5f94b146e29bd26ee4b4b2159298be98"
+ }
+}

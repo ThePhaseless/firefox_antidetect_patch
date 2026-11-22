@@ -1,46 +1,41 @@
 diff --git a/toolkit/components/windowwatcher/nsWindowWatcher.cpp b/toolkit/components/windowwatcher/nsWindowWatcher.cpp
-index a1044338912d917f109fb89bda437cece4007e09..a49128e3aff5ea2653f6329e15453bd82782b918 100644
+index a1044338912d917f109fb89bda437cece4007e09..77eade93927132bc74797791815901526d3a79aa 100644
 --- a/toolkit/components/windowwatcher/nsWindowWatcher.cpp
 +++ b/toolkit/components/windowwatcher/nsWindowWatcher.cpp
-@@ -76,6 +76,9 @@
- #include "nsIAppWindow.h"
+@@ -77,6 +77,9 @@
  #include "nsIXULBrowserWindow.h"
  #include "ReferrerInfo.h"
-+#include "JugglerWindowSize.h"  // STEALTH-HOOK(automation/window-size)
-+// STEALTH-HOOK(fingerprint/screen-window/popup-position)
-+#include "StealthWindowPlacement.h"
  
++#include "JugglerWindowSize.h"  // STEALTH-HOOK(automation/window-size)
++#include "StealthWindowPlacement.h"  // STEALTH-HOOK(fingerprint/screen-window/popup-position)
++
  using namespace mozilla;
  using namespace mozilla::dom;
-@@ -1902,7 +1905,8 @@ uint32_t nsWindowWatcher::CalculateChromeFlagsForContent(
+ 
+@@ -1902,7 +1905,7 @@ uint32_t nsWindowWatcher::CalculateChromeFlagsForContent(
      return nsIWebBrowserChrome::CHROME_DOCUMENT_PICTURE_IN_PICTURE_FLAGS;
    }
    *aIsPopupRequested = ShouldOpenPopup(aFeatures);
 -  return *aIsPopupRequested ? nsIWebBrowserChrome::CHROME_MINIMAL_POPUP
-+  // STEALTH-HOOK(automation/window-size)
-+  return *aIsPopupRequested ? mozilla::JugglerPopupChromeFlags(aFeatures)
++  return *aIsPopupRequested ? mozilla::JugglerPopupChromeFlags(aFeatures, nsIWebBrowserChrome::CHROME_MINIMAL_POPUP)  // STEALTH-HOOK(automation/window-size)
                              : nsIWebBrowserChrome::CHROME_ALL;
  }
  
-@@ -2322,6 +2326,11 @@ static void SizeOpenedWindow(nsIDocShellTreeOwner* aTreeOwner,
+@@ -2322,6 +2325,8 @@ static void SizeOpenedWindow(nsIDocShellTreeOwner* aTreeOwner,
      top = *aSizeSpec.mTop;
    }
  
-+  // STEALTH-HOOK(fingerprint/screen-window/popup-position)
-+  const bool stealthPlaced = mozilla::StealthPlacePopupAtDefault(
-+      aIsCallerChrome, treeOwnerAsWin, aSizeSpec.mLeft.isSome(),
-+      aSizeSpec.mTop.isSome(), left, top);
++  const bool stealthPlaced = mozilla::StealthPlacePopupAtDefault(aIsCallerChrome, treeOwnerAsWin, aSizeSpec.mLeft.isSome(), aSizeSpec.mTop.isSome(), left, top);  // STEALTH-HOOK(fingerprint/screen-window/popup-position)
 +
    // Set up width
    if (aSizeSpec.mOuterWidth) {
      width = *aSizeSpec.mOuterWidth;
-@@ -2338,7 +2347,8 @@ static void SizeOpenedWindow(nsIDocShellTreeOwner* aTreeOwner,
+@@ -2338,7 +2343,7 @@ static void SizeOpenedWindow(nsIDocShellTreeOwner* aTreeOwner,
      height = *aSizeSpec.mInnerHeight;
    }
  
 -  bool positionSpecified = aSizeSpec.PositionSpecified();
-+  // STEALTH-HOOK(fingerprint/screen-window/popup-position)
-+  bool positionSpecified = aSizeSpec.PositionSpecified() || stealthPlaced;
++  bool positionSpecified = aSizeSpec.PositionSpecified() || stealthPlaced;  // STEALTH-HOOK(fingerprint/screen-window/popup-position)
  
    // Check security state for use in determining window dimensions
    bool enabled = false;

@@ -1,13 +1,24 @@
 # fingerprint/screen-window/popup-position
 
 Category: spoof
-Prefs: none read directly
-Test: TODO
+Prefs: none read directly (the declared window frame comes from the core through `StealthDeclaredWindowFrame()`)
+Test: wrapper `tests/test_popup_geometry_is_the_declared_frame_e2e.py::test_a_popup_is_its_inner_size_plus_the_declared_frame` (neither left nor top); the only-left case has no test yet (to be added to that file by the characterization stream, green on firefox-68); `tests/test_popup_pages.py`; node `juggler/tests/explicit_size_flag_is_free.test.mjs` (bit of the explicit-size flag, shared with automation/window-size)
 
 ## What it does
 
-TODO: one paragraph, from the notes below.
+A window a page opens without `left`/`top` is born at the declared default position, not wherever the host puts it: retail Firefox on Windows 11 opens it at 4,4 device pixels (3,3 CSS at 125%, 2,2 at 200%), while the host would put it anywhere (Windows staggers from the opener, a bare X server has no window manager at all) and a popup's `screenX`/`screenY` is its REAL position (`nsGlobalWindowOuter::GetScreenXY`). The default is applied at the birth of the window, so both builds have the same real position and nothing corrects it afterwards. A position the page does give needs nothing: `CalcSizeSpec` has already turned its CSS pixels into desktop pixels with the opener's own CSS-to-desktop scale (measured on the Linux build at 1.25, 1.5 and 2: a second conversion put `left=100` at `screenX` 125, 150 and 200). Chrome callers and the engine-off case keep the stock behaviour.
+
+The logic is `StealthPlacePopupAtDefault` in `toolkit/components/windowwatcher/StealthWindowPlacement.{h,cpp}`. The file `nsWindowWatcher.cpp` also carries the hook of `automation/window-size` (the flag of an explicit popup size, `JugglerPopupChromeFlags` in `JugglerWindowSize.{h,cpp}`); this folder owns the file.
 
 ## Hooks in Mozilla files
 
-- `toolkit/components/windowwatcher/nsWindowWatcher.cpp` (nsWindowWatcher::CalculateChromeFlagsForContent (hunk 2); static SizeOpenedWindow (hunks 3 and 4); include at top (hunk 1), movable): File mixes two features: this spoof part (popup default position, which a page reads as screenX/screenY, and the chrome flags) and the Juggler flag JUGGLER_WINDOW_EXPLICIT_SIZE (feature juggler-popup-explicit-size, see nsIWebBrowserChrome.idl). Split them in the series. Verified: StealthDeclarationGate.h is gfx/thebes/StealthDeclarationGate.h (struct StealthWindowFrame line 124, StealthDeclaredWin
+All in `toolkit/components/windowwatcher/nsWindowWatcher.cpp`:
+
+- Registration: two includes in a block of ours after `#include "ReferrerInfo.h"`: `JugglerWindowSize.h` (marker of automation/window-size) and `StealthWindowPlacement.h`.
+- `nsWindowWatcher::CalculateChromeFlagsForContent`, the popup branch of the ternary: wrap-expression `mozilla::JugglerPopupChromeFlags(aFeatures, nsIWebBrowserChrome::CHROME_MINIMAL_POPUP)` around Mozilla's operand (marker of automation/window-size, comment line above as at its branch): the function ORs our bit into Mozilla's flags and follows them if Mozilla changes them. It uses the two-argument overload of `JugglerWindowSize.{h,cpp}` that automation/window-size adds; this branch is rebased on hooks/automation__window-size.
+- `SizeOpenedWindow`, anchor after the left/top set-up and before the width/height set-up: `const bool stealthPlaced = mozilla::StealthPlacePopupAtDefault(aIsCallerChrome, treeOwnerAsWin, aSizeSpec.mLeft.isSome(), aSizeSpec.mTop.isSome(), left, top);`: writes left/top only when absent and tells whether a position was declared. It needs `left`/`top` and `treeOwnerAsWin`, locals of Mozilla's function.
+- `SizeOpenedWindow`: `bool positionSpecified = aSizeSpec.PositionSpecified() || stealthPlaced;` (one line rewritten, declared exception approved by the pm, G35): the caller treats the declared position as specified.
+
+Designed but not done (moved rows, G28): the two `SizeOpenedWindow` hooks merge into one anchor after `bool positionSpecified = aSizeSpec.PositionSpecified();` with the `|| stealthPlaced` moved into the function (it would take `bool& aPositionSpecified`); the code between the two positions (width/height set-up) reads and writes only width, height and the chrome sizes. It needs the popup-position e2e green on firefox-68 first.
+
+Port note: the anchor needs Mozilla's left/top set-up to stay before the width/height set-up, and `positionSpecified` to be declared from `aSizeSpec.PositionSpecified()`.

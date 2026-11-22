@@ -4,12 +4,17 @@
   "modules/libpref/Preferences.cpp",
   "modules/libpref/greprefs.js",
   "modules/libpref/init/all.js",
-  "modules/libpref/moz.build"
+  "modules/libpref/moz.build",
+  "modules/libpref/test/gtest/moz.build"
  ],
  "added": {
+  "modules/libpref/StealthPrefSanitize.cpp": "100644",
+  "modules/libpref/StealthPrefSanitize.h": "100644",
   "modules/libpref/init/StealthPrefList.yaml": "100644",
   "modules/libpref/init/StealthPrefs.js": "100644",
-  "modules/libpref/test/test_stealth_prefs_declared_once.py": "100644"
+  "modules/libpref/test/gtest/TestStealthPrefSanitize.cpp": "100644",
+  "modules/libpref/test/test_stealth_prefs_declared_once.py": "100644",
+  "modules/libpref/test/test_stealth_prefs_final_values.py": "100644"
  },
  "inventory": [
   {
@@ -352,6 +357,24 @@
    "verifier": {
     "changed": [],
     "why": "Checked against the diff; no correction needed."
+   }
+  },
+  {
+   "file": "modules/libpref/test/gtest/moz.build",
+   "category": "build",
+   "feature": "stealth-pref-declarations",
+   "prefs": [],
+   "added": 1,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "hook added by the 2026-11 hook rework (registration of our own file)",
+   "evidence": [],
+   "notes": "Hook registering our own code (minimal record added by the final-line integration).",
+   "verifier": {
+    "changed": [],
+    "why": "Added by the hook rework of platform/prefs."
    }
   }
  ]

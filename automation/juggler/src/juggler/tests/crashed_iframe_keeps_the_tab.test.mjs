@@ -74,13 +74,12 @@ test('the target names the crashed frame the way the content side does, and tell
 });
 
 test('the engine passes the crashed context\'s id as the notification data, and nothing when it does not know it', () => {
-  // The logic lives in a file of ours; nsFrameLoader.cpp keeps an include and a hook of a few lines.
+  // The logic lives in a file of ours; nsFrameLoader.cpp has ONE notification of this topic, and it carries our data.
+  // (That the hook is there is HOOKS.json's to prove: here, that a second entry that Mozilla adds is seen.)
   const source = strip(fs.readFileSync(path.join(TREE, 'dom/base/nsFrameLoader.cpp'), 'utf8'));
-  const fn = source.slice(source.indexOf('void nsFrameLoader::MaybeNotifyCrashed('));
-  const notify = fn.slice(0, 1500);
-  assert.match(notify, /nsAutoString crashedContext;/);
-  assert.match(notify, /"oop-frameloader-crashed",\s*StealthCrashedContextData\(aBrowsingContext, crashedContext\)\)/);
-  assert.match(source, /#include "StealthFrameCrash\.h"/);
+  const notifications = source.match(/NotifyObservers\([^;]*"oop-frameloader-crashed"[^;]*;/g) || [];
+  assert.equal(notifications.length, 1);
+  assert.match(notifications[0], /"oop-frameloader-crashed",\s*StealthCrashedContextScope\(aBrowsingContext, nullptr\)\)/);
 
   const header = strip(fs.readFileSync(path.join(TREE, 'dom/base/StealthFrameCrash.h'), 'utf8'));
   const helper = header.slice(header.indexOf('StealthCrashedContextData('));
@@ -88,6 +87,8 @@ test('the engine passes the crashed context\'s id as the notification data, and 
   assert.match(helper, /if \(!aBrowsingContext\) \{\s*return nullptr;\s*\}/);
   assert.match(helper, /return StealthCrashedContextData\(aBrowsingContext->Id\(\), aBuffer\);/);
   assert.match(header, /aBuffer\.AppendInt\(aId\);\s*return aBuffer\.get\(\);/);
+  // the scope holds the digits in its own buffer, filled by the helper above, for the life of the temporary
+  assert.match(header, /\?\s*StealthCrashedContextData\(aBrowsingContext, mBuffer\)\s*:\s*aWhenUnknown/);
 });
 
 // The behaviour, from the real file: the real handler run in a vm with the platform around it stubbed.

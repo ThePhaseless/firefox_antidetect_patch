@@ -10,9 +10,10 @@
  ],
  "added": {
   "dom/base/test/browser_stealth_language_workers.js": "100644",
-  "dom/serviceworkers/StealthWorkerDeclaration.cpp": "100644",
-  "dom/serviceworkers/StealthWorkerDeclaration.h": "100644",
-  "dom/workers/StealthWorkerDeclaration.h": "100644"
+  "dom/serviceworkers/StealthServiceWorkerDeclaration.cpp": "100644",
+  "dom/serviceworkers/StealthServiceWorkerDeclaration.h": "100644",
+  "dom/workers/StealthWorkerDeclaration.h": "100644",
+  "dom/worklet/StealthWorkletDeclaration.h": "100644"
  },
  "inventory": [
   {

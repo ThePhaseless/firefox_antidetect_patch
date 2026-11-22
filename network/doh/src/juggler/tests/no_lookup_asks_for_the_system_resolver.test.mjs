@@ -87,13 +87,14 @@ for (const [file, upstream] of Object.entries(SERVICES)) {
 
 test('the resolver hook: two calls at the top of the functions that build the record key from the flags', () => {
   const text = read('netwerk/dns/nsHostResolver.cpp');
-  // 3 lines of ours: the include and the two calls.
-  assert.equal((text.match(/STEALTH-HOOK\(network\/doh\)/g) || []).length, 3);
-  assert.match(text, /#include "PLDHashTable\.h"\n#include "StealthSessionResolver\.h"  \/\/ STEALTH-HOOK\(network\/doh\)\n#include "TRR\.h"\n/);
+  assert.match(text, /\n#include "DNSLogging\.h"\n\n#include "StealthSessionResolver\.h"  \/\/ STEALTH-HOOK\(network\/doh\)\n\n/);
   const resolve = body(text, 'nsresult nsHostResolver::ResolveHost(', 'nsAutoCString host(aHost);');
-  assert.match(resolve, /nsResolveHostCallback\* aCallback\) \{\n  \/\/ STEALTH-HOOK\(network\/doh\): [^\n]*\n  flags = StealthFlagsFollowSession\(aHost, aOriginAttributes, flags\);\n  $/);
+  assert.match(resolve, /nsResolveHostCallback\* aCallback\) \{\n  StealthApplySessionFlags\(aHost, aOriginAttributes, &flags\);  \/\/ STEALTH-HOOK\(network\/doh\)\n  $/);
   const detach = body(text, 'void nsHostResolver::DetachCallback(', 'RefPtr<nsHostRecord> rec;');
-  assert.match(detach, /nsresult status\) \{\n  flags = StealthFlagsFollowSession\(host, aOriginAttributes,\n\s+flags\);  \/\/ STEALTH-HOOK\(network\/doh\)\n  $/);
+  assert.match(detach, /nsresult status\) \{\n  StealthApplySessionFlags\(host, aOriginAttributes, &flags\);  \/\/ STEALTH-HOOK\(network\/doh\)\n  $/);
+  // These two are the only entries: a lookup and its cancellation build the key from the same function.
+  assert.equal((text.match(/StealthApplySessionFlags\(/g) || []).length, 2);
+  assert.doesNotMatch(text, /StealthFlagsFollowSession\(/);
   // The Mozilla function that computes the effective mode is untouched.
   const compute = body(text, 'void nsHostResolver::ComputeEffectiveTRRMode', '// Kick-off a name resolve operation');
   assert.doesNotMatch(compute, /Stealth/);
@@ -110,14 +111,16 @@ test('the resolver hook: only the two mode bits, per context, never the name of 
   // The DoH server's name is read from the TRR service only for a request for
   // "TRR disabled", the one the DoH request itself makes, and compared
   // case-insensitively with the host of its URI.
-  const wrapper = body(cpp, 'nsIDNSService::DNSFlags StealthFlagsFollowSession(', '}  // namespace mozilla::net');
+  const wrapper = body(cpp, 'nsIDNSService::DNSFlags StealthFlagsFollowSession(', 'bool StealthProxyIsMandatory(');
   assert.match(wrapper, /TRRService::Get\(\)/);
   assert.match(wrapper, /\(aFlags & nsIDNSService::RESOLVE_TRR_MODE_MASK\) ==\s*nsIDNSService::RESOLVE_TRR_DISABLED_MODE &&\s*HostIsTRRServer\(service, aHost\)/);
   assert.match(cpp, /GetAsciiHost\(serverHost\)/);
   assert.match(cpp, /nsCaseInsensitiveCStringComparator/);
   assert.match(h, /StealthFlagsFollowSession\(\s*const nsACString& aHost, const OriginAttributes& aAttrs,\s*nsIDNSService::DNSFlags aFlags\)/);
+  // The function the two hooks call applies it to the flags they hold, from the address.
+  assert.match(cpp, /void StealthApplySessionFlags\(const nsACString& aHost,\s+const OriginAttributes& aAttrs,\s+nsIDNSService::DNSFlags\* aFlags\) \{\n  \*aFlags = StealthFlagsFollowSession\(aHost, aAttrs, \*aFlags\);\n\}/);
   // Built in the DNS library, and with its gtest.
-  assert.match(read('netwerk/dns/moz.build'), /\]\nUNIFIED_SOURCES \+= \["StealthSessionResolver\.cpp"\]  # STEALTH-HOOK\(network\/doh\)\n/);
+  assert.match(read('netwerk/dns/moz.build'), /\]\nUNIFIED_SOURCES \+= \["StealthSessionResolver\.cpp", "StealthTRRRequest\.cpp"\]  # STEALTH-HOOK\(network\/doh\)\n/);
   assert.match(read('netwerk/test/gtest/moz.build'), /include\("stealth\.build"\)  # STEALTH-HOOK\(network\/socks\)/);
   assert.match(read('netwerk/test/gtest/stealth.build'), /SOURCES \+= \[[^\]]*"TestStealthSessionResolver\.cpp",/);
   const gtest = read('netwerk/test/gtest/TestStealthSessionResolver.cpp');
@@ -143,7 +146,9 @@ test('the records and the callbacks agree: a lookup and its cancellation build t
   const dns = read('netwerk/dns/nsDNSService2.cpp');
   assert.match(dns, /mResolver->DetachCallback\(mHost, mTrrServer, mType, mOriginAttributes, mFlags,/);
   const text = read('netwerk/dns/nsHostResolver.cpp');
-  assert.equal((text.match(/StealthFlagsFollowSession\(/g) || []).length, 2);
+  assert.equal((text.match(/StealthApplySessionFlags\(/g) || []).length, 2);
+  const cpp = read('netwerk/dns/StealthSessionResolver.cpp');
+  assert.equal((cpp.match(/StealthFlagsFollowSession\(aHost, aAttrs, \*aFlags\)/g) || []).length, 1, 'the one function both entries call');
 });
 
 // ---- premises the "leave" verdicts rest on ---------------------------------

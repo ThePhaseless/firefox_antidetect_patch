@@ -4,87 +4,25 @@
   "function": "",
   "kind": "add",
   "form": "registration",
-  "line": "#include \"mozilla/StaticPrefs_zoom.h\"",
-  "test": ""
+  "line": "#include \"StealthAudioContextValues.h\"  // STEALTH-HOOK(fingerprint/audio/context-values)",
+  "test": "wrapper:tests/test_audio_context_values_are_declared_e2e.py::test_the_audio_context_answers_the_declared_latency_and_channel_count"
  },
  {
   "file": "dom/media/webaudio/AudioContext.cpp",
   "function": "double AudioContext::OutputLatency() {",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/audio/context-values)",
-  "test": ""
- },
- {
-  "file": "dom/media/webaudio/AudioContext.cpp",
-  "function": "double AudioContext::OutputLatency() {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  {",
-  "test": ""
- },
- {
-  "file": "dom/media/webaudio/AudioContext.cpp",
-  "function": "double AudioContext::OutputLatency() {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    int32_t latency_ms = mozilla::StaticPrefs::zoom_stealth_audio_output_latency_ms();",
-  "test": ""
- },
- {
-  "file": "dom/media/webaudio/AudioContext.cpp",
-  "function": "double AudioContext::OutputLatency() {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    if (latency_ms > 0) return latency_ms / 1000.0;",
-  "test": ""
- },
- {
-  "file": "dom/media/webaudio/AudioContext.cpp",
-  "function": "double AudioContext::OutputLatency() {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  }",
-  "test": ""
+  "form": "anchor",
+  "line": "  if (double stealth; StealthAudioOutputLatency(&stealth)) return stealth;  // STEALTH-HOOK(fingerprint/audio/context-values)",
+  "test": "wrapper:tests/test_audio_context_values_are_declared_e2e.py::test_the_audio_context_answers_the_declared_latency_and_channel_count",
+  "anchor": "if (mIsShutDown) { return 0.0; }",
+  "why": "A guard at the head of the function would have to redo Mozilla's mIsShutDown check (a shut-down context answers 0.0, not the declared value); it stays right after that block, before the reduceFingerprinting branch and the cubeb read."
  },
  {
   "file": "dom/media/webaudio/AudioContext.cpp",
   "function": "void AudioContext::UnregisterActiveNode(AudioNode* aNode) {",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/audio/context-values)",
-  "test": ""
- },
- {
-  "file": "dom/media/webaudio/AudioContext.cpp",
-  "function": "void AudioContext::UnregisterActiveNode(AudioNode* aNode) {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  {",
-  "test": ""
- },
- {
-  "file": "dom/media/webaudio/AudioContext.cpp",
-  "function": "void AudioContext::UnregisterActiveNode(AudioNode* aNode) {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    int32_t ch = mozilla::StaticPrefs::zoom_stealth_audio_max_channel_count();",
-  "test": ""
- },
- {
-  "file": "dom/media/webaudio/AudioContext.cpp",
-  "function": "void AudioContext::UnregisterActiveNode(AudioNode* aNode) {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    if (ch > 0) return (uint32_t)ch;",
-  "test": ""
- },
- {
-  "file": "dom/media/webaudio/AudioContext.cpp",
-  "function": "void AudioContext::UnregisterActiveNode(AudioNode* aNode) {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  }",
-  "test": ""
+  "form": "guard",
+  "line": "  if (uint32_t stealth; StealthAudioMaxChannelCount(&stealth)) return stealth;  // STEALTH-HOOK(fingerprint/audio/context-values)",
+  "test": "wrapper:tests/test_audio_context_values_are_declared_e2e.py::test_the_audio_context_answers_the_declared_latency_and_channel_count"
  }
 ]

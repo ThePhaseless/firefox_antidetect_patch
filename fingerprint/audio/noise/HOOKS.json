@@ -5,7 +5,7 @@
   "kind": "add",
   "form": "registration",
   "line": "UNIFIED_SOURCES += [\"TestStealthAudioNoise.cpp\"]  # STEALTH-HOOK(fingerprint/audio/noise)",
-  "test": ""
+  "test": "gtest:StealthAudioNoise.AnalyserMatchesReferenceBitForBit"
  },
  {
   "file": "dom/media/gtest/moz.build",
@@ -13,7 +13,7 @@
   "kind": "add",
   "form": "registration",
   "line": "UNIFIED_SOURCES += [\"TestStealthMediaDeclaration.cpp\"]  # STEALTH-HOOK(fingerprint/media/decode-declaration)",
-  "test": ""
+  "test": "gtest:StealthMediaDeclaration.SupportsAsyncAnswersFromTheDeclaration"
  },
  {
   "file": "dom/media/webaudio/AnalyserNode.cpp",
@@ -21,39 +21,27 @@
   "kind": "add",
   "form": "registration",
   "line": "#include \"StealthAudioNoise.h\"  // STEALTH-HOOK(fingerprint/audio/noise)",
-  "test": ""
+  "test": "gtest:StealthAudioNoise.AnalyserMatchesReferenceBitForBit"
  },
  {
   "file": "dom/media/webaudio/AnalyserNode.cpp",
   "function": "void AnalyserNode::GetFloatFrequencyData(const Float32Array& aArray) {",
   "kind": "add",
-  "form": "unknown",
-  "line": "    // STEALTH-HOOK(fingerprint/audio/noise)",
-  "test": ""
- },
- {
-  "file": "dom/media/webaudio/AnalyserNode.cpp",
-  "function": "void AnalyserNode::GetFloatFrequencyData(const Float32Array& aArray) {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    StealthAddFrequencyNoise(aData, length);",
-  "test": ""
+  "form": "anchor",
+  "line": "    StealthAddFrequencyNoise(aData, length);  // STEALTH-HOOK(fingerprint/audio/noise)",
+  "test": "wrapper:tests/test_audio_noise_e2e.py::test_audio_values_follow_the_seed_only_when_fp_noise_is_on",
+  "anchor": "the `for (size_t i = 0; i < length; ++i)` loop that fills aData with the decibel values, in the ProcessData lambda of AnalyserNode::GetFloatFrequencyData (last line of the lambda; G30)",
+  "why": "the noise needs the values the loop wrote; a wrap-expression would rewrite the 2-line statement (C1/C6) and a function wrap would add noise to unwritten data when FFTAnalysis() fails"
  },
  {
   "file": "dom/media/webaudio/AnalyserNode.cpp",
   "function": "void AnalyserNode::GetFloatTimeDomainData(const Float32Array& aArray) {",
   "kind": "add",
-  "form": "unknown",
-  "line": "    // STEALTH-HOOK(fingerprint/audio/noise)",
-  "test": ""
- },
- {
-  "file": "dom/media/webaudio/AnalyserNode.cpp",
-  "function": "void AnalyserNode::GetFloatTimeDomainData(const Float32Array& aArray) {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    StealthAddTimeDomainNoise(aData, length);",
-  "test": ""
+  "form": "anchor",
+  "line": "    StealthAddTimeDomainNoise(aData, length);  // STEALTH-HOOK(fingerprint/audio/noise)",
+  "test": "wrapper:tests/test_audio_noise_e2e.py::test_audio_values_follow_the_seed_only_when_fp_noise_is_on",
+  "anchor": "`GetTimeDomainData(aData.Elements(), length);` in the ProcessData lambda of AnalyserNode::GetFloatTimeDomainData (last line of the lambda; G30)",
+  "why": "the noise needs the buffer GetTimeDomainData filled; wrapping GetTimeDomainData would also perturb the Byte variant, and the comma operator is refused by the pm"
  },
  {
   "file": "dom/media/webaudio/AudioDestinationNode.cpp",
@@ -61,63 +49,33 @@
   "kind": "add",
   "form": "registration",
   "line": "#include \"StealthAudioNoise.h\"  // STEALTH-HOOK(fingerprint/audio/noise)",
-  "test": ""
+  "test": "gtest:StealthAudioNoise.OfflineMatchesReferenceBitForBit"
  },
  {
   "file": "dom/media/webaudio/AudioDestinationNode.cpp",
   "function": "class OfflineDestinationNodeEngine final : public AudioNodeEngine {",
   "kind": "add",
-  "form": "unknown",
-  "line": "      // STEALTH-HOOK(fingerprint/audio/noise)",
-  "test": ""
- },
- {
-  "file": "dom/media/webaudio/AudioDestinationNode.cpp",
-  "function": "class OfflineDestinationNodeEngine final : public AudioNodeEngine {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "      StealthAddOfflineAudioNoise(aInput.IsNull(), i, inputChannelCount,",
-  "test": ""
- },
- {
-  "file": "dom/media/webaudio/AudioDestinationNode.cpp",
-  "function": "class OfflineDestinationNodeEngine final : public AudioNodeEngine {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "                                  mWriteIndex, mLength, duration, outputData);",
-  "test": ""
+  "form": "anchor",
+  "line": "      StealthAddOfflineAudioNoise(aInput.IsNull(), i, inputChannelCount, mWriteIndex, mLength, duration, outputData);  // STEALTH-HOOK(fingerprint/audio/noise)",
+  "test": "wrapper:tests/test_audio_noise_e2e.py::test_audio_values_follow_the_seed_only_when_fp_noise_is_on",
+  "anchor": "the closing brace of the `for (uint32_t s = 0; s < duration; ++s)` copy loop inside the channel loop of OfflineDestinationNodeEngine::ProcessBlock (last line of the block; G30; kept in place, G28)",
+  "why": "OfflineDestinationNodeEngine is local to the .cpp so no function of ours can wrap ProcessBlock; the noise needs what the copy loop wrote and the old mWriteIndex"
  },
  {
   "file": "dom/media/webaudio/DynamicsCompressorNode.h",
   "function": "namespace mozilla::dom {",
   "kind": "add",
-  "form": "unknown",
-  "line": "// STEALTH-HOOK(fingerprint/audio/noise)",
-  "test": ""
- },
- {
-  "file": "dom/media/webaudio/DynamicsCompressorNode.h",
-  "function": "namespace mozilla::dom {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "float StealthPerturbCompressorReduction(float aReduction);",
-  "test": ""
+  "form": "registration",
+  "line": "float StealthPerturbCompressorReduction(float aReduction);  // STEALTH-HOOK(fingerprint/audio/noise)",
+  "test": "gtest:StealthAudioNoise.CompressorMatchesReferenceBitForBit"
  },
  {
   "file": "dom/media/webaudio/DynamicsCompressorNode.h",
   "function": "class DynamicsCompressorNode final : public AudioNode {",
   "kind": "add",
-  "form": "unknown",
-  "line": "    // STEALTH-HOOK(fingerprint/audio/noise)",
-  "test": ""
- },
- {
-  "file": "dom/media/webaudio/DynamicsCompressorNode.h",
-  "function": "class DynamicsCompressorNode final : public AudioNode {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    aReduction = StealthPerturbCompressorReduction(aReduction);",
-  "test": ""
+  "form": "member",
+  "line": "    aReduction = StealthPerturbCompressorReduction(aReduction);  // STEALTH-HOOK(fingerprint/audio/noise)",
+  "test": "gtest:StealthAudioNoise.CompressorMatchesReferenceBitForBit"
  },
  {
   "file": "dom/media/webaudio/moz.build",
@@ -125,6 +83,6 @@
   "kind": "add",
   "form": "registration",
   "line": "UNIFIED_SOURCES += [\"StealthAudioNoise.cpp\"]  # STEALTH-HOOK(fingerprint/audio/noise)",
-  "test": ""
+  "test": "gtest:StealthAudioNoise.AnalyserMatchesReferenceBitForBit"
  }
 ]

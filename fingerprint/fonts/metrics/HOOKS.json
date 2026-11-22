@@ -3,163 +3,53 @@
   "file": "gfx/skia/skia/src/core/SkScalerContext.cpp",
   "function": "",
   "kind": "add",
-  "form": "unknown",
-  "line": "// STEALTH-HOOK(fingerprint/fonts/metrics)",
-  "test": ""
- },
- {
-  "file": "gfx/skia/skia/src/core/SkScalerContext.cpp",
-  "function": "",
-  "kind": "add",
-  "form": "unknown",
-  "line": "#include \"mozilla/gfx/StealthGlyphCoverage.h\"",
-  "test": ""
+  "form": "registration",
+  "line": "#include \"mozilla/gfx/StealthGlyphCoverage.h\"  // STEALTH-HOOK(fingerprint/fonts/metrics)",
+  "test": "wrapper:tests/test_a_screenshot_draws_the_text_of_the_bundled_fonts_as_the_content_does_e2e.py::test_the_text_of_a_bundled_family_is_drawn_by_the_screenshot_as_the_content_drew_it"
  },
  {
   "file": "gfx/skia/skia/src/core/SkScalerContext.cpp",
   "function": "void SkScalerContext::getImage(const SkGlyph& origGlyph) {",
   "kind": "add",
-  "form": "unknown",
-  "line": "    // STEALTH-HOOK(fingerprint/fonts/metrics)",
-  "test": ""
- },
- {
-  "file": "gfx/skia/skia/src/core/SkScalerContext.cpp",
-  "function": "void SkScalerContext::getImage(const SkGlyph& origGlyph) {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    if (unfilteredGlyph->maskFormat() == SkMask::kA8_Format) {",
-  "test": ""
- },
- {
-  "file": "gfx/skia/skia/src/core/SkScalerContext.cpp",
-  "function": "void SkScalerContext::getImage(const SkGlyph& origGlyph) {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "        mozilla::gfx::StealthQuantiseGlyphCoverage(",
-  "test": ""
- },
- {
-  "file": "gfx/skia/skia/src/core/SkScalerContext.cpp",
-  "function": "void SkScalerContext::getImage(const SkGlyph& origGlyph) {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "                static_cast<uint8_t*>(unfilteredGlyph->fImage),",
-  "test": ""
- },
- {
-  "file": "gfx/skia/skia/src/core/SkScalerContext.cpp",
-  "function": "void SkScalerContext::getImage(const SkGlyph& origGlyph) {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "                unfilteredGlyph->width(), unfilteredGlyph->height(),",
-  "test": ""
- },
- {
-  "file": "gfx/skia/skia/src/core/SkScalerContext.cpp",
-  "function": "void SkScalerContext::getImage(const SkGlyph& origGlyph) {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "                unfilteredGlyph->rowBytes());",
-  "test": ""
- },
- {
-  "file": "gfx/skia/skia/src/core/SkScalerContext.cpp",
-  "function": "void SkScalerContext::getImage(const SkGlyph& origGlyph) {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    }",
-  "test": ""
+  "form": "anchor",
+  "line": "    mozilla::gfx::StealthQuantiseGlyphCoverage(*unfilteredGlyph);  // STEALTH-HOOK(fingerprint/fonts/metrics)",
+  "test": "wrapper:tests/test_a_screenshot_draws_the_text_of_the_bundled_fonts_as_the_content_does_e2e.py::test_the_text_of_a_bundled_family_is_drawn_by_the_screenshot_as_the_content_drew_it",
+  "anchor": "if (!fGenerateImageFromPath) { ... } else { ... } (the block that fills the mask; the line after it is if (fMaskFilter))",
+  "why": "a guard at the top or a wrap of getImage cannot run before the mask filter: with fMaskFilter the blur must act on the already quantised mask (unfilteredGlyph), while the output of getImage is already blurred; a wrap of an expression is impossible because the mask is born in three places (DirectWrite, FreeType, from a path)"
  },
  {
   "file": "gfx/thebes/gfxDWriteFonts.cpp",
   "function": "",
   "kind": "add",
   "form": "registration",
-  "line": "#include \"StealthTextQuality.h\"",
-  "test": ""
+  "line": "#include \"StealthTextQuality.h\"  // STEALTH-HOOK(fingerprint/fonts/metrics)",
+  "test": "gtest:StealthTextQuality.TheDeclarationIsReadAndTheHostIsNot"
  },
  {
   "file": "gfx/thebes/gfxDWriteFonts.cpp",
   "function": "using namespace mozilla::gfx;",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/fonts/metrics)",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxDWriteFonts.cpp",
-  "function": "using namespace mozilla::gfx;",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  if (const Maybe<BYTE> declared = StealthDeclaredTextQuality()) {",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxDWriteFonts.cpp",
-  "function": "using namespace mozilla::gfx;",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    return *declared;",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxDWriteFonts.cpp",
-  "function": "using namespace mozilla::gfx;",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  }",
-  "test": ""
+  "form": "guard",
+  "line": "  if (StealthTextQualityDeclared()) return StealthDeclaredTextQuality();  // STEALTH-HOOK(fingerprint/fonts/metrics)",
+  "test": "gtest:StealthTextQuality.TheDeclarationIsReadAndTheHostIsNot"
  },
  {
   "file": "gfx/thebes/gfxDWriteFonts.cpp",
   "function": "void gfxDWriteFont::UpdateClearTypeVars() {",
   "kind": "rewrite",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/fonts/metrics)",
-  "removed": "  HRESULT hr = Factory::GetDWriteFactory()->CreateRenderingParams(\n      getter_AddRefs(defaultRenderingParams));",
-  "test": ""
+  "form": "wrap-expression",
+  "line": "  HRESULT hr = StealthDWriteFactory(Factory::GetDWriteFactory())->CreateRenderingParams(  // STEALTH-HOOK(fingerprint/fonts/metrics)",
+  "removed": "  HRESULT hr = Factory::GetDWriteFactory()->CreateRenderingParams(",
+  "test": "gtest:StealthTextQuality.TheRenderingParamsAreNotAskedOfTheHost"
  },
  {
   "file": "gfx/thebes/gfxDWriteFonts.cpp",
   "function": "void gfxDWriteFont::UpdateClearTypeVars() {",
   "kind": "rewrite",
-  "form": "unknown",
-  "line": "  const bool stealthDeclared = StealthTextQualityDeclared();",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxDWriteFonts.cpp",
-  "function": "void gfxDWriteFont::UpdateClearTypeVars() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  HRESULT hr =",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxDWriteFonts.cpp",
-  "function": "void gfxDWriteFont::UpdateClearTypeVars() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "      StealthCreateRenderingParams(stealthDeclared, defaultRenderingParams);",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxDWriteFonts.cpp",
-  "function": "void gfxDWriteFont::UpdateClearTypeVars() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/fonts/metrics)",
+  "form": "wrap-expression",
+  "line": "  if (StealthClearTypeParamsApply(gfxVars::SystemTextQuality() == CLEARTYPE_QUALITY)) {  // STEALTH-HOOK(fingerprint/fonts/metrics)",
   "removed": "  if (gfxVars::SystemTextQuality() == CLEARTYPE_QUALITY) {",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxDWriteFonts.cpp",
-  "function": "void gfxDWriteFont::UpdateClearTypeVars() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  if (stealthDeclared || gfxVars::SystemTextQuality() == CLEARTYPE_QUALITY) {",
-  "test": ""
+  "test": "gtest:StealthTextQuality.TheDeclarationIsReadAndTheHostIsNot"
  },
  {
   "file": "gfx/thebes/gfxFT2FontBase.cpp",
@@ -167,7 +57,7 @@
   "kind": "add",
   "form": "registration",
   "line": "#include \"StealthDesignMetrics.h\"  // STEALTH-HOOK(fingerprint/fonts/metrics)",
-  "test": ""
+  "test": "gtest:StealthFontMetrics.ClearTypeTakesTheOS2AverageUnrounded"
  },
  {
   "file": "gfx/thebes/gfxFT2FontBase.cpp",
@@ -175,42 +65,27 @@
   "kind": "add",
   "form": "anchor",
   "line": "  StealthDWriteAveCharWidth(*this, mMetrics);  // STEALTH-HOOK(fingerprint/fonts/metrics)",
-  "test": "",
-  "anchor": "",
-  "why": ""
+  "test": "gtest:StealthFontMetrics.ClearTypeTakesTheOS2AverageUnrounded",
+  "anchor": "if (mMetrics.aveCharWidth == 0.0) { mMetrics.aveCharWidth = mMetrics.spaceWidth; }",
+  "why": "the hook replaces mMetrics.aveCharWidth, the intermediate value that Mozilla uses on the next line (maxAdvance = max(maxAdvance, aveCharWidth)); a guard at the top would be overwritten by Mozilla's later writes, a wrap of the function cannot undo the max already taken with FreeType's value, and the value is born in several writes"
  },
  {
   "file": "gfx/thebes/gfxFT2FontBase.cpp",
   "function": "bool gfxFT2FontBase::GetFTGlyphExtents(uint16_t aGID, int32_t* aAdvance,",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  if (aAdvance && !StealthDesignAdvance(*this, aGID, bold.x, aAdvance)) {  // STEALTH-HOOK(fingerprint/fonts/metrics)",
-  "removed": "  if (aAdvance) {",
-  "test": ""
+  "kind": "add",
+  "form": "anchor",
+  "line": "  StealthDesignAdvance(*this, aGID, bold.x, aAdvance);  // STEALTH-HOOK(fingerprint/fonts/metrics)",
+  "test": "gtest:StealthFontMetrics.DesignAdvanceAtAFractionalSize",
+  "anchor": "if (aAdvance) { ... *aAdvance = NS_lround(advance * extentsScale); }",
+  "why": "the hook needs bold.x, a local born after the glyph is loaded (GetEmboldenStrength is a private member function), and overwrites *aAdvance before the COLR fallback below reads it; a guard at the top or a wrap of the function do not reach that local"
  },
  {
   "file": "gfx/thebes/gfxFT2FontBase.cpp",
   "function": "gfxFT2FontBase::GlyphMetrics gfxFT2FontBase::GetCachedGlyphMetrics(",
   "kind": "add",
-  "form": "unknown",
-  "line": "  if (StealthDesignGlyphBounds(*this, aGID, aBounds)) {  // STEALTH-HOOK(fingerprint/fonts/metrics)",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxFT2FontBase.cpp",
-  "function": "gfxFT2FontBase::GlyphMetrics gfxFT2FontBase::GetCachedGlyphMetrics(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    return true;",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxFT2FontBase.cpp",
-  "function": "gfxFT2FontBase::GlyphMetrics gfxFT2FontBase::GetCachedGlyphMetrics(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  }",
-  "test": ""
+  "form": "guard",
+  "line": "  if (StealthDesignGlyphBounds(*this, aGID, aBounds)) return true;  // STEALTH-HOOK(fingerprint/fonts/metrics)",
+  "test": "gtest:StealthFontMetrics.DesignGlyphBoundsAreTheDesignBox"
  },
  {
   "file": "gfx/thebes/gfxFont.cpp",
@@ -218,7 +93,7 @@
   "kind": "add",
   "form": "registration",
   "line": "#include \"StealthTextMeasuring.h\"  // STEALTH-HOOK(fingerprint/fonts/metrics)",
-  "test": ""
+  "test": "gtest:StealthFontMetrics.MetricsOffTheMainThreadReadTheDeclaration"
  },
  {
   "file": "gfx/thebes/gfxFont.cpp",
@@ -226,7 +101,7 @@
   "kind": "add",
   "form": "notice",
   "line": "  StealthTextMeasuringInit();  // STEALTH-HOOK(fingerprint/fonts/metrics)",
-  "test": ""
+  "test": "gtest:StealthFontMetrics.MetricsOffTheMainThreadReadTheDeclaration"
  },
  {
   "file": "gfx/thebes/gfxFont.cpp",
@@ -234,106 +109,50 @@
   "kind": "add",
   "form": "anchor",
   "line": "  StealthImposeBundleVMetrics(mFontEntry, GetAdjustedSize(), &mMetrics);  // STEALTH-HOOK(fingerprint/fonts/metrics)",
-  "test": "",
-  "anchor": "",
-  "why": ""
+  "test": "wrapper:tests/test_canvas_measure_text_metrics_e2e.py::test_measure_text_vertical_metrics_are_whole_and_retail",
+  "anchor": "if (...) { memset(&mMetrics, 0, sizeof(mMetrics)); return; } (the zero-size early return of gfxFont::SanitizeMetrics)",
+  "why": "at the top of the function it is not equivalent (G10/G18): the memset of mMetrics in the early return changes exactly what the hook imposes, and the lines below (ascent/descent/lineGap overrides, clamps) read mMetrics, so a guard or a wrap cannot stand before them"
  },
  {
   "file": "gfx/thebes/gfxFont.h",
   "function": "class gfxFont {",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/fonts/metrics): defined in StealthBundleFontList.cpp",
-  "test": ""
+  "form": "member",
+  "line": "  bool GetStealthHostIndepVMetrics(gfxFloat&, gfxFloat&, gfxFloat&, gfxFloat&);  // STEALTH-HOOK(fingerprint/fonts/metrics)",
+  "test": "wrapper:tests/test_canvas_measure_text_metrics_e2e.py::test_measure_text_vertical_metrics_are_whole_and_retail"
  },
  {
-  "file": "gfx/thebes/gfxFont.h",
-  "function": "class gfxFont {",
+  "file": "gfx/thebes/gfxHarfBuzzShaper.cpp",
+  "function": "",
   "kind": "add",
-  "form": "unknown",
-  "line": "  bool GetStealthHostIndepVMetrics(gfxFloat& aEmAscent, gfxFloat& aEmDescent,",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxFont.h",
-  "function": "class gfxFont {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "                                   gfxFloat& aMaxAscent, gfxFloat& aMaxDescent);",
-  "test": ""
+  "form": "registration",
+  "line": "#include \"StealthDesignFontAccess.h\"  // STEALTH-HOOK(fingerprint/fonts/metrics)",
+  "test": "gtest:StealthFontMetrics.TheDesignFontReleaseDropsItsFaceReference"
  },
  {
   "file": "gfx/thebes/gfxHarfBuzzShaper.cpp",
   "function": "gfxHarfBuzzShaper::~gfxHarfBuzzShaper() {",
   "kind": "add",
   "form": "anchor",
-  "line": "  hb_font_destroy(mDesignFont);  // STEALTH-HOOK(fingerprint/fonts/metrics)",
-  "test": "",
-  "anchor": "",
-  "why": ""
+  "line": "  StealthReleaseDesignFont(mDesignFont);  // STEALTH-HOOK(fingerprint/fonts/metrics)",
+  "test": "gtest:StealthFontMetrics.TheDesignFontReleaseDropsItsFaceReference",
+  "anchor": "hb_font_destroy(mHBFont);",
+  "why": "G39: the release of a resource of ours stays in the body of the destructor at the moment it has today; a RAII member would move it to the end of the member destruction"
  },
  {
   "file": "gfx/thebes/gfxHarfBuzzShaper.h",
   "function": "class gfxHarfBuzzShaper : public gfxFontShaper {",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/fonts/metrics)",
-  "test": ""
+  "form": "member",
+  "line": "  friend struct StealthDesignFontAccess;  // STEALTH-HOOK(fingerprint/fonts/metrics)",
+  "test": "gtest:StealthFontMetrics.DesignAdvanceAtAFractionalSize"
  },
  {
   "file": "gfx/thebes/gfxHarfBuzzShaper.h",
   "function": "class gfxHarfBuzzShaper : public gfxFontShaper {",
   "kind": "add",
-  "form": "unknown",
-  "line": "  bool GetDesignGlyphExtents(uint16_t aGID, int32_t& aXBearing,",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxHarfBuzzShaper.h",
-  "function": "class gfxHarfBuzzShaper : public gfxFontShaper {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "                             int32_t& aYBearing, int32_t& aWidth,",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxHarfBuzzShaper.h",
-  "function": "class gfxHarfBuzzShaper : public gfxFontShaper {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "                             int32_t& aHeight) const;",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxHarfBuzzShaper.h",
-  "function": "class gfxHarfBuzzShaper : public gfxFontShaper {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  bool GetDesignAdvance(uint16_t aGID, int32_t& aAdvance) const;",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxHarfBuzzShaper.h",
-  "function": "class gfxHarfBuzzShaper : public gfxFontShaper {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/fonts/metrics)",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxHarfBuzzShaper.h",
-  "function": "class gfxHarfBuzzShaper : public gfxFontShaper {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  mutable hb_font_t* mDesignFont = nullptr;",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxHarfBuzzShaper.h",
-  "function": "class gfxHarfBuzzShaper : public gfxFontShaper {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  hb_font_t* GetDesignFont() const;",
-  "test": ""
+  "form": "member",
+  "line": "  mutable hb_font_t* mDesignFont = nullptr;  // STEALTH-HOOK(fingerprint/fonts/metrics)",
+  "test": "gtest:StealthFontMetrics.DesignAdvanceAtAFractionalSize"
  }
 ]

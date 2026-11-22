@@ -12,6 +12,7 @@
 #include "mozilla/Assertions.h"
 #include "mozilla/dom/Navigator.h"
 #include "mozilla/dom/WorkerLoadInfo.h"
+#include "mozilla/dom/WorkerPrivate.h"
 #include "mozilla/intl/StealthSessionPrefs.h"
 #include "nsString.h"
 #include "nsTArray.h"
@@ -57,7 +58,7 @@ namespace mozilla::dom {
 // and ICU read `TZ` differently and no value satisfies both, so
 // America/Phoenix gave the machine's zone in a Worker ([B334]), and a second
 // context with a zone of its own gave the session's ([B346]).
-inline void DeclareWorkerLanguageAndZone(WorkerLoadInfo& aLoadInfo) {
+inline void StealthDeclareWorkerLanguageAndZone(WorkerLoadInfo& aLoadInfo) {
   MOZ_ASSERT(NS_IsMainThread());
 
   intl::OrSessionLanguage(aLoadInfo.mLanguageOverrideLocale);
@@ -70,18 +71,27 @@ inline void DeclareWorkerLanguageAndZone(WorkerLoadInfo& aLoadInfo) {
   }
 }
 
-// Worker thread. Sets the realm's Intl default locale from aLanguageOverride
-// (an Accept-Language list or a single tag), as its primary tag.
+// Worker thread. The realm's Intl default locale for aLanguageOverride (an
+// Accept-Language list or a single tag), as its primary tag.
 //
 // The override may be an Accept-Language list ("fr-FR, fr"); the realm's Intl
 // default locale is a single BCP-47 tag, as at birth (SetDeclaredRealmTimeAndLanguage)
-// and in the window (BrowsingContext::DidSet). Touches only the realm and its
-// arguments.
-inline void SetWorkerRealmLocale(JS::Realm* aRealm,
-                                 const nsACString& aLanguageOverride) {
-  nsAutoCString primaryLocale;
-  intl::PrimaryLanguageTag(aLanguageOverride, primaryLocale);
-  JS::SetRealmLocaleOverride(aRealm, primaryLocale.get());
+// and in the window (BrowsingContext::DidSet). Touches only its argument.
+// UpdateLanguageOverrideInternal calls JS::SetRealmLocaleOverride with it: the
+// tag lives until the end of that statement, as long as the call needs it.
+class StealthLocaleTag {
+ public:
+  explicit StealthLocaleTag(const char* aLanguageOverride) {
+    intl::PrimaryLanguageTag(nsDependentCString(aLanguageOverride), mTag);
+  }
+  operator const char*() const { return mTag.get(); }
+
+ private:
+  nsAutoCString mTag;
+};
+
+inline StealthLocaleTag StealthWorkerRealmLocale(const char* aLanguageOverride) {
+  return StealthLocaleTag(aLanguageOverride);
 }
 
 // Worker thread. True when the worker follows its owner's LanguageOverride,
@@ -91,8 +101,8 @@ inline void SetWorkerRealmLocale(JS::Realm* aRealm,
 // follows its owner's LanguageOverride ignores it, exactly as the owner's
 // Navigator::GetLanguages does; its nested workers carry the same list. Reads
 // only the worker's own load info.
-inline bool WorkerFollowsOwnerLanguage(const WorkerLoadInfo& aLoadInfo) {
-  return !aLoadInfo.mLanguageOverride.IsEmpty();
+inline bool StealthWorkerFollowsOwnerLanguage(const WorkerPrivate* aWorker) {
+  return !aWorker->GetLanguageOverride().IsEmpty();
 }
 
 }  // namespace mozilla::dom

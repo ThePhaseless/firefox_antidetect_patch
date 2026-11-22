@@ -93,15 +93,3 @@ add_task(async function test_the_module_reads_no_preference() {
   Assert.ok(!src.includes("usage_ping"), "no usage_ping preference is read");
   Assert.ok(!src.includes("Services.prefs"), "no preference is read at all");
 });
-
-add_task(async function test_hook_is_wired() {
-  // Guards the one thing xpcshell cannot reach: the final-ui-startup
-  // observer reaches the call.
-  let src = await (
-    await fetch("resource:///modules/BrowserGlue.sys.mjs")
-  ).text();
-  Assert.ok(
-    src.includes("// STEALTH-HOOK(platform/launch-counter)") &&
-      src.includes("lazy.StealthLaunchCounter.fire()")
-  );
-});

@@ -71,6 +71,17 @@ TEST(StealthFullscreen, NothingWithoutADeclaredScreenOrAScale)
             Nothing());
 }
 
+// nsIWidget::InfallibleMakeFullScreen moves the window to the declared screen
+// when there is one, and to the rectangle Firefox chose (the host's monitor)
+// otherwise: the second is the control of the first.
+TEST(StealthFullscreen, TheRectOrTakesTheDeclaredScreenAndElseMozillas)
+{
+  const DesktopRect host(0, 0, 1024, 768);
+  const DesktopRect declared(0, 0, 1920, 1080);
+  EXPECT_EQ(widget::StealthFullscreenRectOr(Some(declared), host), declared);
+  EXPECT_EQ(widget::StealthFullscreenRectOr(Nothing(), host), host);
+}
+
 // Windows' own rules for a fullscreen window (StealthFullscreenWin.cpp). Run
 // 41325657085: on the GPU-less CI desktop (a 1024x768 monitor) the window of a
 // persona with a 1280x720 or 1920x1080 screen went fullscreen at 1024x768,

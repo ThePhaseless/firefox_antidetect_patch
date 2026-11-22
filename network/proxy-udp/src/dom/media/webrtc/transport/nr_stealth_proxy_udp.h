@@ -24,6 +24,7 @@
 #include "StealthPcUdpProxy.h"
 #include "nr_socket_proxy_config.h"
 #include "nsSOCKSUDPIOLayer.h"
+#include "nsXULAppAPI.h"
 #include "prio.h"
 
 namespace mozilla {
@@ -42,6 +43,23 @@ inline bool StealthUdpProxyAttachRefused(PRFileDesc* aFd,
   return StealthUdpProxyAttachRefused(aFd, proxy);
 }
 
+/* NrSocketBase::CreateSocket: the socket of a PeerConnection is made with the proxy config of its PeerConnection (the layer is put on it by
+ * NrSocket::create, from the config). The socket is Mozilla's own `new NrSocket()`, given the config before create() is called; the
+ * config is the first argument, Mozilla's expression the last. A template, so that the header does not have to know NrSocket: the
+ * access to its private field is checked where the call is made. */
+struct StealthNrSocketAccess {
+  template <typename SocketT>
+  static void SetProxyConfig(SocketT* aSocket, const std::shared_ptr<NrSocketProxyConfig>& aConfig) {
+    aSocket->mProxyConfig = aConfig;
+  }
+};
+
+template <typename SocketT>
+inline SocketT* StealthNrSocketOf(const std::shared_ptr<NrSocketProxyConfig>& aConfig, SocketT* aSocket) {
+  StealthNrSocketAccess::SetProxyConfig(aSocket, aConfig);
+  return aSocket;
+}
+
 bool StealthBind(struct PRFileDesc* aFd, const union PRNetAddr* aAddr);  // nr_stealth_network.h
 
 /* NrSocket::create: the bind of a new socket (StealthBind), and its birth. Only a socket whose bind worked takes the road of its
@@ -54,6 +72,12 @@ inline bool StealthBindAndBear(PRFileDesc* aFd, const PRNetAddr* aAddr) {
   }
   net::nsSOCKSUDPIOLayerSocketBorn(aFd);
   return true;
+}
+
+/* NrSocket::create: Mozilla's PR_Bind, by its name with the same arguments (StealthBind: the bind, and the test seam that makes it fail
+ * with a given NSPR error), and the birth of the socket after a bind that worked (StealthBindAndBear). PR_SUCCESS or PR_FAILURE. */
+inline PRStatus StealthPRBind(PRFileDesc* aFd, const PRNetAddr* aAddr) {
+  return StealthBindAndBear(aFd, aAddr) ? PR_SUCCESS : PR_FAILURE;
 }
 
 }  // namespace mozilla

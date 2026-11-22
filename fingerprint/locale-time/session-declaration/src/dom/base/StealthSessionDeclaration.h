@@ -12,6 +12,7 @@
 #include "prtime.h"
 
 class nsAtom;
+class nsDocShell;
 
 namespace JS {
 class RealmOptions;
@@ -67,6 +68,13 @@ void GetDeclaredTimezone(BrowsingContext* aContext, nsAString& aZone);
 void GetDeclaredLanguage(BrowsingContext* aContext, nsACString& aLanguage);
 // Workers carry their owner's fields in WorkerLoadInfoData and fall to the
 // session's in WorkerPrivate, through the same intl::OrSession*.
+
+// The two values as BrowsingContext::DidSet reads them: the value of the field
+// (`aOverride`, of the top context itself) or, when it is empty, the session's
+// declaration. Same result as GetDeclaredLanguage / GetDeclaredTimezone of the
+// top BrowsingContext. Main thread only.
+nsCString StealthLanguageOrSession(const nsCString& aOverride);
+nsString StealthTimezoneOrSession(const nsString& aOverride);
 
 // The same for a document: its BrowsingContext, or the window it is scoped to
 // when it has none (a document made by DOMParser or XMLHttpRequest).
@@ -135,6 +143,35 @@ void SeedDeclaredTimezoneAndLanguage(BrowsingContext* aContext);
 void SetRealmDeclaredLocale(JS::Realm* aRealm, const nsACString& aLanguage);
 
 /**
+ * The default Intl locale of a window realm, from the declared language, as the
+ * argument of JS::SetRealmLocaleOverride:
+ *   JS::SetRealmLocaleOverride(realm, StealthRealmLocale(realm, list).get());
+ * The override may be an Accept-Language list ("fr-FR, fr") so that
+ * navigator.languages reports the full desktop-default list; the realm's Intl
+ * default locale is a single BCP-47 tag, so `get()` is the list's primary tag.
+ * `aLanguage` must not be empty: the caller clears the override with nullptr
+ * itself.
+ *
+ * The document of this window caches the language of its text with no `lang`
+ * and follows its context when the context's language changes: the temporary
+ * refreshes it when it is destroyed, at the end of the statement, that is after
+ * the realm took the tag (the same three steps, in the same order, as the
+ * function this replaces). Main thread only.
+ */
+class StealthRealmLocale {
+ public:
+  StealthRealmLocale(JS::Realm* aRealm, const nsACString& aLanguage);
+  ~StealthRealmLocale();
+  StealthRealmLocale(const StealthRealmLocale&) = delete;
+  StealthRealmLocale& operator=(const StealthRealmLocale&) = delete;
+  const char* get() const { return mTag.get(); }
+
+ private:
+  JS::Realm* mRealm;
+  nsAutoCString mTag;
+};
+
+/**
  * `aTime` exploded as the local time of a page in `aDocument`, with
  * `tm_params` filled: UTC when resistFingerprinting asks for it, else the
  * declared zone's wall clock at that instant (daylight saving included),
@@ -146,6 +183,21 @@ void SetRealmDeclaredLocale(JS::Realm* aRealm, const nsACString& aLanguage);
  */
 void ExplodeLocalTime(PRTime aTime, const Document* aDocument,
                       PRExplodedTime* aExploded);
+
+/**
+ * What Document::GetFormattedTimeString (document.lastModified) and EXSLT's
+ * date:date-time() call in place of PR_ExplodeTime, with the parameters Mozilla
+ * chose: PR_GMTParameters (resistFingerprinting asks for UTC) is exploded as
+ * PR_ExplodeTime does, the declared zone not consulted. PR_LocalTimeParameters
+ * is the local time of a page in `aDocument`, with `tm_params` filled: the
+ * declared zone's wall clock at that instant (daylight saving included),
+ * computed with ICU. It replaces the C runtime's local time, which on Windows
+ * is the host's whatever `TZ` says ([B339]); that path remains only when
+ * nothing is declared. A zone ICU does not know is exploded as UTC, never as
+ * the host's. `aDocument` must not be null. Main thread only.
+ */
+void StealthExplodeTime(const Document* aDocument, PRTime aTime,
+                        PRTimeParamFn aParams, PRExplodedTime* aExploded);
 
 /**
  * STEALTHFOX: the language of a document's text that declares none is the
@@ -180,6 +232,11 @@ nsAtom* ChooseCharsetLanguage(nsAtom* aFromCharset, nsAtom* aProcessLanguage,
 nsAtom* InternedLanguage(const nsACString& aDeclared);
 nsAtom* DocumentCharsetLanguage(const Document* aDocument,
                                 nsAtom* aFromCharset);
+
+// Document::SetContainer, right after it stored the container: the context is
+// known now, so the language of the text with no `lang` is computed again.
+// Nothing with no container. Main thread only.
+void StealthDocumentContainerSet(Document* aDocument, nsDocShell* aContainer);
 
 // Computes the document's language again; when it changed and the document is
 // already styled, flushes its font cache and restyles it, as a change of

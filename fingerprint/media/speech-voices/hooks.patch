@@ -1,78 +1,71 @@
 diff --git a/dom/media/webspeech/synth/SpeechSynthesis.cpp b/dom/media/webspeech/synth/SpeechSynthesis.cpp
-index e6ce72941509966e4a0950afc502304231dad48d..4d2a1a8758798316caae472f12c1123df6b4c3e6 100644
+index e6ce72941509966e4a0950afc502304231dad48d..65cbb10f8e417f8952f43fc1dae7aa89535faa32 100644
 --- a/dom/media/webspeech/synth/SpeechSynthesis.cpp
 +++ b/dom/media/webspeech/synth/SpeechSynthesis.cpp
-@@ -5,6 +5,7 @@
- #include "SpeechSynthesis.h"
+@@ -18,6 +18,8 @@
+ #include "nsSpeechTask.h"
+ #include "nsSynthVoiceRegistry.h"
  
- #include "AutoplayPolicy.h"
 +#include "StealthSpeechVoices.h"  // STEALTH-HOOK(fingerprint/media/speech-voices)
- #include "mozilla/Logging.h"
- #include "mozilla/dom/Document.h"
- #include "mozilla/dom/Element.h"
-@@ -244,6 +245,10 @@ void SpeechSynthesis::GetVoices(
++
+ #undef LOG
+ mozilla::LogModule* GetSpeechSynthLog() {
+   static mozilla::LazyLogModule sLog("SpeechSynthesis");
+@@ -244,6 +246,7 @@ void SpeechSynthesis::GetVoices(
                                                   RFPTarget::SpeechSynthesis)) {
      return;
    }
-+  // STEALTH-HOOK(fingerprint/media/speech-voices)
-+  if (StealthGetVoices(this, aResult, mVoiceCache)) {
-+    return;
-+  }
++  if (StealthGetVoices(this, aResult, mVoiceCache)) return;  // STEALTH-HOOK(fingerprint/media/speech-voices)
  
    nsresult rv = nsSynthVoiceRegistry::GetInstance()->GetVoiceCount(&voiceCount);
    if (NS_WARN_IF(NS_FAILED(rv))) {
 diff --git a/dom/media/webspeech/synth/SpeechSynthesisVoice.cpp b/dom/media/webspeech/synth/SpeechSynthesisVoice.cpp
-index c5aefb69c9a2005d1cbb1ac09bd14bd79bbaaa9f..41cba8a16de1cc79ebd70e447d884b2ba4a61d33 100644
+index c5aefb69c9a2005d1cbb1ac09bd14bd79bbaaa9f..2332141a0ea9554e2d6a1f93a46921edfb0a4119 100644
 --- a/dom/media/webspeech/synth/SpeechSynthesisVoice.cpp
 +++ b/dom/media/webspeech/synth/SpeechSynthesisVoice.cpp
-@@ -5,6 +5,8 @@
- #include "SpeechSynthesis.h"
+@@ -6,6 +6,8 @@
  #include "mozilla/dom/SpeechSynthesisVoiceBinding.h"
  #include "nsSynthVoiceRegistry.h"
-+// STEALTH-HOOK(fingerprint/media/speech-voices)
-+#include "StealthSpeechVoice.h"
  
++#include "StealthSpeechVoice.h"  // STEALTH-HOOK(fingerprint/media/speech-voices)
++
  namespace mozilla::dom {
  
-@@ -30,10 +32,14 @@ JSObject* SpeechSynthesisVoice::WrapObject(JSContext* aCx,
+ NS_IMPL_CYCLE_COLLECTION_WRAPPERCACHE(SpeechSynthesisVoice, mParent)
+@@ -30,10 +32,12 @@ JSObject* SpeechSynthesisVoice::WrapObject(JSContext* aCx,
  nsISupports* SpeechSynthesisVoice::GetParentObject() const { return mParent; }
  
  void SpeechSynthesisVoice::GetVoiceURI(nsString& aRetval) const {
-+  // STEALTH-HOOK(fingerprint/media/speech-voices)
-+  if (StealthVoiceRetailURI(mUri, aRetval)) return;
++  if (StealthVoiceRetailURI(mUri, aRetval)) return;  // STEALTH-HOOK(fingerprint/media/speech-voices)
    aRetval = mUri;
  }
  
  void SpeechSynthesisVoice::GetName(nsString& aRetval) const {
-+  // STEALTH-HOOK(fingerprint/media/speech-voices)
-+  if (StealthVoiceName(mUri, aRetval)) return;
++  if (StealthVoiceName(mUri, aRetval)) return;  // STEALTH-HOOK(fingerprint/media/speech-voices)
    DebugOnly<nsresult> rv =
        nsSynthVoiceRegistry::GetInstance()->GetVoiceName(mUri, aRetval);
    NS_WARNING_ASSERTION(NS_SUCCEEDED(rv),
-@@ -41,6 +47,8 @@ void SpeechSynthesisVoice::GetName(nsString& aRetval) const {
+@@ -41,6 +45,7 @@ void SpeechSynthesisVoice::GetName(nsString& aRetval) const {
  }
  
  void SpeechSynthesisVoice::GetLang(nsString& aRetval) const {
-+  // STEALTH-HOOK(fingerprint/media/speech-voices)
-+  if (StealthVoiceLang(mUri, aRetval)) return;
++  if (StealthVoiceLang(mUri, aRetval)) return;  // STEALTH-HOOK(fingerprint/media/speech-voices)
    DebugOnly<nsresult> rv =
        nsSynthVoiceRegistry::GetInstance()->GetVoiceLang(mUri, aRetval);
    NS_WARNING_ASSERTION(NS_SUCCEEDED(rv),
-@@ -48,6 +56,8 @@ void SpeechSynthesisVoice::GetLang(nsString& aRetval) const {
+@@ -48,6 +53,7 @@ void SpeechSynthesisVoice::GetLang(nsString& aRetval) const {
  }
  
  bool SpeechSynthesisVoice::LocalService() const {
-+  // STEALTH-HOOK(fingerprint/media/speech-voices)
-+  if (Maybe<bool> stealth = StealthVoiceLocal(mUri)) return *stealth;
++  if (bool stealth = false; StealthVoiceLocal(mUri, &stealth)) return stealth;  // STEALTH-HOOK(fingerprint/media/speech-voices)
    bool isLocal;
    DebugOnly<nsresult> rv =
        nsSynthVoiceRegistry::GetInstance()->IsLocalVoice(mUri, &isLocal);
-@@ -58,6 +68,8 @@ bool SpeechSynthesisVoice::LocalService() const {
+@@ -58,6 +64,7 @@ bool SpeechSynthesisVoice::LocalService() const {
  }
  
  bool SpeechSynthesisVoice::Default() const {
-+  // STEALTH-HOOK(fingerprint/media/speech-voices)
-+  if (Maybe<bool> stealth = StealthVoiceDefault(mUri)) return *stealth;
++  if (bool stealth = false; StealthVoiceDefault(mUri, &stealth)) return stealth;  // STEALTH-HOOK(fingerprint/media/speech-voices)
    bool isDefault;
    DebugOnly<nsresult> rv =
        nsSynthVoiceRegistry::GetInstance()->IsDefaultVoice(mUri, &isDefault);
@@ -88,13 +81,3 @@ index 3f29c33c797c145c56857fc432976c274410344c..a167c5bdef1d49f8d523a0e6c3cfb5f3
  
  UNIFIED_SOURCES += ["test/nsFakeSynthServices.cpp"]
  
-diff --git a/dom/media/webspeech/synth/test/mochitest.toml b/dom/media/webspeech/synth/test/mochitest.toml
-index dc41cec561be938ad44b25a999c8546d4b5d74d6..6ebb07ee2bdff0ec9d70b211e55c8a851acf537d 100644
---- a/dom/media/webspeech/synth/test/mochitest.toml
-+++ b/dom/media/webspeech/synth/test/mochitest.toml
-@@ -42,3 +42,5 @@ support-files = [
- ["test_speech_simple.html"]
- 
- ["test_speech_cancel_on_navigation.html"]
-+
-+["test_stealth_voices.html"]

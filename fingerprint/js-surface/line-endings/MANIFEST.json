@@ -3,7 +3,10 @@
   "dom/file/BlobSet.cpp",
   "dom/serializers/nsPlainTextSerializer.cpp"
  ],
- "added": {},
+ "added": {
+  "dom/file/StealthNativeEOL.h": "100644",
+  "dom/serializers/StealthPlainTextLineBreak.h": "100644"
+ },
  "inventory": [
   {
    "file": "dom/file/BlobSet.cpp",

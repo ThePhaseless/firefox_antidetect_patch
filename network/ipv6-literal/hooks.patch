@@ -1,21 +1,22 @@
 diff --git a/netwerk/base/nsSocketTransport2.cpp b/netwerk/base/nsSocketTransport2.cpp
-index 440e4b8dfd0ad23d2b91b8f84cc8074dd0e1ed5c..8e7b4a4fa9e0972716351705eb87a8856af7f2eb 100644
+index 440e4b8dfd0ad23d2b91b8f84cc8074dd0e1ed5c..5237feb50abd264aa827c23e9e2bcb38cdfa3968 100644
 --- a/netwerk/base/nsSocketTransport2.cpp
 +++ b/netwerk/base/nsSocketTransport2.cpp
-@@ -11,6 +11,7 @@
- #include "NSSErrorsService.h"
- #include "NetworkDataCountLayer.h"
- #include "QuicSocketControl.h"
+@@ -70,6 +70,8 @@
+ #endif
+ /* End keepalive config inclusions. */
+ 
 +#include "StealthIPv6Literal.h"  // STEALTH-HOOK(network/ipv6-literal)
- #include "mozilla/ProfilerBandwidthCounter.h"
- #include "mozilla/StaticPrefs_network.h"
- #include "mozilla/SyncRunnable.h"
-@@ -1677,7 +1678,7 @@ nsresult nsSocketTransport::InitiateSocket() {
++
+ #define SUCCESSFUL_CONNECTING_TO_IPV4_ADDRESS 0
+ #define UNSUCCESSFUL_CONNECTING_TO_IPV4_ADDRESS 1
+ #define SUCCESSFUL_CONNECTING_TO_IPV6_ADDRESS 2
+@@ -1677,7 +1679,7 @@ nsresult nsSocketTransport::InitiateSocket() {
    }
  #endif
  
 -  status = PR_Connect(fd, &prAddr, NS_SOCKET_CONNECT_TIMEOUT);
-+  status = StealthConnect(fd, mNetAddr, mProxyTransparent && !mProxyHost.IsEmpty() ? StealthConnectTarget::kBehindSocksProxy : StealthConnectTarget::kDirect, &prAddr, NS_SOCKET_CONNECT_TIMEOUT);  // STEALTH-HOOK(network/ipv6-literal)
++  status = StealthConnect(mNetAddr, mProxyTransparent, mProxyHost, fd, &prAddr, NS_SOCKET_CONNECT_TIMEOUT);  // STEALTH-HOOK(network/ipv6-literal)
    PRErrorCode code = PR_GetError();
    if (status == PR_SUCCESS) {
      PR_SetFDInheritable(fd, false);

@@ -4,96 +4,35 @@
   "function": "",
   "kind": "add",
   "form": "registration",
-  "line": "#include \"StealthSandbox.h\"  // STEALTH-HOOK(automation/hybrid-xrays)",
-  "test": ""
- },
- {
-  "file": "js/xpconnect/src/Sandbox.cpp",
-  "function": "",
-  "kind": "add",
-  "form": "registration",
-  "line": "#include \"XrayWrapper.h\"  // STEALTH-HOOK(automation/hybrid-xrays)",
-  "test": ""
- },
- {
-  "file": "js/xpconnect/src/Sandbox.cpp",
-  "function": "",
-  "kind": "add",
-  "form": "registration",
   "line": "#include \"mozilla/intl/StealthSessionPrefs.h\"  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
-  "test": ""
+  "test": "wrapper:tests/test_context_locale_e2e.py::test_a_context_locale_reaches_navigator_intl_and_the_header"
+ },
+ {
+  "file": "js/xpconnect/src/Sandbox.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthSandbox.h\"  // STEALTH-HOOK(automation/hybrid-xrays)",
+  "test": "wrapper:tests/test_the_callers_code_is_not_counted_e2e.py::test_what_the_page_added_is_the_pages"
  },
  {
   "file": "js/xpconnect/src/Sandbox.cpp",
   "function": "bool SandboxProxyHandler::getPropertyDescriptorImpl(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  } else if (xpc::IsHybridXrayWrapper(obj)) {",
-  "test": ""
- },
- {
-  "file": "js/xpconnect/src/Sandbox.cpp",
-  "function": "bool SandboxProxyHandler::getPropertyDescriptorImpl(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    // STEALTH-HOOK(automation/hybrid-xrays)",
-  "test": ""
- },
- {
-  "file": "js/xpconnect/src/Sandbox.cpp",
-  "function": "bool SandboxProxyHandler::getPropertyDescriptorImpl(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    if (!xpc::HybridXrayGetBareName(cx, obj, id, desc_)) {",
-  "test": ""
- },
- {
-  "file": "js/xpconnect/src/Sandbox.cpp",
-  "function": "bool SandboxProxyHandler::getPropertyDescriptorImpl(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "      return false;",
-  "test": ""
- },
- {
-  "file": "js/xpconnect/src/Sandbox.cpp",
-  "function": "bool SandboxProxyHandler::getPropertyDescriptorImpl(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    }",
-  "test": ""
+  "kind": "rewrite",
+  "form": "wrap-call",
+  "line": "    if (!xpc::StealthGetPropertyDescriptor(cx, obj, id, desc_, &holder)) {  // STEALTH-HOOK(automation/hybrid-xrays)",
+  "removed": "    if (!JS_GetPropertyDescriptorById(cx, obj, id, desc_, &holder)) {",
+  "test": "wrapper:tests/test_the_callers_code_is_not_counted_e2e.py::test_what_the_page_added_is_the_pages"
  },
  {
   "file": "js/xpconnect/src/Sandbox.cpp",
   "function": "nsresult xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp,",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(automation/hybrid-xrays)",
-  "test": ""
- },
- {
-  "file": "js/xpconnect/src/Sandbox.cpp",
-  "function": "nsresult xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  if (!xpc::StealthCheckHybridXrays(cx, principal, options)) {",
-  "test": ""
- },
- {
-  "file": "js/xpconnect/src/Sandbox.cpp",
-  "function": "nsresult xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    return NS_ERROR_INVALID_ARG;",
-  "test": ""
- },
- {
-  "file": "js/xpconnect/src/Sandbox.cpp",
-  "function": "nsresult xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  }",
-  "test": ""
+  "form": "anchor",
+  "line": "  if (!xpc::StealthCheckHybridXrays(cx, principal, options)) return NS_ERROR_INVALID_ARG;  // STEALTH-HOOK(automation/hybrid-xrays)",
+  "test": "xpcshell:js/xpconnect/tests/unit/test_stealth_hybrid_xrays_options.js#run_test",
+  "anchor": "bool isSystemPrincipal = principal->IsSystemPrincipal();",
+  "why": "principal is derived inside CreateSandboxObject (QI of prinOrSop, GetPrincipal, NullPrincipal fallback) and cannot be recomputed without copying Mozilla logic; a guard at the top would also move the check before the associatedWindow error"
  },
  {
   "file": "js/xpconnect/src/Sandbox.cpp",
@@ -102,7 +41,9 @@
   "form": "unknown",
   "line": "        // STEALTH-HOOK(fingerprint/locale-time/timezone)",
   "removed": "        realmOptions.behaviors().setLocaleOverride(\n            PromiseFlatCString(localeOverride).get());",
-  "test": ""
+  "test": "wrapper:tests/test_context_locale_e2e.py::test_a_context_locale_reaches_navigator_intl_and_the_header",
+  "exception": "as on the baseline; a one-line form needs a new function and touches the same two Mozilla lines, no portability gain; to review at the port to 160",
+  "pm": "approvato"
  },
  {
   "file": "js/xpconnect/src/Sandbox.cpp",
@@ -110,7 +51,9 @@
   "kind": "rewrite",
   "form": "unknown",
   "line": "        nsAutoCString primaryLocale;",
-  "test": ""
+  "test": "wrapper:tests/test_context_locale_e2e.py::test_a_context_locale_reaches_navigator_intl_and_the_header",
+  "exception": "as on the baseline; a one-line form needs a new function and touches the same two Mozilla lines, no portability gain; to review at the port to 160",
+  "pm": "approvato"
  },
  {
   "file": "js/xpconnect/src/Sandbox.cpp",
@@ -118,7 +61,9 @@
   "kind": "rewrite",
   "form": "unknown",
   "line": "        mozilla::intl::PrimaryLanguageTag(localeOverride, primaryLocale);",
-  "test": ""
+  "test": "wrapper:tests/test_context_locale_e2e.py::test_a_context_locale_reaches_navigator_intl_and_the_header",
+  "exception": "as on the baseline; a one-line form needs a new function and touches the same two Mozilla lines, no portability gain; to review at the port to 160",
+  "pm": "approvato"
  },
  {
   "file": "js/xpconnect/src/Sandbox.cpp",
@@ -126,39 +71,29 @@
   "kind": "rewrite",
   "form": "unknown",
   "line": "        realmOptions.behaviors().setLocaleOverride(primaryLocale.get());",
-  "test": ""
+  "test": "wrapper:tests/test_context_locale_e2e.py::test_a_context_locale_reaches_navigator_intl_and_the_header",
+  "exception": "as on the baseline; a one-line form needs a new function and touches the same two Mozilla lines, no portability gain; to review at the port to 160",
+  "pm": "approvato"
+ },
+ {
+  "file": "js/xpconnect/src/Sandbox.cpp",
+  "function": "nsresult xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp,",
+  "kind": "add",
+  "form": "anchor",
+  "line": "    MOZ_RELEASE_ASSERT(priv->hybridXrays == options.hybridXrays);  // STEALTH-HOOK(automation/hybrid-xrays)",
+  "test": "wrapper:tests/test_the_callers_code_is_not_counted_e2e.py::test_the_token_field_is_found_without_the_page_counting",
+  "anchor": "the closing line of the branch of the if (ExistingCompartment) {...} else {...} block that sets the compartment flags",
+  "why": "the two lines are one per branch of Mozilla's if (the reused branch checks, the new one writes); they are not merged into one line after the if (G18)"
  },
  {
   "file": "js/xpconnect/src/Sandbox.cpp",
   "function": "nsresult xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp,",
   "kind": "add",
   "form": "unknown",
-  "line": "    // STEALTH-HOOK(automation/hybrid-xrays)",
-  "test": ""
- },
- {
-  "file": "js/xpconnect/src/Sandbox.cpp",
-  "function": "nsresult xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    MOZ_RELEASE_ASSERT(priv->hybridXrays == options.hybridXrays);",
-  "test": ""
- },
- {
-  "file": "js/xpconnect/src/Sandbox.cpp",
-  "function": "nsresult xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    // STEALTH-HOOK(automation/hybrid-xrays)",
-  "test": ""
- },
- {
-  "file": "js/xpconnect/src/Sandbox.cpp",
-  "function": "nsresult xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    priv->hybridXrays = options.hybridXrays;",
-  "test": ""
+  "line": "    priv->hybridXrays = options.hybridXrays;  // STEALTH-HOOK(automation/hybrid-xrays)",
+  "test": "wrapper:tests/test_the_callers_code_is_not_counted_e2e.py::test_the_token_field_is_found_without_the_page_counting",
+  "anchor": "the closing line of the branch of the if (ExistingCompartment) {...} else {...} block that sets the compartment flags",
+  "why": "the two lines are one per branch of Mozilla's if (the reused branch checks, the new one writes); they are not merged into one line after the if (G18)"
  },
  {
   "file": "js/xpconnect/src/Sandbox.cpp",
@@ -166,7 +101,11 @@
   "kind": "add",
   "form": "unknown",
   "line": "            // STEALTH-HOOK(automation/hybrid-xrays)",
-  "test": ""
+  "test": "xpcshell:js/xpconnect/tests/unit/test_stealth_hybrid_xrays_options.js#run_test",
+  "anchor": "ParseBoolean(\"wantXrays\", &wantXrays) &&",
+  "why": "moved row left as today (G28): the option is parsed inside Mozilla's && chain of SandboxOptions::Parse; moving it to a head guard reads hybridXrays before wantXrays",
+  "exception": "G35, approved by the pm (PM-VERDICT 22/11): the option is parsed inside Mozilla's && chain of SandboxOptions::Parse, right after wantXrays; a head guard would read hybridXrays before wantXrays (order of property reads of the options object, error with two invalid options)",
+  "pm": "approvato"
  },
  {
   "file": "js/xpconnect/src/Sandbox.cpp",
@@ -174,64 +113,51 @@
   "kind": "add",
   "form": "unknown",
   "line": "            ParseBoolean(\"hybridXrays\", &hybridXrays) &&",
-  "test": ""
- },
- {
-  "file": "js/xpconnect/src/XPCJSRuntime.cpp",
-  "function": "CompartmentPrivate::CompartmentPrivate(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "      hybridXrays(false),",
-  "test": ""
+  "test": "xpcshell:js/xpconnect/tests/unit/test_stealth_hybrid_xrays_options.js#run_test",
+  "exception": "G35, approved by the pm (PM-VERDICT 22/11): the option is parsed inside Mozilla's && chain of SandboxOptions::Parse, right after wantXrays; a head guard would read hybridXrays before wantXrays (order of property reads of the options object, error with two invalid options)",
+  "pm": "approvato"
  },
  {
   "file": "js/xpconnect/src/xpcprivate.h",
   "function": "class MOZ_STACK_CLASS SandboxOptions : public OptionsBase {",
   "kind": "add",
   "form": "member",
-  "line": "        hybridXrays(false),",
-  "test": ""
- },
- {
-  "file": "js/xpconnect/src/xpcprivate.h",
-  "function": "class MOZ_STACK_CLASS SandboxOptions : public OptionsBase {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(automation/hybrid-xrays)",
-  "test": ""
- },
- {
-  "file": "js/xpconnect/src/xpcprivate.h",
-  "function": "class MOZ_STACK_CLASS SandboxOptions : public OptionsBase {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  bool hybridXrays;",
-  "test": ""
- },
- {
-  "file": "js/xpconnect/src/xpcprivate.h",
-  "function": "class CompartmentPrivate {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    return !wantXrays && !hybridXrays && !isWebExtensionContentScript &&",
-  "removed": "    return !wantXrays && !isWebExtensionContentScript &&",
-  "test": ""
+  "line": "  bool hybridXrays = false;  // STEALTH-HOOK(automation/hybrid-xrays)",
+  "test": "wrapper:tests/test_the_callers_code_is_not_counted_e2e.py::test_the_token_field_is_found_without_the_page_counting"
  },
  {
   "file": "js/xpconnect/src/xpcprivate.h",
   "function": "class CompartmentPrivate {",
   "kind": "add",
   "form": "unknown",
-  "line": "  // STEALTH-HOOK(automation/hybrid-xrays)",
-  "test": ""
+  "line": "  bool StealthIsHybrid() const { return hybridXrays; }  // STEALTH-HOOK(automation/hybrid-xrays)",
+  "test": "wrapper:tests/test_the_callers_code_is_not_counted_e2e.py::test_the_token_field_is_found_without_the_page_counting"
  },
  {
   "file": "js/xpconnect/src/xpcprivate.h",
   "function": "class CompartmentPrivate {",
   "kind": "add",
+  "form": "guard",
+  "line": "    if (this->StealthIsHybrid()) return false;  // STEALTH-HOOK(automation/hybrid-xrays)",
+  "test": "",
+  "untestable": "the only caller of CanShareCompartmentWith passes the compartment of a window, never that of a sandbox, so no page and no gtest can reach the guard; the result is false in both forms",
+  "pm": "approvato"
+ },
+ {
+  "file": "js/xpconnect/src/xpcprivate.h",
+  "function": "class CompartmentPrivate {",
+  "kind": "add",
+  "form": "member",
+  "line": "  bool hybridXrays = false;  // STEALTH-HOOK(automation/hybrid-xrays)",
+  "test": "wrapper:tests/test_the_callers_code_is_not_counted_e2e.py::test_the_token_field_is_found_without_the_page_counting"
+ },
+ {
+  "file": "js/xpconnect/tests/unit/xpcshell.toml",
+  "function": "head = \"head_ongc.js\"",
+  "kind": "add",
   "form": "unknown",
-  "line": "  bool hybridXrays;",
-  "test": ""
+  "line": "[\"test_stealth_hybrid_xrays_options.js\"]  # STEALTH-HOOK(automation/hybrid-xrays)",
+  "test": "xpcshell:js/xpconnect/tests/unit/test_stealth_hybrid_xrays_options.js#run_test"
  },
  {
   "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
@@ -239,115 +165,50 @@
   "kind": "add",
   "form": "registration",
   "line": "#include \"StealthHybridXray.h\"  // STEALTH-HOOK(automation/hybrid-xrays)",
-  "test": ""
+  "test": "wrapper:tests/test_the_callers_code_is_not_counted_e2e.py::test_what_the_page_added_is_the_pages"
  },
  {
   "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
   "function": "static void DEBUG_CheckUnwrapSafety(HandleObject obj,",
   "kind": "add",
   "form": "unknown",
-  "line": "          // STEALTH-HOOK(automation/hybrid-xrays)",
-  "test": ""
- },
- {
-  "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
-  "function": "static void DEBUG_CheckUnwrapSafety(HandleObject obj,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "          !targetCompartmentPrivate->hybridXrays &&",
-  "test": ""
- },
- {
-  "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
-  "function": "JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(automation/hybrid-xrays)",
-  "test": ""
- },
- {
-  "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
-  "function": "JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  const StealthXrayFlags xray = StealthComputeXrayFlags(origin, target);",
-  "test": ""
+  "line": "          !targetCompartmentPrivate->hybridXrays &&  // STEALTH-HOOK(automation/hybrid-xrays)",
+  "test": "wrapper:tests/test_the_callers_code_is_not_counted_e2e.py::test_what_the_page_added_is_the_pages"
  },
  {
   "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
   "function": "JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,",
   "kind": "rewrite",
-  "form": "unknown",
-  "line": "           (!targetSubsumesOrigin ||",
-  "removed": "           (!targetSubsumesOrigin || (!originCompartmentPrivate->wantXrays &&",
-  "test": ""
- },
- {
-  "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
-  "function": "JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "            (!xray.originForcesXrays && !xray.targetForcesXrays))) {",
+  "form": "wrap-expression",
+  "line": "                                      !StealthTargetWantsXrays(cx, targetCompartmentPrivate->wantXrays)))) {  // STEALTH-HOOK(automation/hybrid-xrays)",
   "removed": "                                      !targetCompartmentPrivate->wantXrays))) {",
-  "test": ""
+  "test": "wrapper:tests/test_the_callers_code_is_not_counted_e2e.py::test_what_the_caller_hands_the_page_from_a_cross_origin_frame_stays_cross_origin"
  },
  {
   "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
   "function": "JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,",
   "kind": "add",
   "form": "unknown",
-  "line": "  // STEALTH-HOOK(automation/hybrid-xrays)",
-  "test": ""
- },
- {
-  "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
-  "function": "JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  else if (StealthCallerObjectApplies(origin, target, targetIsChrome,",
-  "test": ""
- },
- {
-  "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
-  "function": "JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "                                      targetSubsumesOrigin)) {",
-  "test": ""
- },
- {
-  "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
-  "function": "JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    wrapper = StealthCallerObjectWrapper();",
-  "test": ""
- },
- {
-  "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
-  "function": "JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  }",
-  "test": ""
+  "line": "  else if (StealthCallerObjectApplies(origin, target, targetIsChrome, targetSubsumesOrigin)) wrapper = StealthCallerObjectWrapper();  // STEALTH-HOOK(automation/hybrid-xrays)",
+  "test": "wrapper:tests/test_the_callers_code_is_not_counted_e2e.py::test_what_the_caller_hands_the_page_has_the_pages_own_prototypes"
  },
  {
   "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
   "function": "JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,",
   "kind": "rewrite",
-  "form": "unknown",
-  "line": "           !xray.originForcesXrays && !xray.targetForcesXrays &&",
-  "removed": "           !originCompartmentPrivate->wantXrays &&\n           !targetCompartmentPrivate->wantXrays &&",
-  "test": ""
+  "form": "wrap-expression",
+  "line": "           !StealthTargetWantsXrays(cx, targetCompartmentPrivate->wantXrays) &&  // STEALTH-HOOK(automation/hybrid-xrays)",
+  "removed": "           !targetCompartmentPrivate->wantXrays &&",
+  "test": "wrapper:tests/test_the_callers_code_is_not_counted_e2e.py::test_what_the_page_added_is_the_pages"
  },
  {
   "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
   "function": "JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,",
   "kind": "rewrite",
-  "form": "unknown",
-  "line": "    bool sameOriginXrays = xray.originForcesXrays || xray.targetForcesXrays;",
-  "removed": "    bool sameOriginXrays = originCompartmentPrivate->wantXrays ||\n                           targetCompartmentPrivate->wantXrays;",
-  "test": ""
+  "form": "wrap-expression",
+  "line": "                           StealthTargetWantsXrays(cx, targetCompartmentPrivate->wantXrays);  // STEALTH-HOOK(automation/hybrid-xrays)",
+  "removed": "                           targetCompartmentPrivate->wantXrays;",
+  "test": "wrapper:tests/test_the_callers_code_is_not_counted_e2e.py::test_what_the_page_added_is_the_pages"
  },
  {
   "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
@@ -356,15 +217,19 @@
   "form": "unknown",
   "line": "    // STEALTH-HOOK(automation/hybrid-xrays)",
   "removed": "    wrapper = SelectWrapper(securityWrapper, xrayType, waiveXrays, obj);",
-  "test": ""
+  "test": "wrapper:tests/test_the_callers_code_is_not_counted_e2e.py::test_what_the_page_added_is_the_pages",
+  "exception": "G35, declared by the pm's verdict (point 2): the selection answers inside the generic branch, before Mozilla's SelectWrapper, as it does today; moved after the chain the whole classification would run for our case and be replaced afterwards; no fixed form expresses a ternary that chooses between our wrapper and Mozilla's call",
+  "pm": "approvato"
  },
  {
   "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
   "function": "JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,",
   "kind": "rewrite",
   "form": "unknown",
-  "line": "    wrapper = xray.targetHybrid && !securityWrapper && !waiveXrays",
-  "test": ""
+  "line": "    wrapper = StealthTargetIsHybrid(cx) && !securityWrapper && !waiveXrays",
+  "test": "wrapper:tests/test_the_callers_code_is_not_counted_e2e.py::test_what_the_page_added_is_the_pages",
+  "exception": "G35, declared by the pm's verdict (point 2): the selection answers inside the generic branch, before Mozilla's SelectWrapper, as it does today; moved after the chain the whole classification would run for our case and be replaced afterwards; no fixed form expresses a ternary that chooses between our wrapper and Mozilla's call",
+  "pm": "approvato"
  },
  {
   "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
@@ -372,7 +237,9 @@
   "kind": "rewrite",
   "form": "unknown",
   "line": "                  ? StealthHybridWrapper(xrayType)",
-  "test": ""
+  "test": "wrapper:tests/test_the_callers_code_is_not_counted_e2e.py::test_what_the_page_added_is_the_pages",
+  "exception": "G35, declared by the pm's verdict (point 2): the selection answers inside the generic branch, before Mozilla's SelectWrapper, as it does today; moved after the chain the whole classification would run for our case and be replaced afterwards; no fixed form expresses a ternary that chooses between our wrapper and Mozilla's call",
+  "pm": "approvato"
  },
  {
   "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
@@ -380,39 +247,17 @@
   "kind": "rewrite",
   "form": "unknown",
   "line": "                  : SelectWrapper(securityWrapper, xrayType, waiveXrays, obj);",
-  "test": ""
+  "test": "wrapper:tests/test_the_callers_code_is_not_counted_e2e.py::test_what_the_page_added_is_the_pages",
+  "exception": "G35, declared by the pm's verdict (point 2): the selection answers inside the generic branch, before Mozilla's SelectWrapper, as it does today; moved after the chain the whole classification would run for our case and be replaced afterwards; no fixed form expresses a ternary that chooses between our wrapper and Mozilla's call",
+  "pm": "approvato"
  },
  {
   "file": "js/xpconnect/wrappers/XrayWrapper.h",
   "function": "class XrayWrapper : public Base {",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(automation/hybrid-xrays)",
-  "test": ""
- },
- {
-  "file": "js/xpconnect/wrappers/XrayWrapper.h",
-  "function": "class XrayWrapper : public Base {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  constexpr XrayWrapper(unsigned flags, bool aHasPrototype);",
-  "test": ""
- },
- {
-  "file": "js/xpconnect/wrappers/XrayWrapper.h",
-  "function": "JSObject* EnsureXrayExpandoObject(JSContext* cx, JS::HandleObject wrapper);",
-  "kind": "add",
-  "form": "unknown",
-  "line": "// STEALTH-HOOK(automation/hybrid-xrays)",
-  "test": ""
- },
- {
-  "file": "js/xpconnect/wrappers/XrayWrapper.h",
-  "function": "JSObject* EnsureXrayExpandoObject(JSContext* cx, JS::HandleObject wrapper);",
-  "kind": "add",
-  "form": "unknown",
-  "line": "#include \"StealthHybridXray.h\"",
-  "test": ""
+  "form": "member",
+  "line": "  constexpr XrayWrapper(unsigned flags, bool aHasPrototype);  // STEALTH-HOOK(automation/hybrid-xrays)",
+  "test": "wrapper:tests/test_the_callers_code_is_not_counted_e2e.py::test_what_the_page_added_is_the_pages"
  },
  {
   "file": "js/xpconnect/wrappers/moz.build",
@@ -420,6 +265,6 @@
   "kind": "add",
   "form": "registration",
   "line": "SOURCES += [\"StealthHybridXray.cpp\"]  # STEALTH-HOOK(automation/hybrid-xrays)",
-  "test": ""
+  "test": "wrapper:tests/test_the_callers_code_is_not_counted_e2e.py::test_what_the_page_added_is_the_pages"
  }
 ]

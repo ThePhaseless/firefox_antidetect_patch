@@ -1,12 +1,13 @@
-// A TCP socket of a PeerConnection (TURN over TCP) is opened plain (DIRECT) only when its context has no proxy. Upstream's
+/// A TCP socket of a PeerConnection (TURN over TCP) is opened plain (DIRECT) only when its context has no proxy. Upstream's
 // WebrtcTCPSocket::OnProxyAvailable opens it plain at the end of the function for every other outcome too: a lookup that failed (a PAC
 // thread cancelled or shut down answers a failure status, which skips the proxy filters), a null info with a failed status, or an info of
 // a type it does not know. The socket then leaves from the host's own address while the context has a proxy. The UDP twin
 // (PcUdpProxy::KindFor) already reads a failed lookup as "proxy not known: nothing goes out".
 //
-// The hook is one tagged line before that end, calling StealthTcpDirectRefused (own file StealthIceResolverContext.cpp, declared in
-// nr_stealth_network.h which the TCP socket already includes). WebrtcTCPSocket.cpp stays at its ceiling of added lines: the two hooks of
-// OpenWithoutHttpProxy that sat before the bind (the context of the name lookup, the bind address) became one call, StealthTcpSocketBorn.
+// The hook is one guard before that end, StealthTcpSocketRefusesDirect (own file StealthWebrtcTcpSocket.h), which asks
+// StealthTcpDirectRefused (own file StealthIceResolverContext.cpp, declared in nr_stealth_network.h) and closes the socket. The
+// two hooks of OpenWithoutHttpProxy that sat before the bind (the context of the name lookup, the bind address) are one call,
+// StealthTcpSocketBorn. The file lists its entries here; the presence of each hook is the series' list of hooks.
 // Behaviour of the functions: dom/media/webrtc/transport/test/gtest/TestStealthTcpProxyRoad.cpp.
 //
 // Run: node --test juggler/tests/*.test.mjs
@@ -22,8 +23,9 @@ const TREE = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
 const read = rel => fs.readFileSync(path.join(TREE, rel), 'utf8');
 const T = 'dom/media/webrtc/transport/';
 const TCP = T + 'ipc/WebrtcTCPSocket.cpp';
+const OWN = T + 'ipc/StealthWebrtcTcpSocket.h';
 
-const HOOK = '  if (mozilla::StealthTcpDirectRefused(mProxyConfig.isSome(), NS_FAILED(aResult), aProxyinfo)) { CloseWithReason(NS_ERROR_FAILURE); return NS_OK; }  // STEALTH-HOOK(network/proxy-udp)\n';
+const HOOK = '  if (StealthTcpSocketRefusesDirect(this, aResult, aProxyinfo)) return NS_OK;  // STEALTH-HOOK(network/proxy-udp)\n';
 
 function onProxyAvailable() {
   const text = read(TCP);
@@ -32,7 +34,7 @@ function onProxyAvailable() {
   return text.slice(start, text.indexOf('\n}\n', start) + 3);
 }
 
-test('the end of OnProxyAvailable refuses a socket whose lookup failed or answered an unknown proxy, before it can open it plain', () => {
+test('the only plain open at the end of OnProxyAvailable is below the refusal of a socket whose lookup failed or answered an unknown proxy', () => {
   const body = onProxyAvailable();
   assert.ok(body.includes(HOOK), 'no refusal before the plain open');
   const plain = body.indexOf('OpenWithoutHttpProxy(nullptr);');
@@ -51,25 +53,33 @@ test('the rule is the one of UDP: only "no proxy" (lookup succeeded, no info) op
   assert.match(read('netwerk/socket/StealthPcUdpProxy.cpp'), /Kind kind = NS_SUCCEEDED\(aStatus\) \? Kind::Direct : Kind::Blocked;/);
 });
 
-test('the function is declared in the header the TCP socket already includes: no new include in its file', () => {
+test('the refusal closes the socket with NS_ERROR_FAILURE and is the only caller of the rule in the files of the socket', () => {
+  const own = read(OWN);
+  const fn = own.match(/static bool TcpSocketRefusesDirect\([\s\S]*?\n  }\n/)[0];
+  assert.match(fn, /StealthTcpDirectRefused\(aSocket->mProxyConfig\.isSome\(\), NS_FAILED\(aResult\), aProxyInfo\)/);
+  assert.match(fn, /aSocket->CloseWithReason\(NS_ERROR_FAILURE\);\n    return true;/);
+  const calls = [TCP, OWN].map(f => (read(f).match(/StealthTcpDirectRefused\(/g) || []).length);
+  assert.deepEqual(calls, [0, 1], 'the rule is asked from Mozilla\'s file, or from a second place');
+  // The function is declared in the header our file includes; the file of Mozilla has one include of ours.
   assert.match(read(T + 'nr_stealth_network.h'), /\nbool StealthTcpDirectRefused\(bool aHasProxyConfig, bool aLookupFailed, nsIProxyInfo\* aInfo\);\n/);
-  assert.match(read(T + 'nr_stealth_network.h'), /\nclass nsIProxyInfo;\n/);
+  assert.match(own, /#include "transport\/nr_stealth_network\.h"/);
   const text = read(TCP);
-  assert.match(text, /\n#include "transport\/nr_stealth_network\.h"/);
+  assert.match(text, /\n#include "StealthWebrtcTcpSocket\.h"  \/\/ STEALTH-HOOK\(network\/proxy-udp\)\n/);
   assert.doesNotMatch(text, /StealthIceResolverContext\.h/);
-  assert.equal(text.match(/\n#include [^\n]*STEALTH-HOOK/g).length, 2, 'a third tagged include');
+  assert.equal(text.match(/\n#include [^\n]*STEALTH-HOOK/g).length, 1, 'a second tagged include');
 });
 
-test('the two hooks before the bind are one line: the file keeps its tagged lines and its added lines', () => {
+test('the name context and the bind address of the transport come from one call, StealthTcpSocketBorn: the only entry of both', () => {
   const text = read(TCP);
-  const tagged = text.split('\n').filter(l => /STEALTH-HOOK\(/.test(l));
-  assert.ok(tagged.length <= 6, `${tagged.length} tagged lines, the file had 6 before the refusal: the merge is not done`);
   assert.doesNotMatch(text, /StealthTcpNameContext\(/);
   assert.doesNotMatch(text, /StealthTcpBindAddress\(/);
   assert.equal(text.match(/StealthTcpSocketBorn\(/g).length, 1);
   assert.match(read(T + 'nr_stealth_network.h'),
     /\nbool StealthTcpSocketBorn\(nsISocketTransport\* aTransport, const net::WebrtcProxyConfig\* aConfig, const char\* aDeclaredAddress,\n\s+uint16_t aNicerPort, union PRNetAddr\* aOut\);\n/);
-  // The ceiling of the series (tools/hook-budget.json): 17 lines added to the release. Skipped where the release tag is not in the checkout.
+  // Of the files of the engine outside the tests, only our file and the function of the context call the two.
+  const own = read(OWN);
+  assert.match(own, /mozilla::StealthTcpSocketBorn\(aSocket->mTransport, aSocket->mProxyConfig\.ptrOr\(nullptr\),\n\s+aSocket->mLocalAddress\.get\(\), aSocket->mLocalPort, aAddr\);/);
+  // The ceiling of the series (tools/hook-budget.json). Skipped where the release tag is not in the checkout.
   let diff = null;
   try {
     diff = execFileSync('git', ['diff', '-U0', 'FIREFOX_159_0_RELEASE', '--', TCP],

@@ -1,0 +1,9 @@
+[DEFAULT]
+head = "head_urlformatter.js"
+skip-if = [
+  "os == 'android'",
+]
+
+["test_stealth_apikeys.js"]
+
+["test_stealth_apikeys_observer.js"]

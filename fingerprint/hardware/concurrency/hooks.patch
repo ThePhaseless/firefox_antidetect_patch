@@ -1,25 +1,21 @@
 diff --git a/dom/workers/WorkerNavigator.cpp b/dom/workers/WorkerNavigator.cpp
-index 50dbb0847d352e5ba07e01319d0c9013fbfb4bc9..adf701249ce3998229e6292e2a84e955d24d8f07 100644
+index 50dbb0847d352e5ba07e01319d0c9013fbfb4bc9..74e3fb486841e958105459c66a11ea6859863a53 100644
 --- a/dom/workers/WorkerNavigator.cpp
 +++ b/dom/workers/WorkerNavigator.cpp
-@@ -29,6 +29,7 @@
- #include "nsPIDOMWindow.h"
+@@ -30,6 +30,8 @@
  #include "nsRFPService.h"
  #include "nsString.h"
-+#include "mozilla/StaticPrefs_zoom.h"
  
++#include "StealthHardwareConcurrency.h"  // STEALTH-HOOK(fingerprint/hardware/concurrency)
++
  class JSObject;
  struct JSContext;
-@@ -227,6 +228,12 @@ void WorkerNavigator::GetUserAgent(nsCString& aUserAgent,
+ 
+@@ -227,6 +229,7 @@ void WorkerNavigator::GetUserAgent(nsCString& aUserAgent,
  }
  
  uint64_t WorkerNavigator::HardwareConcurrency() const {
-+  // STEALTH-HOOK(fingerprint/hardware/concurrency)
-+  {
-+    int32_t hwc = mozilla::StaticPrefs::zoom_stealth_hw_concurrency();
-+    if (hwc > 0) return uint64_t(hwc);
-+  }
-+
++  if (uint64_t stealth; StealthWorkerHardwareConcurrency(&stealth)) return stealth;  // STEALTH-HOOK(fingerprint/hardware/concurrency)
    RuntimeService* rts = RuntimeService::GetService();
    MOZ_ASSERT(rts);
  

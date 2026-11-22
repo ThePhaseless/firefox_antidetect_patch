@@ -1,16 +1,17 @@
 diff --git a/widget/GfxInfoBase.cpp b/widget/GfxInfoBase.cpp
-index 9ebeb94673c98bde3238c03208d6fa9408c21452..1768d2e8a353df6fdeffc692146cbb156100e71a 100644
+index 9ebeb94673c98bde3238c03208d6fa9408c21452..469cee301a37656e89d1d72693912d9670930378 100644
 --- a/widget/GfxInfoBase.cpp
 +++ b/widget/GfxInfoBase.cpp
-@@ -4,6 +4,7 @@
-  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+@@ -40,6 +40,8 @@
+ #include "nsVersionComparator.h"
+ #include "nsXULAppAPI.h"
  
- #include "GfxInfoBase.h"
 +#include "StealthGfxFeatureStatus.h"  // STEALTH-HOOK(platform/declaration-gate)
- 
- #include <mutex>  // std::call_once
- 
-@@ -589,6 +590,7 @@ GfxInfoBase::GetFeatureStatus(int32_t aFeature, nsACString& aFailureId,
++
+ #ifdef MOZ_WIDGET_ANDROID
+ #  include "AndroidBuild.h"
+ #  include "nsContentUtils.h"
+@@ -589,6 +591,7 @@ GfxInfoBase::GetFeatureStatus(int32_t aFeature, nsACString& aFailureId,
      MOZ_ASSERT_UNREACHABLE("Checking retired feature!");
      return NS_ERROR_INVALID_ARG;
    }
@@ -18,7 +19,7 @@ index 9ebeb94673c98bde3238c03208d6fa9408c21452..1768d2e8a353df6fdeffc692146cbb15
  
    // Ignore the gfx.blocklist.all pref on release and beta.
  #if defined(RELEASE_OR_BETA)
-@@ -1232,6 +1234,7 @@ nsresult GfxInfoBase::GetFeatureStatusImpl(
+@@ -1232,6 +1235,7 @@ nsresult GfxInfoBase::GetFeatureStatusImpl(
  NS_IMETHODIMP
  GfxInfoBase::GetFeatureSuggestedDriverVersion(int32_t aFeature,
                                                nsAString& aVersion) {
@@ -26,7 +27,7 @@ index 9ebeb94673c98bde3238c03208d6fa9408c21452..1768d2e8a353df6fdeffc692146cbb15
    nsCString version;
    if (GetPrefValueForDriverVersion(version)) {
      aVersion = NS_ConvertASCIItoUTF16(version);
-@@ -1259,6 +1262,7 @@ GfxInfoBase::GetFeatureSuggestedDriverVersionStr(const nsAString& aFeature,
+@@ -1259,6 +1263,7 @@ GfxInfoBase::GetFeatureSuggestedDriverVersionStr(const nsAString& aFeature,
  
  void GfxInfoBase::EvaluateDownloadedBlocklist(
      nsTArray<RefPtr<GfxDriverInfo>>& aDriverInfo) {
@@ -35,18 +36,19 @@ index 9ebeb94673c98bde3238c03208d6fa9408c21452..1768d2e8a353df6fdeffc692146cbb15
    // GetFeatureStatusImpl since we will use the static list instead. In that
    // case, all we want to do is make sure the pref is removed.
 diff --git a/widget/gtk/GfxInfo.cpp b/widget/gtk/GfxInfo.cpp
-index cac1557e2f595204473e75e8977055e6a121a810..6d1068386ec936f7a2d6e66431f899d5f3a111a4 100644
+index cac1557e2f595204473e75e8977055e6a121a810..c8b6fc9524253946ded1b441078aa7098c2c94a7 100644
 --- a/widget/gtk/GfxInfo.cpp
 +++ b/widget/gtk/GfxInfo.cpp
-@@ -17,6 +17,7 @@
- #include <string>
+@@ -37,6 +37,8 @@
+ #include "nsWhitespaceTokenizer.h"
+ #include "prenv.h"
  
- #include "MediaCodecsSupport.h"
 +#include "StealthGfxFeatureStatus.h"  // STEALTH-HOOK(platform/declaration-gate)
- #include "WidgetUtilsGtk.h"
- #include "mozilla/GUniquePtr.h"
- #include "mozilla/SSE.h"
-@@ -252,6 +253,7 @@ void GfxInfo::GetData() {
++
+ #ifdef MOZ_WAYLAND
+ #  include "nsWaylandDisplay.h"
+ #endif
+@@ -252,6 +254,7 @@ void GfxInfo::GetData() {
    GfxInfo::FireGLXTestProcess();
  
    GfxInfoBase::GetData();
@@ -54,7 +56,7 @@ index cac1557e2f595204473e75e8977055e6a121a810..6d1068386ec936f7a2d6e66431f899d5
  
    char* glxData = nullptr;
    auto free = mozilla::MakeScopeExit([&] { g_free((void*)glxData); });
-@@ -695,6 +697,7 @@ int GfxInfo::FireTestProcess(const nsAString& aBinaryFile, int* aOutPipe,
+@@ -695,6 +698,7 @@ int GfxInfo::FireTestProcess(const nsAString& aBinaryFile, int* aOutPipe,
  }
  
  bool GfxInfo::FireGLXTestProcess() {

@@ -192,7 +192,27 @@ test('source: the generate mode asks the network for nothing and opens no window
   assert.match(module, /preventDefault = true/);
 });
 
-test('source: the hook in RemoteSecuritySettings.init stops the sync before anything else', () => {
+test('source: the only entry that creates a security-state client is RemoteSecuritySettings.init, below our guard', () => {
   const settings = read('../security/manager/ssl/RemoteSecuritySettings.sys.mjs');
-  assert.match(settings, /init\(\) \{\s*\/\/ STEALTH-HOOK\(stillborn\/security-state\)\s*const \{ StealthSecurityState \} = ChromeUtils\.importESModule\("resource:\/\/gre\/modules\/psm\/StealthSecurityState\.sys\.mjs"\);\s*if \(StealthSecurityState\.ownsSync\(\)\) \{ return this; \}\s*\/\/ Avoid repeated initialization/);
+  const start = settings.indexOf('  init() {');
+  assert.ok(start > 0, 'RemoteSecuritySettings.init exists');
+  const end = start + settings.slice(start).search(/^};/m);
+  assert.ok(end > start, 'the object ends after init()');
+  const init = settings.slice(start, end);
+  const guard = init.indexOf('ownsSync()');
+  assert.ok(guard > 0, 'init() asks StealthSecurityState.ownsSync()');
+  // Every way to make a client of the bucket: Mozilla's three constructions, each once, all inside init().
+  const entries = [/RemoteSettings\("onecrl"/g, /new IntermediatePreloads\(/g, /new CRLiteFilters\(/g];
+  for (const entry of entries) {
+    assert.equal((settings.match(entry) || []).length, 1, `${entry} is built in one place only`);
+    const at = init.search(entry);
+    assert.ok(at > guard, `${entry} is built in init(), after the guard`);
+  }
+  // The classes are made by their own constructors and by nothing else, so a client of the bucket
+  // that Mozilla adds later outside init() makes this test red.
+  const bucketClients = (settings.match(/bucketName: SECURITY_STATE_BUCKET/g) || []).length;
+  assert.equal(bucketClients, 3, 'three clients of the bucket: onecrl in init(), one in each class constructor');
+  assert.equal((settings.match(/RemoteSettings\(/g) || []).length, 3, 'no other RemoteSettings client is made in this file');
+  // The guard is the first statement of init(), before the _initialized check.
+  assert.ok(guard < init.indexOf('this._initialized'), 'the guard is before the _initialized check');
 });

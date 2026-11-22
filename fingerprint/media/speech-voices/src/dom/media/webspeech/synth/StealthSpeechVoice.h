@@ -6,7 +6,6 @@
 #ifndef DOM_MEDIA_WEBSPEECH_SYNTH_STEALTHSPEECHVOICE_H_
 #define DOM_MEDIA_WEBSPEECH_SYNTH_STEALTHSPEECHVOICE_H_
 
-#include "mozilla/Maybe.h"
 #include "nsStringFwd.h"
 
 namespace mozilla::dom {
@@ -37,10 +36,10 @@ bool StealthVoiceRetailURI(const nsAString& aUri, nsAString& aOut);
 bool StealthVoiceName(const nsAString& aUri, nsAString& aOut);
 bool StealthVoiceLang(const nsAString& aUri, nsAString& aOut);
 
-// SpeechSynthesisVoice.localService / .default: Some(value) for an internal
-// URI, Nothing otherwise.
-Maybe<bool> StealthVoiceLocal(const nsAString& aUri);
-Maybe<bool> StealthVoiceDefault(const nsAString& aUri);
+// SpeechSynthesisVoice.localService / .default: true and *aOut = the value for
+// an internal URI, false (and *aOut untouched) otherwise.
+bool StealthVoiceLocal(const nsAString& aUri, bool* aOut);
+bool StealthVoiceDefault(const nsAString& aUri, bool* aOut);
 
 }  // namespace mozilla::dom
 

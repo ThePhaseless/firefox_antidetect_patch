@@ -2,7 +2,9 @@
  "modified": [
   "dom/html/HTMLInputElement.cpp"
  ],
- "added": {},
+ "added": {
+  "dom/html/StealthFileChooser.h": "100644"
+ },
  "inventory": [
   {
    "file": "dom/html/HTMLInputElement.cpp",

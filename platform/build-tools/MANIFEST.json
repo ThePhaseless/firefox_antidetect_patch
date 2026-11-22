@@ -8,6 +8,8 @@
  "added": {
   "build/stealth_check_build_files.py": "100644",
   "build/stealth_check_sources.py": "100644",
+  "python/mozbuild/mozbuild/stealth_build_tools.py": "100644",
+  "scripts/ci/test_stealth_build_tools.py": "100644",
   "scripts/ci/test_stealth_download_watchdog.py": "100644",
   "third_party/python/vsdownload/stealth_download_watchdog.py": "100644"
  },

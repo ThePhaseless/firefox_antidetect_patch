@@ -35,7 +35,7 @@ namespace mozilla {
  * already allow read access to everything, between the chrome and extensions
  * directory rules, so the order of the rules does not change.
  */
-inline void AddDeclaredBrandingReadRule(sandbox::TargetConfig* aConfig) {
+inline void StealthBrandingAddReadRule(sandbox::TargetConfig* aConfig) {
   if (nsCOMPtr<nsIFile> branding =
           mozilla::net::StealthBrandingDeclaredArchive()) {
     nsAutoString brandingRule;

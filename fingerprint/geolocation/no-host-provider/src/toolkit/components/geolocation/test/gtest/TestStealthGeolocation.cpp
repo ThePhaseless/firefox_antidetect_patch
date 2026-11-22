@@ -12,6 +12,7 @@
 #include <string.h>
 
 #include "mozilla/StealthGeolocation.h"
+#include "mozilla/dom/PermissionsBinding.h"
 #include "nsIGeolocationProvider.h"
 
 TEST(StealthDeclaredNetwork, GeolocationProviderIsTheNetworkProviderOnEveryOS)
@@ -29,4 +30,14 @@ TEST(StealthDeclaredNetwork, TheSystemLocationSwitchIsDeclaredOn)
 {
   // On, whatever the machine says: the answer does not come from the OS.
   EXPECT_TRUE(mozilla::StealthSystemLocationDeclaredOn());
+}
+
+TEST(StealthDeclaredNetwork, OnlyTheGeolocationPermissionSkipsItsOsMonitor)
+{
+  // The declared switch never changes, so its monitor is skipped; every other
+  // permission keeps the monitor Mozilla starts for it (negative control).
+  EXPECT_TRUE(mozilla::StealthSkipsPermissionMonitor(
+      mozilla::dom::PermissionName::Geolocation));
+  EXPECT_FALSE(mozilla::StealthSkipsPermissionMonitor(
+      mozilla::dom::PermissionName::Notifications));
 }

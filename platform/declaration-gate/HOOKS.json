@@ -5,7 +5,7 @@
   "kind": "add",
   "form": "registration",
   "line": "#include \"StealthGfxFeatureStatus.h\"  // STEALTH-HOOK(platform/declaration-gate)",
-  "test": ""
+  "test": "gtest:StealthGfxFeatureStatus.EveryLiveFeatureAnswersFromTheDeclaration"
  },
  {
   "file": "widget/GfxInfoBase.cpp",
@@ -13,9 +13,9 @@
   "kind": "add",
   "form": "anchor",
   "line": "  if (mozilla::gfx::StealthGfxDeclaredStatus(this, aFeature, aFailureId, aStatus)) return NS_OK;  // STEALTH-HOOK(platform/declaration-gate)",
-  "test": "",
-  "anchor": "",
-  "why": ""
+  "test": "gtest:StealthGfxFeatureStatus.EveryLiveFeatureAnswersFromTheDeclaration",
+  "anchor": "if (IsFeatureRetired(aFeature)) { ... return NS_ERROR_INVALID_ARG; }",
+  "why": "The retired-feature check must run first as in the baseline: a retired feature is refused by Mozilla's code before anything of ours; WebGL depends on this function."
  },
  {
   "file": "widget/GfxInfoBase.cpp",
@@ -23,7 +23,7 @@
   "kind": "add",
   "form": "guard",
   "line": "  if (mozilla::gfx::StealthGfxSuggestedDriverVersion(aVersion)) return NS_OK;  // STEALTH-HOOK(platform/declaration-gate)",
-  "test": ""
+  "test": "gtest:StealthGfxFeatureStatus.NoSuggestedDriverVersionWhileDeclared"
  },
  {
   "file": "widget/GfxInfoBase.cpp",
@@ -31,7 +31,7 @@
   "kind": "add",
   "form": "guard",
   "line": "  if (mozilla::gfx::StealthGfxDeclarationActive()) return;  // STEALTH-HOOK(platform/declaration-gate)",
-  "test": ""
+  "test": "gtest:StealthGfxFeatureStatus.TheDownloadedBlocklistLeavesTheProfileAlone"
  },
  {
   "file": "widget/gtk/GfxInfo.cpp",
@@ -39,7 +39,7 @@
   "kind": "add",
   "form": "registration",
   "line": "#include \"StealthGfxFeatureStatus.h\"  // STEALTH-HOOK(platform/declaration-gate)",
-  "test": ""
+  "test": "gtest:StealthGfxFeatureStatus.EveryLiveFeatureAnswersFromTheDeclaration"
  },
  {
   "file": "widget/gtk/GfxInfo.cpp",
@@ -47,9 +47,9 @@
   "kind": "add",
   "form": "anchor",
   "line": "  if (gfx::StealthFillGtkGfxInfoWithoutHost(mTestType, mGlxTestError, mAdapterRAM, mIsWayland, mIsXWayland)) return;  // STEALTH-HOOK(platform/declaration-gate)",
-  "test": "",
-  "anchor": "",
-  "why": ""
+  "test": "gtest:StealthGfxFeatureStatus.TheHostIsNotProbedWhileDeclared",
+  "anchor": "GfxInfoBase::GetData();",
+  "why": "GfxInfo::GetData sets mInitialized and runs GfxInfoBase::GetData() before; a guard in the head would skip both, and the five fields it fills (test type, glxtest error, adapter RAM, the two display flags) are the ones the glxtest parse below would otherwise write."
  },
  {
   "file": "widget/gtk/GfxInfo.cpp",
@@ -57,6 +57,6 @@
   "kind": "add",
   "form": "guard",
   "line": "  if (gfx::StealthNoHostGLProbe()) return false;  // STEALTH-HOOK(platform/declaration-gate)",
-  "test": ""
+  "test": "gtest:StealthGfxFeatureStatus.TheHostIsNotProbedWhileDeclared"
  }
 ]

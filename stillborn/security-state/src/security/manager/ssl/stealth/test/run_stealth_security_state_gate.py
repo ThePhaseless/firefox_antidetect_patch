@@ -7,6 +7,7 @@
     python run_stealth_security_state_gate.py <firefox binary>
         [--cases generate,inspect,...]
         [--module-file StealthSecurityState.sys.mjs] [--crlite-data DIR]
+        [--junit FILE]
     python run_stealth_security_state_gate.py --make-crlite-data DIR
 
 Each case is one `firefox -xpcshell stealth_security_state_case.js` process with
@@ -78,6 +79,11 @@ loads it from a resource: URL pointed at its folder, and calls its startup class
 as the profile-after-change category does. (`category` and `poller` are about the
 package and ignore it.)
 
+--junit FILE writes the verdict as a junit (xunit2) file: one testcase per case, named `case:<name>`, its classname the path of this script as a
+dotted module (what the hook tests judge turns back into this file). A case that passed is a passed testcase, one that failed is a <failure>, one that
+did not run (a process that did not start or did not answer, a case the run stopped before) is an <error>, one that --cases did not select is
+<skipped/>: a skipped case is never a pass. The exit status is the same with or without it.
+
 Exit status: 0 when every case passed, 1 when one failed, 2 when one did not run.
 """
 
@@ -94,6 +100,7 @@ import sys
 import tempfile
 import threading
 import urllib.parse
+import xml.etree.ElementTree as ET
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CASE_SCRIPT = os.path.join(HERE, "stealth_security_state_case.js")
@@ -790,7 +797,38 @@ COMPOSITE = {
 }
 
 
-def main():
+JUNIT_CLASSNAME = "security.manager.ssl.stealth.test.run_stealth_security_state_gate"
+
+
+def write_junit(path, outcomes, selected):
+    """outcomes: {case: (status, message)}, status being passed, failed or error, for the cases that ran; selected: the cases --cases asked for.
+    Every case of ALL_CASES is a testcase: one not selected is skipped, one selected with no outcome did not run (the gate stopped before it)."""
+    rows = []
+    for case in ALL_CASES:
+        if case in outcomes:
+            rows.append((case,) + tuple(outcomes[case]))
+        elif case in selected:
+            rows.append((case, "error", "did not run: the gate stopped before this case"))
+        else:
+            rows.append((case, "skipped", "not selected by --cases"))
+    count = lambda status: str(len([r for r in rows if r[1] == status]))
+    root = ET.Element("testsuites")
+    suite = ET.SubElement(
+        root, "testsuite", name="security-state", tests=str(len(rows)), failures=count("failed"), errors=count("error"), skipped=count("skipped"), time="0"
+    )
+    for case, status, message in rows:
+        testcase = ET.SubElement(suite, "testcase", classname=JUNIT_CLASSNAME, name="case:" + case, time="0")
+        if status in ("failed", "error"):
+            child = ET.SubElement(testcase, "failure" if status == "failed" else "error", message=(message or status)[:300])
+            child.text = message
+        elif status == "skipped":
+            ET.SubElement(testcase, "skipped", message=message)
+    folder = os.path.dirname(os.path.abspath(path))
+    os.makedirs(folder, exist_ok=True)
+    ET.ElementTree(root).write(path, encoding="utf-8", xml_declaration=True)
+
+
+def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("firefox", nargs="?")
     ap.add_argument("--cases", default=",".join(ALL_CASES))
@@ -798,7 +836,8 @@ def main():
     ap.add_argument("--crlite-data", help="a folder with Mozilla's test_crlite_filters files, instead of crlite_test_data.json")
     ap.add_argument("--make-crlite-data", metavar="DIR", help="write crlite_test_data.json from Mozilla's test_crlite_filters folder DIR, and stop")
     ap.add_argument("--module-file", help="a source of StealthSecurityState.sys.mjs to test instead of the package's")
-    args = ap.parse_args()
+    ap.add_argument("--junit", metavar="FILE", help="also write the verdict as a junit (xunit2) file, one testcase case:<name> per case")
+    args = ap.parse_args(argv)
     if args.make_crlite_data:
         make_crlite_data(os.path.abspath(args.make_crlite_data))
         print("wrote " + CRLITE_DATA_FILE)
@@ -815,6 +854,7 @@ def main():
 
     workdir = tempfile.mkdtemp(prefix="stealth-security-state-")
     status = 0
+    outcomes = {}
     try:
         fixture_file = make_fixture(workdir, args.filler, crlite_data_dir(args.crlite_data, workdir))
         with open(fixture_file, encoding="utf-8") as fh:
@@ -827,24 +867,29 @@ def main():
                 if case in COMPOSITE:
                     verdict = COMPOSITE[case](args.firefox, fixture_file, fixture, workdir, module_file)
                     print(verdict.line())
+                    outcomes[case] = ("failed", "; ".join(verdict.problems)) if verdict.problems else ("passed", "; ".join(verdict.notes))
                     if verdict.problems:
                         status = max(status, 1)
                     continue
                 result, problem, log = run_case(args.firefox, case, fixture_file, workdir, module_file)
             except CaseFailed as exc:
                 print("%-24s FAIL  %s" % (case, exc))
+                outcomes[case] = ("failed", str(exc))
                 status = max(status, 1)
                 continue
             except RuntimeError as exc:
                 print("%-24s DID NOT RUN: %s" % (case, exc))
+                outcomes[case] = ("error", "did not run: %s" % exc)
                 status = max(status, 2)
                 continue
             if result is None:
                 print("%-24s DID NOT RUN: %s" % (case, problem))
                 print(log[-2000:])
+                outcomes[case] = ("error", "did not run: %s" % problem)
                 status = max(status, 2)
                 continue
             ok, detail = result["ok"], result["detail"]
+            outcomes[case] = ("passed" if ok else "failed", detail)
             print("%-24s %s  %s" % (case, "PASS" if ok else "FAIL", detail))
             if result.get("evidence"):
                 print("%-24s evidence (never asserted): %s" % ("", json.dumps(result["evidence"])))
@@ -852,6 +897,8 @@ def main():
                 status = max(status, 1)
     finally:
         shutil.rmtree(workdir, ignore_errors=True)
+        if args.junit:
+            write_junit(args.junit, outcomes, cases)
     return status
 
 

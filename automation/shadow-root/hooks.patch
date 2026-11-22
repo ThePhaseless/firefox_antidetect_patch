@@ -1,21 +1,22 @@
 diff --git a/dom/base/Element.cpp b/dom/base/Element.cpp
-index b0f08fd6241f36b7a499d33613030f27a63aab96..ecfb19362f30f4ea80fe51ea1f45df177b0b2bdb 100644
+index b0f08fd6241f36b7a499d33613030f27a63aab96..26f19a995fe24f36e089c0bd759af24bf7024c40 100644
 --- a/dom/base/Element.cpp
 +++ b/dom/base/Element.cpp
-@@ -210,6 +210,7 @@
- #include "nsThreadUtils.h"
- #include "nsWindowSizes.h"
- #include "nsXULElement.h"
-+#include "StealthShadowRoot.h"  // STEALTH-HOOK(automation/shadow-root)
+@@ -219,6 +219,8 @@
+ #  include "nsAccessibilityService.h"
+ #endif
  
- #ifdef DEBUG
- #  include "mozilla/dom/Range.h"
-@@ -1385,14 +1386,15 @@ void Element::SetSlot(const nsAString& aName, ErrorResult& aError) {
++#include "StealthShadowRoot.h"  // STEALTH-HOOK(automation/shadow-root)
++
+ using mozilla::gfx::Matrix4x4;
+ 
+ namespace mozilla::dom {
+@@ -1385,14 +1387,14 @@ void Element::SetSlot(const nsAString& aName, ErrorResult& aError) {
  void Element::GetSlot(nsAString& aName) { GetAttr(nsGkAtoms::slot, aName); }
  
  // https://dom.spec.whatwg.org/#dom-element-shadowroot
 -ShadowRoot* Element::GetShadowRootForBindings() const {
-+ShadowRoot* Element::GetShadowRootForBindings(nsIPrincipal& aSubject) const {
++ShadowRoot* Element::GetShadowRootForBindings(nsIPrincipal& aSubject) const {  // STEALTH-HOOK(automation/shadow-root)
    /**
     * 1. Let shadow be context object's shadow root.
     * 2. If shadow is null or its mode is "closed", then return null.
@@ -23,38 +24,33 @@ index b0f08fd6241f36b7a499d33613030f27a63aab96..ecfb19362f30f4ea80fe51ea1f45df17
    ShadowRoot* shadowRoot = GetShadowRoot();
    if (!shadowRoot || shadowRoot->IsClosed()) {
 -    return nullptr;
-+    // STEALTH-HOOK(automation/shadow-root)
-+    return StealthClosedShadowRootForBindings(shadowRoot, aSubject);
++    return StealthClosedShadowRootForBindings(shadowRoot, aSubject);  // STEALTH-HOOK(automation/shadow-root)
    }
  
    /**
 diff --git a/dom/base/Element.h b/dom/base/Element.h
-index d21ad1a44c6b36de916fda72ca928290f60e1fa5..ad8abf78e1e2c73eb79068b210789eba1eeb2607 100644
+index d21ad1a44c6b36de916fda72ca928290f60e1fa5..04e327727f5a0b548057a50e1ba7282aac5dd3f3 100644
 --- a/dom/base/Element.h
 +++ b/dom/base/Element.h
-@@ -1801,7 +1801,8 @@ class Element : public FragmentOrElement {
+@@ -1801,7 +1801,7 @@ class Element : public FragmentOrElement {
    void SetSlot(const nsAString& aName, ErrorResult& aError);
    void GetSlot(nsAString& aName);
  
 -  ShadowRoot* GetShadowRootForBindings() const;
-+  // STEALTH-HOOK(automation/shadow-root): the subject tells the sandbox apart
-+  ShadowRoot* GetShadowRootForBindings(nsIPrincipal& aSubject) const;
++  ShadowRoot* GetShadowRootForBindings(nsIPrincipal& aSubject) const;  // STEALTH-HOOK(automation/shadow-root)
    ShadowRoot* GetOpenOrClosedShadowRoot(nsIPrincipal& aSubject) const;
    [[nodiscard]] ShadowRoot* GetShadowRoot() const {
      const nsExtendedDOMSlots* slots = GetExistingExtendedDOMSlots();
 diff --git a/dom/webidl/Element.webidl b/dom/webidl/Element.webidl
-index 827724eb7766b964e7053ccc9731ad7cd8f0afd3..89a645535453474476cb0f0d7387afbd8021e368 100644
+index 827724eb7766b964e7053ccc9731ad7cd8f0afd3..14df57237bdd209515179ec12dc4f2bd01a0709f 100644
 --- a/dom/webidl/Element.webidl
 +++ b/dom/webidl/Element.webidl
-@@ -292,7 +292,10 @@ partial interface Element {
+@@ -292,7 +292,7 @@ partial interface Element {
    // Shadow DOM v1
    [Throws, UseCounter]
    ShadowRoot attachShadow(ShadowRootInit shadowRootInitDict);
 -  [BinaryName="shadowRootForBindings"]
-+  // STEALTH: NeedsSubjectPrincipal only. Same attribute, same name, same
-+  // spec answer for the page - nothing new appears on Element.prototype, which
-+  // is what makes this invisible where a new accessor would be the tell.
-+  [NeedsSubjectPrincipal, BinaryName="shadowRootForBindings"]
++  [NeedsSubjectPrincipal, BinaryName="shadowRootForBindings"]  // STEALTH-HOOK(automation/shadow-root)
    readonly attribute ShadowRoot? shadowRoot;
  
    [NeedsSubjectPrincipal, Func="Document::IsCallerChromeOrAddon"]

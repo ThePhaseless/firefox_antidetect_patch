@@ -9,8 +9,9 @@
 // What a WebGL context says about the machine it runs on, replaced by the
 // values the session declares: getParameter, the renderer and vendor strings,
 // getShaderPrecisionFormat and the extension list. Called from hooks in
-// ClientWebGLContext.cpp; every function reports "not overridden" (false or
-// Nothing()) when its pref is empty, and the caller then runs Mozilla's code.
+// ClientWebGLContext.cpp, WebGLContext*.cpp; every function reports "not
+// overridden" (false or Nothing()) when its pref is empty, and the caller then
+// runs Mozilla's code.
 // The prefs are the contract with the core: zoom.stealth.webgl.* and
 // zoom.stealth.webgl2.*.
 
@@ -18,6 +19,7 @@
 
 #include "WebGLTypes.h"
 #include "js/TypeDecls.h"
+#include "mozilla/AlreadyAddRefed.h"
 #include "mozilla/EnumeratedRange.h"
 #include "mozilla/Maybe.h"
 #include "nsTArray.h"
@@ -26,7 +28,9 @@
 namespace mozilla {
 
 class ClientWebGLContext;
+class WebGLShaderPrecisionFormatJS;
 class ErrorResult;
+class WebGLContext;
 
 // getParameter(pname) from one of three prefs, each a comma-separated list of
 // "ENUM|VALUE" entries (ENUM in decimal):
@@ -106,6 +110,16 @@ bool StealthWebGLUnmaskedVendorOverride(Maybe<std::string>& aRet);
 Maybe<webgl::ShaderPrecisionFormat> StealthWebGLShaderPrecision(
     GLenum aShaderType, GLenum aPrecisionType);
 
+// getShaderPrecisionFormat: a guard in ClientWebGLContext::
+// GetShaderPrecisionFormat, right after Mozilla's lost-context check and BEFORE
+// Mozilla reads the precisions the host reported: when the pref has a triple
+// for the pair, aOut is the answer (an object built here) and the result is
+// true, and the host's table is never looked at (and no INVALID_ENUM is raised
+// for a pair the host lacks). The pref is read once.
+bool StealthWebGLShaderPrecisionFormat(
+    GLenum aShaderType, GLenum aPrecisionType,
+    already_AddRefed<WebGLShaderPrecisionFormatJS>* aOut);
+
 // The extension whitelist: zoom.stealth.webgl.extensions (WebGL 1) or
 // zoom.stealth.webgl2.extensions (WebGL 2), comma-separated names, trimmed. An
 // empty pref means no override. The pref is re-read and re-parsed on every
@@ -122,10 +136,10 @@ Maybe<bool> StealthWebGLExtensionVerdict(bool aIsWebGL2, WebGLExtensionID aExt);
 bool StealthDeclaredExtension(bool aIsWebGL2, WebGLExtensionID aExt,
                               bool aServed);
 
-// Applied at the END of MakeLimits, so every limit Mozilla derives from the
-// extension bits inside it (draw buffers, ASTC HDR, multiview) is computed
-// from what the GL serves; only the bits handed to the content process are
-// the declared ones.
+// Applied at the END of MakeLimits (the hook sits right before its
+// `return limits;`), so every limit Mozilla derives from the extension bits
+// inside it (draw buffers, ASTC HDR, multiview) is computed from what the GL
+// serves; only the bits handed to the content process are the declared ones.
 template <typename Bits>
 void StealthDeclareExtensions(const bool aIsWebGL2, Bits& aBits) {
   for (const auto ext : MakeEnumeratedRange(WebGLExtensionID::Max)) {
@@ -133,6 +147,45 @@ void StealthDeclareExtensions(const bool aIsWebGL2, Bits& aBits) {
     aBits[ext] = StealthDeclaredExtension(aIsWebGL2, ext, served);
   }
 }
+
+void StealthDeclareLimits(const WebGLContext& aWebGL, webgl::Limits* aLimits);
+
+// IsExtensionSupported, in the case of WEBGL_provoking_vertex, after Mozilla's
+// check that the GL has the feature: the host serves the extension when the
+// persona declares it for this context, ahead of Mozilla's per-platform
+// policy (ANGLE or macOS only). True when it is declared; otherwise Mozilla's
+// policy answers, as it did. The page is told the persona's
+// list on the client side; a declared extension the host refused tripped the
+// assert in ProvokingVertex and took the main process down on Linux
+// (2026-11-07).
+bool StealthWebGLExtensionServed(const WebGLContext* aCtx,
+                                 WebGLExtensionID aExt);
+
+// RequestExtension, after Mozilla's check of the limits: a declared extension
+// the host does not serve is harmless (nothing is created).
+bool StealthWebGLExtensionUnserved(const WebGLContext* aCtx,
+                                   WebGLExtensionID aExt);
+
+// The entry points of extensions the persona declares and the host may not
+// have enabled. They sit after Mozilla's IsContextLost() check (which has a
+// side effect, HandlePendingContextLoss, that must run first) and, for the
+// indexed variants, after Mozilla's validation of the enums: an entry point
+// whose extension the host never enabled returns before Mozilla's
+// MOZ_RELEASE_ASSERT, which stays. Until firefox-56 one call from the page
+// aborted the host process (Linux: the main process). True when the call must
+// return. Read with symbols 2026-11-07.
+bool StealthWebGLDrawBuffersIndexedMissing(const WebGLContext* aCtx);
+bool StealthWebGLPolygonOffsetClampMissing(const WebGLContext* aCtx);
+bool StealthWebGLProvokingVertexMissing(const WebGLContext* aCtx);
+bool StealthWebGLClipControlMissing(const WebGLContext* aCtx);
+
+// InitAndValidateGL, after Mozilla's reads of the four stencil masks and their
+// debug assertions: the masks start at all ones, ANGLE's value on Windows,
+// instead of the driver's (Mesa trims to its stencil bits: 255). What a page
+// sets is unchanged; the driver masks to its own bits either way. The four
+// private fields of WebGLContext come as arguments.
+void StealthInitStencilMasks(GLuint& aValueMaskFront, GLuint& aValueMaskBack,
+                             GLuint& aWriteMaskFront, GLuint& aWriteMaskBack);
 
 }  // namespace mozilla
 

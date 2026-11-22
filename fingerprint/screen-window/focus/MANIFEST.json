@@ -2,7 +2,9 @@
  "modified": [
   "xpfe/appshell/AppWindow.cpp"
  ],
- "added": {},
+ "added": {
+  "xpfe/appshell/StealthAppWindowFocus.h": "100644"
+ },
  "inventory": [
   {
    "file": "xpfe/appshell/AppWindow.cpp",

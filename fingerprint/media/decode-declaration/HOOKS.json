@@ -5,7 +5,7 @@
   "kind": "add",
   "form": "registration",
   "line": "#include \"StealthMediaDeclaration.h\"  // STEALTH-HOOK(fingerprint/media/decode-declaration)",
-  "test": ""
+  "test": "gtest:StealthMediaDeclaration.DecodingInfoOfAFileAnswersFromTheDeclaration"
  },
  {
   "file": "dom/media/mediacapabilities/MediaCapabilities.cpp",
@@ -13,39 +13,17 @@
   "kind": "add",
   "form": "shadow",
   "line": "  const auto GetNumberOfProcessors = StealthDeclaredNumberOfProcessors;  // STEALTH-HOOK(fingerprint/media/decode-declaration)",
-  "test": ""
+  "test": "gtest:StealthMediaDeclaration.WebrtcAv1EncodeSmoothFollowsTheDeclaredCores"
  },
  {
   "file": "dom/media/mediacapabilities/MediaCapabilities.cpp",
   "function": "void MediaCapabilities::CreateNonWebRTCDecodingInfo(",
   "kind": "add",
-  "form": "unknown",
-  "line": "               // STEALTH-HOOK(fingerprint/media/decode-declaration)",
-  "test": ""
- },
- {
-  "file": "dom/media/mediacapabilities/MediaCapabilities.cpp",
-  "function": "void MediaCapabilities::CreateNonWebRTCDecodingInfo(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "               if (auto d = StealthDeclaredDecodingInfoFor(aConfiguration)) {",
-  "test": ""
- },
- {
-  "file": "dom/media/mediacapabilities/MediaCapabilities.cpp",
-  "function": "void MediaCapabilities::CreateNonWebRTCDecodingInfo(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "                 return promise->MaybeResolve(std::move(*d));",
-  "test": ""
- },
- {
-  "file": "dom/media/mediacapabilities/MediaCapabilities.cpp",
-  "function": "void MediaCapabilities::CreateNonWebRTCDecodingInfo(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "               }",
-  "test": ""
+  "form": "anchor",
+  "line": "               if (auto d = StealthDeclaredDecodingInfoFor(aConfiguration)) return promise->MaybeResolve(std::move(*d));  // STEALTH-HOOK(fingerprint/media/decode-declaration)",
+  "test": "gtest:StealthMediaDeclaration.DecodingInfoOfAFileAnswersFromTheDeclaration",
+  "anchor": "NS_ENSURE_TRUE_VOID(global); (inside the lambda of CreateNonWebRTCDecodingInfo)",
+  "why": "it sits inside a lambda of Mozilla's function, after holder->Complete() and the global check and before the reject test, where `promise` and `aConfiguration` are in scope; the lambda has no head of its own to guard (PM-DECISIONS media/decode-declaration 1: one line added after NS_ENSURE_TRUE_VOID(global))"
  },
  {
   "file": "dom/media/moz.build",
@@ -53,7 +31,7 @@
   "kind": "add",
   "form": "registration",
   "line": "EXPORTS += [\"StealthMediaDeclaration.h\"]  # STEALTH-HOOK(fingerprint/media/decode-declaration)",
-  "test": ""
+  "test": "gtest:StealthMediaDeclaration.SupportsAsyncAnswersFromTheDeclaration"
  },
  {
   "file": "dom/media/moz.build",
@@ -61,79 +39,31 @@
   "kind": "add",
   "form": "registration",
   "line": "UNIFIED_SOURCES += [\"StealthMediaDeclaration.cpp\"]  # STEALTH-HOOK(fingerprint/media/decode-declaration)",
-  "test": ""
+  "test": "gtest:StealthMediaDeclaration.SupportsAsyncAnswersFromTheDeclaration"
  },
  {
   "file": "dom/media/platforms/PDMFactory.cpp",
   "function": "",
   "kind": "add",
   "form": "registration",
-  "line": "#include \"StealthMediaDeclaration.h\"",
-  "test": ""
+  "line": "#include \"StealthMediaDeclaration.h\"  // STEALTH-HOOK(fingerprint/media/decode-declaration)",
+  "test": "gtest:StealthMediaDeclaration.SupportsAndSupportsAsyncAgree"
  },
  {
   "file": "dom/media/platforms/PDMFactory.cpp",
   "function": "DecodeSupportSet PDMFactory::SupportsMimeType(",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/media/decode-declaration)",
-  "test": ""
- },
- {
-  "file": "dom/media/platforms/PDMFactory.cpp",
-  "function": "DecodeSupportSet PDMFactory::SupportsMimeType(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  if (auto declared = StealthDeclaredDecodeSupportSet(aParams.MimeType())) {",
-  "test": ""
- },
- {
-  "file": "dom/media/platforms/PDMFactory.cpp",
-  "function": "DecodeSupportSet PDMFactory::SupportsMimeType(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    return *declared;",
-  "test": ""
- },
- {
-  "file": "dom/media/platforms/PDMFactory.cpp",
-  "function": "DecodeSupportSet PDMFactory::SupportsMimeType(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  }",
-  "test": ""
+  "form": "guard",
+  "line": "  if (DecodeSupportSet declared; StealthDeclaredDecodeSupportFor(aParams, &declared)) return declared;  // STEALTH-HOOK(fingerprint/media/decode-declaration)",
+  "test": "gtest:StealthMediaDeclaration.SupportsAndSupportsAsyncAgree"
  },
  {
   "file": "dom/media/platforms/PDMFactory.cpp",
   "function": "DecodeSupportSet PDMFactory::Supports(",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/media/decode-declaration)",
-  "test": ""
- },
- {
-  "file": "dom/media/platforms/PDMFactory.cpp",
-  "function": "DecodeSupportSet PDMFactory::Supports(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  if (auto declared = StealthDeclaredDecodeSupportSet(aParams.MimeType())) {",
-  "test": ""
- },
- {
-  "file": "dom/media/platforms/PDMFactory.cpp",
-  "function": "DecodeSupportSet PDMFactory::Supports(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    return PDMSupportsDecoderPromise::CreateAndResolve(*declared, __func__);",
-  "test": ""
- },
- {
-  "file": "dom/media/platforms/PDMFactory.cpp",
-  "function": "DecodeSupportSet PDMFactory::Supports(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  }",
-  "test": ""
+  "form": "guard",
+  "line": "  if (auto declared = StealthDeclaredDecodeSupportAsyncFor(aParams)) return declared;  // STEALTH-HOOK(fingerprint/media/decode-declaration)",
+  "test": "gtest:StealthMediaDeclaration.SupportsAsyncAnswersFromTheDeclaration"
  },
  {
   "file": "dom/media/webrtc/jsapi/DefaultCodecPreferences.cpp",
@@ -141,23 +71,23 @@
   "kind": "add",
   "form": "registration",
   "line": "#include \"StealthMediaDeclaration.h\"  // STEALTH-HOOK(fingerprint/media/decode-declaration)",
-  "test": ""
+  "test": "gtest:StealthMediaDeclaration.DeclaredH264GateIgnoresThePlugin"
  },
  {
   "file": "dom/media/webrtc/jsapi/DefaultCodecPreferences.cpp",
   "function": "bool DefaultCodecPreferences::H264EnabledStatic() {",
   "kind": "add",
   "form": "guard",
-  "line": "  if (auto d = StealthDeclaredSoftwareH264()) return *d;  // STEALTH-HOOK(fingerprint/media/decode-declaration)",
-  "test": ""
+  "line": "  if (bool declared; StealthDeclaredSoftwareH264(&declared)) return declared;  // STEALTH-HOOK(fingerprint/media/decode-declaration)",
+  "test": "gtest:StealthMediaDeclaration.DeclaredH264GateIgnoresThePlugin"
  },
  {
   "file": "dom/media/webrtc/jsapi/DefaultCodecPreferences.cpp",
   "function": "bool DefaultCodecPreferences::HardwareH264EnabledStatic() {",
   "kind": "add",
   "form": "guard",
-  "line": "  if (auto d = StealthDeclaredSoftwareH264()) return *d;  // STEALTH-HOOK(fingerprint/media/decode-declaration)",
-  "test": ""
+  "line": "  if (bool declared; StealthDeclaredSoftwareH264(&declared)) return declared;  // STEALTH-HOOK(fingerprint/media/decode-declaration)",
+  "test": "gtest:StealthMediaDeclaration.DeclaredH264GateIgnoresThePlugin"
  },
  {
   "file": "dom/media/webrtc/libwebrtcglue/WebrtcVideoCodecFactory.cpp",
@@ -165,22 +95,14 @@
   "kind": "add",
   "form": "registration",
   "line": "#include \"StealthMediaDeclaration.h\"  // STEALTH-HOOK(fingerprint/media/decode-declaration)",
-  "test": ""
+  "test": "gtest:StealthMediaDeclaration.EncodeSupportAnswersFromTheDeclaration"
  },
  {
   "file": "dom/media/webrtc/libwebrtcglue/WebrtcVideoCodecFactory.cpp",
   "function": "PlatformEncodeSupportOrNone(const EncoderConfig& aConfig) {",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/media/decode-declaration)",
-  "test": ""
- },
- {
-  "file": "dom/media/webrtc/libwebrtcglue/WebrtcVideoCodecFactory.cpp",
-  "function": "PlatformEncodeSupportOrNone(const EncoderConfig& aConfig) {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  if (auto declared = StealthDeclaredWebrtcEncodeSupport(aConfig)) return declared;",
-  "test": ""
+  "form": "guard",
+  "line": "  if (auto declared = StealthDeclaredWebrtcEncodeSupport(aConfig)) return declared;  // STEALTH-HOOK(fingerprint/media/decode-declaration)",
+  "test": "gtest:StealthMediaDeclaration.EncodeSupportAnswersFromTheDeclaration"
  }
 ]

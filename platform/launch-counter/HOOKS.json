@@ -1,27 +1,11 @@
 [
  {
   "file": "browser/components/BrowserGlue.sys.mjs",
-  "function": "ChromeUtils.defineESModuleGetters(lazy, {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  StealthLaunchCounter: \"resource:///modules/StealthLaunchCounter.sys.mjs\",",
-  "test": ""
- },
- {
-  "file": "browser/components/BrowserGlue.sys.mjs",
   "function": "BrowserGlue.prototype = {",
   "kind": "add",
   "form": "unknown",
-  "line": "    // STEALTH-HOOK(platform/launch-counter)",
-  "test": ""
- },
- {
-  "file": "browser/components/BrowserGlue.sys.mjs",
-  "function": "BrowserGlue.prototype = {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    try { lazy.StealthLaunchCounter.fire(); } catch (e) {}",
-  "test": ""
+  "line": "    try { ChromeUtils.importESModule(\"resource:///modules/StealthLaunchCounter.sys.mjs\").StealthLaunchCounter.fire(); } catch {}  // STEALTH-HOOK(platform/launch-counter)",
+  "test": "wrapper:tests/test_the_launch_counter_is_one_plain_get_before_any_page_e2e.py::test_the_browser_sends_one_plain_get_to_the_counter_before_any_page"
  },
  {
   "file": "browser/components/moz.build",
@@ -29,7 +13,7 @@
   "kind": "add",
   "form": "registration",
   "line": "EXTRA_JS_MODULES += [\"StealthLaunchCounter.sys.mjs\"]  # STEALTH-HOOK(platform/launch-counter)",
-  "test": ""
+  "test": "wrapper:tests/test_the_launch_counter_is_one_plain_get_before_any_page_e2e.py::test_the_browser_sends_one_plain_get_to_the_counter_before_any_page"
  },
  {
   "file": "browser/components/tests/unit/xpcshell.toml",
@@ -37,6 +21,6 @@
   "kind": "add",
   "form": "unknown",
   "line": "[\"test_stealth_launch_counter.js\"]  # STEALTH-HOOK(platform/launch-counter)",
-  "test": ""
+  "test": "wrapper:tests/test_the_launch_counter_is_one_plain_get_before_any_page_e2e.py::test_the_browser_sends_one_plain_get_to_the_counter_before_any_page"
  }
 ]

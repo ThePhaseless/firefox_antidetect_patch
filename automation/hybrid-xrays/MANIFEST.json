@@ -1,14 +1,15 @@
 {
  "modified": [
   "js/xpconnect/src/Sandbox.cpp",
-  "js/xpconnect/src/XPCJSRuntime.cpp",
   "js/xpconnect/src/xpcprivate.h",
+  "js/xpconnect/tests/unit/xpcshell.toml",
   "js/xpconnect/wrappers/WrapperFactory.cpp",
   "js/xpconnect/wrappers/XrayWrapper.h",
   "js/xpconnect/wrappers/moz.build"
  ],
  "added": {
   "js/xpconnect/src/StealthSandbox.h": "100644",
+  "js/xpconnect/tests/unit/test_stealth_hybrid_xrays_options.js": "100644",
   "js/xpconnect/wrappers/StealthHybridXray.cpp": "100644",
   "js/xpconnect/wrappers/StealthHybridXray.h": "100644"
  },
@@ -38,26 +39,6 @@
    }
   },
   {
-   "file": "js/xpconnect/src/XPCJSRuntime.cpp",
-   "category": "juggler",
-   "feature": "hybrid-xrays",
-   "prefs": [],
-   "added": 1,
-   "removed": 0,
-   "hunks": 1,
-   "inline_logic_lines": 1,
-   "hookable": "already-hook",
-   "anchor": "CompartmentPrivate::CompartmentPrivate",
-   "evidence": [
-    "+      hybridXrays(false),"
-   ],
-   "notes": "Initialiser for the new CompartmentPrivate member. It must stay in declaration order (right after wantXrays in xpcprivate.h), or the compiler warns about reordered initialisers.",
-   "verifier": {
-    "changed": [],
-    "why": "Checked against the diff and tree: category, feature, prefs, anchor, counts and evidence hold."
-   }
-  },
-  {
    "file": "js/xpconnect/src/xpcprivate.h",
    "category": "juggler",
    "feature": "hybrid-xrays",
@@ -77,6 +58,26 @@
    "verifier": {
     "changed": [],
     "why": "Checked against the diff and tree: category, feature, prefs, anchor, counts and evidence hold."
+   }
+  },
+  {
+   "file": "js/xpconnect/tests/unit/xpcshell.toml",
+   "category": "juggler",
+   "feature": "hybrid-xrays",
+   "prefs": [],
+   "added": 2,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "[\"test_scriptable_nsIClassInfo.js\"]",
+   "evidence": [
+    "+[\"test_stealth_hybrid_xrays_options.js\"]  # STEALTH-HOOK(automation/hybrid-xrays)"
+   ],
+   "notes": "Registration of our xpcshell test of the hybridXrays option of Cu.Sandbox (js/xpconnect/tests/unit/test_stealth_hybrid_xrays_options.js).",
+   "verifier": {
+    "changed": [],
+    "why": "Checked against the diff; one registration line and its blank line."
    }
   },
   {

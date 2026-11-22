@@ -53,6 +53,17 @@ Maybe<DesktopRect> StealthDeclaredFullscreenRect(nsIWidget& aWidget) {
                                aWidget.GetDesktopToDeviceScale(), origin);
 }
 
+DesktopRect StealthFullscreenRectOr(const Maybe<DesktopRect>& aDeclared,
+                                    const DesktopRect& aMozilla) {
+  return aDeclared.valueOr(aMozilla);
+}
+
+DesktopRect StealthFullscreenRectOr(nsIWidget& aWidget,
+                                    const DesktopRect& aMozilla) {
+  return StealthFullscreenRectOr(StealthDeclaredFullscreenRect(aWidget),
+                                 aMozilla);
+}
+
 Maybe<LayoutDeviceIntRect> StealthDeclaredFullscreenDeviceRect(
     nsIWidget& aWidget) {
   const Maybe<DesktopRect> rect = StealthDeclaredFullscreenRect(aWidget);

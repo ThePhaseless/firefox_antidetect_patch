@@ -15,15 +15,15 @@
 //
 // Both functions are members of ScriptPreloader (declared in
 // ScriptPreloader.h), so the private state (mScripts, mMonitor,
-// mWrittenCacheData and the nested type CachedStencil) is reached with no
+// mStealthWrittenCacheData and the nested type CachedStencil) is reached with no
 // friend declaration and no accessor.
 //
-// Comment of the member `AutoMemMap mWrittenCacheData` (declared in
+// Comment of the member `AutoMemMap mStealthWrittenCacheData` (declared in
 // ScriptPreloader.h between mCacheData and mMonitor, a position that fixes the
 // destruction order and must not change):
 //
 //   La mappatura del file che abbiamo SCRITTO in questa sessione, dopo che
-//   AdoptWrittenCache l'ha adottata. Vive quanto l'istanza, perche' i
+//   StealthAdoptWrittenCache l'ha adottata. Vive quanto l'istanza, perche' i
 //   mXDRRange delle voci puntano dentro di lei: distruggerla prima li
 //   renderebbe pendenti.
 //
@@ -41,16 +41,16 @@
 
 namespace mozilla {
 
-void ScriptPreloader::ReportWrittenCache(
+void ScriptPreloader::StealthReportWrittenCache(
     nsIHandleReportCallback* aHandleReport, nsISupports* aData) {
   // La mappatura del file scritto in QUESTA sessione, adottata al posto delle
-  // copie sull'heap (AdoptWrittenCache). Va riportata, altrimenti i megabyte
+  // copie sull'heap (StealthAdoptWrittenCache). Va riportata, altrimenti i megabyte
   // spariscono dall'heap e non ricompaiono da nessuna parte, e un totale che non
   // torna e' indistinguibile da un risparmio vero.
   MOZ_COLLECT_REPORT(
       "explicit/script-preloader/non-heap/memmapped-written-cache",
       KIND_NONHEAP, UNITS_BYTES,
-      mWrittenCacheData.nonHeapSizeOfExcludingThis(),
+      mStealthWrittenCacheData.nonHeapSizeOfExcludingThis(),
       "The cache file this session wrote, mapped read-only and adopted in "
       "place of the heap copies of the same bytes.");
 }
@@ -75,7 +75,7 @@ void ScriptPreloader::ReportWrittenCache(
 // Non restituisce nulla: l'unico chiamante (WriteCache) registrava l'errore e
 // andava avanti, quindi la registrazione sta qui e il gancio e' una riga sola.
 // Il testo dei due messaggi di log e' quello di prima.
-void ScriptPreloader::AdoptWrittenCache(nsIFile* aCacheFile) {
+void ScriptPreloader::StealthAdoptWrittenCache(nsIFile* aCacheFile) {
   auto adopt = [&]() -> Result<Ok, nsresult> {
     // ⛔ Si adotta UNA volta sola, e non e' una precauzione teorica.
     // AutoMemMap::init apre con MOZ_ASSERT(!fd): in debug scatta, in RELEASE
@@ -88,11 +88,11 @@ void ScriptPreloader::AdoptWrittenCache(nsIFile* aCacheFile) {
     // quel caso le voci di allora tengono le loro copie sull'heap, che e' il
     // comportamento di prima, e la mappatura vecchia resta viva finche' vive
     // l'istanza.
-    if (mWrittenCacheData.initialized()) {
+    if (mStealthWrittenCacheData.initialized()) {
       return Ok();
     }
 
-    MOZ_TRY(mWrittenCacheData.init(aCacheFile));
+    MOZ_TRY(mStealthWrittenCacheData.init(aCacheFile));
 
     mMonitor.AssertNotCurrentThreadOwns();
     MonitorAutoLock mal(mMonitor);
@@ -107,7 +107,7 @@ void ScriptPreloader::AdoptWrittenCache(nsIFile* aCacheFile) {
     // danno lo stesso risultato solo perche' l'allineamento e' un divisore di 4.
     // Questa e' una copia di InitCacheInternal (che resta com'e' in Mozilla): se
     // quella cambia, va cambiata anche questa.
-    auto size = mWrittenCacheData.size();
+    auto size = mStealthWrittenCacheData.size();
 
     uint32_t headerSize;
     uint32_t crc;
@@ -115,7 +115,7 @@ void ScriptPreloader::AdoptWrittenCache(nsIFile* aCacheFile) {
       return Err(NS_ERROR_UNEXPECTED);
     }
 
-    auto data = mWrittenCacheData.get<uint8_t>();
+    auto data = mStealthWrittenCacheData.get<uint8_t>();
     MOZ_RELEASE_ASSERT(JS::IsTranscodingBytecodeAligned(data.get()));
 
     auto end = data + size;
@@ -143,7 +143,7 @@ void ScriptPreloader::AdoptWrittenCache(nsIFile* aCacheFile) {
     data += headerSize;
 
     // Reconstruct alignment padding if required.
-    size_t currentOffset = data - mWrittenCacheData.get<uint8_t>();
+    size_t currentOffset = data - mStealthWrittenCacheData.get<uint8_t>();
     data += JS::AlignTranscodingBytecodeOffset(currentOffset) - currentOffset;
 
     InputBuffer buf(header);

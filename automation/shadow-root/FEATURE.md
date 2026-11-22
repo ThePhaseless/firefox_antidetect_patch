@@ -1,15 +1,25 @@
 # automation/shadow-root
 
 Category: juggler
-Prefs: none read directly
-Test: TODO
+Prefs: none read directly (the engine gate `StealthEngineActive()` reads `zoom.stealth.fpp.hw_seed`)
+Test: wrapper `tests/test_ua_widget_not_selectable.py::test_an_author_closed_shadow_root_is_still_reachable`, `tests/test_ua_widget_not_selectable.py::test_the_page_itself_still_sees_null_on_both_kinds_of_closed_root` (the same closed root is null for the page and found by the sandbox), `tests/test_shadow_trusted_input.py`
 
 ## What it does
 
-TODO: one paragraph, from the notes below.
+The `shadowRoot` getter of an element hides closed roots from the page (spec answer: null). The automation sandbox (Juggler's isolated world, a `Cu.Sandbox` on an `ExpandedPrincipal`) is given the author's closed root so selectors can pierce it; it never gets a UA widget (the calendar button of `<input type=date>`, video controls, ...), which would add engine internals to the page's DOM as seen by automation. The page keeps reading null on both kinds of closed root; with the engine off the getter is upstream's.
+
+The decision is `StealthClosedShadowRootForBindings(aShadowRoot, aSubject)` in `dom/base/StealthShadowRoot.h` (inline, on purpose). Its order is deliberate: the principal test (one load and one compare off `BasePrincipal::mKind`) goes first, so content returns on it and never reaches the UA-widget test or the pref read. What content pays there is readable from JS as a timing ratio (closed root over element with no root: retail 1.13, the first version 1.95), so the content path must compile to what it did when it sat in `Element.cpp`.
+
+The getter needs the caller's principal, so the attribute is declared `[NeedsSubjectPrincipal, BinaryName="shadowRootForBindings"]`: same attribute, same name, same spec answer for the page, nothing new on `Element.prototype` (a new accessor would be the tell).
 
 ## Hooks in Mozilla files
 
-- `dom/base/Element.cpp` (Element::GetShadowRootForBindings, movable): Closed shadow roots are returned only to the automation sandbox (ExpandedPrincipal subject), never UA widgets; the page keeps the spec answer (null). The decision is about 10 logic lines and can move to one of our files behind a one-line call. The principal test is deliberately before the pref read (the comment says content must not pay for the exception; timing was measured). mozilla::gfx::Stealt
-- `dom/base/Element.h` (Element::GetShadowRootForBindings (declaration), already-hook): Declaration only. Caller is the generated binding: dom/webidl/Element.webidl:298 declares shadowRoot with [NeedsSubjectPrincipal, BinaryName="shadowRootForBindings"], so the generated code passes the subject principal (earlier doubt refuted, the build does not break).
-- `dom/webidl/Element.webidl` (partial interface Element, readonly attribute shadowRoot, already-hook): Adds NeedsSubjectPrincipal so the native getter receives the caller's principal. [verified: Element.h:1800 and Element.cpp:1410-1480: content callers get null for closed roots (a non-ExpandedPrincipal returns nullptr), UA widgets are refused, and only the sandbox/automation principal gets the closed root, gated by mozilla::gfx::StealthEngineActive().] The page-visible answer is unchanged by design
+Declared exceptions (pm approved, `PM-DECISIONS.md`: the member + new BinaryName form was refused because it adds one call and one `GetShadowRoot()` on every path of `el.shadowRoot`, moving a ratio a page measures; the lines stay as they are):
+
+- `dom/base/Element.cpp`, `Element::GetShadowRootForBindings`: the signature takes `nsIPrincipal& aSubject` (one line rewritten) and the `return nullptr;` of the closed-or-no-root branch is `return StealthClosedShadowRootForBindings(shadowRoot, aSubject);` (one line rewritten).
+- `dom/base/Element.h`: the declaration with the same parameter (one line rewritten).
+- `dom/webidl/Element.webidl`: `[NeedsSubjectPrincipal, BinaryName="shadowRootForBindings"]` on the `shadowRoot` attribute (one line rewritten).
+
+Registration: `#include "StealthShadowRoot.h"` in a block of ours after Mozilla's includes in `Element.cpp`.
+
+Port note: if Mozilla changes the getter's body or the attribute annotation the conflict is the signal; what the hook needs is the branch "shadow is null or closed" of the getter and the caller's subject principal.

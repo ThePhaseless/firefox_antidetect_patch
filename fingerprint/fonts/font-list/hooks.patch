@@ -1,182 +1,76 @@
-diff --git a/gfx/thebes/CoreTextFontList.cpp b/gfx/thebes/CoreTextFontList.cpp
-index b6696c70c4b9065dd04683020010cb8f61e36791..d7fb0423acd95fce1b8536bf367e81c286e6494f 100644
---- a/gfx/thebes/CoreTextFontList.cpp
-+++ b/gfx/thebes/CoreTextFontList.cpp
-@@ -7,6 +7,7 @@
- #include "AppleUtils.h"
- #include "MainThreadUtils.h"
- #include "SharedFontList-impl.h"
-+#include "StealthBundleFontList.h"  // STEALTH-HOOK(fingerprint/fonts/font-list)
- #include "gfxFontConstants.h"
- #include "gfxMacFont.h"
- #include "gfxUserFontSet.h"
-@@ -340,7 +341,8 @@ nsresult CTFontEntry::ReadCMAP(FontInfoData* aFontInfoData) {
-   if (NS_SUCCEEDED(rv)) {
-     gfxPlatformFontList* pfl = gfxPlatformFontList::PlatformFontList();
-     fontlist::FontList* sharedFontList = pfl->SharedFontList();
--    if (!IsUserFont() && mShmemFace && mShmemFamily) {
-+    // STEALTH-HOOK(fingerprint/fonts/font-list)
-+    if (ShouldPublishCharacterMap() && mShmemFamily) {
-       mShmemFace->SetCharacterMap(sharedFontList, charmap, mShmemFamily);
-       if (TrySetShmemCharacterMap()) {
-         setCharMap = false;
-@@ -1106,6 +1108,11 @@ CoreTextFontList::~CoreTextFontList() {
- 
- void CoreTextFontList::AddFamily(const nsACString& aFamilyName,
-                                  FontVisibility aVisibility) {
-+#ifdef MOZ_BUNDLED_FONTS  // STEALTH-HOOK(fingerprint/fonts/font-list)
-+  if (StealthDropFamily(mStealthBundleOnly, mBundledFamilies, aFamilyName)) {
-+    return;
-+  }
-+#endif
-   nsAutoCString key;
-   ToLowerCase(aFamilyName, key);
- 
-@@ -1300,6 +1307,13 @@ void CoreTextFontList::InitSharedFontListForPlatform() {
- 
-   InitSystemFontNames();
- 
-+  // STEALTH-HOOK(fingerprint/fonts/font-list)
-+  if (StealthSetBundledFamilyNames(mStealthBundleOnly, SharedFontList())) {
-+    InitAliasesForSingleFaceList();
-+    GetPrefsAndStartLoader();
-+    return;
-+  }
-+
-   if (XRE_IsParentProcess()) {
-     // Only the parent process listens for OS font-changed notifications;
-     // after rebuilding its list, it will update the content processes.
-@@ -1766,6 +1780,13 @@ already_AddRefed<gfxFontFamily> CoreTextFontList::CreateFontFamily(
- 
- already_AddRefed<gfxFontEntry> CoreTextFontList::CreateFontEntry(
-     fontlist::Face* aFace, const fontlist::Family* aFamily) {
-+  if (mStealthBundleOnly) {  // STEALTH-HOOK(fingerprint/fonts/font-list)
-+    RefPtr fe = StealthBundledCTFontEntry(aFace, aFamily, SharedFontList());
-+    if (fe) {
-+      fe->InitializeFrom(aFace, aFamily);
-+    }
-+    return fe.forget();
-+  }
-   RefPtr fe = MakeRefPtr<CTFontEntry>(
-       aFace->mDescriptor.AsString(SharedFontList()), aFace->mWeight, false,
-       0.0);  // XXX standardFace, sizeHint
-@@ -1861,6 +1882,10 @@ void CoreTextFontList::AddFaceInitData(
- void CoreTextFontList::GetFacesInitDataForFamily(
-     const fontlist::Family* aFamily, nsTArray<fontlist::Face::InitData>& aFaces,
-     bool aLoadCmaps) const {
-+  if (mStealthBundleOnly) {  // STEALTH-HOOK(fingerprint/fonts/font-list)
-+    StealthFacesForFamily(aFamily, SharedFontList(), aFaces);
-+    return;
-+  }
-   auto name = aFamily->Key().AsString(SharedFontList());
-   CrashReporter::AutoRecordAnnotation autoFontName(
-       CrashReporter::Annotation::FontName, name);
-@@ -1978,6 +2003,12 @@ void CoreTextFontList::InitSystemFontNames() {
- FontFamily CoreTextFontList::GetDefaultFontForPlatform(
-     FontVisibilityProvider* aFontVisibilityProvider, const gfxFontStyle* aStyle,
-     nsAtom* aLanguage) {
-+  if (mStealthBundleOnly) {  // STEALTH-HOOK(fingerprint/fonts/font-list)
-+    FontFamily f = FindFamily(aFontVisibilityProvider, StealthUiFamily());
-+    if (!f.IsNull()) {
-+      return f;
-+    }
-+  }
-   AutoCFTypeRef<CTFontRef> font(CTFontCreateUIFontForLanguage(
-       kCTFontUIFontUser, 0.0, nullptr));  // TODO: language
-   AutoCFTypeRef<CFStringRef> name(CTFontCopyFamilyName(font));
 diff --git a/gfx/thebes/gfxDWriteFontList.cpp b/gfx/thebes/gfxDWriteFontList.cpp
-index a804e7154b7182fe73a37a94b186b50275971f5e..6d7667be34b4c8362f4de426a230c608235122d7 100644
+index a804e7154b7182fe73a37a94b186b50275971f5e..a57733d6bddaf81b0b25f74d3a26338c555ea5c1 100644
 --- a/gfx/thebes/gfxDWriteFontList.cpp
 +++ b/gfx/thebes/gfxDWriteFontList.cpp
-@@ -6,6 +6,7 @@
+@@ -33,6 +33,8 @@
+ #include "nsUnicharUtils.h"
+ #include "nsWindowsHelpers.h"
  
- #include "../2d/AutoHelpersWin.h"
- #include "SharedFontList-impl.h"
-+#include "StealthBundleFontList.h"  // STEALTH-HOOK(fingerprint/fonts/font-list)
- #include "gfxDWriteCommon.h"
- #include "gfxDWriteFonts.h"
- #include "gfxRect.h"
-@@ -536,7 +537,8 @@ nsresult gfxDWriteFontEntry::ReadCMAP(FontInfoData* aFontInfoData) {
++#include "StealthFontListHooks.h"  // STEALTH-HOOK(fingerprint/fonts/font-list)
++
+ #define StandardFonts
+ #include "StandardFonts-win10.inc"
+ #undef StandardFonts
+@@ -536,7 +538,7 @@ nsresult gfxDWriteFontEntry::ReadCMAP(FontInfoData* aFontInfoData) {
      }
      gfxPlatformFontList* pfl = gfxPlatformFontList::PlatformFontList();
      fontlist::FontList* sharedFontList = pfl->SharedFontList();
 -    if (!IsUserFont() && mShmemFace) {
-+    // STEALTH-HOOK(fingerprint/fonts/font-list)
-+    if (ShouldPublishCharacterMap()) {
++    if (StealthPublishCharacterMap(this, !IsUserFont()) && mShmemFace) {  // STEALTH-HOOK(fingerprint/fonts/font-list)
        mShmemFace->SetCharacterMap(sharedFontList, charmap, mShmemFamily);
        if (TrySetShmemCharacterMap()) {
          setCharMap = false;
-@@ -784,8 +786,10 @@ gfxFont* gfxDWriteFontEntry::CreateFontInstance(
-     // Only pass in the underlying IDWriteFont if the unscaled font doesn't
+@@ -785,7 +787,7 @@ gfxFont* gfxDWriteFontEntry::CreateFontInstance(
      // reflect a data font. This signals whether or not we can safely query
      // a descriptor to represent the font for various transport use-cases.
-+    // STEALTH-HOOK(fingerprint/fonts/font-list)
      unscaledFont =
 -        new UnscaledFontDWrite(fontFace, !mIsDataUserFont ? mFont : nullptr);
-+        new UnscaledFontDWrite(fontFace, !mIsDataUserFont ? mFont : nullptr,
-+                               mBundleFilePath);
++        StealthWithBundlePath(mBundleFilePath, new UnscaledFontDWrite(fontFace, !mIsDataUserFont ? mFont : nullptr));  // STEALTH-HOOK(fingerprint/fonts/font-list)
      if (useBoldSim) {
        mUnscaledFontBold = unscaledFont;
      } else {
-@@ -834,9 +838,10 @@ nsresult gfxDWriteFontEntry::CreateFontFace(
-         hr = mFont->CreateFontFace(getter_AddRefs(mFontFace));
+@@ -835,7 +837,7 @@ nsresult gfxDWriteFontEntry::CreateFontFace(
        } else if (mFontFile) {
          IDWriteFontFile* fontFile = mFontFile.get();
-+        // STEALTH-HOOK(fingerprint/fonts/font-list)
          hr = Factory::GetDWriteFactory()->CreateFontFace(
 -            mFaceType, 1, &fontFile, 0, DWRITE_FONT_SIMULATIONS_NONE,
--            getter_AddRefs(mFontFace));
-+            mFaceType, 1, &fontFile, mBundleFaceIndex,
-+            DWRITE_FONT_SIMULATIONS_NONE, getter_AddRefs(mFontFace));
++            mFaceType, 1, &fontFile, StealthFaceIndex(mBundleFaceIndex, 0), DWRITE_FONT_SIMULATIONS_NONE,  // STEALTH-HOOK(fingerprint/fonts/font-list)
+             getter_AddRefs(mFontFace));
        } else {
          MOZ_ASSERT_UNREACHABLE("invalid font entry");
-         return NS_ERROR_FAILURE;
-@@ -1129,6 +1134,9 @@ static void GetPostScriptNameFromNameTable(IDWriteFontFace* aFace,
+@@ -1129,6 +1131,7 @@ static void GetPostScriptNameFromNameTable(IDWriteFontFace* aFace,
  
  already_AddRefed<gfxFontEntry> gfxDWriteFontList::CreateFontEntry(
      fontlist::Face* aFace, const fontlist::Family* aFamily) {
-+  if (mStealthBundleOnly) {  // STEALTH-HOOK(fingerprint/fonts/font-list)
-+    return CreateStealthBundleFontEntry(aFace, aFamily);
-+  }
++  if (gfxPlatformFontList::StealthBundleOnly()) return CreateStealthBundleFontEntry(aFace, aFamily);  // STEALTH-HOOK(fingerprint/fonts/font-list)
    IDWriteFontCollection* collection =
  #ifdef MOZ_BUNDLED_FONTS
        aFamily->IsBundled() ? mBundledFonts : mSystemFonts;
-@@ -1395,6 +1403,11 @@ void gfxDWriteFontList::AppendFamiliesFromCollection(
+@@ -1395,6 +1398,7 @@ void gfxDWriteFontList::AppendFamiliesFromCollection(
  void gfxDWriteFontList::GetFacesInitDataForFamily(
      const fontlist::Family* aFamily, nsTArray<fontlist::Face::InitData>& aFaces,
      bool aLoadCmaps) const {
-+  if (mStealthBundleOnly) {  // STEALTH-HOOK(fingerprint/fonts/font-list)
-+    StealthBundleFontList::Get()->GetFaces(
-+        aFamily->DisplayName().AsString(SharedFontList()), aFaces);
-+    return;
-+  }
++  if (StealthFacesForFamily(this, aFamily, aFaces)) return;  // STEALTH-HOOK(fingerprint/fonts/font-list)
    IDWriteFontCollection* collection =
  #ifdef MOZ_BUNDLED_FONTS
        aFamily->IsBundled() ? mBundledFonts : mSystemFonts;
-@@ -1481,6 +1494,10 @@ bool gfxDWriteFontList::ReadFaceNames(const fontlist::Family* aFamily,
+@@ -1481,6 +1485,7 @@ bool gfxDWriteFontList::ReadFaceNames(const fontlist::Family* aFamily,
                                        const fontlist::Face* aFace,
                                        nsCString& aPSName,
                                        nsCString& aFullName) {
-+  if (mStealthBundleOnly) {  // STEALTH-HOOK(fingerprint/fonts/font-list)
-+    return gfxPlatformFontList::ReadFaceNames(aFamily, aFace, aPSName,
-+                                              aFullName);
-+  }
++  if (gfxPlatformFontList::StealthBundleOnly()) return gfxPlatformFontList::ReadFaceNames(aFamily, aFace, aPSName, aFullName);  // STEALTH-HOOK(fingerprint/fonts/font-list)
    IDWriteFontCollection* collection =
  #ifdef MOZ_BUNDLED_FONTS
        aFamily->IsBundled() ? mBundledFonts : mSystemFonts;
-@@ -1559,6 +1576,11 @@ bool gfxDWriteFontList::ReadFaceNames(const fontlist::Family* aFamily,
+@@ -1559,6 +1564,7 @@ bool gfxDWriteFontList::ReadFaceNames(const fontlist::Family* aFamily,
  
  void gfxDWriteFontList::ReadFaceNamesForFamily(
      fontlist::Family* aFamily, bool aNeedFullnamePostscriptNames) {
-+  if (mStealthBundleOnly) {  // STEALTH-HOOK(fingerprint/fonts/font-list)
-+    gfxPlatformFontList::ReadFaceNamesForFamily(aFamily,
-+                                                aNeedFullnamePostscriptNames);
-+    return;
-+  }
++  if (gfxPlatformFontList::StealthBundleOnly()) return gfxPlatformFontList::ReadFaceNamesForFamily(aFamily, aNeedFullnamePostscriptNames);  // STEALTH-HOOK(fingerprint/fonts/font-list)
    if (!aFamily->IsInitialized()) {
      if (!InitializeFamily(aFamily)) {
        return;
-@@ -1697,9 +1719,13 @@ void gfxDWriteFontList::InitSharedFontListForPlatform() {
+@@ -1697,9 +1703,13 @@ void gfxDWriteFontList::InitSharedFontListForPlatform() {
        forceClassicFams.Sort();
      }
      nsTArray<fontlist::Family::InitData> families;
@@ -192,390 +86,317 @@ index a804e7154b7182fe73a37a94b186b50275971f5e..6d7667be34b4c8362f4de426a230c608
        TimeStamp start2 = TimeStamp::Now();
        AppendFamiliesFromCollection(mBundledFonts, families);
        TimeStamp end2 = TimeStamp::Now();
-@@ -1715,8 +1741,11 @@ void gfxDWriteFontList::InitSharedFontListForPlatform() {
-     return;
-   }
- 
--  GetDirectWriteSubstitutes();
--  GetFontSubstitutes();
-+  // STEALTH-HOOK(fingerprint/fonts/font-list)
-+  if (StealthBundleFontList::UsesHostSubstitutes(mStealthBundleOnly)) {
-+    GetDirectWriteSubstitutes();
-+    GetFontSubstitutes();
-+  }
- }
- 
- nsresult gfxDWriteFontList::InitFontListForPlatform() {
-@@ -1768,8 +1797,12 @@ nsresult gfxDWriteFontList::InitFontListForPlatform() {
- 
+@@ -1769,7 +1779,7 @@ nsresult gfxDWriteFontList::InitFontListForPlatform() {
    const uint32_t kBundledCount = mFontFamilies.Count();
  
--  GetFontsFromCollection(mSystemFonts);
+   GetFontsFromCollection(mSystemFonts);
 -  if (mFontFamilies.Count() == kBundledCount) {
-+  // STEALTH-HOOK(fingerprint/fonts/font-list)
-+  if (!mStealthBundleOnly) {
-+    GetFontsFromCollection(mSystemFonts);
-+  }
-+  // STEALTH-HOOK(fingerprint/fonts/font-list)
-+  if (!mStealthBundleOnly && mFontFamilies.Count() == kBundledCount) {
++  if (StealthNoFontsFound(this, mFontFamilies.Count() == kBundledCount)) {  // STEALTH-HOOK(fingerprint/fonts/font-list)
      // If no fonts are found, something is out of whack, so bail.
      NS_ERROR("no fonts found in the system fontlist -- holy crap batman!");
      glean::fontlist::dwritefont_init_problem.AccumulateSingleSample(
-@@ -1780,14 +1813,20 @@ nsresult gfxDWriteFontList::InitFontListForPlatform() {
-   QueryPerformanceCounter(&t3);  // iterate over system fonts
+@@ -1908,6 +1918,7 @@ nsresult gfxDWriteFontList::InitFontListForPlatform() {
  
-   mOtherFamilyNamesInitialized = true;
--  GetFontSubstitutes();
-+  // STEALTH-HOOK(fingerprint/fonts/font-list)
-+  if (StealthBundleFontList::UsesHostSubstitutes(mStealthBundleOnly)) {
-+    GetFontSubstitutes();
-+  }
+ void gfxDWriteFontList::GetFontsFromCollection(
+     IDWriteFontCollection* aCollection) {
++  if (StealthSkipsHostCollection(this, aCollection, mSystemFonts)) return;  // STEALTH-HOOK(fingerprint/fonts/font-list)
+   for (UINT32 i = 0; i < aCollection->GetFontFamilyCount(); i++) {
+     RefPtr<IDWriteFontFamily> family;
+     aCollection->GetFontFamily(i, getter_AddRefs(family));
+@@ -2007,6 +2018,7 @@ static void RemoveCharsetFromFontSubstitute(nsACString& aName) {
+ #define MAX_VALUE_DATA 512
  
-   // bug 642093 - DirectWrite does not support old bitmap (.fon)
-   // font files, but a few of these such as "Courier" and "MS Sans Serif"
-   // are frequently specified in shoddy CSS, without appropriate fallbacks.
-   // By mapping these to TrueType equivalents, we provide better consistency
-   // with both pre-DW systems and with IE9, which appears to do the same.
--  GetDirectWriteSubstitutes();
-+  // STEALTH-HOOK(fingerprint/fonts/font-list)
-+  if (StealthBundleFontList::UsesHostSubstitutes(mStealthBundleOnly)) {
-+    GetDirectWriteSubstitutes();
-+  }
+ nsresult gfxDWriteFontList::GetFontSubstitutes() {
++  if (StealthSkipsHostSubstitutes(this)) return NS_OK;  // STEALTH-HOOK(fingerprint/fonts/font-list)
+   for (const FontSubstitute& fs : kFontSubstitutes) {
+     nsAutoCString substituteName(fs.substituteName);
+     nsAutoCString actualFontName(fs.actualFontName);
+@@ -2112,6 +2124,7 @@ static const FontSubstitution sDirectWriteSubs[] = {
+     {"Script", "Mistral"}};
  
-   // bug 551313 - DirectWrite creates a Gill Sans family out of
-   // poorly named members of the Gill Sans MT family containing
-@@ -2716,6 +2755,10 @@ BundledFontLoader::CreateEnumeratorFromKey(
+ void gfxDWriteFontList::GetDirectWriteSubstitutes() {
++  if (StealthSkipsHostSubstitutes(this)) return;  // STEALTH-HOOK(fingerprint/fonts/font-list)
+   for (const auto& sub : sDirectWriteSubs) {
+     nsAutoCString substituteName(sub.aliasName);
+     BuildKeyNameFromFontName(substituteName);
+@@ -2716,6 +2729,7 @@ BundledFontLoader::CreateEnumeratorFromKey(
  
  already_AddRefed<IDWriteFontCollection>
  gfxDWriteFontList::CreateBundledFontsCollection(IDWriteFactory* aFactory) {
-+  if (StealthBundleFontList::SkipsPlatformBundledCollection(  // STEALTH-HOOK(fingerprint/fonts/font-list)
-+          SharedFontList() != nullptr, mStealthBundleOnly, XRE_IsParentProcess())) {
-+    return nullptr;
-+  }
++  if (StealthSkipsBundledCollection(this)) return nullptr;  // STEALTH-HOOK(fingerprint/fonts/font-list)
    nsCOMPtr<nsIFile> localDir;
    nsresult rv = NS_GetSpecialDirectory(NS_GRE_DIR, getter_AddRefs(localDir));
    if (NS_FAILED(rv)) {
 diff --git a/gfx/thebes/gfxFcPlatformFontList.cpp b/gfx/thebes/gfxFcPlatformFontList.cpp
-index 3fbad92c0dbcb8f65fb58e052fe798a1dbe58aad..70fd6f2d4fa941a3c3cb37e1e6be73b8e85eee57 100644
+index 3fbad92c0dbcb8f65fb58e052fe798a1dbe58aad..8e3c2404db887bb46a894268cef16792056f04b2 100644
 --- a/gfx/thebes/gfxFcPlatformFontList.cpp
 +++ b/gfx/thebes/gfxFcPlatformFontList.cpp
-@@ -5,6 +5,7 @@
- #include "gfxFcPlatformFontList.h"
+@@ -59,6 +59,8 @@
  
- #include "SharedFontList-impl.h"
-+#include "StealthFcFontList.h"
- #include "gfxFT2Utils.h"
- #include "gfxFont.h"
- #include "gfxPlatform.h"
-@@ -509,7 +510,8 @@ gfxFontconfigFontEntry::AutoHBFace gfxFontconfigFontEntry::GetHBFace() {
+ #include FT_MULTIPLE_MASTERS_H
+ 
++#include "StealthFcFontList.h"  // STEALTH-HOOK(fingerprint/fonts/font-list)
++
+ using namespace mozilla;
+ using namespace mozilla::gfx;
+ using namespace mozilla::intl;
+@@ -509,7 +511,7 @@ gfxFontconfigFontEntry::AutoHBFace gfxFontconfigFontEntry::GetHBFace() {
        NS_WARNING(nsPrintfCString("fallback to gfxFontEntry::GetHBFace for %s",
                                   Name().get())
                       .get());
 -      face = hb_face_reference(gfxFontEntry::GetHBFace());
-+      // STEALTH-HOOK(fingerprint/fonts/font-list)
-+      face = StealthBaseHBFaceRef(this);
++      face = StealthBaseHBFaceRef(this);  // STEALTH-HOOK(fingerprint/fonts/font-list)
        useTableCache = true;
      }
      AutoWriteLock lock(mLock);
-@@ -626,7 +628,8 @@ nsresult gfxFontconfigFontEntry::ReadCMAP(FontInfoData* aFontInfoData) {
+@@ -626,7 +628,7 @@ nsresult gfxFontconfigFontEntry::ReadCMAP(FontInfoData* aFontInfoData) {
    if (NS_SUCCEEDED(rv)) {
      gfxPlatformFontList* pfl = gfxPlatformFontList::PlatformFontList();
      fontlist::FontList* sharedFontList = pfl->SharedFontList();
 -    if (!IsUserFont() && mShmemFace) {
-+    // STEALTH-HOOK(fingerprint/fonts/font-list)
-+    if (ShouldPublishCharacterMap()) {
++    if (StealthPublishCharacterMap(this, !IsUserFont()) && mShmemFace) {  // STEALTH-HOOK(fingerprint/fonts/font-list)
        mShmemFace->SetCharacterMap(sharedFontList, charmap, mShmemFamily);
        if (TrySetShmemCharacterMap()) {
          setCharMap = false;
-@@ -659,7 +662,9 @@ nsresult gfxFontconfigFontEntry::ReadCMAP(FontInfoData* aFontInfoData) {
+@@ -658,6 +660,7 @@ nsresult gfxFontconfigFontEntry::ReadCMAP(FontInfoData* aFontInfoData) {
+ }
  
  bool gfxFontconfigFontEntry::HasFontTableInternal(uint32_t aTableTag) {
++  if (bool rv; StealthFaceDataHasTable(this, aTableTag, &rv)) return rv;  // STEALTH-HOOK(fingerprint/fonts/font-list)
    if (auto* ufd = GetUserFontData()) {
--    return !!gfxFontUtils::FindTableDirEntry(ufd->Data(), aTableTag);
-+    // STEALTH-HOOK(fingerprint/fonts/font-list)
-+    return !!gfxFontUtils::FindTableDirEntry(
-+        ufd->Data(), aTableTag, StealthTableFaceIndex(GetFTFace()));
+     return !!gfxFontUtils::FindTableDirEntry(ufd->Data(), aTableTag);
    }
-   return gfxFT2FontEntryBase::FaceHasTable(GetFTFace(), aTableTag);
+@@ -665,6 +668,7 @@ bool gfxFontconfigFontEntry::HasFontTableInternal(uint32_t aTableTag) {
  }
-@@ -667,7 +672,9 @@ bool gfxFontconfigFontEntry::HasFontTableInternal(uint32_t aTableTag) {
+ 
  hb_blob_t* gfxFontconfigFontEntry::GetFontTableInternal(uint32_t aTableTag) {
++  if (hb_blob_t* rv; StealthFaceDataTable(this, aTableTag, &rv)) return rv;  // STEALTH-HOOK(fingerprint/fonts/font-list)
    // for data fonts, read directly from the font data
    if (auto* ufd = GetUserFontData()) {
--    return gfxFontUtils::GetTableFromFontData(ufd->Data(), aTableTag);
-+    // STEALTH-HOOK(fingerprint/fonts/font-list)
-+    return gfxFontUtils::GetTableFromFontData(
-+        ufd->Data(), aTableTag, StealthTableFaceIndex(GetFTFace()));
-   }
- 
-   // Use the cache only if it has already been created.
-@@ -675,7 +682,8 @@ hb_blob_t* gfxFontconfigFontEntry::GetFontTableInternal(uint32_t aTableTag) {
+     return gfxFontUtils::GetTableFromFontData(ufd->Data(), aTableTag);
+@@ -675,7 +679,7 @@ hb_blob_t* gfxFontconfigFontEntry::GetFontTableInternal(uint32_t aTableTag) {
      return gfxFontEntry::GetFontTableInternal(aTableTag);
    }
  
 -  auto* table = hb_face_reference_table(GetHBFace(), aTableTag);
-+  // STEALTH-HOOK(fingerprint/fonts/font-list)
-+  auto* table = StealthHBFaceTable(this, aTableTag);
++  auto* table = StealthHBFaceTable(this, aTableTag);  // STEALTH-HOOK(fingerprint/fonts/font-list)
    return table != hb_blob_get_empty() ? table : nullptr;
  }
  
-@@ -1061,6 +1069,8 @@ gfxFont* gfxFontconfigFontEntry::CreateFontInstance(
-     FcPatternAddBool(renderPattern, FC_EMBEDDED_BITMAP, FcFalse);
-   }
+@@ -751,6 +755,7 @@ double gfxFontconfigFontEntry::GetAspect(uint8_t aSizeAdjustBasis) {
  
-+  // STEALTH-HOOK(fingerprint/fonts/font-list)
-+  StealthDeclareTextOptions(renderPattern);
-   int loadFlags;
-   unsigned int synthFlags;
-   PrepareFontOptions(renderPattern, &loadFlags, &synthFlags);
-@@ -1078,6 +1088,8 @@ gfxFont* gfxFontconfigFontEntry::CreateFontInstance(
+ static void PrepareFontOptions(FcPattern* aPattern, int* aOutLoadFlags,
+                                unsigned int* aOutSynthFlags) {
++  StealthDeclareTextOptions(aPattern);  // STEALTH-HOOK(fingerprint/fonts/font-list)
+   int loadFlags = FT_LOAD_DEFAULT;
+   unsigned int synthFlags = 0;
+ 
+@@ -1078,6 +1083,7 @@ gfxFont* gfxFontconfigFontEntry::CreateFontInstance(
      }
      file = ToCharPtr(fcFile);
    }
-+  // STEALTH-HOOK(fingerprint/fonts/font-list)
-+  StealthDeclaredFontFile(renderPattern, file, index);
++  StealthDeclaredFontFile(renderPattern, file, index);  // STEALTH-HOOK(fingerprint/fonts/font-list)
  
    RefPtr<UnscaledFontFontconfig> unscaledFont;
    {
-@@ -1094,6 +1106,8 @@ gfxFont* gfxFontconfigFontEntry::CreateFontInstance(
+@@ -1094,6 +1100,7 @@ gfxFont* gfxFontconfigFontEntry::CreateFontInstance(
                                           : new UnscaledFontFontconfig(
                                                 std::move(file), index, ftFace);
      mUnscaledFontCache.Add(unscaledFont);
-+    // STEALTH-HOOK(fingerprint/fonts/font-list)
-+    StealthPreferFileUnscaledFont(this, unscaledFont, file, index, ftFace);
++    StealthPreferFileUnscaledFont(this, unscaledFont, file, index, ftFace);  // STEALTH-HOOK(fingerprint/fonts/font-list)
    }
  
    gfxFont* newFont = new gfxFontconfigFont(
-@@ -1711,6 +1725,10 @@ void gfxFcPlatformFontList::AddPatternToFontList(
+@@ -1711,6 +1718,7 @@ void gfxFcPlatformFontList::AddPatternToFontList(
      }
    }
  
-+  // STEALTH-HOOK(fingerprint/fonts/font-list)
-+  if (!aFontFamily) {
-+    return;
-+  }
++  if (StealthDropPatternWithoutFamily(aFontFamily)) return;  // STEALTH-HOOK(fingerprint/fonts/font-list)
    // Add pointers to other localized family names. Most fonts
    // only have a single name, so the first call to GetString
    // will usually not match
-@@ -1829,6 +1847,10 @@ nsresult gfxFcPlatformFontList::InitFontListForPlatform() {
+@@ -1829,6 +1837,7 @@ nsresult gfxFcPlatformFontList::InitFontListForPlatform() {
    }
  #endif
  
-+  // STEALTH-HOOK(fingerprint/fonts/font-list)
-+  if (mStealthBundleOnly) {
-+    return NS_OK;
-+  }
++  if (StealthSkipsSystemFontSet(this)) return NS_OK;  // STEALTH-HOOK(fingerprint/fonts/font-list)
    // iterate over available fonts
    FcFontSet* systemFonts = FcConfigGetFonts(nullptr, FcSetSystem);
    AddFontSetFamilies(systemFonts, policy.get(), /* aAppFonts = */ false);
-@@ -1942,6 +1964,10 @@ void gfxFcPlatformFontList::InitSharedFontListForPlatform() {
+@@ -1942,6 +1951,7 @@ void gfxFcPlatformFontList::InitSharedFontListForPlatform() {
          std::move(timerId));
    }
  #endif
-+  // STEALTH-HOOK(fingerprint/fonts/font-list): the parent shows the bundle to fontconfig first, a screenshot remakes its fonts from the path
-+  if (mStealthBundleOnly && StealthPopulateSharedList(SharedFontList())) {
-+    return;
-+  }
++  if (StealthPopulateSharedList(this)) return;  // STEALTH-HOOK(fingerprint/fonts/font-list)
  
    UniquePtr<SandboxPolicy> policy;
  
-@@ -2289,6 +2315,10 @@ gfxFcPlatformFontList::GetFilteredPlatformFontLists() {
+@@ -2289,6 +2299,7 @@ gfxFcPlatformFontList::GetFilteredPlatformFontLists() {
  
  already_AddRefed<gfxFontEntry> gfxFcPlatformFontList::CreateFontEntry(
      fontlist::Face* aFace, const fontlist::Family* aFamily) {
-+  // STEALTH-HOOK(fingerprint/fonts/font-list)
-+  if (mStealthBundleOnly) {
-+    return StealthCreateBundleFontEntry(aFace, aFamily, SharedFontList());
-+  }
++  if (gfxPlatformFontList::StealthBundleOnly()) return StealthCreateBundleFontEntry(this, aFace, aFamily);  // STEALTH-HOOK(fingerprint/fonts/font-list)
    nsAutoCString desc(aFace->mDescriptor.AsString(SharedFontList()));
    FcPattern* pattern = FcNameParse((const FcChar8*)desc.get());
    RefPtr fe = MakeRefPtr<gfxFontconfigFontEntry>(desc, pattern);
-@@ -2459,6 +2489,11 @@ bool gfxFcPlatformFontList::FindAndAddFamiliesLocked(
+@@ -2456,6 +2467,7 @@ bool gfxFcPlatformFontList::FindAndAddFamiliesLocked(
+     StyleGenericFontFamily aGeneric, const nsACString& aFamily,
+     nsTArray<FamilyAndGeneric>* aOutput, FindFamiliesFlags aFlags,
+     gfxFontStyle* aStyle, nsAtom* aLanguage, gfxFloat aDevToCssSize) {
++  if (gfxPlatformFontList::StealthBundleOnly()) return gfxPlatformFontList::FindAndAddFamiliesLocked(aFontVisibilityProvider, aGeneric, aFamily, aOutput, aFlags, aStyle, aLanguage, aDevToCssSize);  // STEALTH-HOOK(fingerprint/fonts/font-list)
    nsAutoCString familyName(aFamily);
    ToLowerCase(familyName);
  
-+  if (mStealthBundleOnly) {  // STEALTH-HOOK(fingerprint/fonts/font-list)
-+    return gfxPlatformFontList::FindAndAddFamiliesLocked(
-+        aFontVisibilityProvider, aGeneric, aFamily, aOutput, aFlags, aStyle,
-+        aLanguage, aDevToCssSize);
-+  }
-   if (!(aFlags & FindFamiliesFlags::eQuotedFamilyName)) {
-     // deprecated generic names are explicitly converted to standard generics
-     bool isDeprecatedGeneric = false;
-@@ -2754,7 +2789,8 @@ void gfxFcPlatformFontList::AddGenericFonts(
+@@ -2754,7 +2766,7 @@ void gfxFcPlatformFontList::AddGenericFonts(
    }
  
    // when pref fonts exist, use standard pref font lookup
 -  if (usePrefFontList) {
-+  // STEALTH-HOOK(fingerprint/fonts/font-list)
-+  if (usePrefFontList || mStealthBundleOnly) {
++  if (StealthUsePrefFontList(this, usePrefFontList)) {  // STEALTH-HOOK(fingerprint/fonts/font-list)
      gfxPlatformFontList::AddGenericFonts(aFontVisibilityProvider, aGenericType,
                                           aLanguage, aFamilyList);
      if (!isSystemUi) {
 diff --git a/gfx/thebes/gfxPlatformFontList.cpp b/gfx/thebes/gfxPlatformFontList.cpp
-index cabecffc5c4f9a21f5d069738f82d866c2bcbeb2..be2bcbc1e9562ed17c35bfc953064cb59688679a 100644
+index cabecffc5c4f9a21f5d069738f82d866c2bcbeb2..6f3860b1719bdcf973f280a4c35da81d76c98910 100644
 --- a/gfx/thebes/gfxPlatformFontList.cpp
 +++ b/gfx/thebes/gfxPlatformFontList.cpp
-@@ -7,6 +7,7 @@
- #include "FontVisibilityProvider.h"
- #include "GeckoProfiler.h"
- #include "SharedFontList-impl.h"
-+#include "StealthBundleFontList.h"  // STEALTH-HOOK(fingerprint/fonts/font-list)
- #include "base/eintr_wrapper.h"
- #include "gfxScriptItemizer.h"
- #include "gfxTextRun.h"
-@@ -255,6 +256,9 @@ gfxPlatformFontList::MemoryReporter::CollectReports(
+@@ -49,6 +49,8 @@
+ 
+ #include <numeric>
+ 
++#include "StealthFontListHooks.h"  // STEALTH-HOOK(fingerprint/fonts/font-list)
++
+ using namespace mozilla;
+ using mozilla::intl::Locale;
+ using mozilla::intl::LocaleParser;
+@@ -255,6 +257,7 @@ gfxPlatformFontList::MemoryReporter::CollectReports(
                         "Memory used for (platform-specific) font loader.");
    }
  
-+  // STEALTH-HOOK(fingerprint/fonts/font-list)
-+  StealthReportBundleFiles(FontListMallocSizeOf, aHandleReport, aData);
-+
++  StealthReportBundleFiles(aHandleReport, aData);  // STEALTH-HOOK(fingerprint/fonts/font-list)
    if (sizes.mSharedSize) {
      MOZ_COLLECT_REPORT(
          "font-list-shmem", KIND_NONHEAP, UNITS_BYTES, sizes.mSharedSize,
-@@ -319,6 +323,9 @@ gfxPlatformFontList::gfxPlatformFontList(bool aNeedFullnamePostscriptNames)
- 
-   mFontPrefs = MakeUnique<FontPrefs>();
- 
-+  // STEALTH-HOOK(fingerprint/fonts/font-list)
-+  mStealthBundleOnly = true;
-+
-   gfxFontUtils::GetPrefsFontList(kFontSystemWhitelistPref, mEnabledFontsList);
-   mFontFamilyWhitelistActive = !mEnabledFontsList.IsEmpty();
- 
-@@ -1345,8 +1352,9 @@ already_AddRefed<gfxFont> gfxPlatformFontList::CommonFontFallback(
-     uint32_t aNextCh, Script aRunScript, FontPresentation aPresentation,
-     const gfxFontStyle* aMatchStyle, FontFamily& aMatchedFamily) {
+@@ -1347,6 +1350,7 @@ already_AddRefed<gfxFont> gfxPlatformFontList::CommonFontFallback(
    AutoTArray<const char*, NUM_FALLBACK_FONTS> defaultFallbacks;
--  gfxPlatform::GetPlatform()->GetCommonFallbackFonts(
--      aCh, aRunScript, aPresentation, defaultFallbacks);
-+  // STEALTH-HOOK(fingerprint/fonts/font-list)
-+  StealthGetCommonFallbackFonts(mStealthBundleOnly, aCh, aRunScript,
-+                                aPresentation, defaultFallbacks);
+   gfxPlatform::GetPlatform()->GetCommonFallbackFonts(
+       aCh, aRunScript, aPresentation, defaultFallbacks);
++  StealthReplaceCommonFallbackFonts(this, aCh, aRunScript, aPresentation, defaultFallbacks);  // STEALTH-HOOK(fingerprint/fonts/font-list)
    GlobalFontMatch data(aCh, aNextCh, *aMatchStyle, aPresentation);
    FontVisibility level = aFontVisibilityProvider
                               ? aFontVisibilityProvider->GetFontVisibility()
-@@ -1424,7 +1432,8 @@ already_AddRefed<gfxFont> gfxPlatformFontList::GlobalFontFallback(
+@@ -1424,7 +1428,7 @@ already_AddRefed<gfxFont> gfxPlatformFontList::GlobalFontFallback(
      uint32_t aNextCh, Script aRunScript, FontPresentation aPresentation,
      const gfxFontStyle* aMatchStyle, uint32_t& aCmapCount,
      FontFamily& aMatchedFamily) {
 -  bool useCmaps = IsFontFamilyWhitelistActive() ||
-+  // STEALTH-HOOK(fingerprint/fonts/font-list)
-+  bool useCmaps = IsFontFamilyWhitelistActive() || mStealthBundleOnly ||
++  bool useCmaps = StealthUseCmaps(this, IsFontFamilyWhitelistActive()) ||  // STEALTH-HOOK(fingerprint/fonts/font-list)
                    gfxPlatform::GetPlatform()->UseCmapsDuringSystemFallback();
    FontVisibility level = aFontVisibilityProvider
                               ? aFontVisibilityProvider->GetFontVisibility()
-@@ -1474,9 +1483,8 @@ already_AddRefed<gfxFont> gfxPlatformFontList::GlobalFontFallback(
-         if (!IsVisibleToCSS(family, level)) {
+@@ -1475,7 +1479,7 @@ already_AddRefed<gfxFont> gfxPlatformFontList::GlobalFontFallback(
            continue;
          }
--        if (!family.IsFullyInitialized() &&
+         if (!family.IsFullyInitialized() &&
 -            StaticPrefs::gfx_font_rendering_fallback_async() &&
--            !XRE_IsParentProcess()) {
-+        // STEALTH-HOOK(fingerprint/fonts/font-list)
-+        if (!family.IsFullyInitialized() && MayDeferCmapLoading()) {
++            StealthMayDeferCmapLoading(this, StaticPrefs::gfx_font_rendering_fallback_async()) &&  // STEALTH-HOOK(fingerprint/fonts/font-list)
+             !XRE_IsParentProcess()) {
            // Start loading all the missing charmaps; but this is async,
            // so for now we just continue, ignoring this family.
-           StartCmapLoadingFromFamily(i);
-@@ -1723,6 +1731,9 @@ bool gfxPlatformFontList::FindAndAddFamiliesLocked(
+@@ -1723,6 +1727,7 @@ bool gfxPlatformFontList::FindAndAddFamiliesLocked(
    nsAutoCString key;
    GenerateFontListKey(aFamily, key);
  
-+  // STEALTH-HOOK(fingerprint/fonts/font-list)
-+  StealthApplyAlias(mStealthBundleOnly, key);
-+
++  StealthApplyAlias(this, key);  // STEALTH-HOOK(fingerprint/fonts/font-list)
    bool allowHidden = bool(aFlags & FindFamiliesFlags::eSearchHiddenFamilies);
    FontVisibility visibilityLevel =
        aFontVisibilityProvider ? aFontVisibilityProvider->GetFontVisibility()
-@@ -2001,6 +2012,10 @@ bool gfxPlatformFontList::InitializeFamily(fontlist::Family* aFamily,
+@@ -2001,6 +2006,7 @@ bool gfxPlatformFontList::InitializeFamily(fontlist::Family* aFamily,
      }
    }
  
-+  StealthLoadMissingCharacterMaps(  // STEALTH-HOOK(fingerprint/fonts/font-list)
-+      list, aFamily, aLoadCmaps && mStealthBundleOnly,
-+      [&](fontlist::Face* aFace) { return CreateFontEntry(aFace, aFamily); });
-+
++  StealthLoadMissingCharacterMaps(list, aFamily, aLoadCmaps);  // STEALTH-HOOK(fingerprint/fonts/font-list)
    if (aLoadCmaps && aFamily->IsInitialized()) {
      aFamily->SetupFamilyCharMap(list);
    }
-@@ -2219,6 +2234,9 @@ void gfxPlatformFontList::MaybeRemoveCmap(gfxCharacterMap* aCharMap,
+@@ -2219,6 +2225,7 @@ void gfxPlatformFontList::MaybeRemoveCmap(gfxCharacterMap* aCharMap,
  static void GetSystemUIFontFamilies(
      FontVisibilityProvider* aFontVisibilityProvider,
      [[maybe_unused]] nsAtom* aLangGroup, nsTArray<nsCString>& aFamilies) {
-+  // STEALTH-HOOK(fingerprint/fonts/font-list)
-+  StealthSystemUIFamilies(aFamilies);
-+  return;
++  if (StealthSystemUIFamilies(aFamilies)) return;  // STEALTH-HOOK(fingerprint/fonts/font-list)
    // TODO: On macOS, use CTCreateUIFontForLanguage or such thing (though the
    // code below ends up using [NSFont systemFontOfSize: 0.0].
    nsFont systemFont;
-@@ -2270,6 +2288,10 @@ void gfxPlatformFontList::ResolveGenericFontNames(
+@@ -2270,6 +2277,7 @@ void gfxPlatformFontList::ResolveGenericFontNames(
      gfxFontUtils::ParseFontList(value, genericFamilies);
    }
  
-+  // STEALTH-HOOK(fingerprint/fonts/font-list)
-+  StealthPrependDeclaredGeneric(mStealthBundleOnly, aGenericType, langGroupStr,
-+                                genericFamilies);
-+
++  StealthPrependDeclaredGeneric(this, aGenericType, langGroupStr, genericFamilies);  // STEALTH-HOOK(fingerprint/fonts/font-list)
    nsAtom* langGroup = GetLangGroupForPrefLang(aPrefLang);
    MOZ_ASSERT(langGroup, "null lang group for pref lang");
  
-@@ -2305,6 +2327,9 @@ void gfxPlatformFontList::ResolveEmojiFontNames(
+@@ -2305,6 +2313,7 @@ void gfxPlatformFontList::ResolveEmojiFontNames(
      gfxFontUtils::ParseFontList(value, genericFamilies);
    }
  
-+  // STEALTH-HOOK(fingerprint/fonts/font-list)
-+  StealthPrependEmojiFamily(mStealthBundleOnly, genericFamilies);
-+
++  StealthPrependEmojiFamily(this, genericFamilies);  // STEALTH-HOOK(fingerprint/fonts/font-list)
    GetFontFamiliesFromGenericFamilies(
        aFontVisibilityProvider, StyleGenericFontFamily::MozEmoji,
        genericFamilies, nullptr, aGenericFamilies);
 diff --git a/gfx/thebes/gfxPlatformFontList.h b/gfx/thebes/gfxPlatformFontList.h
-index 4719c99e05d8b71dc8ccc95f57f3918b8f4fef17..34fa07fcd5a2e13e9906a9ed42eefe7cfec5c87a 100644
+index 4719c99e05d8b71dc8ccc95f57f3918b8f4fef17..2db798036371613750d969d23829bea67769b344 100644
 --- a/gfx/thebes/gfxPlatformFontList.h
 +++ b/gfx/thebes/gfxPlatformFontList.h
-@@ -434,6 +434,10 @@ class gfxPlatformFontList : public gfxFontInfoLoader {
+@@ -433,6 +433,7 @@ class gfxPlatformFontList : public gfxFontInfoLoader {
+                                       bool aLoadCmaps = false);
    void InitializeFamily(uint32_t aGeneration, uint32_t aFamilyIndex,
                          bool aLoadCmaps);
++  bool MayDeferCmapLoading() const;  // STEALTH-HOOK(fingerprint/fonts/font-list)
  
-+  // STEALTH-HOOK(fingerprint/fonts/font-list)
-+  bool MayDeferCmapLoading() const;
-+  bool StealthBundleOnly() const;
-+
    // name lookup table methods
  
-   void AddOtherFamilyNames(gfxFontFamily* aFamilyEntry,
-@@ -463,9 +467,8 @@ class gfxPlatformFontList : public gfxFontInfoLoader {
-    */
+@@ -456,6 +457,7 @@ class gfxPlatformFontList : public gfxFontInfoLoader {
+       MOZ_REQUIRES(mLock);
+ 
+   bool NeedFullnamePostscriptNames() { return mExtraNames != nullptr; }
++  bool StealthBundleOnly() const;  // STEALTH-HOOK(fingerprint/fonts/font-list)
+ 
+   /**
+    * Read PSName and FullName of the given face, for src:local lookup,
+@@ -464,12 +466,16 @@ class gfxPlatformFontList : public gfxFontInfoLoader {
    virtual bool ReadFaceNames(const mozilla::fontlist::Family* aFamily,
                               const mozilla::fontlist::Face* aFace,
--                             nsCString& aPSName, nsCString& aFullName) {
--    return false;
--  }
-+                             nsCString& aPSName, nsCString& aFullName);
-+  // STEALTH-HOOK(fingerprint/fonts/font-list)
+                              nsCString& aPSName, nsCString& aFullName) {
++    if (gfxPlatformFontList::StealthBundleOnly()) return StealthReadFaceNames(aFamily, aFace, aPSName, aFullName);  // STEALTH-HOOK(fingerprint/fonts/font-list)
+     return false;
+   }
++  bool StealthReadFaceNames(const mozilla::fontlist::Family* aFamily, const mozilla::fontlist::Face* aFace, nsCString& aPSName, nsCString& aFullName);  // STEALTH-HOOK(fingerprint/fonts/font-list)
  
    // initialize localized family names
    bool InitOtherFamilyNames(bool aDeferOtherFamilyNamesLoading);
-@@ -1006,7 +1009,12 @@ class gfxPlatformFontList : public gfxFontInfoLoader {
++  void RecordFaceNamesFromTable(mozilla::fontlist::Family*, uint32_t, const nsACString&, const nsCString&, const char*, uint32_t) MOZ_REQUIRES(mLock);  // STEALTH-HOOK(fingerprint/fonts/font-list)
+   bool InitOtherFamilyNames(uint32_t aGeneration, bool aDefer);
++  void StealthLoadMissingCharacterMaps(mozilla::fontlist::FontList* aList, mozilla::fontlist::Family* aFamily, bool aLoadCmaps);  // STEALTH-HOOK(fingerprint/fonts/font-list)
+ 
+   // pure virtual functions, to be provided by concrete subclasses
+ 
+@@ -1004,9 +1010,10 @@ class gfxPlatformFontList : public gfxFontInfoLoader {
+    * part of initially populating the font list with family records, in which
+    * case this method is unused.
     */
-   virtual void ReadFaceNamesForFamily(mozilla::fontlist::Family* aFamily,
+-  virtual void ReadFaceNamesForFamily(mozilla::fontlist::Family* aFamily,
++  virtual void ReadFaceNamesForFamily_Mozilla(mozilla::fontlist::Family* aFamily,  // STEALTH-HOOK(fingerprint/fonts/font-list)
                                        bool aNeedFullnamePostscriptNames)
--      MOZ_REQUIRES(mLock) {}
-+      MOZ_REQUIRES(mLock);  // STEALTH-HOOK(fingerprint/fonts/font-list)
-+
-+  // STEALTH-HOOK(fingerprint/fonts/font-list)
-+  void RecordFaceNamesFromTable(mozilla::fontlist::Family*, uint32_t,
-+                                const nsACString&, const nsCString&,
-+                                const char*, uint32_t) MOZ_REQUIRES(mLock);
+       MOZ_REQUIRES(mLock) {}
++  virtual void ReadFaceNamesForFamily(mozilla::fontlist::Family* aFamily, bool aNeedFullnamePostscriptNames) MOZ_REQUIRES(mLock);  // STEALTH-HOOK(fingerprint/fonts/font-list)
  
    typedef nsRefPtrHashtable<nsCStringHashKey, gfxFontFamily> FontFamilyTable;
    typedef nsRefPtrHashtable<nsCStringHashKey, gfxFontEntry> FontEntryTable;
-@@ -1109,6 +1117,7 @@ class gfxPlatformFontList : public gfxFontInfoLoader {
+@@ -1109,6 +1116,7 @@ class gfxPlatformFontList : public gfxFontInfoLoader {
  
    nsTArray<nsCString> mEnabledFontsList;
    nsTHashSet<nsCString> mIconFontsSet;
-+  bool mStealthBundleOnly = false;  // STEALTH-HOOK(fingerprint/fonts/font-list)
++  bool mStealthBundleOnly = true;  // STEALTH-HOOK(fingerprint/fonts/font-list)
  
    // This is an owning reference; we are responsible to delete the FontList at
    // appropriate times.

@@ -43,13 +43,13 @@ const withoutComments = text => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\
 test('both call sites pass the attributes of the lookup', () => {
   const text = read('netwerk/dns/nsHostResolver.cpp');
   const resolve = body(text, 'nsresult nsHostResolver::ResolveHost(', 'nsAutoCString host(aHost);');
-  assert.match(resolve, /nsResolveHostCallback\* aCallback\) \{\n  \/\/ STEALTH-HOOK\(network\/doh\): [^\n]*\n  flags = StealthFlagsFollowSession\(aHost, aOriginAttributes, flags\);\n  $/);
+  assert.match(resolve, /nsResolveHostCallback\* aCallback\) \{\n  StealthApplySessionFlags\(aHost, aOriginAttributes, &flags\);  \/\/ STEALTH-HOOK\(network\/doh\)\n  $/);
   const detach = body(text, 'void nsHostResolver::DetachCallback(', 'RefPtr<nsHostRecord> rec;');
-  assert.match(detach, /nsresult status\) \{\n  flags = StealthFlagsFollowSession\(host, aOriginAttributes,\n\s+flags\);  \/\/ STEALTH-HOOK\(network\/doh\)\n  $/);
+  assert.match(detach, /nsresult status\) \{\n  StealthApplySessionFlags\(host, aOriginAttributes, &flags\);  \/\/ STEALTH-HOOK\(network\/doh\)\n  $/);
   // The parameters those names refer to are the attributes of the lookup.
   assert.match(resolve, /const OriginAttributes& aOriginAttributes,/);
   assert.match(detach, /const OriginAttributes& aOriginAttributes,/);
-  assert.equal((text.match(/StealthFlagsFollowSession\(/g) || []).length, 2);
+  assert.equal((text.match(/StealthApplySessionFlags\(/g) || []).length, 2);
 });
 
 test('a lookup and its cancellation resolve with the same flags', () => {

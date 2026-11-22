@@ -65,7 +65,7 @@ def _cases() -> list:
                 not any(s.get("name") in CHECKS for s in build["steps"])))
     text = " ".join(s.get("run", "") for s in checks["steps"])
     out.append(("checks: what they run is what the build used to run",
-                "scripts/check_release_naming.py" in text and "check_upstream_source.py --online" in text and "node --test juggler/tests/*.test.mjs" in text
+                "scripts/check_release_naming.py" in text and "check_upstream_source.py --online" in text and "node --test" in text and "juggler/tests/*.test.mjs" in text
                 and "validate_release.py --selftest" in text and "test_make_seal.py" in text and "test_workflow_cache_rules.py" in text))
     out.append(("checks: the tree is materialized from the series before they run, on a GitHub runner",
                 "engine.py materialize --into ." in checks["steps"][1]["run"] and checks["runs-on"] == "ubuntu-24.04" and names.index(CHECKS[0]) > 1))

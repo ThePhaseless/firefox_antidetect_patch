@@ -13,6 +13,7 @@
   "gfx/2d/StealthGlyphCoverage.h": "100644",
   "gfx/tests/gtest/TestStealthFontMetrics.cpp": "100644",
   "gfx/tests/gtest/TestStealthTextQuality.cpp": "100644",
+  "gfx/thebes/StealthDesignFontAccess.h": "100644",
   "gfx/thebes/StealthDesignMetrics.cpp": "100644",
   "gfx/thebes/StealthDesignMetrics.h": "100644",
   "gfx/thebes/StealthDesignMetrics.mozbuild": "100644",

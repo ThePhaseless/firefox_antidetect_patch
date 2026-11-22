@@ -1,50 +1,36 @@
 # fingerprint/media/decode-declaration
 
-Category: build, other, spoof
-Prefs: zoom.stealth.media.decode_support, zoom.stealth.media.decoding_info, zoom.stealth.media.encode_support, zoom.stealth.hw_concurrency (declared by fingerprint/hardware)
-Test: gtest StealthMediaDeclaration.* (dom/media/gtest/TestStealthMediaDeclaration.cpp: EncodeSupport*, DeclaredH264GateIgnoresThePlugin, DeclaredNumberOfProcessors, WebrtcAv1EncodeSmoothFollowsTheDeclaredCores)
+Category: build, spoof
+Prefs: zoom.stealth.media.decode_support, zoom.stealth.media.encode_support, zoom.stealth.media.decoding_info, zoom.stealth.hw_concurrency (declared by fingerprint/hardware)
+Test: gtest:StealthMediaDeclaration.* (dom/media/gtest/TestStealthMediaDeclaration.cpp: SupportsAsyncAnswersFromTheDeclaration, SupportsAndSupportsAsyncAgree, UndeclaredTypeFallsThrough, PowerEfficientIsHardwareOrAtMost640x480, DecodingInfoPowerEfficientFollowsTheRetailRule, AnUnsupportedTypeIsNotPowerEfficientAtAnySize, DecodingInfoOfAFileAnswersFromTheDeclaration (the real MediaCapabilities::DecodingInfo, declared "no" and declared "yes" for the same file), DeclaredNumberOfProcessors, EncodeSupportAnswersFromTheDeclaration, EncodeSupportDeclaredNoIsEmpty, EncodeSupportUndeclaredAndMalformedFallThrough, DeclaredH264GateIgnoresThePlugin, WebrtcAv1EncodeSmoothFollowsTheDeclaredCores); the suite is in the gtest filter of the candidate
 
 ## What it does
 
-TODO: one paragraph, from the notes below.
+What the engine says it can decode and encode (canPlayType, decodingInfo, the WebRTC codec lists) is declared by the core, not read from the codecs the machine has installed. The declaration sits one layer below the strings a page sees: PDMFactory is asked about a TRACK mime type (video/avc, video/hevc, video/av1, video/vp9, a dozen names Gecko defines), so declaring those covers every string built from them, and everything above (container rules, the codec-list AND, the H.264 profile and level windows of `IsAllowedH264Codec`) stays Gecko's own host-independent logic. It used to be a table of whole type strings in `DecoderTraits::CanHandleMediaType`, which could hold only the strings somebody had seen (3 of the 12 rows that differed on Linux); there is deliberately no hook in DecoderTraits.cpp any more.
+
+The declaration is consulted BEFORE the EME module, so on a build where EME is present the declared answer wins. Decoder creation is untouched (`CreateDecoder`, `GetDecoderModule` and `StrictSupportsAsync` keep Mozilla's code); only the query roads answer from the declaration:
+
+- `PDMFactory::Supports` (sync: MP4Decoder, MatroskaDecoder, WebMDecoder, KeySystemConfig, MediaCapabilities with the codec-support cache pref off) and `PDMFactory::SupportsAsync` (since 159 the WebRTC branch of decodingInfo and the cache-backed path ask here; it asks each platform module directly, so it has its own hook) give the declared `DecodeSupportSet`, an empty set included ("this build cannot decode it").
+- `mediaCapabilities.decodingInfo` (non-WebRTC): the declared answer, keyed by container mime plus codec family (`avc1`, `hev1`, `av01`, `vp09`, `vp8`), applies on both branches of the promise, the reject one and the resolve one: the second question decodingInfo asks ("can the decoder handle this stream") queries a real decoder and is host-dependent twice over. powerEfficient is the declared hardware bit OR a picture of 640x480 pixels or fewer (retail's rule, `StealthPowerEfficientFor`). A configuration with an undeclared codec, or one Gecko's own gate (`CanHandleContainerType`) turns away, is not declared and keeps the engine's answer. Audio is not consulted (bundled, no host dependence).
+- WebRTC: `WebrtcVideoEncoderFactory::SupportsCodec` answers the declared encode set; the H.264 gate (`SoftwareH264EnabledStatic`, `SendingH264PacketizationModeZeroSupportedStatic`) is the declared software flag (decode sw AND encode sw) when both tables declare video/avc, so the OpenH264 plugin and the GPU blocklist no longer decide.
+- `IsSWEncodeSmooth` sizes libwebrtc's encoder threads from the core count: the shadow `GetNumberOfProcessors = StealthDeclaredNumberOfProcessors` gives it the declared `zoom.stealth.hw_concurrency` (the real count only when nothing is declared); the real thread pools keep the real count.
+
+An unrecognised token in a table is not declared (it falls through to the real answer, never to "no"): the failure mode is "we fail to disguise", not "the page breaks".
+
+The cost, a trade and not a win: a declared "yes" for a codec this build cannot decode makes a site pick H.264 and the video does not play where it used to fall back to WebM. Fidelity to Windows is bought with broken playback on Linux; the way out is to ship the decoder, not to change the answer.
 
 ## Hooks in Mozilla files
 
-- `dom/media/DecoderTraits.cpp` (CanHandleMediaType (comment above it), already-hook): Comment-only (13 lines) recording that a codec-string table was removed on 2026-08-08 and that the declaration now lives in PDMFactory::Supports (dom/media/StealthMediaDeclaration.h, not in this group). No code in the diff. Drop the comment from the patch.
-- `dom/media/mediacapabilities/MediaCapabilities.cpp` (new file-scope StealthDeclaredDecodingInfoFor (hunk @@ -233) and the promise lambda in MediaCapabilities::CreateNonWebRTCDecodingInfo (hunk @@ -1159), movable): The helper loops over codecs and calls StealthDeclaredDecodingInfo (StealthMediaDeclaration.*, not in this group). Move the helper to StealthMediaDeclaration.cpp; the Mozilla file keeps the include and one call in the lambda that returns early. The declared answer overrides on both resolve branches, not only on reject. Comments are long measurement narratives (2026-08-08) and belong in docs. Audio
-- `dom/media/moz.build` (EXPORTS += [...] and UNIFIED_SOURCES += [...] in dom/media/moz.build, already-hook): 
-- `dom/media/platforms/PDMFactory.cpp` (PDMFactory::Supports(const SupportDecoderParams&, DecoderDoctorDiagnostics*) const, movable): The block maps two bools to a DecodeSupportSet inside Mozilla code. Movable: one hook such as an if-let on a StealthDecodeSupport(aParams) result, with the bit mapping in our file. The hook returns before the mEMEPDM->Supports branch, so declared answers also override EME answers when EME is present. Verify that is intended. [verified: CONFIRMED that the hook precedes the EME branch, PDMFactory.cp
+Each is one line with the marker on the line.
+
+- `dom/media/mediacapabilities/MediaCapabilities.cpp`: the include of `StealthMediaDeclaration.h` in a block of ours before `namespace mozilla::dom`; shadow in `IsSWEncodeSmooth`, `const auto GetNumberOfProcessors = StealthDeclaredNumberOfProcessors;` (G21: the only use of `GetNumberOfProcessors` in the function is `cores`; a wrap `Stealth(GetNumberOfProcessors())` would read the host core count and then correct it, which the invariants forbid); a one-line guard in the lambda of `MediaCapabilities::CreateNonWebRTCDecodingInfo`, right after `NS_ENSURE_TRUE_VOID(global)` (`if (auto d = StealthDeclaredDecodingInfoFor(aConfiguration)) return promise->MaybeResolve(std::move(*d));`): a pure addition, as on the 68 base; the declared answer resolves the promise before the engine's answer is computed, and Mozilla's two `promise->MaybeResolve(std::move(info));` lines are untouched.
+- `dom/media/platforms/PDMFactory.cpp`: the include, in a block of ours after `FFVPXRuntimeLinker.h` (the list of Mozilla's includes is left to Mozilla); guard in `PDMFactory::Supports`, `if (DecodeSupportSet declared; StealthDeclaredDecodeSupportFor(aParams, &declared)) return declared;` and guard in `PDMFactory::SupportsAsync`, `if (auto declared = StealthDeclaredDecodeSupportAsyncFor(aParams)) return declared;`: first statements, before the EME module and before `GetDecoderModule`, so the host's module is never asked for a declared type. They must stay guards: running Mozilla's body first would read the host and then discard it.
+- `dom/media/webrtc/jsapi/DefaultCodecPreferences.cpp`: the include; guards `if (bool declared; StealthDeclaredSoftwareH264(&declared)) return declared;` as the first statement of `SoftwareH264EnabledStatic` (before the `#ifdef` and the GMP check) and of `SendingH264PacketizationModeZeroSupportedStatic`.
+- `dom/media/webrtc/libwebrtcglue/WebrtcVideoCodecFactory.cpp`: the include; guard `if (auto declared = StealthDeclaredWebrtcEncodeSupport(aConfig)) return declared;` first statement of `WebrtcVideoEncoderFactory::SupportsCodec`, before the creation strategy is looked at.
+- `dom/media/moz.build`: `EXPORTS += ["StealthMediaDeclaration.h"]` and `UNIFIED_SOURCES += ["StealthMediaDeclaration.cpp"]`, each after the closing `]` of its list.
+- `dom/media/gtest/moz.build`: `UNIFIED_SOURCES += ["TestStealthMediaDeclaration.cpp"]` after the closing `]` (the line next to it, for `TestStealthAudioNoise.cpp`, is fingerprint/audio/noise's).
 
 ## Our own files
 
-- `dom/media/StealthMediaDeclaration.cpp`
-- `dom/media/StealthMediaDeclaration.h`
-
-## dom/media/DecoderTraits.cpp: CanHandleMediaType
-
-Stealth: there is deliberately no declared-answer hook in DecoderTraits.cpp any
-more, in front of CanHandleMediaType.
-
-One lived at the top of CanHandleMediaType until 2026-08-08, matching whole type
-STRINGS against a table from invisible_core. It could only ever hold the
-strings somebody had seen: measured that day against retail Windows, our
-Linux build differed on 12 rows and the table covered 3 of them, because the
-space it was trying to enumerate - profile x constraint x level x container x
-the audio codec travelling along - has no end.
-
-The declaration moved one layer down, to PDMFactory::Supports, where the key
-is a track mime type and the set is a dozen names Gecko defines itself. See
-dom/media/StealthMediaDeclaration.h. Everything in DecoderTraits.cpp is then
-Gecko's own host-independent logic and needs no help.
-
-Firefox 159 (2026-10-30): the WebRTC branch of MediaCapabilities.decodingInfo
-stopped asking PDMFactory::Supports. It goes WebrtcMediaDataDecoder::Supports ->
-PDMFactorySupport::IsSupportedAsync -> PDMFactory::SupportsAsync, which asks
-each platform module directly, so a page saw the host's real hardware-decode
-bit. SupportsAsync now carries the same hook at its entry as Supports, and the
-hook ceiling of PDMFactory.cpp went from 5 to 9 lines for it: two entries, no
-common callee in Mozilla's code. PDMFactory::StrictSupportsAsync (new in 159)
-keeps no hook: retail creates a real decoder there, and the non-WebRTC
-decodingInfo that calls it is answered by StealthDeclaredDecodingInfoFor
-afterwards. Test: dom/media/gtest/TestStealthMediaDeclaration.cpp (both roads
-give the declared set).
+- `dom/media/StealthMediaDeclaration.h/.cpp`: the declaration and its parsers (`StealthDeclaredDecodeSupport`, `StealthDeclaredEncodeSupport`, `StealthDeclaredDecodingInfo`), the pure rule `StealthPowerEfficientFor`, the hook functions `StealthDeclaredDecodeSupportFor(const SupportDecoderParams&, DecodeSupportSet*)`, `StealthDeclaredDecodeSupportAsyncFor` (a promise already resolved with the declared set, null when undeclared; same type as `PDMSupportsDecoderPromise`, asserted in the .cpp; the header forward-declares `SupportDecoderParams` and does not include PlatformDecoderModule.h), `StealthDeclaredSoftwareH264(bool*)` (the `Maybe<bool>` overload stays, used by the gtest), `StealthDeclaredWebrtcEncodeSupport`, `StealthDeclaredNumberOfProcessors`, `StealthDeclaredDecodingInfoFor`; `StealthDeclaredDecodingInfoFor` returns the declared answer or nothing.
+- `dom/media/gtest/TestStealthMediaDeclaration.cpp`: the suite `StealthMediaDeclaration`. Every case has its negative control: the declared value differs from what any host reports (made-up mime types that no module decodes; a declared yes and a declared no for the same file; declared cores offset from the host's count).

@@ -5,7 +5,8 @@
 /*
  * The road of the pingsender background task (B266): what TelemetrySend.sys.mjs
  * and BackgroundTask_pingsender.sys.mjs share. TelemetrySend only calls the
- * functions below from one-line hooks.
+ * functions below from one-line hooks. The module of the background task hooks
+ * in through `useCallbacksFrom`.
  */
 
 import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
@@ -28,6 +29,36 @@ export const PINGSENDER_ROUTE_ENV = "STEALTHFOX_PINGSENDER_ROUTE";
 export function attachCallbacks(request, callbacks) {
   if (callbacks) {
     request.channel.notificationCallbacks = callbacks;
+  }
+}
+
+// What answers "which callbacks for this host": set by the background task
+// once it has taken the session's road (StealthPingsenderRoute.takeSessionRoute),
+// never set in the browser process, where a ping carries no callbacks.
+let callbacksFrom = null;
+
+/**
+ * @param {function(string): (nsIInterfaceRequestor|null)} fn the callbacks for
+ *   a ping sent to a host, or null when it takes the default road.
+ */
+export function useCallbacksFrom(fn) {
+  callbacksFrom = fn;
+}
+
+/**
+ * Called in sendStandalonePing right after `request.open(...)`: the channel
+ * exists only after `open()`, and XMLHttpRequest takes the channel's callbacks
+ * when it sends, so the callbacks of the session's road must be set between
+ * the two. They are those of the endpoint's host, as the pingsender background
+ * task's road answers for it; where no road was taken (the browser itself)
+ * nothing is attached.
+ *
+ * @param {object} request the ServiceRequest, after `open()`.
+ * @param {string} endpoint the URL the ping is sent to.
+ */
+export function attachRoute(request, endpoint) {
+  if (callbacksFrom) {
+    attachCallbacks(request, callbacksFrom(new URL(endpoint).hostname));
   }
 }
 

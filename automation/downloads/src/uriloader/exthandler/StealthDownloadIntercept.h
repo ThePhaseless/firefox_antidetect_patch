@@ -15,13 +15,19 @@ class nsIRequest;
  * interceptor (nsIDownloadInterceptor, installed with
  * nsIExternalHelperAppService.setDownloadInterceptor) take over a download.
  * Parent process, main thread only. Friend of nsExternalAppHandler, which
- * only calls Start and Complete.
+ * only calls Start and Complete, and of nsExternalHelperAppService, whose
+ * mInterceptor field (set by setDownloadInterceptor, defined in
+ * StealthDownloadIntercept.cpp) holds the interceptor: when it is set, Start
+ * asks it to redirect each download into the automation's downloads folder.
  */
 class StealthDownloadIntercept final {
  public:
   /**
-   * Called from nsExternalAppHandler::OnStartRequest, where it would set up
-   * its own temp file. Asks the interceptor about this download. Returns true
+   * Called from nsExternalAppHandler::OnStartRequest, after the child process
+   * has returned and before it would set up its own temp file (mSourceUrl and
+   * mBrowsingContext are set by then, and the early returns for spam, a
+   * forbidden download and the content process have been taken): the
+   * interceptor may own the download. Asks the interceptor about this download. Returns true
    * when the interceptor took it: the data goes to the file it chose (or the
    * download is canceled when it chose none) and the caller must return
    * NS_OK, skipping the transfer, the dialogs and the downloads UI. Returns

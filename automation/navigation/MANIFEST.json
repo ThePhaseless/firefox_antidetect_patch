@@ -2,6 +2,7 @@
  "modified": [
   "docshell/base/CanonicalBrowsingContext.cpp",
   "docshell/base/nsDocShell.cpp",
+  "docshell/base/test/gtest/moz.build",
   "netwerk/base/LoadInfo.cpp",
   "netwerk/base/LoadInfo.h",
   "netwerk/base/TRRLoadInfo.cpp",
@@ -11,7 +12,11 @@
  "added": {
   "docshell/base/StealthNavigation.cpp": "100644",
   "docshell/base/StealthNavigation.h": "100644",
-  "docshell/base/StealthNavigationEvents.h": "100644"
+  "docshell/base/StealthNavigationEvents.h": "100644",
+  "docshell/base/test/gtest/TestStealthNavigation.cpp": "100644",
+  "docshell/base/test/gtest/stealth.build": "100644",
+  "netwerk/base/StealthLoadInfo.cpp": "100644",
+  "netwerk/base/StealthLoadInfo.h": "100644"
  },
  "inventory": [
   {
@@ -58,6 +63,26 @@
      "notes"
     ],
     "why": "Corrected the feature count in notes (three, not four) and added a hunk-to-feature map."
+   }
+  },
+  {
+   "file": "docshell/base/test/gtest/moz.build",
+   "category": "build",
+   "feature": "juggler-navigation-events",
+   "prefs": [],
+   "added": 1,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "after the closing bracket of UNIFIED_SOURCES",
+   "evidence": [
+    "+include(\"stealth.build\")  # STEALTH-HOOK(automation/navigation)"
+   ],
+   "notes": "One line includes docshell/base/test/gtest/stealth.build, our file, which lists TestStealthNavigation.cpp and the local include of docshell/base.",
+   "verifier": {
+    "changed": [],
+    "why": "Written from the diff against the tag."
    }
   },
   {

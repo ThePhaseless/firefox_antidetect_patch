@@ -1,0 +1,10 @@
+{
+ "files": [
+  "browser/components/tests/unit/test_stealth_launch_counter.js",
+  "js/xpconnect/tests/unit/test_stealth_hybrid_xrays_options.js",
+  "toolkit/components/url-classifier/tests/unit/test_stealth_hashcompleter_context.js",
+  "toolkit/components/urlformatter/tests/unit/test_stealth_apikeys.js",
+  "toolkit/components/urlformatter/tests/unit/test_stealth_apikeys_observer.js"
+ ],
+ "min_tests": 9
+}

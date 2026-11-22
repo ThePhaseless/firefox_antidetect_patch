@@ -1,53 +1,54 @@
 diff --git a/js/xpconnect/loader/ScriptPreloader.cpp b/js/xpconnect/loader/ScriptPreloader.cpp
-index 1c779e72d15756239c7edae272a5d6b3485df974..bb82cac16f425f3dd028a778c3109ab7dcb4fa30 100644
+index 1c779e72d15756239c7edae272a5d6b3485df974..55ad760dfde0d0fda76f714fb5fe39b88ba41ac0 100644
 --- a/js/xpconnect/loader/ScriptPreloader.cpp
 +++ b/js/xpconnect/loader/ScriptPreloader.cpp
-@@ -117,6 +117,8 @@ nsresult ScriptPreloader::CollectReports(nsIHandleReportCallback* aHandleReport,
+@@ -117,6 +117,7 @@ nsresult ScriptPreloader::CollectReports(nsIHandleReportCallback* aHandleReport,
                         UNITS_BYTES, mCacheData->nonHeapSizeOfExcludingThis(),
                         "The memory-mapped startup script cache file.");
    }
-+  // STEALTH-HOOK(platform/script-cache)
-+  ReportWrittenCache(aHandleReport, aData);
++  StealthReportWrittenCache(aHandleReport, aData);  // STEALTH-HOOK(platform/script-cache)
  
    return NS_OK;
  }
-@@ -884,6 +886,8 @@ Result<Ok, nsresult> ScriptPreloader::WriteCache() {
+@@ -884,6 +885,7 @@ Result<Ok, nsresult> ScriptPreloader::WriteCache() {
    }
  
    MOZ_TRY(cacheFile->MoveTo(nullptr, mBaseName + u".bin"_ns));
-+  // STEALTH-HOOK(platform/script-cache)
-+  AdoptWrittenCache(cacheFile);
++  StealthAdoptWrittenCache(cacheFile);  // STEALTH-HOOK(platform/script-cache)
  
    return Ok();
  }
-@@ -1491,3 +1495,4 @@ NS_IMPL_ISUPPORTS(ScriptPreloader, nsIObserver, nsIRunnable, nsIMemoryReporter,
+@@ -1491,3 +1493,5 @@ NS_IMPL_ISUPPORTS(ScriptPreloader, nsIObserver, nsIRunnable, nsIMemoryReporter,
  #undef LOG
  
  }  // namespace mozilla
++
 +#include "StealthScriptCache-inl.h"  // STEALTH-HOOK(platform/script-cache)
 diff --git a/js/xpconnect/loader/ScriptPreloader.h b/js/xpconnect/loader/ScriptPreloader.h
-index c9da15647761b67e68ea267d58d091cb153d7adc..d059fabfcc9b9a354db31ce7dc7a1b259b519c2e 100644
+index c9da15647761b67e68ea267d58d091cb153d7adc..14bf2eae1b435af4985443f3a07b62e4b4c94f31 100644
 --- a/js/xpconnect/loader/ScriptPreloader.h
 +++ b/js/xpconnect/loader/ScriptPreloader.h
-@@ -434,6 +434,11 @@ class ScriptPreloader : public nsIObserver,
+@@ -423,6 +423,7 @@ class ScriptPreloader : public nsIObserver,
+   void CacheWriteComplete();
+ 
+   void FinishContentStartup();
++  void StealthReportWrittenCache(nsIHandleReportCallback* aHandleReport, nsISupports* aData);  // STEALTH-HOOK(platform/script-cache)
+ 
+   // Returns true if scripts added to the cache now will be encoded and
+   // written to the cache. If we've already encoded scripts for the cache
+@@ -433,6 +434,7 @@ class ScriptPreloader : public nsIObserver,
+   // Returns a file pointer for the cache file with the given name in the
    // current profile.
    Result<nsCOMPtr<nsIFile>, nsresult> GetCacheFile(const nsAString& suffix);
++  void StealthAdoptWrittenCache(nsIFile* aCacheFile);  // STEALTH-HOOK(platform/script-cache)
  
-+  // STEALTH-HOOK(platform/script-cache)
-+  void AdoptWrittenCache(nsIFile* aCacheFile);
-+  void ReportWrittenCache(nsIHandleReportCallback* aHandleReport,
-+                          nsISupports* aData);
-+
    // Waits for the given cached script to finish compiling off-thread, or
    // decodes it synchronously on the main thread, as appropriate.
-   already_AddRefed<JS::Stencil> WaitForCachedStencil(
-@@ -556,6 +561,9 @@ class ScriptPreloader : public nsIObserver,
+@@ -555,6 +557,7 @@ class ScriptPreloader : public nsIObserver,
+   // fields, and its lifetime is guaranteed to be longer than ScriptPreloader
    // instance.
    AutoMemMap* mCacheData;
++  AutoMemMap mStealthWrittenCacheData;  // STEALTH-HOOK(platform/script-cache)
  
-+  // STEALTH-HOOK(platform/script-cache)
-+  AutoMemMap mWrittenCacheData;
-+
    Monitor mMonitor MOZ_ACQUIRED_AFTER(mSaveMonitor.Lock());
    MainThreadAndLockCapability<Monitor> mSaveMonitor;
- };

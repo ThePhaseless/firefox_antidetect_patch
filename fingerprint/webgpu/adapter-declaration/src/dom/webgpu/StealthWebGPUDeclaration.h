@@ -45,6 +45,7 @@
 namespace mozilla {
 namespace dom {
 enum class GPUFeatureName : uint8_t;
+class Promise;
 }  // namespace dom
 namespace webgpu {
 
@@ -86,9 +87,12 @@ bool StealthWebGPUPreloadBundledVulkan();
 // bundled Vulkan driver is mapped, and WebGPU is off when it cannot be.
 void StealthWebGPUPlatformInit();
 
-// Instance::RequestAdapter, after Firefox's own validation: true when the
-// declared GPU has no WebGPU adapter, and the promise resolves null.
-bool StealthWebGPUNoAdapter();
+// Instance::RequestAdapter, right after the power preference is computed
+// (Firefox's own validation has run by then): true when the declared GPU has no
+// WebGPU adapter, and the promise is resolved with null here; the hook then
+// returns the promise. A declaration that is neither "d3d12" nor "none" is
+// refused.
+bool StealthWebGPUNoAdapter(RefPtr<dom::Promise>& aPromise);
 
 // Instance::RequestAdapter, once the request is made: remembers whether this
 // adapter was asked for with forceFallbackAdapter.
@@ -102,9 +106,23 @@ bool StealthWebGPUDeclareAdapter(Adapter* aAdapter, const Instance* aInstance,
                                  RawId aId, RefPtr<SupportedFeatures>& aFeatures,
                                  ffi::WGPULimits& aLimits, StealthLimitKey aKey);
 
-// AdapterInfo::IsFallbackAdapter: the declared answer, Nothing() when the
-// engine is off.
-Maybe<bool> StealthWebGPUDeclaredIsFallback(const Adapter* aAdapter);
+// AdapterInfo::IsFallbackAdapter: true when the answer is the declared one
+// (the engine is on).
+bool StealthWebGPUDeclared();
+
+// AdapterInfo::IsFallbackAdapter with the engine on: the answer declared for
+// this adapter (aAdapter is the AdapterInfo's parent), the note the request
+// left. An adapter the constructor did not declare answers false.
+bool StealthWebGPUIsFallback(const Adapter* aAdapter);
+
+// wgpu_parent_get_compositor_device_luid (Windows, GPU process): the out
+// parameter is zeroed before Firefox's code fills it, so a missing compositor
+// device reads as no match and never as uninitialised memory. A template so
+// that this header names no ffi type.
+template <class T>
+void StealthWebGPUZeroLuid(T* aOut) {
+  *aOut = {};
+}
 
 // Adapter::RequestDevice, just before the descriptor goes to wgpu: every
 // "max" limit lowered to the host's, every "min" raised to it, and the

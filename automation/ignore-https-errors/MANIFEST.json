@@ -2,7 +2,9 @@
  "modified": [
   "security/manager/ssl/nsCertOverrideService.cpp"
  ],
- "added": {},
+ "added": {
+  "security/manager/ssl/StealthIgnoreHTTPSErrors.h": "100644"
+ },
  "inventory": [
   {
    "file": "security/manager/ssl/nsCertOverrideService.cpp",

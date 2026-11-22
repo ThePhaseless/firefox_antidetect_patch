@@ -11,6 +11,7 @@
 
 #include "StealthSessionResolver.h"
 #include "TRRLoadInfo.h"
+#include "TRRService.h"
 #include "gtest/gtest.h"
 #include "mozilla/OriginAttributes.h"
 #include "mozilla/Preferences.h"
@@ -291,4 +292,43 @@ TEST(TestStealthSessionResolver, OnlyADoHRequestIsRefusedAndAFailureKeepsItsStat
   EXPECT_EQ(StealthTRRProxyAnswer(NS_ERROR_FAILURE, nullptr, true), NS_ERROR_FAILURE);
   EXPECT_EQ(StealthTRRProxyAnswer(NS_BINDING_ABORTED, nullptr, true), NS_BINDING_ABORTED);
   EXPECT_EQ(StealthTRRProxyAnswer(NS_ERROR_ABORT, nullptr, true), NS_ERROR_ABORT);
+}
+
+// The hook of nsHostResolver::ResolveHost and DetachCallback: the flags they were given, put through the function of the
+// resolver from their address. A context with a proxy is DoH only, a context without one is native. Where the TRR service
+// does not exist in the test process the function leaves the flags as they are, and the first check still holds: the hook and
+// the function it wraps give the same flags.
+TEST(TestStealthSessionResolver, TheHookAppliesTheFlagsThroughTheirAddress)
+{
+  nsAutoCString old;
+  const bool hadValue = NS_SUCCEEDED(Preferences::GetCString("network.trr.stealth.contexts", old));
+  ASSERT_EQ(Preferences::SetCString("network.trr.stealth.contexts", "7"_ns), NS_OK);
+
+  const nsIDNSService::DNSFlags given = WithMode(nsIRequest::TRR_DEFAULT_MODE, nsIDNSService::RESOLVE_BYPASS_CACHE);
+  OriginAttributes proxied;
+  proxied.mUserContextId = 7;
+  OriginAttributes plain;
+  plain.mUserContextId = 3;
+
+  nsIDNSService::DNSFlags flags = given;
+  StealthApplySessionFlags("a.test"_ns, proxied, &flags);
+  EXPECT_EQ(flags, StealthFlagsFollowSession("a.test"_ns, proxied, given));
+  nsIDNSService::DNSFlags other = given;
+  StealthApplySessionFlags("a.test"_ns, plain, &other);
+  EXPECT_EQ(other, StealthFlagsFollowSession("a.test"_ns, plain, given));
+  if (TRRService::Get()) {
+    EXPECT_EQ(flags, WithMode(nsIRequest::TRR_ONLY_MODE, nsIDNSService::RESOLVE_BYPASS_CACHE))
+        << "a lookup of a context with a proxy is DoH only";
+    EXPECT_EQ(other, WithMode(nsIRequest::TRR_DISABLED_MODE, nsIDNSService::RESOLVE_BYPASS_CACHE))
+        << "a lookup of a context without a proxy is native";
+  } else {
+    EXPECT_EQ(flags, given);
+    EXPECT_EQ(other, given);
+  }
+
+  if (hadValue) {
+    Preferences::SetCString("network.trr.stealth.contexts", old);
+  } else {
+    Preferences::ClearUser("network.trr.stealth.contexts");
+  }
 }

@@ -12,3 +12,4 @@ SOURCES += [
     "TestStealthSocksCredentials.cpp",
     "TestStealthTRRContext.cpp",
 ]
+SOURCES += ["TestStealthHttp3Socks.cpp"]  # STEALTH-HOOK(network/proxy-udp)

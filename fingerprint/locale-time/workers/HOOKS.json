@@ -4,48 +4,34 @@
   "function": "skip-if = [",
   "kind": "add",
   "form": "unknown",
-  "line": "# STEALTH-HOOK(fingerprint/locale-time/workers)",
-  "test": ""
- },
- {
-  "file": "dom/base/test/browser.toml",
-  "function": "skip-if = [",
-  "kind": "add",
-  "form": "unknown",
-  "line": "[\"browser_stealth_language_workers.js\"]",
-  "test": ""
+  "line": "[\"browser_stealth_language_workers.js\"]  # STEALTH-HOOK(fingerprint/locale-time/workers)",
+  "test": "wrapper:tests/test_context_locale_e2e.py::test_a_context_locale_reaches_navigator_intl_and_the_header"
  },
  {
   "file": "dom/serviceworkers/ServiceWorkerPrivate.cpp",
   "function": "",
   "kind": "add",
   "form": "registration",
-  "line": "#include \"StealthWorkerDeclaration.h\"  // STEALTH-HOOK(fingerprint/locale-time/workers)",
-  "test": ""
+  "line": "#include \"StealthServiceWorkerDeclaration.h\"  // STEALTH-HOOK(fingerprint/locale-time/workers)",
+  "test": "wrapper:tests/test_context_locale_e2e.py::test_a_context_locale_reaches_navigator_intl_and_the_header"
  },
  {
   "file": "dom/serviceworkers/ServiceWorkerPrivate.cpp",
   "function": "void ServiceWorkerPrivate::RefreshRemoteWorkerData(",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/locale-time/workers)",
-  "test": ""
- },
- {
-  "file": "dom/serviceworkers/ServiceWorkerPrivate.cpp",
-  "function": "void ServiceWorkerPrivate::RefreshRemoteWorkerData(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  StealthWorkerDeclaration(mInfo->Principal(), mRemoteWorkerData);",
-  "test": ""
+  "form": "anchor",
+  "line": "  StealthWorkerDeclaration(mInfo->Principal(), mRemoteWorkerData);  // STEALTH-HOOK(fingerprint/locale-time/workers)",
+  "test": "wrapper:tests/test_context_locale_e2e.py::test_a_service_worker_of_a_context_with_its_own_zone_has_it",
+  "anchor": "aRegistration->Descriptor().ToIPC();",
+  "why": "The hook fills languageOverrideLocale and timezoneOverride of mRemoteWorkerData after Mozilla filled descriptor and registrationDescriptor; it is the last statement of RefreshRemoteWorkerData (G30). A guard or notice at the top would run the scan of the browsing context groups at another moment (G18, no difference allowed in any case): it stays where it is."
  },
  {
   "file": "dom/serviceworkers/moz.build",
   "function": "UNIFIED_SOURCES += [",
   "kind": "add",
   "form": "registration",
-  "line": "UNIFIED_SOURCES += [\"StealthWorkerDeclaration.cpp\"]  # STEALTH-HOOK(fingerprint/locale-time/workers)",
-  "test": ""
+  "line": "UNIFIED_SOURCES += [\"StealthServiceWorkerDeclaration.cpp\"]  # STEALTH-HOOK(fingerprint/locale-time/workers)",
+  "test": "wrapper:tests/test_context_locale_e2e.py::test_a_context_locale_reaches_navigator_intl_and_the_header"
  },
  {
   "file": "dom/workers/WorkerPrivate.cpp",
@@ -53,199 +39,95 @@
   "kind": "add",
   "form": "registration",
   "line": "#include \"StealthWorkerDeclaration.h\"  // STEALTH-HOOK(fingerprint/locale-time/workers)",
-  "test": ""
+  "test": "wrapper:tests/test_context_locale_e2e.py::test_a_context_locale_reaches_navigator_intl_and_the_header"
  },
  {
   "file": "dom/workers/WorkerPrivate.cpp",
   "function": "WorkerPrivate::WorkerPrivate(",
   "kind": "add",
-  "form": "unknown",
-  "line": "    // STEALTH-HOOK(fingerprint/locale-time/workers)",
-  "test": ""
- },
- {
-  "file": "dom/workers/WorkerPrivate.cpp",
-  "function": "WorkerPrivate::WorkerPrivate(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    DeclareWorkerLanguageAndZone(mLoadInfo);",
-  "test": ""
+  "form": "anchor",
+  "line": "    StealthDeclareWorkerLanguageAndZone(mLoadInfo);  // STEALTH-HOOK(fingerprint/locale-time/workers)",
+  "test": "wrapper:tests/test_context_locale_e2e.py::test_a_context_locale_reaches_navigator_intl_and_the_header",
+  "anchor": "AssertIsOnMainThread();",
+  "why": "First statement of the no-parent branch of the WorkerPrivate constructor body, before RuntimeService::GetDefaultJSSettings and the realm options read the language and the zone from mLoadInfo. A constructor hook stays in the body at today's moment (G23); aLoadInfo is already moved into mLoadInfo there, so a wrap of the init list would change the order (design row moved, refused)."
  },
  {
   "file": "dom/workers/WorkerPrivate.cpp",
   "function": "void WorkerPrivate::UpdateLanguageOverrideInternal(",
   "kind": "rewrite",
-  "form": "unknown",
-  "line": "          // STEALTH-HOOK(fingerprint/locale-time/workers)",
+  "form": "wrap-expression",
+  "line": "          JS::SetRealmLocaleOverride(realm, StealthWorkerRealmLocale(aLanguageOverride.get()));  // STEALTH-HOOK(fingerprint/locale-time/workers)",
   "removed": "          JS::SetRealmLocaleOverride(realm, aLanguageOverride.get());",
-  "test": ""
- },
- {
-  "file": "dom/workers/WorkerPrivate.cpp",
-  "function": "void WorkerPrivate::UpdateLanguageOverrideInternal(",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "          SetWorkerRealmLocale(realm, aLanguageOverride);",
-  "test": ""
+  "test": "",
+  "untestable": "no product API sets the language after a worker is born; the hook stays (G24)",
+  "pm": "approvato"
  },
  {
   "file": "dom/workers/WorkerPrivate.cpp",
   "function": "void WorkerPrivate::UpdateTimezoneOverrideInternal(JSContext* aCx,",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/locale-time/workers)",
-  "test": ""
- },
- {
-  "file": "dom/workers/WorkerPrivate.cpp",
-  "function": "void WorkerPrivate::UpdateTimezoneOverrideInternal(JSContext* aCx,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  if (WorkerFollowsOwnerLanguage(mLoadInfo)) {",
-  "test": ""
- },
- {
-  "file": "dom/workers/WorkerPrivate.cpp",
-  "function": "void WorkerPrivate::UpdateTimezoneOverrideInternal(JSContext* aCx,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    return;",
-  "test": ""
- },
- {
-  "file": "dom/workers/WorkerPrivate.cpp",
-  "function": "void WorkerPrivate::UpdateTimezoneOverrideInternal(JSContext* aCx,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  }",
-  "test": ""
+  "form": "guard",
+  "line": "  if (StealthWorkerFollowsOwnerLanguage(this)) return;  // STEALTH-HOOK(fingerprint/locale-time/workers)",
+  "test": "wrapper:tests/test_context_locale_e2e.py::test_a_worker_with_its_own_language_ignores_the_accept_languages_pref"
  },
  {
   "file": "dom/worklet/WorkletGlobalScope.cpp",
   "function": "",
   "kind": "add",
   "form": "registration",
-  "line": "#include \"mozilla/dom/StealthSessionDeclaration.h\"  // STEALTH-HOOK(fingerprint/locale-time/workers)",
-  "test": ""
+  "line": "#include \"StealthWorkletDeclaration.h\"  // STEALTH-HOOK(fingerprint/locale-time/workers)",
+  "test": "wrapper:tests/test_context_locale_e2e.py::test_an_audio_worklet_of_a_context_speaks_its_language_and_zone"
  },
  {
   "file": "dom/worklet/WorkletGlobalScope.cpp",
   "function": "JS::RealmOptions WorkletGlobalScope::CreateRealmOptions() const {",
   "kind": "add",
-  "form": "unknown",
-  "line": "  SetDeclaredRealmTimeAndLanguage(  // STEALTH-HOOK(fingerprint/locale-time/workers)",
-  "test": ""
- },
- {
-  "file": "dom/worklet/WorkletGlobalScope.cpp",
-  "function": "JS::RealmOptions WorkletGlobalScope::CreateRealmOptions() const {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "      options, ShouldResistFingerprinting(RFPTarget::JSDateTimeUTC),",
-  "test": ""
- },
- {
-  "file": "dom/worklet/WorkletGlobalScope.cpp",
-  "function": "JS::RealmOptions WorkletGlobalScope::CreateRealmOptions() const {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "      ShouldResistFingerprinting(RFPTarget::JSLocale),",
-  "test": ""
- },
- {
-  "file": "dom/worklet/WorkletGlobalScope.cpp",
-  "function": "JS::RealmOptions WorkletGlobalScope::CreateRealmOptions() const {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "      mImpl->LoadInfo().Language(), mImpl->LoadInfo().Timezone());",
-  "test": ""
+  "form": "anchor",
+  "line": "  StealthDeclareWorkletRealm(this, options);  // STEALTH-HOOK(fingerprint/locale-time/workers)",
+  "test": "wrapper:tests/test_context_locale_e2e.py::test_an_audio_worklet_of_a_context_speaks_its_language_and_zone",
+  "anchor": "the if (ShouldResistFingerprinting(RFPTarget::JSLocale)) { ... } block of CreateRealmOptions",
+  "why": "It must run after Mozilla's two resistFingerprinting branches wrote options.behaviors() (it declares the zone and locale unless RFP asked for its own values), and before the SharedArrayBuffer line; moving it to the return would change the order (G18): it stays where it is."
  },
  {
   "file": "dom/worklet/WorkletImpl.cpp",
   "function": "",
   "kind": "add",
   "form": "registration",
-  "line": "#include \"mozilla/dom/StealthSessionDeclaration.h\"  // STEALTH-HOOK(fingerprint/locale-time/workers)",
-  "test": ""
- },
- {
-  "file": "dom/worklet/WorkletImpl.cpp",
-  "function": "",
-  "kind": "add",
-  "form": "unknown",
-  "line": "// STEALTH-HOOK(fingerprint/locale-time/workers)",
-  "test": ""
- },
- {
-  "file": "dom/worklet/WorkletImpl.cpp",
-  "function": "",
-  "kind": "add",
-  "form": "unknown",
-  "line": "#include \"nsPIDOMWindowInlines.h\"",
-  "test": ""
+  "line": "#include \"StealthWorkletDeclaration.h\"  // STEALTH-HOOK(fingerprint/locale-time/workers)",
+  "test": "wrapper:tests/test_context_locale_e2e.py::test_an_audio_worklet_of_a_context_speaks_its_language_and_zone"
  },
  {
   "file": "dom/worklet/WorkletImpl.cpp",
   "function": "WorkletLoadInfo::WorkletLoadInfo(nsPIDOMWindowInner* aWindow)",
   "kind": "add",
-  "form": "unknown",
-  "line": "  dom::GetDeclaredLanguage(aWindow->GetBrowsingContext(), mLanguage);",
-  "test": ""
- },
- {
-  "file": "dom/worklet/WorkletImpl.cpp",
-  "function": "WorkletLoadInfo::WorkletLoadInfo(nsPIDOMWindowInner* aWindow)",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  dom::GetDeclaredTimezone(aWindow->GetBrowsingContext(), mTimezone);",
-  "test": ""
+  "form": "anchor",
+  "line": "  StealthWorkletAccess::Declare(this, aWindow);  // STEALTH-HOOK(fingerprint/locale-time/workers)",
+  "test": "wrapper:tests/test_context_locale_e2e.py::test_an_audio_worklet_of_a_context_speaks_its_language_and_zone",
+  "anchor": "the if (outerWindow) { ... } else { ... } block of the WorkletLoadInfo constructor",
+  "why": "The values are read from the window's context after mOuterWindowID is set, as the last statement of the constructor body (G23: a constructor hook stays in the body at today's moment); it is the last line of the block (G30)."
  },
  {
   "file": "dom/worklet/WorkletImpl.h",
   "function": "",
   "kind": "add",
   "form": "registration",
-  "line": "#include \"nsString.h\"",
-  "test": ""
+  "line": "#include \"nsString.h\"  // STEALTH-HOOK(fingerprint/locale-time/workers)",
+  "test": "wrapper:tests/test_context_locale_e2e.py::test_an_audio_worklet_of_a_context_speaks_its_language_and_zone"
+ },
+ {
+  "file": "dom/worklet/WorkletImpl.h",
+  "function": "class WorkletThread;",
+  "kind": "add",
+  "form": "member",
+  "line": "  friend struct StealthWorkletAccess;  // STEALTH-HOOK(fingerprint/locale-time/workers)",
+  "test": "wrapper:tests/test_context_locale_e2e.py::test_an_audio_worklet_of_a_context_speaks_its_language_and_zone"
  },
  {
   "file": "dom/worklet/WorkletImpl.h",
   "function": "class WorkletLoadInfo {",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/locale-time/workers)",
-  "test": ""
- },
- {
-  "file": "dom/worklet/WorkletImpl.h",
-  "function": "class WorkletLoadInfo {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  const nsCString& Language() const { return mLanguage; }",
-  "test": ""
- },
- {
-  "file": "dom/worklet/WorkletImpl.h",
-  "function": "class WorkletLoadInfo {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  const nsString& Timezone() const { return mTimezone; }",
-  "test": ""
- },
- {
-  "file": "dom/worklet/WorkletImpl.h",
-  "function": "class WorkletLoadInfo {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  nsCString mLanguage;",
-  "test": ""
- },
- {
-  "file": "dom/worklet/WorkletImpl.h",
-  "function": "class WorkletLoadInfo {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  nsString mTimezone;",
-  "test": ""
+  "form": "member",
+  "line": "  std::pair<nsCString, nsString> mStealthDeclared;  // STEALTH-HOOK(fingerprint/locale-time/workers)",
+  "test": "wrapper:tests/test_context_locale_e2e.py::test_an_audio_worklet_of_a_context_speaks_its_language_and_zone"
  }
 ]

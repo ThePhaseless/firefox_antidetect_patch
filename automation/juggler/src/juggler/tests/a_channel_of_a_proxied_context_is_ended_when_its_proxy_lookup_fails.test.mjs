@@ -23,24 +23,26 @@ const read = rel => fs.readFileSync(path.join(TREE, rel), 'utf8');
 const CHANNEL = 'netwerk/protocol/http/nsHttpChannel.cpp';
 const ASK = 'StealthProxyIsMandatory(LoadIsTRRServiceChannel(), mLoadInfo.get())';
 
-test('both fail-closed calls of nsHttpChannel ask whether the proxy is mandatory, not only whether the channel is a DoH one', () => {
-  const text = read(CHANNEL);
-  const calls = text.split('\n').filter(l => l.includes('StealthTRRFailClosed('));
-  assert.equal(calls.length, 2);
-  for (const line of calls) {
-    assert.ok(line.includes(ASK), `a fail-closed call that ignores the context: ${line.trim()}`);
-    assert.match(line, /  \/\/ STEALTH-HOOK\(network\/doh\)$/);
+test('the only fail-closed rules of nsHttpChannel are the two templates of our header, and both ask whether the proxy is mandatory, not only whether the channel is a DoH one', () => {
+  const header = read('netwerk/ipc/StealthTRRContext.h');
+  assert.doesNotMatch(read(CHANNEL), /StealthTRRFailClosed\(/, 'a fail-closed call made in Mozilla\'s file, outside the templates');
+  for (const name of ['StealthChannelProxyLookup', 'StealthChannelOnProxyAnswer']) {
+    const fn = header.match(new RegExp(`${name}\\(ChannelT\\* aChannel[\\s\\S]*?\\n}\\n`))[0];
+    assert.ok(fn.includes('StealthProxyIsMandatory(isTRR, loadInfo.get())'), `${name} ignores the context: ${fn}`);
+    assert.equal(fn.split('StealthTRRFailClosed(').length - 1, 1, name);
   }
-  assert.doesNotMatch(text, /StealthTRRFailClosed\([^\n]*, LoadIsTRRServiceChannel\(\), mCanceled\)/);
 });
 
-test('the lookup that cannot start and the failed status are both covered, before the DIRECT road is taken', () => {
+test('the one call of ResolveProxy in MaybeResolveProxyAndBeginConnect is wrapped, so the lookup that cannot start and the failed status are both covered, before the DIRECT road is taken', () => {
   const text = read(CHANNEL);
   const start = text.slice(text.indexOf('void nsHttpChannel::MaybeResolveProxyAndBeginConnect()'));
-  assert.ok(start.indexOf('NS_SUCCEEDED(proxyRv = ResolveProxy())') < start.indexOf(ASK));
-  assert.ok(start.indexOf(ASK) < start.indexOf('rv = BeginConnect();'));
+  const wrapped = start.indexOf('NS_SUCCEEDED(StealthChannelProxyLookup(this, ResolveProxy()))');
+  assert.ok(wrapped > 0, 'the lookup is not given to the rule');
+  assert.equal(start.slice(0, start.indexOf('\n}\n')).split('ResolveProxy()').length - 1, 1, 'a second, bare call of ResolveProxy');
+  assert.ok(wrapped < start.indexOf('rv = BeginConnect();'));
   const proxy = text.slice(text.indexOf('nsHttpChannel::OnProxyAvailable('));
-  assert.ok(proxy.indexOf(ASK) > 0 && proxy.indexOf(ASK) < proxy.indexOf('if (NS_SUCCEEDED(status)) {\n    mProxyInfo = pi;'),
+  const hook = 'if (StealthChannelOnProxyAnswer(this, status, pi)) return NS_OK;  // STEALTH-HOOK(network/doh)';
+  assert.ok(proxy.indexOf(hook) > 0 && proxy.indexOf(hook) < proxy.indexOf('if (NS_SUCCEEDED(status)) {\n    mProxyInfo = pi;'),
     'the status is used before the rule');
 });
 

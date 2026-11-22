@@ -2,7 +2,9 @@
  "modified": [
   "dom/media/CubebUtils.cpp"
  ],
- "added": {},
+ "added": {
+  "dom/media/StealthSampleRate.h": "100644"
+ },
  "inventory": [
   {
    "file": "dom/media/CubebUtils.cpp",

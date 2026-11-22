@@ -1,6 +1,7 @@
 {
  "modified": [
   "gfx/gl/GLContext.cpp",
+  "gfx/gl/GLContext.h",
   "gfx/gl/gtest/moz.build",
   "gfx/gl/moz.build"
  ],
@@ -30,6 +31,28 @@
    "verifier": {
     "changed": [],
     "why": "Written with the hook, 2026-11-01."
+   }
+  },
+  {
+   "file": "gfx/gl/GLContext.h",
+   "category": "spoof",
+   "feature": "webgl-multisample",
+   "prefs": [
+    "webgl.msaa-samples"
+   ],
+   "added": 1,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "after the mAvailableFeatures member of GLContext",
+   "evidence": [
+    "+  bool mStealthReportedMultisample = false;  // STEALTH-HOOK(fingerprint/webgl/multisample)"
+   ],
+   "notes": "The field that carries the feature as the driver reports it from after InitFeatures() to after the driver-workaround block in GLContext::InitImpl (G5/G22).",
+   "verifier": {
+    "changed": [],
+    "why": "Written with the hook, 2026-11-21."
    }
   },
   {

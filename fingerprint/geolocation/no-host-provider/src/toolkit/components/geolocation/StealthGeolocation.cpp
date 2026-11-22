@@ -4,6 +4,7 @@
 
 #include "mozilla/StealthGeolocation.h"
 
+#include "mozilla/dom/PermissionsBinding.h"
 #include "nsServiceManagerUtils.h"
 
 namespace mozilla {
@@ -19,5 +20,10 @@ bool StealthSelectGeolocationProvider(
 }
 
 bool StealthSystemLocationDeclaredOn() { return true; }
+
+bool StealthSkipsPermissionMonitor(dom::PermissionName aName) {
+  return aName == dom::PermissionName::Geolocation &&
+         StealthSystemLocationDeclaredOn();
+}
 
 }  // namespace mozilla

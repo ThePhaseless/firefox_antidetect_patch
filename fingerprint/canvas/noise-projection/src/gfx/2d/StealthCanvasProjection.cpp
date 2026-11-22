@@ -309,9 +309,9 @@ already_AddRefed<DataSourceSurface> StealthProjectedRegion(
 
 // The projected stand-in reads as projected here too.
 already_AddRefed<DataSourceSurface> StealthProjectOriginal(
-    SourceSurface* aOriginal, const IntSize& aSize,
+    already_AddRefed<DataSourceSurface> aData, const IntSize& aSize,
     const StealthStandIn& aStandIn) {
-  RefPtr<DataSourceSurface> data = aOriginal->GetDataSurface();
+  RefPtr<DataSourceSurface> data = aData;
   if (data && aStandIn.noise) {
     return StealthProjectedRegion(data, IntRect(IntPoint(), aSize),
                                   aStandIn.premultiplied, aStandIn.noise);

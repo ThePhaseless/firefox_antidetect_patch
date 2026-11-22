@@ -2,15 +2,19 @@
 
 Category: spoof
 Prefs: zoom.stealth.storage.quota_mb
-Test: TODO
+Test: gtest:StealthQuotaEstimate.OriginScopeReportsThePrefInBytes, gtest:StealthQuotaEstimate.GroupScopeKeepsMozillasLimit, gtest:StealthQuotaEstimate.UnsetPrefChangesNeitherScope (the pure function); wrapper:tests/test_storage_estimate_quota_is_declared_e2e.py::test_storage_estimate_quota_is_the_declared_quota (the wiring)
 
 ## What it does
 
-TODO: one paragraph, from the notes below.
+`navigator.storage.estimate().quota` reports the quota declared by the launcher (`zoom.stealth.storage.quota_mb`, in MB, when > 0) instead of the limit Mozilla computes from the host disk; with the pref unset (-1) Mozilla's limit is reported. Only the reported value changes: eviction keeps Mozilla's limits. The group scope of the same operation (parent process only, the ServiceWorker quota mitigation) keeps Mozilla's limit, as in retail.
 
 ## Hooks in Mozilla files
 
-- `dom/quota/OriginOperations.cpp` (EstimateOp::GetResponse, already-hook): the limit written into the estimate response passes through `StealthEstimateLimit` (dom/quota/StealthQuotaEstimate.h). Only the reported value changes; eviction keeps Mozilla's limits.
+All in `dom/quota/OriginOperations.cpp`, own code in `dom/quota/StealthQuotaEstimate.h` (header only).
+
+- registration: `#include "StealthQuotaEstimate.h"` in our block after Mozilla's includes.
+- wrap-expression, `EstimateOp::GetResponse`: `estimateResponse.limit() = StealthEstimateLimit(mScope, mUsageAndLimit.second);` Mozilla's expression `mUsageAndLimit.second` is the argument; `mScope` (the private `EstimateOp::Scope`) is passed as an extra leading argument and the comparison with `Scope::Origin` is made in the template overload `StealthEstimateLimit(Scope, uint64_t)`, which calls `StealthEstimateLimit(uint64_t, bool aOriginScope)` (a scoped enum does not convert to bool, so the template is chosen). The bool overload stays: the gtest calls it.
+- `dom/quota/test/gtest/moz.build`: `UNIFIED_SOURCES += ["TestStealthQuotaEstimate.cpp"]` after the closing `]` (registration, kept).
 
 ## Where the hook sits
 

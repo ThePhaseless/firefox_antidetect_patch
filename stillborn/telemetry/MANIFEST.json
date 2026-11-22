@@ -6,6 +6,7 @@
  ],
  "added": {
   "juggler/tests/pingsender_route_lives_in_our_file.test.mjs": "100644",
+  "juggler/tests/pingsender_route_reaches_the_channel.test.mjs": "100644",
   "toolkit/components/telemetry/app/StealthPingsender.sys.mjs": "100644",
   "toolkit/components/telemetry/pings/StealthPingsenderRoute.sys.mjs": "100644"
  },

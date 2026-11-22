@@ -6,9 +6,9 @@
 //
 // The name of an ICE server is looked up in the browser context of the page that made
 // the PeerConnection: NrIceResolver gives the DNS service the attributes it holds
-// (OriginAttributes attrs = mAttrs), and MediaTransportImplNicer::SetProxyConfig fills
-// them from the load info of the PeerConnection's proxy config through
-// StealthIceResolverAttributes.
+// (through StealthIceResolverLookupAttributes), and MediaTransportImplNicer::SetProxyConfig
+// fills them from the load info of the PeerConnection's proxy config through
+// StealthIceResolverSetContext and StealthIceResolverAttributes.
 // Red on the old code: the resolver had no attributes (every lookup used the default
 // ones) and the function does not exist.
 //
@@ -79,4 +79,43 @@ TEST(StealthIceResolverContext, TheResolverPassesTheContextItWasGiven) {
   // Another PeerConnection's resolver is its own.
   RefPtr<NrIceResolver> other = MakeRefPtr<NrIceResolver>();
   EXPECT_EQ(0u, other->GetOriginAttributes().mUserContextId);
+}
+
+// MediaTransportImplNicer::SetProxyConfig hands its resolver and the proxy config to StealthIceResolverSetContext, which gives
+// the resolver the context of the PeerConnection and nothing else of its attributes. No resolver (the transport is shut down):
+// nothing to do. Red on the old code: the function does not exist, and the resolver had no attributes of its own.
+TEST(StealthIceResolverContext, TheResolverOfAPeerConnectionIsGivenItsContext) {
+  RefPtr<NrIceResolver> resolver = MakeRefPtr<NrIceResolver>();
+  StealthIceResolverSetContext(resolver, ContextWithUser(6));
+  EXPECT_EQ(6u, resolver->GetOriginAttributes().mUserContextId);
+
+  OriginAttributes pc = ContextWithUser(7);
+  pc.mFirstPartyDomain.AssignLiteral("example.test");
+  pc.mPrivateBrowsingId = 1;
+  RefPtr<NrIceResolver> other = MakeRefPtr<NrIceResolver>();
+  StealthIceResolverSetContext(other, pc);
+  EXPECT_EQ(7u, other->GetOriginAttributes().mUserContextId);
+  EXPECT_TRUE(other->GetOriginAttributes().mFirstPartyDomain.IsEmpty());
+  EXPECT_EQ(0u, other->GetOriginAttributes().mPrivateBrowsingId);
+
+  RefPtr<NrIceResolver> none;
+  StealthIceResolverSetContext(none, ContextWithUser(6));
+  EXPECT_EQ(nullptr, none.get());
+}
+
+// NrIceResolver::resolve passes the attributes of its lookup through StealthIceResolverLookupAttributes: those the resolver was
+// given, or the ones Mozilla's code made while it has none.
+TEST(StealthIceResolverContext, TheLookupOfAnIceServerNameCarriesTheAttributesOfItsResolver) {
+  RefPtr<NrIceResolver> resolver = MakeRefPtr<NrIceResolver>();
+  OriginAttributes upstream;
+  upstream.mPrivateBrowsingId = 1;
+  OriginAttributes attrs;
+  StealthIceResolverLookupAttributes(resolver, &attrs);
+  EXPECT_TRUE(attrs == OriginAttributes());
+  resolver->SetOriginAttributes(StealthIceResolverAttributes(ContextWithUser(6)));
+  StealthIceResolverLookupAttributes(resolver, &attrs);
+  EXPECT_EQ(6u, attrs.mUserContextId);
+  OriginAttributes kept = upstream;
+  StealthIceResolverLookupAttributes(nullptr, &kept);
+  EXPECT_TRUE(kept == upstream);
 }

@@ -14,33 +14,25 @@
 
 namespace mozilla {
 
-// STEALTH: whether aDllPath lies in the directory of aExePath (or below),
-// case-insensitively. GetVersionAndVendorInfo skips the signature lookup for
-// those modules that also carry firefox.exe's version (this build's own;
-// the signed C++ runtime beside them keeps it): they carry no Authenticode
-// signature, so the lookup always fell through to the catalog search, which
-// hashes the whole file and walks every system catalog - 1.26 s of CPU per
-// launch in the "Untrusted Modules" thread, on a 2026-10-27 profile, for an
-// answer that cannot exist. GetTrust then classifies them as it already did:
-// FirefoxDirectory (+AndVersion), from their path and version resource.
-// Declared in UntrustedModulesData.h.
-/* static */
-bool ModuleRecord::IsInDirectoryOf(const nsAString& aDllPath,
-                                   const nsAString& aExePath) {
-  const int32_t slash = aExePath.RFindChar(u'\\');
+// STEALTH: whether aModulePath lies in the directory of aExeFilePath (or below),
+// case-insensitively. The path test of StealthSkipsSignatureLookup (see its
+// comment in StealthOwnBinaries.h).
+bool StealthIsInDirectoryOf(const nsAString& aModulePath,
+                            const nsAString& aExeFilePath) {
+  const int32_t slash = aExeFilePath.RFindChar(u'\\');
   if (slash <= 0) {
     return false;
   }
-  const nsDependentSubstring dir = Substring(aExePath, 0, slash + 1);
-  return StringBeginsWith(aDllPath, dir, nsCaseInsensitiveStringComparator);
+  const nsDependentSubstring dir = Substring(aExeFilePath, 0, slash + 1);
+  return StringBeginsWith(aModulePath, dir, nsCaseInsensitiveStringComparator);
 }
 
 namespace {
 
 // STEALTH: one of this build's own binaries - beside firefox.exe and with its
 // version - whose signature lookup can only fall through to the catalog
-// search (see IsInDirectoryOf). Anything else in the directory, such as the
-// signed C++ runtime, keeps the lookup and its classification.
+// search (see StealthIsInDirectoryOf). Anything else in the directory, such as
+// the signed C++ runtime, keeps the lookup and its classification.
 bool IsOwnUnsignedBinary(const nsAString& aPath,
                          const ModuleVersionInfo& aVerInfo) {
   wchar_t exePath[MAX_PATH * 4];
@@ -50,7 +42,7 @@ bool IsOwnUnsignedBinary(const nsAString& aPath,
     return false;
   }
   const nsDependentString exe(exePath, exeLen);
-  if (!ModuleRecord::IsInDirectoryOf(aPath, exe)) {
+  if (!StealthIsInDirectoryOf(aPath, exe)) {
     return false;
   }
   ModuleVersionInfo exeVer;

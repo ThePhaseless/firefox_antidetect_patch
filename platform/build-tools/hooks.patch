@@ -1,68 +1,80 @@
 diff --git a/python/mozbuild/mozbuild/backend/recursivemake.py b/python/mozbuild/mozbuild/backend/recursivemake.py
-index f5a2b8c474c5c322b56520a19977bc0a3853d57e..2d758869cf41ee0d545e3c4938ae6fbf61098169 100644
+index f5a2b8c474c5c322b56520a19977bc0a3853d57e..c0e930c10ae28b90aa9a61404259d2b2d6b729a9 100644
 --- a/python/mozbuild/mozbuild/backend/recursivemake.py
 +++ b/python/mozbuild/mozbuild/backend/recursivemake.py
-@@ -1640,7 +1640,10 @@ class RecursiveMakeBackend(MakeBackend):
+@@ -77,6 +77,8 @@ from ..util import FileAvoidWrite, ensureParentDir, pairwise
+ from .common import CommonBackend
+ from .make import MakeBackend
+ 
++from mozbuild.stealth_build_tools import stealth_absolute_object_path  # STEALTH-HOOK(platform/build-tools)
++
+ # To protect against accidentally adding logic to Makefiles that belong in moz.build,
+ # we check if moz.build-like variables are defined in Makefiles. If they are, we throw
+ # an error to encourage the usage of moz.build instead.
+@@ -1640,7 +1642,7 @@ class RecursiveMakeBackend(MakeBackend):
          if isinstance(obj, (Program, SharedLibrary)):
              obj_target = self._pretty_path(obj.output_path, backend_file)
  
 -        objs_ref = " \\\n    ".join(os.path.relpath(o, obj.objdir) for o in objs)
-+        # Stealthfox fix: use absolute paths for obj dependencies. mozmake 4.4.1
-+        # Win32 fails on relative paths > ~150 chars (libwebrtc deeply nested).
-+        # Absolute paths bypass the bug; linker accepts them either way.
-+        objs_ref = " \\\n    ".join(o for o in objs)
++        objs_ref = " \\\n    ".join(stealth_absolute_object_path(o, os.path.relpath(o, obj.objdir)) for o in objs)  # STEALTH-HOOK(platform/build-tools)
          if isinstance(obj, (SimpleProgram, Program, SharedLibrary)):
              # Don't bother with a list file if we're only linking objects built
              # in this directory.
 diff --git a/python/mozbuild/mozbuild/frontend/data.py b/python/mozbuild/mozbuild/frontend/data.py
-index fb9fe22529c09ec49d5ce74b5baba6b19480651b..c56d5a5547c4cf38074dd884afec340523a57b84 100644
+index fb9fe22529c09ec49d5ce74b5baba6b19480651b..0ac68af142b3f5ed827670cff799f0317a397185 100644
 --- a/python/mozbuild/mozbuild/frontend/data.py
 +++ b/python/mozbuild/mozbuild/frontend/data.py
-@@ -1214,8 +1214,9 @@ class UnifiedSources(BaseSources):
+@@ -1214,8 +1214,8 @@ class UnifiedSources(BaseSources):
              # On Windows, path names have a maximum length of 255 characters,
              # so avoid creating extremely long path names.
              unified_prefix = context.relsrcdir
 -            if len(unified_prefix) > 20:
 -                unified_prefix = unified_prefix[-20:].split("/", 1)[-1]
-+            if len(unified_prefix) > 30:
-+                # STEALTH-HOOK(platform/build-tools)
-+                unified_prefix = unified_prefix[-30:].split("/", 1)[-1]
++            if len(unified_prefix) > 30:  # STEALTH-HOOK(platform/build-tools)
++                unified_prefix = unified_prefix[-30:].split("/", 1)[-1]  # STEALTH-HOOK(platform/build-tools)
              unified_prefix = unified_prefix.replace("/", "_")
  
              suffix = self.canonical_suffix[1:]
 diff --git a/python/mozbuild/mozbuild/jar.py b/python/mozbuild/mozbuild/jar.py
-index 17dbf4059db656567e2a0e3102f5d466ee602139..c81260b08b96cf35f1bc9aa8956ec94279189ac8 100644
+index 17dbf4059db656567e2a0e3102f5d466ee602139..bbfe02cf1e516b57815f7cb17a361a979bf4566e 100644
 --- a/python/mozbuild/mozbuild/jar.py
 +++ b/python/mozbuild/mozbuild/jar.py
-@@ -531,6 +531,9 @@ class JarMaker:
+@@ -22,6 +22,8 @@ from mozbuild.action.buildlist import addEntriesToListFile
+ from mozbuild.preprocessor import Preprocessor
+ from mozbuild.util import ensure_bytes
+ 
++from mozbuild.stealth_build_tools import stealth_long_path  # STEALTH-HOOK(platform/build-tools)
++
+ if sys.platform == "win32":
+     from ctypes import WinError, windll
+ 
+@@ -531,6 +533,7 @@ class JarMaker:
              except OSError as e:
                  if e.errno != errno.ENOENT:
                      raise
-+            # STEALTH-HOOK(platform/build-tools)
-+            if os.name == "nt":
-+                out = "\\\\?\\" + os.path.abspath(out).replace("/", "\\")
++            out = stealth_long_path(out)  # STEALTH-HOOK(platform/build-tools)
              if "b" in mode:
                  return open(out, mode)
              else:
 diff --git a/third_party/python/vsdownload/vsdownload.py b/third_party/python/vsdownload/vsdownload.py
-index 28f2c660cf6a42603d08e0bbf961c93f60a205cc..28827039b16ddc82e2fc15ffb58cecebaffff756 100755
+index 28f2c660cf6a42603d08e0bbf961c93f60a205cc..ef94883dedf926925c6e0ab8cc9565c79267d8da 100755
 --- a/third_party/python/vsdownload/vsdownload.py
 +++ b/third_party/python/vsdownload/vsdownload.py
-@@ -31,6 +31,7 @@ import tempfile
- import urllib.request
+@@ -32,6 +32,8 @@ import urllib.request
  import xml.etree.ElementTree as ET
  import zipfile
-+from stealth_download_watchdog import stealth_urlretrieve  # STEALTH-HOOK(platform/build-tools)
  
++from stealth_download_watchdog import stealth_urlretrieve  # STEALTH-HOOK(platform/build-tools)
++
  def getArgsParser():
      class OptionalBoolean(argparse.Action):
-@@ -634,7 +635,8 @@ def _downloadPayload(payload, destname, fileid, allowHashMismatch):
+         def __init__(self,
+@@ -634,7 +636,7 @@ def _downloadPayload(payload, destname, fileid, allowHashMismatch):
              if "size" in payload:
                  size = payload["size"]
              print("Downloading %s (%s)" % (fileid, formatSize(size)), flush=True)
 -            urllib.request.urlretrieve(payload["url"], destname)
-+            # STEALTH-HOOK(platform/build-tools): per-file download watchdog, logic in stealth_download_watchdog.py
-+            stealth_urlretrieve(payload, destname, fileid)
++            stealth_urlretrieve(payload, destname, fileid, download=lambda: urllib.request.urlretrieve(payload["url"], destname))  # STEALTH-HOOK(platform/build-tools)
              if "sha256" in payload:
                  if sha256File(destname).lower() != payload["sha256"].lower():
                      if allowHashMismatch:

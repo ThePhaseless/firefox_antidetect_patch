@@ -267,12 +267,57 @@ class WatchdogTest(unittest.TestCase):
         self.assertEqual(armed, [0] * len(m.RESUME_WAITS))
         self._assert_clean()
 
-    def test_hook_presence_guard(self):
+    def test_the_only_download_of_vsdownload_is_the_hooked_one(self):
+        # The only entry: every download of vsdownload.py goes through the
+        # watchdog, because the only urlretrieve of the file is the call the
+        # hook line hands to it.
         with open(os.path.join(VSDIR, "vsdownload.py"), encoding="utf-8") as f:
-            text = f.read()
-        self.assertEqual(text.count("stealth_urlretrieve(payload, destname, fileid)"), 1)
-        self.assertNotIn("signal.", text)
-        self.assertNotIn('urllib.request.urlretrieve(payload["url"]', text)
+            lines = [l for l in f.read().splitlines() if "urllib.request.urlretrieve(" in l]
+        self.assertEqual(len(lines), 1)
+        self.assertIn("stealth_urlretrieve(payload, destname, fileid, download=", lines[0])
+
+    def test_the_call_passed_as_download_is_the_one_guarded(self):
+        # The hook hands Mozilla's own urlretrieve call to the watchdog: a cut
+        # in that call is resumed (the default call is not made), as with the
+        # default one.
+        class Rest:
+            status = 200
+            headers = {"Content-Length": str(len(FILE))}
+
+            def __init__(self):
+                self.left = FILE
+
+            def read(self, n):
+                block, self.left = self.left[:n], self.left[n:]
+                return block
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+        def must_not_run(url, dest):
+            raise AssertionError("the default call was made")
+
+        with tempfile.TemporaryDirectory() as d:
+            dest = os.path.join(d, "f")
+
+            def cut():
+                with open(dest, "wb") as f:
+                    f.write(FILE[:100])
+                raise urllib.error.ContentTooShortError("retrieval incomplete", b"")
+            m.urllib.request.urlretrieve = must_not_run
+            m.urllib.request.urlopen = lambda request: Rest()
+            m.stealth_urlretrieve({"url": "http://cdn.invalid/f"}, dest, "f", wait=lambda s: None, download=cut)
+            with open(dest, "rb") as f:
+                self.assertEqual(f.read(), FILE)
+
+    @unittest.skipUnless(HAVE_ALARM, "SIGALRM is Unix-only")
+    def test_the_alarm_runs_during_the_call_passed_as_download(self):
+        with self.assertRaises(TimeoutError):
+            m.stealth_urlretrieve({"url": "u"}, "d", "f", timeout=1, download=lambda: time.sleep(5))
+        self._assert_clean()
 
 
 if __name__ == "__main__":

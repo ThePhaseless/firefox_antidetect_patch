@@ -50,15 +50,40 @@ inline bool StealthDebuggerReadMode(JSContext* cx, JSObject* debuggerObject) {
          stealthVal.isTrue();
 }
 
+// The hook of Debugger::addDebuggeeGlobal: reads stealthMode into the field
+// Debugger::invisibleDebuggee_ (passed by the hook, G14: no friend), at the
+// point where the property read has always been, before the no-GC region. The
+// following hook lines of the function read the field: nothing else writes it
+// between this call and the end of the function.
+inline void StealthDebuggerReadMode(JSContext* cx, JSObject* debuggerObject,
+                                    bool* aInvisibleDebuggee) {
+  *aInvisibleDebuggee = StealthDebuggerReadMode(cx, debuggerObject);
+}
+
 // Releases the mozilla::ScopeExit rollback guards on the early successful
-// return of an invisible attach. In that case step 4 (alloc-metadata builder,
+// return of an invisible attach, and returns true (the value of the return the
+// hook line stands for). In that case step 4 (alloc-metadata builder,
 // never attached for a stealth debuggee, so allocationMetadataBuilder_ stays
 // null = vanilla even if tracking is ever enabled) and step 5 (setIsDebuggee,
 // updateDebuggerObservesWasm/Coverage, ensureExecutionObservabilityOfRealm: the
 // Realm does NOT enter debug mode) are skipped.
+//
+// The lines of Mozilla's addDebuggeeGlobal/removeDebuggeeGlobal that read
+// invisibleDebuggee_ are declared exceptions (G35, approved by the pm): no form
+// can skip a Mozilla statement without a possible allocation failure that a
+// stealth attach never had.
+//   step (1): `if (!invisibleDebuggee_ && !globalDebuggers.append(...))`: no
+//             entry is pushed in Realm::debuggers_ for a stealth debuggee.
+//   rollback guard of step (1): pops the entry only if one was pushed.
+//   between (3) and (4): `if (invisibleDebuggee_) return
+//             StealthDebuggerReleaseGuards(...)`: steps (4) and (5) are skipped.
+//   removeDebuggeeGlobal: `if (!invisibleDebuggee_)` before the erase: a
+//             stealth debuggee never kept an entry (findDebuggerInVector asserts
+//             the entry exists; erase on end() is undefined).
 template <typename... Guards>
-inline void StealthDebuggerReleaseGuards(Guards&... guards) {
+inline bool StealthDebuggerReleaseGuards(Guards&... guards) {
   (guards.release(), ...);
+  return true;
 }
 
 }  // namespace js

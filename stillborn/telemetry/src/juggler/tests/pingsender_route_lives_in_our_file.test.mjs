@@ -2,10 +2,11 @@
 // toolkit/components/telemetry/app/StealthPingsender.sys.mjs, and
 // TelemetrySend.sys.mjs only calls it from marked one-line hooks.
 //
-// Two halves: a source guard that fails if the logic comes back into the
-// Mozilla file, and a behaviour check of the moved functions on stubs, so the
-// move cannot change what the child gets (the program and its arguments, the
-// environment variable around the start of the one child, the proxy record).
+// Two halves: the entry guards (the only start of the child, the only use of
+// the program, both below our hooks), and a behaviour check of the moved
+// functions on stubs, so the move cannot change what the child gets (the
+// program and its arguments, the environment variable around the start of the
+// one child, the proxy record).
 //
 // Run: node --test juggler/tests/*.test.mjs
 
@@ -20,34 +21,28 @@ const TREE = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
 const APP = path.join(TREE, 'toolkit/components/telemetry/app');
 const HOOK = 'STEALTH-HOOK(stillborn/telemetry)';
 
-test('TelemetrySend.sys.mjs holds only hooks of the pingsender road', () => {
+test('the only child the pingsender road starts is started by our runAsync', () => {
   const text = fs.readFileSync(path.join(APP, 'TelemetrySend.sys.mjs'), 'utf8');
-  assert.doesNotMatch(text, /Services\.env/);
-  assert.doesNotMatch(text, /TargetRegistry/);
-  assert.doesNotMatch(text, /\.notificationCallbacks\s*=[^=]/);
-  assert.doesNotMatch(text, /function sessionRoute/);
-  const named = text.split('\n').filter(l => l.includes('StealthPingsender'));
-  // Near-miss guard: the hooks exist, so an empty list is a broken test.
-  assert.ok(named.length >= 5, `only ${named.length} lines name StealthPingsender`);
-  for (const line of named)
-    assert.ok(line.includes(HOOK), `a hook without its marker: ${line}`);
+  // The only start of the pingsender in TelemetrySend.sys.mjs goes through
+  // StealthPingsender.runAsync: a second `.runAsync(` that Mozilla adds to a
+  // new version would start a child with no road in its environment.
+  const starts = text.split('\n').filter(l => /\.runAsync\(/.test(l));
+  assert.deepEqual(starts.map(l => l.trim()),
+    [`StealthPingsender.runAsync(process, params, observer); // ${HOOK}`]);
+  // Near-miss guard: the call exists.
+  assert.ok(starts.length === 1, 'the start of the pingsender moved');
 });
 
-test("Mozilla's choice of the program stays, and ours overrides it after", () => {
+test('the program is chosen by our invocation() before it is used', () => {
   const text = fs.readFileSync(path.join(APP, 'TelemetrySend.sys.mjs'), 'utf8');
-  // Mozilla's lines, as Mozilla wrote them: a removed line conflicts at a port
-  // like an added one.
-  const nimbus = text.indexOf(
-    'if (lazy.NimbusFeatures.pingsender.getVariable("backgroundTaskEnabled")) {');
-  assert.ok(nimbus > 0, "Mozilla's Nimbus check is gone");
-  assert.match(text, /NimbusFeatures: "resource:\/\/nimbus\/ExperimentAPI\.sys\.mjs"/);
-  assert.match(text, /let exeName =\n\s+AppConstants\.platform === "win" \? "pingsender\.exe" : "pingsender";/);
-  // Ours: after Mozilla's block, before the program is used.
-  const override = text.indexOf(
-    `({ exeName, params } = StealthPingsender.invocation()); // ${HOOK}`);
-  const used = text.indexOf('this._log.info(\n      `Invoking');
-  assert.ok(override > nimbus, "the override must come after Mozilla's choice");
-  assert.ok(used > override, 'the override must come before the program is used');
+  // The only place `exeName` is turned into a file to start comes after the
+  // override that makes it `firefox --backgroundtask pingsender`: a second use
+  // of it before the override (a program of Mozilla's choice) fails here.
+  const override = text.indexOf('({ exeName, params } = StealthPingsender.invocation());');
+  assert.ok(override > 0, 'the override of the program is gone');
+  const uses = [...text.matchAll(/exe\.append\(exeName\)/g)].map(m => m.index);
+  assert.equal(uses.length, 1, 'a second place starts a program');
+  assert.ok(uses[0] > override, 'the program is used before our override');
 });
 
 // Load the own file on stubs: the one import is replaced by a stub object and

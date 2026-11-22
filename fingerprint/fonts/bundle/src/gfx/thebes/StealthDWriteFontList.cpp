@@ -31,8 +31,8 @@
 // ---------------------------------------------------------------------------
 // ReadCMAP and CreateFontFace.
 // ---------------------------------------------------------------------------
-// ReadCMAP asks gfxFontEntry::ShouldPublishCharacterMap(), which is true for a
-// bundled face although it is built from file data. CreateFontFace passes
+// ReadCMAP asks StealthPublishCharacterMap (StealthFontListHooks.cpp), which is
+// true for a bundled face although it is built from file data. CreateFontFace passes
 // mBundleFaceIndex instead of 0, so one face of a multi-face .ttc file is
 // addressed by index; the member is 0 for every other font.
 //
@@ -108,6 +108,7 @@
 #include "gfxFontUtils.h"
 #include "mozilla/RefPtr.h"
 #include "nsString.h"
+#include "nsThreadUtils.h"
 
 using namespace mozilla;
 
@@ -192,3 +193,42 @@ already_AddRefed<gfxFontEntry> gfxDWriteFontList::CreateStealthBundleFontEntry(
   entry->InitializeFrom(aFace, aFamily);
   return entry.forget();
 }
+
+// ---------------------------------------------------------------------------
+// The bundle path travels with the unscaled font (series folder
+// fingerprint/fonts/bundle; the hook that gives it the path is
+// StealthWithBundlePath, fingerprint/fonts/font-list).
+// ---------------------------------------------------------------------------
+// STEALTH: Mozilla's GetFontDescriptor answers from mFontFileName, the file
+// name of the font with its terminator, which it reads from the IDWriteFont:
+// `if (!mFont) return false;`. The bundle's faces are made from file data and
+// have no IDWriteFont (the loader of our fonts is not an
+// IDWriteLocalFontFileLoader, so Mozilla cannot get the name back), and
+// Gecko then sends the BYTES of the font to WebRender: 65.9 MB in the parent
+// process against 1.9 on an empty page ([B154]). The path of the bundle file is
+// put where Mozilla keeps the file name (path plus terminator), so the callback
+// gets the bytes Mozilla would give it for a font installed at that path, with
+// the same face index.
+namespace mozilla::gfx {
+
+void UnscaledFontDWrite::StealthSeedFilePath(const std::wstring& aPath) {
+  mFontFileName.assign(aPath.begin(), aPath.end());
+  mFontFileName.push_back(0);
+}
+
+bool UnscaledFontDWrite::StealthGetSeededDescriptor(FontDescriptorOutput aCb,
+                                                    void* aBaton) {
+  MOZ_ASSERT(NS_IsMainThread());
+  // Mozilla's own cache of the name answers the same way: for a font whose name
+  // it had already read the arguments are the ones it would pass; a font with
+  // no name (the stock fonts not yet asked, a font made from a descriptor)
+  // falls through to Mozilla's lines.
+  if (mFontFileName.empty()) {
+    return false;
+  }
+  aCb(reinterpret_cast<const uint8_t*>(mFontFileName.data()),
+      mFontFileName.size() * sizeof(WCHAR), mFontFace->GetIndex(), aBaton);
+  return true;
+}
+
+}  // namespace mozilla::gfx

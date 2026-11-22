@@ -1,168 +1,155 @@
 diff --git a/dom/base/test/browser.toml b/dom/base/test/browser.toml
-index 9ffd6897ad21f3a0ab87c2bddd09a9614d3325d9..2e386c793684827824d25f27c7bc662b6e7c6fd4 100644
+index 9ffd6897ad21f3a0ab87c2bddd09a9614d3325d9..65be9a24ccdb543d0cc32238a2661f14d3b7bfde 100644
 --- a/dom/base/test/browser.toml
 +++ b/dom/base/test/browser.toml
-@@ -319,6 +319,9 @@ skip-if = [
+@@ -319,6 +319,8 @@ skip-if = [
    "true", # Bug 1271028
  ]
  
-+# STEALTH-HOOK(fingerprint/locale-time/workers)
-+["browser_stealth_language_workers.js"]
++["browser_stealth_language_workers.js"]  # STEALTH-HOOK(fingerprint/locale-time/workers)
 +
  ["browser_timeout_throttling_with_audio_playback.js"]
  
  ["browser_timezone_override.js"]
 diff --git a/dom/serviceworkers/ServiceWorkerPrivate.cpp b/dom/serviceworkers/ServiceWorkerPrivate.cpp
-index cc6ab40b50f278f95aebf38d5b35ac2cc7d40aa3..a0f9dcf3d4d2f3509dbaaa2c98ee401eb582897c 100644
+index cc6ab40b50f278f95aebf38d5b35ac2cc7d40aa3..5d74fdd0f4adb50af34553a8e7547aa262012145 100644
 --- a/dom/serviceworkers/ServiceWorkerPrivate.cpp
 +++ b/dom/serviceworkers/ServiceWorkerPrivate.cpp
-@@ -10,6 +10,7 @@
- #include "ServiceWorkerManager.h"
- #include "ServiceWorkerRegistrationInfo.h"
- #include "ServiceWorkerUtils.h"
-+#include "StealthWorkerDeclaration.h"  // STEALTH-HOOK(fingerprint/locale-time/workers)
- #include "js/ErrorReport.h"
- #include "mozIThirdPartyUtil.h"
- #include "mozilla/Assertions.h"
-@@ -1989,6 +1990,8 @@ void ServiceWorkerPrivate::RefreshRemoteWorkerData(
+@@ -94,6 +94,8 @@
+ #include "nsStringStream.h"
+ #include "nsThreadUtils.h"
+ 
++#include "StealthServiceWorkerDeclaration.h"  // STEALTH-HOOK(fingerprint/locale-time/workers)
++
+ extern mozilla::LazyLogModule sWorkerTelemetryLog;
+ 
+ #ifdef LOG
+@@ -1989,6 +1991,7 @@ void ServiceWorkerPrivate::RefreshRemoteWorkerData(
    serviceWorkerData.descriptor() = mInfo->Descriptor().ToIPC();
    serviceWorkerData.registrationDescriptor() =
        aRegistration->Descriptor().ToIPC();
-+  // STEALTH-HOOK(fingerprint/locale-time/workers)
-+  StealthWorkerDeclaration(mInfo->Principal(), mRemoteWorkerData);
++  StealthWorkerDeclaration(mInfo->Principal(), mRemoteWorkerData);  // STEALTH-HOOK(fingerprint/locale-time/workers)
  }
  
  RefPtr<FetchServicePromises> ServiceWorkerPrivate::SetupNavigationPreload(
 diff --git a/dom/serviceworkers/moz.build b/dom/serviceworkers/moz.build
-index ced898d0af8b48a5bbd188681a9fdac9b3689310..654d928e91984b233ce1f51972082dae21b9da3a 100644
+index ced898d0af8b48a5bbd188681a9fdac9b3689310..983106654cf6e2f92ba2c4e736405b37e432a539 100644
 --- a/dom/serviceworkers/moz.build
 +++ b/dom/serviceworkers/moz.build
 @@ -83,6 +83,7 @@ UNIFIED_SOURCES += [
      "ServiceWorkerUpdateJob.cpp",
      "ServiceWorkerUtils.cpp",
  ]
-+UNIFIED_SOURCES += ["StealthWorkerDeclaration.cpp"]  # STEALTH-HOOK(fingerprint/locale-time/workers)
++UNIFIED_SOURCES += ["StealthServiceWorkerDeclaration.cpp"]  # STEALTH-HOOK(fingerprint/locale-time/workers)
  
  IPDL_SOURCES += [
      "IPCNavigationPreloadState.ipdlh",
 diff --git a/dom/workers/WorkerPrivate.cpp b/dom/workers/WorkerPrivate.cpp
-index dc8cf215235fa3866072ffcf62404bb31c304956..a93706a70801f0809555a2cd29c4804e98c6620e 100644
+index dc8cf215235fa3866072ffcf62404bb31c304956..082e9c866bab9e760ccd71e190354a3e38502eab 100644
 --- a/dom/workers/WorkerPrivate.cpp
 +++ b/dom/workers/WorkerPrivate.cpp
-@@ -9,6 +9,7 @@
- #include "MessageEventRunnable.h"
- #include "RuntimeService.h"
- #include "ScriptLoader.h"
+@@ -122,6 +122,8 @@
+ #include "nsThreadUtils.h"
+ #include "nsUTF8Utils.h"
+ 
 +#include "StealthWorkerDeclaration.h"  // STEALTH-HOOK(fingerprint/locale-time/workers)
- #include "WorkerCSPEventListener.h"
- #include "WorkerDebugger.h"
- #include "WorkerDebuggerManager.h"
-@@ -2982,6 +2983,8 @@ WorkerPrivate::WorkerPrivate(
++
+ #ifdef XP_WIN
+ #  undef PostMessage
+ #endif
+@@ -2982,6 +2984,7 @@ WorkerPrivate::WorkerPrivate(
    } else {
      AssertIsOnMainThread();
  
-+    // STEALTH-HOOK(fingerprint/locale-time/workers)
-+    DeclareWorkerLanguageAndZone(mLoadInfo);
++    StealthDeclareWorkerLanguageAndZone(mLoadInfo);  // STEALTH-HOOK(fingerprint/locale-time/workers)
      RuntimeService::GetDefaultJSSettings(mJSSettings);
  
      {
-@@ -6357,7 +6360,8 @@ void WorkerPrivate::UpdateLanguageOverrideInternal(
+@@ -6357,7 +6360,7 @@ void WorkerPrivate::UpdateLanguageOverrideInternal(
          if (aLanguageOverride.IsEmpty()) {
            JS::SetRealmLocaleOverride(realm, nullptr);
          } else {
 -          JS::SetRealmLocaleOverride(realm, aLanguageOverride.get());
-+          // STEALTH-HOOK(fingerprint/locale-time/workers)
-+          SetWorkerRealmLocale(realm, aLanguageOverride);
++          JS::SetRealmLocaleOverride(realm, StealthWorkerRealmLocale(aLanguageOverride.get()));  // STEALTH-HOOK(fingerprint/locale-time/workers)
          }
        }
      }
-@@ -6403,6 +6407,10 @@ void WorkerPrivate::UpdateTimezoneOverrideInternal(JSContext* aCx,
+@@ -6403,6 +6406,7 @@ void WorkerPrivate::UpdateTimezoneOverrideInternal(JSContext* aCx,
  
  void WorkerPrivate::UpdateLanguagesInternal(
      const nsTArray<nsString>& aLanguages) {
-+  // STEALTH-HOOK(fingerprint/locale-time/workers)
-+  if (WorkerFollowsOwnerLanguage(mLoadInfo)) {
-+    return;
-+  }
++  if (StealthWorkerFollowsOwnerLanguage(this)) return;  // STEALTH-HOOK(fingerprint/locale-time/workers)
    WorkerGlobalScope* globalScope = GlobalScope();
    RefPtr<WorkerNavigator> nav = globalScope->GetExistingNavigator();
    if (nav) {
 diff --git a/dom/worklet/WorkletGlobalScope.cpp b/dom/worklet/WorkletGlobalScope.cpp
-index 10c6b713cc1e0f626b47c6b9488d193515ed2384..b7e5c5fec4cb3846a8b066cd6a8d4c5e5c21734c 100644
+index 10c6b713cc1e0f626b47c6b9488d193515ed2384..164f23440a5d7adc8bd92e672b6121790672636a 100644
 --- a/dom/worklet/WorkletGlobalScope.cpp
 +++ b/dom/worklet/WorkletGlobalScope.cpp
-@@ -8,6 +8,7 @@
- #include "mozilla/SchedulerGroup.h"
- #include "mozilla/dom/BindingUtils.h"
- #include "mozilla/dom/Console.h"
-+#include "mozilla/dom/StealthSessionDeclaration.h"  // STEALTH-HOOK(fingerprint/locale-time/workers)
- #include "mozilla/dom/WorkletGlobalScopeBinding.h"
- #include "mozilla/dom/WorkletImpl.h"
- #include "mozilla/dom/WorkletThread.h"
-@@ -141,6 +142,10 @@ JS::RealmOptions WorkletGlobalScope::CreateRealmOptions() const {
+@@ -17,6 +17,8 @@
+ #include "nsRFPService.h"
+ #include "nsThreadUtils.h"
+ 
++#include "StealthWorkletDeclaration.h"  // STEALTH-HOOK(fingerprint/locale-time/workers)
++
+ using JS::loader::ModuleLoaderBase;
+ using mozilla::dom::loader::WorkletModuleLoader;
+ 
+@@ -141,6 +143,7 @@ JS::RealmOptions WorkletGlobalScope::CreateRealmOptions() const {
      nsCString locale = nsRFPService::GetSpoofedJSLocale();
      options.behaviors().setLocaleOverride(locale.get());
    }
-+  SetDeclaredRealmTimeAndLanguage(  // STEALTH-HOOK(fingerprint/locale-time/workers)
-+      options, ShouldResistFingerprinting(RFPTarget::JSDateTimeUTC),
-+      ShouldResistFingerprinting(RFPTarget::JSLocale),
-+      mImpl->LoadInfo().Language(), mImpl->LoadInfo().Timezone());
++  StealthDeclareWorkletRealm(this, options);  // STEALTH-HOOK(fingerprint/locale-time/workers)
  
    // The SharedArrayBuffer global constructor property should not be present in
    // a fresh global object when shared memory objects aren't allowed (because
 diff --git a/dom/worklet/WorkletImpl.cpp b/dom/worklet/WorkletImpl.cpp
-index 1d3fc2a703a55e3c5390e79e93eb1ebc34217500..5ab73e5561c49db34ccb613eba7a815b0f6a465b 100644
+index 1d3fc2a703a55e3c5390e79e93eb1ebc34217500..2747dde99936930a84e25e9a918997515911746b 100644
 --- a/dom/worklet/WorkletImpl.cpp
 +++ b/dom/worklet/WorkletImpl.cpp
-@@ -13,10 +13,13 @@
- #include "mozilla/dom/PolicyContainer.h"
- #include "mozilla/dom/RegisterWorkletBindings.h"
- #include "mozilla/dom/ScriptSettings.h"
-+#include "mozilla/dom/StealthSessionDeclaration.h"  // STEALTH-HOOK(fingerprint/locale-time/workers)
- #include "mozilla/dom/WorkletBinding.h"
- #include "mozilla/dom/WorkletGlobalScope.h"
+@@ -18,6 +18,8 @@
  #include "mozilla/dom/worklet/WorkletModuleLoader.h"
  #include "nsGlobalWindowInner.h"
-+// STEALTH-HOOK(fingerprint/locale-time/workers)
-+#include "nsPIDOMWindowInlines.h"
  
++#include "StealthWorkletDeclaration.h"  // STEALTH-HOOK(fingerprint/locale-time/workers)
++
  using mozilla::dom::loader::WorkletModuleLoader;
  using mozilla::dom::loader::WorkletScriptLoader;
-@@ -34,6 +37,8 @@ WorkletLoadInfo::WorkletLoadInfo(nsPIDOMWindowInner* aWindow)
+ 
+@@ -34,6 +36,7 @@ WorkletLoadInfo::WorkletLoadInfo(nsPIDOMWindowInner* aWindow)
    } else {
      mOuterWindowID = 0;
    }
-+  dom::GetDeclaredLanguage(aWindow->GetBrowsingContext(), mLanguage);
-+  dom::GetDeclaredTimezone(aWindow->GetBrowsingContext(), mTimezone);
++  StealthWorkletAccess::Declare(this, aWindow);  // STEALTH-HOOK(fingerprint/locale-time/workers)
  }
  
  // ---------------------------------------------------------------------------
 diff --git a/dom/worklet/WorkletImpl.h b/dom/worklet/WorkletImpl.h
-index 1089511fcdb8ff31b0fdd4d38c4040810551daf7..d6aaf878cfe518dc30ba9dfb0cac7a14b8a240aa 100644
+index 1089511fcdb8ff31b0fdd4d38c4040810551daf7..24f90f80c994832d667384e2006ecc64a2ce3553 100644
 --- a/dom/worklet/WorkletImpl.h
 +++ b/dom/worklet/WorkletImpl.h
-@@ -13,6 +13,7 @@
- #include "mozilla/dom/OffThreadCSPContext.h"
+@@ -14,6 +14,8 @@
  #include "mozilla/ipc/PBackgroundSharedTypes.h"
  #include "nsRFPService.h"
-+#include "nsString.h"
  
++#include "nsString.h"  // STEALTH-HOOK(fingerprint/locale-time/workers)
++
  class nsPIDOMWindowInner;
  class nsIPrincipal;
-@@ -35,10 +36,16 @@ class WorkletLoadInfo {
+ class nsIRunnable;
+@@ -31,6 +33,7 @@ class WorkletThread;
+ class WorkletLoadInfo {
+  public:
+   explicit WorkletLoadInfo(nsPIDOMWindowInner* aWindow);
++  friend struct StealthWorkletAccess;  // STEALTH-HOOK(fingerprint/locale-time/workers)
+ 
    uint64_t OuterWindowID() const { return mOuterWindowID; }
    uint64_t InnerWindowID() const { return mInnerWindowID; }
- 
-+  // STEALTH-HOOK(fingerprint/locale-time/workers)
-+  const nsCString& Language() const { return mLanguage; }
-+  const nsString& Timezone() const { return mTimezone; }
-+
+@@ -38,6 +41,7 @@ class WorkletLoadInfo {
   private:
    // Modified only in constructor.
    uint64_t mOuterWindowID;
++  std::pair<nsCString, nsString> mStealthDeclared;  // STEALTH-HOOK(fingerprint/locale-time/workers)
    const uint64_t mInnerWindowID;
-+  nsCString mLanguage;
-+  nsString mTimezone;
  };
  
- /**

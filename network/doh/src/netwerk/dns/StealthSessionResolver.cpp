@@ -119,6 +119,12 @@ nsIDNSService::DNSFlags StealthFlagsFollowSession(
       hostIsTRRServer);
 }
 
+void StealthApplySessionFlags(const nsACString& aHost,
+                              const OriginAttributes& aAttrs,
+                              nsIDNSService::DNSFlags* aFlags) {
+  *aFlags = StealthFlagsFollowSession(aHost, aAttrs, *aFlags);
+}
+
 bool StealthProxyIsMandatory(bool aIsTRRServiceChannel, uint32_t aUserContextId,
                              const nsACString& aContextsWithProxy) {
   return aIsTRRServiceChannel ||

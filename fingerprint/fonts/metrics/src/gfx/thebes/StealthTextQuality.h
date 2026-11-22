@@ -10,15 +10,14 @@
 // engine on: declared, never asked of the host. Called from the hooks in
 // gfxDWriteFonts.cpp (GetSystemTextQuality and
 // gfxDWriteFont::UpdateClearTypeVars). Header-only on purpose:
-// gfxDWriteFonts.cpp is the only includer, and a header needs no line in
-// gfx/thebes/moz.build.
+// gfxDWriteFonts.cpp and its gtest are the only includers, and a header needs
+// no line in gfx/thebes/moz.build.
 
 #include <stdint.h>
 #include <windows.h>
 #include <dwrite.h>
 
 #include "StealthDeclarationGate.h"
-#include "mozilla/Maybe.h"
 #include "mozilla/RefPtr.h"
 #include "mozilla/StaticPrefs_zoom.h"
 #include "mozilla/gfx/2D.h"
@@ -45,19 +44,17 @@ namespace gfx {
  * server - which is engine rule 7-quater (70-known-bugs.md [B362]). The
  * declaration gate refuses a launch without it.
  *
- * Nothing() when the engine is off: the caller then runs stock Firefox's own
- * SystemParametersInfo path. When it is on, only 0 (DEFAULT_QUALITY), 4
+ * Called only under StealthTextQualityDeclared() (the guard at the top of
+ * GetSystemTextQuality): with the engine off the caller runs stock Firefox's
+ * own SystemParametersInfo path. Only 0 (DEFAULT_QUALITY), 4
  * (ANTIALIASED_QUALITY) and 5 (CLEARTYPE_QUALITY) are accepted; anything else
  * refuses rather than asking the host.
  */
-inline Maybe<BYTE> StealthDeclaredTextQuality() {
-  if (!StealthEngineActive()) {
-    return Nothing();
-  }
+inline BYTE StealthDeclaredTextQuality() {
   const int32_t declared = StaticPrefs::zoom_stealth_text_system_quality();
   if (declared == DEFAULT_QUALITY || declared == ANTIALIASED_QUALITY ||
       declared == CLEARTYPE_QUALITY) {
-    return Some(BYTE(declared));
+    return BYTE(declared);
   }
   StealthRefuse(
       "stealth: zoom.stealth.text.system_quality is %d, not one of 0 "
@@ -69,9 +66,9 @@ inline Maybe<BYTE> StealthDeclaredTextQuality() {
 }
 
 /**
- * Is the ClearType state declared (engine on)?
- * gfxDWriteFont::UpdateClearTypeVars asks once and passes the answer to
- * StealthCreateRenderingParams and to the condition of its prefs block.
+ * Is the ClearType state declared (engine on)? Asked by the guard of
+ * GetSystemTextQuality, by StealthDWriteFactoryProxy below and by
+ * StealthClearTypeParamsApply.
  *
  * DO NOT ASK THE MACHINE. The six values of UpdateClearTypeVars are read once
  * at startup and then stay fixed for the whole process, which makes them
@@ -108,18 +105,53 @@ inline Maybe<BYTE> StealthDeclaredTextQuality() {
 inline bool StealthTextQualityDeclared() { return StealthEngineActive(); }
 
 /**
- * The DWrite default rendering parameters, or E_FAIL without calling DWrite
- * when the ClearType state is declared. The E_FAIL goes down the same road as a
- * failed factory call in the caller: the caller's own `else` logs its
- * gfxWarning, exactly as it always did with the engine on.
+ * The receiver of gfxDWriteFont::UpdateClearTypeVars' CreateRenderingParams
+ * call, wrapped: with the ClearType state declared the call that would read the
+ * host's DWrite defaults is never made and the answer is E_FAIL; otherwise it is
+ * forwarded to the real factory, so the engine off is stock Firefox byte for
+ * byte. The E_FAIL goes down the same road as a failed factory call in the
+ * caller: its own `else` logs its gfxWarning, exactly as it always did with the
+ * engine on. The receiver is wrapped, not the result, because the host is read
+ * by the call itself.
+ *
+ * A template on the factory type so that a test can count the calls that reach
+ * the host with a fake. operator-> returns the proxy itself, which lives until
+ * the end of the full expression the hook sits in.
  */
-inline HRESULT StealthCreateRenderingParams(
-    bool aDeclared, RefPtr<IDWriteRenderingParams>& aParams) {
-  if (aDeclared) {
-    return E_FAIL;
+template <typename F>
+class StealthDWriteFactoryProxy {
+ public:
+  explicit StealthDWriteFactoryProxy(F* aFactory) : mFactory(aFactory) {}
+  StealthDWriteFactoryProxy* operator->() { return this; }
+  HRESULT CreateRenderingParams(IDWriteRenderingParams** aParams) {
+    if (StealthTextQualityDeclared()) {
+      return E_FAIL;
+    }
+    return mFactory->CreateRenderingParams(aParams);
   }
-  return Factory::GetDWriteFactory()->CreateRenderingParams(
-      getter_AddRefs(aParams));
+
+ private:
+  F* mFactory;
+};
+
+template <typename F>
+StealthDWriteFactoryProxy<F> StealthDWriteFactory(F* aFactory) {
+  return StealthDWriteFactoryProxy<F>(aFactory);
+}
+
+template <typename F>
+StealthDWriteFactoryProxy<F> StealthDWriteFactory(const RefPtr<F>& aFactory) {
+  return StealthDWriteFactoryProxy<F>(aFactory.get());
+}
+
+/**
+ * The condition of the ClearType prefs block of UpdateClearTypeVars: with the
+ * engine on the declared parameters apply whatever the declared quality;
+ * otherwise Mozilla's own condition (aStock: the system text quality is
+ * CLEARTYPE_QUALITY).
+ */
+inline bool StealthClearTypeParamsApply(bool aStock) {
+  return StealthTextQualityDeclared() || aStock;
 }
 
 }  // namespace gfx

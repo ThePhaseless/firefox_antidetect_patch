@@ -14,6 +14,7 @@
 #include "mozilla/Logging.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/RandomNum.h"
+#include "nsError.h"
 #include "prerror.h"
 #include "prio.h"
 #include "prnetdb.h"
@@ -25,7 +26,13 @@
 #include "transport_addr.h"
 #include "local_addr.h"
 #include "stun_util.h"
+#include "nr_socket.h"
+#include "nr_socket_local.h"
+#include "ice_ctx.h"
+#include "nr_stealth_addrs.h"
 // clang-format on
+
+#include "nricectx.h"
 
 namespace {
 
@@ -215,6 +222,17 @@ extern "C" int nr_stealth_default_local_address(int aIpVersion, nr_local_addr* a
   return R_NOT_FOUND;
 }
 
+extern "C" int nr_stealth_default_local_address_guard(nr_ice_ctx* aCtx, int aIpVersion, nr_local_addr* aAddrs,
+                                                      int aAddrCt, nr_local_addr* aAddrp, int* aStatus) {
+  // With a target for the lookup the family is the page's server's, which the declared machine may not have; without one
+  // it is the family that was asked for.
+  int family = aCtx->target_for_default_local_address_lookup
+                   ? nr_stealth_default_family(aIpVersion, aAddrs, aAddrCt)
+                   : aIpVersion;
+  *aStatus = nr_stealth_default_local_address(family, aAddrs, aAddrCt, aAddrp);
+  return 1;
+}
+
 extern "C" int nr_stealth_default_family(int aTargetIpVersion, nr_local_addr* aAddrs, int aAddrCt) {
   bool has4 = false, has6 = false;
   for (int i = 0; i < aAddrCt; ++i) {
@@ -317,6 +335,98 @@ int nr_stealth_own_peer_from_kernel(const nr_transport_addr* aSelf, const mozill
     return 0;
   }
   return WithAddress(self, aAddr);
+}
+
+mozilla::StealthHostPorts::StealthHostPorts() : StealthHostPorts(RandomUint64OrDie()) {}
+
+/* The wrapper of Mozilla's nr_socket_local_create (the body, nr_socket_local_create_Mozilla, is in nricectx.cpp): see
+ * nr_stealth_network.h. A host UDP socket of a declared address takes the next port of its connection (R3); a busy one
+ * is skipped (R_ALREADY from NrSocket::create), as the kernel skips it. */
+int nr_socket_local_create(void* obj, nr_transport_addr* addr, nr_socket** sockp) {
+  if (!obj || addr->protocol != IPPROTO_UDP || nr_stealth_addr_is_wildcard_ip(addr) ||
+      nr_transport_addr_is_loopback(addr)) {
+    return nr_socket_local_create_Mozilla(obj, addr, sockp);
+  }
+  nr_transport_addr chosen;
+  int r = R_ALREADY;
+  bool internalError = false;
+  static_cast<mozilla::NrIceCtx*>(obj)->StealthPorts().NextAvailable([&](uint16_t aPort) {
+    if (nr_transport_addr_copy(&chosen, addr) || nr_transport_addr_set_port(&chosen, aPort)) {
+      internalError = true;
+      return true;
+    }
+    r = nr_socket_local_create_Mozilla(obj, &chosen, sockp);
+    return r != R_ALREADY;
+  });
+  return internalError ? R_INTERNAL : r;
+}
+
+/* NrSocket::sendto, first statement: `to = StealthOwnPeerToKernel(&my_addr_, to);`. To another socket of this browser at our
+ * declared address the datagram goes on the kernel's loopback (R3): the copy of `aTo` rewritten, in a buffer of this thread that
+ * lives until the next call (sendto uses it synchronously, on the socket thread); any other destination is `aTo` itself. */
+const nr_transport_addr* mozilla::StealthOwnPeerToKernel(const nr_transport_addr* aMyAddr, const nr_transport_addr* aTo) {
+  static thread_local nr_transport_addr sOwnPeer;
+  if (!nr_transport_addr_copy(&sOwnPeer, aTo) &&
+      nr_stealth_own_peer_to_kernel(aMyAddr, StealthOwnPortsOfThisProcess(), &sOwnPeer)) {
+    return &sOwnPeer;
+  }
+  return aTo;
+}
+
+/* NrSocket::recvfrom, right after Mozilla's conversion of the sender's address into `aFrom`: a datagram that came from another
+ * socket of this browser came from the kernel's loopback, the peer is our declared address (R3). */
+void mozilla::StealthOwnPeerFromKernel(const nr_transport_addr* aMyAddr, nr_transport_addr* aFrom) {
+  (void)nr_stealth_own_peer_from_kernel(aMyAddr, StealthOwnPortsOfThisProcess(), aFrom);
+}
+
+mozilla::StealthOwnPorts& mozilla::StealthOwnPortsOfThisProcess() {
+  static mozilla::StealthOwnPorts sOwn;
+  return sOwn;
+}
+
+bool mozilla::StealthBindAddress(const nr_transport_addr* aAddr, PRNetAddr* aNaddr) {
+  if (nr_stealth_addr_is_wildcard_ip(aAddr) || nr_transport_addr_is_loopback(aAddr)) {
+    return false;
+  }
+  uint16_t port = 0;
+  return nr_transport_addr_get_port(aAddr, &port) ||
+         PR_SetNetAddr(PR_IpAddrAny, aNaddr->raw.family, port, aNaddr) != PR_SUCCESS;
+}
+
+bool mozilla::StealthBindPortNotAvailable() {
+  return PR_GetError() == PR_ADDRESS_IN_USE_ERROR || PR_GetError() == PR_NO_ACCESS_RIGHTS_ERROR;
+}
+
+int mozilla::StealthDeclaredAddressKept(nr_transport_addr* aMyAddr, const nr_transport_addr* aAddr, int aMozillaResult) {
+  if (aMozillaResult || nr_stealth_addr_is_wildcard_ip(aAddr)) {
+    return aMozillaResult;
+  }
+  uint16_t port = 0;
+  int r = nr_transport_addr_get_port(aMyAddr, &port);
+  if (r) return r;
+  r = nr_transport_addr_copy(aMyAddr, aAddr);
+  if (r) return r;
+  return nr_transport_addr_set_port(aMyAddr, port);
+}
+
+bool mozilla::StealthSocketAttachRefusedForTests(const nr_transport_addr* aAddr) {
+  return aAddr->protocol == IPPROTO_UDP && StealthTakeFailNextSocketAttachForTests();
+}
+
+nsresult mozilla::StealthSocketAttached(const nr_transport_addr* aMyAddr, uint16_t* aOwnPort, const nr_transport_addr* aAddr,
+                                        nsresult aMozillaResult) {
+  if (NS_SUCCEEDED(aMozillaResult) && aAddr->protocol == IPPROTO_UDP && !nr_stealth_addr_is_wildcard_ip(aMyAddr) &&
+      !nr_transport_addr_is_loopback(aMyAddr) && !nr_transport_addr_get_port(aMyAddr, aOwnPort)) {
+    StealthOwnPortsOfThisProcess().Add(aMyAddr->ip_version, *aOwnPort);
+  }
+  return aMozillaResult;
+}
+
+void mozilla::StealthOwnPortReleased(const nr_transport_addr* aMyAddr, uint16_t* aOwnPort) {
+  if (*aOwnPort) {
+    StealthOwnPortsOfThisProcess().Remove(aMyAddr->ip_version, *aOwnPort);
+    *aOwnPort = 0;
+  }
 }
 
 namespace mozilla {

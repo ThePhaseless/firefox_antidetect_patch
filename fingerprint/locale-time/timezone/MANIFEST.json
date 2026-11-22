@@ -6,7 +6,9 @@
   "dom/xslt/xslt/txEXSLTFunctions.cpp",
   "js/xpconnect/src/nsXPConnect.cpp"
  ],
- "added": {},
+ "added": {
+  "dom/base/test/gtest/TestStealthTimezone.cpp": "100644"
+ },
  "inventory": [
   {
    "file": "docshell/base/BrowsingContext.cpp",

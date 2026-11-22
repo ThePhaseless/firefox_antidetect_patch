@@ -5,15 +5,15 @@
   "kind": "add",
   "form": "registration",
   "line": "#include \"StealthOwnGL.h\"  // STEALTH-HOOK(fingerprint/webgl/own-gl)",
-  "test": ""
+  "test": "wrapper:tests/test_webgl_draws_on_the_engine_s_own_gl_e2e.py::test_webgl_draws_on_the_engine_s_own_gl"
  },
  {
   "file": "gfx/gl/GLContextProviderLinux.cpp",
   "function": "already_AddRefed<GLContext> GLContextProviderLinux::CreateForCompositorWidget(",
   "kind": "add",
   "form": "guard",
-  "line": "  if (StealthOwnGLRequired()) return sGLContextProviderEGL.CreateHeadless(desc, out_failureId);  // STEALTH-HOOK(fingerprint/webgl/own-gl): never GLX",
-  "test": ""
+  "line": "  if (StealthOwnGLRequired()) return StealthOwnGLCreateHeadless(desc, out_failureId);  // STEALTH-HOOK(fingerprint/webgl/own-gl)",
+  "test": "wrapper:tests/test_webgl_draws_on_the_engine_s_own_gl_e2e.py::test_webgl_draws_on_the_engine_s_own_gl"
  },
  {
   "file": "gfx/gl/GLLibraryEGL.cpp",
@@ -21,26 +21,24 @@
   "kind": "add",
   "form": "registration",
   "line": "#include \"StealthOwnGL.h\"  // STEALTH-HOOK(fingerprint/webgl/own-gl)",
-  "test": ""
+  "test": "wrapper:tests/test_webgl_draws_on_the_engine_s_own_gl_e2e.py::test_webgl_draws_on_the_engine_s_own_gl"
  },
  {
   "file": "gfx/gl/GLLibraryEGL.cpp",
   "function": "bool GLLibraryEGL::Init(nsACString* const out_failureId) {",
   "kind": "add",
   "form": "anchor",
-  "line": "  if (!StealthLoadOwnGLOrRefuse(&mEGLLibrary, &mGLLibrary, out_failureId)) return false;  // STEALTH-HOOK(fingerprint/webgl/own-gl): ours or none",
-  "test": "",
-  "anchor": "",
-  "why": ""
+  "line": "  if (StealthOwnGLRefused(&mEGLLibrary, &mGLLibrary, out_failureId)) return false;  // STEALTH-HOOK(fingerprint/webgl/own-gl)",
+  "test": "wrapper:tests/test_webgl_draws_on_the_engine_s_own_gl_e2e.py::test_webgl_draws_on_the_engine_s_own_gl",
+  "anchor": "mozilla::ScopedGfxFeatureReporter reporter(\"EGL\");",
+  "why": "a guard at the top would run before the ScopedGfxFeatureReporter and its early return false would skip the reporter's failure note; right after the reporter, before #ifdef XP_WIN, nothing lies between the old position (inside #else !Windows) and this one on non-Windows, and on Windows StealthOwnGLRequired() is false and the call does nothing. The mEGLLibrary/mGLLibrary fields are passed (G14), no friend"
  },
  {
   "file": "gfx/gl/GLLibraryEGL.cpp",
-  "function": "std::shared_ptr<EglDisplay> GLLibraryEGL::CreateDisplayLocked(",
+  "function": "std::shared_ptr<EglDisplay> GLLibraryEGL::CreateDisplay(",
   "kind": "add",
-  "form": "anchor",
-  "line": "    if (StealthOwnGLRequired()) return StealthOwnGLSurfacelessDisplay(*this, aProofOfLock);  // STEALTH-HOOK(fingerprint/webgl/own-gl): surfaceless only",
-  "test": "",
-  "anchor": "",
-  "why": ""
+  "form": "guard",
+  "line": "  if (StealthOwnGLRequired()) return StealthOwnGLSurfacelessDisplay(*this, aProofOfLock);  // STEALTH-HOOK(fingerprint/webgl/own-gl)",
+  "test": "wrapper:tests/test_webgl_draws_on_the_engine_s_own_gl_e2e.py::test_webgl_draws_on_the_engine_s_own_gl"
  }
 ]

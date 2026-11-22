@@ -1,464 +1,70 @@
 [
  {
-  "file": "gfx/thebes/CoreTextFontList.cpp",
-  "function": "",
-  "kind": "add",
-  "form": "registration",
-  "line": "#include \"StealthBundleFontList.h\"  // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/CoreTextFontList.cpp",
-  "function": "nsresult CTFontEntry::ReadCMAP(FontInfoData* aFontInfoData) {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "removed": "    if (!IsUserFont() && mShmemFace && mShmemFamily) {",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/CoreTextFontList.cpp",
-  "function": "nsresult CTFontEntry::ReadCMAP(FontInfoData* aFontInfoData) {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    if (ShouldPublishCharacterMap() && mShmemFamily) {",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/CoreTextFontList.cpp",
-  "function": "CoreTextFontList::~CoreTextFontList() {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "#ifdef MOZ_BUNDLED_FONTS  // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/CoreTextFontList.cpp",
-  "function": "CoreTextFontList::~CoreTextFontList() {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  if (StealthDropFamily(mStealthBundleOnly, mBundledFamilies, aFamilyName)) {",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/CoreTextFontList.cpp",
-  "function": "CoreTextFontList::~CoreTextFontList() {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    return;",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/CoreTextFontList.cpp",
-  "function": "CoreTextFontList::~CoreTextFontList() {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  }",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/CoreTextFontList.cpp",
-  "function": "CoreTextFontList::~CoreTextFontList() {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "#endif",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/CoreTextFontList.cpp",
-  "function": "void CoreTextFontList::InitSharedFontListForPlatform() {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/CoreTextFontList.cpp",
-  "function": "void CoreTextFontList::InitSharedFontListForPlatform() {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  if (StealthSetBundledFamilyNames(mStealthBundleOnly, SharedFontList())) {",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/CoreTextFontList.cpp",
-  "function": "void CoreTextFontList::InitSharedFontListForPlatform() {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    InitAliasesForSingleFaceList();",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/CoreTextFontList.cpp",
-  "function": "void CoreTextFontList::InitSharedFontListForPlatform() {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    GetPrefsAndStartLoader();",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/CoreTextFontList.cpp",
-  "function": "void CoreTextFontList::InitSharedFontListForPlatform() {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    return;",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/CoreTextFontList.cpp",
-  "function": "void CoreTextFontList::InitSharedFontListForPlatform() {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  }",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/CoreTextFontList.cpp",
-  "function": "already_AddRefed<gfxFontFamily> CoreTextFontList::CreateFontFamily(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  if (mStealthBundleOnly) {  // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/CoreTextFontList.cpp",
-  "function": "already_AddRefed<gfxFontFamily> CoreTextFontList::CreateFontFamily(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    RefPtr fe = StealthBundledCTFontEntry(aFace, aFamily, SharedFontList());",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/CoreTextFontList.cpp",
-  "function": "already_AddRefed<gfxFontFamily> CoreTextFontList::CreateFontFamily(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    if (fe) {",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/CoreTextFontList.cpp",
-  "function": "already_AddRefed<gfxFontFamily> CoreTextFontList::CreateFontFamily(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "      fe->InitializeFrom(aFace, aFamily);",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/CoreTextFontList.cpp",
-  "function": "already_AddRefed<gfxFontFamily> CoreTextFontList::CreateFontFamily(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    }",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/CoreTextFontList.cpp",
-  "function": "already_AddRefed<gfxFontFamily> CoreTextFontList::CreateFontFamily(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    return fe.forget();",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/CoreTextFontList.cpp",
-  "function": "already_AddRefed<gfxFontFamily> CoreTextFontList::CreateFontFamily(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  }",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/CoreTextFontList.cpp",
-  "function": "void CoreTextFontList::AddFaceInitData(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  if (mStealthBundleOnly) {  // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/CoreTextFontList.cpp",
-  "function": "void CoreTextFontList::AddFaceInitData(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    StealthFacesForFamily(aFamily, SharedFontList(), aFaces);",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/CoreTextFontList.cpp",
-  "function": "void CoreTextFontList::AddFaceInitData(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    return;",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/CoreTextFontList.cpp",
-  "function": "void CoreTextFontList::AddFaceInitData(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  }",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/CoreTextFontList.cpp",
-  "function": "void CoreTextFontList::InitSystemFontNames() {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  if (mStealthBundleOnly) {  // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/CoreTextFontList.cpp",
-  "function": "void CoreTextFontList::InitSystemFontNames() {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    FontFamily f = FindFamily(aFontVisibilityProvider, StealthUiFamily());",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/CoreTextFontList.cpp",
-  "function": "void CoreTextFontList::InitSystemFontNames() {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    if (!f.IsNull()) {",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/CoreTextFontList.cpp",
-  "function": "void CoreTextFontList::InitSystemFontNames() {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "      return f;",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/CoreTextFontList.cpp",
-  "function": "void CoreTextFontList::InitSystemFontNames() {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    }",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/CoreTextFontList.cpp",
-  "function": "void CoreTextFontList::InitSystemFontNames() {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  }",
-  "test": ""
- },
- {
   "file": "gfx/thebes/gfxDWriteFontList.cpp",
   "function": "",
   "kind": "add",
   "form": "registration",
-  "line": "#include \"StealthBundleFontList.h\"  // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": ""
+  "line": "#include \"StealthFontListHooks.h\"  // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "gtest:StealthFontListHooks.PublishCharacterMap"
  },
  {
   "file": "gfx/thebes/gfxDWriteFontList.cpp",
   "function": "nsresult gfxDWriteFontEntry::ReadCMAP(FontInfoData* aFontInfoData) {",
   "kind": "rewrite",
-  "form": "unknown",
-  "line": "    // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "form": "wrap-expression",
+  "line": "    if (StealthPublishCharacterMap(this, !IsUserFont()) && mShmemFace) {  // STEALTH-HOOK(fingerprint/fonts/font-list)",
   "removed": "    if (!IsUserFont() && mShmemFace) {",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "nsresult gfxDWriteFontEntry::ReadCMAP(FontInfoData* aFontInfoData) {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    if (ShouldPublishCharacterMap()) {",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "gfxFont* gfxDWriteFontEntry::CreateFontInstance(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": ""
+  "test": "gtest:StealthFontListHooks.PublishCharacterMap"
  },
  {
   "file": "gfx/thebes/gfxDWriteFontList.cpp",
   "function": "gfxFont* gfxDWriteFontEntry::CreateFontInstance(",
   "kind": "rewrite",
-  "form": "unknown",
-  "line": "        new UnscaledFontDWrite(fontFace, !mIsDataUserFont ? mFont : nullptr,",
+  "form": "wrap-expression",
+  "line": "        StealthWithBundlePath(mBundleFilePath, new UnscaledFontDWrite(fontFace, !mIsDataUserFont ? mFont : nullptr));  // STEALTH-HOOK(fingerprint/fonts/font-list)",
   "removed": "        new UnscaledFontDWrite(fontFace, !mIsDataUserFont ? mFont : nullptr);",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "gfxFont* gfxDWriteFontEntry::CreateFontInstance(",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "                               mBundleFilePath);",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "nsresult gfxDWriteFontEntry::CreateFontFace(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "        // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": ""
+  "test": "wrapper:tests/test_a_screenshot_draws_the_text_of_the_bundled_fonts_as_the_content_does_e2e.py::test_the_text_of_a_bundled_family_is_drawn_by_the_screenshot_as_the_content_drew_it"
  },
  {
   "file": "gfx/thebes/gfxDWriteFontList.cpp",
   "function": "nsresult gfxDWriteFontEntry::CreateFontFace(",
   "kind": "rewrite",
-  "form": "unknown",
-  "line": "            mFaceType, 1, &fontFile, mBundleFaceIndex,",
+  "form": "wrap-expression",
+  "line": "            mFaceType, 1, &fontFile, StealthFaceIndex(mBundleFaceIndex, 0), DWRITE_FONT_SIMULATIONS_NONE,  // STEALTH-HOOK(fingerprint/fonts/font-list)",
   "removed": "            mFaceType, 1, &fontFile, 0, DWRITE_FONT_SIMULATIONS_NONE,",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "nsresult gfxDWriteFontEntry::CreateFontFace(",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "            DWRITE_FONT_SIMULATIONS_NONE, getter_AddRefs(mFontFace));",
-  "removed": "            getter_AddRefs(mFontFace));",
-  "test": ""
+  "test": "gtest:StealthFontListHooks.FaceIndex"
  },
  {
   "file": "gfx/thebes/gfxDWriteFontList.cpp",
   "function": "static void GetPostScriptNameFromNameTable(IDWriteFontFace* aFace,",
   "kind": "add",
-  "form": "unknown",
-  "line": "  if (mStealthBundleOnly) {  // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "static void GetPostScriptNameFromNameTable(IDWriteFontFace* aFace,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    return CreateStealthBundleFontEntry(aFace, aFamily);",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "static void GetPostScriptNameFromNameTable(IDWriteFontFace* aFace,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  }",
-  "test": ""
+  "form": "guard",
+  "line": "  if (gfxPlatformFontList::StealthBundleOnly()) return CreateStealthBundleFontEntry(aFace, aFamily);  // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "wrapper:tests/test_the_font_list_is_the_bundle_e2e.py::test_the_font_list_is_the_bundle_and_nothing_else"
  },
  {
   "file": "gfx/thebes/gfxDWriteFontList.cpp",
   "function": "void gfxDWriteFontList::AppendFamiliesFromCollection(",
   "kind": "add",
-  "form": "unknown",
-  "line": "  if (mStealthBundleOnly) {  // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "void gfxDWriteFontList::AppendFamiliesFromCollection(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    StealthBundleFontList::Get()->GetFaces(",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "void gfxDWriteFontList::AppendFamiliesFromCollection(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "        aFamily->DisplayName().AsString(SharedFontList()), aFaces);",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "void gfxDWriteFontList::AppendFamiliesFromCollection(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    return;",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "void gfxDWriteFontList::AppendFamiliesFromCollection(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  }",
-  "test": ""
+  "form": "guard",
+  "line": "  if (StealthFacesForFamily(this, aFamily, aFaces)) return;  // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "gtest:StealthFcBundleFonts.FacesForFamilyComeFromTheManifestOnlyUnderBundleOnly"
  },
  {
   "file": "gfx/thebes/gfxDWriteFontList.cpp",
   "function": "bool gfxDWriteFontList::ReadFaceNames(const fontlist::Family* aFamily,",
   "kind": "add",
-  "form": "unknown",
-  "line": "  if (mStealthBundleOnly) {  // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": ""
+  "form": "guard",
+  "line": "  if (gfxPlatformFontList::StealthBundleOnly()) return gfxPlatformFontList::ReadFaceNames(aFamily, aFace, aPSName, aFullName);  // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "wrapper:tests/test_bundle_font_names_e2e.py::test_src_local_resolves_a_bundled_postscript_name_and_not_a_host_only_name"
  },
  {
   "file": "gfx/thebes/gfxDWriteFontList.cpp",
   "function": "bool gfxDWriteFontList::ReadFaceNames(const fontlist::Family* aFamily,",
   "kind": "add",
-  "form": "unknown",
-  "line": "    return gfxPlatformFontList::ReadFaceNames(aFamily, aFace, aPSName,",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "bool gfxDWriteFontList::ReadFaceNames(const fontlist::Family* aFamily,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "                                              aFullName);",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "bool gfxDWriteFontList::ReadFaceNames(const fontlist::Family* aFamily,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  }",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "bool gfxDWriteFontList::ReadFaceNames(const fontlist::Family* aFamily,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  if (mStealthBundleOnly) {  // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "bool gfxDWriteFontList::ReadFaceNames(const fontlist::Family* aFamily,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    gfxPlatformFontList::ReadFaceNamesForFamily(aFamily,",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "bool gfxDWriteFontList::ReadFaceNames(const fontlist::Family* aFamily,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "                                                aNeedFullnamePostscriptNames);",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "bool gfxDWriteFontList::ReadFaceNames(const fontlist::Family* aFamily,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    return;",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "bool gfxDWriteFontList::ReadFaceNames(const fontlist::Family* aFamily,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  }",
-  "test": ""
+  "form": "guard",
+  "line": "  if (gfxPlatformFontList::StealthBundleOnly()) return gfxPlatformFontList::ReadFaceNamesForFamily(aFamily, aNeedFullnamePostscriptNames);  // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "wrapper:tests/test_bundle_font_names_e2e.py::test_src_local_resolves_a_bundled_postscript_name_and_not_a_host_only_name"
  },
  {
   "file": "gfx/thebes/gfxDWriteFontList.cpp",
@@ -467,7 +73,9 @@
   "form": "unknown",
   "line": "    if (mStealthBundleOnly) {  // STEALTH-HOOK(fingerprint/fonts/font-list)",
   "removed": "    AppendFamiliesFromCollection(mSystemFonts, families, &forceClassicFams);",
-  "test": ""
+  "test": "wrapper:tests/test_the_font_list_is_the_bundle_e2e.py::test_the_font_list_is_the_bundle_and_nothing_else",
+  "exception": "DW9: the two rewritten lines of Mozilla (families = the bundle's list instead of the system collection; the bundled collection only when not bundle-only) stay where they are: moving them into the callee would add one cache Add and one glean sample (G18, PM-DECISIONS fonts/font-list Q4)",
+  "pm": "approvato"
  },
  {
   "file": "gfx/thebes/gfxDWriteFontList.cpp",
@@ -475,7 +83,9 @@
   "kind": "rewrite",
   "form": "unknown",
   "line": "      families = StealthBundleFontList::Get()->Families().Clone();",
-  "test": ""
+  "test": "wrapper:tests/test_the_font_list_is_the_bundle_e2e.py::test_the_font_list_is_the_bundle_and_nothing_else",
+  "exception": "DW9: the two rewritten lines of Mozilla (families = the bundle's list instead of the system collection; the bundled collection only when not bundle-only) stay where they are: moving them into the callee would add one cache Add and one glean sample (G18, PM-DECISIONS fonts/font-list Q4)",
+  "pm": "approvato"
  },
  {
   "file": "gfx/thebes/gfxDWriteFontList.cpp",
@@ -483,7 +93,9 @@
   "kind": "rewrite",
   "form": "unknown",
   "line": "    } else {",
-  "test": ""
+  "test": "wrapper:tests/test_the_font_list_is_the_bundle_e2e.py::test_the_font_list_is_the_bundle_and_nothing_else",
+  "exception": "DW9: the two rewritten lines of Mozilla (families = the bundle's list instead of the system collection; the bundled collection only when not bundle-only) stay where they are: moving them into the callee would add one cache Add and one glean sample (G18, PM-DECISIONS fonts/font-list Q4)",
+  "pm": "approvato"
  },
  {
   "file": "gfx/thebes/gfxDWriteFontList.cpp",
@@ -491,7 +103,9 @@
   "kind": "rewrite",
   "form": "unknown",
   "line": "      AppendFamiliesFromCollection(mSystemFonts, families, &forceClassicFams);",
-  "test": ""
+  "test": "wrapper:tests/test_the_font_list_is_the_bundle_e2e.py::test_the_font_list_is_the_bundle_and_nothing_else",
+  "exception": "DW9: the two rewritten lines of Mozilla (families = the bundle's list instead of the system collection; the bundled collection only when not bundle-only) stay where they are: moving them into the callee would add one cache Add and one glean sample (G18, PM-DECISIONS fonts/font-list Q4)",
+  "pm": "approvato"
  },
  {
   "file": "gfx/thebes/gfxDWriteFontList.cpp",
@@ -499,7 +113,9 @@
   "kind": "rewrite",
   "form": "unknown",
   "line": "    }",
-  "test": ""
+  "test": "wrapper:tests/test_the_font_list_is_the_bundle_e2e.py::test_the_font_list_is_the_bundle_and_nothing_else",
+  "exception": "DW9: the two rewritten lines of Mozilla (families = the bundle's list instead of the system collection; the bundled collection only when not bundle-only) stay where they are: moving them into the callee would add one cache Add and one glean sample (G18, PM-DECISIONS fonts/font-list Q4)",
+  "pm": "approvato"
  },
  {
   "file": "gfx/thebes/gfxDWriteFontList.cpp",
@@ -508,829 +124,354 @@
   "form": "unknown",
   "line": "    if (mBundledFonts && !mStealthBundleOnly) {",
   "removed": "    if (mBundledFonts) {",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "void gfxDWriteFontList::InitSharedFontListForPlatform() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "removed": "  GetDirectWriteSubstitutes();\n  GetFontSubstitutes();",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "void gfxDWriteFontList::InitSharedFontListForPlatform() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  if (StealthBundleFontList::UsesHostSubstitutes(mStealthBundleOnly)) {",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "void gfxDWriteFontList::InitSharedFontListForPlatform() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    GetDirectWriteSubstitutes();",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "void gfxDWriteFontList::InitSharedFontListForPlatform() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    GetFontSubstitutes();",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "void gfxDWriteFontList::InitSharedFontListForPlatform() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  }",
-  "test": ""
+  "test": "wrapper:tests/test_the_font_list_is_the_bundle_e2e.py::test_the_font_list_is_the_bundle_and_nothing_else",
+  "exception": "DW9: the two rewritten lines of Mozilla (families = the bundle's list instead of the system collection; the bundled collection only when not bundle-only) stay where they are: moving them into the callee would add one cache Add and one glean sample (G18, PM-DECISIONS fonts/font-list Q4)",
+  "pm": "approvato"
  },
  {
   "file": "gfx/thebes/gfxDWriteFontList.cpp",
   "function": "nsresult gfxDWriteFontList::InitFontListForPlatform() {",
   "kind": "rewrite",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "removed": "  GetFontsFromCollection(mSystemFonts);\n  if (mFontFamilies.Count() == kBundledCount) {",
-  "test": ""
+  "form": "wrap-expression",
+  "line": "  if (StealthNoFontsFound(this, mFontFamilies.Count() == kBundledCount)) {  // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "removed": "  if (mFontFamilies.Count() == kBundledCount) {",
+  "test": "gtest:StealthFontListHooks.NoFontsFound"
  },
  {
   "file": "gfx/thebes/gfxDWriteFontList.cpp",
   "function": "nsresult gfxDWriteFontList::InitFontListForPlatform() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  if (!mStealthBundleOnly) {",
-  "test": ""
+  "kind": "add",
+  "form": "guard",
+  "line": "  if (StealthSkipsHostCollection(this, aCollection, mSystemFonts)) return;  // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "gtest:StealthFontListHooks.SkipsHostCollection"
  },
  {
   "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "nsresult gfxDWriteFontList::InitFontListForPlatform() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    GetFontsFromCollection(mSystemFonts);",
-  "test": ""
+  "function": "static void RemoveCharsetFromFontSubstitute(nsACString& aName) {",
+  "kind": "add",
+  "form": "guard",
+  "line": "  if (StealthSkipsHostSubstitutes(this)) return NS_OK;  // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "gtest:StealthFontListHooks.SkipsHostSubstitutes"
  },
  {
   "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "nsresult gfxDWriteFontList::InitFontListForPlatform() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  }",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "nsresult gfxDWriteFontList::InitFontListForPlatform() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "nsresult gfxDWriteFontList::InitFontListForPlatform() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  if (!mStealthBundleOnly && mFontFamilies.Count() == kBundledCount) {",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "nsresult gfxDWriteFontList::InitFontListForPlatform() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "removed": "  GetFontSubstitutes();",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "nsresult gfxDWriteFontList::InitFontListForPlatform() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  if (StealthBundleFontList::UsesHostSubstitutes(mStealthBundleOnly)) {",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "nsresult gfxDWriteFontList::InitFontListForPlatform() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    GetFontSubstitutes();",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "nsresult gfxDWriteFontList::InitFontListForPlatform() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  }",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "nsresult gfxDWriteFontList::InitFontListForPlatform() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "removed": "  GetDirectWriteSubstitutes();",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "nsresult gfxDWriteFontList::InitFontListForPlatform() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  if (StealthBundleFontList::UsesHostSubstitutes(mStealthBundleOnly)) {",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "nsresult gfxDWriteFontList::InitFontListForPlatform() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    GetDirectWriteSubstitutes();",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "nsresult gfxDWriteFontList::InitFontListForPlatform() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  }",
-  "test": ""
+  "function": "static const FontSubstitution sDirectWriteSubs[] = {",
+  "kind": "add",
+  "form": "guard",
+  "line": "  if (StealthSkipsHostSubstitutes(this)) return;  // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "gtest:StealthFontListHooks.SkipsHostSubstitutes"
  },
  {
   "file": "gfx/thebes/gfxDWriteFontList.cpp",
   "function": "BundledFontLoader::CreateEnumeratorFromKey(",
   "kind": "add",
-  "form": "unknown",
-  "line": "  if (StealthBundleFontList::SkipsPlatformBundledCollection(  // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "BundledFontLoader::CreateEnumeratorFromKey(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "          SharedFontList() != nullptr, mStealthBundleOnly, XRE_IsParentProcess())) {",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "BundledFontLoader::CreateEnumeratorFromKey(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    return nullptr;",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "BundledFontLoader::CreateEnumeratorFromKey(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  }",
-  "test": ""
+  "form": "guard",
+  "line": "  if (StealthSkipsBundledCollection(this)) return nullptr;  // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "gtest:StealthBundledCollection.SkippedOnlyForTheSharedListOfAContentProcess"
  },
  {
   "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
   "function": "",
   "kind": "add",
   "form": "registration",
-  "line": "#include \"StealthFcFontList.h\"",
-  "test": ""
+  "line": "#include \"StealthFcFontList.h\"  // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "gtest:StealthFcFontList.TextOptions"
  },
  {
   "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
   "function": "gfxFontconfigFontEntry::AutoHBFace gfxFontconfigFontEntry::GetHBFace() {",
   "kind": "rewrite",
   "form": "unknown",
-  "line": "      // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "line": "      face = StealthBaseHBFaceRef(this);  // STEALTH-HOOK(fingerprint/fonts/font-list)",
   "removed": "      face = hb_face_reference(gfxFontEntry::GetHBFace());",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
-  "function": "gfxFontconfigFontEntry::AutoHBFace gfxFontconfigFontEntry::GetHBFace() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "      face = StealthBaseHBFaceRef(this);",
-  "test": ""
+  "test": "wrapper:tests/test_the_parent_reads_the_bundle_from_fontconfig_s_cache_linux_e2e.py::test_the_warm_parent_reads_the_bundle_from_fontconfig_cache_and_does_not_scan_it",
+  "exception": "the network on AutoHBFace in gfxFontEntry.h (operator hb_face_t*() const&& = delete, fingerprint/fonts/bundle) makes Mozilla's line `face = hb_face_reference(gfxFontEntry::GetHBFace());` a compile error, because it binds the returned temporary; the line stays as it is today, with a named object (G35, G24)",
+  "pm": "approvato"
  },
  {
   "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
   "function": "nsresult gfxFontconfigFontEntry::ReadCMAP(FontInfoData* aFontInfoData) {",
   "kind": "rewrite",
-  "form": "unknown",
-  "line": "    // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "form": "wrap-expression",
+  "line": "    if (StealthPublishCharacterMap(this, !IsUserFont()) && mShmemFace) {  // STEALTH-HOOK(fingerprint/fonts/font-list)",
   "removed": "    if (!IsUserFont() && mShmemFace) {",
-  "test": ""
+  "test": "gtest:StealthFontListHooks.PublishCharacterMap"
  },
  {
   "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
   "function": "nsresult gfxFontconfigFontEntry::ReadCMAP(FontInfoData* aFontInfoData) {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    if (ShouldPublishCharacterMap()) {",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
-  "function": "nsresult gfxFontconfigFontEntry::ReadCMAP(FontInfoData* aFontInfoData) {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "removed": "    return !!gfxFontUtils::FindTableDirEntry(ufd->Data(), aTableTag);",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
-  "function": "nsresult gfxFontconfigFontEntry::ReadCMAP(FontInfoData* aFontInfoData) {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    return !!gfxFontUtils::FindTableDirEntry(",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
-  "function": "nsresult gfxFontconfigFontEntry::ReadCMAP(FontInfoData* aFontInfoData) {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "        ufd->Data(), aTableTag, StealthTableFaceIndex(GetFTFace()));",
-  "test": ""
+  "kind": "add",
+  "form": "guard",
+  "line": "  if (bool rv; StealthFaceDataHasTable(this, aTableTag, &rv)) return rv;  // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "gtest:StealthFcBundleFonts.FaceDataTableFallsThroughForAFaceWithAFile"
  },
  {
   "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
   "function": "bool gfxFontconfigFontEntry::HasFontTableInternal(uint32_t aTableTag) {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "removed": "    return gfxFontUtils::GetTableFromFontData(ufd->Data(), aTableTag);",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
-  "function": "bool gfxFontconfigFontEntry::HasFontTableInternal(uint32_t aTableTag) {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    return gfxFontUtils::GetTableFromFontData(",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
-  "function": "bool gfxFontconfigFontEntry::HasFontTableInternal(uint32_t aTableTag) {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "        ufd->Data(), aTableTag, StealthTableFaceIndex(GetFTFace()));",
-  "test": ""
+  "kind": "add",
+  "form": "guard",
+  "line": "  if (hb_blob_t* rv; StealthFaceDataTable(this, aTableTag, &rv)) return rv;  // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "gtest:StealthFcBundleFonts.FaceDataTableFallsThroughForAFaceWithAFile"
  },
  {
   "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
   "function": "hb_blob_t* gfxFontconfigFontEntry::GetFontTableInternal(uint32_t aTableTag) {",
   "kind": "rewrite",
   "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "line": "  auto* table = StealthHBFaceTable(this, aTableTag);  // STEALTH-HOOK(fingerprint/fonts/font-list)",
   "removed": "  auto* table = hb_face_reference_table(GetHBFace(), aTableTag);",
-  "test": ""
+  "test": "wrapper:tests/test_the_parent_reads_the_bundle_from_fontconfig_s_cache_linux_e2e.py::test_the_warm_parent_reads_the_bundle_from_fontconfig_cache_and_does_not_scan_it",
+  "exception": "the network on AutoHBFace in gfxFontEntry.h (fingerprint/fonts/bundle) makes Mozilla's line `auto* table = hb_face_reference_table(GetHBFace(), aTableTag);` a compile error, because it binds the returned temporary; the line stays as it is today (G35, G24)",
+  "pm": "approvato"
  },
  {
   "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
-  "function": "hb_blob_t* gfxFontconfigFontEntry::GetFontTableInternal(uint32_t aTableTag) {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  auto* table = StealthHBFaceTable(this, aTableTag);",
-  "test": ""
+  "function": "double gfxFontconfigFontEntry::GetAspect(uint8_t aSizeAdjustBasis) {",
+  "kind": "add",
+  "form": "notice",
+  "line": "  StealthDeclareTextOptions(aPattern);  // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "gtest:StealthFcFontList.TextOptions"
  },
  {
   "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
   "function": "gfxFont* gfxFontconfigFontEntry::CreateFontInstance(",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": ""
+  "form": "anchor",
+  "line": "  StealthDeclaredFontFile(renderPattern, file, index);  // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "gtest:StealthFcFontList.DeclaredFontFile",
+  "anchor": "if (!face->GetFontData()) {...} (the statement that fills file and index)",
+  "why": "it completes `file` and `index`, which that statement leaves empty for a face made from data, and the locals it reads (renderPattern, file, index) exist only at this point; no guard, wrap or notice at the head of the function can see them"
  },
  {
   "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
   "function": "gfxFont* gfxFontconfigFontEntry::CreateFontInstance(",
   "kind": "add",
-  "form": "unknown",
-  "line": "  StealthDeclareTextOptions(renderPattern);",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
-  "function": "gfxFont* gfxFontconfigFontEntry::CreateFontInstance(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
-  "function": "gfxFont* gfxFontconfigFontEntry::CreateFontInstance(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  StealthDeclaredFontFile(renderPattern, file, index);",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
-  "function": "gfxFont* gfxFontconfigFontEntry::CreateFontInstance(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
-  "function": "gfxFont* gfxFontconfigFontEntry::CreateFontInstance(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    StealthPreferFileUnscaledFont(this, unscaledFont, file, index, ftFace);",
-  "test": ""
+  "form": "anchor",
+  "line": "    StealthPreferFileUnscaledFont(this, unscaledFont, file, index, ftFace);  // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "gtest:StealthFcFontList.PreferFileUnscaledFont",
+  "anchor": "mUnscaledFontCache.Add(unscaledFont);",
+  "why": "G30, last line of the block: it replaces the UnscaledFont Mozilla has just chosen and cached (ftFace->GetFontData() ? ... : ...) with one built on the path, and needs the locals unscaledFont, file, index and ftFace; the variant that does the Add once instead of twice (design row Fc9 'moved') is not done: G18, Q4"
  },
  {
   "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
   "function": "void gfxFcPlatformFontList::AddPatternToFontList(",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
-  "function": "void gfxFcPlatformFontList::AddPatternToFontList(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  if (!aFontFamily) {",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
-  "function": "void gfxFcPlatformFontList::AddPatternToFontList(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    return;",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
-  "function": "void gfxFcPlatformFontList::AddPatternToFontList(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  }",
-  "test": ""
+  "form": "anchor",
+  "line": "  if (StealthDropPatternWithoutFamily(aFontFamily)) return;  // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "gtest:StealthFcFontList.PatternWithoutFamily",
+  "anchor": "if (FcStrCmp(canonical, aLastFamilyName) != 0) {...} (the block that assigns aFontFamily)",
+  "why": "Q1 (pm): an early return in the middle of the function; at the head aFontFamily is the caller's value and the block above must still run, a guard before it would skip the family assignment"
  },
  {
   "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
   "function": "nsresult gfxFcPlatformFontList::InitFontListForPlatform() {",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
-  "function": "nsresult gfxFcPlatformFontList::InitFontListForPlatform() {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  if (mStealthBundleOnly) {",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
-  "function": "nsresult gfxFcPlatformFontList::InitFontListForPlatform() {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    return NS_OK;",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
-  "function": "nsresult gfxFcPlatformFontList::InitFontListForPlatform() {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  }",
-  "test": ""
+  "form": "anchor",
+  "line": "  if (StealthSkipsSystemFontSet(this)) return NS_OK;  // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "gtest:StealthFcFontList.SkipsSystemFontSet",
+  "anchor": "#ifdef MOZ_BUNDLED_FONTS ... AddFontSetFamilies(appFonts, policy.get(), /* aAppFonts = */ true); ... #endif",
+  "why": "Q1 (pm): the app-bundled set above must still be processed before the host system font set is skipped; a guard at the head of the function would skip it too"
  },
  {
   "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
   "function": "void gfxFcPlatformFontList::InitSharedFontListForPlatform() {",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/fonts/font-list): the parent shows the bundle to fontconfig first, a screenshot remakes its fonts from the path",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
-  "function": "void gfxFcPlatformFontList::InitSharedFontListForPlatform() {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  if (mStealthBundleOnly && StealthPopulateSharedList(SharedFontList())) {",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
-  "function": "void gfxFcPlatformFontList::InitSharedFontListForPlatform() {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    return;",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
-  "function": "void gfxFcPlatformFontList::InitSharedFontListForPlatform() {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  }",
-  "test": ""
+  "form": "anchor",
+  "line": "  if (StealthPopulateSharedList(this)) return;  // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "gtest:StealthFcBundleFonts.TheFontOfAFileOfTheBundleIsMadeFromThatFile",
+  "anchor": "#ifdef MOZ_BUNDLED_FONTS ... ActivateBundledFonts(); ... #endif",
+  "why": "Q1 (pm): the bundle must be shown to fontconfig (ActivateBundledFonts) before the shared list is built from the manifest, or a screenshot's font comes back as another file of the host; at the head of the function that has not happened yet"
  },
  {
   "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
   "function": "gfxFcPlatformFontList::GetFilteredPlatformFontLists() {",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
-  "function": "gfxFcPlatformFontList::GetFilteredPlatformFontLists() {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  if (mStealthBundleOnly) {",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
-  "function": "gfxFcPlatformFontList::GetFilteredPlatformFontLists() {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    return StealthCreateBundleFontEntry(aFace, aFamily, SharedFontList());",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
-  "function": "gfxFcPlatformFontList::GetFilteredPlatformFontLists() {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  }",
-  "test": ""
+  "form": "guard",
+  "line": "  if (gfxPlatformFontList::StealthBundleOnly()) return StealthCreateBundleFontEntry(this, aFace, aFamily);  // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "wrapper:tests/test_screenshot_of_text_returns_linux_e2e.py::test_a_screenshot_of_a_page_with_text_returns"
  },
  {
   "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
   "function": "bool gfxFcPlatformFontList::FindAndAddFamiliesLocked(",
   "kind": "add",
-  "form": "unknown",
-  "line": "  if (mStealthBundleOnly) {  // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
-  "function": "bool gfxFcPlatformFontList::FindAndAddFamiliesLocked(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    return gfxPlatformFontList::FindAndAddFamiliesLocked(",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
-  "function": "bool gfxFcPlatformFontList::FindAndAddFamiliesLocked(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "        aFontVisibilityProvider, aGeneric, aFamily, aOutput, aFlags, aStyle,",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
-  "function": "bool gfxFcPlatformFontList::FindAndAddFamiliesLocked(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "        aLanguage, aDevToCssSize);",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
-  "function": "bool gfxFcPlatformFontList::FindAndAddFamiliesLocked(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  }",
-  "test": ""
+  "form": "guard",
+  "line": "  if (gfxPlatformFontList::StealthBundleOnly()) return gfxPlatformFontList::FindAndAddFamiliesLocked(aFontVisibilityProvider, aGeneric, aFamily, aOutput, aFlags, aStyle, aLanguage, aDevToCssSize);  // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "wrapper:tests/test_bundle_font_names_e2e.py::test_src_local_resolves_a_bundled_postscript_name_and_not_a_host_only_name"
  },
  {
   "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
   "function": "void gfxFcPlatformFontList::AddGenericFonts(",
   "kind": "rewrite",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "form": "wrap-expression",
+  "line": "  if (StealthUsePrefFontList(this, usePrefFontList)) {  // STEALTH-HOOK(fingerprint/fonts/font-list)",
   "removed": "  if (usePrefFontList) {",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
-  "function": "void gfxFcPlatformFontList::AddGenericFonts(",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  if (usePrefFontList || mStealthBundleOnly) {",
-  "test": ""
+  "test": "gtest:StealthFontListHooks.UsePrefFontList"
  },
  {
   "file": "gfx/thebes/gfxPlatformFontList.cpp",
   "function": "",
   "kind": "add",
   "form": "registration",
-  "line": "#include \"StealthBundleFontList.h\"  // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": ""
+  "line": "#include \"StealthFontListHooks.h\"  // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "gtest:StealthFontListHooks.PublishCharacterMap"
  },
  {
   "file": "gfx/thebes/gfxPlatformFontList.cpp",
   "function": "gfxPlatformFontList::MemoryReporter::CollectReports(",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxPlatformFontList.cpp",
-  "function": "gfxPlatformFontList::MemoryReporter::CollectReports(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  StealthReportBundleFiles(FontListMallocSizeOf, aHandleReport, aData);",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxPlatformFontList.cpp",
-  "function": "gfxPlatformFontList::gfxPlatformFontList(bool aNeedFullnamePostscriptNames)",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxPlatformFontList.cpp",
-  "function": "gfxPlatformFontList::gfxPlatformFontList(bool aNeedFullnamePostscriptNames)",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  mStealthBundleOnly = true;",
-  "test": ""
+  "form": "anchor",
+  "line": "  StealthReportBundleFiles(aHandleReport, aData);  // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "gtest:StealthFcBundleFonts.ReportBundleFiles",
+  "anchor": "if (sizes.mLoaderSize) {...} (the font-loader report)",
+  "why": "the order of the reports of about:memory is the order of these statements; at the head of the function the bundle reports would come before Mozilla's"
  },
  {
   "file": "gfx/thebes/gfxPlatformFontList.cpp",
   "function": "already_AddRefed<gfxFont> gfxPlatformFontList::CommonFontFallback(",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "removed": "  gfxPlatform::GetPlatform()->GetCommonFallbackFonts(\n      aCh, aRunScript, aPresentation, defaultFallbacks);",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxPlatformFontList.cpp",
-  "function": "already_AddRefed<gfxFont> gfxPlatformFontList::CommonFontFallback(",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  StealthGetCommonFallbackFonts(mStealthBundleOnly, aCh, aRunScript,",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxPlatformFontList.cpp",
-  "function": "already_AddRefed<gfxFont> gfxPlatformFontList::CommonFontFallback(",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "                                aPresentation, defaultFallbacks);",
-  "test": ""
+  "kind": "add",
+  "form": "anchor",
+  "line": "  StealthReplaceCommonFallbackFonts(this, aCh, aRunScript, aPresentation, defaultFallbacks);  // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "gtest:StealthFcBundleFonts.CommonFallbackIsTheManifestListUnderBundleOnly",
+  "anchor": "gfxPlatform::GetPlatform()->GetCommonFallbackFonts(aCh, aRunScript, aPresentation, defaultFallbacks);",
+  "why": "it replaces defaultFallbacks, which Mozilla's code below reads, with the manifest list; a call that fills an out-array in the middle of a function fits none of guard, wrap-expression or wrap-function"
  },
  {
   "file": "gfx/thebes/gfxPlatformFontList.cpp",
   "function": "already_AddRefed<gfxFont> gfxPlatformFontList::GlobalFontFallback(",
   "kind": "rewrite",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "form": "wrap-expression",
+  "line": "  bool useCmaps = StealthUseCmaps(this, IsFontFamilyWhitelistActive()) ||  // STEALTH-HOOK(fingerprint/fonts/font-list)",
   "removed": "  bool useCmaps = IsFontFamilyWhitelistActive() ||",
-  "test": ""
+  "test": "gtest:StealthFontListHooks.UseCmaps"
  },
  {
   "file": "gfx/thebes/gfxPlatformFontList.cpp",
   "function": "already_AddRefed<gfxFont> gfxPlatformFontList::GlobalFontFallback(",
   "kind": "rewrite",
-  "form": "unknown",
-  "line": "  bool useCmaps = IsFontFamilyWhitelistActive() || mStealthBundleOnly ||",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxPlatformFontList.cpp",
-  "function": "already_AddRefed<gfxFont> gfxPlatformFontList::GlobalFontFallback(",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "        // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "removed": "        if (!family.IsFullyInitialized() &&\n            StaticPrefs::gfx_font_rendering_fallback_async() &&\n            !XRE_IsParentProcess()) {",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxPlatformFontList.cpp",
-  "function": "already_AddRefed<gfxFont> gfxPlatformFontList::GlobalFontFallback(",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "        if (!family.IsFullyInitialized() && MayDeferCmapLoading()) {",
-  "test": ""
+  "form": "wrap-expression",
+  "line": "            StealthMayDeferCmapLoading(this, StaticPrefs::gfx_font_rendering_fallback_async()) &&  // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "removed": "            StaticPrefs::gfx_font_rendering_fallback_async() &&",
+  "test": "gtest:StealthFontListHooks.MayDeferCmapLoading"
  },
  {
   "file": "gfx/thebes/gfxPlatformFontList.cpp",
   "function": "bool gfxPlatformFontList::FindAndAddFamiliesLocked(",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxPlatformFontList.cpp",
-  "function": "bool gfxPlatformFontList::FindAndAddFamiliesLocked(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  StealthApplyAlias(mStealthBundleOnly, key);",
-  "test": ""
+  "form": "anchor",
+  "line": "  StealthApplyAlias(this, key);  // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "gtest:StealthFontList.AliasIsIdentityWhenNotBundleOnly",
+  "anchor": "GenerateFontListKey(aFamily, key);",
+  "why": "it rewrites `key`, which that statement has just produced and the lookups below read"
  },
  {
   "file": "gfx/thebes/gfxPlatformFontList.cpp",
   "function": "bool gfxPlatformFontList::InitializeFamily(fontlist::Family* aFamily,",
   "kind": "add",
-  "form": "unknown",
-  "line": "  StealthLoadMissingCharacterMaps(  // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxPlatformFontList.cpp",
-  "function": "bool gfxPlatformFontList::InitializeFamily(fontlist::Family* aFamily,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "      list, aFamily, aLoadCmaps && mStealthBundleOnly,",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxPlatformFontList.cpp",
-  "function": "bool gfxPlatformFontList::InitializeFamily(fontlist::Family* aFamily,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "      [&](fontlist::Face* aFace) { return CreateFontEntry(aFace, aFamily); });",
-  "test": ""
+  "form": "anchor",
+  "line": "  StealthLoadMissingCharacterMaps(list, aFamily, aLoadCmaps);  // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "wrapper:tests/test_the_font_list_is_the_bundle_e2e.py::test_the_font_list_is_the_bundle_and_nothing_else",
+  "anchor": "the if/else that fills the missing cmaps of an initialized family (before `if (aLoadCmaps && aFamily->IsInitialized())`)",
+  "why": "it runs after BOTH branches of Mozilla's `if (!aFamily->IsInitialized())` and before SetupFamilyCharMap, which reads the cmaps it loads; the locals list and aFamily exist only there"
  },
  {
   "file": "gfx/thebes/gfxPlatformFontList.cpp",
   "function": "void gfxPlatformFontList::MaybeRemoveCmap(gfxCharacterMap* aCharMap,",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxPlatformFontList.cpp",
-  "function": "void gfxPlatformFontList::MaybeRemoveCmap(gfxCharacterMap* aCharMap,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  StealthSystemUIFamilies(aFamilies);",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxPlatformFontList.cpp",
-  "function": "void gfxPlatformFontList::MaybeRemoveCmap(gfxCharacterMap* aCharMap,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  return;",
-  "test": ""
+  "form": "guard",
+  "line": "  if (StealthSystemUIFamilies(aFamilies)) return;  // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "gtest:StealthFontList.SystemUiIsSegoeUi"
  },
  {
   "file": "gfx/thebes/gfxPlatformFontList.cpp",
   "function": "void gfxPlatformFontList::ResolveGenericFontNames(",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxPlatformFontList.cpp",
-  "function": "void gfxPlatformFontList::ResolveGenericFontNames(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  StealthPrependDeclaredGeneric(mStealthBundleOnly, aGenericType, langGroupStr,",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxPlatformFontList.cpp",
-  "function": "void gfxPlatformFontList::ResolveGenericFontNames(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "                                genericFamilies);",
-  "test": ""
+  "form": "anchor",
+  "line": "  StealthPrependDeclaredGeneric(this, aGenericType, langGroupStr, genericFamilies);  // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "gtest:StealthFontList.PrependGoesToIndexZeroOnlyUnderBundleOnly",
+  "anchor": "if (mFontPrefs->LookupNameList(prefName, value)) {...} (the generic font.name-list lookup)",
+  "why": "it changes genericFamilies, which GetFontFamiliesFromGenericFamilies reads below"
  },
  {
   "file": "gfx/thebes/gfxPlatformFontList.cpp",
   "function": "void gfxPlatformFontList::ResolveEmojiFontNames(",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxPlatformFontList.cpp",
-  "function": "void gfxPlatformFontList::ResolveEmojiFontNames(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  StealthPrependEmojiFamily(mStealthBundleOnly, genericFamilies);",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxPlatformFontList.h",
-  "function": "class gfxPlatformFontList : public gfxFontInfoLoader {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxPlatformFontList.h",
-  "function": "class gfxPlatformFontList : public gfxFontInfoLoader {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  bool MayDeferCmapLoading() const;",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxPlatformFontList.h",
-  "function": "class gfxPlatformFontList : public gfxFontInfoLoader {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  bool StealthBundleOnly() const;",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxPlatformFontList.h",
-  "function": "class gfxPlatformFontList : public gfxFontInfoLoader {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "                             nsCString& aPSName, nsCString& aFullName);",
-  "removed": "                             nsCString& aPSName, nsCString& aFullName) {\n    return false;\n  }",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxPlatformFontList.h",
-  "function": "class gfxPlatformFontList : public gfxFontInfoLoader {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxPlatformFontList.h",
-  "function": "class gfxPlatformFontList : public gfxFontInfoLoader {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "      MOZ_REQUIRES(mLock);  // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "removed": "      MOZ_REQUIRES(mLock) {}",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxPlatformFontList.h",
-  "function": "class gfxPlatformFontList : public gfxFontInfoLoader {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxPlatformFontList.h",
-  "function": "class gfxPlatformFontList : public gfxFontInfoLoader {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  void RecordFaceNamesFromTable(mozilla::fontlist::Family*, uint32_t,",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxPlatformFontList.h",
-  "function": "class gfxPlatformFontList : public gfxFontInfoLoader {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "                                const nsACString&, const nsCString&,",
-  "test": ""
- },
- {
-  "file": "gfx/thebes/gfxPlatformFontList.h",
-  "function": "class gfxPlatformFontList : public gfxFontInfoLoader {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "                                const char*, uint32_t) MOZ_REQUIRES(mLock);",
-  "test": ""
+  "form": "anchor",
+  "line": "  StealthPrependEmojiFamily(this, genericFamilies);  // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "gtest:StealthFontList.PrependGoesToIndexZeroOnlyUnderBundleOnly",
+  "anchor": "if (...) { ParseFontList(...) } (the emoji font.name-list lookup)",
+  "why": "it changes genericFamilies, which GetFontFamiliesFromGenericFamilies reads below"
  },
  {
   "file": "gfx/thebes/gfxPlatformFontList.h",
   "function": "class gfxPlatformFontList : public gfxFontInfoLoader {",
   "kind": "add",
   "form": "member",
-  "line": "  bool mStealthBundleOnly = false;  // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": ""
+  "line": "  bool MayDeferCmapLoading() const;  // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "gtest:StealthFcBundleFonts.FallbackNeverDefersUnderBundleOnly"
+ },
+ {
+  "file": "gfx/thebes/gfxPlatformFontList.h",
+  "function": "class gfxPlatformFontList : public gfxFontInfoLoader {",
+  "kind": "add",
+  "form": "member",
+  "line": "  bool StealthBundleOnly() const;  // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "gtest:StealthFcBundleFonts.FallbackNeverDefersUnderBundleOnly"
+ },
+ {
+  "file": "gfx/thebes/gfxPlatformFontList.h",
+  "function": "class gfxPlatformFontList : public gfxFontInfoLoader {",
+  "kind": "add",
+  "form": "guard",
+  "line": "    if (gfxPlatformFontList::StealthBundleOnly()) return StealthReadFaceNames(aFamily, aFace, aPSName, aFullName);  // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "wrapper:tests/test_bundle_font_names_e2e.py::test_src_local_resolves_a_bundled_postscript_name_and_not_a_host_only_name"
+ },
+ {
+  "file": "gfx/thebes/gfxPlatformFontList.h",
+  "function": "class gfxPlatformFontList : public gfxFontInfoLoader {",
+  "kind": "add",
+  "form": "member",
+  "line": "  bool StealthReadFaceNames(const mozilla::fontlist::Family* aFamily, const mozilla::fontlist::Face* aFace, nsCString& aPSName, nsCString& aFullName);  // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "wrapper:tests/test_bundle_font_names_e2e.py::test_src_local_resolves_a_bundled_postscript_name_and_not_a_host_only_name"
+ },
+ {
+  "file": "gfx/thebes/gfxPlatformFontList.h",
+  "function": "class gfxPlatformFontList : public gfxFontInfoLoader {",
+  "kind": "add",
+  "form": "member",
+  "line": "  void RecordFaceNamesFromTable(mozilla::fontlist::Family*, uint32_t, const nsACString&, const nsCString&, const char*, uint32_t) MOZ_REQUIRES(mLock);  // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "wrapper:tests/test_bundle_font_names_e2e.py::test_src_local_resolves_a_bundled_postscript_name_and_not_a_host_only_name"
+ },
+ {
+  "file": "gfx/thebes/gfxPlatformFontList.h",
+  "function": "class gfxPlatformFontList : public gfxFontInfoLoader {",
+  "kind": "add",
+  "form": "member",
+  "line": "  void StealthLoadMissingCharacterMaps(mozilla::fontlist::FontList* aList, mozilla::fontlist::Family* aFamily, bool aLoadCmaps);  // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "wrapper:tests/test_the_font_list_is_the_bundle_e2e.py::test_the_font_list_is_the_bundle_and_nothing_else"
+ },
+ {
+  "file": "gfx/thebes/gfxPlatformFontList.h",
+  "function": "class gfxPlatformFontList : public gfxFontInfoLoader {",
+  "kind": "rewrite",
+  "form": "wrap-function",
+  "line": "  virtual void ReadFaceNamesForFamily_Mozilla(mozilla::fontlist::Family* aFamily,  // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "removed": "  virtual void ReadFaceNamesForFamily(mozilla::fontlist::Family* aFamily,",
+  "test": "wrapper:tests/test_bundle_font_names_e2e.py::test_src_local_resolves_a_bundled_postscript_name_and_not_a_host_only_name"
+ },
+ {
+  "file": "gfx/thebes/gfxPlatformFontList.h",
+  "function": "class gfxPlatformFontList : public gfxFontInfoLoader {",
+  "kind": "add",
+  "form": "member",
+  "line": "  virtual void ReadFaceNamesForFamily(mozilla::fontlist::Family* aFamily, bool aNeedFullnamePostscriptNames) MOZ_REQUIRES(mLock);  // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "wrapper:tests/test_bundle_font_names_e2e.py::test_src_local_resolves_a_bundled_postscript_name_and_not_a_host_only_name"
+ },
+ {
+  "file": "gfx/thebes/gfxPlatformFontList.h",
+  "function": "class gfxPlatformFontList : public gfxFontInfoLoader {",
+  "kind": "add",
+  "form": "member",
+  "line": "  bool mStealthBundleOnly = true;  // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "gtest:StealthFcBundleFonts.FallbackNeverDefersUnderBundleOnly"
  }
 ]

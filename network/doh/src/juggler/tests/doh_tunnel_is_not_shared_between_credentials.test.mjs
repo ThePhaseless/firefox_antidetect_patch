@@ -110,12 +110,16 @@ test('the TRR connection info carries the origin attributes of the lookup contex
   const text = fs.readFileSync(path.join(TREE, 'netwerk/protocol/http/TRRServiceChannel.cpp'), 'utf8');
   const begin = text.slice(text.indexOf('nsresult TRRServiceChannel::BeginConnect()'));
   const body = begin.slice(0, begin.indexOf('\n}\n'));
-  // The attributes of the lookup's context are computed once, from the load info,
-  // and given to the connection info and to the alternative service mapping in
-  // place of the default ones (two Mozilla lines rewritten, registered).
-  assert.match(body, /OriginAttributes stealthAttrs = StealthTRRContextOfLoadInfo\(mLoadInfo\)\.valueOr\(OriginAttributes\(\)\);  \/\/ STEALTH-HOOK\(network\/doh\)\n/);
-  assert.match(body, /new nsHttpConnectionInfo\(\s*host, port, ""_ns, mUsername, proxyInfo, stealthAttrs, isHttps\);  \/\/ STEALTH-HOOK\(network\/doh\)/);
-  assert.match(body, /mapping->GetConnectionInfo\(getter_AddRefs\(mConnectionInfo\), proxyInfo,\s+stealthAttrs\);  \/\/ STEALTH-HOOK\(network\/doh\)/);
-  // The default OriginAttributes() no longer builds the connection info.
+  // The attributes of the lookup's context, from the load info of the channel, are given by one function of ours to the
+  // connection info and to the alternative service mapping, in place of the default ones (two Mozilla lines rewritten).
+  assert.match(body, /new nsHttpConnectionInfo\(\s*host, port, ""_ns, mUsername, proxyInfo, StealthTRRConnectionAttributes\(this, OriginAttributes\(\)\), isHttps\);  \/\/ STEALTH-HOOK\(network\/doh\)/);
+  assert.match(body, /mapping->GetConnectionInfo\(getter_AddRefs\(mConnectionInfo\), proxyInfo,\s+StealthTRRConnectionAttributes\(this, OriginAttributes\(\)\)\);  \/\/ STEALTH-HOOK\(network\/doh\)/);
+  // The only connection infos of the channel are those two, and none is made with the default attributes alone.
+  assert.equal(body.split('new nsHttpConnectionInfo(').length - 1, 1);
   assert.doesNotMatch(body, /proxyInfo, OriginAttributes\(\), isHttps\)/);
+  assert.doesNotMatch(body, /stealthAttrs/);
+  const header = fs.readFileSync(path.join(TREE, 'netwerk/ipc/StealthTRRContext.h'), 'utf8');
+  assert.match(header, /OriginAttributes StealthTRRConnectionAttributes\(\s*nsIChannel\* aChannel, const OriginAttributes& aUpstream\);/);
+  const code = fs.readFileSync(path.join(TREE, 'netwerk/ipc/StealthTRRContext.cpp'), 'utf8');
+  assert.match(code, /return StealthTRRContextOfLoadInfo\(loadInfo\)\.valueOr\(aUpstream\);/);
 });

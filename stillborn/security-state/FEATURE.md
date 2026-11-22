@@ -97,8 +97,10 @@ drive are never created.
 
 ## Hooks in Mozilla files
 
-- `security/manager/ssl/RemoteSecuritySettings.sys.mjs` (RemoteSecuritySettings.init(), first statements, already-hook): early return, always: none of the three clients of the bucket security-state is created. Mozilla's lines are untouched.
-- `security/manager/ssl/moz.build` (after the DIRS list, already-hook): builds our directory, which registers the profile-after-change component and installs the module.
+- `security/manager/ssl/RemoteSecuritySettings.sys.mjs` (guard, first statement of `RemoteSecuritySettings.init()`): `if (ChromeUtils.importESModule("resource://gre/modules/psm/StealthSecurityState.sys.mjs").StealthSecurityState.ownsSync()) return this;`. `ownsSync()` is always true, so none of the three clients of the bucket security-state is created and no client, sync observer or poll-end observer is registered; it runs before the `_initialized` check, as the import and the check did before. The module is imported in line because the `lazy` list at the top of Mozilla's file cannot take a line of ours. `ownsSync` keeps its name (G41; the contract tool flags it as C10).
+- `security/manager/ssl/moz.build` (registration, after the DIRS list): `DIRS += ["stealth"]`. The directory registers the profile-after-change component and installs the module; without it the gate cases `never_asked` and `generate` fail.
+
+The only entry that makes a client of the bucket is `init()`: `juggler/tests/the_client_gets_nothing_before_cert_storage_has_read_the_security_state.test.mjs` asserts that each of Mozilla's three constructions (`RemoteSettings("onecrl"`, `new IntermediatePreloads(`, `new CRLiteFilters(`) exists once, inside `init()` and below the guard, and that the file makes no other `RemoteSettings` client; a client that Mozilla adds outside `init()` makes it red. The behaviour is proved by the `poller` case of `run_stealth_security_state_gate.py`: `init()` leaves the three clients null and a poll of a fake server that lists them asks for none (without the guard the clients are created and the case is red).
 
 ## Our own files
 

@@ -5,6 +5,7 @@
 #include "mozilla/net/StealthBranding.h"
 
 #include "StealthDeclarationGate.h"
+#include "SubstitutingProtocolHandler.h"
 #include "mozilla/StaticMutex.h"
 #include "mozilla/StaticPtr.h"
 #include "mozilla/StaticPrefs_zoom.h"
@@ -81,6 +82,11 @@ already_AddRefed<nsIFile> StealthBrandingDeclaredArchive() {
 }
 
 void StealthBrandingRegisterPackage(const nsACString& aPackage, nsIURI* aBase) {
+  if (!aBase) {
+    // A package with no content directory in this process (a content process is
+    // told only the directories it can resolve): nothing to remember.
+    return;
+  }
   if (!aPackage.Equals(kBrandingPackage)) {
     return;
   }
@@ -95,6 +101,15 @@ void StealthBrandingRegisterPackage(const nsACString& aPackage, nsIURI* aBase) {
                      "stealth: the branding package is not a directory");
   StaticMutexAutoLock lock(sMutex);
   sBrandingDir = new nsCString(branding);
+}
+
+bool StealthBrandingRecordedDirectory(nsACString& aDirectory) {
+  StaticMutexAutoLock lock(sMutex);
+  if (!sBrandingDir) {
+    return false;
+  }
+  aDirectory.Assign(*sBrandingDir);
+  return true;
 }
 
 nsresult StealthBrandingRedirect(nsACString& aResolvedSpec) {
@@ -150,12 +165,15 @@ nsresult StealthBrandingRedirect(nsACString& aResolvedSpec) {
   return NS_OK;
 }
 
-nsresult StealthBrandingResolveChromeURL(const nsACString& aPath,
-                                         nsIURI* aBase, nsIURI** aResult) {
+nsresult StealthBrandingChromeURL(nsresult aRv, nsIURI** aResult) {
+  if (NS_FAILED(aRv)) {
+    return aRv;
+  }
+  // Take the URI the registry resolved; *aResult is written again below, or
+  // left empty on failure, as it is when the registry itself fails.
+  nsCOMPtr<nsIURI> resolved = dont_AddRef(*aResult);
+  *aResult = nullptr;
   nsresult rv;
-  nsCOMPtr<nsIURI> resolved;
-  rv = NS_NewURI(getter_AddRefs(resolved), aPath, nullptr, aBase);
-  NS_ENSURE_SUCCESS(rv, rv);
   nsAutoCString spec;
   rv = resolved->GetSpec(spec);
   NS_ENSURE_SUCCESS(rv, rv);
@@ -167,6 +185,15 @@ nsresult StealthBrandingResolveChromeURL(const nsACString& aPath,
     return NS_OK;
   }
   return NS_NewURI(aResult, declared);
+}
+
+nsresult SubstitutingProtocolHandler::ResolveURI(nsIURI* uri,
+                                                 nsACString& result) {
+  nsresult rv = ResolveURI_Mozilla(uri, result);
+  if (NS_FAILED(rv)) {
+    return rv;
+  }
+  return StealthBrandingRedirect(result);
 }
 
 }  // namespace mozilla::net

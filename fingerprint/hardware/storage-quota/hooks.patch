@@ -1,22 +1,22 @@
 diff --git a/dom/quota/OriginOperations.cpp b/dom/quota/OriginOperations.cpp
-index 175390050cc8c1b8e2e04f5f7c9c8a5da467f43d..45aea35955fa5e481d242a12c65b015b38351765 100644
+index 175390050cc8c1b8e2e04f5f7c9c8a5da467f43d..3b509448efaa2aec7e49e9932f344e23e2a3dcd2 100644
 --- a/dom/quota/OriginOperations.cpp
 +++ b/dom/quota/OriginOperations.cpp
-@@ -18,6 +18,7 @@
- #include "OriginParser.h"
- #include "QuotaRequestBase.h"
- #include "ResolvableNormalOriginOp.h"
+@@ -70,6 +70,8 @@
+ #include "prthread.h"
+ #include "prtime.h"
+ 
 +#include "StealthQuotaEstimate.h"  // STEALTH-HOOK(fingerprint/hardware/storage-quota)
- #include "mozilla/Assertions.h"
- #include "mozilla/Atomics.h"
- #include "mozilla/Maybe.h"
-@@ -3854,7 +3855,8 @@ void EstimateOp::GetResponse(RequestResponse& aResponse) {
++
+ namespace mozilla::dom::quota {
+ 
+ namespace {
+@@ -3854,7 +3856,7 @@ void EstimateOp::GetResponse(RequestResponse& aResponse) {
    EstimateResponse estimateResponse;
  
    estimateResponse.usage() = mUsageAndLimit.first;
 -  estimateResponse.limit() = mUsageAndLimit.second;
-+  estimateResponse.limit() =
-+      StealthEstimateLimit(mUsageAndLimit.second, mScope == Scope::Origin);  // STEALTH-HOOK(fingerprint/hardware/storage-quota)
++  estimateResponse.limit() = StealthEstimateLimit(mScope, mUsageAndLimit.second);  // STEALTH-HOOK(fingerprint/hardware/storage-quota)
  
    aResponse = estimateResponse;
  }

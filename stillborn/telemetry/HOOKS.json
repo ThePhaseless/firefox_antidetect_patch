@@ -5,74 +5,17 @@
   "kind": "add",
   "form": "registration",
   "line": "import * as StealthPingsender from \"resource://gre/modules/StealthPingsender.sys.mjs\"; // STEALTH-HOOK(stillborn/telemetry)",
-  "test": ""
+  "test": "node:juggler/tests/pingsender_route_reaches_the_channel.test.mjs#a ping to a host the proxy governs carries the answer to its 407"
  },
  {
   "file": "toolkit/components/telemetry/app/TelemetrySend.sys.mjs",
-  "function": "import { ServiceRequest } from \"resource://gre/modules/ServiceRequest.sys.mjs\";",
-  "kind": "add",
-  "form": "unknown",
-  "line": "export { PINGSENDER_ROUTE_ENV } from \"resource://gre/modules/StealthPingsender.sys.mjs\"; // STEALTH-HOOK(stillborn/telemetry)",
-  "test": ""
- },
- {
-  "file": "toolkit/components/telemetry/app/TelemetrySend.sys.mjs",
-  "function": "export function gzipCompressString(string) {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "export function sendStandalonePing(",
-  "removed": "export function sendStandalonePing(endpoint, payload, extraHeaders = {}) {",
-  "test": ""
- },
- {
-  "file": "toolkit/components/telemetry/app/TelemetrySend.sys.mjs",
-  "function": "export function gzipCompressString(string) {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  endpoint,",
-  "test": ""
- },
- {
-  "file": "toolkit/components/telemetry/app/TelemetrySend.sys.mjs",
-  "function": "export function gzipCompressString(string) {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  payload,",
-  "test": ""
- },
- {
-  "file": "toolkit/components/telemetry/app/TelemetrySend.sys.mjs",
-  "function": "export function gzipCompressString(string) {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  extraHeaders = {},",
-  "test": ""
- },
- {
-  "file": "toolkit/components/telemetry/app/TelemetrySend.sys.mjs",
-  "function": "export function gzipCompressString(string) {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  notificationCallbacks = null // STEALTH-HOOK(stillborn/telemetry)",
-  "test": ""
- },
- {
-  "file": "toolkit/components/telemetry/app/TelemetrySend.sys.mjs",
-  "function": "export function gzipCompressString(string) {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": ") {",
-  "test": ""
- },
- {
-  "file": "toolkit/components/telemetry/app/TelemetrySend.sys.mjs",
-  "function": "export function gzipCompressString(string) {",
+  "function": "export function sendStandalonePing(endpoint, payload, extraHeaders = {}) {",
   "kind": "add",
   "form": "anchor",
-  "line": "    StealthPingsender.attachCallbacks(request, notificationCallbacks); // STEALTH-HOOK(stillborn/telemetry)",
-  "test": "",
-  "anchor": "",
-  "why": ""
+  "line": "    StealthPingsender.attachRoute(request, endpoint); // STEALTH-HOOK(stillborn/telemetry)",
+  "test": "node:juggler/tests/pingsender_route_reaches_the_channel.test.mjs#a ping to a host the proxy governs carries the answer to its 407",
+  "anchor": "request.open(\"POST\", endpoint, true);",
+  "why": "the channel exists only after open() and XMLHttpRequest takes the channel's callbacks at send(); a guard cannot (request is a local of Mozilla's executor) and a wrap cannot (open() returns undefined)"
  },
  {
   "file": "toolkit/components/telemetry/app/TelemetrySend.sys.mjs",
@@ -80,7 +23,11 @@
   "kind": "add",
   "form": "unknown",
   "line": "    ({ exeName, params } = StealthPingsender.invocation()); // STEALTH-HOOK(stillborn/telemetry)",
-  "test": ""
+  "test": "node:juggler/tests/pingsender_route_lives_in_our_file.test.mjs#the program and its arguments",
+  "anchor": "the closing brace of Mozilla's `if (lazy.NimbusFeatures.pingsender.getVariable(\"backgroundTaskEnabled\")) {` block",
+  "why": "it assigns Mozilla's locals exeName and params after Mozilla's choice and before their use; no guard or wrap can reach a value of Mozilla's locals",
+  "exception": "stays as today: declaring toolkit.telemetry.shutdownPingSender.backgroundtask.enabled in firefox.js would make the program depend on a pref that can change (PM-DECISIONS, stillborn/telemetry)",
+  "pm": "approvato"
  },
  {
   "file": "toolkit/components/telemetry/app/TelemetrySend.sys.mjs",
@@ -89,7 +36,9 @@
   "form": "unknown",
   "line": "    StealthPingsender.runAsync(process, params, observer); // STEALTH-HOOK(stillborn/telemetry)",
   "removed": "    process.runAsync(params, params.length, observer);",
-  "test": ""
+  "test": "node:juggler/tests/no_ping_leaves_before_the_session_proxy_is_decided.test.mjs#undecided: the pingsender is not started and the road is never put in the environment",
+  "exception": "G35 (PM-VERDICT stillborn/telemetry, 22/11): the line stays as on the base, in place of Mozilla's call of process.runAsync",
+  "pm": "approvato"
  },
  {
   "file": "toolkit/components/telemetry/moz.build",
@@ -97,7 +46,7 @@
   "kind": "add",
   "form": "registration",
   "line": "EXTRA_JS_MODULES += [\"app/StealthPingsender.sys.mjs\"]  # STEALTH-HOOK(stillborn/telemetry)",
-  "test": ""
+  "test": "wrapper:tests/test_the_shutdown_ping_leaves_by_the_background_task_e2e.py::test_the_shutdown_ping_is_sent_by_the_background_task_and_not_by_the_host_program"
  },
  {
   "file": "toolkit/components/telemetry/moz.build",
@@ -105,7 +54,7 @@
   "kind": "add",
   "form": "registration",
   "line": "EXTRA_JS_MODULES.backgroundtasks += [\"pings/StealthPingsenderRoute.sys.mjs\"]  # STEALTH-HOOK(stillborn/telemetry)",
-  "test": ""
+  "test": "wrapper:tests/test_the_shutdown_ping_leaves_by_the_background_task_e2e.py::test_the_shutdown_ping_is_sent_by_the_background_task_and_not_by_the_host_program"
  },
  {
   "file": "toolkit/components/telemetry/pings/BackgroundTask_pingsender.sys.mjs",
@@ -113,7 +62,7 @@
   "kind": "add",
   "form": "registration",
   "line": "import * as StealthRoute from \"resource://gre/modules/backgroundtasks/StealthPingsenderRoute.sys.mjs\"; // STEALTH-HOOK(stillborn/telemetry)",
-  "test": ""
+  "test": "node:juggler/tests/pingsender_route_reaches_the_channel.test.mjs#a ping to a host the proxy governs carries the answer to its 407"
  },
  {
   "file": "toolkit/components/telemetry/pings/BackgroundTask_pingsender.sys.mjs",
@@ -121,15 +70,6 @@
   "kind": "add",
   "form": "notice",
   "line": "  StealthRoute.takeSessionRoute(); // STEALTH-HOOK(stillborn/telemetry)",
-  "test": ""
- },
- {
-  "file": "toolkit/components/telemetry/pings/BackgroundTask_pingsender.sys.mjs",
-  "function": "async function sendPing(endpoint, path) {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  }, StealthRoute.pingAuthFor(hostname)); // STEALTH-HOOK(stillborn/telemetry)",
-  "removed": "  });",
-  "test": ""
+  "test": "node:juggler/tests/pingsender_route_reaches_the_channel.test.mjs#without the road in the environment nothing is sent (it fails closed)"
  }
 ]

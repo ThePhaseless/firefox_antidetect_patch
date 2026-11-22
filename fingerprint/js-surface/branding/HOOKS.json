@@ -5,161 +5,69 @@
   "kind": "add",
   "form": "registration",
   "line": "#include \"mozilla/net/StealthBranding.h\"  // STEALTH-HOOK(fingerprint/js-surface/branding)",
-  "test": ""
+  "test": "gtest:StealthBranding.TheChromeRegistryWrapKeepsOrRebuildsTheResolvedUri"
  },
  {
   "file": "chrome/nsChromeRegistry.cpp",
   "function": "nsChromeRegistry::ConvertChromeURL(nsIURI* aChromeURI, nsIURI** aResult) {",
   "kind": "rewrite",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/js-surface/branding)",
+  "form": "wrap-expression",
+  "line": "  return mozilla::net::StealthBrandingChromeURL(NS_NewURI(aResult, path, nullptr, baseURI), aResult);  // STEALTH-HOOK(fingerprint/js-surface/branding)",
   "removed": "  return NS_NewURI(aResult, path, nullptr, baseURI);",
-  "test": ""
- },
- {
-  "file": "chrome/nsChromeRegistry.cpp",
-  "function": "nsChromeRegistry::ConvertChromeURL(nsIURI* aChromeURI, nsIURI** aResult) {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  return mozilla::net::StealthBrandingResolveChromeURL(path, baseURI, aResult);",
-  "test": ""
+  "test": "gtest:StealthBranding.TheChromeRegistryServesTheDeclaredJarWhenItHasBranding"
  },
  {
   "file": "chrome/nsChromeRegistryChrome.cpp",
   "function": "",
   "kind": "add",
   "form": "registration",
-  "line": "#include \"mozilla/net/StealthBranding.h\"",
-  "test": ""
+  "line": "#include \"mozilla/net/StealthBranding.h\"  // STEALTH-HOOK(fingerprint/js-surface/branding)",
+  "test": "gtest:StealthBranding.TheChromeRegistryServesTheDeclaredJarWhenItHasBranding"
  },
  {
   "file": "chrome/nsChromeRegistryChrome.cpp",
   "function": "void nsChromeRegistryChrome::ManifestContent(ManifestProcessingContext& cx,",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH: where the branding directory is, for the declared-branding",
-  "test": ""
- },
- {
-  "file": "chrome/nsChromeRegistryChrome.cpp",
-  "function": "void nsChromeRegistryChrome::ManifestContent(ManifestProcessingContext& cx,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  // redirect. StealthBranding.h.",
-  "test": ""
- },
- {
-  "file": "chrome/nsChromeRegistryChrome.cpp",
-  "function": "void nsChromeRegistryChrome::ManifestContent(ManifestProcessingContext& cx,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  mozilla::net::StealthBrandingRegisterPackage(packageName, entry->baseURI);",
-  "test": ""
+  "form": "anchor",
+  "line": "  mozilla::net::StealthBrandingRegisterPackage(packageName, entry->baseURI);  // STEALTH-HOOK(fingerprint/js-surface/branding)",
+  "test": "gtest:StealthBranding.TheChromeRegistryServesTheDeclaredJarWhenItHasBranding",
+  "anchor": "`entry->flags = flags;` in nsChromeRegistryChrome::ManifestContent",
+  "why": "it needs entry->baseURI, which the two statements above produce ('resolved' is moved into the entry): a guard in the head or a wrap of the function cannot see it, and the hook only observes"
  },
  {
   "file": "chrome/nsChromeRegistryContent.cpp",
   "function": "",
   "kind": "add",
   "form": "registration",
-  "line": "#include \"mozilla/net/StealthBranding.h\"",
-  "test": ""
+  "line": "#include \"mozilla/net/StealthBranding.h\"  // STEALTH-HOOK(fingerprint/js-surface/branding)",
+  "test": "gtest:StealthBranding.ThePackageRegistrationKeepsOnlyBrandingWithADirectory"
  },
  {
   "file": "chrome/nsChromeRegistryContent.cpp",
   "function": "void nsChromeRegistryContent::RegisterPackage(const ChromePackage& aPackage) {",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/js-surface/branding)",
-  "test": ""
- },
- {
-  "file": "chrome/nsChromeRegistryContent.cpp",
-  "function": "void nsChromeRegistryContent::RegisterPackage(const ChromePackage& aPackage) {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  if (content) {",
-  "test": ""
- },
- {
-  "file": "chrome/nsChromeRegistryContent.cpp",
-  "function": "void nsChromeRegistryContent::RegisterPackage(const ChromePackage& aPackage) {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    mozilla::net::StealthBrandingRegisterPackage(aPackage.package, content);",
-  "test": ""
- },
- {
-  "file": "chrome/nsChromeRegistryContent.cpp",
-  "function": "void nsChromeRegistryContent::RegisterPackage(const ChromePackage& aPackage) {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  }",
-  "test": ""
+  "form": "anchor",
+  "line": "  mozilla::net::StealthBrandingRegisterPackage(aPackage.package, content);  // STEALTH-HOOK(fingerprint/js-surface/branding)",
+  "test": "gtest:StealthBranding.ThePackageRegistrationKeepsOnlyBrandingWithADirectory",
+  "anchor": "the `if (NS_FAILED(rv)) return;` block of the skin base URI in nsChromeRegistryContent::RegisterPackage (the line before MakeUnique<PackageEntry>)",
+  "why": "it needs the local `content` URI the three NS_NewURI blocks above produce, before it is moved into the entry; no argument of the function carries it"
  },
  {
   "file": "netwerk/protocol/res/SubstitutingProtocolHandler.cpp",
-  "function": "",
-  "kind": "add",
-  "form": "registration",
-  "line": "#include \"mozilla/net/StealthBranding.h\"",
-  "test": ""
- },
- {
-  "file": "netwerk/protocol/res/SubstitutingProtocolHandler.cpp",
-  "function": "nsresult SubstitutingProtocolHandler::ResolveURI(nsIURI* uri,",
+  "function": "nsresult SubstitutingProtocolHandler::HasSubstitution(",
   "kind": "rewrite",
-  "form": "unknown",
-  "line": "    // STEALTH-HOOK(fingerprint/js-surface/branding)",
-  "removed": "    return NS_OK;",
-  "test": ""
+  "form": "wrap-function",
+  "line": "nsresult SubstitutingProtocolHandler::ResolveURI_Mozilla(nsIURI* uri,  // STEALTH-HOOK(fingerprint/js-surface/branding)",
+  "removed": "nsresult SubstitutingProtocolHandler::ResolveURI(nsIURI* uri,",
+  "test": "gtest:StealthBranding.TheResourceWayAndTheChromeWayGiveTheSameJar"
  },
  {
-  "file": "netwerk/protocol/res/SubstitutingProtocolHandler.cpp",
-  "function": "nsresult SubstitutingProtocolHandler::ResolveURI(nsIURI* uri,",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    return StealthBrandingRedirect(result);",
-  "test": ""
- },
- {
-  "file": "netwerk/protocol/res/SubstitutingProtocolHandler.cpp",
-  "function": "nsresult SubstitutingProtocolHandler::ResolveURI(nsIURI* uri,",
+  "file": "netwerk/protocol/res/SubstitutingProtocolHandler.h",
+  "function": "class SubstitutingProtocolHandler {",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/js-surface/branding)",
-  "test": ""
- },
- {
-  "file": "netwerk/protocol/res/SubstitutingProtocolHandler.cpp",
-  "function": "nsresult SubstitutingProtocolHandler::ResolveURI(nsIURI* uri,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  rv = StealthBrandingRedirect(result);",
-  "test": ""
- },
- {
-  "file": "netwerk/protocol/res/SubstitutingProtocolHandler.cpp",
-  "function": "nsresult SubstitutingProtocolHandler::ResolveURI(nsIURI* uri,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  if (NS_FAILED(rv)) {",
-  "test": ""
- },
- {
-  "file": "netwerk/protocol/res/SubstitutingProtocolHandler.cpp",
-  "function": "nsresult SubstitutingProtocolHandler::ResolveURI(nsIURI* uri,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    return rv;",
-  "test": ""
- },
- {
-  "file": "netwerk/protocol/res/SubstitutingProtocolHandler.cpp",
-  "function": "nsresult SubstitutingProtocolHandler::ResolveURI(nsIURI* uri,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  }",
-  "test": ""
+  "form": "wrap-function",
+  "line": "  nsresult ResolveURI_Mozilla(nsIURI* aResURI, nsACString& aResult);  // STEALTH-HOOK(fingerprint/js-surface/branding)",
+  "test": "gtest:StealthBranding.TheResourceWayAndTheChromeWayGiveTheSameJar"
  },
  {
   "file": "netwerk/protocol/res/moz.build",
@@ -167,7 +75,7 @@
   "kind": "add",
   "form": "registration",
   "line": "EXPORTS.mozilla.net += [\"StealthBranding.h\"]  # STEALTH-HOOK(fingerprint/js-surface/branding)",
-  "test": ""
+  "test": "gtest:StealthBranding.TheDeclaredArchiveReplacesTheBrandingDirectoryAsJar"
  },
  {
   "file": "netwerk/protocol/res/moz.build",
@@ -175,79 +83,41 @@
   "kind": "add",
   "form": "registration",
   "line": "UNIFIED_SOURCES += [\"StealthBranding.cpp\"]  # STEALTH-HOOK(fingerprint/js-surface/branding)",
-  "test": ""
+  "test": "gtest:StealthBranding.TheDeclaredArchiveReplacesTheBrandingDirectoryAsJar"
+ },
+ {
+  "file": "netwerk/protocol/res/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "TEST_DIRS += [\"gtest\"]  # STEALTH-HOOK(fingerprint/js-surface/branding)",
+  "test": "gtest:StealthBranding.TheDeclaredArchiveReplacesTheBrandingDirectoryAsJar"
  },
  {
   "file": "security/sandbox/linux/broker/SandboxBrokerPolicyFactory.cpp",
   "function": "",
   "kind": "add",
   "form": "registration",
-  "line": "#include \"mozilla/net/StealthBranding.h\"",
-  "test": ""
+  "line": "#include \"StealthLinuxSandboxBranding.h\"  // STEALTH-HOOK(fingerprint/js-surface/branding)",
+  "test": "gtest:StealthBranding.SandboxPolicyAllowsTheDeclaredArchive"
  },
  {
   "file": "security/sandbox/linux/broker/SandboxBrokerPolicyFactory.cpp",
   "function": "void SandboxBrokerPolicyFactory::InitContentPolicy() {",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/js-surface/branding)",
-  "test": ""
+  "form": "anchor",
+  "line": "  StealthBrandingAddReadRule(policy);  // STEALTH-HOOK(fingerprint/js-surface/branding)",
+  "test": "gtest:StealthBranding.SandboxPolicyAllowsTheDeclaredArchive",
+  "anchor": "`AddDynamicPathList(policy, \"security.sandbox.content.read_path_whitelist\", rdonly);` in SandboxBrokerPolicyFactory::InitContentPolicy",
+  "why": "the rule is added to the local `policy` built at the top of InitContentPolicy, between two of Mozilla's rule groups (the order of the rules does not change); a guard in the head would see an empty policy, a wrap has no value to alter"
  },
  {
-  "file": "security/sandbox/linux/broker/SandboxBrokerPolicyFactory.cpp",
-  "function": "void SandboxBrokerPolicyFactory::InitContentPolicy() {",
+  "file": "security/sandbox/linux/gtest/moz.build",
+  "function": "UNIFIED_SOURCES = [",
   "kind": "add",
-  "form": "unknown",
-  "line": "  if (nsCOMPtr<nsIFile> branding =",
-  "test": ""
- },
- {
-  "file": "security/sandbox/linux/broker/SandboxBrokerPolicyFactory.cpp",
-  "function": "void SandboxBrokerPolicyFactory::InitContentPolicy() {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "          mozilla::net::StealthBrandingDeclaredArchive()) {",
-  "test": ""
- },
- {
-  "file": "security/sandbox/linux/broker/SandboxBrokerPolicyFactory.cpp",
-  "function": "void SandboxBrokerPolicyFactory::InitContentPolicy() {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    nsAutoCString brandingPath;",
-  "test": ""
- },
- {
-  "file": "security/sandbox/linux/broker/SandboxBrokerPolicyFactory.cpp",
-  "function": "void SandboxBrokerPolicyFactory::InitContentPolicy() {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    if (NS_SUCCEEDED(branding->GetNativePath(brandingPath))) {",
-  "test": ""
- },
- {
-  "file": "security/sandbox/linux/broker/SandboxBrokerPolicyFactory.cpp",
-  "function": "void SandboxBrokerPolicyFactory::InitContentPolicy() {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "      policy->AddPath(rdonly, brandingPath.get());",
-  "test": ""
- },
- {
-  "file": "security/sandbox/linux/broker/SandboxBrokerPolicyFactory.cpp",
-  "function": "void SandboxBrokerPolicyFactory::InitContentPolicy() {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    }",
-  "test": ""
- },
- {
-  "file": "security/sandbox/linux/broker/SandboxBrokerPolicyFactory.cpp",
-  "function": "void SandboxBrokerPolicyFactory::InitContentPolicy() {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  }",
-  "test": ""
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"TestStealthBrandingPolicy.cpp\"]  # STEALTH-HOOK(fingerprint/js-surface/branding)",
+  "test": "gtest:StealthBranding.SandboxPolicyAllowsTheDeclaredArchive"
  },
  {
   "file": "security/sandbox/win/src/sandboxbroker/sandboxBroker.cpp",
@@ -255,22 +125,16 @@
   "kind": "add",
   "form": "registration",
   "line": "#include \"StealthSandboxBranding.h\"  // STEALTH-HOOK(fingerprint/js-surface/branding)",
-  "test": ""
+  "test": "wrapper:tests/test_the_branding_a_page_loads_is_the_declared_archive_e2e.py::test_the_branding_a_page_loads_is_the_declared_archive"
  },
  {
   "file": "security/sandbox/win/src/sandboxbroker/sandboxBroker.cpp",
   "function": "void SandboxBroker::SetSecurityLevelForContentProcess(int32_t aSandboxLevel,",
   "kind": "add",
-  "form": "unknown",
-  "line": "    // STEALTH-HOOK(fingerprint/js-surface/branding)",
-  "test": ""
- },
- {
-  "file": "security/sandbox/win/src/sandboxbroker/sandboxBroker.cpp",
-  "function": "void SandboxBroker::SetSecurityLevelForContentProcess(int32_t aSandboxLevel,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    AddDeclaredBrandingReadRule(config);",
-  "test": ""
+  "form": "anchor",
+  "line": "    StealthBrandingAddReadRule(config);  // STEALTH-HOOK(fingerprint/js-surface/branding)",
+  "test": "wrapper:tests/test_the_branding_a_page_loads_is_the_declared_archive_e2e.py::test_the_branding_a_page_loads_is_the_declared_archive",
+  "anchor": "the `AddCachedDirRule(config, sandbox::FileSemantics::kAllowReadonly, sProfileDir, u\"\\chrome\\*\"_ns);` rule in SandboxBroker::SetSecurityLevelForContentProcess",
+  "why": "it adds a rule to the local `config` inside the `else` branch (sandbox level != 1), and the order of the rules in the configuration must not change; a guard in the head would run outside that branch"
  }
 ]

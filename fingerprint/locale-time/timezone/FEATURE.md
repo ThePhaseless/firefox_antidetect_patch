@@ -1,64 +1,64 @@
 # fingerprint/locale-time/timezone
 
-Category: other, spoof
+Category: spoof
 Prefs: juggler.locale.override, juggler.timezone.override
-Test: TODO
+Test: wrapper:tests/test_context_locale_e2e.py::test_a_context_locale_reaches_navigator_intl_and_the_header, wrapper:tests/test_a_launch_and_a_context_timezone_reach_the_page_e2e.py::test_a_launch_and_a_context_timezone_reach_the_page, wrapper:tests/test_bypass_csp_e2e.py::test_bypass_csp_lifts_the_page_policy_and_its_absence_keeps_it, gtest:StealthTimezone.LocalTimeIsTheDeclaredZonesWallClock, gtest:StealthTimezone.GMTParametersAreUTCWhateverIsDeclared, gtest:StealthTimezone.NothingDeclaredIsTheLocalTimeOfMozilla, gtest:StealthTimezone.AFieldWinsAndAnEmptyOneFallsToTheSession, gtest:StealthTimezone.NothingDeclaredAndAnEmptyFieldIsEmpty, gtest:StealthTimezone.TheRealmLocaleIsThePrimaryTagOfTheList, gtest:StealthDocumentLanguage.WithNoContextTheSessionsLanguageIsTheDocumentsOne
 
 ## What it does
 
-TODO: one paragraph, from the notes below.
+Every realm, every worker, `document.lastModified` and EXSLT's `date:date-time()` read the time zone and the
+language the session or the context declares, never the host's. The functions that read the declaration live
+in `dom/base/StealthSessionDeclaration.{h,cpp}` (folder fingerprint/locale-time/session-declaration, the one
+reader of the declaration, which also adds the functions these hooks call, G47); this folder only carries the hooks that call them and the tests of the calls.
+The zone and the language of a top context are seeded in the parent from the session when the context
+attaches, replaced per context when a client sets its own, and read by `BrowsingContext::DidSet` as the field
+or, when the field is empty, the session's value (never the build's or the host's). Every realm takes its zone
+at birth from its context and `DidSet` carries a change to the realms already alive; no block applies a zone
+to every realm of a content process (one zone on every realm of a process would override a context's own).
+When nothing is declared (the engine launched without the core) every caller keeps Firefox's own path.
 
 ## Hooks in Mozilla files
 
-- `docshell/base/BrowsingContext.cpp` (BrowsingContext::Attach; BrowsingContext::DidSet(FieldIndex<IDX_LanguageOverride>); BrowsingContext::DidSet(FieldIndex<IDX_TimezoneOverride>), movable): Attach seeds the timezone and language fields from the session (parent process, top-level only); about 14 logic lines in one hunk, so a one-call hook into our own file is the target. DidSet now reads the declared value (field, else session) instead of the field alone, so a cleared field falls back to the session value in every process. The pref names come from the comments; the reads happen in int
-- `dom/base/Document.cpp` (Document::InitCSP; static GetFormattedTimeString (called from Document::GetLastModified and Document::RetrieveRelevantHeaders); Document::ComputeVisibilityState, already-hook): Four unrelated changes in one file. (1) spoof, feature timezone-declared: document.lastModified formatting now uses the declared zone via ExplodeLocalTime (defined in dom/base/StealthSessionDeclaration.h, ours); the UTC branch for RFP is gone. (2) juggler, feature csp-bypass: InitCSP returns early when CSP_IsBypassedFor(*this) (defined in dom/security/nsCSPUtils.cpp, another group). Give it its ow
-- `dom/ipc/ContentChild.cpp` (ContentChild::RecvSetXPCOMProcessAttributes; ContentChild::RecvSystemTimezoneChanged, already-hook): Comment-only: no code added or removed. The first comment records removal of a juggler.timezone.override block (it never ran); the second is a note on RecvSystemTimezoneChanged. The patch should drop these comments; the zone now comes from StealthSessionDeclaration (dom/base, not in this group).
-- `dom/xslt/xslt/txEXSLTFunctions.cpp` (txEXSLTFunctionCall::evaluate (date:date-time branch), already-hook): Replaces PR_ExplodeTime with ExplodeLocalTime (our dom/base/StealthSessionDeclaration.h). The removed code chose PR_GMTParameters when JSDateTimeUTC was resisted; the new call does not reference that flag. [verified: REFUTED, ExplodeLocalTime (dom/base/StealthSessionDeclaration.cpp:95-98) checks ShouldResistFingerprinting(JSDateTimeUTC) and uses PR_GMTParameters, then falls back to PR_LocalTimePar
-- `js/xpconnect/src/nsXPConnect.cpp` (InitGlobalObjectOptions, already-hook): Page-observable: the realm's timezone and default locale. Mozilla's code (resistFingerprinting's spoofed values, else the override values) stays as Mozilla wrote it; at the end of the function one call to SetDeclaredRealmTimeAndLanguage (dom/base/StealthSessionDeclaration, ours) sets the declared zone again and the PRIMARY TAG of the language override, which may be an Accept-Language list. With aForceUTC or aLocaleEnUS it does nothing.
+- `docshell/base/BrowsingContext.cpp`: `Attach` keeps Mozilla's body and signature; its last statement is the one-line hook `SeedDeclaredTimezoneAndLanguage(this);` (anchor at the end of the function, G30). `DidSet(LanguageOverride)` and `DidSet(TimezoneOverride)` wrap Mozilla's
+  `GetLanguageOverride()` / `GetTimezoneOverride()` in `StealthLanguageOrSession` / `StealthTimezoneOrSession` (`IsTop()` holds, so
+  the value is the field's or the session's). The realm's locale in `DidSet(LanguageOverride)` is `JS::SetRealmLocaleOverride(realm,
+  StealthRealmLocale(realm, <Mozilla's argument>).get())`: `StealthRealmLocale` holds the primary tag of the list (a realm's Intl
+  locale is one BCP-47 tag, `navigator.languages` keeps the list) and, destroyed at the end of the statement, refreshes the language of
+  the realm's extant document: tag, Mozilla's set, refresh, in that order, as the function it replaces did. Include in a block of ours.
+- `dom/base/Document.cpp`, `Document.h`: `GetFormattedTimeString` (document.lastModified) takes the document as a parameter of ours
+  (declared exception, G35) and calls `StealthExplodeTime(aDocument, aTime, <Mozilla's parameters>, &prtime)` in place of
+  `PR_ExplodeTime`; its two callers pass `this` (G9). Mozilla's choice of `PR_GMTParameters` (resistFingerprinting asks UTC) or
+  `PR_LocalTimeParameters` stays Mozilla's: with GMT it is `PR_ExplodeTime`, with local time it is the declared zone's wall clock
+  (daylight saving included, computed with ICU; `tm_params` split into standard time and daylight saving as `PR_LocalTimeParameters`
+  does, EXSLT prints their sum), or `PR_LocalTimeParameters` when nothing is declared. A zone ICU does not know is exploded as UTC,
+  never as the host's. `SetContainer` has an anchor after `mInChromeDocShell = ...` (`StealthDocumentContainerSet`: when there is a
+  container, the language of the document's text with no `lang` is computed again, because the context exists from then; a wrap
+  of the function would run after `NotifyActivityChanged`). `RecomputeLanguageFromCharset` keeps Mozilla's lookup line and adds the one-line
+  `language = DocumentCharsetLanguage(this, language);` after it (the language of text that declares none is its context's, not the process's). `Document.h` declares
+  `friend class StealthDocumentAccess` (the one door to the private recompute). `InitCSP` keeps the early return
+  `if (CSP_IsBypassedFor(*this)) return NS_OK;` (marker of automation/bypass-csp, function in dom/security): the CSP context set up
+  before it stays even when the automation lifts the page's policies (history entries and a later `<meta>` expect one); what is
+  skipped is every policy the page itself sends.
+- `dom/xslt/xslt/txEXSLTFunctions.cpp`: Mozilla's `timezone` (UTC when `JSDateTimeUTC` is resisted, else local) is restored as in the tag;
+  the call `StealthExplodeTime(sourceDoc, time, timezone, &prtime)` replaces `PR_ExplodeTime` (declared exception, G35: the document is the local
+  `sourceDoc`). The page's local time is the declared zone's, not the C runtime's ([B339]).
+- `js/xpconnect/src/nsXPConnect.cpp`: `xpc::InitGlobalObjectOptions` keeps Mozilla's body and signature; its last line is the one-line hook
+  `mozilla::dom::SetDeclaredRealmTimeAndLanguage(...)` (anchor at the end of the function, G30): Mozilla's code (resistFingerprinting's spoofed values, else the
+  override values) runs first, then the declared zone and the PRIMARY TAG of the language override (which may be an Accept-Language list) are set. With
+  `aForceUTC` or `aLocaleEnUS` it does nothing. Every caller reaches the same symbol.
+- `dom/base/test/gtest/moz.build`: one line registering `TestStealthTimezone.cpp`.
 
-## dom/base/Document.cpp: Document::InitCSP
+## Tests
 
-Hook: after the CSP context is set up, `if (CSP_IsBypassedFor(*this)) return NS_OK;`
-(CSP_IsBypassedFor is declared in dom/security/nsCSPUtils.h and defined in dom/security/StealthBypassCSP.cpp; feature automation/bypass-csp).
-
-The CSP context set up earlier in InitCSP (before the CSP_IsBypassedFor early return) stays
-even when the automation bypasses the page's policies: history entries and a later <meta>
-expect one. What is skipped is every policy the page itself sends.
-
-## dom/base/Document.cpp: GetFormattedTimeString
-
-STEALTHFOX (firefox-50): the local time of the page, the declared zone's
-(ExplodeLocalTime), not the C runtime's ([B339]).
-
-The static function takes the Document instead of the `aUniversal` flag; its callers
-Document::GetLastModified and Document::RetrieveRelevantHeaders pass `*this`.
-ExplodeLocalTime is defined in dom/base/StealthSessionDeclaration.h/.cpp.
-
-## dom/base/Document.cpp: Document::ComputeVisibilityState
-
-In the branch that returns Hidden when the document is not visible, has no window, or its
-outer window is in the background:
-
-Stealth: GetForceActiveState removed in 150. The 146 hack relied on
-it to report Visible regardless of OS focus, defeating a commercial
-fingerprinting service's detection via document.hidden. TODO:
-re-implement via a different mechanism (e.g. JS-side override or
-pref-gated unconditional Visible).
-
-## dom/ipc/ContentChild.cpp: ContentChild::RecvSetXPCOMProcessAttributes
-
-At the end of the function, after the TRR mode block (no code of ours is left there):
-
-STEALTHFOX (firefox-50): the block that applied `juggler.timezone.override`
-to every realm of this process is gone. It never ran - the pref had no
-default, so it arrived empty here - and from firefox-50 it would have:
-the pref has a default (modules/libpref/init/StealthPrefList.yaml) so the session's zone
-reaches content processes, and one zone stamped on every realm of a
-process would have overridden a context's own. Every realm takes its zone
-at birth from its context (dom/base/StealthSessionDeclaration.h), and
-BrowsingContext::DidSet carries a change to the realms already alive.
-
-## dom/ipc/ContentChild.cpp: ContentChild::RecvSystemTimezoneChanged
-
-Stealth: SetTimeZoneOverride was removed in 150. Just reset like vanilla.
-(The function only calls nsJSUtils::ResetTimeZone().)
+- `TestStealthTimezone.cpp` (gtest, suite `StealthTimezone`): `StealthExplodeTime` with a declared Pacific/Chatham (21:13, offsets 12:45 + 1h) and
+  Asia/Kolkata (12:58), with `PR_GMTParameters` (UTC whatever is declared), with nothing declared (Mozilla's local time); the field or the session in
+  `StealthLanguageOrSession` / `StealthTimezoneOrSession`; the primary tag of `StealthRealmLocale`. Negative control: the declared-zone values differ from
+  UTC and from the host's (no runner is in Chatham).
+- wrapper e2e `test_a_launch_and_a_context_timezone_reach_the_page_e2e.py` (to write): browser launched with `timezone='Pacific/Chatham'`, a second
+  context `new_context(timezone_id='Asia/Kolkata')`; in each page `Intl.DateTimeFormat().resolvedOptions().timeZone`, `new Date(2026, 9, 21)
+  .getTimezoneOffset()`, `document.lastModified` of a page served with `Last-Modified: Wed, 21 Oct 2026 07:28:00 GMT` (10/21/2026 21:13:00 and
+  12:58:00) and of a page with no header (the hour of the declared zone), EXSLT `date:date-time()` through `XSLTProcessor` (suffix +13:45 / +05:30)
+  and a Worker's time zone. Negative control: a browser launched with no timezone gives the host's values, which differ from these on every runner.
+- wrapper e2e `test_context_locale_e2e.py` (exists): launch locale on the default context, `new_context(locale=...)`, workers.
+- wrapper e2e `test_bypass_csp_e2e.py` (exists): CSP lifted and kept.
+- gtest `StealthDocumentLanguage.*` (folder session-declaration): the function level of `DocumentCharsetLanguage` and `ChooseCharsetLanguage`.

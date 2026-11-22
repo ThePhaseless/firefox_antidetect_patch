@@ -19,6 +19,8 @@
 // SkScalerContext.cpp - it declares one free function and includes nothing
 // itself. See SkScalerContext::getImage() and WHERE IT IS CALLED below.
 
+class SkGlyph;
+
 namespace mozilla {
 namespace gfx {
 
@@ -90,6 +92,16 @@ namespace gfx {
  */
 void StealthQuantiseGlyphCoverage(uint8_t* aImage, int32_t aWidth,
                                   int32_t aHeight, size_t aRowBytes);
+
+/**
+ * The same, for the glyph the rasteriser has just filled: does nothing unless
+ * the glyph's mask is kA8_Format, otherwise quantises its image in place. The
+ * hook in SkScalerContext::getImage is this one call, so the kA8 test and the
+ * reading of the image, size and stride live here and not in vendored Skia.
+ * The glyph is const because Skia hands it over that way; the image it points
+ * at is the writable mask the caller owns.
+ */
+void StealthQuantiseGlyphCoverage(const SkGlyph& aGlyph);
 
 }  // namespace gfx
 }  // namespace mozilla

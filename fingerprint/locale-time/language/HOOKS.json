@@ -3,53 +3,31 @@
   "file": "intl/locale/LocaleService.cpp",
   "function": "",
   "kind": "add",
-  "form": "unknown",
-  "line": "// STEALTH-HOOK(fingerprint/locale-time/language)",
-  "test": ""
- },
- {
-  "file": "intl/locale/LocaleService.cpp",
-  "function": "",
-  "kind": "add",
-  "form": "unknown",
-  "line": "#include \"mozilla/intl/StealthSessionPrefs.h\"",
-  "test": ""
+  "form": "registration",
+  "line": "#include \"mozilla/intl/StealthSessionPrefs.h\"  // STEALTH-HOOK(fingerprint/locale-time/language)",
+  "test": "gtest:Intl_Locale_StealthSystemLocales.TheDeclaredLanguageIsTheRegionalLanguage"
  },
  {
   "file": "intl/locale/LocaleService.cpp",
   "function": "LocaleService::GetRegionalPrefsLocales(nsTArray<nsCString>& aRetVal) {",
   "kind": "rewrite",
   "form": "unknown",
-  "line": "    // STEALTH-HOOK(fingerprint/locale-time/language)",
-  "removed": "    if (NS_SUCCEEDED(",
-  "test": ""
+  "line": "    if (NS_SUCCEEDED(MachineRegionalPrefsLocales(aRetVal))) {  // STEALTH-HOOK(fingerprint/locale-time/language)",
+  "removed": "    if (NS_SUCCEEDED(\n            OSPreferences::GetInstance()->GetRegionalPrefsLocales(aRetVal))) {",
+  "test": "gtest:Intl_Locale_StealthSystemLocales.WithTheOSLocalesPreferenceTheDeclaredLanguageIsTheOnlyOne",
+  "exception": "OSPreferences::GetRegionalPrefsLocales has two other callers (Troubleshoot.sys.mjs, TelemetryEnvironment.sys.mjs) that receive the host's value today and a guard at the source would change what they see, and would run GetInstance() before the guard in the declared case; no form expresses the call without it (G31 analysed, G35 approved by the pm in PM-VERDICT)",
+  "pm": "approvato"
  },
  {
   "file": "intl/locale/LocaleService.cpp",
   "function": "LocaleService::GetRegionalPrefsLocales(nsTArray<nsCString>& aRetVal) {",
   "kind": "rewrite",
   "form": "unknown",
-  "line": "    if (NS_SUCCEEDED(MachineRegionalPrefsLocales(aRetVal))) {",
-  "removed": "            OSPreferences::GetInstance()->GetRegionalPrefsLocales(aRetVal))) {",
-  "test": ""
- },
- {
-  "file": "intl/locale/LocaleService.cpp",
-  "function": "LocaleService::GetRegionalPrefsLocales(nsTArray<nsCString>& aRetVal) {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/locale-time/language)",
-  "removed": "  if (NS_FAILED(OSPreferences::GetInstance()->GetRegionalPrefsLocales(",
-  "test": ""
- },
- {
-  "file": "intl/locale/LocaleService.cpp",
-  "function": "LocaleService::GetRegionalPrefsLocales(nsTArray<nsCString>& aRetVal) {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  if (NS_FAILED(MachineRegionalPrefsLocales(regionalPrefsLocales))) {",
-  "removed": "          regionalPrefsLocales))) {",
-  "test": ""
+  "line": "  if (NS_FAILED(MachineRegionalPrefsLocales(regionalPrefsLocales))) {  // STEALTH-HOOK(fingerprint/locale-time/language)",
+  "removed": "  if (NS_FAILED(OSPreferences::GetInstance()->GetRegionalPrefsLocales(\n          regionalPrefsLocales))) {",
+  "test": "gtest:Intl_Locale_StealthSystemLocales.TheDeclaredLanguageIsTheRegionalLanguage",
+  "exception": "OSPreferences::GetRegionalPrefsLocales has two other callers (Troubleshoot.sys.mjs, TelemetryEnvironment.sys.mjs) that receive the host's value today and a guard at the source would change what they see, and would run GetInstance() before the guard in the declared case; no form expresses the call without it (G31 analysed, G35 approved by the pm in PM-VERDICT)",
+  "pm": "approvato"
  },
  {
   "file": "intl/locale/moz.build",
@@ -57,7 +35,7 @@
   "kind": "add",
   "form": "registration",
   "line": "EXPORTS.mozilla.intl += [\"StealthSessionPrefs.h\"]  # STEALTH-HOOK(fingerprint/locale-time/session-declaration)",
-  "test": ""
+  "test": "gtest:Intl_Locale_StealthSystemLocales.TheDeclaredLanguageIsTheRegionalLanguage"
  },
  {
   "file": "intl/locale/moz.build",
@@ -65,7 +43,7 @@
   "kind": "add",
   "form": "registration",
   "line": "UNIFIED_SOURCES += [\"StealthSessionPrefs.cpp\"]  # STEALTH-HOOK(fingerprint/locale-time/session-declaration)",
-  "test": ""
+  "test": "gtest:Intl_Locale_StealthSystemLocales.TheDeclaredLanguageIsTheRegionalLanguage"
  },
  {
   "file": "intl/locale/nsLanguageAtomService.cpp",
@@ -73,38 +51,26 @@
   "kind": "add",
   "form": "registration",
   "line": "#include \"mozilla/intl/StealthSessionPrefs.h\"  // STEALTH-HOOK(fingerprint/locale-time/language)",
-  "test": ""
+  "test": "gtest:Intl_Locale_StealthSystemLocales.AWorkerThreadKeepsItsOwnDeclaredLanguage"
  },
  {
   "file": "intl/locale/nsLanguageAtomService.cpp",
   "function": "nsStaticAtom* nsLanguageAtomService::LookupLanguage(",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/locale-time/language)",
-  "test": ""
- },
- {
-  "file": "intl/locale/nsLanguageAtomService.cpp",
-  "function": "nsStaticAtom* nsLanguageAtomService::LookupLanguage(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  if (nsAtom* worker = intl::WorkerLocaleLanguage()) return worker;",
-  "test": ""
+  "form": "guard",
+  "line": "  if (nsAtom* worker = intl::WorkerLocaleLanguage()) return worker;  // STEALTH-HOOK(fingerprint/locale-time/language)",
+  "test": "gtest:Intl_Locale_StealthSystemLocales.TheLanguageAtomServiceAnswersAWorkersDeclaredLanguage"
  },
  {
   "file": "intl/locale/nsLanguageAtomService.cpp",
   "function": "nsAtom* nsLanguageAtomService::GetLocaleLanguage() {",
   "kind": "add",
-  "form": "unknown",
-  "line": "    // STEALTH-HOOK(fingerprint/locale-time/language)",
-  "test": ""
- },
- {
-  "file": "intl/locale/nsLanguageAtomService.cpp",
-  "function": "nsAtom* nsLanguageAtomService::GetLocaleLanguage() {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    if ((mLocaleLanguage = intl::SessionLocaleLanguage())) return mLocaleLanguage;",
-  "test": ""
+  "form": "anchor",
+  "line": "    if ((mLocaleLanguage = intl::SessionLocaleLanguage())) return mLocaleLanguage;  // STEALTH-HOOK(fingerprint/locale-time/language)",
+  "test": "wrapper:tests/test_context_locale_e2e.py::test_text_without_lang_takes_the_language_group_of_the_session_language",
+  "anchor": "if (!mLocaleLanguage) {",
+  "why": "",
+  "exception": "mid-function branch inside Mozilla's lazy init under the write lock: no guard or wrap of the function expresses it without running Mozilla's init first (G31 analysed, G35 approved by the pm in PM-VERDICT)",
+  "pm": "approvato"
  }
 ]

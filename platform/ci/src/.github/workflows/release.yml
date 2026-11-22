@@ -104,10 +104,10 @@ on:
         default: false
       gtest_filter:
         # What the last green gtests ran (run 41402916724), and the suites of ours added since: EVERY suite of our own files is here (the
-        # list of them: git grep for TEST(Stealth*, TEST(Idwr, and the one of ours inside a Mozilla file, StartupCache.WritesNeverLowerIOPriority).
+        # list of them: git grep for TEST(Stealth*, TEST(Idwr, and every suite of ours that sits in a Mozilla directory's gtest: StealthStartupCache).
         # A suite that exists on one platform only is named all the same: scripts/ci/gtest_run.py knows which (NOT_ON). * has never gone green here.
         description: "gtests=true only: which, as mach gtest takes them; * is all, and unproven"
-        default: 'StealthGfxFeatureStatus.*:StealthWebGPUAdapter.*:StealthWebGPUDeclaration.*:StealthWebGPUBundledVulkan.*:StealthWebGPUInstanceEnv.*:StealthFullscreen.*:StealthScaleDeclaration.*:StealthWindowGeometry.*:StealthGLMultisample.*:StealthFrameCrash.*:StealthJugglerEventId.*:StealthSessionUdpProxy.*:StealthDeclaredNetwork.*:StealthSocksUdpPool.*:TestStealthTRRContext.*:TestStealthSocksCredentials.*:TestStealthSessionResolver.*:StealthIceResolverContext.*:StealthUdpProxyBirth.*:StealthNrSocketBirth.*:StealthPcUdpProxyKinds.*:StealthTcpProxyRoad.*:StealthPcProxyConfig.*:StealthInputEventBirth.*:StealthKeyBirthScope.*:StealthBirthOrder.*:StealthFcBundleFonts.*:StealthAudioNoise.*:StealthBundledCollection.*:StealthBundledFamilyFilter.*:StealthCanvasProjection.*:StealthDocumentLanguage.*:StealthFallbackNames.*:StealthFcFontList.*:StealthFontList.*:StealthFontMetrics.*:StealthMediaDeclaration.*:StealthOwnBinaries.*:StealthQuotaEstimate.*:StealthTextQuality.*:StealthTtcFace.*:StealthWebGPUExternalTexture.*:Intl_Locale_StealthSystemLocales.*:Idwr.*:StartupCache.WritesNeverLowerIOPriority'
+        default: 'StealthGfxFeatureStatus.*:StealthWebGPUAdapter.*:StealthWebGPUDeclaration.*:StealthWebGPUBundledVulkan.*:StealthWebGPUInstanceEnv.*:StealthFullscreen.*:StealthScaleDeclaration.*:StealthWindowGeometry.*:StealthGLMultisample.*:StealthFrameCrash.*:StealthJugglerEventId.*:StealthSessionUdpProxy.*:StealthDeclaredNetwork.*:StealthSocksUdpPool.*:TestStealthTRRContext.*:TestStealthSocksCredentials.*:TestStealthSessionResolver.*:StealthIceResolverContext.*:StealthUdpProxyBirth.*:StealthNrSocketBirth.*:StealthPcUdpProxyKinds.*:StealthTcpProxyRoad.*:StealthPcProxyConfig.*:StealthInputEventBirth.*:StealthKeyBirthScope.*:StealthBirthOrder.*:StealthFcBundleFonts.*:StealthAudioNoise.*:StealthBundledCollection.*:StealthGlyphCoverage.*:StealthBundleHooks.*:StealthFontListHooks.*:StealthDebugger.*:StealthWindowInputDesktop.*:StealthPrefSanitize.*:TestStealthLinkClickAfter.*:TestStealthLoadInfo.*:TestStealthDocShellDefaults.*:StealthCanvasProjection.*:StealthDocumentLanguage.*:StealthFallbackNames.*:StealthFcFontList.*:StealthFontList.*:StealthFontMetrics.*:StealthMediaDeclaration.*:StealthOwnBinaries.*:StealthQuotaEstimate.*:StealthTextQuality.*:StealthTtcFace.*:StealthWebGPUExternalTexture.*:Intl_Locale_StealthSystemLocales.*:Idwr.*:StealthBranding.*:StealthCanvasUtils.*:StealthDragGesture.*:StealthHttp3Socks.*:StealthJugglerCoalesce.*:StealthJugglerMouseAck.*:StealthMouseEventCopy.*:StealthMouseEventIPC.*:StealthNsProxyInfoKinds.*:StealthSocksUdpLayer.*:StealthStackFrames.*:StealthStartupCache.*:StealthTimezone.*'
       relaunch_of:
         description: >
           Set by the watch of a run whose machine was lost, to that run's id: this run
@@ -239,6 +239,8 @@ jobs:
           python3 scripts/ci/test_stealth_download_watchdog.py
           # The compile-only step's list of directories, its errors and its fallback to one directory at a time.
           python3 scripts/ci/test_objects_first.py
+          # The build tools' hooks (python/mozbuild), through the host line of jar.py.
+          python3 scripts/ci/test_stealth_build_tools.py
           echo "matrix=$(python3 scripts/ci matrix)" | tee -a "$GITHUB_OUTPUT"
 
   # Everything that does not depend on the binary, BEFORE a node is turned on: a server is an hour paid whatever it does, and a run whose
@@ -259,6 +261,28 @@ jobs:
       - name: The source tree, the Mozilla tag with our series applied (tools/engine.py)
         shell: bash
         run: python3 .series/tools/engine.py materialize --into .
+      # THE JUNIT OF OUR PYTHON TESTS OF THE TREE, for the named hook tests judge (`py:<path>::<name>`): the part `junitpart-py-checks` of the artifact
+      # `junit-py`, which the job `junit-py` puts together with the part of package-ab (the series' tools/tests). Ours only (scripts/ci/py_junit.py: the
+      # files the series adds, with something for pytest to collect), run from the tree's root so a classname is the path in the tree. First after the
+      # materialize, so that no later step that fails hides it; it does not change the verdict of this job (the judge is red for a named test that
+      # did not pass), and its upload runs whatever happened.
+      - name: Our python tests of the tree, as junit
+        continue-on-error: true
+        timeout-minutes: 8
+        shell: bash
+        run: |
+          mkdir -p junit-py/checks
+          python3 -m pip install --quiet pytest pyyaml
+          FILES="$(python3 scripts/ci/py_junit.py list --series .series --tree .)"
+          python3 -m pytest $FILES -q -p no:cacheprovider -o addopts='' -o junit_family=xunit2 --rootdir=. --junitxml=junit-py/checks/tree-tests.xml
+      - name: Keep the junit (the part of this job, junitpart-py-checks)
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: junitpart-py-checks
+          path: junit-py
+          if-no-files-found: ignore
+          retention-days: 14
       # Cheapest gate in the pipeline, guarding the most expensive failure: the asset
       # basename is hand-written in every matrix entry below and derived independently
       # on the client side. When the two disagree CI publishes one name while the
@@ -297,7 +321,15 @@ jobs:
         shell: bash
         # The files, expanded by the shell: from Node 21 the arguments of
         # --test are file patterns, and a directory is loaded as a module.
-        run: node --test juggler/tests/*.test.mjs
+        # One process and one junit per file, at junit-node/<tree path>.xml: the named hook tests judge (`hook-tests-judge`) reads which file
+        # each test is in from the name of the junit, whatever the reporter writes. Every file runs, and the step is red if any did.
+        run: |
+          rc=0
+          for f in juggler/tests/*.test.mjs; do
+            mkdir -p "junit-node/$(dirname "$f")"
+            node --test --test-reporter=spec --test-reporter-destination=stdout               --test-reporter=junit --test-reporter-destination="junit-node/$f.xml" "$f" || rc=1
+          done
+          exit "$rc"
 
       # Every suite of the wrapper's list has its legs in the gate. The list (ci/required-suites.json) is the wrapper's and the matrix of the gate's
       # `wrapper-e2e` job is written by hand: run 44834434976 learned that wrapper.e2e.fakeweb had no leg only from `wrapper-e2e-complete`, after the build.
@@ -327,6 +359,15 @@ jobs:
           python3 scripts/test_memory_watch.py
           python3 scripts/test_cpu_watch.py
           python3 scripts/test_workflow_cache_rules.py
+      # The junit of Juggler's tests, for `hook-tests-judge`: a hook that names `node:<path>#<title>` is judged on it.
+      - name: Keep the junit of Juggler's tests
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: junit-node
+          path: junit-node
+          if-no-files-found: ignore
+          retention-days: 14
       # A newer push to the branch has replaced this candidate (the rule is «un nuovo push annulla la prova vecchia»; the `concurrency` above
       # cancels a run that a newer one finds in progress, this catches the one that was queued behind it). Cancelled HERE, before `node` starts:
       # the sleep keeps this job running until the cancel has landed, because a job that ended would let the node start. Exit 2 (the head could
@@ -350,6 +391,33 @@ jobs:
             exit 1
           fi
           exit 0
+
+  # THE ARTIFACT `junit-py`, one for the run (an artifact name is one per run, and two jobs write python junit): the parts of every job that runs python tests
+  # of ours, `junitpart-py-<job>` (`checks`: the tests of the tree; `package-ab`: the series' tools/tests), put together as junit-py/<job>/<file>.xml. The
+  # judge reads `junit-*` folders by their name, so a part is `junitpart-*`, which it does not read. After the checks and the gate (whichever of the two
+  # gates this run has), whatever they said; its steps do not fail it. Whoever lists the jobs the judge waits for (`hook-tests-judge`) lists this one.
+  junit-py:
+    name: junit-py
+    needs: [checks, gate, gate-reuse]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Every job's python junit
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: junitpart-py-*
+          path: junit-py
+          merge-multiple: true
+      - name: Keep junit-py
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: junit-py
+          path: junit-py
+          if-no-files-found: ignore
+          retention-days: 14
 
   # Turns each leg's node on, on its own machine (scripts/ci/latitude_node.py). If either
   # cannot, the run fails: nothing else compiles a leg, the build is skipped, and
@@ -1147,7 +1215,7 @@ jobs:
           retention-days: ${{ needs.plan.outputs.kind == 'release' && 14 || 2 }}
 
       # The engine's own tests, on request (input gtests): the stealth hooks each
-      # have one (StartupCache.WritesNeverLowerIOPriority, the bundled-font and
+      # have one (StealthStartupCache, the bundled-font and
       # own-binary rules) and nothing else runs them. After the package and the
       # symbols, so what ships is already built and checked when the second
       # libxul is linked. A phase, so the report has its row.
@@ -1522,11 +1590,48 @@ jobs:
       wrapper_ref: ${{ needs.plan.outputs.wrapper_ref }}
       core_ref: ${{ needs.plan.outputs.core_ref }}
 
+  # THE NAMED HOOK TESTS. Every hook of every folder of the series names its test in HOOKS.json (`test`, the grammar of tools/hooks_list.py), and the
+  # candidate ran only the gtests of its filter and the rows of the wrapper's list: a hook whose test nobody ran, or that was renamed away, was green
+  # (red team H1a, H1b). hook-tests-judge.yml reads the results of THIS run (the gtest reports of both legs, the junit of the gate's wrapper legs, the junit
+  # of Juggler's tests) and is red for every named test that is not in them, is skipped, did not pass, or (a gtest) is not in the filter of the run. It reads
+  # artifacts only: seconds. It comes after the gate and the gtests, whatever they said (always(): their red is in the results it reads), and the publish
+  # needs it. Its judge is MAIN's, and a main without it fails the job (hook-tests-judge.yml says why).
+  # Two calls and not one job with the reuse gate among its needs: the publish needs the judge, and a skipped ancestor (the reuse gate, in every run that
+  # builds) skips every job below it, the publish included (actions/runner#2205, held by test_release_path.py). A run that reused has no publish.
+  # Both wait for `junit-py` (the job of the branch ci/legs-junit that puts together the python junit of the checks and of package-ab, and is itself after
+  # the gate, which holds the xpcshell and cargo merge jobs): the artifacts `junit-py`, `junit-xpcshell` and `junit-cargo` exist when the judge reads them.
+  # THIS FILE IS VALID ONLY TOGETHER WITH ci/legs-junit (a `needs` on a job that is not there is refused). `junit-py` is after the reuse gate, so it is the
+  # skipped ancestor of the publish in a run that builds: the publish says so itself (always(), and the result of each of its needs), as it must.
+  hook-tests-judge:
+    needs: [plan, checks, build, gate, gtest-cross, gtest-linux, junit-py]
+    # A compile-only run has no binary and no results; a run whose build failed has no gate to read (the run is red for the build).
+    if: always() && needs.plan.result == 'success' && needs.plan.outputs.stop_after != 'objects' && needs.build.result == 'success'
+    permissions: { actions: read, contents: read }
+    uses: ./.github/workflows/hook-tests-judge.yml
+    with:
+      gtests: ${{ needs.plan.outputs.gtests }}
+      gtest_filter: ${{ needs.plan.outputs.gtest_filter }}
+      reuse_run_id: ''
+
+  # The run that reused a green build (a push to main): its verdicts are the gate-reuse's and the gtests of the run it found.
+  hook-tests-judge-reuse:
+    needs: [plan, checks, gate-reuse, junit-py]
+    if: always() && needs.plan.result == 'success' && needs.plan.outputs.reuse_run_id != ''
+    permissions: { actions: read, contents: read }
+    uses: ./.github/workflows/hook-tests-judge.yml
+    with:
+      gtests: ${{ needs.plan.outputs.gtests }}
+      gtest_filter: ${{ needs.plan.outputs.gtest_filter }}
+      reuse_run_id: ${{ needs.plan.outputs.reuse_run_id }}
+
   publish:
-    # both verdicts: the gate and the gtests (a gtest job with gtests=false runs and succeeds, its steps are skipped)
-    needs: [plan, build, gate, gtest-cross, gtest-linux]
-    # a candidate publishes nothing: skipped, and the run is green
-    if: needs.plan.outputs.kind == 'release'
+    # the verdicts: the gate, the gtests and the named hook tests (a gtest job with gtests=false runs and succeeds, its steps are skipped)
+    needs: [plan, build, gate, gtest-cross, gtest-linux, hook-tests-judge]
+    # a candidate publishes nothing: skipped, and the run is green. Every need must have succeeded, said here and not left to the implicit success(): the
+    # judge is after `junit-py`, which is after the reuse gate (skipped in a run that builds), and a skipped ancestor skips the publish (actions/runner#2205).
+    if: >-
+      !cancelled() && needs.plan.outputs.kind == 'release' && needs.plan.result == 'success' && needs.build.result == 'success' && needs.gate.result == 'success'
+      && needs.gtest-cross.result == 'success' && needs.gtest-linux.result == 'success' && needs.hook-tests-judge.result == 'success'
     permissions: { actions: read, contents: write }
     uses: ./.github/workflows/publish.yml
     with:

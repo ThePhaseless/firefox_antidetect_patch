@@ -155,23 +155,29 @@ test('the connect wrapper reads the declaration, fails without touching the netw
   assert.match(impl, /#include "mozilla\/StaticPrefs_network\.h"/);
 });
 
-test('nsSocketTransport::InitiateSocket connects through the wrapper; a SOCKS destination is exempt', () => {
+test('nsSocketTransport::InitiateSocket connects only through the wrapper; a SOCKS destination is exempt', () => {
   const sock = read('netwerk/base/nsSocketTransport2.cpp');
   assert.match(sock, /#include "StealthIPv6Literal\.h"\s+\/\/ STEALTH-HOOK\(network\/ipv6-literal\)/);
   const init = body(sock, 'nsresult nsSocketTransport::InitiateSocket() {');
-  // The only connect of the function is the wrapper, on the line the hook marks.
+  // The only entry: the one connect of the function is the wrapper, and no other code of the file starts a connect.
   assert.equal(init.match(/= PR_Connect\(/g), null);
+  const code = sock.split('\n').filter(l => !/^\s*\/\//.test(l)).join('\n');
+  assert.equal(code.match(/\bPR_Connect\(/g), null);
   const lines = init.split('\n').filter(l => l.includes('StealthConnect('));
   assert.equal(lines.length, 1);
   assert.ok(lines[0].includes(HOOK), 'the hook is on the line');
-  // Behind a SOCKS proxy mNetAddr is the destination, which the proxy reaches, not this host:
-  // neither the IPv6 route rule nor the IPv4-mapped rule applies to it.
-  const at = init.indexOf('StealthConnect(');
-  assert.match(init.slice(Math.max(0, at - 500), at + 500),
-    /mProxyTransparent && !mProxyHost\.IsEmpty\(\)\s*\?\s*StealthConnectTarget::kBehindSocksProxy\s*:\s*StealthConnectTarget::kDirect/);
-  // The failure is read like a connect() failure, on the very next line.
-  assert.match(init.slice(at, at + 400), /PRErrorCode code = PR_GetError\(\);/);
   assert.equal(sock.match(/StealthConnect\(/g).length, 1);
+  // The destination handed over is the one the socket resolved, with the transport's own proxy fields.
+  assert.match(lines[0], /StealthConnect\(mNetAddr, mProxyTransparent, mProxyHost, /);
+  // The failure is read like a connect() failure, on the very next line.
+  const at = init.indexOf('StealthConnect(');
+  assert.match(init.slice(at, at + 400), /PRErrorCode code = PR_GetError\(\);/);
+  // Behind a SOCKS proxy mNetAddr is the destination, which the proxy reaches, not this host: neither the IPv6
+  // route rule nor the IPv4-mapped rule applies to it. The decision is made in our function, on those fields.
+  const impl = read('netwerk/base/StealthIPv6Literal.cpp');
+  const fn = body(impl, 'PRStatus StealthConnect(const NetAddr& aAddr, bool aProxyTransparent,');
+  assert.match(fn, /aProxyTransparent && !aProxyHost\.IsEmpty\(\)\s*\?\s*StealthConnectTarget::kBehindSocksProxy\s*:\s*StealthConnectTarget::kDirect/);
+  assert.match(fn, /return StealthConnect\(aFd, aAddr, target, aPrAddr, aTimeout\);/);
 });
 
 test('the SOCKS layer reaches its proxy through the wrapper: the route rule applies, the mapped rule does not', () => {

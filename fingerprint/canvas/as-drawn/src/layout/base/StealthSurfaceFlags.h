@@ -8,6 +8,8 @@
 
 #include <stdint.h>
 
+#include <utility>
+
 // Our flag for nsLayoutUtils::SurfaceFromElement's aSurfaceFlags
 // (fingerprint/canvas/as-drawn): the canvas as drawn, without the noise a
 // page's readback gets. It is not in Mozilla's SFE_* enum because Mozilla
@@ -27,10 +29,10 @@ constexpr uint32_t kStealthSfeAsDrawn = 1u << 31;
 // this header needs no canvas include.
 template <class Canvas, class... Args>
 auto StealthCanvasSnapshot(Canvas* aCanvas, uint32_t aSurfaceFlags,
-                           Args... aArgs) {
+                           Args&&... aArgs) {
   return (aSurfaceFlags & kStealthSfeAsDrawn)
-             ? aCanvas->GetSurfaceSnapshotAsDrawn(aArgs...)
-             : aCanvas->GetSurfaceSnapshot(aArgs...);
+             ? aCanvas->GetSurfaceSnapshotAsDrawn(std::forward<Args>(aArgs)...)
+             : aCanvas->GetSurfaceSnapshot(std::forward<Args>(aArgs)...);
 }
 
 #endif  // StealthSurfaceFlags_h

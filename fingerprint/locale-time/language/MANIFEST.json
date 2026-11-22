@@ -4,7 +4,9 @@
   "intl/locale/moz.build",
   "intl/locale/nsLanguageAtomService.cpp"
  ],
- "added": {},
+ "added": {
+  "intl/locale/tests/gtest/TestStealthRegionalLocales.cpp": "100644"
+ },
  "inventory": [
   {
    "file": "intl/locale/LocaleService.cpp",

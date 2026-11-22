@@ -1,41 +1,44 @@
 diff --git a/startupcache/StartupCache.cpp b/startupcache/StartupCache.cpp
-index d365f7ec1b3dde5ccd81157718e3830ae8e0a21f..8136bafbbfda293c45311174f9bd0f8e5d783c3b 100644
+index d365f7ec1b3dde5ccd81157718e3830ae8e0a21f..3adae4aed2489125b82da4acf0e3e29c117b69f5 100644
 --- a/startupcache/StartupCache.cpp
 +++ b/startupcache/StartupCache.cpp
-@@ -794,7 +794,7 @@ void StartupCache::MaybeWriteOffMainThread(WriteType aWriteType,
+@@ -44,6 +44,8 @@
+ #  include <windows.h>
+ #endif
+ 
++#include "StealthStartupCache.h"  // STEALTH-HOOK(platform/startup-cache)
++
+ #ifdef IS_BIG_ENDIAN
+ #  define SC_ENDIAN "big"
+ #else
+@@ -794,7 +796,7 @@ void StartupCache::MaybeWriteOffMainThread(WriteType aWriteType,
    nsCOMPtr<nsIRunnable> runnable = NS_NewRunnableFunction(
        "StartupCache::Write", [self, aWriteType, aUseLowPriorityIO]() mutable {
          Maybe<nsAutoLowPriorityIO> lowPriority;
 -        if (aUseLowPriorityIO) {
-+        if (aUseLowPriorityIO && StartupCache::WritesMayLowerIOPriority()) {
++        if (StealthWritesMayLowerIOPriority(aUseLowPriorityIO)) {  // STEALTH-HOOK(platform/startup-cache)
            lowPriority.emplace();
          }
          MutexAutoLock lock(self->mTableLock);
-diff --git a/startupcache/StartupCache.h b/startupcache/StartupCache.h
-index 7feeae10c4cf56bd5ec9755c5d76603691e6c8a2..5f91bcd297be9f342a212b148c4e01f06aa53c3c 100644
---- a/startupcache/StartupCache.h
-+++ b/startupcache/StartupCache.h
-@@ -158,6 +158,9 @@ class StartupCache : public nsIMemoryReporter {
-   // Returns a buffer that was previously stored, caller does not take ownership
-   nsresult GetBuffer(const char* id, const char** outbuf, uint32_t* length);
+diff --git a/startupcache/moz.build b/startupcache/moz.build
+index 66633a2693ab90042c292726d49f9684567b3c0e..af740eb1cb72cb427e43c89db02c300e54f12a44 100644
+--- a/startupcache/moz.build
++++ b/startupcache/moz.build
+@@ -12,6 +12,7 @@ EXPORTS.mozilla.scache += [
+     "StartupCache.h",
+     "StartupCacheUtils.h",
+ ]
++EXPORTS.mozilla.scache += ["StealthStartupCache.h"]  # STEALTH-HOOK(platform/startup-cache)
  
-+  // STEALTH-HOOK(platform/startup-cache): see FEATURE.md
-+  static bool WritesMayLowerIOPriority() { return false; }
-+
-   // Stores a buffer. Caller yields ownership.
-   nsresult PutBuffer(const char* id, UniqueFreePtr<char[]>&& inbuf,
-                      uint32_t length);
-diff --git a/startupcache/test/TestStartupCache.cpp b/startupcache/test/TestStartupCache.cpp
-index 76a65e7b8b03658e64c29a181af56b6aa4561671..eec0a206e127b172f5d7f2493dc910242912a4db 100644
---- a/startupcache/test/TestStartupCache.cpp
-+++ b/startupcache/test/TestStartupCache.cpp
-@@ -184,3 +184,9 @@ TEST_F(TestStartupCache, WriteObject) {
-   EXPECT_NS_SUCCEEDED(rv);
-   ASSERT_TRUE(outSpec.Equals(spec));
- }
-+
-+// STEALTH-HOOK(platform/startup-cache): see FEATURE.md
-+TEST(StartupCache, WritesNeverLowerIOPriority)
-+{
-+  EXPECT_FALSE(StartupCache::WritesMayLowerIOPriority());
-+}
+ UNIFIED_SOURCES += [
+     "StartupCache.cpp",
+diff --git a/startupcache/test/moz.build b/startupcache/test/moz.build
+index 3ec6317c70d6883bb15e73b5d9ffb40cf89b2144..805bbf3b83bbd1e0672a6945eb1ed427656da786 100644
+--- a/startupcache/test/moz.build
++++ b/startupcache/test/moz.build
+@@ -5,4 +5,5 @@
+ UNIFIED_SOURCES += [
+     "TestStartupCache.cpp",
+ ]
++UNIFIED_SOURCES += ["TestStealthStartupCache.cpp"]  # STEALTH-HOOK(platform/startup-cache)
+ FINAL_LIBRARY = "xul-gtest"

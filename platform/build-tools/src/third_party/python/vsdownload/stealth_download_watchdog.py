@@ -90,7 +90,8 @@ def _resume(url, destname, fileid, cut, alarm, wait):
     raise cut
 
 
-def stealth_urlretrieve(payload, destname, fileid, timeout=120, wait=time.sleep):
+def stealth_urlretrieve(payload, destname, fileid, timeout=120, wait=time.sleep,
+                       download=None):
     """urllib.request.urlretrieve(payload["url"], destname) with a time limit
     of `timeout` seconds per network attempt where SIGALRM exists, and a cut
     file resumed (see above) before giving up.
@@ -100,6 +101,11 @@ def stealth_urlretrieve(payload, destname, fileid, timeout=120, wait=time.sleep)
     trip back from the pool's worker as an OSError with its type and text. `payload` is the dict, not the url: the
     key is read after the alarm is armed, as before, so a missing "url" fails the
     same way and the alarm is still cancelled in `finally`.
+
+    `download`, when given, is the call that fetches the file: vsdownload.py's
+    hook passes Mozilla's own `urllib.request.urlretrieve(payload["url"],
+    destname)` as a lambda, so it is Mozilla's call that the alarm, the resume
+    and the error conversion guard. Without it the call is made here, as before.
     """
 
     def _dl_watchdog(signum, frame):
@@ -117,7 +123,10 @@ def stealth_urlretrieve(payload, destname, fileid, timeout=120, wait=time.sleep)
     try:
         url = payload["url"]
         try:
-            urllib.request.urlretrieve(url, destname)
+            if download is None:
+                urllib.request.urlretrieve(url, destname)
+            else:
+                download()
         except urllib.error.ContentTooShortError as cut:
             _resume(url, destname, fileid, cut, alarm, wait)
     except Exception as e:

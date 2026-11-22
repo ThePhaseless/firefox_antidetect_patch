@@ -1,90 +1,78 @@
 diff --git a/gfx/skia/skia/src/core/SkScalerContext.cpp b/gfx/skia/skia/src/core/SkScalerContext.cpp
-index 85edc26a3f7930ec9ffff752141ffacb881e7e23..6eb0b241ba11e834e3306778ada63aaf6f4ecccd 100644
+index 85edc26a3f7930ec9ffff752141ffacb881e7e23..fc723ae64a416c7f067590a156a983fff4a01477 100644
 --- a/gfx/skia/skia/src/core/SkScalerContext.cpp
 +++ b/gfx/skia/skia/src/core/SkScalerContext.cpp
-@@ -42,6 +42,8 @@
- #include "src/core/SkWriteBuffer.h"
- #include "src/utils/SkFloatUtils.h"
- #include "src/utils/SkMatrix22.h"
-+// STEALTH-HOOK(fingerprint/fonts/metrics)
-+#include "mozilla/gfx/StealthGlyphCoverage.h"
+@@ -49,6 +49,8 @@
+ #include <new>
+ #include <utility>
  
- #include <algorithm>
- #include <cstring>
-@@ -653,6 +655,14 @@ void SkScalerContext::getImage(const SkGlyph& origGlyph) {
++#include "mozilla/gfx/StealthGlyphCoverage.h"  // STEALTH-HOOK(fingerprint/fonts/metrics)
++
+ ///////////////////////////////////////////////////////////////////////////////
+ 
+ namespace {
+@@ -653,6 +655,8 @@ void SkScalerContext::getImage(const SkGlyph& origGlyph) {
          }
      }
  
-+    // STEALTH-HOOK(fingerprint/fonts/metrics)
-+    if (unfilteredGlyph->maskFormat() == SkMask::kA8_Format) {
-+        mozilla::gfx::StealthQuantiseGlyphCoverage(
-+                static_cast<uint8_t*>(unfilteredGlyph->fImage),
-+                unfilteredGlyph->width(), unfilteredGlyph->height(),
-+                unfilteredGlyph->rowBytes());
-+    }
++    mozilla::gfx::StealthQuantiseGlyphCoverage(*unfilteredGlyph);  // STEALTH-HOOK(fingerprint/fonts/metrics)
 +
      if (fMaskFilter) {
          // k3D_Format should not be mask filtered.
          SkASSERT(SkMask::k3D_Format != unfilteredGlyph->fMaskFormat);
 diff --git a/gfx/thebes/gfxDWriteFonts.cpp b/gfx/thebes/gfxDWriteFonts.cpp
-index ce52760aeeed01b32648a6d9164cf9384acf3889..eef93f418127388a6619b476018658c429493254 100644
+index ce52760aeeed01b32648a6d9164cf9384acf3889..846579f800beee95d1701c44e5ff8912d0cbd97f 100644
 --- a/gfx/thebes/gfxDWriteFonts.cpp
 +++ b/gfx/thebes/gfxDWriteFonts.cpp
-@@ -6,6 +6,7 @@
+@@ -18,6 +18,8 @@
+ #include "mozilla/gfx/Logging.h"
+ #include "mozilla/gfx/gfxVars.h"
  
- #include <algorithm>
++#include "StealthTextQuality.h"  // STEALTH-HOOK(fingerprint/fonts/metrics)
++
+ using namespace mozilla;
+ using namespace mozilla::gfx;
  
-+#include "StealthTextQuality.h"
- #include "gfxContext.h"
- #include "gfxDWriteFontList.h"
- #include "gfxHarfBuzzShaper.h"
-@@ -34,6 +35,10 @@ using namespace mozilla::gfx;
+@@ -34,6 +36,7 @@ using namespace mozilla::gfx;
  // Cleartype can be dynamically enabled/disabled, so we have to allow for
  // dynamically updating it.
  static BYTE GetSystemTextQuality() {
-+  // STEALTH-HOOK(fingerprint/fonts/metrics)
-+  if (const Maybe<BYTE> declared = StealthDeclaredTextQuality()) {
-+    return *declared;
-+  }
++  if (StealthTextQualityDeclared()) return StealthDeclaredTextQuality();  // STEALTH-HOOK(fingerprint/fonts/metrics)
    BOOL font_smoothing;
    UINT smoothing_type;
  
-@@ -199,8 +204,10 @@ void gfxDWriteFont::UpdateClearTypeVars() {
+@@ -199,7 +202,7 @@ void gfxDWriteFont::UpdateClearTypeVars() {
  
    // Override these from DWrite function if available.
    RefPtr<IDWriteRenderingParams> defaultRenderingParams;
 -  HRESULT hr = Factory::GetDWriteFactory()->CreateRenderingParams(
--      getter_AddRefs(defaultRenderingParams));
-+  // STEALTH-HOOK(fingerprint/fonts/metrics)
-+  const bool stealthDeclared = StealthTextQualityDeclared();
-+  HRESULT hr =
-+      StealthCreateRenderingParams(stealthDeclared, defaultRenderingParams);
++  HRESULT hr = StealthDWriteFactory(Factory::GetDWriteFactory())->CreateRenderingParams(  // STEALTH-HOOK(fingerprint/fonts/metrics)
+       getter_AddRefs(defaultRenderingParams));
    if (SUCCEEDED(hr) && defaultRenderingParams) {
      clearTypeLevel = defaultRenderingParams->GetClearTypeLevel();
- 
-@@ -233,7 +240,8 @@ void gfxDWriteFont::UpdateClearTypeVars() {
+@@ -233,7 +236,7 @@ void gfxDWriteFont::UpdateClearTypeVars() {
    // gfxWindowsPlatform::SetupClearTypeParams, but it seems odd because the
    // default params will still be the ClearType ones although we won't use the
    // anti-alias for ClearType because of GetSystemDefaultAAMode.
 -  if (gfxVars::SystemTextQuality() == CLEARTYPE_QUALITY) {
-+  // STEALTH-HOOK(fingerprint/fonts/metrics)
-+  if (stealthDeclared || gfxVars::SystemTextQuality() == CLEARTYPE_QUALITY) {
++  if (StealthClearTypeParamsApply(gfxVars::SystemTextQuality() == CLEARTYPE_QUALITY)) {  // STEALTH-HOOK(fingerprint/fonts/metrics)
      int32_t prefInt = Preferences::GetInt(GFX_CLEARTYPE_PARAMS_LEVEL, -1);
      if (prefInt >= 0 && prefInt <= 100) {
        clearTypeLevel = float(prefInt / 100.0);
 diff --git a/gfx/thebes/gfxFT2FontBase.cpp b/gfx/thebes/gfxFT2FontBase.cpp
-index 6cf3d24740f15fd830576024f327a94bd8dcac59..65853b0ccd150f1c1546fb3ab2c4d85512a0448f 100644
+index 6cf3d24740f15fd830576024f327a94bd8dcac59..c86aed39c2eb11015e6ed0ba29a352421b4996d7 100644
 --- a/gfx/thebes/gfxFT2FontBase.cpp
 +++ b/gfx/thebes/gfxFT2FontBase.cpp
-@@ -21,6 +21,7 @@
- #include FT_TRUETYPE_TABLES_H
+@@ -22,6 +22,8 @@
  #include FT_ADVANCES_H
  #include FT_MULTIPLE_MASTERS_H
-+#include "StealthDesignMetrics.h"  // STEALTH-HOOK(fingerprint/fonts/metrics)
  
++#include "StealthDesignMetrics.h"  // STEALTH-HOOK(fingerprint/fonts/metrics)
++
  #ifndef FT_LOAD_COLOR
  #  define FT_LOAD_COLOR (1L << 20)
-@@ -558,6 +559,7 @@ void gfxFT2FontBase::InitExtraMetrics(gfxFloat aEmHeight,
+ #endif
+@@ -558,6 +560,7 @@ void gfxFT2FontBase::InitExtraMetrics(gfxFloat aEmHeight,
    if (mMetrics.aveCharWidth == 0.0) {
      mMetrics.aveCharWidth = mMetrics.spaceWidth;
    }
@@ -92,38 +80,36 @@ index 6cf3d24740f15fd830576024f327a94bd8dcac59..65853b0ccd150f1c1546fb3ab2c4d855
    // Apparently hinting can mean that max_advance is not always accurate.
    mMetrics.maxAdvance = std::max(mMetrics.maxAdvance, mMetrics.aveCharWidth);
  
-@@ -723,7 +725,7 @@ bool gfxFT2FontBase::GetFTGlyphExtents(uint16_t aGID, int32_t* aAdvance,
-   // Due to freetype bug 52683 we MUST use the linearHoriAdvance field when
-   // dealing with a variation font; also use it for scalable fonts when not
-   // applying hinting. Otherwise, prefer hinted width from glyph->advance.x.
--  if (aAdvance) {
-+  if (aAdvance && !StealthDesignAdvance(*this, aGID, bold.x, aAdvance)) {  // STEALTH-HOOK(fingerprint/fonts/metrics)
-     FT_Fixed advance;
-     if (!roundX || FT_HAS_MULTIPLE_MASTERS(face.get())) {
-       advance = face.get()->glyph->linearHoriAdvance;
-@@ -824,6 +826,9 @@ gfxFT2FontBase::GlyphMetrics gfxFT2FontBase::GetCachedGlyphMetrics(
+@@ -742,6 +745,7 @@ bool gfxFT2FontBase::GetFTGlyphExtents(uint16_t aGID, int32_t* aAdvance,
+     }
+     *aAdvance = NS_lround(advance * extentsScale);
+   }
++  StealthDesignAdvance(*this, aGID, bold.x, aAdvance);  // STEALTH-HOOK(fingerprint/fonts/metrics)
+ 
+   if (aBounds) {
+     const FT_Glyph_Metrics& metrics = face.get()->glyph->metrics;
+@@ -824,6 +828,7 @@ gfxFT2FontBase::GlyphMetrics gfxFT2FontBase::GetCachedGlyphMetrics(
  
  bool gfxFT2FontBase::GetGlyphBounds(uint16_t aGID, gfxRect* aBounds,
                                      bool aTight) {
-+  if (StealthDesignGlyphBounds(*this, aGID, aBounds)) {  // STEALTH-HOOK(fingerprint/fonts/metrics)
-+    return true;
-+  }
++  if (StealthDesignGlyphBounds(*this, aGID, aBounds)) return true;  // STEALTH-HOOK(fingerprint/fonts/metrics)
    IntRect bounds;
    const GlyphMetrics metrics = GetCachedGlyphMetrics(aGID, &bounds);
    if (!metrics.HasValidBounds()) {
 diff --git a/gfx/thebes/gfxFont.cpp b/gfx/thebes/gfxFont.cpp
-index f4a983fcb965b391604f62d37b6ceebb7ee8b3ad..353fb76c96b2c5899997107c38d48693442b1627 100644
+index f4a983fcb965b391604f62d37b6ceebb7ee8b3ad..32af058596db13462825ecd53b57f5b46b42f46d 100644
 --- a/gfx/thebes/gfxFont.cpp
 +++ b/gfx/thebes/gfxFont.cpp
-@@ -7,6 +7,7 @@
- #include "COLRFonts.h"
- #include "FontPaletteCache.h"
- #include "GreekCasing.h"
+@@ -57,6 +57,8 @@
+ #include <limits>
+ #include <numeric>
+ 
 +#include "StealthTextMeasuring.h"  // STEALTH-HOOK(fingerprint/fonts/metrics)
- #include "TextDrawTarget.h"
- #include "ThebesRLBox.h"
- #include "cairo.h"
-@@ -141,6 +142,7 @@ gfxFontCache::Observer::Observe(nsISupports* aSubject, const char* aTopic,
++
+ using namespace mozilla;
+ using namespace mozilla::gfx;
+ using namespace mozilla::unicode;
+@@ -141,6 +143,7 @@ gfxFontCache::Observer::Observe(nsISupports* aSubject, const char* aTopic,
  }
  
  nsresult gfxFontCache::Init() {
@@ -131,7 +117,7 @@ index f4a983fcb965b391604f62d37b6ceebb7ee8b3ad..353fb76c96b2c5899997107c38d48693
    StaticMutexAutoLock lock(gMutex);
    NS_ASSERTION(!gGlobalCache, "Where did this come from?");
    gGlobalCache = new gfxFontCache(GetMainThreadSerialEventTarget());
-@@ -4456,6 +4458,7 @@ void gfxFont::SanitizeMetrics(bool aIsBadUnderlineFont) {
+@@ -4456,6 +4459,7 @@ void gfxFont::SanitizeMetrics(bool aIsBadUnderlineFont) {
      memset(&mMetrics, 0, sizeof(mMetrics));
      return;
    }
@@ -140,57 +126,56 @@ index f4a983fcb965b391604f62d37b6ceebb7ee8b3ad..353fb76c96b2c5899997107c38d48693
    // If the font entry has ascent/descent/lineGap-override values,
    // replace the metrics from the font with the overrides.
 diff --git a/gfx/thebes/gfxFont.h b/gfx/thebes/gfxFont.h
-index 5dff682e0b7d34ab598ccc7d6301e1f97dcfd16e..b27a89a09f06b0f13aa9b60ca32a452083f76f4c 100644
+index 5dff682e0b7d34ab598ccc7d6301e1f97dcfd16e..20e961ce60c78d1ee743f09a3bae52b74e8abfee 100644
 --- a/gfx/thebes/gfxFont.h
 +++ b/gfx/thebes/gfxFont.h
-@@ -1716,6 +1716,10 @@ class gfxFont {
+@@ -1716,6 +1716,8 @@ class gfxFont {
      return *mVerticalMetrics;
    }
  
-+  // STEALTH-HOOK(fingerprint/fonts/metrics): defined in StealthBundleFontList.cpp
-+  bool GetStealthHostIndepVMetrics(gfxFloat& aEmAscent, gfxFloat& aEmDescent,
-+                                   gfxFloat& aMaxAscent, gfxFloat& aMaxDescent);
++  bool GetStealthHostIndepVMetrics(gfxFloat&, gfxFloat&, gfxFloat&, gfxFloat&);  // STEALTH-HOOK(fingerprint/fonts/metrics)
 +
    struct Baselines {
      std::atomic<gfxFloat> mAlphabetic{
          std::numeric_limits<gfxFloat>::quiet_NaN()};
 diff --git a/gfx/thebes/gfxHarfBuzzShaper.cpp b/gfx/thebes/gfxHarfBuzzShaper.cpp
-index 6757adf578ef6515f338f44e4b14dc7a20b56966..71c3bde2e94a30d276935b3b1e5fbffccb18615d 100644
+index 6757adf578ef6515f338f44e4b14dc7a20b56966..2083392101911b8424b9477230a1064d830c6c68 100644
 --- a/gfx/thebes/gfxHarfBuzzShaper.cpp
 +++ b/gfx/thebes/gfxHarfBuzzShaper.cpp
-@@ -55,6 +55,7 @@ gfxHarfBuzzShaper::~gfxHarfBuzzShaper() {
+@@ -19,6 +19,8 @@
+ #include "nsString.h"
+ #include "nsUnicodeProperties.h"
+ 
++#include "StealthDesignFontAccess.h"  // STEALTH-HOOK(fingerprint/fonts/metrics)
++
+ extern "C" {
+ hb_unicode_funcs_t* mozilla_harfbuzz_glue_set_up_unicode_funcs();
+ }
+@@ -55,6 +57,7 @@ gfxHarfBuzzShaper::~gfxHarfBuzzShaper() {
    hb_blob_destroy(mLocaTable);
    hb_blob_destroy(mGlyfTable);
    hb_font_destroy(mHBFont);
-+  hb_font_destroy(mDesignFont);  // STEALTH-HOOK(fingerprint/fonts/metrics)
++  StealthReleaseDesignFont(mDesignFont);  // STEALTH-HOOK(fingerprint/fonts/metrics)
    hb_buffer_destroy(mBuffer);
  }
  
 diff --git a/gfx/thebes/gfxHarfBuzzShaper.h b/gfx/thebes/gfxHarfBuzzShaper.h
-index e6d43b6a3998fc2a1905b9da680f0ac544d413b1..6afdfd3e8014fa63a4d82cb4a225161a655269ae 100644
+index e6d43b6a3998fc2a1905b9da680f0ac544d413b1..a8e42bd9c715c6f67eac3432e621c56ded7fde15 100644
 --- a/gfx/thebes/gfxHarfBuzzShaper.h
 +++ b/gfx/thebes/gfxHarfBuzzShaper.h
-@@ -55,6 +55,12 @@ class gfxHarfBuzzShaper : public gfxFontShaper {
-                                  hb_font_extents_t* extents, void* user_data);
- 
+@@ -57,6 +57,7 @@ class gfxHarfBuzzShaper : public gfxFontShaper {
   public:
-+  // STEALTH-HOOK(fingerprint/fonts/metrics)
-+  bool GetDesignGlyphExtents(uint16_t aGID, int32_t& aXBearing,
-+                             int32_t& aYBearing, int32_t& aWidth,
-+                             int32_t& aHeight) const;
-+  bool GetDesignAdvance(uint16_t aGID, int32_t& aAdvance) const;
-+
    explicit gfxHarfBuzzShaper(gfxFont* aFont);
    virtual ~gfxHarfBuzzShaper();
++  friend struct StealthDesignFontAccess;  // STEALTH-HOOK(fingerprint/fonts/metrics)
  
-@@ -167,6 +173,10 @@ class gfxHarfBuzzShaper : public gfxFontShaper {
+   // Returns whether the shaper has been successfully initialized.
+   bool IsInitialized() const { return mHBFont != nullptr; }
+@@ -166,6 +167,7 @@ class gfxHarfBuzzShaper : public gfxFontShaper {
+ 
    // size-specific font object, owned by the gfxHarfBuzzShaper
    hb_font_t* mHBFont = nullptr;
++  mutable hb_font_t* mDesignFont = nullptr;  // STEALTH-HOOK(fingerprint/fonts/metrics)
  
-+  // STEALTH-HOOK(fingerprint/fonts/metrics)
-+  mutable hb_font_t* mDesignFont = nullptr;
-+  hb_font_t* GetDesignFont() const;
-+
    // Held for the duration of ShapeText(): the shaper (and its hb_buffer_t)
    // is shared across threads via the global gfxFontCache, so concurrent
-   // ShapeText() calls must be serialized to avoid racing on mBuffer and

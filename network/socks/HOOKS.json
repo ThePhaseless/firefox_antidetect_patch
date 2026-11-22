@@ -5,7 +5,15 @@
   "kind": "add",
   "form": "registration",
   "line": "UNIFIED_SOURCES += [\"StealthIPv6Literal.cpp\"]  # STEALTH-HOOK(network/ipv6-literal)",
-  "test": ""
+  "test": "gtest:StealthDeclaredNetwork.NothingIsBlockedWhileIPv6IsDeclared"
+ },
+ {
+  "file": "netwerk/base/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"StealthLoadInfo.cpp\"]  # STEALTH-HOOK(automation/navigation)",
+  "test": "gtest:TestStealthLoadInfo.EveryCopyOfALoadInfoKeepsItsLoadIdentifier"
  },
  {
   "file": "netwerk/base/moz.build",
@@ -13,88 +21,51 @@
   "kind": "add",
   "form": "registration",
   "line": "UNIFIED_SOURCES += [\"StealthSocksCredentials.cpp\"]  # STEALTH-HOOK(network/socks)",
-  "test": ""
+  "test": "gtest:TestStealthSocksCredentials.PrefsChanged"
  },
  {
   "file": "netwerk/base/nsProtocolProxyService.cpp",
   "function": "",
   "kind": "add",
   "form": "registration",
-  "line": "#include \"StealthSocksCredentials.h\"",
-  "test": ""
+  "line": "#include \"StealthSocksCredentials.h\"  // STEALTH-HOOK(network/socks)",
+  "test": "gtest:TestStealthSocksCredentials.PrefsChanged"
  },
  {
   "file": "netwerk/base/nsProtocolProxyService.cpp",
-  "function": "void nsProtocolProxyService::PrefsChanged(nsIPrefBranch* prefBranch,",
+  "function": "nsProtocolProxyService::GetName(nsACString& aName) {",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(network/socks)",
-  "test": ""
- },
- {
-  "file": "netwerk/base/nsProtocolProxyService.cpp",
-  "function": "void nsProtocolProxyService::PrefsChanged(nsIPrefBranch* prefBranch,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  StealthSocksPrefsChanged(prefBranch, pref, mSOCKSProxyUsername,",
-  "test": ""
- },
- {
-  "file": "netwerk/base/nsProtocolProxyService.cpp",
-  "function": "void nsProtocolProxyService::PrefsChanged(nsIPrefBranch* prefBranch,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "                           mSOCKSProxyPassword);",
-  "test": ""
+  "form": "notice",
+  "line": "  StealthSocksPrefsChanged(prefBranch, pref, mSOCKSProxyUsername, mSOCKSProxyPassword);  // STEALTH-HOOK(network/socks)",
+  "test": "gtest:TestStealthSocksCredentials.ReachResolvedProxyInfo"
  },
  {
   "file": "netwerk/base/nsProtocolProxyService.cpp",
   "function": "nsresult nsProtocolProxyService::Resolve_Internal(nsIChannel* channel,",
   "kind": "rewrite",
   "form": "unknown",
-  "line": "    // STEALTH-HOOK(network/socks)",
-  "removed": "    rv = NewProxyInfo_Internal(type, *host, port, \"\"_ns, \"\"_ns, \"\"_ns, \"\"_ns,\n                               \"\"_ns, proxyFlags, UINT32_MAX, nullptr, flags,\n                               result);",
-  "test": ""
- },
- {
-  "file": "netwerk/base/nsProtocolProxyService.cpp",
-  "function": "nsresult nsProtocolProxyService::Resolve_Internal(nsIChannel* channel,",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    rv = NewProxyInfo_Internal(type, *host, port, \"\"_ns, mSOCKSProxyUsername,",
-  "test": ""
- },
- {
-  "file": "netwerk/base/nsProtocolProxyService.cpp",
-  "function": "nsresult nsProtocolProxyService::Resolve_Internal(nsIChannel* channel,",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "                               mSOCKSProxyPassword, \"\"_ns, \"\"_ns, proxyFlags,",
-  "test": ""
- },
- {
-  "file": "netwerk/base/nsProtocolProxyService.cpp",
-  "function": "nsresult nsProtocolProxyService::Resolve_Internal(nsIChannel* channel,",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "                               UINT32_MAX, nullptr, flags, result);",
-  "test": ""
+  "line": "    rv = NewProxyInfo_Internal(type, *host, port, \"\"_ns, mSOCKSProxyUsername, mSOCKSProxyPassword, \"\"_ns,  // STEALTH-HOOK(network/socks)",
+  "removed": "    rv = NewProxyInfo_Internal(type, *host, port, \"\"_ns, \"\"_ns, \"\"_ns, \"\"_ns,",
+  "test": "gtest:TestStealthSocksCredentials.ReachResolvedProxyInfo",
+  "why": "G9/G14: Mozilla's call with the two members as its 5th and 6th arguments; only the first line of the call is rewritten (the tool does not yet read a replaced argument as a wrap)",
+  "exception": "G35, approved by the pm (PM-DECISIONS 22/11 morning, value declared = a literal in place of a literal): the two \"\"_ns` credentials become mSOCKSProxyUsername / mSOCKSProxyPassword, the session's SOCKS credentials, as on the base; to be reviewed at the port to 160",
+  "pm": "approvato"
  },
  {
   "file": "netwerk/base/nsProtocolProxyService.h",
   "function": "class nsProtocolProxyService final : public nsIProtocolProxyService2,",
   "kind": "add",
-  "form": "unknown",
-  "line": "  nsCString mSOCKSProxyUsername;",
-  "test": ""
+  "form": "member",
+  "line": "  nsCString mSOCKSProxyUsername;  // STEALTH-HOOK(network/socks)",
+  "test": "gtest:TestStealthSocksCredentials.ReachResolvedProxyInfo"
  },
  {
   "file": "netwerk/base/nsProtocolProxyService.h",
   "function": "class nsProtocolProxyService final : public nsIProtocolProxyService2,",
   "kind": "add",
-  "form": "unknown",
-  "line": "  nsCString mSOCKSProxyPassword;",
-  "test": ""
+  "form": "member",
+  "line": "  nsCString mSOCKSProxyPassword;  // STEALTH-HOOK(network/socks)",
+  "test": "gtest:TestStealthSocksCredentials.ReachResolvedProxyInfo"
  },
  {
   "file": "netwerk/test/gtest/moz.build",
@@ -102,6 +73,6 @@
   "kind": "add",
   "form": "unknown",
   "line": "include(\"stealth.build\")  # STEALTH-HOOK(network/socks)",
-  "test": ""
+  "test": "gtest:TestStealthSocksCredentials.PrefsChanged"
  }
 ]

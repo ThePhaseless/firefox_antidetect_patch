@@ -5,7 +5,7 @@
   "kind": "add",
   "form": "registration",
   "line": "#include \"StealthSurfaceFlags.h\"  // STEALTH-HOOK(fingerprint/canvas/as-drawn)",
-  "test": ""
+  "test": "wrapper:tests/test_moz_element_paints_a_webgl_canvas_as_drawn_e2e.py::test_moz_element_paints_a_webgl_canvas_as_drawn"
  },
  {
   "file": "layout/base/nsLayoutUtils.cpp",
@@ -14,7 +14,9 @@
   "form": "unknown",
   "line": "  result.mSourceSurface = StealthCanvasSnapshot(aElement, aSurfaceFlags, pAlphaType, aTarget);  // STEALTH-HOOK(fingerprint/canvas/as-drawn)",
   "removed": "  result.mSourceSurface = aElement->GetSurfaceSnapshot(pAlphaType, aTarget);",
-  "test": ""
+  "test": "wrapper:tests/test_moz_element_paints_a_webgl_canvas_as_drawn_e2e.py::test_moz_element_paints_a_webgl_canvas_as_drawn",
+  "exception": "G29 (PM-DECISIONS 22/11 morning, read by the pm against the tag): one Mozilla line, only the called function changes",
+  "pm": "approvato"
  },
  {
   "file": "layout/painting/nsImageRenderer.cpp",
@@ -22,57 +24,39 @@
   "kind": "add",
   "form": "registration",
   "line": "#include \"StealthSurfaceFlags.h\"  // STEALTH-HOOK(fingerprint/canvas/as-drawn)",
-  "test": ""
+  "test": "wrapper:tests/test_moz_element_paints_a_webgl_canvas_as_drawn_e2e.py::test_moz_element_paints_a_webgl_canvas_as_drawn"
  },
  {
   "file": "layout/painting/nsImageRenderer.cpp",
   "function": "bool nsImageRenderer::PrepareImage() {",
   "kind": "rewrite",
   "form": "unknown",
-  "line": "    mImageElementSurface = nsLayoutUtils::SurfaceFromElement(",
+  "line": "    mImageElementSurface = nsLayoutUtils::SurfaceFromElement(paintElement, kStealthSfeAsDrawn);  // STEALTH-HOOK(fingerprint/canvas/as-drawn)",
   "removed": "    mImageElementSurface = nsLayoutUtils::SurfaceFromElement(paintElement);",
-  "test": ""
- },
- {
-  "file": "layout/painting/nsImageRenderer.cpp",
-  "function": "bool nsImageRenderer::PrepareImage() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "        paintElement, kStealthSfeAsDrawn);",
-  "test": ""
+  "test": "wrapper:tests/test_moz_element_paints_a_webgl_canvas_as_drawn_e2e.py::test_moz_element_paints_a_webgl_canvas_as_drawn",
+  "exception": "G29 (PM-DECISIONS 22/11 morning, read by the pm against the tag): one Mozilla line, one argument of ours is added to the call",
+  "pm": "approvato"
  },
  {
   "file": "widget/nsBaseDragService.cpp",
   "function": "nsresult nsBaseDragSession::DrawDragForImage(",
   "kind": "rewrite",
-  "form": "unknown",
-  "line": "    // The drag image shows the canvas; a page never reads it back.",
+  "form": "wrap-function",
+  "line": "    *aSurface = aCanvas->GetSurfaceSnapshotAsDrawn();  // STEALTH-HOOK(fingerprint/canvas/as-drawn)",
   "removed": "    *aSurface = aCanvas->GetSurfaceSnapshot();",
-  "test": ""
- },
- {
-  "file": "widget/nsBaseDragService.cpp",
-  "function": "nsresult nsBaseDragSession::DrawDragForImage(",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    *aSurface = aCanvas->GetSurfaceSnapshotAsDrawn();",
-  "test": ""
+  "test": "",
+  "untestable": "a page cannot read a drag image or a taskbar preview; the compile and HOOKS.json prove the hook",
+  "pm": "approvato"
  },
  {
   "file": "widget/windows/TaskbarPreview.cpp",
   "function": "TaskbarPreviewCallback::Done(nsISupports* aCanvas, bool aDrawBorder) {",
   "kind": "rewrite",
-  "form": "unknown",
-  "line": "  // The taskbar shows the canvas; a page never reads it back.",
+  "form": "wrap-function",
+  "line": "  RefPtr<gfx::SourceSurface> source = canvas->GetSurfaceSnapshotAsDrawn();  // STEALTH-HOOK(fingerprint/canvas/as-drawn)",
   "removed": "  RefPtr<gfx::SourceSurface> source = canvas->GetSurfaceSnapshot();",
-  "test": ""
- },
- {
-  "file": "widget/windows/TaskbarPreview.cpp",
-  "function": "TaskbarPreviewCallback::Done(nsISupports* aCanvas, bool aDrawBorder) {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  RefPtr<gfx::SourceSurface> source = canvas->GetSurfaceSnapshotAsDrawn();",
-  "test": ""
+  "test": "",
+  "untestable": "a page cannot read a drag image or a taskbar preview; the compile and HOOKS.json prove the hook",
+  "pm": "approvato"
  }
 ]

@@ -2,7 +2,9 @@
  "modified": [
   "widget/gtk/nsWindow.cpp"
  ],
- "added": {},
+ "added": {
+  "widget/gtk/StealthOcclusion.h": "100644"
+ },
  "inventory": [
   {
    "file": "widget/gtk/nsWindow.cpp",

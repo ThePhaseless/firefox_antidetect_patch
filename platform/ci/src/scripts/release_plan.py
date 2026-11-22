@@ -93,11 +93,14 @@ DEFAULT_GTEST_FILTER = ("StealthGfxFeatureStatus.*:StealthWebGPUAdapter.*:"
                         "StealthJugglerEventId.*:StealthSessionUdpProxy.*:StealthDeclaredNetwork.*:StealthSocksUdpPool.*:TestStealthTRRContext.*:TestStealthSocksCredentials.*:TestStealthSessionResolver.*:StealthIceResolverContext.*:StealthUdpProxyBirth.*:StealthNrSocketBirth.*:"
                         "StealthPcUdpProxyKinds.*:StealthTcpProxyRoad.*:StealthPcProxyConfig.*:"
                         "StealthInputEventBirth.*:StealthKeyBirthScope.*:StealthBirthOrder.*:StealthFcBundleFonts.*:"
-                        "StealthAudioNoise.*:StealthBundledCollection.*:StealthBundledFamilyFilter.*:"
+                        "StealthAudioNoise.*:StealthBundledCollection.*:"
+                        "StealthGlyphCoverage.*:StealthBundleHooks.*:StealthFontListHooks.*:StealthDebugger.*:StealthWindowInputDesktop.*:StealthPrefSanitize.*:TestStealthLinkClickAfter.*:TestStealthLoadInfo.*:TestStealthDocShellDefaults.*:"
                         "StealthCanvasProjection.*:StealthDocumentLanguage.*:StealthFallbackNames.*:StealthFcFontList.*:"
                         "StealthFontList.*:StealthFontMetrics.*:StealthMediaDeclaration.*:StealthOwnBinaries.*:"
                         "StealthQuotaEstimate.*:StealthTextQuality.*:StealthTtcFace.*:StealthWebGPUExternalTexture.*:"
-                        "Intl_Locale_StealthSystemLocales.*:Idwr.*:StartupCache.WritesNeverLowerIOPriority")
+                        "Intl_Locale_StealthSystemLocales.*:Idwr.*:"
+                        "StealthBranding.*:StealthCanvasUtils.*:StealthDragGesture.*:StealthHttp3Socks.*:StealthJugglerCoalesce.*:"
+                        "StealthJugglerMouseAck.*:StealthMouseEventCopy.*:StealthMouseEventIPC.*:StealthNsProxyInfoKinds.*:StealthSocksUdpLayer.*:StealthStackFrames.*:StealthStartupCache.*:StealthTimezone.*")
 DEFAULT_REF = "main"
 # What `stop_after` can say: nothing (the whole run), or the objects of the touched directories.
 STOP_AFTERS = ("", "objects")

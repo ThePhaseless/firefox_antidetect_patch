@@ -5,15 +5,18 @@
   "kind": "add",
   "form": "registration",
   "line": "#include \"StealthIPv6Literal.h\"  // STEALTH-HOOK(network/ipv6-literal)",
-  "test": ""
+  "test": "gtest:StealthDeclaredNetwork.TheConnectFailsWithTheRealErrorAndSendsNothing"
  },
  {
   "file": "netwerk/base/nsSocketTransport2.cpp",
   "function": "nsresult nsSocketTransport::InitiateSocket() {",
   "kind": "rewrite",
   "form": "unknown",
-  "line": "  status = StealthConnect(fd, mNetAddr, mProxyTransparent && !mProxyHost.IsEmpty() ? StealthConnectTarget::kBehindSocksProxy : StealthConnectTarget::kDirect, &prAddr, NS_SOCKET_CONNECT_TIMEOUT);  // STEALTH-HOOK(network/ipv6-literal)",
+  "line": "  status = StealthConnect(mNetAddr, mProxyTransparent, mProxyHost, fd, &prAddr, NS_SOCKET_CONNECT_TIMEOUT);  // STEALTH-HOOK(network/ipv6-literal)",
   "removed": "  status = PR_Connect(fd, &prAddr, NS_SOCKET_CONNECT_TIMEOUT);",
-  "test": ""
+  "test": "wrapper:tests/test_ipv6_literal_connect_e2e.py::test_a_direct_ipv6_literal_is_refused_and_one_behind_socks_is_left_to_the_proxy",
+  "why": "G9/G14: Mozilla's PR_Connect call with our three transport fields passed to the new StealthConnect overload; one line rewritten (the tool does not read a call replaced by another name with other arguments as a wrap)",
+  "exception": "G35, approved by the pm (PM-DECISIONS 22/11 morning, the tool restricted to one argument of ours): PR_Connect becomes StealthConnect with three transport fields of ours (mNetAddr, mProxyTransparent, mProxyHost) as in the verdict of the folder; to be reviewed at the port to 160",
+  "pm": "approvato"
  }
 ]

@@ -5,10 +5,16 @@
 #ifndef mozilla_StealthGeolocation_h
 #define mozilla_StealthGeolocation_h
 
+#include <stdint.h>
+
 #include "nsCOMPtr.h"
 #include "nsIGeolocationProvider.h"
 
 namespace mozilla {
+
+namespace dom {
+enum class PermissionName : uint8_t;
+}  // namespace dom
 
 /**
  * The position a page reads comes only from the core's declaration (the
@@ -44,6 +50,14 @@ bool StealthSelectGeolocationProvider(
  * cancelled the request with PERMISSION_DENIED).
  */
 bool StealthSystemLocationDeclaredOn();
+
+/**
+ * First statement of the parent-side monitor entry of PermissionObserver: true
+ * for the geolocation permission, whose OS state is the declared switch above
+ * and never changes, so no OS monitor is started for it (the early return is the
+ * caller's). Every other permission keeps its monitor.
+ */
+bool StealthSkipsPermissionMonitor(dom::PermissionName aName);
 
 }  // namespace mozilla
 

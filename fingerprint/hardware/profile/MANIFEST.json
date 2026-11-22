@@ -2,7 +2,9 @@
  "modified": [
   "dom/base/Navigator.cpp"
  ],
- "added": {},
+ "added": {
+  "dom/base/StealthHardwareProfile.h": "100644"
+ },
  "inventory": [
   {
    "file": "dom/base/Navigator.cpp",

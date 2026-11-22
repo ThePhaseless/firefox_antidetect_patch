@@ -1,26 +1,18 @@
 [
  {
   "file": "dom/webidl/Window.webidl",
-  "function": "dictionary SynthesizeEventData {",
+  "function": "dictionary SynthesizeMouseEventData : SynthesizeEventData {",
   "kind": "add",
-  "form": "unknown",
-  "line": "  // STEALTH-HOOK(fingerprint/input/latency): members are ordered by name, not here.",
-  "test": ""
+  "form": "registration",
+  "line": "  double latency = 0;  // STEALTH-HOOK(fingerprint/input/latency)",
+  "test": "wrapper:tests/test_input_is_born_before_the_page_sees_it_e2e.py::test_every_key_and_move_is_born_before_its_handler_runs"
  },
  {
   "file": "dom/webidl/Window.webidl",
-  "function": "dictionary SynthesizeEventData {",
+  "function": "dictionary SynthesizeMouseEventData : SynthesizeEventData {",
   "kind": "add",
-  "form": "unknown",
-  "line": "  unsigned long jugglerEventId = 0;",
-  "test": ""
- },
- {
-  "file": "dom/webidl/Window.webidl",
-  "function": "dictionary SynthesizeEventData {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  double latency = 0;",
-  "test": ""
+  "form": "registration",
+  "line": "  unsigned long jugglerEventId = 0;  // STEALTH-HOOK(fingerprint/input/latency)",
+  "test": "wrapper:tests/test_input_is_born_before_the_page_sees_it_e2e.py::test_every_key_and_move_is_born_before_its_handler_runs"
  }
 ]

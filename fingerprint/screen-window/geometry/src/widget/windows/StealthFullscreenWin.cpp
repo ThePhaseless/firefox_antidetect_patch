@@ -9,15 +9,15 @@
 
 namespace mozilla::widget {
 
-void StealthHoldDeclaredFullscreen(nsIWidget& aWidget, bool aFullscreen,
-                                   WINDOWPOS* aPos) {
+void StealthHoldDeclaredFullscreen(nsIWidget& aWidget, WINDOWPOS* aPos) {
+  const bool fullscreen = aWidget.SizeMode() == nsSizeMode_Fullscreen;
   Maybe<LayoutDeviceIntRect> declared;
-  if (aFullscreen) {
+  if (fullscreen) {
     declared = StealthDeclaredFullscreenDeviceRect(aWidget);
   }
   int32_t x = aPos->x, y = aPos->y, cx = aPos->cx, cy = aPos->cy;
   StealthHeldFullscreenPosition(
-      declared, aFullscreen, !(aPos->flags & SWP_NOMOVE), !(aPos->flags & SWP_NOSIZE),
+      declared, fullscreen, !(aPos->flags & SWP_NOMOVE), !(aPos->flags & SWP_NOSIZE),
       &x, &y, &cx, &cy);
   aPos->x = x;
   aPos->y = y;
@@ -25,16 +25,17 @@ void StealthHoldDeclaredFullscreen(nsIWidget& aWidget, bool aFullscreen,
   aPos->cy = cy;
 }
 
-void StealthDeclaredFullscreenTrackSize(nsIWidget& aWidget, bool aFullscreen,
-                                        MINMAXINFO* aInfo) {
+void StealthDeclaredFullscreenTrackSize(nsIWidget& aWidget, LPARAM aLParam) {
+  MINMAXINFO* mmi = reinterpret_cast<MINMAXINFO*>(aLParam);
+  const bool fullscreen = aWidget.SizeMode() == nsSizeMode_Fullscreen;
   Maybe<LayoutDeviceIntRect> declared;
-  if (aFullscreen) {
+  if (fullscreen) {
     declared = StealthDeclaredFullscreenDeviceRect(aWidget);
   }
-  int32_t w = aInfo->ptMaxTrackSize.x, h = aInfo->ptMaxTrackSize.y;
-  StealthFullscreenMaxTrackSize(declared, aFullscreen, &w, &h);
-  aInfo->ptMaxTrackSize.x = w;
-  aInfo->ptMaxTrackSize.y = h;
+  int32_t w = mmi->ptMaxTrackSize.x, h = mmi->ptMaxTrackSize.y;
+  StealthFullscreenMaxTrackSize(declared, fullscreen, &w, &h);
+  mmi->ptMaxTrackSize.x = w;
+  mmi->ptMaxTrackSize.y = h;
 }
 
 }  // namespace mozilla::widget

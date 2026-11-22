@@ -46,10 +46,13 @@ GREEN_FILTER = ("StealthGfxFeatureStatus.*:StealthWebGPUAdapter.*:StealthWebGPUD
                 "sUdpPool.*:TestStealthTRRContext.*:TestStealthSocksCredentials.*:TestStealthSessionResolver.*:StealthIceResolv"
                 "erContext.*:StealthUdpProxyBirth.*:StealthNrSocketBirth.*:StealthPcUdpProxyKinds.*:StealthTcpProxyRoad.*:Steal"
                 "thPcProxyConfig.*:StealthInputEventBirth.*:StealthKeyBirthScope.*:StealthBirthOrder.*:StealthFcBundleFonts.*:S"
-                "tealthAudioNoise.*:StealthBundledCollection.*:StealthBundledFamilyFilter.*:StealthCanvasProjection.*:StealthDo"
-                "cumentLanguage.*:StealthFallbackNames.*:StealthFcFontList.*:StealthFontList.*:StealthFontMetrics.*:StealthMedi"
-                "aDeclaration.*:StealthOwnBinaries.*:StealthQuotaEstimate.*:StealthTextQuality.*:StealthTtcFace.*:StealthWebGPU"
-                "ExternalTexture.*:Intl_Locale_StealthSystemLocales.*:Idwr.*:StartupCache.WritesNeverLowerIOPriority")
+                "tealthAudioNoise.*:StealthBundledCollection.*:StealthGlyphCoverage.*:StealthBundleHooks.*:StealthFontListHooks"
+                ".*:StealthDebugger.*:StealthWindowInputDesktop.*:StealthPrefSanitize.*:TestStealthLinkClickAfter.*:TestStealth"
+                "LoadInfo.*:TestStealthDocShellDefaults.*:StealthCanvasProjection.*:StealthDocumentLanguage.*:StealthFallbackNa"
+                "mes.*:StealthFcFontList.*:StealthFontList.*:StealthFontMetrics.*:StealthMediaDeclaration.*:StealthOwnBinaries."
+                "*:StealthQuotaEstimate.*:StealthTextQuality.*:StealthTtcFace.*:StealthWebGPUExternalTexture.*:Intl_Locale_Stea"
+                "lthSystemLocales.*:Idwr.*:"
+                "StealthBranding.*:StealthCanvasUtils.*:StealthDragGesture.*:StealthHttp3Socks.*:StealthJugglerCoalesce.*:StealthJugglerMouseAck.*:StealthMouseEventCopy.*:StealthMouseEventIPC.*:StealthNsProxyInfoKinds.*:StealthSocksUdpLayer.*:StealthStackFrames.*:StealthStartupCache.*:StealthTimezone.*")
 GTEST_JOBS = ("gtest-linux", "gtest-cross")
 COMPILE_ONLY_IF = "needs.plan.outputs.stop_after != 'objects'"
 # The steps of a build leg that come after the objects, and are for the browser's build and its package: a compile-only run (stop_after=objects) runs none.
@@ -120,9 +123,9 @@ def group_gate(doc) -> list:
     red_gate_green_gtests = outcome(jobs, {"gate": "failure"})
     out.append(("gate: a red gate leaves the gtests as they are (two verdicts: the run is red if either is)",
                 red_gate_green_gtests["gtest-linux"] == "success" and red_gate_green_gtests["gtest-cross"] == "success"))
-    out.append(("gate: neither has an `if` that would run it past what it needs (no status function; the gate's only condition is a compile-only run's)",
+    out.append(("gate: neither has an `if` that would run it past what it needs (no status function on the gate, whose only condition is a compile-only run's; the publish names the result of each of its needs)",
                 jobs["gate"].get("if") in (None, COMPILE_ONLY_IF) and not e.STATUS.search(str(jobs["gate"].get("if", "")))
-                and not e.STATUS.search(str(jobs["publish"].get("if", "")))))
+                and all(("needs.%s.result == 'success'" % j) in str(jobs["publish"].get("if", "")) for j in ["plan", "build", "gate", *GTEST_JOBS, "hook-tests-judge"])))
     out += group_compile_only(doc)
     candidate = outcome(jobs, {}, kind="candidate")
     out.append(("gate: a candidate gates and publishes nothing", candidate["gate"] == "success" and candidate["publish"] == "skipped"))

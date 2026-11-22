@@ -47,11 +47,12 @@ test('the OCSP request is given the context of the page, after what Mozilla copi
 
 test('the TLS over a tunnel takes the context of the transport it runs over, never a bare default', () => {
   const text = read(TUNNEL);
-  assert.ok(text.includes('#include "mozilla/net/StealthTRRContext.h"  ' + TAG + '\n'), 'the include is missing');
+  assert.ok(text.includes('\n#include "nsSocketTransport2.h"\n\n#include "mozilla/net/StealthTRRContext.h"  ' + TAG + '\n\nnamespace mozilla::net {'), 'the include is missing');
   const body = text.match(/bool TLSTransportLayer::Init\([\s\S]*?\n}\n/)[0];
-  assert.doesNotMatch(body, /OriginAttributes\(\)/, 'a socket control with default attributes is made');
-  const hook = 'nullptr, StealthTransportContext(mSocketTransport), 0, 0, mFD,  ' + TAG + '\n';
+  const hook = 'nullptr, StealthTransportContext(this, OriginAttributes()), 0, 0, mFD,  ' + TAG + '\n';
   assert.ok(body.includes(hook), 'the socket control is not given the context of the transport');
+  // The attributes of the socket control are the one argument our function gives: nothing else of Mozilla's own makes one.
+  assert.equal(body.match(/OriginAttributes\(\)/g).length, 1, 'a socket control with default attributes is made');
   assert.equal(text.match(/StealthTransportContext\(/g).length, 1);
   assert.ok(body.indexOf('provider->AddToSocket(') < body.indexOf(hook), 'the context is not an argument of AddToSocket');
 });
@@ -61,11 +62,13 @@ test('our functions keep the user context alone and read the transport, in the f
   const code = read('netwerk/ipc/StealthTRRContext.cpp');
   assert.match(header, /void StealthKeepRequestContext\(const OriginAttributes& aPage,\s*OriginAttributes& aRequest\);/);
   assert.match(header, /OriginAttributes StealthTransportContext\(nsISocketTransport\* aTransport\);/);
+  assert.match(header, /OriginAttributes StealthTransportContext\(nsISocketTransport\* aTransport,\s*const OriginAttributes& aUpstream\);/);
   assert.match(header, /\nclass nsISocketTransport;\n/);
   const keep = code.match(/void StealthKeepRequestContext\([\s\S]*?\n}\n/)[0];
   assert.match(keep, /aRequest\.mUserContextId = aPage\.mUserContextId;/);
   assert.doesNotMatch(keep, /mFirstPartyDomain|mPrivateBrowsingId/, 'first party domain and private browsing id stay Mozilla\'s');
-  const transport = code.match(/OriginAttributes StealthTransportContext\([\s\S]*?\n}\n/)[0];
+  const transport = code.match(/OriginAttributes StealthTransportContext\(nsISocketTransport\* aTransport,[\s\S]*?\n}\n/)[0];
+  assert.match(transport, /OriginAttributes attrs = aUpstream;/);
   assert.match(transport, /if \(aTransport\) \{/);
   assert.match(transport, /aTransport->GetOriginAttributes\(&attrs\)/);
   assert.match(code, /#include "nsISocketTransport\.h"/, 'the implementation uses nsISocketTransport and includes it');

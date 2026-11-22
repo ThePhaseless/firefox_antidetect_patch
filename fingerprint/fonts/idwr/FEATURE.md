@@ -2,15 +2,21 @@
 
 Category: build
 Prefs: none read directly
-Test: TODO
+Test: the wrapper's e2e tests/test_canvas_text_is_windows_e2e.py (342 canvas text cases whose RGBA hashes are retail Windows Firefox's, on Windows, Debian and Ubuntu: text rendered by idwr; without the directory libxul has no idwr and the test is red); the gtest `Idwr.TexturesAreDirectWrites` (gfx/idwr/tests/gtest/TestIdwr.cpp: golden textures of DirectWrite, read in libxul; its suite `Idwr.*` must be in the default gtest filter of release.yml, G20/G42)
 
 ## What it does
 
-TODO: one paragraph, from the notes below.
+`gfx/idwr` is the text rasterizer of invisible_DWriteCore: DirectWrite 10.0.26100.9711
+in portable C, vendored at the commit in `gfx/idwr/moz.yaml` (fix it upstream and
+vendor again, never here). It is built into libxul on x86_64 and aarch64, so canvas
+and page text are drawn by the same code on every OS and give the bytes retail
+Firefox on Windows gives. Nothing of Mozilla's text drawing changes in this folder:
+the folder only adds the directory to the build; the text path that calls idwr is
+the work of the other folders of fingerprint/fonts.
 
 ## Hooks in Mozilla files
 
-- `gfx/moz.build` (before TEST_DIRS, already-hook): Builds gfx/idwr (invisible_DWriteCore's DirectWrite rasterizer) into libxul, on a line of its own outside Mozilla's DIRS list.
+- `gfx/moz.build` (registration, top level, before `TEST_DIRS`, a Mozilla line on each side): `DIRS += ["idwr"]`. One line with the marker, outside Mozilla's `DIRS` list. Without it libxul has no idwr and the text e2e is red.
 
 ## Our own files
 

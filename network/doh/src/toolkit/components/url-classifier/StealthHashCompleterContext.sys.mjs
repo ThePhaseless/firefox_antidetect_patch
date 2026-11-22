@@ -71,13 +71,14 @@ export function stealthCompleteInContext(
 
 /**
  * Called by HashCompleterRequestBase.openChannel once upstream has set the
- * attributes of the channel (the first party domain of Safe Browsing): the
- * request of the completer of a context carries that context too. A channel
+ * attributes of the channel (the first party domain of Safe Browsing), with the
+ * request (aRequest.completer is its completer): the request of the completer
+ * of a context carries that context too. A channel
  * that cannot be given the context throws, and the request ends in failure
  * (beginBuildChannel notifies it): it never leaves by the wrong road.
  */
-export function stealthApplyContext(aChannel, aCompleter) {
-  const userContextId = aCompleter.stealthUserContextId;
+export function stealthApplyContext(aChannel, aRequest) {
+  const userContextId = aRequest.completer.stealthUserContextId;
   if (!userContextId) {
     return;
   }
