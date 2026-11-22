@@ -362,7 +362,7 @@ OWN_FILES = [
     (r"^dom/events/StealthScreenCoords\.", "fingerprint/screen-window/geometry"),
     (r"^dom/media/StealthMediaDeclaration\.", "fingerprint/media/decode-declaration"),
     (r"^dom/media/webrtc/transport/nr_stealth_network\.", "fingerprint/webrtc/declared-network"),
-    (r"^dom/media/webrtc/transport/test/gtest/(moz\.build|TestStealthDeclaredNetwork\.cpp)$", "fingerprint/webrtc/declared-network"),
+    (r"^dom/media/webrtc/transport/test/gtest/(moz\.build|TestStealthDeclaredNetwork\.cpp|TestStealthExclusivePort\.cpp)$", "fingerprint/webrtc/declared-network"),
     (r"^third_party/libwebrtc/api/location\.h$", "fingerprint/webrtc/declared-network"),
     (r"^netwerk/protocol/res/StealthBranding\.", "fingerprint/js-surface/branding"),
     (r"^chrome/test/unit/(test_stealth_branding_chrome_registry\.js|xpcshell-stealth\.toml)$", "fingerprint/js-surface/branding"),
