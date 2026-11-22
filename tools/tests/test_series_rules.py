@@ -30,13 +30,13 @@ def _with_budget(tmp_path, monkeypatch, change):
 
 def test_a_mozilla_file_that_grows_past_its_budget_fails(tmp_path, monkeypatch):
     def shrink(b):
-        b["startupcache/StartupCache.h"] -= 1
+        b["browser/components/moz.build"] -= 1
     found = _with_budget(tmp_path, monkeypatch, shrink)
-    assert any("startupcache/StartupCache.h" in p and "budget is" in p for p in found), found
+    assert any("browser/components/moz.build" in p and "budget is" in p for p in found), found
 
 
 def test_a_newly_patched_mozilla_file_needs_a_budget(tmp_path, monkeypatch):
-    found = _with_budget(tmp_path, monkeypatch, lambda b: b.pop("startupcache/StartupCache.h"))
+    found = _with_budget(tmp_path, monkeypatch, lambda b: b.pop("browser/components/moz.build"))
     assert any("no hook budget" in p for p in found), found
 
 
@@ -53,14 +53,14 @@ def test_series_must_list_exactly_the_folders_on_disk(tmp_path, monkeypatch):
 
 def test_the_budget_only_goes_down(tmp_path, monkeypatch):
     budget = json.loads(engine.BUDGET.read_text(encoding="utf-8"))
-    budget["startupcache/StartupCache.h"] += 40
+    budget["browser/components/moz.build"] += 40
     path = tmp_path / "hook-budget.json"
     path.write_text(json.dumps(budget), encoding="utf-8")
     monkeypatch.setattr(engine, "BUDGET", path)
     monkeypatch.setattr(engine, "REMOVED_BUDGET", _copy_removed_budget(tmp_path, lambda b: None))
     engine.shrink_budget()
     after = json.loads(path.read_text(encoding="utf-8"))
-    assert after["startupcache/StartupCache.h"] == budget["startupcache/StartupCache.h"] - 40
+    assert after["browser/components/moz.build"] == budget["browser/components/moz.build"] - 40
 
 
 # The second budget: Mozilla's lines we remove or rewrite. Such a line conflicts at a
@@ -101,7 +101,7 @@ def test_a_removed_budget_for_a_file_no_longer_patched_must_go(tmp_path, monkeyp
 def test_the_removed_budget_only_goes_down_and_drops_files_at_zero(tmp_path, monkeypatch):
     def loosen(b):
         b[FILE] += 40
-        b["startupcache/StartupCache.h"] = 7  # patched, removes nothing
+        b["browser/components/moz.build"] = 7  # patched, removes nothing
     path = _copy_removed_budget(tmp_path, loosen)
     monkeypatch.setattr(engine, "REMOVED_BUDGET", path)
     hook = tmp_path / "hook-budget.json"
@@ -111,7 +111,7 @@ def test_the_removed_budget_only_goes_down_and_drops_files_at_zero(tmp_path, mon
     after = json.loads(path.read_text(encoding="utf-8"))
     real = json.loads(engine.REMOVED_BUDGET.read_text(encoding="utf-8"))
     assert after[FILE] == real[FILE]
-    assert "startupcache/StartupCache.h" not in after
+    assert "browser/components/moz.build" not in after
 
 
 def test_lines_are_counted_inside_hunks_only(tmp_path):
@@ -294,7 +294,7 @@ def test_every_record_as_committed_has_the_counts_of_its_patch():
 
 def test_the_record_of_the_accept_language_hook_is_its_own():
     record = _record(HTTP_HANDLER)
-    assert (record["added"], record["removed"], record["hunks"]) == (11, 3, 2)
+    assert (record["added"], record["removed"], record["hunks"]) == (3, 1, 2)
     assert any("PrepareAcceptLanguages" in e for e in record["evidence"])
     assert not any("ParentalControls" in e for e in record["evidence"])
 
@@ -302,7 +302,7 @@ def test_the_record_of_the_accept_language_hook_is_its_own():
 def test_a_record_with_the_counts_of_another_feature_fails():
     record = dict(_record(HTTP_HANDLER), added=18, hunks=6)
     found = engine.record_count_problems([record], _counts())
-    assert any(HTTP_HANDLER in p and "says added 18, removed 3, hunks 6" in p and "has 11, 3, 2" in p
+    assert any(HTTP_HANDLER in p and "says added 18, removed 1, hunks 6" in p and "has 3, 1, 2" in p
                for p in found), found
 
 
