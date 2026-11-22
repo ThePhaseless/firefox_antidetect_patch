@@ -60,7 +60,8 @@ def test_the_budgets_as_committed_are_not_above_main():
     main_hook, main_removed = engine.load_main_budgets()
     hook = json.loads(engine.BUDGET.read_text(encoding="utf-8"))
     removed = json.loads(engine.REMOVED_BUDGET.read_text(encoding="utf-8"))
-    assert engine.budget_raise_problems(hook, removed, main_hook, main_removed) == []
+    # as check reads them: main's budgets, and main's one-time realignment list where main has one
+    assert engine.budget_raise_problems(hook, removed, main_hook, main_removed, engine.load_main_realign()) == []
 
 
 # The one-time realignment of the firefox-69 line: tools/budget-realign-69.json, read from main.

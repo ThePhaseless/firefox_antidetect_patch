@@ -229,13 +229,20 @@ def test_hook_debt_removes_and_never_adds():
 
 
 def test_check_refuses_a_new_violation_and_a_stale_entry(tmp_path, monkeypatch, capsys):
-    debt = json.loads(engine.HOOK_DEBT.read_text(encoding="utf-8"))
+    # whatever debt the series has, none at all once it is paid: one violation is added to the series' own
+    real = hc.contract_violations(engine.ROOT)
+    text = "  x = StealthX(this) + 1;"
+    extra = hc.Violation("C5", "fingerprint/x", "dom/X.cpp", "void X()", text,
+                         hc._key("C5", "fingerprint/x", "dom/X.cpp", "void X()", text))
+    debt = hc.update_debt([], real, init=True)
     path = tmp_path / "hook-debt.json"
     monkeypatch.setattr(engine, "HOOK_DEBT", path)
-    hc.write_debt(path, debt[1:])                       # one violation not listed
+    monkeypatch.setattr(hc, "contract_violations", lambda root: real + [extra])
+    hc.write_debt(path, debt)                           # one violation not listed
     assert engine.check() == 1
     assert "not in the debt list" in capsys.readouterr().out
-    hc.write_debt(path, debt + [dict(debt[0], key="C2|x|y|z|000000000000")])     # one entry gone
+    monkeypatch.setattr(hc, "contract_violations", lambda root: real)
+    hc.write_debt(path, debt + hc.update_debt([], [extra], init=True))     # one entry gone
     assert engine.check() == 1
     assert "no longer occurs" in capsys.readouterr().out
     hc.write_debt(path, debt)
