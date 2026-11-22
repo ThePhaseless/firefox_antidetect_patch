@@ -212,6 +212,20 @@ def test_a_gtest_reference_must_exist(tmp_path):
     assert hl.problems(root) == []
 
 
+def test_a_gtest_declaration_on_two_lines_resolves(tmp_path):
+    root = series(tmp_path, top(G1))
+    src = root / FOLDER / "src" / "intl" / "gtest"
+    src.mkdir(parents=True)
+    (src / "TestWrapped.cpp").write_text(
+        "TEST(Wrapped_Suite,\n     ALongNameThatClangFormatBreaks)\n{\n}\n"
+        "TEST_F(Wrapped_Fixture,\r\n       AlsoBroken) {}\n"
+        "TEST(Wrapped_Suite, OneLine) {}\n", encoding="utf-8")
+    for ref, ok in (("gtest:Wrapped_Suite.ALongNameThatClangFormatBreaks", True),
+                    ("gtest:Wrapped_Fixture.AlsoBroken", True), ("gtest:Wrapped_Suite.OneLine", True),
+                    ("gtest:Wrapped_Suite.Nope", False), ("gtest:Wrapped_Suite.ALongNameThatClang", False)):
+        assert (hl.reference_problem(root, ref) is None) == ok, ref
+
+
 def test_a_node_reference_must_exist_with_its_title(tmp_path):
     root = series(tmp_path, top(G1))
     d = root / FOLDER / "src" / "juggler" / "tests"
