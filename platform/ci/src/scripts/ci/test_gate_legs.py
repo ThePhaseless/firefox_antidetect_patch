@@ -295,9 +295,14 @@ def package_cases(gate: dict) -> list:
     add("package-ab: the call can read the other run's artifacts and the release (actions: read, contents: read), and writes nothing",
         call.get("permissions") == {"actions": "read", "contents": "read"} and wf.get("permissions") == {"actions": "read", "contents": "read"})
     inputs = (on.get("workflow_call") or {}).get("inputs") or {}
-    add("package-ab: package-ab.yml is a reusable workflow (build_run_id, published_tag firefox-68), and runs on its own only for a push to latitude/*-oracles",
-        set(on) == {"workflow_call", "push"} and on["push"].get("branches") == ["latitude/*-oracles"] and set(inputs) == {"build_run_id", "published_tag"}
-        and inputs["published_tag"].get("default") == "firefox-68" and not any("required" in i for i in inputs.values()))
+    add("package-ab: package-ab.yml is a reusable workflow (build_run_id, published_tag firefox-68, candidate_tag empty), and runs on its own only for a push to latitude/*-oracles",
+        set(on) == {"workflow_call", "push"} and on["push"].get("branches") == ["latitude/*-oracles"] and set(inputs) == {"build_run_id", "published_tag", "candidate_tag"}
+        and inputs["published_tag"].get("default") == "firefox-68" and inputs["candidate_tag"].get("default") == "" and not any("required" in i for i in inputs.values()))
+    mode = ((job.get("strategy") or {}).get("matrix") or {}).get("mode", "")
+    add("package-ab: a push runs two legs of the job, the A/B of the run and the A/A of the published tag with itself; a call with candidate_tag is the A/A alone; the gate's call is the A/B alone",
+        (job["strategy"].get("fail-fast") is False) and '["ab","tag"]' in mode and "github.event_name == 'push'" in mode and "inputs.candidate_tag != '' && '[\"tag\"]'" in mode
+        and mode.rstrip(" }").endswith("'[\"ab\"]')")
+        and job["env"].get("CAND_TAG") == "${{ matrix.mode == 'tag' && (inputs.candidate_tag || inputs.published_tag || 'firefox-68') || '' }}")
     add("package-ab: a push measures run 44921963200 against firefox-68 (the inputs of a push are empty), and a call uses what the gate passed",
         job["env"].get("BUILD_RUN_ID") == "${{ inputs.build_run_id || '44921963200' }}" and job["env"].get("TAG") == "${{ inputs.published_tag || 'firefox-68' }}")
     add("package-ab: 15 minutes on a GitHub runner, never the Latitude node",
@@ -309,15 +314,23 @@ def package_cases(gate: dict) -> list:
     built = [s for s in down if s["with"]["name"] == "source-commit"]
     add("package-ab: a build that recorded no source-commit is not an error of the download, the run's head_sha is the series commit",
         built[0].get("continue-on-error") is True and "series-commit.txt" in text and ".head_sha" in text)
-    pub = [s for s in steps if "seal-check" in str(s.get("run", ""))]
+    pub = [s for s in steps if s.get("id") == "published"]
     add("package-ab: the published release is checked against checksums.txt and its seal before anything is compared",
         len(pub) == 1 and "sha256sum -c checksums.txt" in pub[0]["run"] and pub[0]["run"].index("sha256sum -c") < pub[0]["run"].index("seal-check")
-        and steps.index(pub[0]) < steps.index(down[0]) and pub[0].get("id") == "published")
+        and steps.index(pub[0]) < steps.index(down[0]))
+    rel = [s for s in steps if s.get("id") == "candidate_release"]
+    add("package-ab: the candidate release of the A/A is checked against its own checksums.txt and seal too, and only the legs of a tag download it; the artifacts of a run only the others",
+        len(rel) == 1 and rel[0].get("if") == "env.CAND_TAG != ''" and "sha256sum -c checksums.txt" in rel[0]["run"] and "seal-check candidate-release" in rel[0]["run"]
+        and "--output-name candidate_series_commit" in rel[0]["run"] and steps.index(rel[0]) < steps.index(down[0])
+        and all(d.get("if") == "env.CAND_TAG == ''" for d in down))
     ab = [s for s in steps if ' compare "out/published' in str(s.get("run", ""))]
     cmd = str(ab[0]["run"]) if len(ab) == 1 else ""
     add("package-ab: the commits of the diff are fetched when this checkout lacks them, then explain, and one compare per leg whose red makes the step red",
         len(ab) == 1 and cmd.index("fetch --no-tags origin") < cmd.index(" explain ") < cmd.index(" compare ") and "FROM: ${{ steps.published.outputs.series_commit }}" in text
         and "|| RED=1" in cmd and 'exit "$RED"' in cmd and "continue-on-error" not in ab[0] and "if" not in ab[0] and "linux-x86_64 win-x86_64" in cmd)
+    add("package-ab: the compare reads the content of both archives (the diff and the proof of build identity), and the A/A, a release with itself, expects that nothing changed",
+        '--published-archive "$PUB" --candidate-archive "$1" $EXPECT' in cmd and 'EXPECT="--expect-identical"' in cmd and '[ "$CAND_TAG" = "$TAG" ]' in cmd
+        and "CAND_FROM: ${{ steps.candidate_release.outputs.candidate_series_commit }}" in text)
     keep = [s for s in steps if (s.get("with") or {}).get("path") == "out"]
-    add("package-ab: the lists and the reports are kept after a red run too", len(keep) == 1 and "always()" in str(keep[0].get("if", "")) and keep[0]["with"]["name"] == "package-ab")
+    add("package-ab: the lists and the reports are kept after a red run too", len(keep) == 1 and "always()" in str(keep[0].get("if", "")) and keep[0]["with"]["name"] == "package-ab${{ matrix.mode == 'tag' && '-aa' || '' }}")
     return out
