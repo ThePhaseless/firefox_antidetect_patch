@@ -5631,6 +5631,28 @@
   }
  },
  {
+  "file": "dom/canvas/gtest/moz.build",
+  "category": "spoof",
+  "feature": "webgl-parameters",
+  "prefs": [
+   "zoom.stealth.webgl.shader_precisions"
+  ],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "after the UNIFIED_SOURCES list (TestWebGLTextureUploadInit.cpp)",
+  "evidence": [
+   "+UNIFIED_SOURCES += [\"TestStealthWebGLParams.cpp\"]  # STEALTH-HOOK(fingerprint/webgl/parameters)"
+  ],
+  "notes": "Builds TestStealthWebGLParams.cpp: the declared shader precision object is held by its references.",
+  "verifier": {
+   "changed": [],
+   "why": "Written with the hook, 2026-11-22."
+  }
+ },
+ {
   "file": "dom/events/test/gtest/moz.build",
   "category": "spoof",
   "feature": "window-geometry",
