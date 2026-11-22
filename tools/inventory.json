@@ -8304,5 +8304,365 @@
    "changed": [],
    "why": "Written from the diff against the tag."
   }
+ },
+ {
+  "file": "js/xpconnect/tests/unit/xpcshell.toml",
+  "category": "juggler",
+  "feature": "hybrid-xrays",
+  "prefs": [],
+  "added": 2,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "[\"test_scriptable_nsIClassInfo.js\"]",
+  "evidence": [
+   "+[\"test_stealth_hybrid_xrays_options.js\"]  # STEALTH-HOOK(automation/hybrid-xrays)"
+  ],
+  "notes": "Registration of our xpcshell test of the hybridXrays option of Cu.Sandbox (js/xpconnect/tests/unit/test_stealth_hybrid_xrays_options.js).",
+  "verifier": {
+   "changed": [],
+   "why": "Checked against the diff; one registration line and its blank line."
+  }
+ },
+ {
+  "file": "dom/ipc/gtest/moz.build",
+  "category": "juggler",
+  "feature": "juggler-input-dispatch",
+  "prefs": [],
+  "added": 2,
+  "removed": 0,
+  "hunks": 2,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "after the UNIFIED_SOURCES list (RemoteTypeTest.cpp); after the LOCAL_INCLUDES list",
+  "evidence": [
+   "+UNIFIED_SOURCES += [\"TestStealthDragGesture.cpp\", \"TestStealthJugglerCoalesce.cpp\", \"TestStealthMouseEventIPC.cpp\"]  # STEALTH-HOOK(automation/input)",
+   "+LOCAL_INCLUDES += [\"/dom/events\"]  # STEALTH-HOOK(automation/input)"
+  ],
+  "notes": "Builds the gtests of the drag decision, the id through IPC and copy, and the coalescing of the Juggler id; /dom/events is where StealthDragGesture.h is.",
+  "verifier": {
+   "changed": [],
+   "why": "Written with the hook, 2026-11-21."
+  }
+ },
+ {
+  "file": "layout/base/gtest/moz.build",
+  "category": "juggler",
+  "feature": "juggler-input-dispatch",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "after the UNIFIED_SOURCES list (TestUniqueOrNonOwningPtr.cpp)",
+  "evidence": [
+   "+UNIFIED_SOURCES += [\"TestStealthJugglerMouseAck.cpp\"]  # STEALTH-HOOK(automation/input)"
+  ],
+  "notes": "Builds the gtest of StealthJugglerMouseAck (layout/base is already in its local includes).",
+  "verifier": {
+   "changed": [],
+   "why": "Written with the hook, 2026-11-21."
+  }
+ },
+ {
+  "file": "docshell/base/test/gtest/moz.build",
+  "category": "build",
+  "feature": "juggler-navigation-events",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "after the closing bracket of UNIFIED_SOURCES",
+  "evidence": [
+   "+include(\"stealth.build\")  # STEALTH-HOOK(automation/navigation)"
+  ],
+  "notes": "One line includes docshell/base/test/gtest/stealth.build, our file, which lists TestStealthNavigation.cpp and the local include of docshell/base.",
+  "verifier": {
+   "changed": [],
+   "why": "Written from the diff against the tag."
+  }
+ },
+ {
+  "file": "dom/canvas/OffscreenCanvas.h",
+  "category": "spoof",
+  "feature": "canvas-noise-projection",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "class OffscreenCanvas, after GetSurfaceSnapshot (declaration of the as-drawn reader)",
+  "evidence": [
+   "+  already_AddRefed<gfx::SourceSurface> GetSurfaceSnapshotAsDrawn(gfxAlphaType* aOutAlphaType = nullptr);  // STEALTH-HOOK(fingerprint/canvas/noise-projection)"
+  ],
+  "notes": "Member declaration of Mozilla's GetSurfaceSnapshot body, renamed in OffscreenCanvas.cpp; OffscreenCanvas::GetSurfaceSnapshot is defined in dom/canvas/StealthOffscreenSnapshot.cpp.",
+  "verifier": {
+   "changed": [],
+   "why": "Written by the hook-rework executor of this folder."
+  }
+ },
+ {
+  "file": "netwerk/protocol/res/SubstitutingProtocolHandler.h",
+  "category": "spoof",
+  "feature": "stealth-branding-redirect",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "class SubstitutingProtocolHandler, after NS_DECL_NON_VIRTUAL_NSISUBSTITUTINGPROTOCOLHANDLER",
+  "evidence": [
+   "+  nsresult ResolveURI_Mozilla(nsIURI* aResURI, nsACString& aResult);  // STEALTH-HOOK(fingerprint/js-surface/branding)"
+  ],
+  "notes": "Declaration of Mozilla's ResolveURI body under its new name (function wrap): ResolveURI itself is ours, defined in netwerk/protocol/res/StealthBranding.cpp, and redirects every successful resolution to the declared branding archive.",
+  "verifier": {
+   "changed": [],
+   "why": "written by the hook rework, not by the first inventory"
+  }
+ },
+ {
+  "file": "security/sandbox/linux/gtest/moz.build",
+  "category": "build",
+  "feature": "stealth-branding-redirect",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "UNIFIED_SOURCES list of the sandbox gtests",
+  "evidence": [
+   "+UNIFIED_SOURCES += [\"TestStealthBrandingPolicy.cpp\"]  # STEALTH-HOOK(fingerprint/js-surface/branding)"
+  ],
+  "notes": "Registers our gtest of the content sandbox's branding read rule, after the closing bracket of Mozilla's list.",
+  "verifier": {
+   "changed": [],
+   "why": "written by the hook rework, not by the first inventory"
+  }
+ },
+ {
+  "file": "devtools/shared/heapsnapshot/tests/gtest/moz.build",
+  "category": "build",
+  "feature": "debugger-invisible-attach",
+  "prefs": [],
+  "added": 2,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "UNIFIED_SOURCES += [\"TestStealthDebugger.cpp\"] after FINAL_LIBRARY",
+  "evidence": [
+   "+UNIFIED_SOURCES += [\"TestStealthDebugger.cpp\"]  # STEALTH-HOOK(fingerprint/js-surface/debugger)"
+  ],
+  "notes": "Registers the gtest suite StealthDebugger.* of this folder in the existing heapsnapshot gtest library (xul-gtest); the test uses the DevTools.h fixture of that directory.",
+  "verifier": {
+   "changed": [],
+   "why": "Written by the hook-rework executor of this folder."
+  }
+ },
+ {
+  "file": "docshell/base/BrowsingContext.h",
+  "category": "spoof",
+  "feature": "timezone-locale-override",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "class BrowsingContext (private), right after `void Attach(bool aFromIPC, ContentParent* aOriginProcess);`",
+  "evidence": [
+   "+  void Attach_Mozilla(bool aFromIPC, ContentParent* aOriginProcess);  // STEALTH-HOOK(fingerprint/locale-time/timezone)"
+  ],
+  "notes": "One line: the declaration of the renamed Mozilla body of BrowsingContext::Attach; our Attach (dom/base/StealthSessionDeclaration.cpp) calls it and then seeds the declared zone and language. No logic.",
+  "verifier": {
+   "changed": [],
+   "why": "Written by the hook rework of the folder."
+  }
+ },
+ {
+  "file": "widget/windows/nsWindow.h",
+  "category": "spoof",
+  "feature": "window-geometry",
+  "prefs": [
+   "zoom.stealth.screen.width",
+   "zoom.stealth.screen.height"
+  ],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "after the OnWindowPosChanging declaration",
+  "evidence": [
+   "+  void OnWindowPosChanging_Mozilla(WINDOWPOS* info);  // STEALTH-HOOK(fingerprint/screen-window/geometry)"
+  ],
+  "notes": "Declares the renamed body of nsWindow::OnWindowPosChanging (wrap-function): our nsWindow::OnWindowPosChanging in widget/windows/StealthFullscreenWin.cpp calls it and then holds the declared fullscreen rectangle.",
+  "verifier": {
+   "changed": [],
+   "why": "Written with the rework of 2026-11-21."
+  }
+ },
+ {
+  "file": "gfx/gl/GLContext.h",
+  "category": "spoof",
+  "feature": "webgl-multisample",
+  "prefs": [
+   "webgl.msaa-samples"
+  ],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "after the mAvailableFeatures member of GLContext",
+  "evidence": [
+   "+  bool mStealthReportedMultisample = false;  // STEALTH-HOOK(fingerprint/webgl/multisample)"
+  ],
+  "notes": "The field that carries the feature as the driver reports it from after InitFeatures() to after the driver-workaround block in GLContext::InitImpl (G5/G22).",
+  "verifier": {
+   "changed": [],
+   "why": "Written with the hook, 2026-11-21."
+  }
+ },
+ {
+  "file": "toolkit/profile/moz.build",
+  "category": "build",
+  "feature": "doh-trr-context",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "moz.build after the closing bracket of UNIFIED_SOURCES",
+  "evidence": [
+   "+DEFINES[\"MOZ_PROXY_BYPASS_PROTECTION\"] = True  # STEALTH-HOOK(network/doh)"
+  ],
+  "notes": "Defines MOZ_PROXY_BYPASS_PROTECTION for the sources of toolkit/profile, so nsProfileLock.cpp (Mozilla's, unchanged) drops the lookup of the machine's own host name in the Unix symlink lock, which sits under #ifndef MOZ_PROXY_BYPASS_PROTECTION; the signature keeps 127.0.0.1. Only nsProfileLock.cpp reads the symbol in that directory. The global configure option (which also changes network.proxy.allow_bypass and the file picker) is not taken. nsProfileLock.cpp and nsParentalControlsServiceDefault.cpp leave this folder (identical to the tag).",
+  "verifier": {
+   "changed": [],
+   "why": "Written from the diff against the tag."
+  }
+ },
+ {
+  "file": "dom/media/webrtc/transport/ipc/WebrtcTCPSocket.h",
+  "category": "other",
+  "feature": "proxy-udp-egress",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "WebrtcTCPSocket, after the constructor line",
+  "evidence": [
+   "+  friend struct StealthWebrtcTcpSocketAccess;  // STEALTH-HOOK(network/proxy-udp)"
+  ],
+  "notes": "The one friend of the class: the three functions of StealthWebrtcTcpSocket.h read mURI, mProxyConfig, mTransport, mLocalAddress and mLocalPort and call CloseWithReason (several fields, so a friend and not a passed field).",
+  "verifier": {
+   "changed": [],
+   "why": "Written from the diff against the tag."
+  }
+ },
+ {
+  "file": "toolkit/xre/moz.build",
+  "category": "other",
+  "feature": "proxy-udp-egress",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "after the closing bracket of the UNIFIED_SOURCES list that ends with nsXREDirProvider.cpp",
+  "evidence": [
+   "+UNIFIED_SOURCES += [\"StealthIcePrefs.cpp\"]  # STEALTH-HOOK(network/proxy-udp)"
+  ],
+  "notes": "Registers toolkit/xre/StealthIcePrefs.cpp (the lock of the two ICE prefs).",
+  "verifier": {
+   "changed": [],
+   "why": "Written from the diff against the tag."
+  }
+ },
+ {
+  "file": "dom/media/webrtc/moz.build",
+  "category": "build",
+  "feature": "hidden-desktop-window-capture",
+  "prefs": [],
+  "added": 2,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "after the closing ] of EXPORTS.mozilla.media.webrtc, before the chromium-config include",
+  "evidence": [
+   "+TEST_DIRS += [\"tests/gtest\"]  # STEALTH-HOOK(platform/hidden-desktop)"
+  ],
+  "notes": "Registers the Windows gtest of the hidden-desktop capture rule (dom/media/webrtc/tests/gtest, which has sources only when OS_TARGET is WINNT).",
+  "verifier": {
+   "changed": [],
+   "why": "Written with the hook, 2026-11-21."
+  }
+ },
+ {
+  "file": "modules/libpref/test/gtest/moz.build",
+  "category": "build",
+  "feature": "stealth-pref-declarations",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "hook added by the 2026-11 hook rework (registration of our own file)",
+  "evidence": [],
+  "notes": "Hook registering our own code (minimal record added by the final-line integration).",
+  "verifier": {
+   "changed": [],
+   "why": "Added by the hook rework of platform/prefs."
+  }
+ },
+ {
+  "file": "startupcache/moz.build",
+  "category": "build",
+  "feature": "startup-cache-foreground-writes",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "hook added by the 2026-11 hook rework (registration of our own file)",
+  "evidence": [],
+  "notes": "Hook registering our own code (minimal record added by the final-line integration).",
+  "verifier": {
+   "changed": [],
+   "why": "Added by the hook rework of platform/startup-cache."
+  }
+ },
+ {
+  "file": "startupcache/test/moz.build",
+  "category": "build",
+  "feature": "startup-cache-foreground-writes",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "hook added by the 2026-11 hook rework (registration of our own file)",
+  "evidence": [],
+  "notes": "Hook registering our own code (minimal record added by the final-line integration).",
+  "verifier": {
+   "changed": [],
+   "why": "Added by the hook rework of platform/startup-cache."
+  }
  }
 ]
