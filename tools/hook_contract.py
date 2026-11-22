@@ -854,7 +854,7 @@ def _unique(found: list) -> list:
     for v in found:
         n = seen.get(v.key, 0) + 1
         seen[v.key] = n
-        out.append(v if n == 1 else Violation(v.rule, v.folder, v.file, v.function, v.text, "%s#%d" % (v.key, n), v.detail))
+        out.append(v if n == 1 else Violation(v.rule, v.folder, v.file, v.function, v.text, "%s#%d" % (v.key, n), v.detail, v.ids))
     return out
 
 

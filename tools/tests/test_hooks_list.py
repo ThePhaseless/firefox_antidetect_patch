@@ -585,3 +585,18 @@ def test_an_untestable_without_the_pm_or_beside_a_test_is_a_failure(tmp_path):
 def test_check_prints_the_untestable_count(capsys):
     assert engine.check() == 0
     assert "untestable hooks: 0" in capsys.readouterr().out
+
+
+def test_an_approved_exception_covers_every_copy_of_a_repeated_violation(tmp_path):
+    # the same line twice in one function: the second violation has the key `...#2` and keeps the hook ids
+    line = "  x = StealthN(this) + 1;" + MARK                 # logic in the hook: C5
+    patch = hunk("dom/A.cpp", ["   // lead", " " + FN, "+" + line, "   int x = 1;", "+" + line, "   DoIt(x);",
+                              "   return NS_OK;", " }"])
+    root = series(tmp_path, patch)
+    assert len([v for v in hc.contract_violations(root) if v.rule == "C5"]) == 2
+    assert any(v.key.endswith("#2") and v.ids for v in hc._analyse(root)[1])
+    entries = hl.expected(root, FOLDER)
+    for e in entries:
+        e.update(test="wrapper:tests/test_a.py::test_b", exception="the logic is a pref default", pm="approvato")
+    commit_list(root, entries)
+    assert [v for v in hc.contract_violations(root) if v.rule == "C5"] == []
