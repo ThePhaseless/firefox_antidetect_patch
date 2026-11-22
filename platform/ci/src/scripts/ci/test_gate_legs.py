@@ -106,8 +106,16 @@ def cases() -> list:
 
     # the A/B oracles (published engine against the candidate: page, network, host): their legs, their longer budget, and their files kept
     ORACLES = ("wrapper.e2e.ab_oracle", "wrapper.e2e.ab_network", "wrapper.e2e.ab_host")
+    CRASH = "wrapper.e2e.ab_host_crash"
     for ORACLE in ORACLES:
         add("gate legs: the real gate.yml has a %s leg on Linux and on Windows" % ORACLE, {(ORACLE, "linux"), (ORACLE, "windows")} <= have)
+    # the host oracle's recorder: a leg of its own on Linux only, under its own row id (the verdict of the suite step judges it as that row)
+    crash_rows = [r for r in gate_legs.legs(gate) if r.get("suite") == CRASH]
+    add("gate legs: the real gate.yml has a %s leg on Linux and none on Windows (the row is linux_only)" % CRASH,
+        (CRASH, "linux") in have and (CRASH, "windows") not in have and len(crash_rows) == 1 and crash_rows[0].get("kind") == "linux")
+    add("gate legs: the %s leg has 35 minutes (its test's own guard and the setup), and the job reads its budget from the leg" % CRASH,
+        len(crash_rows) == 1 and int(crash_rows[0].get("timeout", 0)) == 35
+        and str(gate["jobs"]["wrapper-e2e"].get("timeout-minutes", "")).replace(" ", "") == "${{matrix.timeout||25}}")
     oracle_rows = [r for r in gate_legs.legs(gate) if r.get("suite") in ORACLES]
     add("gate legs: the oracles' legs have more than the default 25 minutes, and the job reads its budget from the leg",
         len(oracle_rows) == 2 * len(ORACLES) and all(int(r.get("timeout", 0)) > 25 for r in oracle_rows)
@@ -117,10 +125,22 @@ def cases() -> list:
         'export AB_ORACLE_OUT="$PWD/ab-oracle"' in suite_run and "mkdir -p ab-oracle" in suite_run and "result/ab-oracle" not in suite_run)
     oracle_kept = [s for s in steps if (s.get("with") or {}).get("path") == "ab-oracle"]
     add("gate legs: the oracles' dumps and diffs are kept in an artifact of their own per suite and system, after a red suite too, for the oracles' suites only",
-        len(oracle_kept) == 1 and all("matrix.suite == '%s'" % o in oracle_kept[0].get("if", "") for o in ORACLES) and "always()" in oracle_kept[0].get("if", "")
+        len(oracle_kept) == 1 and all("matrix.suite == '%s'" % o in oracle_kept[0].get("if", "") for o in ORACLES + (CRASH,)) and "always()" in oracle_kept[0].get("if", "")
         and str(oracle_kept[0]["with"].get("name")).endswith("-${{ matrix.os }}") and "result-" not in str(oracle_kept[0]["with"]["name"]))
     add("gate legs: the oracles' artifact is kept before the result",
         len(oracle_kept) == 1 and keep >= 0 and steps.index(oracle_kept[0]) < keep and steps.index(oracle_kept[0]) > verdict >= 0)
+
+    # the Linux legs of the oracles and of the recorder: gdb, elfutils and the kernel's core pattern pointed at INVPW_CORE_DIR, before the suite; strace for the host ones
+    cores = [s for s in steps if "$RUNNER_TEMP/cores" in str(s.get("run", ""))]
+    cond = str(cores[0].get("if", "")) if len(cores) == 1 else ""
+    add("gate legs: the cores step of the oracles' legs installs gdb and elfutils, sets the pattern to $RUNNER_TEMP/cores, exports INVPW_CORE_DIR, on Linux, for the four suites, before the suite",
+        len(cores) == 1 and "matrix.kind == 'linux'" in cond and all("matrix.suite == '%s'" % o in cond for o in ORACLES + (CRASH,))
+        and "apt-get install -y gdb elfutils" in cores[0]["run"] and 'mkdir -p "$RUNNER_TEMP/cores"' in cores[0]["run"] and 'chmod 1777 "$RUNNER_TEMP/cores"' in cores[0]["run"]
+        and 'kernel.core_pattern="$RUNNER_TEMP/cores/core.%e.%p.%t"' in cores[0]["run"]
+        and 'echo "INVPW_CORE_DIR=$RUNNER_TEMP/cores" >> "$GITHUB_ENV"' in cores[0]["run"] and "matrix.os" not in cond and names.index(cores[0]["name"]) < suite)
+    deps = " ".join(str(s.get("run", "")) for s in steps if s.get("name") == "Linux system deps (Firefox runtime libs, a virtual display)")
+    add("gate legs: the host oracle's leg and the recorder's leg install strace (in the system deps step, with the fontconfig ones)",
+        "wrapper.e2e.ab_host|wrapper.e2e.ab_host_crash)" in deps and "install -y strace" in deps and "wrapper.e2e.fontconfig|" in deps)
 
     # a leg first, its row second: a suite the wrapper's list does not have yet is said, not failed, and nothing else is skipped
     listed = [i for i, s in enumerate(steps) if "LISTED=1" in str(s.get("run", ""))]

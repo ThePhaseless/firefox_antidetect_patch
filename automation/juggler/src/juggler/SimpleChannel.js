@@ -224,6 +224,21 @@ var SimpleChannel = class SimpleChannel {
     this.transport.dispose();
   }
 
+  /**
+   * Ends the pending requests the owner of this channel knows can never be answered. `errorOf` is given the request
+   * (`{methodName, namespace, params}`) and returns the Error to reject it with, or nothing to leave it waiting.
+   * The transport does not know what a request is about: the caller does.
+   */
+  rejectPendingWhere(errorOf) {
+    for (const [messageId, callback] of [...this._pendingMessages]) {
+      const error = errorOf({methodName: callback.methodName, namespace: callback.namespace, params: callback.message.params});
+      if (!error)
+        continue;
+      this._pendingMessages.delete(messageId);
+      callback.reject(error);
+    }
+  }
+
   _rejectCallbacksFromConnector(connectorId) {
     for (const [messageId, callback] of this._pendingMessages) {
       if (callback.connectorId === connectorId) {

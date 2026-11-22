@@ -479,6 +479,10 @@ jobs:
           - { suite: wrapper.e2e.ab_network, leg: win-x86_64, runner: windows-latest, kind: win, os: windows, timeout: 60 }
           - { suite: wrapper.e2e.ab_host, leg: linux-x86_64, runner: ubuntu-24.04, kind: linux, os: linux, timeout: 50 }
           - { suite: wrapper.e2e.ab_host, leg: win-x86_64, runner: windows-latest, kind: win, os: windows, timeout: 50 }
+          # THE HOST ORACLE'S RECORDER, tested on a launch that dies on purpose (Linux only: the signal sent to the parent, the core the kernel writes and gdb reads, and
+          # strace's signal line have no counterpart on Windows). A leg of its own: the suite id, the junit and the verdict are the row's. One test, whose own guard is 17
+          # minutes (a launch, the signal, the close and gdb over a core), so 35 with the setup. Its evidence is kept with the oracles' files, as <suite>-<os>.
+          - { suite: wrapper.e2e.ab_host_crash, leg: linux-x86_64, runner: ubuntu-24.04, kind: linux, os: linux, timeout: 35 }
     steps:
       - name: Checkout wrapper (its tests, ci/required-suites.json and scripts/ci_verdict.py)
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -547,7 +551,8 @@ jobs:
           sudo apt-get install -y xvfb
           # the fontconfig suite traces the opens of the browser: strace is not in the runner image (setsid is, util-linux).
           # The parts of the whole e2e suite carry the fontconfig e2e files too, and e2e.yml installs it for every Linux run.
-          case "${{ matrix.suite }}" in wrapper.e2e.fontconfig|wrapper.e2e.suite.*) sudo apt-get install -y strace;; esac
+          # The host oracle traces the whole tree of the browser with strace, and so does the test of its recorder.
+          case "${{ matrix.suite }}" in wrapper.e2e.fontconfig|wrapper.e2e.suite.*|wrapper.e2e.ab_host|wrapper.e2e.ab_host_crash) sudo apt-get install -y strace;; esac
           # TEMPORARY: remove after the pm judged the trace of the -11 at exit.
           # tests/test_security_state_engine_e2e.py, on a crash of the engine in generate mode: a core file where kernel.core_pattern says, and gdb to read it (the test
           # deletes the core and saves stderr and the backtrace in $RUNNER_TEMP/invpw-evidence/security-state-generate/, which "Keep what the tests saved" uploads).
@@ -559,6 +564,17 @@ jobs:
           esac
           python -m pip install --quiet "playwright==$(cat scripts/playwright_pin.txt)"
           sudo "$(which python)" -m playwright install-deps firefox
+      # What a browser that did not end with 0 leaves is read with gdb (every thread's backtrace, the libraries with their build ids from elfutils). The kernel writes the core
+      # where its pattern says, so the pattern points at a folder of the job (INVPW_CORE_DIR). Nothing here reaches a launch that does not crash: no environment variable of the
+      # browser, no pref. The recorder's own test (ab_host_crash) needs it as much as the oracles.
+      - name: Cores of a browser that did not end with 0 (gdb, elfutils, where the kernel writes them)
+        if: matrix.kind == 'linux' && (matrix.suite == 'wrapper.e2e.ab_oracle' || matrix.suite == 'wrapper.e2e.ab_network' || matrix.suite == 'wrapper.e2e.ab_host' || matrix.suite == 'wrapper.e2e.ab_host_crash')
+        run: |
+          sudo apt-get install -y gdb elfutils
+          mkdir -p "$RUNNER_TEMP/cores"
+          chmod 1777 "$RUNNER_TEMP/cores"
+          sudo sysctl -w kernel.core_pattern="$RUNNER_TEMP/cores/core.%e.%p.%t"
+          echo "INVPW_CORE_DIR=$RUNNER_TEMP/cores" >> "$GITHUB_ENV"
       - name: Extract + locate firefox binary
         shell: bash
         run: |
@@ -823,8 +839,8 @@ jobs:
           path: fakeweb
           if-no-files-found: ignore
           retention-days: 14
-      - name: Keep the A/B oracles' dumps and diffs (page, network, host)
-        if: always() && (matrix.suite == 'wrapper.e2e.ab_oracle' || matrix.suite == 'wrapper.e2e.ab_network' || matrix.suite == 'wrapper.e2e.ab_host')
+      - name: Keep the A/B oracles' dumps and diffs (page, network, host, and the host recorder's evidence)
+        if: always() && (matrix.suite == 'wrapper.e2e.ab_oracle' || matrix.suite == 'wrapper.e2e.ab_network' || matrix.suite == 'wrapper.e2e.ab_host' || matrix.suite == 'wrapper.e2e.ab_host_crash')
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ${{ matrix.suite == 'wrapper.e2e.ab_oracle' && 'ab-oracle' || matrix.suite }}-${{ matrix.os }}

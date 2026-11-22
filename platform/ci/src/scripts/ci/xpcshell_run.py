@@ -10,7 +10,7 @@ of the source tree, never shipped. This script is the part of Mozilla's runner (
   run    for each declared file (scripts/ci/xpcshell_tests.json): read the manifest that lists it (ours beside it in the series, else Mozilla's of the
          folder: head files, prefs, firefox-appdir, environment), build the
          command of buildXpcsCmd / buildCmdHead / buildCmdTestFile, run it with the runner's environment (no non-local connection), parse the
-         structured log head.js prints, and write junit + a result JSON. Exit 1 when a test fails or is skipped, a process dies or times out, a file
+         structured log head.js prints, and write junit + a result JSON. Exit 1 when a test fails or is skipped, a process dies or times out or leaves a minidump, a file
          collects no test, or fewer tests were collected than the declared minimum
   check  the declared list is exactly the set of our xpcshell tests that the series holds (discover): one the list does not run is a red, so is a
          listed one that the series does not have, so a new test of ours cannot be left out of the leg unseen
@@ -669,9 +669,69 @@ def run_command(command: list, env: dict, cwd: Path, timeout: float):
     return proc.returncode, (out or b"").decode("utf-8", errors="replace"), time.monotonic() - started, timed_out
 
 
+CRASH_THREAD_KEY = re.compile(r"thread.*name|crash(ed|ing).*thread|thread.*(crash|id)", re.I)
+CRASH_VALUE_CHARS = 300
+
+
+def crashed(rc, dumps: list) -> bool:
+    """A process that ended by a crash: a minidump in its folders, or an exit that is a signal (negative on Linux) or an NTSTATUS (0xC0000005 and the like,
+    unsigned in Python on Windows). A plain non-zero exit (exit(5)) is a failure, not evidence of a crash."""
+    return bool(dumps) or (isinstance(rc, int) and (rc < 0 or rc >= 0x80000000))
+
+
+def read_extra(path: Path) -> dict:
+    """The annotations of one `.extra` (a JSON object): MozCrashReason, and every key that names the crashing thread or maps thread ids to names. The
+    values the file does not have are the string `absent` (said, not left out)."""
+    try:
+        data = json.loads(Path(path).read_text(encoding="utf-8", errors="replace"))
+        if not isinstance(data, dict):
+            raise ValueError("not a JSON object")
+    except (OSError, ValueError) as exc:
+        return {"file": Path(path).name, "error": "unreadable: %s" % exc}
+    threads = {k: str(v)[:CRASH_VALUE_CHARS] for k, v in sorted(data.items()) if CRASH_THREAD_KEY.search(k)}
+    return {"file": Path(path).name, "MozCrashReason": str(data["MozCrashReason"])[:CRASH_VALUE_CHARS] if "MozCrashReason" in data else "absent",
+            "thread": threads or "absent"}
+
+
+def collect_crash_evidence(root: Path, rc, target: Path) -> dict | None:
+    """EVIDENCE ONLY, it never changes a verdict: every `.dmp` and `.extra` under `root` (the folder of the process: its temp, its profile) is copied to
+    `target` (inside the run's output folder, which the job uploads) and the annotations of each `.extra` are read. None when the process did not crash."""
+    found = sorted(p for p in Path(root).rglob("*") if p.is_file() and p.suffix in (".dmp", ".extra"))
+    dumps = [p for p in found if p.suffix == ".dmp"]
+    if not crashed(rc, dumps):
+        return None
+    copied = []
+    for p in found:
+        target.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(p, target / p.name)
+        copied.append(p.name)
+    extras = [read_extra(target / p.name) for p in found if p.suffix == ".extra"]
+    return {"dumps": [p.name for p in dumps], "copied": copied, "folder": target.name, "extras": extras}
+
+
+def crash_lines(f: dict) -> list:
+    """The crash evidence of one file as summary lines (markdown list)."""
+    crash = f.get("crash")
+    if not crash:
+        return []
+    lines = ["- `%s`: exit %s, %d minidump(s) kept in `crash/%s/`: %s" % (f["path"], f["rc"], len(crash["dumps"]), crash["folder"], ", ".join(crash["copied"]) or "none")]
+    if not crash["dumps"]:
+        lines.append("  - no minidump in the process's folders")
+    elif not crash["extras"]:
+        lines.append("  - no .extra next to the minidump (MozCrashReason: absent, thread: absent)")
+    for e in crash["extras"]:
+        if "error" in e:
+            lines.append("  - %s: %s" % (e["file"], e["error"]))
+            continue
+        thread = e["thread"] if e["thread"] == "absent" else ", ".join("%s=%s" % kv for kv in e["thread"].items())
+        lines.append("  - %s: MozCrashReason: %s; thread: %s" % (e["file"], e["MozCrashReason"], thread))
+    return lines
+
+
 def run_file(binary, series: Path, support: Path, work: Path, modules: Path, rel: str, timeout: float, logs: Path, base_env: dict | None = None) -> dict:
     """One declared file: stage it, run it, judge it. Never raises for a problem of the file: the problem is the file's red."""
     result = {"path": rel, "rc": None, "seconds": 0.0, "timed_out": False, "tests": [], "errors": [], "collected": 0, "passed": 0, "failed": 0, "ok": False}
+    run_dir = None
     try:
         source = locate_test(series, rel)
         folder = Path(rel).parent.as_posix()
@@ -714,7 +774,14 @@ def run_file(binary, series: Path, support: Path, work: Path, modules: Path, rel
         result["errors"].append("%s: %s" % (type(exc).__name__, exc))
         return result
     logs.mkdir(parents=True, exist_ok=True)
-    write_lf(logs / (re.sub(r"[^A-Za-z0-9_.-]", "_", rel) + ".log"), output)
+    safe = re.sub(r"[^A-Za-z0-9_.-]", "_", rel)
+    write_lf(logs / (safe + ".log"), output)
+    try:  # evidence of a crash (minidump, annotations): kept before the work folder is removed, and never a reason for a verdict
+        crash = collect_crash_evidence(run_dir, rc, logs.parent / "crash" / safe) if run_dir and not timed_out else None
+    except Exception as exc:  # noqa: BLE001
+        crash = {"dumps": [], "copied": [], "folder": safe, "extras": [{"file": "(collection)", "error": "%s: %s" % (type(exc).__name__, exc)}]}
+    if crash:
+        result["crash"] = crash
     parsed = parse_log(output)
     tests = [t for t in parsed["tests"] if not t["setup"]]
     result.update(rc=rc, seconds=round(seconds, 3), timed_out=timed_out, tests=tests, errors=list(parsed["errors"]), collected=len(tests))
@@ -726,6 +793,11 @@ def run_file(binary, series: Path, support: Path, work: Path, modules: Path, rel
         result["errors"].append("timed out after %d s" % timeout)
     elif rc != 0:
         result["errors"].append("exit code %s" % rc)
+    if crash and crash["dumps"]:
+        # a minidump is a crash whatever the exit code: a process of the test that died (an automation-only MOZ_CRASH) or a crash the shell survived. It leads the
+        # file's errors, so that the verdict's line (the first three) names it.
+        reasons = sorted({e["MozCrashReason"] for e in crash["extras"] if "MozCrashReason" in e}) or ["absent"]
+        result["errors"].insert(0, "left a minidump (MozCrashReason: %s): %s" % ("; ".join(reasons), ", ".join(crash["dumps"])))
     declared = len(re.findall(r"^\s*add_task\(", source.read_text(encoding="utf-8", errors="replace"), re.M))
     result["declared_tasks"] = declared
     if tests and declared > len(tests) and not (len(tests) == 1 and tests[0]["name"] == "run_test"):
@@ -797,11 +869,15 @@ def write_junit_files(result: dict, system: str, directory: Path) -> list:
 
 
 def summary_table(result: dict) -> str:
-    rows = ["| file | tests | passed | seconds | result |", "|---|---|---|---|---|"]
+    rows = ["| file | tests | passed | seconds | exit | result |", "|---|---|---|---|---|---|"]
     for f in result["files"]:
-        rows.append("| %s | %d | %d | %s | %s |" % (f["path"], f["collected"], f["passed"], f["seconds"], "ok" if f["ok"] else "RED"))
+        rc = "timeout" if f.get("timed_out") else ("-" if f.get("rc") is None else f["rc"])
+        rows.append("| %s | %d | %d | %s | %s | %s |" % (f["path"], f["collected"], f["passed"], f["seconds"], rc, "ok" if f["ok"] else "RED"))
         for t in f["tests"]:
-            rows.append("| &nbsp;&nbsp;%s | | | %s | %s |" % (t["name"], t.get("seconds"), t["status"]))
+            rows.append("| &nbsp;&nbsp;%s | | | %s | | %s |" % (t["name"], t.get("seconds"), t["status"]))
+    evidence = [line for f in result["files"] for line in crash_lines(f)]
+    if evidence:
+        rows += ["", "crash evidence (minidumps and annotations, also in the artifact under `crash/`):", ""] + evidence
     return "\n".join(rows) + "\n"
 
 

@@ -63,6 +63,7 @@
   "juggler/tests/a_navigation_that_moved_is_not_ended_by_the_docshell_it_left.test.mjs": "100644",
   "juggler/tests/a_peer_connection_of_a_torn_down_window_keeps_its_proxy_config.test.mjs": "100644",
   "juggler/tests/a_proxied_doh_lookup_has_the_trr_only_timeout.test.mjs": "100644",
+  "juggler/tests/a_request_of_a_root_that_went_away_is_answered.test.mjs": "100644",
   "juggler/tests/a_resumed_request_whose_channel_is_cancelled_ends.test.mjs": "100644",
   "juggler/tests/a_tcp_socket_of_a_peer_connection_is_refused_when_its_proxy_lookup_fails.test.mjs": "100644",
   "juggler/tests/a_worker_ended_before_the_cache_is_not_ended_after_the_restore.test.mjs": "100644",

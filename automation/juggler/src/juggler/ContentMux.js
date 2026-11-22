@@ -150,6 +150,18 @@ export class ContentMux {
     traceMux('mux', 'unbindRoot', {name: this._name, rootId, isMain: endpoint.isMain});
     endpoint.channel.resetTransport();
     endpoint.actor = null;
+    // The channel keeps its pending requests across the reset, for a new actor to have them again. A request that names
+    // an execution context cannot be answered by one: the context belongs to the document this actor was of, the contexts
+    // of a new document are announced only after a new root is bound (their ids are unique to the session), and what a
+    // new actor answers to such a request is this very error. Nothing else would end it: the actor is gone, and
+    // `Runtime.evaluate` is sent plainly. A replacement bound first never gets here (`endpoint.actor !== actor`), and a
+    // document that goes into the back-forward cache keeps its actor: neither is touched.
+    endpoint.channel.rejectPendingWhere(({methodName, namespace, params}) => {
+      if (namespace !== '' && namespace !== 'page')
+        return null;
+      const route = ROUTES[methodName] && ROUTES[methodName](params[0] || {});
+      return route && route.kind === 'ctx' ? new Error('Failed to find execution context with id = ' + route.id) : null;
+    });
     return endpoint;
   }
 
