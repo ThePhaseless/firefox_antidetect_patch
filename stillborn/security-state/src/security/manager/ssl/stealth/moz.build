@@ -9,3 +9,5 @@ XPCOM_MANIFESTS += [
 EXTRA_JS_MODULES.psm += [
     "StealthSecurityState.sys.mjs",
 ]
+
+XPCSHELL_TESTS_MANIFESTS += ["test/xpcshell-stealth.toml"]

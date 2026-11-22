@@ -10,7 +10,9 @@
   "security/manager/ssl/stealth/test/crlite_test_data.json": "100644",
   "security/manager/ssl/stealth/test/run_stealth_generate_launch_gate.py": "100644",
   "security/manager/ssl/stealth/test/run_stealth_security_state_gate.py": "100644",
-  "security/manager/ssl/stealth/test/stealth_security_state_case.js": "100644"
+  "security/manager/ssl/stealth/test/stealth_security_state_case.js": "100644",
+  "security/manager/ssl/stealth/test/test_stealth_generate_no_glean_init.js": "100644",
+  "security/manager/ssl/stealth/test/xpcshell-stealth.toml": "100644"
  },
  "inventory": [
   {

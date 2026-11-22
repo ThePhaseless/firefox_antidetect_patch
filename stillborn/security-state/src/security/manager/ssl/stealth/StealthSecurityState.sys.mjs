@@ -563,6 +563,11 @@ export const StealthSecurityState = {
    * ("generation did not finish") until the very end.
    */
   async runAndQuit(startup = Services.startup) {
+    // Generate mode quits right away, so Glean (started at browser-idle-startup, which never comes
+    // here) would be initialised inside the shutdown and race Mozilla's own close_db: panic, SIGSEGV.
+    Services.prefs
+      .getDefaultBranch(null)
+      .setBoolPref("telemetry.fog.init_on_shutdown", false);
     startup.enterLastWindowClosingSurvivalArea();
     // Synchronously, before anything else: the default browser window is opened by
     // BrowserContentHandler only when the command line has not had its default
