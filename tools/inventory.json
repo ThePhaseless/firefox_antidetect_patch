@@ -8304,5 +8304,77 @@
    "changed": [],
    "why": "Written from the diff against the tag."
   }
+ },
+ {
+  "file": "dom/ipc/gtest/moz.build",
+  "category": "build",
+  "feature": "juggler-mouse-event-id",
+  "prefs": [],
+  "added": 2,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "SOURCES after the UNIFIED_SOURCES list",
+  "evidence": [],
+  "notes": "Lines registering our own gtest files in the build.",
+  "verifier": {
+   "changed": [],
+   "why": "Added with the characterization gtests of the baseline line (tests only)."
+  }
+ },
+ {
+  "file": "layout/base/gtest/moz.build",
+  "category": "build",
+  "feature": "juggler-mouse-event-id",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "SOURCES after the UNIFIED_SOURCES list",
+  "evidence": [],
+  "notes": "Lines registering our own gtest files in the build.",
+  "verifier": {
+   "changed": [],
+   "why": "Added with the characterization gtests of the baseline line (tests only)."
+  }
+ },
+ {
+  "file": "docshell/base/test/gtest/moz.build",
+  "category": "build",
+  "feature": "juggler-navigation-events",
+  "prefs": [],
+  "added": 2,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "SOURCES and LOCAL_INCLUDES after the UNIFIED_SOURCES list",
+  "evidence": [],
+  "notes": "Lines registering our own gtest files in the build.",
+  "verifier": {
+   "changed": [],
+   "why": "Added with the characterization gtests of the baseline line (tests only)."
+  }
+ },
+ {
+  "file": "devtools/shared/heapsnapshot/tests/gtest/moz.build",
+  "category": "build",
+  "feature": "debugger-invisible-attach",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "SOURCES after the UNIFIED_SOURCES list",
+  "evidence": [],
+  "notes": "Lines registering our own gtest files in the build.",
+  "verifier": {
+   "changed": [],
+   "why": "Added with the characterization gtests of the baseline line (tests only)."
+  }
  }
 ]

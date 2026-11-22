@@ -1,10 +1,12 @@
 {
  "modified": [
   "devtools/server/actors/thread.js",
+  "devtools/shared/heapsnapshot/tests/gtest/moz.build",
   "js/src/debugger/Debugger.cpp",
   "js/src/debugger/Debugger.h"
  ],
  "added": {
+  "devtools/shared/heapsnapshot/tests/gtest/TestStealthDebuggerOnBase.cpp": "100644",
   "js/src/debugger/StealthDebugger.h": "100644"
  },
  "inventory": [
@@ -31,6 +33,24 @@
      "notes"
     ],
     "why": "Added verification of the no-other-reader and no-StaticPrefList claims."
+   }
+  },
+  {
+   "file": "devtools/shared/heapsnapshot/tests/gtest/moz.build",
+   "category": "build",
+   "feature": "debugger-invisible-attach",
+   "prefs": [],
+   "added": 1,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "SOURCES after the UNIFIED_SOURCES list",
+   "evidence": [],
+   "notes": "Lines registering our own gtest files in the build.",
+   "verifier": {
+    "changed": [],
+    "why": "Added with the characterization gtests of the baseline line (tests only)."
    }
   },
   {

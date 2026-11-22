@@ -49,7 +49,8 @@ GREEN_FILTER = ("StealthGfxFeatureStatus.*:StealthWebGPUAdapter.*:StealthWebGPUD
                 "tealthAudioNoise.*:StealthBundledCollection.*:StealthBundledFamilyFilter.*:StealthCanvasProjection.*:StealthDo"
                 "cumentLanguage.*:StealthFallbackNames.*:StealthFcFontList.*:StealthFontList.*:StealthFontMetrics.*:StealthMedi"
                 "aDeclaration.*:StealthOwnBinaries.*:StealthQuotaEstimate.*:StealthTextQuality.*:StealthTtcFace.*:StealthWebGPU"
-                "ExternalTexture.*:Intl_Locale_StealthSystemLocales.*:Idwr.*:StartupCache.WritesNeverLowerIOPriority")
+                "ExternalTexture.*:Intl_Locale_StealthSystemLocales.*:Idwr.*:StartupCache.WritesNeverLowerIOPriority"
+                ":StealthJugglerCoalesce.*:StealthJugglerMouseAck.*:StealthMouseEventCopy.*:StealthMouseEventIPC.*:TestStealthDocShellDefaults.*:TestStealthLinkClickAfter.*:TestStealthLoadInfo.*:StealthBundleHooks.*:StealthBranding.*:StealthDebugger.*:StealthStackFrames.*")
 GTEST_JOBS = ("gtest-linux", "gtest-cross")
 COMPILE_ONLY_IF = "needs.plan.outputs.stop_after != 'objects'"
 # The steps of a build leg that come after the objects, and are for the browser's build and its package: a compile-only run (stop_after=objects) runs none.

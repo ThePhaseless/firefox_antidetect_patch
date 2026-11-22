@@ -12,6 +12,18 @@ index 6363c0c5110d30071e9b18a25e4500dd290570b6..f094e08498f50b329c52a9da85123349
        return;
      }
  
+diff --git a/devtools/shared/heapsnapshot/tests/gtest/moz.build b/devtools/shared/heapsnapshot/tests/gtest/moz.build
+index c02913fac9def98eb43df329bd7d5d62c2597ea8..7c4bdc2dbaa7e3f9e97fe1950573cacb99313135 100644
+--- a/devtools/shared/heapsnapshot/tests/gtest/moz.build
++++ b/devtools/shared/heapsnapshot/tests/gtest/moz.build
+@@ -22,6 +22,7 @@ UNIFIED_SOURCES = [
+     "SerializesEverythingInHeapGraphOnce.cpp",
+     "SerializesTypeNames.cpp",
+ ]
++SOURCES += ["TestStealthDebuggerOnBase.cpp"]  # STEALTH-HOOK(fingerprint/js-surface/debugger)
+ 
+ # THE MOCK_METHOD2 macro from gtest triggers this clang warning and it's hard
+ # to work around, so we just ignore it.
 diff --git a/js/src/debugger/Debugger.cpp b/js/src/debugger/Debugger.cpp
 index 734904920529c1a426772aae5513b37c7d5b76e7..3e85d4ab2d35377aa38c8455b3efcb1556e40483 100644
 --- a/js/src/debugger/Debugger.cpp

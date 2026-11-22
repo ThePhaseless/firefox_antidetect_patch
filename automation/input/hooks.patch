@@ -146,6 +146,19 @@ index ac5a2b05026352ad1d6a4cb7c80c6e65e88e7b45..a26a3773a1500d68762371fca0d8e868
      mCoalescedInputEvent->AssignPointerHelperData(aMouseOrPointerEvent);
      // Accumulate motion across coalesced events. Without this,
      // the dispatched event would report only the first motion,
+diff --git a/dom/ipc/gtest/moz.build b/dom/ipc/gtest/moz.build
+index da147bc747b8672d8af11e8b5881f24e798eb819..a4fc899ce3aa101f246ccbb9c661c060dc047151 100644
+--- a/dom/ipc/gtest/moz.build
++++ b/dom/ipc/gtest/moz.build
+@@ -7,6 +7,8 @@ UNIFIED_SOURCES += [
+     "ProcessIsolationTest.cpp",
+     "RemoteTypeTest.cpp",
+ ]
++SOURCES += ["TestStealthJugglerCoalesceOnBase.cpp"]  # STEALTH-HOOK(automation/input)
++SOURCES += ["TestStealthMouseEventIPCOnBase.cpp"]  # STEALTH-HOOK(automation/input)
+ 
+ include("/ipc/chromium/chromium-config.mozbuild")
+ 
 diff --git a/layout/base/PresShell.cpp b/layout/base/PresShell.cpp
 index ca58605fd207e17050ead0f37bd63aa3f7edb7e7..961a007e277359133546d135d591953384347ea6 100644
 --- a/layout/base/PresShell.cpp
@@ -167,6 +180,18 @@ index ca58605fd207e17050ead0f37bd63aa3f7edb7e7..961a007e277359133546d135d5919533
  
    AutoWeakFrame weakFrameForPresShell(aFrameForPresShell);
  
+diff --git a/layout/base/gtest/moz.build b/layout/base/gtest/moz.build
+index 9e7558fe897f28502c58901995b39609067d20ef..7348bc993a63d0134bab0915defb7d62c8d504c5 100644
+--- a/layout/base/gtest/moz.build
++++ b/layout/base/gtest/moz.build
+@@ -8,6 +8,7 @@ UNIFIED_SOURCES += [
+     "TestAccessibleCaretManager.cpp",
+     "TestUniqueOrNonOwningPtr.cpp",
+ ]
++SOURCES += ["TestStealthJugglerMouseAckOnBase.cpp"]  # STEALTH-HOOK(automation/input)
+ 
+ # THE MOCK_METHOD2 macro from gtest triggers this clang warning and it's hard
+ # to work around, so we just ignore it.
 diff --git a/widget/MouseEvents.h b/widget/MouseEvents.h
 index e0e3b70f718140d313bb5d54fdc9679a42804df6..aa297e09d3c6f091980b8866917d5eb7f7b913c3 100644
 --- a/widget/MouseEvents.h

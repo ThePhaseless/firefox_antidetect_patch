@@ -5,7 +5,9 @@
   "dom/events/EventStateManager.h",
   "dom/interfaces/base/nsIDOMWindowUtils.idl",
   "dom/ipc/CoalescedMouseData.cpp",
+  "dom/ipc/gtest/moz.build",
   "layout/base/PresShell.cpp",
+  "layout/base/gtest/moz.build",
   "widget/MouseEvents.h",
   "widget/nsGUIEventIPC.h",
   "xpcom/reflect/xptinfo/xptinfo.h"
@@ -13,7 +15,10 @@
  "added": {
   "dom/base/StealthJugglerEventId.h": "100644",
   "dom/base/StealthJugglerInput.h": "100644",
-  "layout/base/StealthJugglerAck.h": "100644"
+  "dom/ipc/gtest/TestStealthJugglerCoalesceOnBase.cpp": "100644",
+  "dom/ipc/gtest/TestStealthMouseEventIPCOnBase.cpp": "100644",
+  "layout/base/StealthJugglerAck.h": "100644",
+  "layout/base/gtest/TestStealthJugglerMouseAckOnBase.cpp": "100644"
  },
  "inventory": [
   {
@@ -130,6 +135,24 @@
    }
   },
   {
+   "file": "dom/ipc/gtest/moz.build",
+   "category": "build",
+   "feature": "juggler-mouse-event-id",
+   "prefs": [],
+   "added": 2,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "SOURCES after the UNIFIED_SOURCES list",
+   "evidence": [],
+   "notes": "Lines registering our own gtest files in the build.",
+   "verifier": {
+    "changed": [],
+    "why": "Added with the characterization gtests of the baseline line (tests only)."
+   }
+  },
+  {
    "file": "layout/base/PresShell.cpp",
    "category": "juggler",
    "feature": "juggler-mouse-event-id",
@@ -153,6 +176,24 @@
      "notes"
     ],
     "why": "Feature renamed to match widget/MouseEvents.h and nsGUIEventIPC.h; recount; resolved the include and field questions."
+   }
+  },
+  {
+   "file": "layout/base/gtest/moz.build",
+   "category": "build",
+   "feature": "juggler-mouse-event-id",
+   "prefs": [],
+   "added": 1,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "SOURCES after the UNIFIED_SOURCES list",
+   "evidence": [],
+   "notes": "Lines registering our own gtest files in the build.",
+   "verifier": {
+    "changed": [],
+    "why": "Added with the characterization gtests of the baseline line (tests only)."
    }
   },
   {

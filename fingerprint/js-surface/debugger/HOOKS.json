@@ -17,6 +17,14 @@
   "test": ""
  },
  {
+  "file": "devtools/shared/heapsnapshot/tests/gtest/moz.build",
+  "function": "UNIFIED_SOURCES = [",
+  "kind": "add",
+  "form": "registration",
+  "line": "SOURCES += [\"TestStealthDebuggerOnBase.cpp\"]  # STEALTH-HOOK(fingerprint/js-surface/debugger)",
+  "test": ""
+ },
+ {
   "file": "js/src/debugger/Debugger.cpp",
   "function": "",
   "kind": "add",

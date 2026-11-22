@@ -104,6 +104,18 @@ index 9890b717e687329386006642e8c536f4dd094bd9..53b32e434f6550ebab025d122846c370
    return ev;
  }
  
+diff --git a/docshell/base/test/gtest/moz.build b/docshell/base/test/gtest/moz.build
+index aedd997bccbb025c0cb24e201c307058b7935a6d..e5ed96fbbe833e0e7835d5a02dd6dc43e74fc1b4 100644
+--- a/docshell/base/test/gtest/moz.build
++++ b/docshell/base/test/gtest/moz.build
+@@ -5,5 +5,7 @@
+ UNIFIED_SOURCES += [
+     "TestFilterStatusForErrorPage.cpp",
+ ]
++SOURCES += ["TestStealthNavigationOnBase.cpp"]  # STEALTH-HOOK(automation/navigation)
++LOCAL_INCLUDES += ["/docshell/base"]  # STEALTH-HOOK(automation/navigation)
+ 
+ FINAL_LIBRARY = "xul-gtest"
 diff --git a/netwerk/base/LoadInfo.cpp b/netwerk/base/LoadInfo.cpp
 index 9d64a00363fcfcdd6f2d99c40b085b0651f7b0b7..1ff2a1f606fc9e883f1d2395d4bf4ac2a5bc39bb 100644
 --- a/netwerk/base/LoadInfo.cpp

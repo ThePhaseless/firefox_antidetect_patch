@@ -148,6 +148,22 @@
   "why": ""
  },
  {
+  "file": "docshell/base/test/gtest/moz.build",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "SOURCES += [\"TestStealthNavigationOnBase.cpp\"]  # STEALTH-HOOK(automation/navigation)",
+  "test": ""
+ },
+ {
+  "file": "docshell/base/test/gtest/moz.build",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "LOCAL_INCLUDES += [\"/docshell/base\"]  # STEALTH-HOOK(automation/navigation)",
+  "test": ""
+ },
+ {
   "file": "netwerk/base/LoadInfo.cpp",
   "function": "LoadInfo::LoadInfo(const LoadInfo& rhs)",
   "kind": "rewrite",

@@ -43,7 +43,8 @@ StealthJugglerEventId StealthKeyBirthScope StealthMediaDeclaration StealthNrSock
 StealthPcUdpProxyKinds StealthQuotaEstimate StealthScaleDeclaration StealthSessionUdpProxy StealthSocksUdpPool StealthTcpProxyRoad
 StealthTextQuality StealthTtcFace StealthUdpProxyBirth StealthWebGPUAdapter StealthWebGPUBundledVulkan StealthWebGPUDeclaration
 StealthWebGPUExternalTexture StealthWebGPUInstanceEnv StealthWindowGeometry TestStealthSessionResolver TestStealthSocksCredentials
-TestStealthTRRContext""".split()
+TestStealthTRRContext
+StealthJugglerCoalesce StealthJugglerMouseAck StealthMouseEventCopy StealthMouseEventIPC TestStealthDocShellDefaults TestStealthLinkClickAfter TestStealthLoadInfo StealthBundleHooks StealthBranding StealthDebugger StealthStackFrames""".split()
 
 
 # ── 1. the errors ───────────────────────────────────────────────────────────────────────────

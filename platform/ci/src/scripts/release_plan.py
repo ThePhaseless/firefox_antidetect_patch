@@ -97,7 +97,8 @@ DEFAULT_GTEST_FILTER = ("StealthGfxFeatureStatus.*:StealthWebGPUAdapter.*:"
                         "StealthCanvasProjection.*:StealthDocumentLanguage.*:StealthFallbackNames.*:StealthFcFontList.*:"
                         "StealthFontList.*:StealthFontMetrics.*:StealthMediaDeclaration.*:StealthOwnBinaries.*:"
                         "StealthQuotaEstimate.*:StealthTextQuality.*:StealthTtcFace.*:StealthWebGPUExternalTexture.*:"
-                        "Intl_Locale_StealthSystemLocales.*:Idwr.*:StartupCache.WritesNeverLowerIOPriority")
+                        "Intl_Locale_StealthSystemLocales.*:Idwr.*:StartupCache.WritesNeverLowerIOPriority"
+                        ":StealthJugglerCoalesce.*:StealthJugglerMouseAck.*:StealthMouseEventCopy.*:StealthMouseEventIPC.*:TestStealthDocShellDefaults.*:TestStealthLinkClickAfter.*:TestStealthLoadInfo.*:StealthBundleHooks.*:StealthBranding.*:StealthDebugger.*:StealthStackFrames.*")
 DEFAULT_REF = "main"
 # What `stop_after` can say: nothing (the whole run), or the objects of the touched directories.
 STOP_AFTERS = ("", "objects")

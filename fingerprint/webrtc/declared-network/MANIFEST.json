@@ -25,6 +25,7 @@
   "dom/media/webrtc/transport/nr_stealth_network.cpp": "100644",
   "dom/media/webrtc/transport/nr_stealth_network.h": "100644",
   "dom/media/webrtc/transport/test/gtest/TestStealthDeclaredNetwork.cpp": "100644",
+  "dom/media/webrtc/transport/test/gtest/TestStealthDeclaredNetworkOnBase.cpp": "100644",
   "dom/media/webrtc/transport/test/gtest/moz.build": "100644",
   "juggler/tests/ipv6_is_one_fact_of_the_declared_network.test.mjs": "100644",
   "third_party/libwebrtc/api/location.h": "100644"

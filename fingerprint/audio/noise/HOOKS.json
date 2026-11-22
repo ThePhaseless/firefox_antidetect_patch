@@ -16,6 +16,14 @@
   "test": ""
  },
  {
+  "file": "dom/media/gtest/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "SOURCES += [\"TestStealthMediaDeclarationOnBase.cpp\"]  # STEALTH-HOOK(fingerprint/media/decode-declaration)",
+  "test": ""
+ },
+ {
   "file": "dom/media/webaudio/AnalyserNode.cpp",
   "function": "",
   "kind": "add",

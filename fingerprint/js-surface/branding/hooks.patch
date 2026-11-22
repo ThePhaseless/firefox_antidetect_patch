@@ -102,7 +102,7 @@ index 0a89a2eb98c19f1c971bf463d90dc51e11d868d7..af61009941046ce29849c90225842970
      nsAutoCString spec;
      uri->GetAsciiSpec(spec);
 diff --git a/netwerk/protocol/res/moz.build b/netwerk/protocol/res/moz.build
-index 99ded3530e154b10e55d4a9dabf656294c243570..74ffc48c86851a223e077cefc316b47f18b86731 100644
+index 99ded3530e154b10e55d4a9dabf656294c243570..1e3edc89e8c41de459cc4ee0783f1254d2c042f9 100644
 --- a/netwerk/protocol/res/moz.build
 +++ b/netwerk/protocol/res/moz.build
 @@ -19,6 +19,7 @@ EXPORTS.mozilla.net += [
@@ -113,11 +113,12 @@ index 99ded3530e154b10e55d4a9dabf656294c243570..74ffc48c86851a223e077cefc316b47f
  
  EXPORTS += [
      "nsResProtocolHandler.h",
-@@ -33,6 +34,7 @@ UNIFIED_SOURCES += [
+@@ -33,6 +34,8 @@ UNIFIED_SOURCES += [
      "RemoteStreamGetter.cpp",
      "SubstitutingProtocolHandler.cpp",
  ]
 +UNIFIED_SOURCES += ["StealthBranding.cpp"]  # STEALTH-HOOK(fingerprint/js-surface/branding)
++TEST_DIRS += ["gtest"]  # STEALTH-HOOK(fingerprint/js-surface/branding)
  
  include("/ipc/chromium/chromium-config.mozbuild")
  

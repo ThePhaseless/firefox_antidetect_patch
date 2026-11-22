@@ -419,6 +419,22 @@
   "test": ""
  },
  {
+  "file": "dom/ipc/gtest/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "SOURCES += [\"TestStealthJugglerCoalesceOnBase.cpp\"]  # STEALTH-HOOK(automation/input)",
+  "test": ""
+ },
+ {
+  "file": "dom/ipc/gtest/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "SOURCES += [\"TestStealthMouseEventIPCOnBase.cpp\"]  # STEALTH-HOOK(automation/input)",
+  "test": ""
+ },
+ {
   "file": "layout/base/PresShell.cpp",
   "function": "",
   "kind": "add",
@@ -440,6 +456,14 @@
   "kind": "add",
   "form": "unknown",
   "line": "  StealthJugglerMouseAck jugglerMouseAck(aGUIEvent);",
+  "test": ""
+ },
+ {
+  "file": "layout/base/gtest/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "SOURCES += [\"TestStealthJugglerMouseAckOnBase.cpp\"]  # STEALTH-HOOK(automation/input)",
   "test": ""
  },
  {

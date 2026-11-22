@@ -734,6 +734,22 @@
  },
  {
   "file": "gfx/tests/gtest/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "SOURCES += [\"TestStealthBundleHooksOnBase.cpp\"]  # STEALTH-HOOK(fingerprint/fonts/bundle)",
+  "test": ""
+ },
+ {
+  "file": "gfx/tests/gtest/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "SOURCES += [\"TestStealthWebGPUDeclarationOnBase.cpp\"]  # STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
+  "test": ""
+ },
+ {
+  "file": "gfx/tests/gtest/moz.build",
   "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
   "kind": "add",
   "form": "unknown",

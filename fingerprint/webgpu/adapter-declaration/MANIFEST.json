@@ -12,6 +12,7 @@
   "dom/webgpu/StealthWebGPUDeclaration.cpp": "100644",
   "dom/webgpu/StealthWebGPUDeclaration.h": "100644",
   "gfx/tests/gtest/TestStealthWebGPUDeclaration.cpp": "100644",
+  "gfx/tests/gtest/TestStealthWebGPUDeclarationOnBase.cpp": "100644",
   "gfx/wgpu_bindings/src/stealth_webgpu_adapter.rs": "100644",
   "gfx/wgpu_bindings/src/stealth_webgpu_env.rs": "100644"
  },

@@ -178,6 +178,14 @@
   "test": ""
  },
  {
+  "file": "netwerk/protocol/res/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "TEST_DIRS += [\"gtest\"]  # STEALTH-HOOK(fingerprint/js-surface/branding)",
+  "test": ""
+ },
+ {
   "file": "security/sandbox/linux/broker/SandboxBrokerPolicyFactory.cpp",
   "function": "",
   "kind": "add",

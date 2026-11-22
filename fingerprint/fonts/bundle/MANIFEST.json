@@ -137,6 +137,7 @@
   "browser/fonts/webdings5_01.ttf": "100644",
   "browser/fonts/wingding5_01.ttf": "100644",
   "browser/fonts/yugothm1_95.ttc": "100644",
+  "gfx/tests/gtest/TestStealthBundleHooksOnBase.cpp": "100644",
   "gfx/thebes/StealthBundleFontList.cpp": "100644",
   "gfx/thebes/StealthBundleFontList.h": "100644",
   "gfx/thebes/StealthBundleFontList.mozbuild": "100644",
