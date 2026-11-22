@@ -295,12 +295,41 @@ mozilla::Atomic<int32_t> sFailNextBindForTests{0};
 
 void mozilla::StealthFailNextBindForTests(int32_t aError) { sFailNextBindForTests = aError; }
 
+namespace {
+#ifdef XP_WIN
+/* A UDP socket bound to a port (not the kernel's choice, port 0) is the only one that can be bound to it, on any address: on
+ * Windows a second socket bound to a specific address (127.0.0.1, the address of the LAN) on the port of a wildcard one is allowed
+ * with no option, and the datagrams sent to that address go to IT, not to the wildcard socket (our own peers are reached at
+ * 127.0.0.1:port, R3). SO_EXCLUSIVEADDRUSE, set before the bind, refuses that second bind, and makes our bind fail when any socket
+ * already holds the port on any address: the caller takes the next port, as the kernel skips a busy one. The retail socket takes a
+ * port the kernel chose and cannot be taken over either. Linux refuses the second bind already (no SO_REUSEADDR on this socket).
+ * False when the option cannot be set: the socket is not bound without it. */
+bool StealthMakePortExclusive(PRFileDesc* aFd, const PRNetAddr* aAddr) {
+  const uint16_t port = aAddr->raw.family == PR_AF_INET6 ? aAddr->ipv6.port : aAddr->inet.port;
+  PRFileDesc* native = PR_GetIdentitiesLayer(aFd, PR_NSPR_IO_LAYER);
+  if (!port || !native || PR_GetDescType(native) != PR_DESC_SOCKET_UDP) {
+    return true;
+  }
+  const PROsfd osfd = PR_FileDesc2NativeHandle(native);
+  const int exclusive = 1;
+  if (osfd == -1 || setsockopt(static_cast<SOCKET>(osfd), SOL_SOCKET, SO_EXCLUSIVEADDRUSE,
+                               reinterpret_cast<const char*>(&exclusive), sizeof(exclusive))) {
+    PR_SetError(PR_UNKNOWN_ERROR, osfd == -1 ? 0 : WSAGetLastError());
+    return false;
+  }
+  return true;
+}
+#else
+bool StealthMakePortExclusive(PRFileDesc*, const PRNetAddr*) { return true; }
+#endif
+}  // namespace
+
 bool mozilla::StealthBind(PRFileDesc* aFd, const PRNetAddr* aAddr) {
   if (const int32_t injected = sFailNextBindForTests.exchange(0)) {
     PR_SetError(injected, 0);
     return false;
   }
-  return PR_Bind(aFd, aAddr) == PR_SUCCESS;
+  return StealthMakePortExclusive(aFd, aAddr) && PR_Bind(aFd, aAddr) == PR_SUCCESS;
 }
 
 bool mozilla::StealthTcpBindAddress(const char* aDeclaredAddress, uint16_t aNicerPort, PRNetAddr* aOut) {

@@ -922,23 +922,25 @@ index e5ed9ceac0e287d3dfc33b2bf4eb4f48a75c0b04..ff7704be29dcc23b8c4ca94585e9b6ca
  # nsAppRunner.cpp and ProfileReset.cpp cannot be built in unified mode because
  # they pull in OS X system headers.
 diff --git a/toolkit/xre/nsAppRunner.cpp b/toolkit/xre/nsAppRunner.cpp
-index 003fc8545a7a8940dad6c34c3e15f8eb26928f68..48e11dbfdb8d7ad94d3f1630fe17300e46afc2f3 100644
+index 003fc8545a7a8940dad6c34c3e15f8eb26928f68..277c155a1d2ee07309cc986ce4d379061dc03fe6 100644
 --- a/toolkit/xre/nsAppRunner.cpp
 +++ b/toolkit/xre/nsAppRunner.cpp
-@@ -359,6 +359,8 @@ constinit std::unique_ptr<WaylandProxy> gWaylandProxy;
+@@ -359,6 +359,9 @@ constinit std::unique_ptr<WaylandProxy> gWaylandProxy;
  
  #include "BinaryPath.h"
  
 +#include "StealthIcePrefs.h"  // STEALTH-HOOK(network/proxy-udp)
++#include "StealthGfxFeatureStatus.h"  // STEALTH-HOOK(platform/declaration-gate)
 +
  #ifdef FUZZING
  #  include "FuzzerRunner.h"
  
-@@ -6203,6 +6205,8 @@ nsresult XREMain::XRE_mainRun() {
+@@ -6203,6 +6206,9 @@ nsresult XREMain::XRE_mainRun() {
      // ready in time for early consumers, such as the component loader.
      mDirProvider.InitializeUserPrefs();
  
 +    StealthLockIcePrefs();  // STEALTH-HOOK(network/proxy-udp)
++    mozilla::gfx::StealthMarkUserPrefsRead();  // STEALTH-HOOK(platform/declaration-gate)
 +
      // Now that preferences are loaded the profile service may be able to
      // determine the correct startup profile.

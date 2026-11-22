@@ -246,7 +246,9 @@ bool StealthTcpSocketBorn(nsISocketTransport* aTransport, const net::WebrtcProxy
 void StealthFailNextSocketAttachForTests(bool aFail);
 bool StealthTakeFailNextSocketAttachForTests();
 
-/* The bind of NrSocket::create (R3: the wildcard of the candidate's family, on the candidate's port): PR_Bind, true when it bound. Tests
+/* The bind of NrSocket::create (R3: the wildcard of the candidate's family, on the candidate's port): PR_Bind, true when it bound. On Windows
+ * a UDP socket bound to a port that is not the kernel's choice is bound with SO_EXCLUSIVEADDRUSE: no other socket holds that port on any address,
+ * and none can take it afterwards (a port another socket holds is the caller's next port). Tests
  * only: StealthFailNextBindForTests(aError) makes the next one (once) fail with the NSPR error aError (e.g. PR_NO_ACCESS_RIGHTS_ERROR, which
  * Windows answers for the ranges of the dynamic range it reserves and Linux for a privileged port), so the mapping of that answer is
  * asserted on every machine, not only on one that happens to refuse a port. 0 = none. */

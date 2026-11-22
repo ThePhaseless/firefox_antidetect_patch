@@ -8,6 +8,7 @@
 // UHD 620 (driver 31.0.101.2145) and an NVIDIA RTX 3060 (driver 32.0.15.6210).
 
 #include "GfxInfoBase.h"
+#include "StealthDeclarationGate.h"
 #include "StealthGfxFeatureStatus.h"
 #include "gtest/gtest.h"
 #include "mozilla/Components.h"
@@ -342,5 +343,65 @@ TEST(StealthGfxFeatureStatus, TheHostIsNotProbedWhileDeclared)
   nsAutoCString drm;
   ASSERT_EQ(gfxInfo->GetDrmRenderDevice(drm), NS_OK);
   EXPECT_TRUE(drm.IsEmpty());
+}
+
+// Not declared (the engine off, stock Firefox): the two hooks give the way
+// back to Mozilla's code, so glxtest probes and GetData reads it, as stock
+// Firefox does; a run that left WebGL with neither the probe nor a
+// declaration had no WebGL at all. The functions are asked directly: a real
+// GfxInfo here would spawn the host's glxtest.
+TEST(StealthGfxFeatureStatus, TheHostIsProbedAsStockWhenNothingIsDeclared)
+{
+  // A gtest runs before XRE_mainRun reads the profile's preferences: say they
+  // were read, as in a real launch, and put it back at the end.
+  StealthSetUserPrefsReadForTesting(true);
+  auto restore =
+      MakeScopeExit([] { StealthSetUserPrefsReadForTesting(false); });
+  Preferences::ClearUser(kSeedPref);
+  ASSERT_FALSE(StealthEngineActive());
+  EXPECT_FALSE(StealthNoHostGLProbe());
+
+  nsAutoCString testType("untouched");
+  bool glxTestError = true;
+  uint32_t adapterRAM = 42;
+  bool isWayland = true;
+  bool isXWayland = true;
+  EXPECT_FALSE(StealthFillGtkGfxInfoWithoutHost(testType, glxTestError,
+                                                adapterRAM, isWayland,
+                                                isXWayland));
+  EXPECT_TRUE(testType.EqualsLiteral("untouched"));
+  EXPECT_TRUE(glxTestError);
+  EXPECT_EQ(adapterRAM, 42u);
+
+  // The control: declared, both hooks answer.
+  Declared declared(kRtx3060);
+  EXPECT_TRUE(StealthNoHostGLProbe());
+  EXPECT_TRUE(StealthFillGtkGfxInfoWithoutHost(testType, glxTestError,
+                                               adapterRAM, isWayland,
+                                               isXWayland));
+  EXPECT_TRUE(testType.EqualsLiteral("EGL"));
+}
+
+// Before the profile's preferences are read the declaration is unknown (the
+// defaults say the engine is off even for a declared launch): nothing probes
+// the host and GfxInfo is filled without it, whatever the defaults say.
+TEST(StealthGfxFeatureStatus, NothingProbesTheHostBeforeTheProfilePrefsAreRead)
+{
+  StealthSetUserPrefsReadForTesting(false);
+  Preferences::ClearUser(kSeedPref);
+  ASSERT_FALSE(StealthEngineActive());
+  EXPECT_TRUE(StealthNoHostGLProbe());
+
+  nsAutoCString testType;
+  bool glxTestError = true;
+  uint32_t adapterRAM = 42;
+  bool isWayland = false;
+  bool isXWayland = false;
+  EXPECT_TRUE(StealthFillGtkGfxInfoWithoutHost(testType, glxTestError,
+                                               adapterRAM, isWayland,
+                                               isXWayland));
+  EXPECT_TRUE(testType.EqualsLiteral("EGL"));
+  EXPECT_FALSE(glxTestError);
+  EXPECT_EQ(adapterRAM, 0u);
 }
 #endif

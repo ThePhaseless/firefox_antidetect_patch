@@ -43,6 +43,7 @@ StealthIceResolverContext StealthInputEventBirth StealthJugglerEventId StealthKe
 StealthOwnBinaries StealthPcProxyConfig StealthPcUdpProxyKinds StealthPrefSanitize StealthQuotaEstimate StealthScaleDeclaration StealthSessionUdpProxy
 StealthSocksUdpPool StealthTcpProxyRoad StealthTextQuality StealthTtcFace StealthUdpProxyBirth StealthWebGPUAdapter StealthWebGPUBundledVulkan
 StealthWebGLParams StealthWebGPUDeclaration StealthWebGPUExternalTexture StealthWebGPUInstanceEnv StealthWindowGeometry StealthWindowInputDesktop
+StealthExclusivePort
 StealthBranding StealthCanvasUtils StealthDragGesture StealthHttp3Socks StealthJugglerCoalesce StealthJugglerMouseAck StealthMouseEventCopy
 StealthMouseEventIPC StealthNsProxyInfoKinds StealthSocksUdpLayer StealthStackFrames StealthStartupCache StealthTimezone
 TestStealthDocShellDefaults TestStealthLinkClickAfter TestStealthLoadInfo TestStealthSessionResolver TestStealthSocksCredentials TestStealthTRRContext""".split()
@@ -291,6 +292,7 @@ def test_suites_of_one_platform_are_not_missing_on_the_other():
     listing = ["StealthFcFontList", "StealthFontMetrics", "StealthMediaDeclaration"]
     on_linux = gtest_run.missing_suites(release_plan.DEFAULT_GTEST_FILTER, listing + ["Idwr"], "linux")
     assert "StealthFcFontList" not in on_linux and "StealthBundledCollection" not in on_linux and "StealthOwnBinaries" not in on_linux
+    assert "StealthExclusivePort" not in on_linux  # Windows only: TestStealthExclusivePort.cpp is built there only
     on_win = gtest_run.missing_suites(release_plan.DEFAULT_GTEST_FILTER, ["StealthBundledCollection", "StealthOwnBinaries"], "win")
     assert "StealthFcFontList" not in on_win and "StealthFontMetrics" not in on_win and "StealthBundledCollection" not in on_win
     assert "StealthMediaDeclaration" in on_win               # a suite both platforms build, absent: that is the error

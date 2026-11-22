@@ -7,6 +7,7 @@
 
 #include "GfxInfoBase.h"
 #include "StealthDeclarationGate.h"
+#include "mozilla/Atomics.h"
 #include "mozilla/StaticMutex.h"
 #include "mozilla/StaticPrefs_zoom.h"
 #include "mozilla/StaticPtr.h"
@@ -259,13 +260,33 @@ bool StealthGfxDeclaredStatus(nsIGfxInfo* /* aGfxInfo */, int32_t aFeature,
   return StealthAnswerGfxFeature(*sTable, aFeature, aFailureId, aStatus);
 }
 
+// Set once, on the main thread, by the hook right after
+// XREMain::XRE_mainRun's InitializeUserPrefs; read wherever GfxInfo is.
+static Atomic<bool> sStealthUserPrefsRead(false);
+
+void StealthMarkUserPrefsRead() { sStealthUserPrefsRead = true; }
+
+bool StealthUserPrefsRead() { return sStealthUserPrefsRead; }
+
+void StealthSetUserPrefsReadForTesting(bool aRead) {
+  sStealthUserPrefsRead = aRead;
+}
+
 #ifdef MOZ_WIDGET_GTK
-bool StealthNoHostGLProbe() { return true; }
+bool StealthNoHostGLProbe() {
+  // Before the profile's preferences are read the declaration is unknown
+  // (StealthEngineActive() reads the defaults): no probe. After, only stock
+  // Firefox (engine off) probes; GfxInfo::GetData fires it then.
+  return !StealthUserPrefsRead() || StealthEngineActive();
+}
 
 bool StealthFillGtkGfxInfoWithoutHost(nsACString& aTestType,
                                       bool& aGlxTestError,
                                       uint32_t& aAdapterRAM, bool& aIsWayland,
                                       bool& aIsXWayland) {
+  if (StealthUserPrefsRead() && !StealthEngineActive()) {
+    return false;  // stock Firefox: Mozilla's GetData reads its glxtest
+  }
   aTestType.AssignLiteral("EGL");
   aGlxTestError = false;
   aAdapterRAM = 0;

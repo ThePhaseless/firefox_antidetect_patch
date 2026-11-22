@@ -18,6 +18,7 @@
   "dom/media/webrtc/transport/nr_stealth_network.h": "100644",
   "dom/media/webrtc/transport/test/gtest/TestStealthDeclaredNetwork.cpp": "100644",
   "dom/media/webrtc/transport/test/gtest/TestStealthDeclaredNetworkBirth.cpp": "100644",
+  "dom/media/webrtc/transport/test/gtest/TestStealthExclusivePort.cpp": "100644",
   "dom/media/webrtc/transport/test/gtest/moz.build": "100644",
   "dom/media/webrtc/transport/test/nr_stealth_test_network.h": "100644",
   "dom/media/webrtc/transport/third_party/nICEr/src/stun/nr_stealth_addrs.h": "100644",

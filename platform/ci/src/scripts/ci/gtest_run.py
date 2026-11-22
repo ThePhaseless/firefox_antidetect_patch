@@ -48,7 +48,7 @@ LOGGED = {"StealthSessionUdpProxy": "sync,SOCKS-UDP:5,nsHostResolver:5"}
 # From the moz.build of each gtest directory: the font-list suites of Windows (TestStealthBundledCollection.cpp, TestStealthTextQuality.cpp, the
 # DirectWrite ones) and the untrusted-modules one (toolkit/xre/dllservices, Windows only) are not built on Linux; fontconfig's are GTK's.
 WINDOWS_ONLY = {"StealthBundledCollection", "StealthFallbackNames", "StealthFontList", "StealthTtcFace",
-                "StealthTextQuality", "StealthOwnBinaries", "StealthWindowInputDesktop"}
+                "StealthTextQuality", "StealthOwnBinaries", "StealthWindowInputDesktop", "StealthExclusivePort"}
 LINUX_ONLY = {"StealthFcFontList", "StealthFontMetrics", "StealthGlyphCoverage"}
 NOT_ON = {"linux": {"StealthWebGPUAdapter", "StealthWebGPUInstanceEnv"} | WINDOWS_ONLY,
           "win": {"StealthWebGPUBundledVulkan", "StealthFcBundleFonts"} | LINUX_ONLY}
@@ -58,7 +58,8 @@ NOT_ON = {"linux": {"StealthWebGPUAdapter", "StealthWebGPUInstanceEnv"} | WINDOW
 # in security/sandbox/linux/gtest (built only where security/sandbox/moz.build has OS_ARCH == "Linux"), the multisample one under #ifdef XP_WIN
 # (gfx/gl/gtest/TestStealthGLMultisample.cpp). An entry for a test that ran on that platform makes the judge red.
 NOT_ON_TESTS = {"linux": {"StealthGLMultisample.BasicRenderDriverBlendsIntoAMultisampledTarget"},
-                "win": {"StealthGfxFeatureStatus.TheHostIsNotProbedWhileDeclared", "StealthBranding.SandboxPolicyAllowsTheDeclaredArchive"}}
+                "win": {"StealthGfxFeatureStatus.TheHostIsNotProbedWhileDeclared", "StealthGfxFeatureStatus.NothingProbesTheHostBeforeTheProfilePrefsAreRead",
+                         "StealthBranding.SandboxPolicyAllowsTheDeclaredArchive"}}
 
 
 def suite_names(listing: str) -> list:

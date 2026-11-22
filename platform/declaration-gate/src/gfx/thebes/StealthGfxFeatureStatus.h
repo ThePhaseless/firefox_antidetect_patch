@@ -73,21 +73,38 @@ bool StealthGfxSuggestedDriverVersion(nsAString& aVersion);
 // pref. Our own GL (llvmpipe behind EGL, in the package) is the only GL, so a
 // host probe has no use, and what it reported (adapter, driver, DRM device,
 // PCI ids, uname) is host data no page may see; its 4 s timeout or a failure
-// used to disable WebGL for the whole session. Always true; a function so the
-// intent lives here and GfxInfo::FireGLXTestProcess, which also covers the
-// early fire in nsAppRunner (before the prefs are read), carries one line.
+// used to disable WebGL for the whole session. True with the engine on, and
+// before the profile's preferences are read (StealthUserPrefsRead): the early
+// fire in nsAppRunner (XRE_mainStartup) and anything that would reach GfxInfo
+// before XRE_mainRun's InitializeUserPrefs (a profile reset or migration
+// window, a temporary XPCOM of the profile manager) cannot tell a declared
+// launch, since StealthEngineActive() still reads the defaults. With the
+// engine off (stock Firefox) false after it: GfxInfo::GetData then fires
+// Mozilla's glxtest itself, as it does when nothing fired it in advance.
 bool StealthNoHostGLProbe();
 
 // What GfxInfo::GetData fills in without glxtest: the test type is EGL (our
 // own GL; keeps gfxPlatformGtk's X11_EGL decision on the declared status), no
 // glxtest error, no adapter RAM, and the two display-protocol flags from the
 // display connection. Every adapter, driver, DRM and PCI field stays empty.
-// Always true: the caller returns.
+// True with the engine on or before the profile's preferences are read (the
+// caller returns); false with the engine off after them, and Mozilla's GetData
+// reads its glxtest as stock Firefox does.
 bool StealthFillGtkGfxInfoWithoutHost(nsACString& aTestType,
                                       bool& aGlxTestError,
                                       uint32_t& aAdapterRAM, bool& aIsWayland,
                                       bool& aIsXWayland);
 #endif
+
+// The profile's preferences have been read: set once by the hook in
+// nsAppRunner right after XRE_mainRun's InitializeUserPrefs, where the
+// declaration (zoom.stealth.fpp.hw_seed and the rest) arrives. Before it,
+// StealthEngineActive() reads only the defaults and cannot tell a declared
+// launch from stock Firefox.
+void StealthMarkUserPrefsRead();
+bool StealthUserPrefsRead();
+// Tests only: a gtest runs in XRE_mainStartup, before that hook.
+void StealthSetUserPrefsReadForTesting(bool aRead);
 
 // Tests only: forget the parsed declaration so the next call parses again.
 void StealthResetGfxFeatureStatusForTesting();

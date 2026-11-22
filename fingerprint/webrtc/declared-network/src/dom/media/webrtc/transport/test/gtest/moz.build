@@ -18,6 +18,10 @@ SOURCES += ["TestStealthPcUdpProxyKinds.cpp"]
 SOURCES += ["TestStealthTcpProxyRoad.cpp"]
 SOURCES += ["TestStealthPcProxyConfig.cpp"]
 
+if CONFIG["OS_TARGET"] == "WINNT":  # STEALTH-HOOK(fingerprint/webrtc/declared-network)
+    # The port a declared host socket draws is its alone (SO_EXCLUSIVEADDRUSE): a rule of Windows, Linux refuses the second bind.
+    SOURCES += ["TestStealthExclusivePort.cpp"]
+
 LOCAL_INCLUDES += [
     "/dom/media/webrtc/transport/ipc",
     "/netwerk/socket",  # STEALTH-HOOK(network/proxy-udp)
