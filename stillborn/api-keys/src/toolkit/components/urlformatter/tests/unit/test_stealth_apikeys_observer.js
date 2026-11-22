@@ -12,6 +12,13 @@ const { SafeBrowsing } = ChromeUtils.importESModule(
 
 const PREF_SB = "zoom.stealth.apikey.google_safebrowsing";
 
+// SafeBrowsing.init() registers the tables with the list manager, which gets
+// the url-classifier DB service; that service keeps its store in the profile
+// (nsUrlClassifierDBService::Init reads NS_APP_USER_PROFILE_LOCAL_50_DIR, then
+// NS_APP_USER_PROFILE_50_DIR, and fails without either). The url-classifier's
+// own tests have it from head_urlclassifier.js; this manifest's head does not.
+do_get_profile();
+
 add_task(async function test_declaration_after_init_enables_the_provider() {
   Services.prefs.clearUserPref(PREF_SB);
   Services.prefs.setBoolPref("browser.safebrowsing.update.enabled", false);
