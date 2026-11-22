@@ -867,3 +867,10 @@ jobs:
         with: { python-version: '3.11' }
       - name: HOST GATE - the same on every host, retail's where the identity does not decide
         run: python scripts/ci_host_gate.py compare host-dump
+
+  # CARGO TESTS: the unit tests of OUR Rust code in WebRender (gfx/wr), which no other round runs. Beside the rest of the gate (no `needs`), on GitHub's
+  # runners, 15 minutes a leg (the timeout is on the job of cargo-tests.yml: a job that calls a workflow takes none). Red when none of ours ran.
+  cargo-tests:
+    name: cargo-tests
+    permissions: { contents: read }
+    uses: ./.github/workflows/cargo-tests.yml

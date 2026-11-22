@@ -163,6 +163,22 @@
   "test": ""
  },
  {
+  "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
+  "function": "mod tests {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "#[cfg(test)]",
+  "test": ""
+ },
+ {
+  "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
+  "function": "mod tests {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "mod stealth_tests;",
+  "test": ""
+ },
+ {
   "file": "dom/media/webrtc/transport/moz.build",
   "function": "include(\"/tools/fuzzing/libfuzzer-config.mozbuild\")",
   "kind": "add",

@@ -1,6 +1,7 @@
 {
  "modified": [],
  "added": {
+  ".github/workflows/cargo-tests.yml": "100644",
   ".github/workflows/gate-only.yml": "100644",
   ".github/workflows/gate.yml": "100644",
   ".github/workflows/latitude-sweeper.yml": "100644",
@@ -15,6 +16,7 @@
   "scripts/ci/__main__.py": "100644",
   "scripts/ci/background.py": "100644",
   "scripts/ci/cache_rules.py": "100644",
+  "scripts/ci/cargo_oracles.py": "100644",
   "scripts/ci/gate_legs.py": "100644",
   "scripts/ci/gh_expr.py": "100644",
   "scripts/ci/gtest_run.py": "100644",

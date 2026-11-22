@@ -71,7 +71,7 @@ index db8a3c004486d5b27e012b0b318b4d8ac477569a..989438d66fb7b276c3eb99bc85f42431
  
    // send the new addresses back to the child
 diff --git a/dom/media/webrtc/transport/mdns_service/src/lib.rs b/dom/media/webrtc/transport/mdns_service/src/lib.rs
-index 82d3609ed94472e02ab3a7b9b291824160e8a79b..871627e4781d2745385d246e0489bae6fbdf4b2f 100644
+index 82d3609ed94472e02ab3a7b9b291824160e8a79b..3ca7f3a18ce19c5c808c4ac8b1591ba9e66196d8 100644
 --- a/dom/media/webrtc/transport/mdns_service/src/lib.rs
 +++ b/dom/media/webrtc/transport/mdns_service/src/lib.rs
 @@ -459,14 +459,23 @@ impl MDNSService {
@@ -100,6 +100,13 @@ index 82d3609ed94472e02ab3a7b9b291824160e8a79b..871627e4781d2745385d246e0489bae6
  
          let thread_name = "mdns_service";
          let builder = thread::Builder::new().name(thread_name.into());
+@@ -929,3 +938,6 @@ mod tests {
+         }
+     }
+ }
++
++#[cfg(test)]
++mod stealth_tests;
 diff --git a/dom/media/webrtc/transport/moz.build b/dom/media/webrtc/transport/moz.build
 index 98369755834cfc31e3f3df454879a1d6df64cbf6..d5b1cfc5b8919762298b011529b450c94e3ea625 100644
 --- a/dom/media/webrtc/transport/moz.build
