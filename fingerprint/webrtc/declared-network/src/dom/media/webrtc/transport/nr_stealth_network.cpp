@@ -18,6 +18,7 @@
 #include "prerror.h"
 #include "prio.h"
 #include "prnetdb.h"
+#include "private/pprio.h"  // PROsfd, PR_FileDesc2NativeHandle (StealthMakePortExclusive)
 
 // nICEr is C++: its headers are not wrapped in extern "C".
 // clang-format off
