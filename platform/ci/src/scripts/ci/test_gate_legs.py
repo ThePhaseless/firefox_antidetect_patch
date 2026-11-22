@@ -166,6 +166,8 @@ def cases() -> list:
         add("gate legs: the command exits 0 and says ok on a gate with them", res.returncode == 0 and res.stdout.startswith("ok:"))
     # the cargo job: the unit tests of OUR Rust in WebRender run on a GitHub runner, and a run in which none of ours ran is red
     out.extend(cargo_cases(gate))
+    # the package manifest A/B: the published engine's archives against a build's, a reusable workflow like the cargo one
+    out.extend(package_cases(gate))
     return out
 
 
@@ -270,3 +272,52 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+
+
+def package_cases(gate: dict) -> list:
+    import yaml
+
+    out = []
+
+    def add(name, ok):
+        out.append((name, bool(ok)))
+
+    text = (WORKFLOWS / "package-ab.yml").read_text(encoding="utf-8")
+    wf = yaml.safe_load(text)
+    on = wf.get("on", wf.get(True)) or {}
+    job = wf["jobs"]["package-ab"]
+    steps = job["steps"]
+    call = gate["jobs"].get("package-ab") or {}
+    add("package-ab: gate.yml has one job that calls package-ab.yml, with no `needs` and no runner of its own, passing the build's run and the published tag",
+        call.get("uses") == "./.github/workflows/package-ab.yml" and "needs" not in call and "runs-on" not in call and "steps" not in call
+        and sum(1 for j in gate["jobs"].values() if "package-ab.yml" in str(j.get("uses", ""))) == 1
+        and (call.get("with") or {}) == {"build_run_id": "${{ inputs.build_run_id }}", "published_tag": "${{ inputs.published_tag }}"})
+    add("package-ab: the call can read the other run's artifacts and the release (actions: read, contents: read), and writes nothing",
+        call.get("permissions") == {"actions": "read", "contents": "read"} and wf.get("permissions") == {"actions": "read", "contents": "read"})
+    inputs = (on.get("workflow_call") or {}).get("inputs") or {}
+    add("package-ab: package-ab.yml is a reusable workflow (build_run_id, published_tag firefox-68), and runs on its own only for a push to latitude/*-oracles",
+        set(on) == {"workflow_call", "push"} and on["push"].get("branches") == ["latitude/*-oracles"] and set(inputs) == {"build_run_id", "published_tag"}
+        and inputs["published_tag"].get("default") == "firefox-68" and not any("required" in i for i in inputs.values()))
+    add("package-ab: a push measures run 44921963200 against firefox-68 (the inputs of a push are empty), and a call uses what the gate passed",
+        job["env"].get("BUILD_RUN_ID") == "${{ inputs.build_run_id || '44921963200' }}" and job["env"].get("TAG") == "${{ inputs.published_tag || 'firefox-68' }}")
+    add("package-ab: 15 minutes on a GitHub runner, never the Latitude node",
+        job.get("timeout-minutes") == 15 and job.get("runs-on") == "ubuntu-24.04" and "latitude-" not in text and "self-hosted" not in text)
+    down = [s for s in steps if str(s.get("uses", "")).startswith("actions/download-artifact")]
+    add("package-ab: the candidate is the asset-* of both legs and the source-commit of one run, read with the token when it is another run's",
+        [(s["with"]["name"]) for s in down] == ["asset-linux-x86_64", "asset-win-x86_64", "source-commit"]
+        and all(s["with"]["run-id"] == "${{ env.BUILD_RUN_ID }}" and "github.run_id" in s["with"]["github-token"] for s in down))
+    built = [s for s in down if s["with"]["name"] == "source-commit"]
+    add("package-ab: a build that recorded no source-commit is not an error of the download, the run's head_sha is the series commit",
+        built[0].get("continue-on-error") is True and "series-commit.txt" in text and ".head_sha" in text)
+    pub = [s for s in steps if "seal-check" in str(s.get("run", ""))]
+    add("package-ab: the published release is checked against checksums.txt and its seal before anything is compared",
+        len(pub) == 1 and "sha256sum -c checksums.txt" in pub[0]["run"] and pub[0]["run"].index("sha256sum -c") < pub[0]["run"].index("seal-check")
+        and steps.index(pub[0]) < steps.index(down[0]) and pub[0].get("id") == "published")
+    ab = [s for s in steps if ' compare "out/published' in str(s.get("run", ""))]
+    cmd = str(ab[0]["run"]) if len(ab) == 1 else ""
+    add("package-ab: the commits of the diff are fetched when this checkout lacks them, then explain, and one compare per leg whose red makes the step red",
+        len(ab) == 1 and cmd.index("fetch --no-tags origin") < cmd.index(" explain ") < cmd.index(" compare ") and "FROM: ${{ steps.published.outputs.series_commit }}" in text
+        and "|| RED=1" in cmd and 'exit "$RED"' in cmd and "continue-on-error" not in ab[0] and "if" not in ab[0] and "linux-x86_64 win-x86_64" in cmd)
+    keep = [s for s in steps if (s.get("with") or {}).get("path") == "out"]
+    add("package-ab: the lists and the reports are kept after a red run too", len(keep) == 1 and "always()" in str(keep[0].get("if", "")) and keep[0]["with"]["name"] == "package-ab")
+    return out

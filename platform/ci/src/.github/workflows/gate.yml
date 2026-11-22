@@ -28,6 +28,10 @@ on:
       core_ref:
         type: string
         default: main
+      published_tag:
+        description: the engine published before, whose archives the package-ab job compares the candidate's with (its seal names the series commit it came from)
+        type: string
+        default: firefox-68
 
 jobs:
   # DRIVE GATE — the firefox-8 catcher. A raw `firefox --screenshot` proves
@@ -874,3 +878,13 @@ jobs:
     name: cargo-tests
     permissions: { contents: read }
     uses: ./.github/workflows/cargo-tests.yml
+
+  # PACKAGE MANIFEST A/B: the archives of the engine published before (inputs.published_tag) against this build's, per leg (package-ab.yml says what is red and what is
+  # only reported). Beside the rest of the gate (no `needs`), on a GitHub runner, 15 minutes. It reads the build's archives of build_run_id.
+  package-ab:
+    name: package-ab
+    permissions: { actions: read, contents: read }
+    uses: ./.github/workflows/package-ab.yml
+    with:
+      build_run_id: ${{ inputs.build_run_id }}
+      published_tag: ${{ inputs.published_tag }}

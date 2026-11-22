@@ -1,0 +1,135 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# package-ab.yml — the package manifest A/B: the files of the archives of the engine published before, against a candidate's, per leg.
+#
+# Red: a file added or missing, or a non-binary file whose content changed and that no source of ours explains (the files of the series that changed between
+# the series commit of the published seal and the candidate's; scripts/ci/ab_package.py says by which rule). Reported only: compiled binaries, the members of
+# omni.ja, the build identity files. The published archives are verified against the seal and checksums.txt before anything is compared. The lists and the
+# reports are the artifact package-ab.
+#
+# THE CANDIDATE is the asset-* artifacts of one run (inputs.build_run_id). THE SERIES COMMIT it was built from is the one that run recorded (series-commit.txt
+# of its artifact source-commit), else the head_sha of that run; the commit is fetched when this checkout's history does not hold it (a run of another branch).
+# Called by gate.yml (so it runs beside the rest of the gate, on the build's own archives) and on a push to latitude/*-oracles, for a run of its own: there
+# the candidate is run 44921963200 (latitude/firefox-69-noglx, whose archives are kept until 2026-11-28) against firefox-68, with the comparator of the pushed commit.
+# ─────────────────────────────────────────────────────────────────────────────
+name: package-ab
+
+on:
+  workflow_call:
+    inputs:
+      build_run_id:
+        description: the run whose asset-* artifacts are the candidate (the caller's own, or another's)
+        type: string
+        default: ''
+      published_tag:
+        description: the engine published before, whose archives the candidate's are compared with (its seal names the series commit it came from)
+        type: string
+        default: firefox-68
+  push:
+    branches: ['latitude/*-oracles']
+    paths-ignore: ['**.md']
+
+permissions: { actions: read, contents: read }
+
+# A newer push to the branch replaces the older run; a called run, or any other event, has a group of its own.
+concurrency:
+  group: package-ab-${{ github.event_name == 'push' && github.workflow == 'package-ab' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'push' && github.workflow == 'package-ab' }}
+
+jobs:
+  package-ab:
+    name: package-ab
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      # A push has no inputs: its candidate is the measured run (its artifacts expire 2026-11-28), its published engine firefox-68.
+      BUILD_RUN_ID: ${{ inputs.build_run_id || '44921963200' }}
+      TAG: ${{ inputs.published_tag || 'firefox-68' }}
+    steps:
+      - name: Checkout the series (its history is the diff of the sources; its scripts are the comparator)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ github.sha }}
+          path: engine-series
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with: { python-version: '3.11' }
+      - name: The published engine, verified against its seal and checksums.txt
+        id: published
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p published
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir published -p checksums.txt -p seal.json -p '*.tar.gz' -p '*.zip'
+          (cd published && sha256sum -c checksums.txt)
+          python engine-series/platform/ci/src/scripts/ci/ab_package.py seal-check published --github-output "$GITHUB_OUTPUT"
+      - name: The candidate, linux
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: asset-linux-x86_64
+          path: candidate/linux-x86_64
+          run-id: ${{ env.BUILD_RUN_ID }}
+          github-token: ${{ env.BUILD_RUN_ID != github.run_id && github.token || '' }}
+      - name: The candidate, windows
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: asset-win-x86_64
+          path: candidate/win-x86_64
+          run-id: ${{ env.BUILD_RUN_ID }}
+          github-token: ${{ env.BUILD_RUN_ID != github.run_id && github.token || '' }}
+      # The series commit the candidate was built from is the one its build recorded (series-commit.txt of the artifact source-commit); the head_sha of its run
+      # when the build did not record one.
+      - name: The series commit the candidate was built from
+        id: built
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: source-commit
+          path: source-commit
+          run-id: ${{ env.BUILD_RUN_ID }}
+          github-token: ${{ env.BUILD_RUN_ID != github.run_id && github.token || '' }}
+      - name: The A/B of the manifests, per leg
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FROM: ${{ steps.published.outputs.series_commit }}
+        run: |
+          set -euo pipefail
+          AB=engine-series/platform/ci/src/scripts/ci/ab_package.py
+          if [ -s source-commit/series-commit.txt ]; then
+            TO="$(tr -d '[:space:]' < source-commit/series-commit.txt)"
+          else
+            TO="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$BUILD_RUN_ID" --jq .head_sha)"
+          fi
+          [ -n "$TO" ] || { echo "ERROR: no series commit for run $BUILD_RUN_ID"; exit 1; }
+          # a commit of another branch is not in this checkout's history: fetch what is missing, by its sha
+          for C in "$FROM" "$TO"; do
+            git -C engine-series cat-file -e "${C}^{commit}" 2>/dev/null || git -C engine-series fetch --no-tags origin "$C"
+          done
+          echo "package A/B: published $TAG (series $FROM) against run $BUILD_RUN_ID (series $TO)" | tee -a "$GITHUB_STEP_SUMMARY"
+          mkdir -p out
+          python "$AB" explain --series engine-series --from "$FROM" --to "$TO" --out out/explained.json
+          RED=0
+          for LEG in linux-x86_64 win-x86_64; do
+            set -- published/firefox-*-stealth-"$LEG".*
+            [ "$#" -eq 1 ] && [ -e "$1" ] || { echo "ERROR: expected one published archive of $LEG, found: $*"; exit 1; }
+            PUB="$1"
+            set -- candidate/"$LEG"/firefox-*-stealth-"$LEG".*
+            [ "$#" -eq 1 ] && [ -e "$1" ] || { echo "ERROR: expected one candidate archive of $LEG, found: $*"; exit 1; }
+            python "$AB" list "$PUB" --out "out/published-$LEG.json"
+            python "$AB" list "$1" --out "out/candidate-$LEG.json"
+            python "$AB" compare "out/published-$LEG.json" "out/candidate-$LEG.json" --explained out/explained.json --report "out/report-$LEG.json" --summary "out/summary-$LEG.md" || RED=1
+            { echo "### package A/B, $LEG"; echo '```'; cat "out/summary-$LEG.md"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          done
+          exit "$RED"
+      - name: Keep the lists and the reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: package-ab
+          path: out
+          if-no-files-found: ignore
+          retention-days: 14
