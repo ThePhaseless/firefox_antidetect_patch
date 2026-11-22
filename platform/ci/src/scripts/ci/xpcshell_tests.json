@@ -2,14 +2,11 @@
  "files": [
   "browser/components/tests/unit/test_stealth_launch_counter.js",
   "chrome/test/unit/test_stealth_branding_chrome_registry.js",
-  "chrome/test/unit/test_stealth_probe_a_global_missing.js",
-  "chrome/test/unit/test_stealth_probe_b_branding_missing.js",
-  "chrome/test/unit/test_stealth_probe_c_on_then_off.js",
   "js/xpconnect/tests/unit/test_stealth_hybrid_xrays_options.js",
   "security/manager/ssl/stealth/test/test_stealth_generate_no_glean_init.js",
   "toolkit/components/url-classifier/tests/unit/test_stealth_hashcompleter_context.js",
   "toolkit/components/urlformatter/tests/unit/test_stealth_apikeys.js",
   "toolkit/components/urlformatter/tests/unit/test_stealth_apikeys_observer.js"
  ],
- "min_tests": 16
+ "min_tests": 13
 }

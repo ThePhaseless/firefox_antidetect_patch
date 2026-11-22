@@ -14,6 +14,11 @@
 // (firefox-appdir in the manifest). A binary that registers no branding package
 // fails here, it is not skipped.
 //
+// No case opens a chrome URL that does not exist: in automation that is a crash by
+// design (nsNetUtil.cpp, the check under xpc::IsInAutomation() that does
+// MOZ_CRASH_UNSAFE_PRINTF("Missing chrome or resource URLs") kills the process), so
+// the declared file shadows one the build ships and the engine-off read finds it.
+//
 // The engine is on with zoom.stealth.fpp.hw_seed > 0. Only a complete declaration
 // is tried with it on: an incomplete one with the engine on refuses the launch
 // (StealthAssertDeclarationsComplete), which would end the shell.
@@ -27,8 +32,14 @@ const { NetUtil } = ChromeUtils.importESModule(
 const SEED_PREF = "zoom.stealth.fpp.hw_seed";
 const ARCHIVE_PREF = "zoom.stealth.branding.archive";
 
-const BRANDING_FILE = "stealth-declared-brand.txt";
-const BRANDING_TEXT = "the branding this test declared";
+// The declared archive holds a file with the SAME NAME as one the build's branding
+// ships under chrome://branding/content/: aboutDialog.css, listed in
+// browser/branding/unofficial/content/jar.mn (the branding the CI build uses: its
+// .mozconfig names no --with-branding, so browser/confvars.sh's
+// MOZ_BRANDING_DIRECTORY=browser/branding/unofficial applies; official/ has the
+// same file). Its bytes are a text marker, never the real stylesheet's.
+const BRANDING_FILE = "aboutDialog.css";
+const BRANDING_TEXT = "/* the branding this test declared */";
 const BRANDING_URL = "chrome://branding/content/" + BRANDING_FILE;
 // A package no build registers: the undeclared variant of the branding package.
 const UNDECLARED_URL =
@@ -154,15 +165,15 @@ add_task(async function test_declared_jar_is_what_a_chrome_load_reads() {
   const text = withEngine(() => readChrome(BRANDING_URL));
   Assert.equal(text, BRANDING_TEXT, "the bytes come from the declared archive");
 
-  // Engine off, no such file in the build's branding: the bytes above are not
-  // the build's.
-  let offFailed = false;
-  try {
-    readChrome(BRANDING_URL);
-  } catch (e) {
-    offFailed = true;
-  }
-  Assert.ok(offFailed, "engine off: the build's branding has no such file");
+  // Engine off: the same URL opens the build's own file, whose bytes are not the
+  // declared ones (nothing is asserted on them beyond that).
+  const stock = readChrome(BRANDING_URL);
+  Assert.greater(
+    stock.length,
+    0,
+    "engine off: the build's own file is not empty"
+  );
+  Assert.notEqual(stock, BRANDING_TEXT, "engine off: not the declared bytes");
 });
 
 add_task(async function test_an_undeclared_package_is_not_resolved() {

@@ -451,6 +451,23 @@ def cases() -> list:
     with tmp:
         _, result, text, _ = t.run()
         add("a green file prints exit 0 and keeps nothing", "| 0 |" in text and not (t.out / "crash").exists())
+    # a minidump is red whatever the exit code (an automation-only MOZ_CRASH in a child process, or a crash the shell survived, still leaves one)
+    tmp, t = tree({"test_declared.js": "task test_one PASS\ndmp abc\n" + extra}, minimum=1)
+    with tmp:
+        code, result, text, junit = t.run()
+        reasons = " ".join(result["reasons"])
+        add("a file that exits 0 with every task green but leaves a minidump is RED, and the reason names the minidump and MozCrashReason",
+            code == 1 and result["verdict"] == "red" and result["files"][0]["rc"] == 0 and result["failed"] == 0 and not result["files"][0]["ok"]
+            and "left a minidump (MozCrashReason: MOZ_RELEASE_ASSERT(x))" in reasons and "abc.dmp" in reasons and "(file)" in junit)
+    tmp, t = tree({"test_declared.js": "task test_one PASS\ndmp abc\n"}, minimum=1)
+    with tmp:
+        code, result, text, _ = t.run()
+        add("exit 0 with a minidump and no .extra is RED too: `left a minidump (MozCrashReason: absent)`",
+            code == 1 and not result["files"][0]["ok"] and "left a minidump (MozCrashReason: absent)" in " ".join(result["reasons"]))
+    tmp, t = tree({"test_declared.js": 'task test_one PASS\nextra abc {"MozCrashReason": "x"}\n'}, minimum=1)
+    with tmp:
+        code, result, text, _ = t.run()
+        add("exit 0 without a .dmp stays green (an .extra alone is not a crash)", code == 0 and result["verdict"] == "green" and result["files"][0]["ok"] and "crash" not in result["files"][0])
     with tempfile.TemporaryDirectory() as tmp_name:
         root, target = Path(tmp_name) / "run", Path(tmp_name) / "out"
         (root / "temp" / "sub").mkdir(parents=True)
@@ -471,8 +488,8 @@ def cases() -> list:
     declared = x.load_list(x.LIST)
     lock = x.load_lock(x.LOCK)
     folders = {Path(f).parent.as_posix() for f in declared["files"]}
-    add("the declared list has our seven xpcshell tests of the line and the three temporary probes of the branding crash (ten files) and the minimum is their sixteen tasks (the launch counter's four, the branding chrome registry's three, the probes' three, the api keys' two and its observer's one, the hash completer's one, the hybrid xrays option's run_test, and the generate mode's one)",
-        len(declared["files"]) == 10 and declared["min_tests"] == 16 and all(Path(f).name.startswith("test_stealth_") for f in declared["files"]))
+    add("the declared list has our seven xpcshell tests of the line and the minimum is their thirteen tasks (the launch counter's four, the branding chrome registry's three, the api keys' two and its observer's one, the hash completer's one, the hybrid xrays option's run_test, and the generate mode's one)",
+        len(declared["files"]) == 7 and declared["min_tests"] == 13 and all(Path(f).name.startswith("test_stealth_") for f in declared["files"]))
     # every xpcshell test that a HOOKS.json names (`"test": "xpcshell:<path>#<test>"`, read by tools/hook_tests_judge.py of main) has its file in the list
     hook_tests = ["chrome/test/unit/test_stealth_branding_chrome_registry.js#test_chrome_registry_serves_the_declared_branding_jar",
                   "js/xpconnect/tests/unit/test_stealth_hybrid_xrays_options.js#run_test",

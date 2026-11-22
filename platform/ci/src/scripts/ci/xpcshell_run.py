@@ -10,7 +10,7 @@ of the source tree, never shipped. This script is the part of Mozilla's runner (
   run    for each declared file (scripts/ci/xpcshell_tests.json): read the manifest that lists it (ours beside it in the series, else Mozilla's of the
          folder: head files, prefs, firefox-appdir, environment), build the
          command of buildXpcsCmd / buildCmdHead / buildCmdTestFile, run it with the runner's environment (no non-local connection), parse the
-         structured log head.js prints, and write junit + a result JSON. Exit 1 when a test fails or is skipped, a process dies or times out, a file
+         structured log head.js prints, and write junit + a result JSON. Exit 1 when a test fails or is skipped, a process dies or times out or leaves a minidump, a file
          collects no test, or fewer tests were collected than the declared minimum
   check  the declared list is exactly the set of our xpcshell tests that the series holds (discover): one the list does not run is a red, so is a
          listed one that the series does not have, so a new test of ours cannot be left out of the leg unseen
@@ -793,6 +793,11 @@ def run_file(binary, series: Path, support: Path, work: Path, modules: Path, rel
         result["errors"].append("timed out after %d s" % timeout)
     elif rc != 0:
         result["errors"].append("exit code %s" % rc)
+    if crash and crash["dumps"]:
+        # a minidump is a crash whatever the exit code: a process of the test that died (an automation-only MOZ_CRASH) or a crash the shell survived. It leads the
+        # file's errors, so that the verdict's line (the first three) names it.
+        reasons = sorted({e["MozCrashReason"] for e in crash["extras"] if "MozCrashReason" in e}) or ["absent"]
+        result["errors"].insert(0, "left a minidump (MozCrashReason: %s): %s" % ("; ".join(reasons), ", ".join(crash["dumps"])))
     declared = len(re.findall(r"^\s*add_task\(", source.read_text(encoding="utf-8", errors="replace"), re.M))
     result["declared_tasks"] = declared
     if tests and declared > len(tests) and not (len(tests) == 1 and tests[0]["name"] == "run_test"):
