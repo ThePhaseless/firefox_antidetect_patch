@@ -34,9 +34,12 @@ Test references (the grammar of `test`; '' is allowed and is debt):
     node:<path>[#<test title>]      <path> is a tree path (juggler/tests/x.test.mjs): <folder>/src/<path> exists in some
                                     folder; with a title, the title string appears in the file
     py:<path>::<test_name>          the same for a python test of ours: the file exists and defines test_name
+    py:<path>::invariant:<name>     a check that is not a test function (an invariant of a checker script): the file exists
+    py:<path>::case:<name>          and contains the name as a word (a string or an identifier), the same for a case name
     xpcshell:<path>#<test>          the same for an xpcshell test: the file exists and the title is in it (rule T3: no
                                     round runs xpcshell yet, so it is debt until a gate leg does)
-    wrapper:<path>::<test>          a test of the wrapper repository: only the format is checked here
+    wrapper:<path>::<test>          a test of the wrapper repository: only the format is checked here; <test> may be
+                                    invariant:<name> or case:<name> for a check of a script that is not a test function
 
 A test must also be RUN by a round (rule T3, G20), judged on the series' copy of the candidate workflow
 (platform/ci/src/.github/workflows/release.yml, not judged when the series has none):
@@ -232,7 +235,15 @@ def reference_problem(root: Path, ref: str, index: _Index | None = None) -> str 
         p = index.src_file(path)
         if p is None:
             return "%s is in no folder's src/" % path
-        if not re.search(r"\bdef\s+%s\b" % re.escape(name), p.read_text(encoding="utf-8", errors="replace")):
+        text = p.read_text(encoding="utf-8", errors="replace")
+        label, colon, bare = name.partition(":")
+        if colon and label in ("invariant", "case"):
+            if not bare:
+                return "py:<path>::%s:<name> expected" % label
+            if not re.search(r"(?<!\w)%s(?!\w)" % re.escape(bare), text):
+                return "%s has no %s named %s" % (path, label, bare)
+            return None
+        if not re.search(r"\bdef\s+%s\b" % re.escape(name), text):
             return "%s does not define %s" % (path, name)
         return None
     if kind == "xpcshell":
@@ -246,7 +257,12 @@ def reference_problem(root: Path, ref: str, index: _Index | None = None) -> str 
             return "the title %r is not in %s" % (title, path)
         return None
     if kind == "wrapper":
-        return None if WRAPPER_RE.match(ref) else "wrapper:<path>::<test> expected"
+        if not WRAPPER_RE.match(ref):
+            return "wrapper:<path>::<test> expected"
+        label, colon, bare = rest.partition("::")[2].partition(":")
+        if colon and label in ("invariant", "case") and not bare:
+            return "wrapper:<path>::%s:<name> expected" % label
+        return None
     return "unknown test reference %r: gtest:, node:, py:, xpcshell: or wrapper:" % ref
 
 

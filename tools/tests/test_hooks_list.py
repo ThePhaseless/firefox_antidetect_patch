@@ -242,6 +242,23 @@ def test_a_py_reference_and_a_wrapper_reference(tmp_path):
     assert hl.reference_problem(root, "whatever:x")
 
 
+def test_a_reference_to_an_invariant_or_a_case_of_a_checker(tmp_path):
+    root = series(tmp_path, top(G1))
+    d = root / FOLDER / "src" / "scripts"
+    d.mkdir(parents=True)
+    (d / "ci_gate.py").write_text('INVARIANTS = ["host-free"]\nCASES = {"clean": 1}\ndef no_proxy():\n    pass\n',
+                                  encoding="utf-8")
+    for ref in ("py:scripts/ci_gate.py::invariant:host-free", "py:scripts/ci_gate.py::invariant:no_proxy",
+                "py:scripts/ci_gate.py::case:clean", "wrapper:scripts/ci_host_gate.py::invariant:host-free",
+                "wrapper:scripts/ci_host_gate.py::case:clean"):
+        assert hl.reference_problem(root, ref) is None, ref
+    for ref in ("py:scripts/ci_gate.py::invariant:absent", "py:scripts/ci_gate.py::case:absent",
+                "py:scripts/ci_gate.py::case:clea", "py:scripts/ci_gate.py::invariant:",
+                "py:scripts/missing.py::invariant:host-free", "wrapper:scripts/ci_host_gate.py::invariant:",
+                "wrapper:scripts/ci_host_gate.py::case:"):
+        assert hl.reference_problem(root, ref), ref
+
+
 # --------------------------------------------------------------------------- debt (rules T1 and T2) and the shared writer
 def test_a_hook_without_a_test_is_debt_until_it_has_one(tmp_path):
     root = series(tmp_path, top(G1))
