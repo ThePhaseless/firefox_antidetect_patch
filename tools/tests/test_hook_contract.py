@@ -537,13 +537,15 @@ def test_g9_partial_line_of_a_multi_line_call_adds_one_plain_argument():
 
 def test_g29_g9_the_called_function_replaced_and_plain_arguments_added():
     ok = {"  const auto l = ShaderOutput(gl);": "  const auto l = StealthShaderOutputLanguage(gl, mStealthPerPage);",
-          "  status = PR_Connect(fd, &prAddr, T);": "  status = StealthConnect(mNetAddr, mProxyTransparent, mProxyHost, fd, &prAddr, T);",
           "  MozFn(a, b);": "  StealthMozFn(this, a, b);",
           "  rv = obj->MozFn(a);": "  rv = obj->StealthMozFn(a, mX);"}
     for removed, added in ok.items():
         text = rewrite(removed, added)
         assert rules(text) == [] and forms_of(text) == ["wrap-call"], (added, rules(text), forms_of(text))
-    for removed, added in (("  MozFn(a, b);", "  StealthMozFn(w, x, y, z, a, b);"),    # four arguments of ours
+    for removed, added in (("  MozFn(a, b);", "  StealthMozFn(x, y, a, b);"),           # two arguments of ours
+                           ("  status = PR_Connect(fd, &p, T);", "  status = StealthConnect(mNetAddr, mProxyTransparent, mProxyHost, fd, &p, T);"),
+                           ("  MozFn(a, b);", "  StealthMozFn(this, a, b, x);"),
+                           ("  MozFn(a, b);", "  StealthMozFn(x, a, b, y);"),
                            ("  MozFn(a, b);", "  StealthMozFn(this, b, a);"),           # reordered
                            ("  MozFn(a, b);", "  StealthMozFn(this, x + 1, a, b);"),    # logic in one
                            ("  MozFn(a, b);", "  StealthMozFn(this, G(), a, b);"),      # a call in one
@@ -561,14 +563,16 @@ def test_g1_a_rename_on_a_definition_line_may_drop_static():
                                  "ShShaderOutput ShaderOutputPerIlDriver(gl::GLContext* gl, int x) {"))
 
 
-def test_a_value_given_through_a_macro_of_ours_or_a_name_in_place_of_a_literal_is_a_declared_value():
-    cases = {"#ifdef XP_WIN": "#if STEALTH_NATIVE_EOL_IS_CRLF",
-             "    aLineBreak.AssignLiteral(NS_ULINEBREAK);": "    aLineBreak.AssignLiteral(STEALTH_NATIVE_ULINEBREAK);",
-             '    rv = F(type, ""_ns, ""_ns, ""_ns, ""_ns,': '    rv = F(type, ""_ns, mUser, mPass, ""_ns,'}
+def test_a_literal_for_a_literal_or_one_macro_of_ours_for_a_token_is_a_declared_value():
+    cases = {"    aLineBreak.AssignLiteral(NS_ULINEBREAK);": "    aLineBreak.AssignLiteral(STEALTH_NATIVE_ULINEBREAK);",
+             '    rv = F(type, ""_ns, 1);': '    rv = F(type, "x"_ns, 2);',
+             "    rv = F(a, 1);": "    rv = F(a, STEALTH_X);"}
     for removed, added in cases.items():
         text = rewrite(removed, added)
         assert forms_of(text) == ["declared-value"] and rules(text) == [], (added, rules(text), forms_of(text))
-    for removed, added in (("#ifdef XP_WIN", "#if OTHER_MACRO"), ("#ifdef XP_WIN", "#if STEALTH_X && FOO"),
+    for removed, added in (("#ifdef XP_WIN", "#if STEALTH_NATIVE_EOL_IS_CRLF"),                 # a directive changed: not one token
+                           ('    rv = F(type, ""_ns, ""_ns, ""_ns, ""_ns,', '    rv = F(type, ""_ns, mUser, mPass, ""_ns,'),   # a field in place of a literal
+                           ("#ifdef XP_WIN", "#if OTHER_MACRO"), ("#ifdef XP_WIN", "#if STEALTH_X && FOO"),
                            ("    A(NS_ULINEBREAK);", "    A(OTHER_ULINEBREAK);"),
                            ("    A(NS_ULINEBREAK, 1);", "    A(STEALTH_ULINEBREAK, 2);"),
                            ("    rv = F(a, b);", "    rv = F(a, c);")):              # a name replaced by a name: not a value

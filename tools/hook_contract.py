@@ -14,10 +14,10 @@ comment, in one of these forms:
                       G9: or one argument of ours (a Stealth call) is added to a call of Mozilla's line
     wrap-function     G1/G2: the signature or macro `Foo` renamed `Foo_Mozilla` (or by another suffix, `FooAsDrawn`),
                       one line rewritten; the one-line declarations and the internal calls rewritten to the same new name
-                      G29/G9: or the called function replaced and one to three plain arguments of ours added (`this`, a member),
+                      G29/G9: or the called function replaced and exactly one plain argument of ours added (`this`, a member),
                       or one plain argument added in front of the closing line of a call that spans lines
-    declared-value    one Mozilla line rewritten with our value (a pref default, a name in place of a literal, a STEALTH_ macro
-                      in place of Mozilla's macro or `#ifdef`)
+    declared-value    one Mozilla line rewritten with our value (a pref default: a literal in place of a literal, or one
+                      STEALTH_ macro in place of one literal or one macro of Mozilla's)
     registration      `#include "StealthX.h"` in a block of ours after Mozilla's, a moz.build
                       `VAR += [...]` after the closing `]`, one line in .ipdl/.webidl/components.conf/jar.mn,
                       G40: a forward declaration `class X;` or a file-scope declaration of a function of ours
@@ -461,7 +461,7 @@ def _value_change(removed: str, code: str) -> bool:
         return TOKEN.findall(re.sub(r"\s(//|#)\s.*$", "", t.strip()))
     r, c = toks(removed), toks(code)
     return len(r) == len(c) and any(x != y for x, y in zip(r, c)) and \
-        all(x == y or (LITERAL.match(x) and (LITERAL.match(y) or IDENT.match(y))) for x, y in zip(r, c))
+        all(x == y or (LITERAL.match(x) and LITERAL.match(y)) for x, y in zip(r, c))
 
 
 def _toks(t: str) -> list:
@@ -603,7 +603,7 @@ def called_replacement(removed: str, code: str):
 
 def called_with_plain_arguments(removed: str, code: str):
     """G29 + G9: the Stealth chain if our line is Mozilla's with the called function replaced by a Stealth-named one of the
-    same qualifier and one to three plain arguments of ours (`this`, a member or a parameter) added before or after
+    same qualifier and exactly one plain argument of ours (`this`, a member or a parameter) added before or after
     Mozilla's arguments, which stay as they are and in order; the rest of the line identical. Else None."""
     want = removed.strip()
     for rm in CALL.finditer(want):
@@ -630,7 +630,7 @@ def called_with_plain_arguments(removed: str, code: str):
                 if [_toks(a) for a in c_args[k:k + m]] != [_toks(a) for a in r_args]:
                     continue
                 extra = c_args[:k] + c_args[k + m:]
-                if 1 <= len(extra) <= 3 and all(SIMPLE_ARG.match(e) for e in extra):
+                if len(extra) == 1 and SIMPLE_ARG.match(extra[0]):
                     return c_chain
     return None
 
@@ -658,18 +658,14 @@ def added_leading_argument(removed: str, code: str) -> bool:
 
 MACRO_VALUE = re.compile(r"^[A-Z][A-Z0-9_]*$")
 OUR_MACRO = re.compile(r"^STEALTH_[A-Z0-9_]+$")
-PP_IF = re.compile(r"^\s*#\s*(?:if|ifdef|ifndef)\b")
-PP_IF_OURS = re.compile(r"^\s*#\s*if\s+!?\s*STEALTH_[A-Z0-9_]+\s*$")
 
 
 def declared_by_macro(removed: str, code: str) -> bool:
-    """A value of Mozilla's given by a macro of ours: a preprocessor condition (`#ifdef XP_WIN`) that becomes `#if
-    STEALTH_NATIVE_EOL_IS_CRLF`, or one macro of Mozilla's in the line replaced by a STEALTH_ one."""
-    if PP_IF.match(removed) and PP_IF_OURS.match(code):
-        return True
+    """A value of Mozilla's given by a macro of ours: one token of the line, a macro of Mozilla's or a literal, replaced
+    one for one by a STEALTH_ macro, the rest of the line identical."""
     r, c = _toks(removed), _toks(code)
     diff = [(x, y) for x, y in zip(r, c) if x != y]
-    return len(r) == len(c) and len(diff) == 1 and bool(MACRO_VALUE.match(diff[0][0])) and bool(OUR_MACRO.match(diff[0][1]))
+    return len(r) == len(c) and len(diff) == 1 and bool(MACRO_VALUE.match(diff[0][0]) or LITERAL.match(diff[0][0])) and bool(OUR_MACRO.match(diff[0][1]))
 
 
 def line_form(ft: str, base: str, code: str, removed: str, kind: str, placement: str, pair: bool, renames=()):
