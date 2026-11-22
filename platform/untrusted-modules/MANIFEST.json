@@ -15,7 +15,7 @@
    "category": "other",
    "feature": "untrusted-modules-own-binaries",
    "prefs": [],
-   "added": 12,
+   "added": 13,
    "removed": 5,
    "hunks": 2,
    "inline_logic_lines": 25,

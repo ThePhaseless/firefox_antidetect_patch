@@ -38,7 +38,7 @@
     "zoom.stealth.fpp.hw_seed",
     "zoom.stealth.audio.fp_noise"
    ],
-   "added": 5,
+   "added": 4,
    "removed": 0,
    "hunks": 3,
    "inline_logic_lines": 16,
@@ -66,7 +66,7 @@
     "zoom.stealth.fpp.hw_seed",
     "zoom.stealth.audio.fp_noise"
    ],
-   "added": 4,
+   "added": 3,
    "removed": 0,
    "hunks": 2,
    "inline_logic_lines": 16,
@@ -93,7 +93,7 @@
     "zoom.stealth.fpp.hw_seed",
     "zoom.stealth.audio.fp_noise"
    ],
-   "added": 4,
+   "added": 3,
    "removed": 0,
    "hunks": 2,
    "inline_logic_lines": 6,

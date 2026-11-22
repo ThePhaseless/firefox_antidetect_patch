@@ -25,7 +25,7 @@
     "geo.provider.network.url",
     "geo.provider.network.scan"
    ],
-   "added": 5,
+   "added": 3,
    "removed": 0,
    "hunks": 2,
    "inline_logic_lines": 3,
@@ -50,7 +50,7 @@
     "geo.provider.network.url",
     "geo.provider.network.scan"
    ],
-   "added": 5,
+   "added": 3,
    "removed": 0,
    "hunks": 2,
    "inline_logic_lines": 3,
@@ -75,9 +75,9 @@
     "geo.provider.network.url",
     "geo.provider.network.scan"
    ],
-   "added": 6,
-   "removed": 10,
-   "hunks": 4,
+   "added": 3,
+   "removed": 0,
+   "hunks": 2,
    "inline_logic_lines": 3,
    "hookable": "movable",
    "anchor": "GeolocationService::Init",
@@ -101,8 +101,8 @@
     "geo.provider.network.scan"
    ],
    "added": 4,
-   "removed": 4,
-   "hunks": 3,
+   "removed": 0,
+   "hunks": 2,
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "moz.build after the closing bracket",

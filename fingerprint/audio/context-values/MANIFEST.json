@@ -14,7 +14,7 @@
     "zoom.stealth.audio.output_latency_ms",
     "zoom.stealth.audio.max_channel_count"
    ],
-   "added": 11,
+   "added": 4,
    "removed": 0,
    "hunks": 3,
    "inline_logic_lines": 4,

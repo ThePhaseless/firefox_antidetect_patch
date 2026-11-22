@@ -16,7 +16,9 @@
 
 #include "js/CharacterEncoding.h"
 #include "js/CompilationAndEvaluation.h"
+#include "js/Conversions.h"
 #include "js/Debug.h"
+#include "js/Exception.h"
 #include "js/GCAPI.h"
 #include "js/PropertyAndElement.h"
 #include "js/Realm.h"
@@ -41,6 +43,10 @@ struct StealthDebugger : public DevTools {
   // global XPConnect created has one.
   JS::PersistentRooted<JSObject*> mDebugger;
   JS::PersistentRooted<JSObject*> mTarget;
+  // Why the last evaluation in the debugger realm gave no answer: the message
+  // of the exception it threw, or what it gave instead of the int32. The
+  // assertions on Attach and EvalInt print it.
+  std::string mLastError;
 
   bool Eval(const char* aCode, JS::MutableHandle<JS::Value> aRv) {
     JS::CompileOptions options(cx);
@@ -51,11 +57,37 @@ struct StealthDebugger : public DevTools {
            JS::Evaluate(cx, options, source, aRv);
   }
 
+  // The pending exception of the evaluation that failed, as a string, into
+  // mLastError; the exception is cleared.
+  void KeepPendingException() {
+    JS::Rooted<JS::Value> exn(cx);
+    if (!JS_IsExceptionPending(cx) || !JS_GetPendingException(cx, &exn)) {
+      mLastError = "the evaluation failed with no pending exception";
+      return;
+    }
+    JS_ClearPendingException(cx);
+    JS::Rooted<JSString*> str(cx, JS::ToString(cx, exn));
+    if (!str) {
+      JS_ClearPendingException(cx);
+      mLastError = "the evaluation threw an exception that has no string";
+      return;
+    }
+    JS::UniqueChars chars = JS_EncodeStringToUTF8(cx, str);
+    mLastError = chars ? std::string(chars.get())
+                       : std::string("the exception has no UTF-8 string");
+  }
+
   // In the debugger realm.
   bool EvalInt(const char* aCode, int32_t* aOut) {
     JSAutoRealm ar(cx, mDebugger.get());
     JS::Rooted<JS::Value> rv(cx);
-    if (!Eval(aCode, &rv) || !rv.isInt32()) {
+    mLastError.clear();
+    if (!Eval(aCode, &rv)) {
+      KeepPendingException();
+      return false;
+    }
+    if (!rv.isInt32()) {
+      mLastError = "the evaluation gave no int32";
       return false;
     }
     *aOut = rv.toInt32();
@@ -114,12 +146,18 @@ struct StealthDebugger : public DevTools {
   // as its debuggee.
   bool Attach(bool aStealth) {
     int32_t count = 0;
-    return EvalInt(aStealth ? "var dbg = new Debugger(); dbg.stealthMode = true;"
+    if (!EvalInt(aStealth ? "var dbg = new Debugger(); dbg.stealthMode = true;"
                               "dbg.addDebuggee(target); dbg.getDebuggees().length;"
                             : "var dbg = new Debugger();"
                               "dbg.addDebuggee(target); dbg.getDebuggees().length;",
-                   &count) &&
-           count == 1;
+                   &count)) {
+      return false;
+    }
+    if (count != 1) {
+      mLastError = "getDebuggees().length is " + std::to_string(count);
+      return false;
+    }
+    return true;
   }
 
   // In the debuggee realm: what a Debugger of that realm finds when it tries to
@@ -129,7 +167,8 @@ struct StealthDebugger : public DevTools {
     JS::Rooted<JS::Value> rv(cx);
     if (!Eval("var probe = new Debugger(); var out = 'no cycle';"
               "try { probe.addDebuggee(debuggerGlobal); }"
-              "catch (e) { out = String(e.message); } out;",
+              "catch (e) { out = String(e.message); }"
+              "probe.removeAllDebuggees(); out;",
               &rv) ||
         !rv.isString()) {
       return "probe failed";
@@ -155,7 +194,7 @@ TEST_F(StealthDebugger, ARealmShowsNoDebuggerOnlyWhenTheDebuggerIsInStealthMode)
   AutoJSAPI jsapi;
   ASSERT_TRUE(jsapi.Init(xpc::PrivilegedJunkScope()));
   ASSERT_TRUE(SetUpGlobals());
-  ASSERT_TRUE(Attach(true));
+  ASSERT_TRUE(Attach(true)) << mLastError;
   EXPECT_EQ(CycleProbe(), "no cycle");
 }
 
@@ -164,7 +203,7 @@ TEST_F(StealthDebugger, WithoutStealthModeTheRealmShowsTheDebugger) {
   AutoJSAPI jsapi;
   ASSERT_TRUE(jsapi.Init(xpc::PrivilegedJunkScope()));
   ASSERT_TRUE(SetUpGlobals());
-  ASSERT_TRUE(Attach(false));
+  ASSERT_TRUE(Attach(false)) << mLastError;
   EXPECT_TRUE(IsCycle(CycleProbe()));
 }
 
@@ -174,10 +213,12 @@ TEST_F(StealthDebugger, RemovingTheDebuggeeLeavesNothingInEitherMode) {
   ASSERT_TRUE(jsapi.Init(xpc::PrivilegedJunkScope()));
   ASSERT_TRUE(SetUpGlobals());
   for (bool stealth : {true, false}) {
-    ASSERT_TRUE(Attach(stealth));
+    ASSERT_TRUE(Attach(stealth))
+        << (stealth ? "stealth: " : "not stealth: ") << mLastError;
     int32_t count = -1;
     ASSERT_TRUE(EvalInt("dbg.removeDebuggee(target); dbg.getDebuggees().length;",
-                        &count));
+                        &count))
+        << (stealth ? "stealth: " : "not stealth: ") << mLastError;
     EXPECT_EQ(count, 0);
     EXPECT_EQ(CycleProbe(), "no cycle");
   }
@@ -189,7 +230,8 @@ TEST_F(StealthDebugger, ACollectedDebuggerLeavesNothingInEitherMode) {
   ASSERT_TRUE(jsapi.Init(xpc::PrivilegedJunkScope()));
   ASSERT_TRUE(SetUpGlobals());
   for (bool stealth : {true, false}) {
-    ASSERT_TRUE(Attach(stealth));
+    ASSERT_TRUE(Attach(stealth))
+        << (stealth ? "stealth: " : "not stealth: ") << mLastError;
     int32_t zero = -1;
     ASSERT_TRUE(EvalInt("dbg = null; 0;", &zero));
     // The Debugger dies in the sweep of this GC while its debuggee lives:

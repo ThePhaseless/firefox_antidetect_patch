@@ -22,7 +22,7 @@
    "prefs": [
     "zoom.stealth.gfx.feature_status"
    ],
-   "added": 4,
+   "added": 5,
    "removed": 0,
    "hunks": 4,
    "inline_logic_lines": 0,
@@ -44,7 +44,7 @@
    "prefs": [
     "zoom.stealth.gfx.feature_status"
    ],
-   "added": 3,
+   "added": 4,
    "removed": 0,
    "hunks": 3,
    "inline_logic_lines": 0,
