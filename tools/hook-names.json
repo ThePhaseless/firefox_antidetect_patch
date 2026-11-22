@@ -1,6 +1,7 @@
 [
  "CSP_IsBypassedFor",
  "GdkIsX11Display",
+ "JugglerPopupChromeFlags",
  "NS_ENSURE_SUCCESS",
  "RefreshDocumentLanguage",
  "SeedDeclaredTimezoneAndLanguage",

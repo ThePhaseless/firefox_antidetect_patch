@@ -337,10 +337,24 @@ def is_known_name(chain: str) -> bool:
     return chain in names or re.split(r"::|\.|->", chain)[-1] in names
 
 
+_our_call_re = None
+
+
+def our_calls(code: str):
+    """G41: the calls of `code` to a function of ours, Stealth-named (G29) or an existing one listed in hook-names.json."""
+    global _our_call_re
+    if _our_call_re is None:
+        names = sorted((re.escape(n) for n in known_names() if re.fullmatch(r"\w+", n)), key=len, reverse=True)
+        known = (r"|(?:[A-Za-z_]\w*::)*(?<!\w)(?:%s)\s*\(" % "|".join(names)) if names else ""
+        _our_call_re = re.compile(STEALTH_CALL.pattern + known)
+    return _our_call_re.finditer(code)
+
+
 def write_known_names(root) -> list:
     """Writes tools/hook-names.json: the non-Stealth names called by the hooks of the series now (the C10 details).
     Run once (G41); a new function is not added to it, it is named Stealth<What>."""
-    global _known_names
+    global _known_names, _our_call_re
+    _our_call_re = None
     names = sorted({v.detail for v in _analyse(root)[1] if v.rule == "C10"})
     KNOWN_NAMES_FILE.write_text(json.dumps(names, indent=1, ensure_ascii=False) + "\n", encoding="utf-8", newline="")
     _known_names = None
@@ -518,7 +532,7 @@ def _wrapped_subexpression(removed: str, code: str):
     want = _toks(removed)
     if not want:
         return None
-    for m in STEALTH_CALL.finditer(code):
+    for m in our_calls(code):
         o = m.end() - 1
         c = _close_paren(code, o)
         if c < 0:
@@ -547,7 +561,7 @@ def _added_argument(removed: str, code: str):
     want = _toks(removed)
     if not want:
         return None
-    for m in STEALTH_CALL.finditer(code):
+    for m in our_calls(code):
         o = m.end() - 1
         c = _close_paren(code, o)
         if c < 0 or has_logic(code[m.start():c + 1], "cpp"):
@@ -598,7 +612,7 @@ def called_replacement(removed: str, code: str):
     if i + 1 >= len(r) or r[i + 1] != "(" or i + len(mc) >= len(c) or c[i + len(mc)] != "(":
         return None
     name = "".join(mc)
-    return name if STEALTH_CHAIN.fullmatch(name) else None
+    return name if (STEALTH_CHAIN.fullmatch(name) or is_known_name(name)) else None
 
 
 def called_with_plain_arguments(removed: str, code: str):
@@ -620,7 +634,7 @@ def called_with_plain_arguments(removed: str, code: str):
             c_name = re.split(r"::|\.|->", c_chain)[-1]
             co = cm.end() - 1
             cc = _close_paren(code, co)
-            if cc < 0 or not STEALTH_NAME.match(c_name) or c_chain[:len(c_chain) - len(c_name)] != r_prefix:
+            if cc < 0 or not (STEALTH_NAME.match(c_name) or is_known_name(c_name)) or c_chain[:len(c_chain) - len(c_name)] != r_prefix:
                 continue
             if _toks(code[:cm.start()]) != _toks(want[:rm.start()]) or _toks(code[cc + 1:]) != _toks(want[rc + 1:]):
                 continue

@@ -664,3 +664,76 @@ def test_a_cargo_reference_is_format_checked_and_run_by_a_cargo_test_step(tmp_pa
     (wf / "cargo-tests.yml").write_text("jobs:\n  c:\n    steps:\n      - run: cargo test --workspace\n",
                                        encoding="utf-8", newline="")
     assert t3_rules(root, "cargo:anything::t") == []
+
+
+# --------------------------------------------------------------------------- T3: a node loop, pytest over a directory, the xpcshell leg's list
+def release_with(tmp_path, steps):
+    root = series(tmp_path, top(G1))
+    wf = root / "platform" / "ci" / "src" / ".github" / "workflows"
+    wf.mkdir(parents=True)
+    (wf / "release.yml").write_text("jobs:\n  checks:\n    steps:\n" + steps, encoding="utf-8", newline="")
+    return root
+
+
+def test_t3_node_tests_run_in_a_shell_loop(tmp_path):
+    root = release_with(tmp_path, (
+        "      - run: |\n"
+        "          rc=0\n"
+        "          for f in juggler/tests/*.test.mjs; do\n"
+        '            node --test --test-reporter=spec "$f" || rc=1\n'
+        "          done\n"
+        "          for g in other/*.mjs; do echo $g; done\n"
+        "          node --test $UNSET ${rc} && true\n"
+        "          exit $rc\n"))
+    assert hl._Rounds(root).node_globs == ["juggler/tests/*.test.mjs"]
+    assert t3_rules(root, "node:juggler/tests/x.test.mjs") == []
+    for ref in ("node:juggler/tests/sub/x.test.mjs", "node:other/y.mjs", "node:rc=1"):
+        assert t3_rules(root, ref) == ["T3"], ref
+    # the old one-line form still works, and the words after `||` or `;` are not globs
+    root = release_with(tmp_path / "one", "      - run: node --test juggler/tests/*.test.mjs; echo done\n")
+    assert hl._Rounds(root).node_globs == ["juggler/tests/*.test.mjs"]
+
+
+def test_t3_a_pytest_line_over_a_directory_runs_the_tests_under_it(tmp_path):
+    root = release_with(tmp_path, "      - run: python -m pytest tools/tests -q --rootdir=.\n"
+                                  "      - run: python -m pytest $SELECT -q scripts/ci/test_one.py\n")
+    for ref in ("py:tools/tests/test_a.py::test_x", "py:tools/tests/sub/test_b.py::test_y", "py:scripts/ci/test_one.py::test_z"):
+        assert t3_rules(root, ref) == [], ref
+    for ref in ("py:tools/other/test_a.py::test_x", "py:tools/tests_other/test_a.py::test_x", "py:scripts/ci/test_two.py::test_z",
+                "py:test_a.py::test_x"):
+        assert t3_rules(root, ref) == ["T3"], ref
+    # a directory that is not a pytest argument does not count
+    root = release_with(tmp_path / "no", "      - run: ls tools/tests\n")
+    assert t3_rules(root, "py:tools/tests/test_a.py::test_x") == ["T3"]
+
+
+def test_t3_an_xpcshell_test_is_run_when_the_legs_list_names_it(tmp_path):
+    root = t3_series(tmp_path)
+    ref = "xpcshell:toolkit/test/test_x.js#test_the_title"
+    assert t3_rules(root, ref) == ["T3"]
+    lst = root / "platform" / "ci" / "src" / "scripts" / "ci"
+    lst.mkdir(parents=True)
+    (lst / "xpcshell_tests.json").write_text(json.dumps({"files": ["toolkit/test/test_x.js"]}), encoding="utf-8", newline="")
+    assert t3_rules(root, ref) == []
+    assert t3_rules(root, "xpcshell:toolkit/test/test_y.js#t") == ["T3"]
+    bare = t3_series(tmp_path / "bare", with_workflow=False)       # the list counts without the candidate workflow too
+    lst = bare / "platform" / "ci" / "src" / "scripts" / "ci"
+    lst.mkdir(parents=True)
+    (lst / "xpcshell_tests.json").write_text(json.dumps({"files": ["toolkit/test/test_x.js"]}), encoding="utf-8", newline="")
+    assert t3_rules(bare, ref) == []
+
+
+def test_a_py_reference_under_tools_tests_names_a_test_of_the_series_itself(tmp_path):
+    root = series(tmp_path, top(G1))
+    ref = "py:tools/tests/test_repo_files_are_ours.py::test_claude_md_is_the_tag_plus_one_line"
+    assert hl.reference_problem(root, ref)                      # red: the series has no such file
+    d = root / "tools" / "tests"
+    d.mkdir(parents=True)
+    (d / "test_repo_files_are_ours.py").write_text("def test_claude_md_is_the_tag_plus_one_line():\n    pass\n", encoding="utf-8")
+    assert hl.reference_problem(root, ref) is None
+    assert hl.reference_problem(root, "py:tools/tests/test_repo_files_are_ours.py::test_gone")
+    assert hl.reference_problem(root, "py:tools/other/test_repo_files_are_ours.py::test_claude_md_is_the_tag_plus_one_line")
+    # the real series: the tests of platform/repo's two hooks resolve
+    for name in ("test_claude_md_is_the_tag_plus_one_line_naming_a_file_that_exists",
+                 "test_readme_md_is_the_tag_plus_one_line_naming_a_file_that_exists"):
+        assert hl.reference_problem(engine.ROOT, "py:tools/tests/test_repo_files_are_ours.py::" + name) is None

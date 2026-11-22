@@ -33,7 +33,8 @@ Test references (the grammar of `test`; '' is allowed and is debt):
     gtest:<Suite>.<Name>            some file under any folder's src/ has TEST(<Suite>, <Name>) or TEST_F(<Suite>, <Name>)
     node:<path>[#<test title>]      <path> is a tree path (juggler/tests/x.test.mjs): <folder>/src/<path> exists in some
                                     folder; with a title, the title string appears in the file
-    py:<path>::<test_name>          the same for a python test of ours: the file exists and defines test_name
+    py:<path>::<test_name>          the same for a python test of ours: the file exists and defines test_name; a path under
+                                    tools/tests/ is a test of the series itself, read from the series root
     py:<path>::invariant:<name>     a check that is not a test function (an invariant of a checker script): the file exists
     py:<path>::case:<name>          and contains the name as a word (a string or an identifier), the same for a case name
     xpcshell:<path>#<test>          the same for an xpcshell test: the file exists and the title is in it (rule T3: no
@@ -242,6 +243,8 @@ def reference_problem(root: Path, ref: str, index: _Index | None = None) -> str 
         if not (path and sep and name):
             return "py:<path>::<test_name> expected"
         p = index.src_file(path)
+        if p is None and path.startswith("tools/tests/") and (Path(root) / path).is_file():
+            p = Path(root) / path           # a test of the series itself
         if p is None:
             return "%s is in no folder's src/" % path
         text = p.read_text(encoding="utf-8", errors="replace")
@@ -397,18 +400,30 @@ class _Rounds:
         wf = Path(root) / WORKFLOWS
         self.known = (wf / CANDIDATE_WORKFLOW).is_file()
         self.filter, self.node_globs, self.lines, self.cargo_tests = "", [], [], []
+        self.xpcshell_files = self._xpcshell_list(Path(root))
         if not self.known:
             return
         cand = (wf / CANDIDATE_WORKFLOW).read_text(encoding="utf-8", errors="replace").split("\n")
         self.filter = self._gtest_filter(cand)
+        loops = {}              # `for f in juggler/tests/*.test.mjs; do`: the globs a `$f` stands for, until `done`
         for ln in cand:
             code = ln.split(" #", 1)[0]
+            if ln.lstrip().startswith("#"):
+                continue
+            loop = re.match(r"^\s*for\s+(\w+)\s+in\s+(.+?);\s*do\b", code)
+            if loop:
+                loops[loop.group(1)] = self._words(loop.group(2))
+            elif re.match(r"^\s*done\b", code):
+                loops.clear()
             m = re.search(r"\bnode\s+--test\s+(.+)$", code)
-            if m and not ln.lstrip().startswith("#"):
-                try:
-                    self.node_globs += [a for a in shlex.split(m.group(1)) if not a.startswith("-")]
-                except ValueError:
-                    pass
+            if m:
+                for a in self._words(m.group(1), stop=True):
+                    if a.startswith("-"):
+                        continue
+                    if a.startswith("$"):
+                        self.node_globs += loops.get(a.strip("${}"), [])
+                    else:
+                        self.node_globs.append(a)
         for p in sorted(wf.glob("*.yml")):
             lines = [ln for ln in p.read_text(encoding="utf-8", errors="replace").split("\n")
                      if not ln.lstrip().startswith("#")]
@@ -422,6 +437,32 @@ class _Rounds:
                 if re.search(r"\bcargo\s+(?:\+\S+\s+)?(?:test|nextest)\b", joined):
                     self.cargo_tests.append(joined)
                 joined = ""
+
+    @staticmethod
+    def _words(text: str, stop: bool = False) -> list:
+        """The shell words of `text`; with `stop`, up to the first `||`, `&&` or `;`."""
+        lex = shlex.shlex(text, posix=True, punctuation_chars=True)
+        lex.whitespace_split = True
+        out = []
+        try:
+            for w in lex:
+                if stop and w in ("||", "&&", ";", "|", "&"):
+                    break
+                out.append(w)
+        except ValueError:
+            pass
+        return out
+
+    @staticmethod
+    def _xpcshell_list(root: Path) -> set:
+        """The files the xpcshell leg runs: the `files` list of scripts/ci/xpcshell_tests.json of the series' copy of the CI."""
+        p = root / "platform" / "ci" / "src" / "scripts" / "ci" / "xpcshell_tests.json"
+        try:
+            data = json.loads(p.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return set()
+        files = data.get("files", []) if isinstance(data, dict) else data
+        return {f for f in files if isinstance(f, str)}
 
     @staticmethod
     def _gtest_filter(lines: list) -> str:
@@ -455,7 +496,18 @@ class _Rounds:
         if fnmatch.fnmatchcase(path, TREE_PY_TESTS):
             return True
         pat = re.compile(r"(?<![\w.\-])%s(?![\w])" % re.escape(path))
-        return any(pat.search(ln) for ln in self.lines)
+        return any(pat.search(ln) or self._pytest_directory(ln, path) for ln in self.lines)
+
+    @staticmethod
+    def _pytest_directory(line: str, path: str) -> bool:
+        """A `pytest` line with a plain argument (no `-`, no `$`) that is a directory the test file is under."""
+        if not re.search(r"\bpytest\b", line):
+            return False
+        for tok in line.split():
+            tok = tok.strip("\"'").rstrip("/")
+            if tok and not tok.startswith(("-", "$")) and "/" in tok and path.startswith(tok + "/"):
+                return True
+        return False
 
     def cargo_runs(self, crate: str) -> bool:
         for cmd in self.cargo_tests:
@@ -469,7 +521,7 @@ class _Rounds:
 
     def xpcshell_runs(self, path: str) -> bool:
         pat = re.compile(r"(?<![\w.\-])%s(?![\w])" % re.escape(path))
-        return any("xpcshell" in ln and pat.search(ln) for ln in self.lines)
+        return path in self.xpcshell_files or any("xpcshell" in ln and pat.search(ln) for ln in self.lines)
 
     def runs(self, ref: str):
         """True/False if a round runs the test `ref` names; None when it cannot be judged (no workflow, a format

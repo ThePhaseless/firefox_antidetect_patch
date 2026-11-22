@@ -603,3 +603,20 @@ def test_g53_a_multi_line_wrap_opened_by_an_added_line_and_closed_by_the_rewritt
     assert "C6" in rules(g53(close_new=G53_CLOSE_NEW.replace("AppUnitsPerDevPixel()", "AppUnitsPerDevPixel(1)")))
     assert "C6" in rules(g53(close_new=G53_CLOSE_NEW.replace("())));", "()));")))       # no `)` of ours: no wrap
     assert "C6" in rules(g53(open_line="      OtherCall(aPresContext,  // STEALTH-HOOK(fingerprint/x)"))   # not our call
+
+
+def test_g41_a_wrap_whose_callee_is_an_existing_name_of_ours_is_the_same_form_as_a_stealth_named_one():
+    ok = {"  return aPopup ? CHROME_MINIMAL_POPUP": "  return aPopup ? mozilla::JugglerPopupChromeFlags(aFeatures, CHROME_MINIMAL_POPUP)",
+          "  auto x = Expr(a, b);": "  auto x = SessionSystemLocale(this, Expr(a, b));",
+          "  Foo(a, b);": "  Foo(a, b, WorkerLocaleLanguage(this));",
+          "  rv = MozFn(a);": "  rv = SessionSystemLocales(a);"}
+    for removed, added in ok.items():
+        text = rewrite(removed, added)
+        assert rules(text) == [], (added, rules(text))
+        assert forms_of(text) in (["wrap-expression"], ["wrap-call"]), (added, forms_of(text))
+    # red: the same shape with a callee that is neither Stealth-named nor listed in hook-names.json
+    for removed, added in (("  return aPopup ? CHROME_MINIMAL_POPUP", "  return aPopup ? mozilla::OtherPopupFlags(aFeatures, CHROME_MINIMAL_POPUP)"),
+                           ("  auto x = Expr(a, b);", "  auto x = NotListed(this, Expr(a, b));"),
+                           ("  Foo(a, b);", "  Foo(a, b, NotListed(this));"),
+                           ("  rv = MozFn(a);", "  rv = NotListed(a);")):
+        assert rules(rewrite(removed, added)) != [], added
