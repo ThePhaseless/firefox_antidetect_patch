@@ -138,6 +138,18 @@ def cases() -> list:
         and "complete --required ci/required-suites.json" in comp_run
         and "3) " in listed_run and "*) " in listed_run and "exit 1" in listed_run.split("*) ", 1)[-1])
 
+    # the xpcshell leg: our xpcshell tests on the candidate's packaged binary, called from the gate
+    xjob = gate["jobs"].get("xpcshell") or {}
+    xdoc = yaml.safe_load((WORKFLOWS / "xpcshell.yml").read_text(encoding="utf-8"))
+    xlegs = {(l["runner"], l["kind"]) for l in xdoc["jobs"]["xpcshell"]["strategy"]["matrix"]["include"]}
+    add("gate legs: the real gate.yml has an xpcshell job that calls xpcshell.yml with the gate's build_run_id (the candidate's artifacts)",
+        xjob.get("uses") == "./.github/workflows/xpcshell.yml" and xjob.get("with", {}).get("build_run_id") == "${{ inputs.build_run_id }}"
+        and "published_tag" not in xjob.get("with", {}))
+    add("gate legs: the xpcshell job runs on Linux and on Windows, 15 minutes each, and has the read permissions the called workflow needs",
+        xlegs == {("ubuntu-24.04", "linux"), ("windows-latest", "win")} and xdoc["jobs"]["xpcshell"]["timeout-minutes"] == 15
+        and xjob.get("permissions") == {"actions": "read", "contents": "read"})
+    add("gate legs: the xpcshell job binds the gate (no continue-on-error, no `if` that skips it)", "continue-on-error" not in xjob and "if" not in xjob)
+
     # the real release.yml: the check runs before the node
     release = yaml.safe_load((WORKFLOWS / "release.yml").read_text(encoding="utf-8"))
     rsteps = release["jobs"]["checks"]["steps"]
