@@ -96,8 +96,16 @@ for line in open(evals["_TEST_FILE"][0], encoding="utf-8").read().splitlines():
         out(action="log", level="ERROR", message=" ".join(w[1:]))
     elif w[0] == "exit":
         code = int(w[1])
+    elif w[0] == "dmp":  # a minidump in the process's temp folder, as the crash reporter leaves it
+        open(os.path.join(os.environ["XPCSHELL_TEST_TEMP_DIR"], w[1] + ".dmp"), "wb").write(b"MDMP fake " + w[1].encode())
+    elif w[0] == "extra":  # its annotations: `extra <name> <JSON object>`
+        open(os.path.join(os.environ["XPCSHELL_TEST_TEMP_DIR"], w[1] + ".extra"), "w", encoding="utf-8").write(line.split(None, 2)[2])
     elif w[0] == "hang":
         time.sleep(60)
+if code < 0 and os.name != "nt":  # a signal, as a crash ends the process on Linux (sys.exit would give 256 + code)
+    import signal
+    sys.stdout.flush()
+    os.kill(os.getpid(), -code)
 sys.exit(code)
 '''
 
@@ -409,6 +417,49 @@ def cases() -> list:
     add("parse_log: a failing assertion of a run_test() file fails its one test", p["tests"][0]["status"] == "FAIL")
     add("parse_log: an empty output has no test", x.parse_log("")["tests"] == [])
 
+    # --- crash evidence: kept and printed, and never a change of the verdict
+    extra = 'extra abc {"MozCrashReason": "MOZ_RELEASE_ASSERT(x)", "CrashedThreadName": "MainThread", "ThreadIdNameMapping": "1:Main,2:Worker"}\n'
+    tmp, t = tree({"test_declared.js": "task test_one PASS\ndmp abc\n" + extra + "exit -11\n"}, minimum=1)
+    with tmp:
+        code, result, text, _ = t.run()
+        kept = t.out / "crash" / "dir_unit_test_declared.js"
+        summary = (t.out / "xpcshell-summary.md").read_text(encoding="utf-8")
+        add("a test that crashed: the .dmp and the .extra of its temp folder are copied to the output folder (the artifact), byte for byte",
+            (kept / "abc.dmp").read_bytes() == b"MDMP fake abc" and (kept / "abc.extra").is_file() and result["files"][0]["crash"]["copied"] == ["abc.dmp", "abc.extra"])
+        add("a test that crashed: the summary and the output print the exit code, MozCrashReason and the crashing thread's name (and the thread map)",
+            all(("| %s |" % result["files"][0]["rc"]) in z and "MOZ_RELEASE_ASSERT(x)" in z and "CrashedThreadName=MainThread" in z and "ThreadIdNameMapping=1:Main,2:Worker" in z for z in (summary, text)))
+        add("a test that crashed stays red as before: the evidence changes no verdict", code == 1 and result["verdict"] == "red" and not result["files"][0]["ok"] and result["files"][0]["rc"] in (-11, 4294967285))  # the exit code is -11 on Linux, the NTSTATUS-like unsigned value on Windows
+    tmp, t = tree({"test_declared.js": "task test_one PASS\ndmp abc\nexit -11\n"}, minimum=1)
+    with tmp:
+        code, result, text, _ = t.run()
+        add("a crash with a minidump and no .extra says so (MozCrashReason: absent, thread: absent), the minidump is still kept",
+            "no .extra next to the minidump (MozCrashReason: absent, thread: absent)" in text and (t.out / "crash" / "dir_unit_test_declared.js" / "abc.dmp").is_file() and code == 1)
+    tmp, t = tree({"test_declared.js": 'task test_one PASS\ndmp abc\nextra abc {"CrashTime": "1"}\nexit -11\n'}, minimum=1)
+    with tmp:
+        _, result, text, _ = t.run()
+        add("an .extra without MozCrashReason or a thread key says `absent` for each, it does not skip them",
+            "MozCrashReason: absent; thread: absent" in text and result["files"][0]["crash"]["extras"][0]["MozCrashReason"] == "absent")
+    tmp, t = tree({"test_declared.js": "task test_one PASS\nexit -11\n"}, minimum=1)
+    with tmp:
+        _, result, text, _ = t.run()
+        add("a signal exit with no minidump says there is none", "no minidump in the process's folders" in text and not (t.out / "crash").exists() and result["files"][0]["crash"]["dumps"] == [])
+    tmp, t = tree({"test_declared.js": PASSING + "exit 5\n"}, minimum=1)
+    with tmp:
+        code, result, text, _ = t.run()
+        add("a non-crash failure (exit 5) prints its exit code too, and has no crash evidence", code == 1 and "| 5 |" in text and "crash" not in result["files"][0] and "crash evidence" not in text)
+    tmp, t = tree({"test_declared.js": PASSING}, minimum=2)
+    with tmp:
+        _, result, text, _ = t.run()
+        add("a green file prints exit 0 and keeps nothing", "| 0 |" in text and not (t.out / "crash").exists())
+    with tempfile.TemporaryDirectory() as tmp_name:
+        root, target = Path(tmp_name) / "run", Path(tmp_name) / "out"
+        (root / "temp" / "sub").mkdir(parents=True)
+        (root / "temp" / "sub" / "x.dmp").write_bytes(b"d")
+        (root / "temp" / "sub" / "x.extra").write_text("not json", encoding="utf-8")
+        got = x.collect_crash_evidence(root, 0, target)
+        add("collect_crash_evidence: a minidump alone is a crash whatever the exit code, found in a subfolder, an unreadable .extra is reported and not raised; no dump and exit 0 is no crash",
+            got is not None and got["dumps"] == ["x.dmp"] and "unreadable" in got["extras"][0]["error"] and x.collect_crash_evidence(Path(tmp_name) / "none", 0, target) is None)
+
     # the manifest
     entry = x.manifest_entry(TOML, "test_declared.js")
     other = x.manifest_entry(TOML, "test_not_in_the_manifest.js")
@@ -420,8 +471,8 @@ def cases() -> list:
     declared = x.load_list(x.LIST)
     lock = x.load_lock(x.LOCK)
     folders = {Path(f).parent.as_posix() for f in declared["files"]}
-    add("the declared list has our seven xpcshell tests of the line and the minimum is their thirteen tasks (the launch counter's four, the branding chrome registry's three, the api keys' two and its observer's one, the hash completer's one, the hybrid xrays option's run_test, and the generate mode's one)",
-        len(declared["files"]) == 7 and declared["min_tests"] == 13 and all(Path(f).name.startswith("test_stealth_") for f in declared["files"]))
+    add("the declared list has our seven xpcshell tests of the line and the three temporary probes of the branding crash (ten files) and the minimum is their sixteen tasks (the launch counter's four, the branding chrome registry's three, the probes' three, the api keys' two and its observer's one, the hash completer's one, the hybrid xrays option's run_test, and the generate mode's one)",
+        len(declared["files"]) == 10 and declared["min_tests"] == 16 and all(Path(f).name.startswith("test_stealth_") for f in declared["files"]))
     # every xpcshell test that a HOOKS.json names (`"test": "xpcshell:<path>#<test>"`, read by tools/hook_tests_judge.py of main) has its file in the list
     hook_tests = ["chrome/test/unit/test_stealth_branding_chrome_registry.js#test_chrome_registry_serves_the_declared_branding_jar",
                   "js/xpconnect/tests/unit/test_stealth_hybrid_xrays_options.js#run_test",

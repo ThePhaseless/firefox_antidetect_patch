@@ -13,6 +13,9 @@
  ],
  "added": {
   "chrome/test/unit/test_stealth_branding_chrome_registry.js": "100644",
+  "chrome/test/unit/test_stealth_probe_a_global_missing.js": "100644",
+  "chrome/test/unit/test_stealth_probe_b_branding_missing.js": "100644",
+  "chrome/test/unit/test_stealth_probe_c_on_then_off.js": "100644",
   "chrome/test/unit/xpcshell-stealth.toml": "100644",
   "netwerk/protocol/res/StealthBranding.cpp": "100644",
   "netwerk/protocol/res/StealthBranding.h": "100644",

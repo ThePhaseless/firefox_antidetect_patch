@@ -5,3 +5,9 @@ skip-if = [
 ]
 
 ["test_stealth_branding_chrome_registry.js"]
+
+["test_stealth_probe_a_global_missing.js"]
+
+["test_stealth_probe_b_branding_missing.js"]
+
+["test_stealth_probe_c_on_then_off.js"]
