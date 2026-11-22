@@ -437,10 +437,11 @@ jobs:
           - { suite: wrapper.e2e.fakeweb, leg: win-x86_64, runner: windows-latest, kind: win, os: windows }
           # EVERY e2e TEST OF THE WRAPPER on the candidate's binary (the wrapper's e2e.yml runs them on the published engine; these rows are the same tests
           # on the engine under test, so that the candidate is judged by what the published one is). The files of a row are the wrapper's list
-          # (ci/required-suites.json, rows wrapper.e2e.suite.*), run by scripts/ci_suite_run.py in the two passes of scripts/run_e2e.py. Linux has two
+          # (ci/required-suites.json, rows wrapper.e2e.suite.*), run by scripts/ci_suite_run.py in the two passes of scripts/run_e2e.py. Linux has three
           # parts; Windows four, and the Control+A e2e on the runner image it has in e2e.yml.
           - { suite: wrapper.e2e.suite.linux.1, leg: linux-x86_64, runner: ubuntu-24.04, kind: linux, os: linux }
           - { suite: wrapper.e2e.suite.linux.2, leg: linux-x86_64, runner: ubuntu-24.04, kind: linux, os: linux }
+          - { suite: wrapper.e2e.suite.linux.3, leg: linux-x86_64, runner: ubuntu-24.04, kind: linux, os: linux }
           - { suite: wrapper.e2e.suite.windows.1, leg: win-x86_64, runner: windows-2022, kind: win, os: windows }
           - { suite: wrapper.e2e.suite.windows.2, leg: win-x86_64, runner: windows-2022, kind: win, os: windows }
           - { suite: wrapper.e2e.suite.windows.3, leg: win-x86_64, runner: windows-2022, kind: win, os: windows }
