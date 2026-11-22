@@ -130,6 +130,9 @@ if mode == "hang":
     time.sleep(60)
 if mode == "none":
     sys.exit(0)
+if mode == "jserror":
+    print("JavaScript error: prefs_dump.js, line 106: SyntaxError: malformed Unicode character escape sequence")
+    sys.exit(0)
 with open(out, "w", encoding="utf-8", newline="\n") as h:
     h.write(open(os.environ["FAKE_PREFS"], encoding="utf-8").read())
 with open(os.path.join(prof, "prefs.js"), "w") as h:  # what a real run leaves: the next dump must not see it
@@ -728,6 +731,22 @@ def cases() -> list:
         add("prefs: the shell exits non-zero: red, exit 1, no dump", code == 1 and "RED" in text and not (tmp / "e.json").is_file())
         code, text = run_dump("none", "n.json")
         add("prefs: the shell exits 0 and writes no dump: red", code == 1 and "no readable dump" in text and not (tmp / "n.json").is_file())
+        code, text = run_dump("jserror", "j.json")
+        add("prefs: the shell exits 0 after a JavaScript error and writes no dump: red, and the shell's own output (the error line) is printed",
+            code == 1 and "no readable dump" in text and "SyntaxError: malformed Unicode character escape sequence" in text)
+        code, text = run_dump("exit", "e2.json")
+        add("prefs: a shell that exits non-zero has its output printed too", code == 1 and "the shell's output" in text)
+        # a relative path to the binary (the workflow's `ff/firefox`) with the dump root as the shell's working directory
+        here = os.getcwd()
+        try:
+            os.chdir(tmp)
+            os.environ["FAKE_MODE"] = "ok"
+            with contextlib.redirect_stdout(io.StringIO()):
+                code = x.prefs_dump([sys.executable, os.path.join("bin", "fake_firefox.py")], Path("rel.json"), Path("rel-root"), 20)
+        finally:
+            os.chdir(here)
+        add("prefs: a binary and a root given as RELATIVE paths (as the workflow does: ff/firefox, prefs-profile) work: the binary is made absolute before the shell's folder is its working directory",
+            code == 0 and (tmp / "rel.json").is_file())
         code, text = run_dump("hang", "h.json", timeout=1.5)
         add("prefs: the shell hangs: red at the timeout", code == 1 and "timed out" in text)
         wanted.write_text(json.dumps(dump(default={})), encoding="utf-8")
@@ -743,6 +762,8 @@ def cases() -> list:
         "announces the profile as head.js does, writes to PREFS_DUMP_OUT",
         all(t in js for t in ('getDefaultBranch("")', "getChildList(", "getPrefType(", "getStringPref(", "getIntPref(", "getBoolPref(", "prefIsLocked(", "prefHasUserValue(",
                               '"profile-do-change"', "PREFS_DUMP_OUT", "XPCSHELL_TEST_PROFILE_DIR")) and b"\r" not in js_path.read_bytes())
+    add("prefs_dump.js: the non-ASCII escape is written with TWO backslashes in the JS source (a single one makes the file not parse: 'malformed Unicode character escape sequence')",
+        'c => "' + chr(92) * 2 + 'u" +' in js and 'c => "' + chr(92) + 'u" +' not in js.replace('c => "' + chr(92) * 2 + 'u" +', ""))
     add("prefs_dump.js: never a getter of the host (no os, no env other than the two paths, no Date)", "Date" not in js and js.count("env.get(") == 2)
 
     # the workflow

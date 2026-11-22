@@ -103,7 +103,7 @@
   // ASCII only on the wire (a \uXXXX for everything else), so that the bytes written do not depend on an encoder the shell does not have.
   const text = JSON.stringify(dump).replace(
     /[^\x20-\x7e]/g,
-    c => "\u" + c.charCodeAt(0).toString(16).padStart(4, "0")
+    c => "\\u" + c.charCodeAt(0).toString(16).padStart(4, "0")
   );
   const file = Cc["@mozilla.org/file/local;1"].createInstance(Ci.nsIFile);
   file.initWithPath(outPath);

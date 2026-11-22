@@ -270,6 +270,7 @@ def verify_asset(directory: Path, leg: str) -> int:
 PREFS_SCRIPT = HERE / "prefs_dump.js"
 PREFS_TYPES = ("string", "int", "bool", "invalid", "error")
 PREFS_BRANCHES = ("default", "user")
+PREFS_OUTPUT_LINES = 40  # the shell's output that a red without a dump prints
 EXIT_CONTROL = 2  # prefs-compare --control: the same engine dumped twice differs; the control is broken, so no result is read from the runs
 
 
@@ -283,7 +284,9 @@ def prefs_dump(binary, out: Path, root: Path | None = None, timeout: float = TIM
     root = (Path(root) if root else Path(tempfile.gettempdir()) / "prefs-dump-root").resolve()  # absolute: the shell runs with it as its working directory
     shutil.rmtree(root, ignore_errors=True)
     exe = list(binary) if isinstance(binary, (list, tuple)) else [str(binary)]
-    xre = Path(exe[-1]).resolve().parent
+    # absolute: the shell runs with `root` as its working directory, and a relative `ff/firefox` is looked up there (FileNotFoundError on Linux)
+    exe[-1] = str(Path(exe[-1]).resolve())
+    xre = Path(exe[-1]).parent
     raw = root / "dump-raw.json"
     env = environment(xre, root)  # makes root/profile, root/temp, root/temp/moz-appdata
     env["PREFS_DUMP_OUT"] = str(raw)
@@ -294,13 +297,15 @@ def prefs_dump(binary, out: Path, root: Path | None = None, timeout: float = TIM
         print("RED prefs: the shell timed out after %d s (%s)" % (timeout, out.name))
         return 1
     if rc != 0:
-        print("RED prefs: the shell exited with %s (%s); last lines: %s" % (rc, out.name, output.splitlines()[-PER_FILE_ERROR_LINES:]))
+        print("RED prefs: the shell exited with %s (%s); the shell's output (last %d lines):\n%s" % (rc, out.name, PREFS_OUTPUT_LINES, "\n".join(output.splitlines()[-PREFS_OUTPUT_LINES:])))
         return 1
     try:
         dump = json.loads(raw.read_text(encoding="utf-8"))
         problems = dump_problems(dump)
     except (OSError, ValueError) as exc:
-        print("RED prefs: no readable dump at PREFS_DUMP_OUT (%s): %s" % (out.name, exc))
+        # a shell that exits 0 after a JavaScript error (a script that does not parse) writes nothing: its own output is the cause
+        print("RED prefs: no readable dump at PREFS_DUMP_OUT (%s): %s; the shell's output (last %d lines):\n%s"
+              % (out.name, exc, PREFS_OUTPUT_LINES, "\n".join(output.splitlines()[-PREFS_OUTPUT_LINES:]) or "(none)"))
         return 1
     if problems:
         print("RED prefs: the dump %s is not usable: %s" % (out.name, "; ".join(problems[:10])))
