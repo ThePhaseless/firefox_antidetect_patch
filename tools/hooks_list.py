@@ -429,13 +429,19 @@ class _Rounds:
                      if not ln.lstrip().startswith("#")]
             self.lines += lines
             joined = ""             # a command continued with a backslash is one command
+            workdir = ""            # the `working-directory:` of the step the line is in, "" if it has none
             for ln in lines:
+                if re.match(r"^\s*-\s+[\w\-]+:", ln):
+                    workdir = ""    # a list item of mappings: a new step
+                wd = re.match(r"""^\s*(?:-\s+)?working-directory:\s*(['"]?)([^'"\s]+)\1\s*$""", ln)
+                if wd:
+                    workdir = wd.group(2)
                 joined += ln.rstrip()
                 if joined.endswith("\\"):
                     joined = joined[:-1] + " "
                     continue
                 if re.search(r"\bcargo\s+(?:\+\S+\s+)?(?:test|nextest)\b", joined):
-                    self.cargo_tests.append(joined)
+                    self.cargo_tests.append((joined, workdir))
                 joined = ""
 
     @staticmethod
@@ -510,12 +516,18 @@ class _Rounds:
         return False
 
     def cargo_runs(self, crate: str) -> bool:
-        for cmd in self.cargo_tests:
+        """A `cargo test` names the crate (`-p`, `--package`, a `--manifest-path` of it), runs the whole workspace, or
+        names no package and runs in its step's `working-directory`, a directory called as the crate: cargo then tests
+        the package of the manifest there (the mdns_service step of cargo-tests.yml)."""
+        for cmd, workdir in self.cargo_tests:
             if re.search(r"--workspace\b|--all\b", cmd):
                 return True
             if re.search(r"(?:^|\s)(?:-p|--package)[\s=]+%s(?![\w\-])" % re.escape(crate), cmd):
                 return True
             if re.search(r"--manifest-path[\s=]+\S*(?<![\w\-])%s/Cargo\.toml" % re.escape(crate), cmd):
+                return True
+            names_a_package = re.search(r"(?:^|\s)(?:-p|--package|--manifest-path)(?:[\s=]|$)", cmd)
+            if workdir and not names_a_package and workdir.rstrip("/").rsplit("/", 1)[-1] == crate:
                 return True
         return False
 

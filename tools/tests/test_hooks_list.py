@@ -666,6 +666,29 @@ def test_a_cargo_reference_is_format_checked_and_run_by_a_cargo_test_step(tmp_pa
     assert t3_rules(root, "cargo:anything::t") == []
 
 
+def test_a_cargo_test_naming_no_package_runs_the_crate_of_its_step_s_working_directory(tmp_path):
+    # the mdns_service step of cargo-tests.yml: `cargo test --lib` in the crate's own directory
+    root = t3_series(tmp_path)
+    wf = root / "platform" / "ci" / "src" / ".github" / "workflows"
+    (wf / "cargo-tests.yml").write_text(
+        "jobs:\n  cargo:\n    steps:\n"
+        "      - name: The test of ours in mdns_service\n"
+        "        id: cargo-mdns\n"
+        "        working-directory: dom/media/webrtc/transport/mdns_service\n"
+        "        run: |\n"
+        "          set -eo pipefail\n"
+        "          cargo test --lib -- stealth_tests:: 2>&1 | tee -a log\n"
+        "      - name: another step, no working directory\n"
+        "        run: cargo test --lib\n"
+        "      - working-directory: 'gfx/wr/'\n"
+        "        run: cargo test -p webrender --lib\n", encoding="utf-8", newline="")
+    assert t3_rules(root, "cargo:mdns_service::stealth_tests::a_test") == []    # red on the tool that read only -p
+    # the directory does not leak into the next step, a named package is not the directory's, a prefix is not the name
+    for ref in ("cargo:transport::t", "cargo:mdns::t", "cargo:wr::t", "cargo:gfx::t"):
+        assert t3_rules(root, ref) == ["T3"], ref
+    assert t3_rules(root, "cargo:webrender::t") == []
+
+
 # --------------------------------------------------------------------------- T3: a node loop, pytest over a directory, the xpcshell leg's list
 def release_with(tmp_path, steps):
     root = series(tmp_path, top(G1))
