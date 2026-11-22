@@ -504,6 +504,31 @@ def cases() -> list:
         meta = ge.export(notes, profile, "s", Path(tmp) / "o2", run=only_short)
         add("export: the spelling in the notes is the one used, with its own flags, and is in the meta",
             all("-t" in c for c in calls) and tuple(meta["gcov_command"]) == ("short, stdout", ["-t", "-gcno={gcno}", "-gcda={gcda}"], "smoke test"))
+    with tempfile.TemporaryDirectory() as tmp:
+        notes = Path(tmp) / "notes"
+        (notes / "gcno" / "obj-rel" / "dom").mkdir(parents=True)
+        (notes / "gcno" / "obj-rel" / "dom" / "u1.gcno").write_bytes(b"x")
+        (notes / "topsrcdir.txt").write_text("/node/src", encoding="utf-8")
+        (notes / "interest.json").write_text(json.dumps(["dom/a.cpp"]), encoding="utf-8")
+        (Path(tmp) / "gcda").mkdir()
+        try:
+            ge.export(notes, Path(tmp) / "gcda", "wrapper.unit.x", Path(tmp) / "o0", rc=0)
+            strict = False
+        except SystemExit as exc:
+            strict = "left no profile" in str(exc) and "no .gcda anywhere" in str(exc)
+        (Path(tmp) / "elsewhere" / "obj-rel" / "dom").mkdir(parents=True)
+        (Path(tmp) / "elsewhere" / "obj-rel" / "dom" / "u1.gcda").write_bytes(b"y")
+        (notes / "topsrcdir.txt").write_text(str(Path(tmp) / "elsewhere"), encoding="utf-8")
+        try:
+            ge.export(notes, Path(tmp) / "gcda", "wrapper.unit.x", Path(tmp) / "o00", rc=0)
+            stray = False
+        except SystemExit as exc:
+            stray = "GCOV_PREFIX_STRIP does not match" in str(exc) and "u1.gcda" in str(exc)
+        add("export: a suite with no profile says where the counters went when they went elsewhere, and says none ran when there are none", stray)
+        meta = ge.export(notes, Path(tmp) / "gcda", "wrapper.unit.x", Path(tmp) / "o1", rc=0, allow_empty=True)
+        add("export: a suite that launches no browser (allow-empty) leaves no profile without a failure, and its result is kept; any other still fails",
+            strict and meta["passed"] is True and meta["no_profile"] and (Path(tmp) / "o1" / "wrapper.unit.x.info").read_text(encoding="utf-8") == ""
+            and cm.load_profiles(Path(tmp) / "o1").keys() == {"wrapper.unit.x"})
     add("env: GCOV_PREFIX_STRIP drops the node's directory", ge.strip_count("/home/runner/work/engine/engine") == 5)
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -596,6 +621,10 @@ def cases() -> list:
     add("workflow: the suites are in the matrix of `wrapper-e2e`, the sandbox leg keeps its sandbox, at most 8 at a time",
         len(legs) == 20 and [r["suite"] for r in legs if r.get("sandbox")] == ["wrapper.e2e.udp.sandbox"]
         and wf["jobs"]["wrapper-e2e"]["strategy"]["max-parallel"] == 8)
+    legs_rows = wf["jobs"]["wrapper-e2e"]["strategy"]["matrix"]["include"]
+    add("workflow: the wrapper's unit suites are marked as launching no browser, and only they are",
+        sorted(r["suite"] for r in legs_rows if r.get("unit")) == ["wrapper.unit.all.linux", "wrapper.unit.compositing", "wrapper.unit.page", "wrapper.unit.udp"]
+        and "matrix.unit" in next(s["run"] for s in wf["jobs"]["wrapper-e2e"]["steps"] if s["name"].startswith("The suite's profile")))
     needed = {"id": "x"}
     required = [dict(needed, id=r["suite"], os=["linux", "windows"]) for r in legs if r["suite"].startswith("wrapper.")]
     add("legs-check: the suites of a list that has all of them pass, with their Windows rows ignored", cm.legs_missing(required, wf) == [])

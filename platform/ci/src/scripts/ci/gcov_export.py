@@ -481,8 +481,24 @@ def junit_counts(path: Path) -> dict:
     return {"tests": tests, "failures": failures, "errors": errors, "skipped": skipped}
 
 
+def stray_gcda(gcda_root: Path, topsrcdir: str, limit: int = 5) -> str:
+    """Where counters went when they are not under `gcda_root`: any .gcda under it at a depth the notes do not expect, in this machine's object
+    directory (obj-rel of the source directory, the path the objects were compiled with) or in the current one. Said in the error of a suite that
+    left no profile, so that a wrong GCOV_PREFIX_STRIP and a browser that never ran are told apart."""
+    found = []
+    for root in (Path(gcda_root), Path(topsrcdir) / "obj-rel", Path.cwd() / "obj-rel"):
+        if root.is_dir():
+            for path in root.rglob("*.gcda"):
+                found.append(str(path))
+                if len(found) >= limit:
+                    break
+    if found:
+        return "%d .gcda or more elsewhere (the first: %s): GCOV_PREFIX_STRIP does not match the path the objects were compiled under" % (len(found), "; ".join(found))
+    return "no .gcda anywhere under %s, %s/obj-rel or ./obj-rel: no process of the suite reached its exit handlers (a browser that crashed at startup writes none)" % (gcda_root, topsrcdir)
+
+
 def export(notes: Path, gcda_root: Path, suite: str, out: Path, jobs: int = 4, rc=None, junit=None, raw=None, run=subprocess.run,
-           js_dir=None, sandbox: str = "off", rust_dir=None, objects=()) -> dict:
+           js_dir=None, sandbox: str = "off", rust_dir=None, objects=(), allow_empty: bool = False) -> dict:
     notes, gcda_root = Path(notes), Path(gcda_root)
     topsrcdir = (notes / "topsrcdir.txt").read_text(encoding="utf-8").strip()
     interest = set(json.loads((notes / "interest.json").read_text(encoding="utf-8")))
@@ -494,10 +510,22 @@ def export(notes: Path, gcda_root: Path, suite: str, out: Path, jobs: int = 4, r
         gcda = gcda_root / gcno.relative_to(notes / "gcno").with_suffix(".gcda")
         if gcda.is_file():
             pairs.append((gcno, gcda))
+    if not pairs and allow_empty:
+        # a suite that launches no browser (the wrapper's unit suites) has no counters to leave: its result is all it gives
+        out = Path(out)
+        out.mkdir(parents=True, exist_ok=True)
+        (out / ("%s.info" % suite)).write_text("", encoding="utf-8", newline="\n")
+        meta = {"suite": suite, "rc": rc, "gcda_files": 0, "no_profile": "expected: the suite launches no browser", "files": 0, "lines": 0,
+                "sandbox": sandbox, "js_info_files": 0, "rust_profraw_files": 0}
+        if junit and Path(junit).is_file():
+            meta.update(junit_counts(Path(junit)))
+        meta["passed"] = (rc == 0 and not meta.get("failures") and not meta.get("errors")) if rc is not None else None
+        (out / ("%s.meta.json" % suite)).write_text(json.dumps(meta, indent=1, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
+        return meta
     if not pairs:
         raise SystemExit("ERROR: suite %s left no profile: not one .gcda of the %d objects the notes name is under %s. The counters did not "
                          "reach the directory: the browser was killed instead of quitting, GCOV_PREFIX did not reach it, or a sandbox refused "
-                         "the write" % (suite, len(list((notes / "gcno").rglob("*.gcno"))), gcda_root))
+                         "the write. %s" % (suite, len(list((notes / "gcno").rglob("*.gcno"))), gcda_root, stray_gcda(gcda_root, topsrcdir)))
     spelling_file = notes / SPELLING_FILE
     spelling = json.loads(spelling_file.read_text(encoding="utf-8")) if spelling_file.is_file() else None
     if spelling is None:
@@ -586,6 +614,7 @@ def main(argv=None) -> int:
     x.add_argument("--raw", type=Path)
     x.add_argument("--js", type=Path, help="the directory SpiderMonkey wrote its lcov into")
     x.add_argument("--rust", type=Path, help="the directory the .profraw files of the Rust code were written to")
+    x.add_argument("--allow-empty", action="store_true", help="a suite that launches no browser: no profile is not a failure, its result is kept")
     x.add_argument("--object", type=Path, action="append", default=[], help="a binary with Rust coverage mapping (libxul.so)")
     x.add_argument("--sandbox", choices=("on", "off"), default="off", help="whether the browser's sandbox was on in this suite")
     a = ap.parse_args(argv)
@@ -607,7 +636,7 @@ def main(argv=None) -> int:
         if a.rust and (a.notes / "rust-llvm-cov").is_file():
             print("LLVM_PROFILE_FILE=%s" % (a.rust.resolve() / "%p-%m.profraw"))
     else:
-        print(json.dumps(export(a.notes, a.gcda, a.suite, a.out, a.jobs, a.rc, a.junit, a.raw, js_dir=a.js, sandbox=a.sandbox, rust_dir=a.rust, objects=a.object), sort_keys=True))
+        print(json.dumps(export(a.notes, a.gcda, a.suite, a.out, a.jobs, a.rc, a.junit, a.raw, js_dir=a.js, sandbox=a.sandbox, rust_dir=a.rust, objects=a.object, allow_empty=a.allow_empty), sort_keys=True))
     return 0
 
 

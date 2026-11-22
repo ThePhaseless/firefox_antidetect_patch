@@ -400,6 +400,23 @@ jobs:
           xvfb-run -a python3 .series/platform/ci/src/scripts/ci/gtest_run.py --root gtest-run --reports gtest-reports
           echo "$?" > result/rc.txt
           cat result/rc.txt
+      # When the gtests did not run (the listing of the instrumented binary died: exit -11 on run 44946611630), where it died: the binary of
+      # dist/bin keeps its symbols, so the backtrace names the function
+      - name: Diagnostic - where the listing of the gtests dies, under gdb (only when they did not run)
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        timeout-minutes: 10
+        run: |
+          [ "$(cat result/rc.txt)" != 0 ] || exit 0
+          cd gtest-run/gtest
+          export MOZ_XRE_DIR="$PWD/../bin" MOZ_RUN_GTEST=True MOZ_WEBRENDER=0 MOZ_ENABLE_INC_ORIGIN_INIT=0
+          xvfb-run -a gdb -batch -nx -ex "set pagination off" -ex run -ex bt -ex "info sharedlibrary"             --args ../bin/firefox -unittest --gtest_list_tests 2>&1 | tail -120
+          echo "--- the same without GCOV_PREFIX and GCOV_PREFIX_STRIP (does the crash depend on them?)"
+          env -u GCOV_PREFIX -u GCOV_PREFIX_STRIP xvfb-run -a ../bin/firefox -unittest --gtest_list_tests > /dev/null 2>&1
+          echo "exit code $?"
+          echo "--- what it loads"
+          ls -la ../bin/firefox ../bin/libxul.so ../bin/libmozsandbox.so 2>&1 || true
+          readelf -d ../bin/firefox | grep -E "NEEDED|RPATH|RUNPATH" || true
       - name: The suite's profile, as an lcov file of the series' files
         run: |
           python3 .series/platform/ci/src/scripts/ci/gcov_export.py export --notes notes --gcda "$RUNNER_TEMP/gcda" --suite gtest \
@@ -436,16 +453,16 @@ jobs:
           # the same road with the browser's sandbox ON: its children's counters are not in this profile
           - { suite: wrapper.e2e.udp.sandbox, os: linux, sandbox: true }
           - { suite: wrapper.e2e.web, os: linux }
-          - { suite: wrapper.unit.udp, os: linux }
-          - { suite: wrapper.unit.all.linux, os: linux, timeout: 120 }
+          - { suite: wrapper.unit.udp, os: linux, unit: true }
+          - { suite: wrapper.unit.all.linux, os: linux, unit: true, timeout: 120 }
           - { suite: wrapper.e2e.doh, os: linux, root: true }
           - { suite: wrapper.e2e.realness, os: linux, root: true }
           - { suite: wrapper.e2e.page, os: linux, timeout: 120 }
-          - { suite: wrapper.unit.page, os: linux }
+          - { suite: wrapper.unit.page, os: linux, unit: true }
           - { suite: wrapper.e2e.context.egress, os: linux, root: true }
           - { suite: wrapper.e2e.context.sink, os: linux, root: true }
           - { suite: wrapper.e2e.compositing, os: linux }
-          - { suite: wrapper.unit.compositing, os: linux }
+          - { suite: wrapper.unit.compositing, os: linux, unit: true }
           - { suite: wrapper.e2e.fontconfig, os: linux }
           - { suite: wrapper.e2e.securitystate, os: linux }
           - { suite: wrapper.e2e.fakeweb, os: linux }
@@ -592,7 +609,7 @@ jobs:
         shell: bash
         run: |
           python3 .series/platform/ci/src/scripts/ci/gcov_export.py export --notes notes --gcda "$RUNNER_TEMP/gcda" --suite "${{ matrix.suite }}" \
-            --out profile --rc "$(cat result/rc.txt)" --junit "result/${{ matrix.suite }}.xml" --raw "profile/${{ matrix.suite }}.gcda.tar.gz" --jobs 4             --js "$RUNNER_TEMP/jscov" --rust "$RUNNER_TEMP/rustprof" --object ff/libxul.so --sandbox "${{ matrix.sandbox && 'on' || 'off' }}"
+            --out profile --rc "$(cat result/rc.txt)" --junit "result/${{ matrix.suite }}.xml" --raw "profile/${{ matrix.suite }}.gcda.tar.gz" --jobs 4             --js "$RUNNER_TEMP/jscov" --rust "$RUNNER_TEMP/rustprof" --object ff/libxul.so ${{ matrix.unit && '--allow-empty' || '' }} --sandbox "${{ matrix.sandbox && 'on' || 'off' }}"
       - name: Keep the profile
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
