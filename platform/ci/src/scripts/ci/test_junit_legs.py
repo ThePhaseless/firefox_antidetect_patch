@@ -139,8 +139,9 @@ def cases() -> list:
         len(keep) == 1 and always(keep[0]) and keep[0]["with"]["path"] == "junit-py" and checks.index(keep[0]) == checks.index(tree_tests[0]) + 1)
     parts_py = [str((s.get("with") or {}).get("name", "")) for wf in (gate, release, load("package-ab.yml")) for job in wf["jobs"].values() for s in uploads(job)
                 if str((s.get("with") or {}).get("name", "")).startswith("junitpart-py-")]
-    add("python parts: one per job and named by it (junitpart-py-<job>), the two there are, none twice",
-        sorted(parts_py) == ["junitpart-py-checks", "junitpart-py-package-ab"])
+    add("python parts: one per job and named by it (junitpart-py-<job>), the three there are, none twice: checks, package-ab, and the gate's "
+        "security-state step, one per leg (junitpart-py-security-state-<leg>)",
+        sorted(parts_py) == ["junitpart-py-checks", "junitpart-py-package-ab", "junitpart-py-security-state-${{ matrix.leg }}"])
     merge = release["jobs"].get("junit-py") or {}
     dl, up = downloads(merge), uploads(merge)
     add("junit-py: one job puts every junitpart-py-* together (merged) after checks and both gates, whatever they said, and uploads the one artifact junit-py",

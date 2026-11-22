@@ -9,6 +9,7 @@ release.yml; these cases hold that script to its known-bad inputs, and hold the 
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -234,8 +235,14 @@ def cargo_cases(gate: dict) -> list:
     if (ms / "stealth_tests.rs").exists():
         body = (ms / "stealth_tests.rs").read_text(encoding="utf-8")
         add("cargo: the floor of %s is the number of #[test] in mdns_service/src/stealth_tests.rs (%d)" % (mdns, floor[mdns]), body.count("#[test]") == floor[mdns])
-        add("cargo: lib.rs of mdns_service declares the module of ours, for the tests only (`#[cfg(test)] mod stealth_tests;`)",
-            "#[cfg(test)]\nmod stealth_tests;" in (ms / "lib.rs").read_text(encoding="utf-8").replace("\r\n", "\n"))
+        # the registration form: one line, `#[cfg(test)] mod stealth_tests;` with its marker; without #[cfg(test)] the module would build into the product
+        decl = re.compile(r"^#\[cfg\(test\)\] mod stealth_tests;  // STEALTH-HOOK\([\w/\-]+\)$", re.M)
+        add("cargo: the registration line is recognised, and the same line without #[cfg(test)] or without its marker is not",
+            bool(decl.search("#[cfg(test)] mod stealth_tests;  // STEALTH-HOOK(fingerprint/webrtc/declared-network)\n"))
+            and not decl.search("mod stealth_tests;  // STEALTH-HOOK(fingerprint/webrtc/declared-network)\n")
+            and not decl.search("#[cfg(test)] mod stealth_tests;\n"))
+        add("cargo: lib.rs of mdns_service declares the module of ours, for the tests only, on one registration line (`#[cfg(test)] mod stealth_tests;` and its marker)",
+            bool(decl.search((ms / "lib.rs").read_text(encoding="utf-8").replace("\r\n", "\n"))))
     wb = (wr / "webrender" / "Cargo.toml").read_text(encoding="utf-8")
     gr = (wr / "wr_glyph_rasterizer" / "Cargo.toml").read_text(encoding="utf-8")
     add("cargo: the dev-dependencies the job drops are in the manifests (mozangle once; glutin, glutin-winit, winit)",
