@@ -59,6 +59,8 @@ NOT_ON = {"linux": {"StealthWebGPUAdapter", "StealthWebGPUInstanceEnv"} | WINDOW
 # (gfx/gl/gtest/TestStealthGLMultisample.cpp). An entry for a test that ran on that platform makes the judge red.
 NOT_ON_TESTS = {"linux": {"StealthGLMultisample.BasicRenderDriverBlendsIntoAMultisampledTarget"},
                 "win": {"StealthGfxFeatureStatus.TheHostIsNotProbedWhileDeclared", "StealthGfxFeatureStatus.NothingProbesTheHostBeforeTheProfilePrefsAreRead",
+                         "StealthGfxFeatureStatus.TheHostProbeIsLaunchedAsSoonAsThePrefsAreReadWithTheEngineOff",
+                         "StealthGfxFeatureStatus.TheHostProbeIsNotLaunchedWithTheEngineOnOrBeforeThePrefsAreRead",
                          "StealthBranding.SandboxPolicyAllowsTheDeclaredArchive"}}
 
 

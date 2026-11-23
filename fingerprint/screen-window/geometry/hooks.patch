@@ -94,14 +94,15 @@ index 2b1e2c210050c9f13c35395f9683baddfb756a07..41c8ef1419811b6556fdbb69f445f814
  LOCAL_INCLUDES += ["/dom/events"]
  
 diff --git a/widget/gtk/moz.build b/widget/gtk/moz.build
-index e4be8ea072892ced0d3d6191f2ce122929e3b335..b2f68537271138874cb311c773b3a2a7333f0952 100644
+index e4be8ea072892ced0d3d6191f2ce122929e3b335..b09d2c5b65f3ffd707649ca22dd2c54b13ca0bdb 100644
 --- a/widget/gtk/moz.build
 +++ b/widget/gtk/moz.build
-@@ -117,6 +117,7 @@ SOURCES += [
+@@ -117,6 +117,8 @@ SOURCES += [
      "nsNativeThemeGTK.cpp",  # conflicts with X11 headers
      "nsWindow.cpp",  # conflicts with X11 headers
  ]
 +SOURCES += ["StealthFullscreenGtk.cpp"]  # STEALTH-HOOK(fingerprint/screen-window/geometry)
++SOURCES += ["StealthHostGLProbe.cpp"]  # STEALTH-HOOK(platform/declaration-gate)
  
  if CONFIG["MOZ_WAYLAND"]:
      UNIFIED_SOURCES += [

@@ -5771,16 +5771,17 @@
    "zoom.stealth.screen.width",
    "zoom.stealth.screen.height"
   ],
-  "added": 1,
+  "added": 2,
   "removed": 0,
   "hunks": 1,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
   "anchor": "after the SOURCES list (MediaKeysEventSourceFactory.cpp, nsNativeThemeGTK.cpp, nsWindow.cpp)",
   "evidence": [
-   "+SOURCES += [\"StealthFullscreenGtk.cpp\"]  # STEALTH-HOOK(fingerprint/screen-window/geometry)"
+   "+SOURCES += [\"StealthFullscreenGtk.cpp\"]  # STEALTH-HOOK(fingerprint/screen-window/geometry)",
+   "+SOURCES += [\"StealthHostGLProbe.cpp\"]  # STEALTH-HOOK(platform/declaration-gate)"
   ],
-  "notes": "Builds StealthFullscreenGtk.cpp, not unified (X11 headers, like nsWindow.cpp).",
+  "notes": "Builds StealthFullscreenGtk.cpp, not unified (X11 headers, like nsWindow.cpp). platform/declaration-gate: builds StealthHostGLProbe.cpp (Mozilla's early host GL probe after the profile's preferences, engine off).",
   "verifier": {
    "changed": [],
    "why": "Written with the hook, 2026-11-01."
@@ -7222,7 +7223,7 @@
    "network.process.enabled",
    "media.peerconnection.mtransport_process"
   ],
-  "added": 6,
+  "added": 7,
   "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 2,
@@ -7231,9 +7232,10 @@
   "evidence": [
    "+    // STEALTH-HOOK(network/proxy-udp): the SOCKS5 UDP layer lives in the socket process; locked, no caller moves the ICE out.",
    "+#include \"StealthGfxFeatureStatus.h\"  // STEALTH-HOOK(platform/declaration-gate)",
-   "+    mozilla::gfx::StealthMarkUserPrefsRead();  // STEALTH-HOOK(platform/declaration-gate)"
+   "+    mozilla::gfx::StealthMarkUserPrefsRead();  // STEALTH-HOOK(platform/declaration-gate)",
+   "+    mozilla::widget::StealthFireHostGLProbeIfStock();  // STEALTH-HOOK(platform/declaration-gate)"
   ],
-  "notes": "Locks the two prefs that decide where the ICE of a PeerConnection runs to the retail value (socket process, ICE in it): the SOCKS5 UDP layer is attached only to the sockets of that process, and a locked pref reads its default whatever user.js, prefs.js or a caller wrote. platform/declaration-gate: the signal that the profile's preferences have been read (StealthMarkUserPrefsRead), right after InitializeUserPrefs; before it the Linux GL probe does not run.",
+  "notes": "Locks the two prefs that decide where the ICE of a PeerConnection runs to the retail value (socket process, ICE in it): the SOCKS5 UDP layer is attached only to the sockets of that process, and a locked pref reads its default whatever user.js, prefs.js or a caller wrote. platform/declaration-gate: the signal that the profile's preferences have been read (StealthMarkUserPrefsRead), right after InitializeUserPrefs; before it the Linux GL probe does not run. With the engine off, Mozilla's early host GL probe is fired again right after the preferences are read (StealthFireHostGLProbeIfStock).",
   "verifier": {
    "changed": [],
    "why": "Written from the diff against the tag."

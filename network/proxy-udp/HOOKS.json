@@ -1470,5 +1470,15 @@
   "test": "gtest:StealthGfxFeatureStatus.NothingProbesTheHostBeforeTheProfilePrefsAreRead",
   "anchor": "`StealthLockIcePrefs();` (network/proxy-udp), right after `mDirProvider.InitializeUserPrefs();` of XREMain::XRE_mainRun",
   "why": "the signal says the profile's preferences, where the declaration arrives, have been read: it must come right after InitializeUserPrefs and before anything reads GfxInfo; nothing between them reads a preference of the declaration"
+ },
+ {
+  "file": "toolkit/xre/nsAppRunner.cpp",
+  "function": "nsresult XREMain::XRE_mainRun() {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "    mozilla::widget::StealthFireHostGLProbeIfStock();  // STEALTH-HOOK(platform/declaration-gate)",
+  "test": "gtest:StealthGfxFeatureStatus.TheHostProbeIsLaunchedAsSoonAsThePrefsAreReadWithTheEngineOff",
+  "anchor": "`mozilla::gfx::StealthMarkUserPrefsRead();` (platform/declaration-gate), right after `mDirProvider.InitializeUserPrefs();` of XREMain::XRE_mainRun",
+  "why": "Mozilla's early host GL probe of XRE_mainStartup comes before the profile's preferences, where the declaration cannot be read; this is the same fire as soon as they are read, so stock Firefox (engine off) probes at startup again"
  }
 ]

@@ -111,4 +111,27 @@ void StealthResetGfxFeatureStatusForTesting();
 
 }  // namespace mozilla::gfx
 
+namespace mozilla::widget {
+
+#ifdef MOZ_WIDGET_GTK
+// Linux: Mozilla fires its host GL probe (GfxInfo::FireGLXTestProcess) at
+// once in XRE_mainStartup, before the profile's preferences are read, where
+// StealthNoHostGLProbe() cannot tell stock Firefox from a declared launch and
+// so never lets it start. With the engine off (stock Firefox) the probe then
+// began only inside GfxInfo::GetData, with its 4 s timeout, and under load
+// it failed and left WebGL off for the session. This is the hook right after
+// the preferences are read (nsAppRunner): with the engine off and outside the
+// background-task mode it fires the probe, as Mozilla does at startup; with
+// the engine on, or before the preferences are read, it does nothing. The
+// launcher is GfxInfo::FireGLXTestProcess unless a test passes its own, so a
+// gtest observes the launch without spawning the host's glxtest.
+using StealthHostGLProbeLauncher = bool (*)();
+void StealthFireHostGLProbeIfStock(
+    StealthHostGLProbeLauncher aLauncher = nullptr);
+#else
+inline void StealthFireHostGLProbeIfStock() {}
+#endif
+
+}  // namespace mozilla::widget
+
 #endif  // GFX_STEALTH_GFX_FEATURE_STATUS_H_

@@ -108,6 +108,14 @@
   "test": "wrapper:scripts/ci_host_gate.py::invariant:fullscreen_is_the_screen"
  },
  {
+  "file": "widget/gtk/moz.build",
+  "function": "SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "SOURCES += [\"StealthHostGLProbe.cpp\"]  # STEALTH-HOOK(platform/declaration-gate)",
+  "test": "gtest:StealthGfxFeatureStatus.TheHostProbeIsLaunchedAsSoonAsThePrefsAreReadWithTheEngineOff"
+ },
+ {
   "file": "widget/gtk/nsWindow.h",
   "function": "class nsWindow : public nsIWidget {",
   "kind": "add",

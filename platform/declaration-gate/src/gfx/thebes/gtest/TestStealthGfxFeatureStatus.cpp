@@ -404,4 +404,52 @@ TEST(StealthGfxFeatureStatus, NothingProbesTheHostBeforeTheProfilePrefsAreRead)
   EXPECT_FALSE(glxTestError);
   EXPECT_EQ(adapterRAM, 0u);
 }
+
+// The launcher a test hands to the hook: counts the launches, spawns nothing.
+static int sFakeProbeLaunches = 0;
+static bool FakeHostGLProbeLauncher() {
+  ++sFakeProbeLaunches;
+  return true;
+}
+
+// The hook right after the profile's preferences are read (nsAppRunner): with
+// the engine off, stock Firefox, Mozilla's early host GL probe is launched
+// there, before any GfxInfo::GetData (whose 4 s timeout failed under load and
+// left WebGL off). It never ran at all, since the early fire in
+// XRE_mainStartup is before the preferences are read and refuses.
+TEST(StealthGfxFeatureStatus, TheHostProbeIsLaunchedAsSoonAsThePrefsAreReadWithTheEngineOff)
+{
+  StealthSetUserPrefsReadForTesting(true);
+  auto restore =
+      MakeScopeExit([] { StealthSetUserPrefsReadForTesting(false); });
+  Preferences::ClearUser(kSeedPref);
+  ASSERT_FALSE(StealthEngineActive());
+
+  sFakeProbeLaunches = 0;
+  widget::StealthFireHostGLProbeIfStock(FakeHostGLProbeLauncher);
+  EXPECT_EQ(sFakeProbeLaunches, 1);
+}
+
+// Nothing is launched with the engine on (the host is never read), nor before
+// the preferences are read (the declaration is not known yet).
+TEST(StealthGfxFeatureStatus, TheHostProbeIsNotLaunchedWithTheEngineOnOrBeforeThePrefsAreRead)
+{
+  auto restore =
+      MakeScopeExit([] { StealthSetUserPrefsReadForTesting(false); });
+  sFakeProbeLaunches = 0;
+
+  StealthSetUserPrefsReadForTesting(true);
+  {
+    Declared declared(kRtx3060);
+    ASSERT_TRUE(StealthEngineActive());
+    widget::StealthFireHostGLProbeIfStock(FakeHostGLProbeLauncher);
+    EXPECT_EQ(sFakeProbeLaunches, 0);
+  }
+
+  StealthSetUserPrefsReadForTesting(false);
+  Preferences::ClearUser(kSeedPref);
+  ASSERT_FALSE(StealthEngineActive());
+  widget::StealthFireHostGLProbeIfStock(FakeHostGLProbeLauncher);
+  EXPECT_EQ(sFakeProbeLaunches, 0);
+}
 #endif
