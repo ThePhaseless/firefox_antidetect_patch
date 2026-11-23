@@ -197,7 +197,7 @@
   "form": "declared-value",
   "line": "  value: 30000  # STEALTH-HOOK(network/doh)",
   "removed": "  value: 1500",
-  "test": "node:juggler/tests/a_proxied_doh_lookup_has_the_trr_only_timeout.test.mjs#the hook is on the value line of the pref of Mozilla"
+  "test": "node:juggler/tests/a_proxied_doh_lookup_has_the_trr_only_timeout.test.mjs#the hook is on the value line of the pref of Mozilla, which is declared nowhere else"
  },
  {
   "file": "modules/libpref/init/StaticPrefList.yaml",
