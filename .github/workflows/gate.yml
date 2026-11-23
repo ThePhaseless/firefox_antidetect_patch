@@ -653,10 +653,11 @@ jobs:
           sudo chmod -R go+rX /opt/ff
           ls -ld /opt /opt/ff /opt/ff/firefox
           echo "FF_EXE=/opt/ff/$(basename "$FF_EXE")" >> "$GITHUB_ENV"
-      # The fake web's control is Playwright's own Firefox (the same pin as the wrapper's fakeweb.yml); the other suites do not need it. On Linux the
-      # libraries Firefox loads are already installed by the system deps step above.
-      - name: Playwright's own Firefox (the control, the fake web only)
-        if: matrix.suite == 'wrapper.e2e.fakeweb'
+      # The fake web's control is Playwright's own Firefox (the same pin as the wrapper's fakeweb.yml), and so is the host oracle's stock control on Windows
+      # (the geolocation step on stock Firefox, scripts/ci_ab_host.py `run_stock`: run 45121964904 was red because the executable was not there); the other
+      # suites do not need it. On Linux the libraries Firefox loads are already installed by the system deps step above.
+      - name: Playwright's own Firefox (the controls, the fake web and the host oracle on Windows)
+        if: matrix.suite == 'wrapper.e2e.fakeweb' || (matrix.suite == 'wrapper.e2e.ab_host' && matrix.os == 'windows')
         shell: bash
         run: |
           python -m pip install --quiet "playwright==$(cat scripts/playwright_pin.txt)"

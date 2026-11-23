@@ -101,8 +101,11 @@ def cases() -> list:
                           and 'INVPW_BINARY_PATH="$FF_EXE"' in r and 'STEALTHFOX_E2E_BINARY="$FF_EXE"' in r for r in run))
     browser = [i for i, s in enumerate(steps) if "playwright install firefox" in (s.get("run") or "")]
     suite = names.index(SUITE_STEP) if SUITE_STEP in names else -1
-    add("gate legs: Playwright's own Firefox is installed for the fake web only, before the suite",
+    add("gate legs: Playwright's own Firefox is installed for the fake web, before the suite",
         len(browser) == 1 and "matrix.suite == 'wrapper.e2e.fakeweb'" in steps[browser[0]].get("if", "") and 0 <= browser[0] < suite)
+    # the host oracle's stock control on Windows launches Playwright's own Firefox (run 45121964904: not installed, so the control never ran); only there
+    add("gate legs: Playwright's own Firefox is installed for the host oracle on Windows only, before the suite",
+        len(browser) == 1 and "(matrix.suite == 'wrapper.e2e.ab_host' && matrix.os == 'windows')" in steps[browser[0]].get("if", "") and 0 <= browser[0] < suite)
 
     # the A/B oracles (published engine against the candidate: page, network, host): their legs, their longer budget, and their files kept
     ORACLES = ("wrapper.e2e.ab_oracle", "wrapper.e2e.ab_network", "wrapper.e2e.ab_host")
