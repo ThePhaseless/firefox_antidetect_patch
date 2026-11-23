@@ -676,7 +676,8 @@ jobs:
           $machine = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\location'
           $user = 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\location'
           foreach ($key in @($machine, $user, "$user\NonPackaged")) {
-            if (-not (Test-Path $key)) { New-Item -Path $key | Out-Null }
+            # -Force creates the missing parents too (run 45176061220: a parent key of HKCU was not there); only a key that is not there is created
+            if (-not (Test-Path $key)) { New-Item -Path $key -Force | Out-Null }
             Set-ItemProperty -Path $key -Name Value -Value 'Allow'
           }
           Set-Service -Name lfsvc -StartupType Manual

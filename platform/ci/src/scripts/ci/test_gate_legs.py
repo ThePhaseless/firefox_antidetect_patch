@@ -133,7 +133,9 @@ def cases() -> list:
     add("gate legs: the location service of the runner is turned on for the host oracle on Windows only, before the suite, and a setting that does not hold is red",
         len(location) == 1 and steps[location[0]].get("if", "") == "matrix.suite == 'wrapper.e2e.ab_host' && matrix.os == 'windows'"
         and steps[location[0]].get("shell") == "pwsh" and 0 <= location[0] < suite
-        and "Start-Service -Name lfsvc" in loc_run and "-Value 'Allow'" in loc_run and "throw" in loc_run and "-Force" not in loc_run)
+        and "Start-Service -Name lfsvc" in loc_run and "-Value 'Allow'" in loc_run and "throw" in loc_run
+        # a missing key is created with its parents (-Force; run 45176061220: a parent key of HKCU was not there), and only when it is not there
+        and "if (-not (Test-Path $key)) { New-Item -Path $key -Force | Out-Null }" in loc_run and "Get-ItemProperty -Path $key -Name Value" in loc_run)
     suite_run = steps[suite]["run"] if suite >= 0 else ""
     add("gate legs: the suite step gives the oracles' tests a folder of their own outside result/ (the completeness judge reads every JSON in result/)",
         'export AB_ORACLE_OUT="$PWD/ab-oracle"' in suite_run and "mkdir -p ab-oracle" in suite_run and "result/ab-oracle" not in suite_run)
