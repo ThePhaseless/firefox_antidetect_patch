@@ -136,6 +136,13 @@ def cases() -> list:
         and "Start-Service -Name lfsvc" in loc_run and "-Value 'Allow'" in loc_run and "throw" in loc_run
         # a missing key is created with its parents (-Force; run 45176061220: a parent key of HKCU was not there), and only when it is not there
         and "if (-not (Test-Path $key)) { New-Item -Path $key -Force | Out-Null }" in loc_run and "Get-ItemProperty -Path $key -Name Value" in loc_run)
+    # the host oracle on Windows runs on the image of the wrapper's host job, where stock Firefox reaches the location provider (runs 45165805370, 45206303882)
+    host_win = [r for r in gate_legs.legs(gate) if r.get("suite") == "wrapper.e2e.ab_host" and r.get("os") == "windows"]
+    add("gate legs: the host oracle's Windows leg runs on windows-2022, the image of the wrapper's host job",
+        len(host_win) == 1 and host_win[0].get("runner") == "windows-2022")
+    add("gate legs: the location step reads Windows' answer (CheckAccess) before and after and is red unless it is Allowed",
+        "AppCapability]::Create('location').CheckAccess()" in loc_run and "CheckAccess(location) before:" in loc_run
+        and "if ($after -ne 'Allowed')" in loc_run and loc_run.index("CheckAccess(location) before:") < loc_run.index("Set-ItemProperty"))
     suite_run = steps[suite]["run"] if suite >= 0 else ""
     add("gate legs: the suite step gives the oracles' tests a folder of their own outside result/ (the completeness judge reads every JSON in result/)",
         'export AB_ORACLE_OUT="$PWD/ab-oracle"' in suite_run and "mkdir -p ab-oracle" in suite_run and "result/ab-oracle" not in suite_run)

@@ -480,7 +480,9 @@ jobs:
           - { suite: wrapper.e2e.ab_network, leg: linux-x86_64, runner: ubuntu-24.04, kind: linux, os: linux, timeout: 75 }
           - { suite: wrapper.e2e.ab_network, leg: win-x86_64, runner: windows-latest, kind: win, os: windows, timeout: 75 }
           - { suite: wrapper.e2e.ab_host, leg: linux-x86_64, runner: ubuntu-24.04, kind: linux, os: linux, timeout: 50 }
-          - { suite: wrapper.e2e.ab_host, leg: win-x86_64, runner: windows-latest, kind: win, os: windows, timeout: 50 }
+          # The host oracle on Windows runs on windows-2022, the image of the wrapper's own host job: there stock Firefox reaches the Windows location provider (runs 45165805370
+          # and 45170547415); on windows-2025 (windows-latest) it did not (runs 45206303882 and 45206310347). Only this leg; windows-2025 is on the list for after the 69.
+          - { suite: wrapper.e2e.ab_host, leg: win-x86_64, runner: windows-2022, kind: win, os: windows, timeout: 50 }
           # THE HOST ORACLE'S RECORDER, tested on a launch that dies on purpose (Linux only: the signal sent to the parent, the core the kernel writes and gdb reads, and
           # strace's signal line have no counterpart on Windows). A leg of its own: the suite id, the junit and the verdict are the row's. One test, whose own guard is 17
           # minutes (a launch, the signal, the close and gdb over a core), so 35 with the setup. Its evidence is kept with the oracles' files, as <suite>-<os>.
@@ -673,6 +675,14 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
+          # Windows' own answer for the user of the job: the question stock Firefox asks before it starts the Windows provider (AppCapability "location"
+          # CheckAccess, dom/geolocation/GeolocationSystemWin.cpp). Read, not presumed: printed before and after, and red unless it is Allowed after
+          # (run 45206303882: on windows-2025 the keys said Allow and stock Firefox did not start the provider). WinRT is read through Windows PowerShell.
+          $access = {
+            $answer = & powershell.exe -NoProfile -Command "`$null = [Windows.Security.Authorization.AppCapabilityAccess.AppCapability,Windows.Security.Authorization.AppCapabilityAccess,ContentType=WindowsRuntime]; [string][Windows.Security.Authorization.AppCapabilityAccess.AppCapability]::Create('location').CheckAccess()" 2>&1
+            ($answer | Out-String).Trim()
+          }
+          "CheckAccess(location) before: $(& $access)"
           $machine = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\location'
           $user = 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\location'
           foreach ($key in @($machine, $user, "$user\NonPackaged")) {
@@ -692,6 +702,9 @@ jobs:
             "$key = $value"
           }
           "lfsvc: $($service.Status), $($service.StartType)"
+          $after = & $access
+          "CheckAccess(location) after: $after"
+          if ($after -ne 'Allowed') { $bad += "Windows answers CheckAccess(location) = $after, not Allowed" }
           if ($bad) { throw ("the location service of the runner is not on: " + ($bad -join '; ')) }
       - name: The suite - every listed test runs and passes
         shell: bash
