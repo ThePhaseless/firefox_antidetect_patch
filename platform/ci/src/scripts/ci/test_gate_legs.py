@@ -123,6 +123,17 @@ def cases() -> list:
     add("gate legs: the oracles' legs have more than the default 25 minutes, and the job reads its budget from the leg",
         len(oracle_rows) == 2 * len(ORACLES) and all(int(r.get("timeout", 0)) > 25 for r in oracle_rows)
         and str(gate["jobs"]["wrapper-e2e"].get("timeout-minutes", "")).replace(" ", "") == "${{matrix.timeout||25}}")
+    # the network legs: the test's guard with a candidate (3285 s, the measured run plus 25%) and the job's own steps fit with room for a slow runner (runs 45121964904, 45153612447)
+    net_rows = [r for r in gate_legs.legs(gate) if r.get("suite") == "wrapper.e2e.ab_network"]
+    add("gate legs: the network oracle's legs have 75 minutes (its guard of 3285 s with a candidate and the job's steps)",
+        len(net_rows) == 2 and all(int(r.get("timeout", 0)) == 75 for r in net_rows))
+    # the host oracle's laboratory on Windows: the location service of the runner is turned on before the suite (run 45153612447: off and denied, the stock control stood still)
+    location = [i for i, s in enumerate(steps) if s.get("name") == "Turn on the Windows location service of the runner (the laboratory of the geolocation step)"]
+    loc_run = steps[location[0]].get("run", "") if location else ""
+    add("gate legs: the location service of the runner is turned on for the host oracle on Windows only, before the suite, and a setting that does not hold is red",
+        len(location) == 1 and steps[location[0]].get("if", "") == "matrix.suite == 'wrapper.e2e.ab_host' && matrix.os == 'windows'"
+        and steps[location[0]].get("shell") == "pwsh" and 0 <= location[0] < suite
+        and "Start-Service -Name lfsvc" in loc_run and "-Value 'Allow'" in loc_run and "throw" in loc_run and "-Force" not in loc_run)
     suite_run = steps[suite]["run"] if suite >= 0 else ""
     add("gate legs: the suite step gives the oracles' tests a folder of their own outside result/ (the completeness judge reads every JSON in result/)",
         'export AB_ORACLE_OUT="$PWD/ab-oracle"' in suite_run and "mkdir -p ab-oracle" in suite_run and "result/ab-oracle" not in suite_run)
