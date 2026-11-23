@@ -1,0 +1,490 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# oracle-stress-hunt.yml - TEMPORARY, on the branch hunt/oracle-stress-69 only, never merged.
+# The A/B oracle legs of gate.yml (wrapper-e2e), each exactly as the gate runs it, many at once on the
+# archives of one candidate build, to see every remaining red in a single run. The job is gate.yml's
+# wrapper-e2e job: its steps are byte-identical but for `inputs.X` -> `env.X` and the `-r<rep>` suffix
+# of the artifact names; the matrix is the 16 legs below.
+# ─────────────────────────────────────────────────────────────────────────────
+name: oracle-stress-hunt
+
+on:
+  push:
+    branches: [hunt/oracle-stress-69]
+
+concurrency:
+  group: hunt-oracle-stress-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: { actions: read, contents: read }
+
+# gate.yml's inputs, fixed
+env:
+  HUNT_BUILD_RUN_ID: '45234838742'
+  HUNT_SEAL_TAG: firefox-69-candidate
+  HUNT_WRAPPER_REF: 4a840e39b047440148b479a196657ce5c1efd18b
+  HUNT_CORE_REF: 0fb09bbd2e9924b0166b712a7d9b5d1266806d7d
+
+jobs:
+  wrapper-e2e:
+    name: ${{ matrix.suite }}-${{ matrix.leg }}-r${{ matrix.rep }}
+    runs-on: ${{ matrix.runner }}
+    # TEMP and TMP on D:\a\_temp (the runner's temp folder): the Firefox profiles land in TEMP and on C: they saturate the disk (queue up to 144,
+    # latencies up to 4 s, parent main thread still 40-60 s). On the job, not in a step: `runner.temp` is not readable in a job's `env`.
+    env:
+      TEMP: ${{ startsWith(matrix.runner, 'windows') && 'D:\a\_temp' || '/tmp' }}
+      TMP: ${{ startsWith(matrix.runner, 'windows') && 'D:\a\_temp' || '/tmp' }}
+    timeout-minutes: ${{ matrix.timeout || 25 }}
+    strategy:
+      fail-fast: false
+      max-parallel: 16
+      matrix:
+        include:
+          - { suite: wrapper.e2e.ab_host, leg: win-x86_64, runner: windows-2022, kind: win, os: windows, timeout: 50, rep: 1 }
+          - { suite: wrapper.e2e.ab_host, leg: win-x86_64, runner: windows-2022, kind: win, os: windows, timeout: 50, rep: 2 }
+          - { suite: wrapper.e2e.ab_host, leg: win-x86_64, runner: windows-2022, kind: win, os: windows, timeout: 50, rep: 3 }
+          - { suite: wrapper.e2e.ab_host, leg: win-x86_64, runner: windows-2022, kind: win, os: windows, timeout: 50, rep: 4 }
+          - { suite: wrapper.e2e.ab_host, leg: win-x86_64, runner: windows-2022, kind: win, os: windows, timeout: 50, rep: 5 }
+          - { suite: wrapper.e2e.ab_network, leg: win-x86_64, runner: windows-latest, kind: win, os: windows, timeout: 75, rep: 1 }
+          - { suite: wrapper.e2e.ab_network, leg: win-x86_64, runner: windows-latest, kind: win, os: windows, timeout: 75, rep: 2 }
+          - { suite: wrapper.e2e.ab_network, leg: win-x86_64, runner: windows-latest, kind: win, os: windows, timeout: 75, rep: 3 }
+          - { suite: wrapper.e2e.ab_network, leg: linux-x86_64, runner: ubuntu-24.04, kind: linux, os: linux, timeout: 75, rep: 1 }
+          - { suite: wrapper.e2e.ab_network, leg: linux-x86_64, runner: ubuntu-24.04, kind: linux, os: linux, timeout: 75, rep: 2 }
+          - { suite: wrapper.e2e.ab_network, leg: linux-x86_64, runner: ubuntu-24.04, kind: linux, os: linux, timeout: 75, rep: 3 }
+          - { suite: wrapper.e2e.ab_oracle, leg: linux-x86_64, runner: ubuntu-24.04, kind: linux, os: linux, timeout: 50, rep: 1 }
+          - { suite: wrapper.e2e.ab_oracle, leg: linux-x86_64, runner: ubuntu-24.04, kind: linux, os: linux, timeout: 50, rep: 2 }
+          - { suite: wrapper.e2e.ab_oracle, leg: linux-x86_64, runner: ubuntu-24.04, kind: linux, os: linux, timeout: 50, rep: 3 }
+          - { suite: wrapper.e2e.ab_host, leg: linux-x86_64, runner: ubuntu-24.04, kind: linux, os: linux, timeout: 50, rep: 1 }
+          - { suite: wrapper.e2e.ab_host, leg: linux-x86_64, runner: ubuntu-24.04, kind: linux, os: linux, timeout: 50, rep: 2 }
+    steps:
+      - name: The pinned inputs are set and well formed
+        shell: bash
+        run: |
+          set -eu
+          fail=0
+          case "$HUNT_BUILD_RUN_ID" in ''|*[!0-9]*) echo "::error::build_run_id is empty or not a run id: '$HUNT_BUILD_RUN_ID'"; fail=1;; esac
+          case "$HUNT_SEAL_TAG" in firefox-[0-9]*-candidate) ;; *) echo "::error::seal_tag is empty or not a candidate tag: '$HUNT_SEAL_TAG'"; fail=1;; esac
+          for v in HUNT_WRAPPER_REF HUNT_CORE_REF; do
+            eval "val=\${$v}"
+            printf '%s' "$val" | grep -Eq '^[0-9a-f]{40}$' || { echo "::error::$v is empty or not a full sha: '$val'"; fail=1; }
+          done
+          [ "$fail" = 0 ] || exit 1
+          echo "build_run_id=$HUNT_BUILD_RUN_ID seal_tag=$HUNT_SEAL_TAG wrapper_ref=$HUNT_WRAPPER_REF core_ref=$HUNT_CORE_REF"
+      - name: Checkout wrapper (its tests, ci/required-suites.json and scripts/ci_verdict.py)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          repository: oss-invisible/playwright
+          ref: ${{ env.HUNT_WRAPPER_REF }}
+          fetch-depth: 1
+      # The judge and the list it compares against are MAIN's, not the candidate's: a candidate that edits ci_verdict.py or
+      # shortens its own list does not judge itself. (Until main has the judge the candidate's own copy runs, said loudly.)
+      - name: Checkout wrapper main (the judge and the list that bind the candidate)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          repository: oss-invisible/playwright
+          ref: main
+          path: wrapper-main
+          fetch-depth: 1
+      # A leg comes first in this file and its row in the wrapper's ci/required-suites.json second: a leg whose suite the list of wrapper_ref does
+      # not have yet is SAID (a warning on the run) and does not run its suite or its verdict, instead of failing. Once the row is in the list the
+      # leg is bound like every other, and a row can never leave the list (the judge compares it with main's).
+      - name: The suite is in the wrapper's list (a leg the list does not have yet is said, not failed)
+        shell: bash
+        env:
+          SUITE: ${{ matrix.suite }}
+          WRAPPER_REF: ${{ env.HUNT_WRAPPER_REF }}
+        run: |
+          # exit 0: listed; exit 3: not listed; anything else (no interpreter, no list, a list that does not parse) is red, never "not listed".
+          # A listed suite whose leg then reports nothing is red in wrapper-e2e-complete ("has no result: the leg did not report").
+          PY="$(command -v python3 || command -v python)"
+          set +e
+          "$PY" -c "import json,os,sys; sys.exit(0 if any(r.get('id') == os.environ['SUITE'] for r in json.load(open('ci/required-suites.json', encoding='utf-8'))) else 3)"
+          rc=$?
+          set -e
+          case "$rc" in
+            0) echo "LISTED=1" >> "$GITHUB_ENV" ;;
+            3) echo "LISTED=0" >> "$GITHUB_ENV"
+               echo "::warning::$SUITE is not in ci/required-suites.json of wrapper_ref $WRAPPER_REF yet: the leg is said, not run (its row ends this)" ;;
+            *) echo "::error::the list of wrapper_ref could not be read ($rc): the leg cannot know whether $SUITE is required"; exit 1 ;;
+          esac
+      - name: Download asset
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: asset-${{ matrix.leg }}
+          path: art
+          run-id: ${{ env.HUNT_BUILD_RUN_ID }}
+          github-token: ${{ env.HUNT_BUILD_RUN_ID != github.run_id && github.token || '' }}
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with: { python-version: '3.11' }
+      # The GeoIP database is made by the wrapper (scripts/ci_lab_geoip.py: the same bytes every run, the sha256 in its ci/geoip.json), never a site: without STEALTHFOX_GEOIP_MMDB the core asks GitHub
+      # which database is the latest on every call, from the python of the test (run 43211837926: a resolver trap counted github.com and
+      # api.github.com as the browser's). The variable reaches every later step of the job, `sudo -E` carries it to a root leg, and the judge
+      # turns a leg that launched without it red. The wrapper checked out above is the one that carries the script and the pin: a wrapper_ref without them fails here.
+      - name: The GeoIP database (made by the repository, same bytes every run)
+        shell: bash
+        run: python scripts/ci_lab_geoip.py build --pin ci/geoip.json
+      # The security state (the intermediate certificates, the OneCRL revocations and the CRLite filters) comes from the wrapper's pin
+      # (scripts/ci_lab_security_state.py, ci/security-state.pin.json), never from Mozilla's servers: the script writes STEALTHFOX_SECURITY_STATE
+      # into the environment of every later step of the job, so the launches of the wrapper's tests carry the same state every run.
+      - name: The security state (set by the repository, same bytes every run)
+        shell: bash
+        run: python scripts/ci_lab_security_state.py set --pin ci/security-state.pin.json
+      - name: Linux system deps (Firefox runtime libs, a virtual display)
+        if: matrix.kind == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+          # the fontconfig suite traces the opens of the browser: strace is not in the runner image (setsid is, util-linux).
+          # The parts of the whole e2e suite carry the fontconfig e2e files too, and e2e.yml installs it for every Linux run.
+          # The host oracle traces the whole tree of the browser with strace, and so does the test of its recorder.
+          case "${{ matrix.suite }}" in wrapper.e2e.fontconfig|wrapper.e2e.suite.*|wrapper.e2e.ab_host|wrapper.e2e.ab_host_crash) sudo apt-get install -y strace;; esac
+          # TEMPORARY: remove after the pm judged the trace of the -11 at exit.
+          # tests/test_security_state_engine_e2e.py, on a crash of the engine in generate mode: a core file where kernel.core_pattern says, and gdb to read it (the test
+          # deletes the core and saves stderr and the backtrace in $RUNNER_TEMP/invpw-evidence/security-state-generate/, which "Keep what the tests saved" uploads).
+          case "${{ matrix.suite }}" in wrapper.e2e.securitystate)
+            sudo apt-get install -y gdb
+            mkdir -p "$RUNNER_TEMP/invpw-cores"
+            sudo sysctl -w kernel.core_pattern="$RUNNER_TEMP/invpw-cores/core.%e.%p"
+            echo "INVPW_CORE_DIR=$RUNNER_TEMP/invpw-cores" >> "$GITHUB_ENV";;
+          esac
+          python -m pip install --quiet "playwright==$(cat scripts/playwright_pin.txt)"
+          sudo "$(which python)" -m playwright install-deps firefox
+      # What a browser that did not end with 0 leaves is read with gdb (every thread's backtrace, the libraries with their build ids from elfutils). The kernel writes the core
+      # where its pattern says, so the pattern points at a folder of the job (INVPW_CORE_DIR). Nothing here reaches a launch that does not crash: no environment variable of the
+      # browser, no pref. The recorder's own test (ab_host_crash) needs it as much as the oracles.
+      - name: Cores of a browser that did not end with 0 (gdb, elfutils, where the kernel writes them)
+        if: matrix.kind == 'linux' && (matrix.suite == 'wrapper.e2e.ab_oracle' || matrix.suite == 'wrapper.e2e.ab_network' || matrix.suite == 'wrapper.e2e.ab_host' || matrix.suite == 'wrapper.e2e.ab_host_crash')
+        run: |
+          sudo apt-get install -y gdb elfutils
+          mkdir -p "$RUNNER_TEMP/cores"
+          chmod 1777 "$RUNNER_TEMP/cores"
+          sudo sysctl -w kernel.core_pattern="$RUNNER_TEMP/cores/core.%e.%p.%t"
+          echo "INVPW_CORE_DIR=$RUNNER_TEMP/cores" >> "$GITHUB_ENV"
+      - name: Extract + locate firefox binary
+        shell: bash
+        run: |
+          set -e
+          mkdir -p ff
+          set -- art/firefox-*-stealth-${{ matrix.leg }}.*
+          [ "$#" -eq 1 ] && [ -e "$1" ] || { echo "ERROR: expected one firefox-*-stealth-${{ matrix.leg }} archive in art/, found: $*"; exit 1; }
+          A="$1"
+          case "${{ matrix.kind }}" in
+            win)   python -c "import zipfile; zipfile.ZipFile('$A').extractall('ff')"; EXE="ff/firefox.exe";;
+            linux) tar xzf "$A" -C ff; EXE="ff/firefox";;
+          esac
+          [ -e "$EXE" ] || { echo "ERROR: firefox binary not found at $EXE"; exit 1; }
+          chmod +x "$EXE" 2>/dev/null || true
+          echo "FF_EXE=$PWD/$EXE" >> "$GITHUB_ENV"
+      # The core under test is exactly core_ref, from git, over what the wrapper's pin resolves (the gate above explains why
+      # and asserts it; the same switches here).
+      - name: The core under test (core_ref, from git) and the wrapper with its dev extra
+        shell: bash
+        env:
+          CORE_REF: ${{ env.HUNT_CORE_REF }}
+        run: |
+          export INVISIBLE_CORE_AUTOFIX=off INVISIBLE_CORE_PIN=allow
+          CORE_GIT="git+https://github.com/oss-invisible/core@$CORE_REF"
+          python -m pip install --quiet "$CORE_GIT"
+          python -m pip install --quiet ".[dev]"
+          python -m pip install --quiet --force-reinstall "$CORE_GIT"
+          python - <<'PY'
+          import json, os, re, subprocess, sys
+          from importlib.metadata import distribution, version
+          ref = os.environ["CORE_REF"]
+          if re.fullmatch(r"[0-9a-f]{40}", ref):
+              want = ref
+          else:
+              rows = [line.split() for line in subprocess.run(
+                  ["git", "ls-remote", "https://github.com/oss-invisible/core", ref, ref + "^{}"],
+                  capture_output=True, text=True, check=True).stdout.splitlines() if line.strip()]
+              peeled = [s for s, r in rows if r.endswith("^{}")]
+              want = (peeled or [s for s, _ in rows] or [""])[0]
+          import invisible_playwright  # noqa: F401
+          raw = distribution("invisible-core").read_text("direct_url.json")
+          got = (json.loads(raw).get("vcs_info") or {}).get("commit_id") if raw else None
+          print("core under test: %s from %s" % (version("invisible-core"), got or "the index"))
+          if not want or got != want:
+              sys.exit("THE CORE UNDER TEST IS NOT core_ref: installed %s from %s, core_ref %r is %s"
+                       % (version("invisible-core"), got or "the index", ref, want or "not a ref of invisible_core"))
+          PY
+      - name: Seal of the binary under test
+        shell: bash
+        env:
+          SEAL_TAG: ${{ env.HUNT_SEAL_TAG }}
+        run: |
+          export INVISIBLE_CORE_AUTOFIX=off INVISIBLE_CORE_PIN=allow
+          python -m invisible_core seal --binary "$FF_EXE" --tag "$SEAL_TAG" -o gate.seal.json
+      # The sandbox leg: the restriction of AppArmor on user namespaces is turned off, as on any Linux where a user may have them, and the runner
+      # user shows that it has one now. The first test of the suite fails if the socket process still has no seccomp filter.
+      - name: User namespaces for a normal user (the sandbox leg)
+        if: matrix.sandbox
+        shell: bash
+        run: |
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          sysctl kernel.apparmor_restrict_unprivileged_userns kernel.unprivileged_userns_clone user.max_user_namespaces 2>&1 || true
+          unshare -U true && echo "user namespaces: allowed for $(id -un) (uid $(id -u))"
+      # The root legs run an engine that stays under /home/runner (the home of the runner user, mode 750). The socket process is born with
+      # CLONE_NEWUSER and does execve INSIDE the new user namespace, where uid 1001 is not mapped and root has no CAP_DAC_OVERRIDE: the
+      # execve fails ("exited with status 127"), there is no socket process and the gather of a PeerConnection has no candidate (run
+      # 43188313516; reproduced by repos-6b: a home of 755, or an engine of root's, and everything works with the real sandbox, Seccomp: 2).
+      # So the engine goes to a path of root's that everyone can read, before the root steps, and FF_EXE points there.
+      - name: The engine where root can run it (the root legs)
+        if: matrix.root
+        shell: bash
+        run: |
+          sudo rm -rf /opt/ff
+          sudo cp -a "$(dirname "$FF_EXE")" /opt/ff
+          sudo chown -R root:root /opt/ff
+          sudo chmod -R go+rX /opt/ff
+          ls -ld /opt /opt/ff /opt/ff/firefox
+          echo "FF_EXE=/opt/ff/$(basename "$FF_EXE")" >> "$GITHUB_ENV"
+      # The fake web's control is Playwright's own Firefox (the same pin as the wrapper's fakeweb.yml), and so is the host oracle's stock control on Windows
+      # (the geolocation step on stock Firefox, scripts/ci_ab_host.py `run_stock`: run 45121964904 was red because the executable was not there); the other
+      # suites do not need it. On Linux the libraries Firefox loads are already installed by the system deps step above.
+      - name: Playwright's own Firefox (the controls, the fake web and the host oracle on Windows)
+        if: matrix.suite == 'wrapper.e2e.fakeweb' || (matrix.suite == 'wrapper.e2e.ab_host' && matrix.os == 'windows')
+        shell: bash
+        run: |
+          python -m pip install --quiet "playwright==$(cat scripts/playwright_pin.txt)"
+          python -m playwright install firefox
+      # The laboratory of the host oracle's geolocation step, before any launch (the published engine, the candidate and the stock control then run on the same machine in
+      # the same state): the runner image has the Windows location service off and denied for the machine (run 45153612447: lfsvc Disabled and Stopped, the machine's
+      # location consent Deny), so stock Firefox cannot reach the platform provider. A runner that is thrown away after the job: the service is made startable and started,
+      # and the consent is Allow for the machine and for the user's non-packaged apps. A setting that does not hold is red with its reason, never a silent go-on.
+      - name: Turn on the Windows location service of the runner (the laboratory of the geolocation step)
+        if: matrix.suite == 'wrapper.e2e.ab_host' && matrix.os == 'windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # Windows' own answer for the user of the job: the question stock Firefox asks before it starts the Windows provider (AppCapability "location"
+          # CheckAccess, dom/geolocation/GeolocationSystemWin.cpp). Read, not presumed: printed before and after, and red unless it is Allowed after
+          # (run 45206303882: on windows-2025 the keys said Allow and stock Firefox did not start the provider). WinRT is read through Windows PowerShell.
+          $access = {
+            $answer = & powershell.exe -NoProfile -Command "`$null = [Windows.Security.Authorization.AppCapabilityAccess.AppCapability,Windows.Security.Authorization.AppCapabilityAccess,ContentType=WindowsRuntime]; [string][Windows.Security.Authorization.AppCapabilityAccess.AppCapability]::Create('location').CheckAccess()" 2>&1
+            ($answer | Out-String).Trim()
+          }
+          "CheckAccess(location) before: $(& $access)"
+          $machine = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\location'
+          $user = 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\location'
+          foreach ($key in @($machine, $user, "$user\NonPackaged")) {
+            # -Force creates the missing parents too (run 45176061220: a parent key of HKCU was not there); only a key that is not there is created
+            if (-not (Test-Path $key)) { New-Item -Path $key -Force | Out-Null }
+            Set-ItemProperty -Path $key -Name Value -Value 'Allow'
+          }
+          Set-Service -Name lfsvc -StartupType Manual
+          Start-Service -Name lfsvc
+          $service = Get-Service -Name lfsvc
+          $bad = @()
+          if ($service.Status -ne 'Running') { $bad += "lfsvc is $($service.Status), not Running" }
+          if ($service.StartType -eq 'Disabled') { $bad += 'lfsvc is still Disabled' }
+          foreach ($key in @($machine, $user, "$user\NonPackaged")) {
+            $value = (Get-ItemProperty -Path $key -Name Value).Value
+            if ($value -ne 'Allow') { $bad += "$key is $value, not Allow" }
+            "$key = $value"
+          }
+          "lfsvc: $($service.Status), $($service.StartType)"
+          $after = & $access
+          "CheckAccess(location) after: $after"
+          if ($after -ne 'Allowed') { $bad += "Windows answers CheckAccess(location) = $after, not Allowed" }
+          if ($bad) { throw ("the location service of the runner is not on: " + ($bad -join '; ')) }
+      - name: The suite - every listed test runs and passes
+        shell: bash
+        run: |
+          [ "$LISTED" = 1 ] || { echo "this suite is not in the wrapper's list yet: said, not run"; exit 0; }
+          export INVISIBLE_CORE_AUTOFIX=off INVISIBLE_CORE_PIN=allow
+          export INVISIBLE_SEAL_FILE="$PWD/gate.seal.json" INVPW_BINARY_PATH="$FF_EXE" STEALTHFOX_E2E_BINARY="$FF_EXE"
+          mkdir -p result
+          # where the A/B oracle's test keeps its three files and its log (outside result/: the completeness judge reads every JSON there as a verdict)
+          mkdir -p ab-oracle
+          export AB_ORACLE_OUT="$PWD/ab-oracle"
+          # The log of a job that is cancelled is what pytest had written: unbuffered, so that it says how far the suite got.
+          export PYTHONUNBUFFERED=1
+          # The engine's log of the UDP layer, a file per process, kept with the result: what the browser said is the only way
+          # to tell a product that was slow from a test that was wrong (the e2e of run 43164943499 could not be told apart).
+          case "${{ matrix.suite }}" in
+            *e2e*)
+              LOGDIR="$(python -c "import os; os.makedirs('result/moz-logs', exist_ok=True); print(os.path.abspath('result/moz-logs'))")"
+              # `timestamp`: a time on every line (the logs of run 43188313516 had none, and a red on Windows could not be read against the test's own times)
+              export MOZ_LOG="timestamp,sync,SOCKS-UDP:5" MOZ_LOG_FILE="$LOGDIR/moz-%PID.log"
+              # the HTTP/3 e2e: what the browser says of the QUIC it starts (a visit that reads h2 where h3 was due)
+              if [ "${{ matrix.suite }}" = "wrapper.e2e.web" ]; then export MOZ_LOG="$MOZ_LOG,nsHttp:5,neqo_http3:5"; fi
+              # the page suite (gate-only 44746170375: a first goto told started and then neither committed nor aborted, and the
+              # SOCKS-UDP log alone wrote nothing for it): the document channel, the process isolation and the docshell of every
+              # navigation, and the Juggler's own trace of its channels and navigations, a file per browser session
+              if [ "${{ matrix.suite }}" = "wrapper.e2e.page" ]; then
+                export MOZ_LOG="$MOZ_LOG,DocumentChannel:5,ProcessIsolation:5,nsDocShell:4,DocLoader:4"
+                mkdir -p result/juggler-trace
+                export INVISIBLE_JUGGLER_TRACE_DIR="$(python -c "import os; print(os.path.abspath('result/juggler-trace'))")"
+              fi
+              # the root legs (run 43188313516: the socket process of every one wrote nothing, the gather had no candidate): the
+              # transport and the sandbox that starts that process
+              if [ "${{ matrix.root }}" = "true" ] || [ "${{ matrix.sandbox }}" = "true" ]; then export MOZ_LOG="$MOZ_LOG,mtransport:5,SandboxBroker:5,SandboxTarget:5"; fi;;
+          esac
+          JUDGE=scripts/ci_verdict.py
+          [ -f wrapper-main/scripts/ci_verdict.py ] && JUDGE=wrapper-main/scripts/ci_verdict.py
+          echo "JUDGE=$JUDGE" >> "$GITHUB_ENV"
+          python "$JUDGE" args --required ci/required-suites.json --suite "${{ matrix.suite }}" --os "${{ matrix.os }}" --with-marker > result/args.txt
+          mapfile -t SELECT < <(tr -d '\r' < result/args.txt)
+          # no PYTEST_ADDOPTS from the environment, no rerun plugin (a test that passes on its second try is not green), junit
+          # in the xunit2 family (the judge reads the class of every test from it)
+          PYTEST=(python -m pytest "${SELECT[@]}" -o addopts='' -o junit_family=xunit2 -q -p no:cacheprovider -p no:rerunfailures -rs --junitxml="result/${{ matrix.suite }}.${{ matrix.os }}.xml")
+          if [ "${{ matrix.root }}" = "true" ]; then
+            # The trap listens on port 53 of a loopback address and points /etc/resolv.conf at it (it takes the first of
+            # 127.0.0.1... it can bind). The runner's own stub resolver is NOT stopped: stopping it took the DNS of the runner
+            # with it, and the result of the job could not be uploaded (run 43164943499: EAI_AGAIN). What listens is said
+            # whole, before the suite, so that a port the trap cannot bind has its holder in the log.
+            (ss -lntup 2>/dev/null || netstat -lntup 2>/dev/null) || echo "no ss or netstat on this runner"
+            # -H: the browser must not see the runner's home as another user's. -u XDG_RUNTIME_DIR: Firefox refuses to run as
+            # root when that directory belongs to the runner's user ("Running Nightly as root in a regular user's session is
+            # not supported", run 43164943499). The trap must run: a test that cannot make it fails instead of going on
+            # without its assertion.
+            # DIAGNOSTICS of the root legs, kept with the result in result/root-diag/ (they judge nothing): the kernel's say on
+            # user namespaces and AppArmor, the processes of the browser a few times during the run, and what the kernel logged.
+            mkdir -p result/root-diag
+            { sysctl kernel.apparmor_restrict_unprivileged_userns kernel.unprivileged_userns_clone user.max_user_namespaces \
+                kernel.yama.ptrace_scope 2>&1; id; cat /proc/self/status | grep -i -E "^(Cap|Seccomp|NoNewPrivs)"; } > result/root-diag/kernel.txt 2>&1 || true
+            ( for _ in $(seq 1 40); do date +%T; { ps -eo pid,ppid,user,stat,args | grep -i -E "[f]irefox|[X]vfb" | cut -c1-260; } || true; sleep 15; done ) \
+              > result/root-diag/ps.log 2>&1 &
+            # What the environment of THIS launch says about the GeoIP database (the judge reads it): through the same sudo as pytest.
+            sudo -H -E env -u PYTEST_ADDOPTS -u XDG_RUNTIME_DIR "PATH=$PATH" python scripts/ci_lab_geoip.py evidence --out geoip-evidence.json > /dev/null
+            sudo -H -E env -u PYTEST_ADDOPTS -u XDG_RUNTIME_DIR INVPW_REQUIRE_TRAP=1 "PATH=$PATH" "${PYTEST[@]}" || true
+            sudo dmesg 2>&1 | grep -i -E "apparmor|DENIED|seccomp|userns" | tail -80 > result/root-diag/dmesg.txt || true
+          else
+            env -u PYTEST_ADDOPTS python scripts/ci_lab_geoip.py evidence --out geoip-evidence.json > /dev/null
+            if [[ "${{ matrix.suite }}" == wrapper.e2e.suite.* ]]; then
+              # THE WHOLE e2e SUITE of the wrapper, a part of it: the files of the row, run by scripts/ci_suite_run.py the way scripts/run_e2e.py runs
+              # them (two passes, no rerun) and written as ONE junit at the path the judge reads. On Linux under a virtual display, as e2e.yml does
+              # (the browser is headed). The script exits 0 when the passes reached the end; the verdict is the judge's, below.
+              PREFIX=""; [ "$RUNNER_OS" = Linux ] && PREFIX="xvfb-run -a"
+              $PREFIX env -u PYTEST_ADDOPTS python -u scripts/ci_suite_run.py --required ci/required-suites.json --suite "${{ matrix.suite }}" --os "${{ matrix.os }}" --binary "$FF_EXE" --junit "result/${{ matrix.suite }}.${{ matrix.os }}.xml" || true
+            else
+              env -u PYTEST_ADDOPTS "${PYTEST[@]}" || true
+            fi
+          fi
+      # The verdict, whatever pytest said: a skipped test, a missing file or a list that shrank is red here.
+      # The leg ran with the pinned GeoIP database and the core never went past it to GitHub: checked HERE, with the script of the wrapper, whatever the
+      # judge below knows (a judge of main that does not read the evidence yet is a window until the first merge; this step is not).
+      - name: The leg ran with the pinned GeoIP database
+        if: always()
+        shell: bash
+        run: |
+          [ "$LISTED" = 1 ] || { echo "this suite is not in the wrapper's list yet: said, not run"; exit 0; }
+          GEOIP_PIN=ci/geoip.json
+          [ -f wrapper-main/ci/geoip.json ] && GEOIP_PIN=wrapper-main/ci/geoip.json
+          python scripts/ci_lab_geoip.py verify --pin "$GEOIP_PIN" --evidence geoip-evidence.json --used "$GEOIP_USED_OUT"
+      - name: Verdict - required suite
+        shell: bash
+        run: |
+          [ "$LISTED" = 1 ] || { echo "this suite is not in the wrapper's list yet: said, not run"; exit 0; }
+          # main's list is read from the checkout of main above: a failed download cannot pass for "main has no list".
+          if [ -f wrapper-main/ci/required-suites.json ]; then
+            MAIN=(--main-required wrapper-main/ci/required-suites.json)
+          else
+            echo "::warning::wrapper main has no ci/required-suites.json yet: nothing to compare the list with (the first merge to main ends this)"
+            MAIN=(--main-required wrapper-main/ci/required-suites.json --main-has-no-list)
+          fi
+          [ "$JUDGE" = "scripts/ci_verdict.py" ] && echo "::warning::wrapper main has no ci_verdict.py yet: the candidate's own judge runs (the first merge to main ends this)"
+          # A leg that launched without the GeoIP database of the pin is red. Until main's judge reads the evidence (the first merge to
+          # main ends this) the legs still write it and that judge is not asked to; said loudly.
+          GEOIP=()
+          GEOIP_PIN=ci/geoip.json
+          [ -f wrapper-main/ci/geoip.json ] && GEOIP_PIN=wrapper-main/ci/geoip.json
+          if grep -q -- '--geoip-pin' "$JUDGE"; then
+            GEOIP=(--geoip geoip-evidence.json --geoip-pin "$GEOIP_PIN")
+          else
+            echo "::warning::the judge ($JUDGE) does not read the GeoIP evidence yet: the leg is not judged on its database"
+          fi
+          python "$JUDGE" judge --required ci/required-suites.json --suite "${{ matrix.suite }}" --os "${{ matrix.os }}" \
+            --junit "result/${{ matrix.suite }}.${{ matrix.os }}.xml" --binary "$FF_EXE" --seal gate.seal.json \
+            --commit "$(git rev-parse HEAD)" "${MAIN[@]}" "${GEOIP[@]}" --out "result/${{ matrix.suite }}.${{ matrix.os }}.json"
+      # THE FAKE WEB has two judgements. The verdict above is the four pytest tests, judged against the registry like every suite. The steps below are the
+      # other one: the entry the wrapper's own fakeweb.yml runs (scripts/run_fakeweb.py), now on the binary of this candidate. Stock Firefox of Playwright goes
+      # first and ours second, one browser at a time, and the verdict is "the same outcome as stock", never a time. A stock Firefox that is not what the
+      # fake web declares is a BROKEN CONTROL: red as such, not a finding about ours. They come after the verdict so that its file is always written first,
+      # and they run even when the suite was red, so that one run shows both. A red step here is a red leg (the exit code), as in fakeweb.yml.
+      # What the fake web writes goes to fakeweb/, never to result/: result/ is the verdict of the suite, and the completeness judge reads
+      # every JSON file in it as one. The reports and traces are kept in an artifact of their own below.
+      - name: Fake web profile P2, stock first and ours second, on a reused routed page
+        if: always() && matrix.suite == 'wrapper.e2e.fakeweb'
+        shell: bash
+        run: |
+          export INVISIBLE_CORE_AUTOFIX=off INVISIBLE_CORE_PIN=allow
+          export INVISIBLE_SEAL_FILE="$PWD/gate.seal.json" INVPW_BINARY_PATH="$FF_EXE" STEALTHFOX_E2E_BINARY="$FF_EXE"
+          mkdir -p fakeweb
+          PREFIX=""; [ "$RUNNER_OS" = Linux ] && PREFIX="xvfb-run -a"
+          $PREFIX python -u scripts/run_fakeweb.py --profile p2 --binary "$FF_EXE" --repetitions 10 --out fakeweb/fakeweb-p2.json
+      - name: Fake web profile P4, stock first and ours second, three walks of the journey
+        if: always() && matrix.suite == 'wrapper.e2e.fakeweb'
+        shell: bash
+        run: |
+          export INVISIBLE_CORE_AUTOFIX=off INVISIBLE_CORE_PIN=allow
+          export INVISIBLE_SEAL_FILE="$PWD/gate.seal.json" INVPW_BINARY_PATH="$FF_EXE" STEALTHFOX_E2E_BINARY="$FF_EXE"
+          mkdir -p fakeweb
+          PREFIX=""; [ "$RUNNER_OS" = Linux ] && PREFIX="xvfb-run -a"
+          set +e
+          $PREFIX python -u scripts/run_fakeweb.py --profile p4 --binary "$FF_EXE" --repetitions 3 --out fakeweb/fakeweb-p4.json 2>&1 | tee fakeweb/fakeweb-p4.log
+          python scripts/fakeweb_p4_report.py journey fakeweb/fakeweb-p4.json > fakeweb/fakeweb-p4-summary.md
+          rc=$?
+          cat fakeweb/fakeweb-p4-summary.md >> "$GITHUB_STEP_SUMMARY"
+          cat fakeweb/fakeweb-p4-summary.md
+          case "$rc" in
+            0) echo "journey: green, ours equals stock on every step";;
+            1) echo "journey: RED, ours differs from stock on a step of a walk whose control is sound";;
+            2) echo "journey: RED, BROKEN CONTROL: stock Firefox is not as tests/fakeweb/pages.json declares (not a finding about ours)";;
+            3) echo "journey: RED, ours differs from stock, and a control is broken";;
+            4) echo "journey: RED, the runner wrote no report";;
+            *) echo "journey: RED, the report did not finish ($rc)";;
+          esac
+          exit "$rc"
+      - name: Fake web profile P4, the types of the requests of stock and of ours (one traced walk each)
+        if: always() && matrix.suite == 'wrapper.e2e.fakeweb'
+        shell: bash
+        run: |
+          export INVISIBLE_CORE_AUTOFIX=off INVISIBLE_CORE_PIN=allow
+          export INVISIBLE_SEAL_FILE="$PWD/gate.seal.json" INVPW_BINARY_PATH="$FF_EXE" STEALTHFOX_E2E_BINARY="$FF_EXE"
+          mkdir -p fakeweb
+          PREFIX=""; [ "$RUNNER_OS" = Linux ] && PREFIX="xvfb-run -a"
+          set +e
+          $PREFIX python -u scripts/run_fakeweb.py --profile p4 --binary "$FF_EXE" --repetitions 1 --trace --out fakeweb/fakeweb-p4-trace.json 2>&1 | tee fakeweb/fakeweb-p4-trace.log
+          python scripts/fakeweb_p4_report.py trace fakeweb/fakeweb-p4-trace.json > fakeweb/fakeweb-p4-trace-summary.md
+          rc=$?
+          cat fakeweb/fakeweb-p4-trace-summary.md >> "$GITHUB_STEP_SUMMARY"
+          cat fakeweb/fakeweb-p4-trace-summary.md
+          case "$rc" in
+            0) echo "request types: green, ours does what stock does";;
+            1) echo "request types: RED, ours differs from stock, see the summary";;
+            2) echo "request types: RED, BROKEN CONTROL: stock reported no sendBeacon (not a finding about ours)";;
+            *) echo "request types: RED ($rc), see the summary";;
+          esac
+          exit "$rc"
+      - name: Keep what the fake web wrote
+        if: always() && matrix.suite == 'wrapper.e2e.fakeweb'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: fakeweb-${{ matrix.os }}-r${{ matrix.rep }}
+          path: fakeweb
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Keep the A/B oracles' dumps and diffs (page, network, host, and the host recorder's evidence)
+        if: always() && (matrix.suite == 'wrapper.e2e.ab_oracle' || matrix.suite == 'wrapper.e2e.ab_network' || matrix.suite == 'wrapper.e2e.ab_host' || matrix.suite == 'wrapper.e2e.ab_host_crash')
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ matrix.suite == 'wrapper.e2e.ab_oracle' && 'ab-oracle' || matrix.suite }}-${{ matrix.os }}-r${{ matrix.rep }}
+          path: ab-oracle
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Keep the result
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: result-${{ matrix.suite }}-${{ matrix.os }}-r${{ matrix.rep }}
+          path: result
+          retention-days: 14
+      - name: Keep what the tests saved
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: evidence-${{ matrix.suite }}-${{ matrix.os }}-r${{ matrix.rep }}
+          path: ${{ runner.temp }}/invpw-evidence
+          if-no-files-found: ignore
+          retention-days: 14
