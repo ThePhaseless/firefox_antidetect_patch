@@ -366,6 +366,7 @@ OWN_FILES = [
     (r"^third_party/libwebrtc/api/location\.h$", "fingerprint/webrtc/declared-network"),
     (r"^netwerk/protocol/res/StealthBranding\.", "fingerprint/js-surface/branding"),
     (r"^chrome/test/unit/(test_stealth_branding_chrome_registry\.js|xpcshell-stealth\.toml)$", "fingerprint/js-surface/branding"),
+    (r"^widget/gtk/StealthHostGLProbe\.cpp$", "platform/declaration-gate"),
     (r"^netwerk/socket/nsSOCKSUDPIOLayer\.", "network/proxy-udp"),
     (r"^netwerk/socket/StealthPcUdpProxy\.", "network/proxy-udp"),
     (r"^netwerk/ipc/StealthDocumentChannel\.", "network/proxy-udp"),
