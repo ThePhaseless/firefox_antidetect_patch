@@ -1328,7 +1328,8 @@ def contract_problems(against_main: bool = False, base=None) -> tuple[list, int,
     hooks = hook_contract.series_hooks(ROOT)
     violations = hook_contract.contract_violations(ROOT)
     if base is not None:
-        violations = [v for v in violations if v.rule != "C16"] + hook_contract.locals_violations(ROOT, base)
+        violations = ([v for v in violations if v.rule not in ("C16", "C17")] + hook_contract.locals_violations(ROOT, base)
+                      + hook_contract.namespace_violations(ROOT, unqualified=True))
     if not HOOK_DEBT.is_file():
         return ["tools/hook-debt.json is missing: python tools/engine.py hook-debt --init"], len(hooks), len(violations)
     return (hook_contract.debt_problems(violations, hook_contract.load_debt(HOOK_DEBT),
@@ -1417,14 +1418,15 @@ def hook_debt(init: bool = False, summary: bool = False) -> int:
 
 
 def hook_locals(source: Path, tag: str) -> int:
-    """C16 (hook-02 point 3) with the whole function read from the Mozilla tag in `source`, not only the lines a hunk shows:
-    a hook that is not an anchor and passes a local of Mozilla's function is red. Reads the tag's objects only."""
-    found = hook_contract.locals_violations(ROOT, hook_contract.git_base_reader(source, tag))
+    """C16 (hook-02 point 3) and C17 (point 7) with the whole function and the enclosing namespaces read from the Mozilla tag in
+    `source`, not only from the lines a hunk shows: a hook that is not an anchor and passes a local of Mozilla's function, or that
+    names a function of ours in a top-level namespace that is not `mozilla`, is red. Reads the tag's objects only."""
+    base = hook_contract.git_base_reader(source, tag)
+    found = hook_contract.locals_violations(ROOT, base) + hook_contract.namespace_violations(ROOT, unqualified=True)
     for v in found:
-        print("FAIL %s/hooks.patch, %s: C16 %s (a local of Mozilla's function passed outside an anchor, hook-02 point 3)"
-              % (v.folder, v.file, v.detail))
+        print("FAIL %s/hooks.patch, %s: %s %s" % (v.folder, v.file, v.rule, v.detail))
     if not found:
-        print("ok: no hook passes a local of Mozilla's function (read from %s)" % tag)
+        print("ok: no hook passes a local of Mozilla's function or sits in a namespace that is not ours (read from %s)" % tag)
     return 1 if found else 0
 
 

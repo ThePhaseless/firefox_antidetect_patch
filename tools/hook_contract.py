@@ -96,7 +96,7 @@ RULES = {
     "C14": "a rewrite that fits wrap-expression: Mozilla's expression survives intact in our line, or the change adds ||, && or ?: around it (port-06)",
     "C15": "a parameter threaded through a C++ signature or call: carry it by side state, or declare it with reason_kind declaration and say why no side state can (port-06)",
     "C16": "a hook passes a local of Mozilla's function as an argument outside an anchor (hook-02 point 3; read from the lines the hunks show)",
-    "C17": "a Stealth-named function placed in a Mozilla namespace (JS::, js::, xpc::, gfx::, net::, ...): ours are `StealthX`, `mozilla::StealthX` or `mozilla::stealth::X`",
+    "C17": "a Stealth-named function in the top-level namespace of someone else (JS::, js::, xpc::, a library's): ours live in `mozilla` or the global namespace",
     "T1": "a hook with no test (the `test` of its HOOKS.json entry is empty)",
     "T2": "an anchor hook without its `anchor` and `why` in HOOKS.json",
     "T3": "a hook whose test no round runs (gtest filter of the candidate, node job, python step)",
@@ -1528,39 +1528,124 @@ def locals_violations(root, base=None) -> list:
     return found
 
 
-# --------------------------------------------------------------------------- C17: our functions never go into a Mozilla namespace
-# A function of ours is `StealthX` (unqualified), `mozilla::StealthX` or `mozilla::stealth::X`; a qualifier that holds a Mozilla namespace
-# (`JS::StealthX`, `js::StealthX`, `xpc::StealthX`, `mozilla::net::StealthX`, ...) puts it in Mozilla's. A class qualifier
-# (`gfxPlatformFontList::StealthX`, a member we declare) is not read as a namespace.
-MOZILLA_NAMESPACES = {"JS", "js", "xpc", "gfx", "net", "widget", "dom", "layers", "ipc", "intl", "webgpu", "CanvasUtils", "gl",
-                      "image", "css", "a11y", "wr", "places", "storage", "hal", "dom_media", "ffi"}
+# --------------------------------------------------------------------------- C17: our functions live in `mozilla`, or nowhere
+# A function of ours (Stealth-named) lives in the global namespace (C files, Rust FFI) or in `mozilla` (any namespace nested in it:
+# `mozilla::StealthX`, `mozilla::net::StealthX`, `mozilla::stealth::StealthX`), never in the top-level namespace of anyone else
+# (`JS`, `js`, `xpc`, a library's or a module's). The first component of a qualifier decides: `mozilla` is ours to use; a nested
+# namespace of mozilla written relative to it (`net::StealthX` inside `namespace mozilla`) is one of MOZILLA_NESTED_NAMESPACES; a
+# class qualifier (`gfxPlatformFontList::StealthX`, a member we declare) is not a namespace. Anything else is a violation.
+# What the hook line cannot show: where an UNQUALIFIED name lives. The namespace around the hook in the Mozilla file does not say
+# (`using namespace mozilla;` and lookup from the enclosing namespace reach ours), and the hunk header names a function, not a
+# namespace. The place is the declaration of the function in our own sources (`<folder>/src`): with `unqualified=True` (the CI
+# command, `engine.py hook-locals`) every unqualified Stealth name a hook uses is looked up there, and a declaration inside a top-level
+# namespace other than `mozilla` is a violation. A name with no declaration there (a member, a macro, a class) is not judged. A foreign
+# namespace that looks like a class (`Foo::`, capitalised with lower-case letters) and a nested mozilla namespace not in the list are
+# not told apart: the lists are the constants below.
+MOZILLA_NESTED_NAMESPACES = {"gfx", "net", "widget", "dom", "layers", "ipc", "intl", "webgpu", "CanvasUtils", "gl", "image", "css",
+                             "a11y", "wr", "places", "storage", "hal"}
 QUALIFIED_STEALTH = re.compile(r"((?:[A-Za-z_]\w*::)+)((?:nr_stealth_|Stealth|stealth_)\w*)")
+UNQUALIFIED_STEALTH = re.compile(r"(?<![\w:.>])((?:nr_stealth_|Stealth|stealth_)\w*)")
+NAMESPACE_OPEN = re.compile(r"^\s*(?:inline\s+)?namespace\s*([\w:]*)\s*\{")
+CLASS_LIKE = re.compile(r"^(?:[A-Z][a-z]\w*|(?:ns|gfx|moz)[A-Z]\w*)$")
+DECLARATION = re.compile(r"^\s*(?:(?:static|inline|extern|constexpr|const|virtual|MOZ_\w+)\s+)*([A-Za-z_][\w:<>,]*)[\s*&]+"
+                         r"((?:nr_stealth_|Stealth|stealth_)\w*)\s*\(")
+NOT_A_TYPE = {"return", "else", "new", "delete", "throw", "co_return", "case", "goto", "using", "typedef", "if", "while", "for"}
 
 
-def analyse_namespaces(folder: str, text: str) -> list:
-    """C17 of one hooks.patch: every hook line that names a Stealth function through a Mozilla namespace."""
+def _our_qualifier_ok(first: str) -> bool:
+    return first == "mozilla" or first in MOZILLA_NESTED_NAMESPACES or bool(CLASS_LIKE.match(first))
+
+
+def namespace_stacks(lines: list, blocks: bool = False) -> list:
+    """For each line, the namespaces that enclose its start, outermost first: the braces of the lines above, outside comments and
+    literals; a `{` that opens `namespace A::B {` is named (an anonymous namespace adds none). With `blocks`, each item is
+    (namespaces, inside a brace that is not a namespace: a function, a class)."""
+    out, stack, in_block = [], [], False
+    for ln in lines:
+        names = [n for frame in stack if frame for n in frame]
+        out.append((names, any(f is None for f in stack)) if blocks else names)
+        s = ln
+        if in_block:
+            if "*/" not in s:
+                continue
+            s, in_block = s.split("*/", 1)[1], False
+        s = re.sub(r"/\*.*?\*/", "", s)
+        if "/*" in s:
+            s, in_block = s.split("/*", 1)[0], True
+        s = _strip_literals(s.split("//", 1)[0])
+        if s.lstrip().startswith("#"):
+            continue
+        ns = NAMESPACE_OPEN.match(s)
+        first = True
+        for ch in s:
+            if ch == "{":
+                stack.append([n for n in ns.group(1).split("::") if n] if (first and ns) else None)
+                first = False
+            elif ch == "}" and stack:
+                stack.pop()
+    return out
+
+
+def own_function_namespaces(root) -> dict:
+    """{Stealth name: set of the top-level namespaces ('' for the global one) of its declarations in the `src` trees of the
+    series}, read from the lines that declare or define a function (a type before the name)."""
+    root, found = Path(root), {}
+    for folder in _folders(root):
+        src = root / folder / "src"
+        if not src.is_dir():
+            continue
+        for p in src.rglob("*"):
+            if not p.is_file() or file_type_of(p.name) not in ("h", "hpp", "cpp", "cc", "c", "mm"):
+                continue
+            lines = p.read_text(encoding="utf-8", errors="replace").split("\n")
+            for ln, (stack, inside) in zip(lines, namespace_stacks(lines, blocks=True)):
+                m = DECLARATION.match(ln)
+                if m and not inside and m.group(1) not in NOT_A_TYPE and "=" not in ln.split(m.group(2))[0]:
+                    found.setdefault(m.group(2), set()).add(stack[0] if stack else "")
+    return found
+
+
+def analyse_namespaces(folder: str, text: str, own=None) -> list:
+    """C17 of one hooks.patch: every hook line of a C or C++ file that names a Stealth function through a qualifier whose first
+    component is neither `mozilla`, a nested namespace of it, nor a class; with `own` (own_function_namespaces) also an unqualified
+    name declared in our sources inside a top-level namespace other than `mozilla`."""
     out = []
     for h in _analyse_patch(folder, text)[0]:
-        if not h.line or is_comment_line(h.line, file_type_of(h.file)):
+        ft = file_type_of(h.file)
+        if not h.line or ft not in C_FAMILY or is_comment_line(h.line, ft):
             continue
         code = marker_split(h.line)[0]
         if is_include(code):
             continue
-        for m in QUALIFIED_STEALTH.finditer(_strip_literals(code)):
-            bad = [c for c in m.group(1).split("::")[:-1] if c in MOZILLA_NAMESPACES]
-            if bad:
-                txt = h.line.strip()
-                out.append(Violation("C17", folder, h.file, h.function, txt, _key("C17", folder, h.file, h.function, txt),
-                                     "%s%s is in the Mozilla namespace %s" % (m.group(1), m.group(2), "::".join(bad)), (hook_identity(h),)))
+        code = _strip_literals(code)
+        why = ""
+        for m in QUALIFIED_STEALTH.finditer(code):
+            first = m.group(1).split("::")[0]
+            if not _our_qualifier_ok(first):
+                why = ("%s%s is in the namespace %s, which is not ours: `mozilla` (or a namespace nested in it), a class, or the "
+                       "global namespace" % (m.group(1), m.group(2), first))
                 break
+        if not why and own:
+            for m in UNQUALIFIED_STEALTH.finditer(code):
+                if code[:m.start()].rstrip().endswith("::"):
+                    continue
+                bad = sorted(n for n in own.get(m.group(1), ()) if n and n != "mozilla")
+                if bad:
+                    why = "%s is declared in our sources inside the namespace %s, which is not ours" % (m.group(1), bad[0])
+                    break
+        if why:
+            txt = h.line.strip()
+            out.append(Violation("C17", folder, h.file, h.function, txt, _key("C17", folder, h.file, h.function, txt), why,
+                                 (hook_identity(h),)))
     return _unique(out)
 
 
-def namespace_violations(root) -> list:
-    """C17 of every non-backport folder."""
+def namespace_violations(root, unqualified: bool = False) -> list:
+    """C17 of every non-backport folder; `unqualified`: also the names declared in our sources (see analyse_namespaces)."""
     root, found = Path(root), []
+    own = own_function_namespaces(root) if unqualified else None
     for folder in _folders(root):
-        found += analyse_namespaces(folder, (root / folder / "hooks.patch").read_text(encoding="utf-8", errors="replace"))
+        found += analyse_namespaces(folder, (root / folder / "hooks.patch").read_text(encoding="utf-8", errors="replace"), own)
     return found
 
 
