@@ -179,6 +179,16 @@ def _cases() -> list:
                 and still_head.head_of("o/r", ref, run=lambda cmd, **kw: Done(128, "")) == ""
                 and still_head.head_of("o/r", ref, run=lambda cmd, **kw: Done(0, "")) == ""))
     out += _reuse_cases(doc)
+    # --- publish.yml: every archive is downloaded by its artifact's name, never by a pattern (run 45278854452: a pattern saw the first 100 of 121) --
+    pub_steps = load("publish.yml")["jobs"]
+    pub_steps = [s for job in pub_steps.values() for s in job.get("steps", [])]
+    by_pattern = [s for s in pub_steps if "download-artifact" in str(s.get("uses", "")) and "asset" in str((s.get("with") or {}).get("pattern", ""))]
+    out.append(("publish: no build asset is downloaded by a pattern (a pattern sees one page of a run's artifacts; run 45278854452 lost asset-linux-x86_64)",
+                by_pattern == []))
+    by_name = [s for s in pub_steps if "actions/runs/$BUILD_RUN/artifacts?name=asset-$leg" in str(s.get("run", ""))]
+    legs_run = str(by_name[0].get("run", "")) if by_name else ""
+    out.append(("publish: each archive is downloaded by its name, asset-<leg>, for every leg of the tree (scripts/ci matrix), and a missing one is red",
+                len(by_name) == 1 and "_src/scripts/ci matrix" in legs_run and "for leg in $LEGS" in legs_run and "exit 1" in legs_run))
     return out
 
 
