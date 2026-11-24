@@ -190,7 +190,8 @@ def test_a_backport_folder_is_exempt(tmp_path):
 
 # --------------------------------------------------------------------------- the debt list
 def test_the_debt_as_committed_is_exactly_the_violations_of_the_series():
-    now = sorted(v.key for v in hc.contract_violations(engine.ROOT))
+    # port-06 rules (C12..C15) are never debt: they are fixed by the engine change and the HOOKS.json fields
+    now = sorted(v.key for v in hc.contract_violations(engine.ROOT) if v.rule not in hc.PORT06_RULES)
     debt = [e["key"] for e in json.loads(engine.HOOK_DEBT.read_text(encoding="utf-8"))]
     assert debt == sorted(debt), "tools/hook-debt.json is not sorted"
     assert now == debt
@@ -230,7 +231,7 @@ def test_hook_debt_removes_and_never_adds():
 
 def test_check_refuses_a_new_violation_and_a_stale_entry(tmp_path, monkeypatch, capsys):
     # whatever debt the series has, none at all once it is paid: one violation is added to the series' own
-    real = hc.contract_violations(engine.ROOT)
+    real = [v for v in hc.contract_violations(engine.ROOT) if v.rule not in hc.PORT06_RULES]     # port-06 rules are never debt
     text = "  x = StealthX(this) + 1;"
     extra = hc.Violation("C5", "fingerprint/x", "dom/X.cpp", "void X()", text,
                          hc._key("C5", "fingerprint/x", "dom/X.cpp", "void X()", text))
