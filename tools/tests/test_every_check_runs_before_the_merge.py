@@ -32,7 +32,7 @@ CHECK_COMMANDS = {
     "rules": ["pytest -q tools/tests", "tools/engine.py check"],
     # series.yml's `rebuilds`: the tree the series makes is the declared one (the CI form of `engine.py verify`: materialize stops on another tree),
     # the births, the core's checks that read the tree
-    "rebuilds": ["engine.py materialize --into source", "tools/births.py --tree source", "release_plan.py --resolve-core-ref",
+    "rebuilds": ["engine.py materialize --into source", "tools/births.py --tree source", "tools/backport_replay.py check --source source", "release_plan.py --resolve-core-ref",
                  "tests/test_pref_types.py", "tests/test_prefs_surface.py", "tests/test_juggler_contract.py", "tests/test_juggler_protocol_mirror.py",
                  "tests/test_webgl_extensions_follow_the_engine.py"],
     # series.yml's `noreply-identity`
