@@ -2,7 +2,7 @@
 
 Category: spoof
 Prefs: gfx.font_rendering.fallback.async, zoom.stealth.fonts.generics, zoom.stealth.text.freetype_antialias, zoom.stealth.text.freetype_hintstyle
-Test: gtest StealthFontListHooks.* (PublishCharacterMap, NoFontsFound, SkipsHostCollection, SkipsHostSubstitutes, FaceIndex, UsePrefFontList, UseCmaps, MayDeferCmapLoading; TestStealthFontListHooks.h, included by TestStealthFcFontList.cpp on Linux and TestStealthBundledCollection.cpp on Windows), StealthFcFontList.* (DeclareFontFile, DeclaredFontFile, TextOptions, TableFaceIndex, PreferFileUnscaledFont, PatternWithoutFamily, SkipsSystemFontSet), StealthFcBundleFonts.* (the font of a file of the bundle, each face of a collection, FacesForFamilyComeFromTheManifestOnlyUnderBundleOnly, CommonFallbackIsTheManifestListUnderBundleOnly, ReportBundleFiles, FaceDataTableFallsThroughForAFaceWithAFile, FallbackNeverDefersUnderBundleOnly), StealthBundledCollection.*, StealthFontList.*, StealthFallbackNames.*, StealthTtcFace.*; wrapper e2e test_system_fonts_and_colors_are_windows_e2e.py, test_canvas_text_is_windows_e2e.py, test_fontconfig_reads_nothing_of_the_host_linux_e2e.py, test_screenshot_of_text_returns_linux_e2e.py; to write in the wrapper: test_bundle_font_names_e2e.py (src:local()), test_the_font_list_is_the_bundle_e2e.py
+Test: gtest StealthFontListHooks.* (PublishCharacterMap, NoFontsFound, SkipsHostCollection, SkipsHostSubstitutes, FaceIndex, UsePrefFontList, UseCmaps, MayDeferCmapLoading, BundledFontsApply; TestStealthFontListHooks.h, included by TestStealthFcFontList.cpp on Linux and TestStealthBundledCollection.cpp on Windows), StealthFcFontList.* (DeclareFontFile, DeclaredFontFile, TextOptions, TableFaceIndex, PreferFileUnscaledFont, PatternWithoutFamily, SkipsSystemFontSet), StealthFcBundleFonts.* (the font of a file of the bundle, each face of a collection, FacesForFamilyComeFromTheManifestOnlyUnderBundleOnly, CommonFallbackIsTheManifestListUnderBundleOnly, ReportBundleFiles, FaceDataTableFallsThroughForAFaceWithAFile, FallbackNeverDefersUnderBundleOnly), StealthBundledCollection.*, StealthFontList.*, StealthFallbackNames.*, StealthTtcFace.*; wrapper e2e test_system_fonts_and_colors_are_windows_e2e.py, test_canvas_text_is_windows_e2e.py, test_fontconfig_reads_nothing_of_the_host_linux_e2e.py, test_screenshot_of_text_returns_linux_e2e.py; to write in the wrapper: test_bundle_font_names_e2e.py (src:local()), test_the_font_list_is_the_bundle_e2e.py
 
 ## What it does
 
@@ -25,16 +25,19 @@ StealthFontListHooks.cpp, so the answer of stock Firefox (aBundleOnly = false) i
 - `gfx/thebes/gfxDWriteFontList.cpp`: registration `#include "StealthFontListHooks.h"` in a block of ours; wraps
   `StealthPublishCharacterMap(this, !IsUserFont()) && mShmemFace` (ReadCMAP),
   `StealthWithBundlePath(mBundleFilePath, new UnscaledFontDWrite(...))` (CreateFontInstance),
-  `StealthFaceIndex(mBundleFaceIndex, 0)` (CreateFontFace) and `StealthNoFontsFound(this, count == kBundledCount)`
-  (InitFontListForPlatform); guards at the head of `CreateFontEntry`, `GetFacesInitDataForFamily`, `ReadFaceNames`,
+  `StealthFaceIndex(mBundleFaceIndex, 0)` (CreateFontFace), `StealthNoFontsFound(this, count == kBundledCount)`
+  (InitFontListForPlatform), and in InitSharedFontListForPlatform the family list of the shared font list, two
+  one-line hooks around Mozilla's own call and condition: the call that appends the system collection is
+  `StealthAppendFamiliesFromCollection(mSystemFonts, families, &forceClassicFams)` (a member with the same arguments:
+  under bundle-only it assigns the manifest's families and never enumerates the host collection, otherwise it makes
+  Mozilla's call) and the condition `if (mBundledFonts)` wraps Mozilla's operand in
+  `StealthBundledFontsApply(this, mBundledFonts)` (false under bundle-only, so the bundled collection is not appended
+  and its timing is not recorded in the parent); guards at the head of `CreateFontEntry`, `GetFacesInitDataForFamily`, `ReadFaceNames`,
   `ReadFaceNamesForFamily`, `GetFontsFromCollection` (the system collection), `GetFontSubstitutes`,
   `GetDirectWriteSubstitutes` and `CreateBundledFontsCollection`. The four calls of the substitute functions in
   InitSharedFontListForPlatform and InitFontListForPlatform are Mozilla's again: the guard is in the callee, whose
   four callers all had the same condition, and `GetFontsFromCollection(mSystemFonts)` too (the bundled collection, its
-  other caller, is not skipped). Left as they are today (design rows `moved`, G18): the `if (mStealthBundleOnly)`
-  that builds the family list from the manifest and the `mBundledFonts && !mStealthBundleOnly` of
-  InitSharedFontListForPlatform: the manifest is assigned instead of the system collection, and the glean timing of the
-  bundled collection is not recorded in the parent.
+  other caller, is not skipped).
 - `gfx/thebes/gfxFcPlatformFontList.cpp`: registration `#include "StealthFcFontList.h"`; wrap
   `StealthPublishCharacterMap(this, !IsUserFont()) && mShmemFace` (ReadCMAP) and
   `StealthUsePrefFontList(this, usePrefFontList)` (AddGenericFonts); guards at the head of `HasFontTableInternal`,
@@ -68,7 +71,7 @@ without a family, the system font set, the alias leak of `Sans:Linux` in FindAnd
 
 ## Not done in this pass
 
-- Design rows `moved` (G18, Q4): `AppendFamiliesFromCollection` guard (DW9) and the single cache Add of `StealthPreferFileUnscaledFont` (Fc9).
+- Design row `moved` (G18, Q4): the single cache Add of `StealthPreferFileUnscaledFont` (Fc9).
 - Q7: the lines of Mozilla in `GetHBFace` and `GetFontTableInternal` stay as declared exceptions.
 - `RecordFaceNamesFromTable` stays a member of gfxPlatformFontList (one line in the header) instead of a lambda inside
   `ReadFaceNamesForFamily`: the thread-safety analysis of a lambda cannot be checked without a build.

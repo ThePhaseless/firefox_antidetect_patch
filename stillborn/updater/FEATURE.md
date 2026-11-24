@@ -20,10 +20,11 @@ without installing").
   same timer, same URL, same headers.
 - `toolkit/mozapps/update/StealthUpdate.sys.mjs` refuses what follows the
   answer:
-  - `noneOffered(updates)` is called in the line after the `try/catch` of `CheckerService.#updateCheck`, on what Mozilla's
-    `updates = this.#parseUpdates(request);` produced, and returns a new empty array whatever the answer offered (every
-    consumer then takes Mozilla's own no-update path: no prompt, no badge, no download). Mozilla's parse line is as in the
-    tag, and a parse error still goes to the `catch` as always; the request has already gone out unchanged.
+  - `StealthNoneOffered(updates)` wraps Mozilla's parse inside the `try` of `CheckerService.#updateCheck`:
+    `updates = StealthNoneOffered(this.#parseUpdates(request));`. It takes what the parse produced and returns a new empty array
+    whatever the answer offered (every consumer then takes Mozilla's own no-update path: no prompt, no badge, no download). The
+    parse is Mozilla's call, with its argument; a parse error skips the wrap as it skips the assignment and goes to Mozilla's
+    `catch` as always; the request has already gone out unchanged.
   - `refusesDownload()` is the guard in `#downloadUpdate`, the one door of every download (a fresh offer, a download resumed
     from an earlier session, the fallback to a complete update; backstop for a download another build left half done at the
     same install path; an update it already staged is applied by the C++ driver at startup, not covered). It stands after
@@ -47,15 +48,16 @@ makes at startup never went out.
 Gate: `scripts/validate_release.py` `assert_updater_is_retails` refuses a
 package without the updater binary, without the retail's MAR channel in
 `update-settings.ini`, or whose `UpdateService.sys.mjs` lacks our refusals
-(it looks for the bytes `StealthUpdate.noneOffered(` and `StealthUpdate.refusesDownload(`, which the hooks still contain).
+(it looks for the bytes `StealthNoneOffered(` and `StealthUpdate.refusesDownload(`, which the hooks contain).
 
 ## Hooks in Mozilla files
 
-- `toolkit/mozapps/update/UpdateService.sys.mjs`: the import, in a block of ours after Mozilla's imports (registration);
+- `toolkit/mozapps/update/UpdateService.sys.mjs`: the two imports, `import * as StealthUpdate ...` and
+  `import { StealthNoneOffered } ...`, in a block of ours after Mozilla's imports (registration, one line each);
   `if (StealthUpdate.refusesDownload()) return Ci.nsIApplicationUpdateService.DOWNLOAD_FAILURE_GENERIC;` in `#downloadUpdate`,
   right after Mozilla's `if (!update) throw` (one line);
-  `updates = StealthUpdate.noneOffered(updates);` as the line after the `try/catch` of `#updateCheck` (anchor; Mozilla's
-  `updates = this.#parseUpdates(request);` is as in the tag).
+  `updates = StealthNoneOffered(this.#parseUpdates(request));` in the `try` of `#updateCheck`, Mozilla's line
+  `updates = this.#parseUpdates(request);` with its call wrapped (wrap-expression).
 - `toolkit/mozapps/update/BackgroundUpdate.sys.mjs`: the import, in a block of ours after Mozilla's imports (registration);
   `if (StealthUpdate.refusesHostTask()) return null;` as the first statement of `_registerBackgroundUpdateTask` (guard).
 - `toolkit/mozapps/update/moz.build`: our module, after Mozilla's list.
@@ -64,5 +66,5 @@ package without the updater binary, without the retail's MAR channel in
 
 ## Our own files
 
-- `toolkit/mozapps/update/StealthUpdate.sys.mjs` (`noneOffered`, `refusesDownload`, `refusesHostTask`).
+- `toolkit/mozapps/update/StealthUpdate.sys.mjs` (`StealthNoneOffered`, `refusesDownload`, `refusesHostTask`).
 - Test: `juggler/tests/updater_refuses_what_follows_the_check.test.mjs`.

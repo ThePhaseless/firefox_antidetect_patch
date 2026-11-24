@@ -36,7 +36,9 @@ sits beside the lines of the other folders):
   mBorrowed`, and the wrap in the destructor: `free(StealthFontDataOwned(this, const_cast<uint8_t*>(mData)))`
   (one Mozilla line rewritten: `free(nullptr)` is a no-op, so a borrowed FontData frees nothing).
 - `gfx/thebes/gfxDWriteFontList.h`: `#include <string>` in a block of ours, the members `mBundleFaceIndex`
-  and `mBundleFilePath` and the declaration of `CreateStealthBundleFontEntry` (members, one line each).
+  and `mBundleFilePath`, the declaration of `CreateStealthBundleFontEntry` and the declaration of
+  `StealthAppendFamiliesFromCollection` (members, one line each; the last is tagged `STEALTH-HOOK(fingerprint/fonts/font-list)`, whose
+  hook in `InitSharedFontListForPlatform` calls it, and sits after Mozilla's `AppendFamiliesFromCollection`).
 - `gfx/thebes/gfxFcPlatformFontList.h`: `friend struct StealthFcAccess;` (marker fingerprint/fonts/font-list: the struct
   is in StealthFcFontList.cpp), after Mozilla's first friend.
 - `gfx/thebes/gfxFontEntry.h`: member `bool ShouldPublishCharacterMap() const;` (defined in

@@ -420,7 +420,7 @@ def assert_windows_runtime_is_shipped(tree: Path) -> None:
 RETAIL_MAR_CHANNELS = b"ACCEPTED_MAR_CHANNEL_IDS=firefox-mozilla-release"
 #: The calls that keep an answer of the update server from being acted on, as
 #: UpdateService.sys.mjs carries them (toolkit/mozapps/update/StealthUpdate.sys.mjs).
-UPDATE_REFUSALS = (b"StealthUpdate.noneOffered(", b"StealthUpdate.refusesDownload(")
+UPDATE_REFUSALS = (b"StealthNoneOffered(", b"StealthUpdate.refusesDownload(")
 
 
 def assert_updater_is_retails(tree: Path) -> None:
@@ -658,7 +658,7 @@ def _selftest() -> int:
                     zf.writestr(m, "x")
         return d
 
-    refusing = b"x = StealthUpdate.noneOffered(u); if (StealthUpdate.refusesDownload()) {}"
+    refusing = b"x = StealthNoneOffered(u); if (StealthUpdate.refusesDownload()) {}"
     settings_ok = b"[Settings]\n" + RETAIL_MAR_CHANNELS + b"\n"
 
     def updtree(binary="updater.exe", settings=settings_ok, service=refusing,
@@ -699,7 +699,7 @@ def _selftest() -> int:
         ("Mozilla's UpdateService, without our refusals",
          lambda: updtree(service=b"updates = this.#parseUpdates(request);"), True),
         ("only one of the two refusals",
-         lambda: updtree(service=b"StealthUpdate.noneOffered(u)"), True),
+         lambda: updtree(service=b"StealthNoneOffered(u)"), True),
         ("a loose Mozilla UpdateService BESIDE a refusing omni.ja",
          lambda: (lambda d: ((d / "modules/UpdateService.sys.mjs").write_bytes(b"x"), d)[1])(
              updtree()), True),

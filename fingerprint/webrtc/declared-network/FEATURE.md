@@ -3,8 +3,9 @@
 Category: build, other, spoof
 Prefs: none (the declaration is the environment variable STEALTHFOX_WEBRTC_NETWORK, read where the interfaces are enumerated)
 Test: StealthDeclaredNetwork.* (dom/media/webrtc/transport/test/gtest/TestStealthDeclaredNetwork.cpp and TestStealthDeclaredNetworkBirth.cpp
-(the default address with no socket made; the host ports of a connection through nr_socket_local_create), in the default gtest filter of
-the candidate); the mtransport unit tests gather on a declared adapter (test/gtest_utils.h, test/nr_stealth_test_network.h); the node tests
+(the default address with no socket made; the host ports of a connection through nr_socket_local_create; the responder starts on the loopback
+whatever list Mozilla built: TheResponderStartsOnTheLoopbackWhateverListMozillaBuilt), in the default gtest filter of
+the candidate); the cargo test mdns_service::stealth_tests::stealth_responder_on_the_loopback_hears_its_own_query; the mtransport unit tests gather on a declared adapter (test/gtest_utils.h, test/nr_stealth_test_network.h); the node tests
 juggler/tests/ipv6_is_one_fact_of_the_declared_network.test.mjs and
 juggler/tests/the_host_network_is_read_nowhere_and_ports_are_the_connections.test.mjs (the only entries of the host reads)
 
@@ -48,8 +49,8 @@ The network WebRTC gathers on is declared by the core, never read from the host.
   leaves nothing in the set. A datagram between two sockets of this process goes on the
   kernel's loopback while each end sees the other's declared address (`StealthOwnPorts`); a server on localhost keeps its address.
 - mDNS. The parent's responder joins the group on the loopback and sends through it (`nr_stealth_mdns_interfaces`: the list is the
-  declaration, whose address the OS does not own, so a join on it fails and the responder would never hear its own query; lib.rs sets
-  the multicast interface to the address it joined on: a query would otherwise leave on the default multicast route and never come
+  declaration, whose address the OS does not own, so a join on it fails and the responder would never hear its own query; stealth_interface.rs
+  sets, after Mozilla's join loop, the multicast interface to the address it joined on: a query would otherwise leave on the default multicast route and never come
   back to its socket, and on Linux a join on 127.0.0.1 hears nothing without it, captures/mdns-loopback/loopback-join of
   invisible_WebRTC), so the query and the answer for our own .local names make the same round trip as on a real adapter; the names
   answer with the declared address.
@@ -82,17 +83,23 @@ Each is one line with the marker; the forms are those of STRUCTURE.md.
 - `test/gtest_utils.h`: our include and the notice `StealthDeclareTestNetwork();` right after `NR_reg_init();` in `MtransportTest::SetUp` (where the base has it).
 - Build lists: `dom/media/webrtc/transport/{moz.build,common.build,build/moz.build}`: one registration line each, after the closing
   bracket (`EXPORTS.transport += [...]`, `transport_lcppsrcs += [...]`, `TEST_DIRS += [...]`). The `common.build` line of network/doh is next to ours.
-- Declared exceptions (G35, approved by the pm: PM-DECISIONS, declared-network item 4; they stay as the previous series has them, with their comments moved here): the
-  mDNS responder on the loopback, `ipc/StunAddrsRequestParent.cpp` (the block that built the address list of the adapters is replaced by
-  one call, with a comment; Mozilla creates the instance only when that list has an IPv4 address) and `mdns_service/src/lib.rs` (the join
-  loop iterates by reference, and 9 lines set the multicast interface of the socket after it: before the loop the order of two socket
-  options would change). Why: the responder joins the mDNS group on the loopback and speaks through it, not on the adapters of the list: the
-  list is the declaration, whose address the OS does not own (a join on it fails, and the responder would never hear its own query); on the
-  loopback the query and the answer make the same round trip through the responder's thread as on a real adapter. The responder speaks
-  through the interface it joined on, or a query would leave on the default multicast route and never come back to its socket: on Linux a join
-  on 127.0.0.1 hears nothing without it (captures/mdns-loopback/loopback-join of invisible_WebRTC). Tests: the cargo test `mdns_service::stealth_tests::stealth_responder_on_the_loopback_hears_its_own_query` and the gtest
-  `TheResponderOnTheLoopbackAnswersAQueryForANameItRegistered` (lib.rs; fails without `set_multicast_if_v4` on Linux, or without a join on the
-  loopback); StunAddrsRequestParent 2 has no test that runs it (an IPDL actor method).
+- The mDNS responder on the loopback. `ipc/StunAddrsRequestParent.cpp`: our include (registration); Mozilla's block that builds the list
+  of the IPv4 addresses of the adapters is Mozilla's, and two one-line wraps decide what it feeds: the condition of
+  `SendStunAddrs` is `if (StealthMdnsResponderWanted(!addrstring.empty()))` (true: the responder starts whatever list Mozilla built;
+  Mozilla's operand is the argument) and the member of the wrapper object is `mAddrsString(StealthMdnsInterfaces(aAddrsString))`
+  (`nr_stealth_mdns_interfaces()`, the loopback, in place of Mozilla's list). `mdns_service/src/lib.rs`: the join loop is Mozilla's, as
+  it consumes `addrs`; `let stealth_if = addrs.first().copied();` before it and
+  `stealth_interface::set_multicast_if(&socket, stealth_if);` after it (an anchor), so the two socket options keep their order, plus the
+  registration `mod stealth_interface;` and `#[cfg(test)] mod stealth_tests;` after `extern crate log;`. The set of the interface and
+  its warning are in stealth_interface.rs. Why: the responder joins the mDNS group on the loopback and speaks through it, not on the
+  adapters of the list: the list is the declaration, whose address the OS does not own (a join on it fails, and the responder would never
+  hear its own query); on the loopback the query and the answer make the same round trip through the responder's thread as on a real
+  adapter. The responder speaks through the interface it joined on, or a query would leave on the default multicast route and never come
+  back to its socket: on Linux a join on 127.0.0.1 hears nothing without it (captures/mdns-loopback/loopback-join of invisible_WebRTC).
+  Tests: the gtest `StealthDeclaredNetwork.TheResponderStartsOnTheLoopbackWhateverListMozillaBuilt` (the two wraps, with the declared
+  adapter as the negative control), the cargo test `mdns_service::stealth_tests::stealth_responder_on_the_loopback_hears_its_own_query`
+  and the gtest `TheResponderOnTheLoopbackAnswersAQueryForANameItRegistered` (lib.rs; fails without `set_multicast_if_v4` on Linux, or
+  without a join on the loopback).
 - `dom/media/webrtc/transport/nr_socket_prsock.{h,cpp}` carries the R3 hooks (bind, own ports, loopback rewrite); the file belongs to
   network/proxy-udp, which has the other hooks in it, and the lines tagged `STEALTH-HOOK(fingerprint/webrtc/declared-network)` there call
   the functions below, which live in nr_stealth_network.{h,cpp} (G47). They are pure additions in nr_socket_prsock.cpp, none wraps a
@@ -105,9 +112,10 @@ Each is one line with the marker; the forms are those of STRUCTURE.md.
 ## Our own files
 
 - `dom/media/webrtc/transport/mdns_service/src/stealth_tests.rs`: the cargo test of the responder on the loopback; lib.rs declares it with one line, `#[cfg(test)] mod stealth_tests;  // STEALTH-HOOK(...)`, after `extern crate log;`.
+- `dom/media/webrtc/transport/mdns_service/src/stealth_interface.rs`: the multicast interface of the responder's socket, set after the join loop; lib.rs declares it with `mod stealth_interface;  // STEALTH-HOOK(...)`.
 
 - `dom/media/webrtc/transport/nr_stealth_network.{h,cpp}` (the declaration, its parser, the default address and its guard, the host ports
-  and `nr_socket_local_create`, the own-port rewrite, the IPv6 fact and the default family),
+  and `nr_socket_local_create`, the own-port rewrite, the IPv6 fact, the default family and the two wraps of the mDNS responder),
   `dom/media/webrtc/transport/third_party/nICEr/src/stun/nr_stealth_addrs.h` (the two C prototypes nICEr's own sources call, with
   nothing but struct names: no path out of nICEr's include directories, so `nicer.gyp` is Mozilla's),
   `dom/media/webrtc/transport/test/nr_stealth_test_network.h`,

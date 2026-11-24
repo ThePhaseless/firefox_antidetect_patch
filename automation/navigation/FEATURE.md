@@ -2,7 +2,7 @@
 
 Category: juggler
 Prefs: none read directly
-Test: gtest TestStealthLinkClickAfter.*, TestStealthLoadInfo.* and TestStealthDocShellDefaults.* (docshell/base/test/gtest, in the default gtest filter of the candidate; TestStealthTRRContext.* for the TRRLoadInfo hooks); node juggler/tests/navigation_refused_before_a_channel.test.mjs (FrameTree's answer, and the only entry of the load); wrapper e2e tests/test_navigation_response.py::test_navigation_answers_with_a_real_response (the start of a navigation, both sides, and the load identifier on the response), tests/test_goto_script_redirect_e2e.py (a redirect clones the load info), tests/test_a_click_waits_for_the_navigation_it_plans_e2e.py (the "before" and "after" of a planned navigation), tests/test_a_goto_to_a_refused_port_ends_with_its_reason_e2e.py (a navigation refused before any channel ends with its reason)
+Test: gtest TestStealthLinkClickAfter.*, TestStealthLoadInfo.* and TestStealthDocShellDefaults.* (docshell/base/test/gtest, in the default gtest filter of the candidate; TestStealthTRRContext.* for the TRRLoadInfo hooks); node juggler/tests/navigation_refused_before_a_channel.test.mjs (FrameTree's answer, and the only entry of the load); wrapper e2e tests/test_navigation_response.py::test_navigation_answers_with_a_real_response (the start of a navigation, both sides, and the load identifier on the response), tests/test_goto_script_redirect_e2e.py (a redirect clones the load info), tests/test_a_click_waits_for_the_navigation_it_plans_e2e.py (the "before" and "after" of a planned navigation), tests/test_a_goto_to_a_refused_port_ends_with_its_reason_e2e.py (a navigation refused before any channel ends with its reason), tests/test_a_navigation_that_moved_is_told_by_the_engine_e2e.py (a load that the parent moves to another process is told, with the process it left); node juggler/tests/navigation_hook_runs_only_for_a_load_that_leaves_the_document.test.mjs (a same-document load never reaches the start hook of the renderer)
 
 ## What it does
 
@@ -15,9 +15,11 @@ notifications and one number on the LoadInfo: nothing a page can read, no networ
   `GetIsCaptivePortalTab` block, where the local `loadState` exists (an anchor: a guard at the top has nothing to read, and the funnel
   `BrowsingContext::LoadURI(nsDocShellLoadState*, bool)` is shared by callers that must not notify).
 - The start and the failure of a load, renderer side. Two anchors in `nsDocShell::InternalLoad`, around Mozilla's call of `DoURILoad`
-  (untouched, as is its header): `StealthNavigationLoad stealthLoad(this, aLoadState, !isJavaScript && !sameDocument);` right before
-  `rv = DoURILoad(...)`, which reports `juggler-navigation-started-renderer` for a navigation that is neither a `javascript:` URL nor a
-  same-document one (the two locals are Mozilla's own, so the rule stays Mozilla's), and `stealthLoad.Failed(rv);` first in the
+  (untouched, as is its header): `StealthNavigationLoad stealthLoad(this, aLoadState);` right before
+  `rv = DoURILoad(...)`. The object takes the docshell and the load state and reads the scheme of the load state's URI itself; it reports
+  `juggler-navigation-started-renderer` unless the navigation is a `javascript:` URL. A same-document navigation never reaches the line:
+  `InternalLoad` returns before `DoURILoad` whenever `sameDocument` is still true after `HandleSameDocumentNavigation`, and nothing writes it
+  after (a node test reads `InternalLoad` and proves that). The second anchor is `stealthLoad.Failed(rv);` first in the
   `if (NS_FAILED(rv))` branch, which reports `juggler-navigation-failed-renderer` with the load identifier and the status, before
   `InternalLoad` shows the error page. A navigation Firefox refuses before any channel reports progress (a restricted port, an unknown
   protocol) ends there and nowhere else, so Juggler ends it with its reason.
@@ -56,7 +58,7 @@ notifications and one number on the LoadInfo: nothing a page can read, no networ
 - `netwerk/base/LoadInfo.cpp`: registration (include of `StealthLoadInfo.h`); notice `StealthLoadInfoCopied(this, rhs);` in the copy constructor's body (the only statement of an empty body: the declared exception of this folder, G45).
 - `netwerk/base/LoadInfo.h`: member `uint64_t mJugglerLoadIdentifier = 0;` after `mUserNavigationInvolvement`. `netwerk/base/nsILoadInfo.idl`: the attribute after `skipHTTPSUpgrade`.
 - `netwerk/base/TRRLoadInfo.cpp`: registration (include), the added line in `Clone`, guard in `SetOriginAttributes`. `TRRLoadInfo.h` is Mozilla's.
-- `netwerk/base/moz.build`: `StealthLoadInfo.cpp`. `netwerk/ipc/DocumentLoadListener.cpp`: the anchor `loadInfo->SetJugglerLoadIdentifier(...)` in `CreateDocumentLoadInfo`; no include.
+- `netwerk/base/moz.build`: `StealthLoadInfo.cpp`. `netwerk/ipc/DocumentLoadListener.cpp`: registration (include of `StealthNavigationEvents.h`); the anchor `loadInfo->SetJugglerLoadIdentifier(...)` in `CreateDocumentLoadInfo`; the notice `StealthNotifyNavigationMoved(aContext, mContentParent, mLoadIdentifier, mIsDocumentLoad, aIsNewTab);` first in `TriggerProcessSwitch` (its arguments are parameters and members of Mozilla's function; the conditions for telling a move are in our header).
 
 Candidates to remove in a later round (G24): `StealthSetRunning(false)` (after `Done`, `mNotified` makes `Cancelled` a no-op whatever `mRunning` is).
 
