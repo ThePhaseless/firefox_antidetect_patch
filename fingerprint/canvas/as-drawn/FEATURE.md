@@ -2,7 +2,7 @@
 
 Category: other, spoof
 Prefs: none read directly
-Test: wrapper:tests/test_moz_element_paints_a_webgl_canvas_as_drawn_e2e.py::test_moz_element_paints_a_webgl_canvas_as_drawn (to write: a WebGL canvas with the noise projection active, painted through `background: -moz-element(#c)`, shows the drawn colour in a screenshot while `readPixels` of the same canvas differs; the noised `readPixels` is its negative control). Existing, for the page read-back: invisible_playwright/tests/test_canvas_reads_as_drawn.py (it does not cover these readers). The drag image and the taskbar preview have no page-visible effect and no test beyond the compile.
+Test: wrapper:tests/test_moz_element_paints_a_webgl_canvas_as_drawn_e2e.py::test_moz_element_paints_a_webgl_canvas_as_drawn (a WebGL canvas with the noise projection active, painted through `background: -moz-element(#c)`, shows the drawn colour in a screenshot while `readPixels` of the same canvas differs; the noised `readPixels` is its negative control). Existing, for the page read-back: invisible_playwright/tests/test_canvas_reads_as_drawn.py (it does not cover these readers). The drag image and the taskbar preview have no page-visible effect and no test beyond the compile.
 
 ## What it does
 
