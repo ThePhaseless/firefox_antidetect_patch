@@ -1,37 +1,32 @@
 diff --git a/dom/base/TextInputProcessor.cpp b/dom/base/TextInputProcessor.cpp
-index 929e614023a6c1c84fc2899425083180830b4727..f6f2e4ebd0c65509858951a374652ce89787b8ec 100644
+index 929e614023a6c1c84fc2899425083180830b4727..fc74f23b08575b4f617f369c36dcc5e397ad2826 100644
 --- a/dom/base/TextInputProcessor.cpp
 +++ b/dom/base/TextInputProcessor.cpp
-@@ -4,6 +4,7 @@
- 
- #include "mozilla/TextInputProcessor.h"
+@@ -21,6 +21,8 @@
+ #include "nsPIDOMWindow.h"
+ #include "nsPresContext.h"
  
 +#include "StealthInputEventBirth.h"  // STEALTH-HOOK(fingerprint/input/event-birth)
- #include "mozilla/AutoRestore.h"
- #include "mozilla/EventForwards.h"
- #include "mozilla/Maybe.h"
-@@ -755,6 +756,7 @@ TextInputProcessor::CommitCompositionWith(const nsAString& aCommitString,
++
+ using mozilla::dom::Event;
+ using mozilla::dom::KeyboardEvent;
+ using namespace mozilla::widget;
+@@ -753,6 +755,7 @@ TextInputProcessor::CommitCompositionWith(const nsAString& aCommitString,
+                                           uint32_t aKeyFlags,
+                                           uint8_t aOptionalArgc,
                                            bool* aSucceeded) {
++  StealthKeyBirthScope stealthBirth(mStealthKeyBirth);  // STEALTH-HOOK(fingerprint/input/event-birth)
    MOZ_RELEASE_ASSERT(aSucceeded, "aSucceeded must not be nullptr");
    MOZ_RELEASE_ASSERT(nsContentUtils::IsCallerChrome());
-+  StealthKeyBirthScope stealthBirth(mStealthKeyBirth);  // STEALTH-HOOK(fingerprint/input/event-birth)
  
-   RefPtr<KeyboardEvent> keyEvent;
-   if (aDOMKeyEvent) {
-@@ -1062,11 +1064,13 @@ nsresult TextInputProcessor::InitEditCommands(
-   return NS_OK;
- }
- 
-+NS_IMETHODIMP TextInputProcessor::SetNextKeyLatency(double aLatencyMs, uint64_t aPageId) { return StealthSetNextKeyLatency(mStealthKeyBirth, aLatencyMs, aPageId, nsContentUtils::IsCallerChrome()); }  // STEALTH-HOOK(fingerprint/input/event-birth)
+@@ -1065,6 +1068,7 @@ nsresult TextInputProcessor::InitEditCommands(
  NS_IMETHODIMP
  TextInputProcessor::Keydown(Event* aDOMKeyEvent, uint32_t aKeyFlags,
                              uint8_t aOptionalArgc, uint32_t* aConsumedFlags) {
++  StealthKeyBirthScope stealthBirth(mStealthKeyBirth);  // STEALTH-HOOK(fingerprint/input/event-birth)
    MOZ_RELEASE_ASSERT(aConsumedFlags, "aConsumedFlags must not be nullptr");
    MOZ_RELEASE_ASSERT(nsContentUtils::IsCallerChrome());
-+  StealthKeyBirthScope stealthBirth(mStealthKeyBirth);  // STEALTH-HOOK(fingerprint/input/event-birth)
    if (!aOptionalArgc) {
-     aKeyFlags = 0;
-   }
 @@ -1098,6 +1102,7 @@ nsresult TextInputProcessor::KeydownInternal(
    WidgetKeyboardEvent keyEvent(aKeyboardEvent);
    keyEvent.mFlags.mIsTrusted = true;
@@ -40,14 +35,14 @@ index 929e614023a6c1c84fc2899425083180830b4727..f6f2e4ebd0c65509858951a374652ce8
    nsresult rv = PrepareKeyboardEventToDispatch(keyEvent, aKeyFlags);
    if (NS_WARN_IF(NS_FAILED(rv))) {
      return rv;
-@@ -1182,6 +1187,7 @@ TextInputProcessor::Keyup(Event* aDOMKeyEvent, uint32_t aKeyFlags,
+@@ -1180,6 +1185,7 @@ nsresult TextInputProcessor::KeydownInternal(
+ NS_IMETHODIMP
+ TextInputProcessor::Keyup(Event* aDOMKeyEvent, uint32_t aKeyFlags,
                            uint8_t aOptionalArgc, bool* aDoDefault) {
++  StealthKeyBirthScope stealthBirth(mStealthKeyBirth);  // STEALTH-HOOK(fingerprint/input/event-birth)
    MOZ_RELEASE_ASSERT(aDoDefault, "aDoDefault must not be nullptr");
    MOZ_RELEASE_ASSERT(nsContentUtils::IsCallerChrome());
-+  StealthKeyBirthScope stealthBirth(mStealthKeyBirth);  // STEALTH-HOOK(fingerprint/input/event-birth)
    if (!aOptionalArgc) {
-     aKeyFlags = 0;
-   }
 @@ -1212,6 +1218,7 @@ nsresult TextInputProcessor::KeyupInternal(
    WidgetKeyboardEvent keyEvent(aKeyboardEvent);
    keyEvent.mFlags.mIsTrusted = true;
@@ -57,31 +52,32 @@ index 929e614023a6c1c84fc2899425083180830b4727..f6f2e4ebd0c65509858951a374652ce8
    if (NS_WARN_IF(NS_FAILED(rv))) {
      return rv;
 diff --git a/dom/base/TextInputProcessor.h b/dom/base/TextInputProcessor.h
-index 60bb55efedebd29c2944cbce2b44e5aed5d7fdbd..011a5e04b15b30c732d59f501fbef154e10aca92 100644
+index 60bb55efedebd29c2944cbce2b44e5aed5d7fdbd..dc8a57d8adc7860c3a7ce13a556abf06e907ce8a 100644
 --- a/dom/base/TextInputProcessor.h
 +++ b/dom/base/TextInputProcessor.h
-@@ -243,6 +243,7 @@ class TextInputProcessor final : public nsITextInputProcessor,
+@@ -241,6 +241,7 @@ class TextInputProcessor final : public nsITextInputProcessor,
+   TextEventDispatcher* mDispatcher;  // [Weak]
+   nsCOMPtr<nsITextInputProcessorCallback> mCallback;
    RefPtr<ModifierKeyDataArray> mModifierKeyDataArray;
++  struct { double mLatencyMs = 0; uint64_t mPageId = 0; } mStealthKeyBirth;  // STEALTH-HOOK(fingerprint/input/event-birth)
  
    bool mForTests;
-+  struct { double mLatencyMs = 0; uint64_t mPageId = 0; } mStealthKeyBirth;  // STEALTH-HOOK(fingerprint/input/event-birth) shape of StealthKeyBirth
  };
- 
- // See nsITextInputProcessorListener documentation in
 diff --git a/dom/base/nsContentUtils.cpp b/dom/base/nsContentUtils.cpp
-index 7929fcdeb59c47dbd2bee9e8d8bfd7ef2e8db87b..6270a0c385190bff8404a34383b9cd898ca9c664 100644
+index 7929fcdeb59c47dbd2bee9e8d8bfd7ef2e8db87b..ff2d17735369d2b63043b28430e6a99519a3cd0b 100644
 --- a/dom/base/nsContentUtils.cpp
 +++ b/dom/base/nsContentUtils.cpp
-@@ -28,6 +28,8 @@
- #include "PLDHashTable.h"
- #include "ReferrerInfo.h"
- #include "ScopedNSSTypes.h"
+@@ -425,6 +425,9 @@
+ #include "xpcprivate.h"
+ #include "xpcpublic.h"
+ 
 +#include "StealthInputEventBirth.h"  // STEALTH-HOOK(fingerprint/input/event-birth)
 +#include "StealthJugglerEventId.h"  // STEALTH-HOOK(automation/input)
- #include "ThirdPartyUtil.h"
- #include "Units.h"
- #include "chrome/common/ipc_message.h"
-@@ -10508,6 +10510,7 @@ Result<bool, nsresult> nsContentUtils::SynthesizeMouseEvent(
++
+ #if defined(XP_WIN)
+ // Undefine LoadImage to prevent naming conflict with Windows.
+ #  undef LoadImage
+@@ -10508,6 +10511,7 @@ Result<bool, nsresult> nsContentUtils::SynthesizeMouseEvent(
    mouseOrPointerEvent.mModifiers =
        GetWidgetModifiers(aMouseEventData.mModifiers);
    mouseOrPointerEvent.mButton = aMouseEventData.mButton;
@@ -89,12 +85,11 @@ index 7929fcdeb59c47dbd2bee9e8d8bfd7ef2e8db87b..6270a0c385190bff8404a34383b9cd89
    mouseOrPointerEvent.mButtons =
        aMouseEventData.mButtons.WasPassed()
            ? aMouseEventData.mButtons.Value()
-@@ -10542,6 +10545,8 @@ Result<bool, nsresult> nsContentUtils::SynthesizeMouseEvent(
+@@ -10542,6 +10546,7 @@ Result<bool, nsresult> nsContentUtils::SynthesizeMouseEvent(
                                            aMouseEventData.mMovementY.Value());
    }
  
-+  // STEALTH-HOOK(fingerprint/input/event-birth)
-+  StealthSetInputEventBirth(mouseOrPointerEvent, aMouseEventData.mLatency, aPresShell);
++  StealthSetMouseEventBirth(mouseOrPointerEvent, aMouseEventData, aPresShell);  // STEALTH-HOOK(fingerprint/input/event-birth)
    nsEventStatus status = nsEventStatus_eIgnore;
    if (aOptions.mToWindow) {
      nsresult rv = aPresShell->HandleEvent(aPresShell->GetRootFrame(),
@@ -107,14 +102,17 @@ index 7929fcdeb59c47dbd2bee9e8d8bfd7ef2e8db87b..6270a0c385190bff8404a34383b9cd89
    } else {
      status = aWidget->DispatchEvent(&mouseOrPointerEvent);
 diff --git a/dom/base/test/gtest/moz.build b/dom/base/test/gtest/moz.build
-index aaf31169b44149bd6042cea4eb2e08c87c1378e7..54bfdfdd9e428489e8eab19e11eee8b5367e9f6f 100644
+index aaf31169b44149bd6042cea4eb2e08c87c1378e7..2a44b40a543947caf396ab1be5b6bbcf167a5742 100644
 --- a/dom/base/test/gtest/moz.build
 +++ b/dom/base/test/gtest/moz.build
-@@ -13,6 +13,7 @@ UNIFIED_SOURCES += [
+@@ -13,6 +13,10 @@ UNIFIED_SOURCES += [
      "TestXMLSerializerNoBreakLink.cpp",
      "TestXPathGenerator.cpp",
  ]
-+UNIFIED_SOURCES += ["TestStealthDocumentLanguage.cpp", "TestStealthInputEventBirth.cpp"]  # STEALTH-HOOK(fingerprint/input/event-birth)
++UNIFIED_SOURCES += ["TestStealthDocumentLanguage.cpp"]  # STEALTH-HOOK(fingerprint/locale-time/session-declaration)
++UNIFIED_SOURCES += ["TestStealthInputEventBirth.cpp"]  # STEALTH-HOOK(fingerprint/input/event-birth)
++UNIFIED_SOURCES += ["TestStealthStackFrames.cpp"]  # STEALTH-HOOK(fingerprint/js-surface/stack-frames)
++UNIFIED_SOURCES += ["TestStealthTimezone.cpp"]  # STEALTH-HOOK(fingerprint/locale-time/timezone)
  
  LOCAL_INCLUDES += ["/dom/base"]
  

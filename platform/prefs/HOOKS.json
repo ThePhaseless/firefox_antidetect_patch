@@ -1,0 +1,141 @@
+[
+ {
+  "file": "browser/app/profile/firefox.js",
+  "function": "pref(\"media.contextmenu.video-overlay-detection\", true);",
+  "kind": "rewrite",
+  "form": "declared-value",
+  "line": "pref(\"browser.translations.enable\", false);  // STEALTH-HOOK(platform/prefs)",
+  "removed": "pref(\"browser.translations.enable\", true);",
+  "test": "py:modules/libpref/test/test_stealth_prefs_final_values.py::test_translations_are_off_in_the_load_order"
+ },
+ {
+  "file": "browser/app/profile/firefox.js",
+  "function": "pref(\"media.contextmenu.video-overlay-detection\", true);",
+  "kind": "rewrite",
+  "form": "declared-value",
+  "line": "pref(\"browser.translations.select.enable\", false);  // STEALTH-HOOK(platform/prefs)",
+  "removed": "pref(\"browser.translations.select.enable\", true);",
+  "test": "py:modules/libpref/test/test_stealth_prefs_final_values.py::test_translations_are_off_in_the_load_order"
+ },
+ {
+  "file": "modules/libpref/Preferences.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthPrefSanitize.h\"  // STEALTH-HOOK(platform/prefs)",
+  "test": "gtest:StealthPrefSanitize.ThePrefixIsAllowedInContent"
+ },
+ {
+  "file": "modules/libpref/Preferences.cpp",
+  "function": "static bool ShouldSanitizePreference(const Pref* const aPref) {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  if (StealthPrefAllowedInContent(aPref->Name())) return false;  // STEALTH-HOOK(platform/prefs)",
+  "test": "gtest:StealthPrefSanitize.ThePrefixIsAllowedInContent",
+  "anchor": "MOZ_DIAGNOSTIC_ASSERT(XRE_IsParentProcess());",
+  "why": "ShouldSanitizePreference starts with a diagnostic assert that must keep running for every name (G28: no difference in any case, including diagnostic builds), so the guard sits right after it instead of at the head."
+ },
+ {
+  "file": "modules/libpref/greprefs.js",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include init/StealthPrefs.js",
+  "test": "py:modules/libpref/test/test_stealth_prefs_final_values.py::test_our_defaults_reach_the_load_order_through_greprefs"
+ },
+ {
+  "file": "modules/libpref/init/all.js",
+  "function": "pref(\"font.size.monospace.x-math\", 13);",
+  "kind": "rewrite",
+  "form": "declared-value",
+  "line": "  pref(\"font.size.monospace.ar\", 13);  // STEALTH-HOOK(platform/prefs)",
+  "removed": "  pref(\"font.size.monospace.ar\", 12);",
+  "test": "py:modules/libpref/test/test_stealth_prefs_final_values.py::test_monospace_sizes_are_13_on_linux_and_windows"
+ },
+ {
+  "file": "modules/libpref/init/all.js",
+  "function": "pref(\"font.size.monospace.x-math\", 13);",
+  "kind": "rewrite",
+  "form": "declared-value",
+  "line": "  pref(\"font.size.monospace.el\", 13);  // STEALTH-HOOK(platform/prefs)",
+  "removed": "  pref(\"font.size.monospace.el\", 12);",
+  "test": "py:modules/libpref/test/test_stealth_prefs_final_values.py::test_monospace_sizes_are_13_on_linux_and_windows"
+ },
+ {
+  "file": "modules/libpref/init/all.js",
+  "function": "pref(\"font.size.monospace.x-math\", 13);",
+  "kind": "rewrite",
+  "form": "declared-value",
+  "line": "  pref(\"font.size.monospace.he\", 13);  // STEALTH-HOOK(platform/prefs)",
+  "removed": "  pref(\"font.size.monospace.he\", 12);",
+  "test": "py:modules/libpref/test/test_stealth_prefs_final_values.py::test_monospace_sizes_are_13_on_linux_and_windows"
+ },
+ {
+  "file": "modules/libpref/init/all.js",
+  "function": "pref(\"font.size.monospace.x-math\", 13);",
+  "kind": "rewrite",
+  "form": "declared-value",
+  "line": "  pref(\"font.size.monospace.x-cyrillic\", 13);  // STEALTH-HOOK(platform/prefs)",
+  "removed": "  pref(\"font.size.monospace.x-cyrillic\", 12);",
+  "test": "py:modules/libpref/test/test_stealth_prefs_final_values.py::test_monospace_sizes_are_13_on_linux_and_windows"
+ },
+ {
+  "file": "modules/libpref/init/all.js",
+  "function": "pref(\"font.size.monospace.x-math\", 13);",
+  "kind": "rewrite",
+  "form": "declared-value",
+  "line": "  pref(\"font.size.monospace.x-unicode\", 13);  // STEALTH-HOOK(platform/prefs)",
+  "removed": "  pref(\"font.size.monospace.x-unicode\", 12);",
+  "test": "py:modules/libpref/test/test_stealth_prefs_final_values.py::test_monospace_sizes_are_13_on_linux_and_windows"
+ },
+ {
+  "file": "modules/libpref/init/all.js",
+  "function": "pref(\"font.size.monospace.x-math\", 13);",
+  "kind": "rewrite",
+  "form": "declared-value",
+  "line": "  pref(\"font.size.monospace.x-western\", 13);  // STEALTH-HOOK(platform/prefs)",
+  "removed": "  pref(\"font.size.monospace.x-western\", 12);",
+  "test": "py:modules/libpref/test/test_stealth_prefs_final_values.py::test_monospace_sizes_are_13_on_linux_and_windows"
+ },
+ {
+  "file": "modules/libpref/init/all.js",
+  "function": "pref(\"network.tcp.keepalive.idle_time\", 600); // seconds; 10 mins",
+  "kind": "rewrite",
+  "form": "declared-value",
+  "line": "  pref(\"geo.provider.network.url\", \"\");  // STEALTH-HOOK(fingerprint/geolocation/no-host-provider)",
+  "removed": "  pref(\"geo.provider.network.url\", \"https://www.googleapis.com/geolocation/v1/geolocate?key=%GOOGLE_LOCATION_SERVICE_API_KEY%&solution_channel=%OS%\");",
+  "test": "node:juggler/tests/geolocation_network_url_is_empty_by_default.test.mjs#the value is changed on Mozilla's own line, with the hook, and the line is one"
+ },
+ {
+  "file": "modules/libpref/moz.build",
+  "function": "pref_groups = [",
+  "kind": "add",
+  "form": "registration",
+  "line": "pref_groups += [\"juggler\"]  # STEALTH-HOOK(platform/prefs)",
+  "test": "py:modules/libpref/test/test_stealth_prefs_final_values.py::test_the_generator_gets_our_pref_list_and_groups"
+ },
+ {
+  "file": "modules/libpref/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"StealthPrefSanitize.cpp\"]  # STEALTH-HOOK(platform/prefs)",
+  "test": "gtest:StealthPrefSanitize.ThePrefixIsAllowedInContent"
+ },
+ {
+  "file": "modules/libpref/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "gen_inputs += [\"init/StealthPrefList.yaml\"]  # STEALTH-HOOK(platform/prefs)",
+  "test": "py:modules/libpref/test/test_stealth_prefs_final_values.py::test_the_generator_gets_our_pref_list_and_groups"
+ },
+ {
+  "file": "modules/libpref/test/gtest/moz.build",
+  "function": "UNIFIED_SOURCES = [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"TestStealthPrefSanitize.cpp\"]  # STEALTH-HOOK(platform/prefs)",
+  "test": "gtest:StealthPrefSanitize.ThePrefixIsAllowedInContent"
+ }
+]

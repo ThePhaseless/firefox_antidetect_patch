@@ -4,14 +4,16 @@
   "intl/locale/moz.build",
   "intl/locale/nsLanguageAtomService.cpp"
  ],
- "added": {},
+ "added": {
+  "intl/locale/tests/gtest/TestStealthRegionalLocales.cpp": "100644"
+ },
  "inventory": [
   {
    "file": "intl/locale/LocaleService.cpp",
    "category": "spoof",
    "feature": "session-language-declared",
    "prefs": [],
-   "added": 6,
+   "added": 4,
    "removed": 4,
    "hunks": 3,
    "inline_logic_lines": 10,
@@ -57,7 +59,7 @@
    "category": "spoof",
    "feature": "session-language-declared",
    "prefs": [],
-   "added": 5,
+   "added": 4,
    "removed": 0,
    "hunks": 3,
    "inline_logic_lines": 6,

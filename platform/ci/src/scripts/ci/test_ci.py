@@ -719,17 +719,29 @@ def main() -> int:
     import test_workflow_steps_bind
     import test_gate_windows_temp
     import test_gate_legs
+    import test_xpcshell_run
+    import test_ab_package
+    import test_cargo_junit
+    import test_junit_legs
+    import test_py_junit
+    import test_hook_tests_judge_job
     parts = {"test_latitude_node": test_latitude_node.cases(), "test_link_pin": test_link_pin.cases(), "test_cache_rules": test_cache_rules.cases(),
              "test_release_builder": test_release_builder.cases(), "test_release_path": test_release_path.cases(),
              "test_release_checks": test_release_checks.cases(), "test_gate_geoip": test_gate_geoip.cases(),
              "test_gate_security_state": test_gate_security_state.cases(),
              "test_gate_protocol_mirror": test_gate_protocol_mirror.cases(), "test_workflow_steps_bind": test_workflow_steps_bind.cases(),
-             "test_gate_windows_temp": test_gate_windows_temp.cases(), "test_gate_legs": test_gate_legs.cases()}
+             "test_gate_windows_temp": test_gate_windows_temp.cases(), "test_gate_legs": test_gate_legs.cases(),
+             "test_xpcshell_run": test_xpcshell_run.cases(),
+             "test_ab_package": test_ab_package.cases(),
+             "test_ab_package": test_ab_package.cases(),
+             "test_xpcshell_run": test_xpcshell_run.cases(),
+             "test_cargo_junit": test_cargo_junit.cases(), "test_junit_legs": test_junit_legs.cases(), "test_py_junit": test_py_junit.cases(),
+             "test_gate_windows_temp": test_gate_windows_temp.cases(), "test_gate_legs": test_gate_legs.cases(), "test_hook_tests_judge_job": test_hook_tests_judge_job.cases()}
     for found in parts.values():
         cases += found
     # A floor per module: one that returns fewer cases than it had (an emptied list, a stopped import) is red, not a shorter green. Raise a floor by
     # hand when a case is added; lower it never.
-    floors = {"test_release_checks": 65, "test_gate_geoip": 5, "test_gate_security_state": 4, "test_gate_protocol_mirror": 4, "test_workflow_steps_bind": 18, "test_gate_windows_temp": 19, "test_gate_legs": 23, "test_latitude_node": 294}
+    floors = {"test_release_checks": 78, "test_gate_geoip": 5, "test_gate_security_state": 10, "test_gate_protocol_mirror": 4, "test_workflow_steps_bind": 18, "test_gate_windows_temp": 21, "test_gate_legs": 71, "test_latitude_node": 294, "test_xpcshell_run": 132, "test_ab_package": 32, "test_cargo_junit": 12, "test_junit_legs": 25, "test_py_junit": 11, "test_hook_tests_judge_job": 14}
     short = {name: (len(parts[name]), floor) for name, floor in floors.items() if len(parts[name]) < floor}
     cases.append(("the modules this file runs still bring their cases (a floor each)%s" % ("" if not short else ": fewer than the floor: %s" % short), not short))
 

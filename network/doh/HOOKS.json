@@ -1,0 +1,345 @@
+[
+ {
+  "file": "dom/media/webrtc/jsapi/MediaTransportHandler.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"transport/StealthIceResolverContext.h\"  // STEALTH-HOOK(network/doh)",
+  "test": "gtest:StealthIceResolverContext.TheResolverOfAPeerConnectionIsGivenItsContext"
+ },
+ {
+  "file": "dom/media/webrtc/jsapi/MediaTransportHandler.cpp",
+  "function": "void MediaTransportImplNicer::SetProxyConfig(",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  StealthIceResolverSetContext(mDNSResolver, aProxyConfig);  // STEALTH-HOOK(network/doh)",
+  "test": "gtest:StealthIceResolverContext.TheResolverOfAPeerConnectionIsGivenItsContext",
+  "anchor": "if (!mIceCtx) { return; }  (Mozilla's check at the head of SetProxyConfig)",
+  "why": "at the head the call would read the config on the closing road too; no test fixes the position, so it stays where it is today (G28)"
+ },
+ {
+  "file": "dom/media/webrtc/transport/nriceresolver.cpp",
+  "function": "int NrIceResolver::resolve(nr_resolver_resource* resource,",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  StealthIceResolverLookupAttributes(this, &attrs);  // STEALTH-HOOK(network/doh)",
+  "test": "gtest:StealthIceResolverContext.TheLookupOfAnIceServerNameCarriesTheAttributesOfItsResolver",
+  "anchor": "OriginAttributes attrs;  (Mozilla's declaration in NrIceResolver::resolve)",
+  "why": "the attributes are born as the local of Mozilla and the argument of AsyncResolveNative reads it: filling it right after its declaration keeps Mozilla's argument line as it is (a pure addition, G51)"
+ },
+ {
+  "file": "dom/media/webrtc/transport/nriceresolver.h",
+  "function": "OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthIceResolverContext.h\"  // STEALTH-HOOK(network/doh)",
+  "test": "gtest:StealthIceResolverContext.TheResolverPassesTheContextItWasGiven"
+ },
+ {
+  "file": "dom/media/webrtc/transport/nriceresolver.h",
+  "function": "class NrIceResolver {",
+  "kind": "add",
+  "form": "member",
+  "line": "  const OriginAttributes& GetOriginAttributes() const;  // STEALTH-HOOK(network/doh)",
+  "test": "gtest:StealthIceResolverContext.TheResolverPassesTheContextItWasGiven"
+ },
+ {
+  "file": "dom/media/webrtc/transport/nriceresolver.h",
+  "function": "class NrIceResolver {",
+  "kind": "add",
+  "form": "member",
+  "line": "  void SetOriginAttributes(const OriginAttributes& aAttrs);  // STEALTH-HOOK(network/doh)",
+  "test": "gtest:StealthIceResolverContext.TheResolverPassesTheContextItWasGiven"
+ },
+ {
+  "file": "dom/media/webrtc/transport/nriceresolver.h",
+  "function": "class NrIceResolver {",
+  "kind": "add",
+  "form": "member",
+  "line": "  OriginAttributes mAttrs;  // STEALTH-HOOK(network/doh)",
+  "test": "gtest:StealthIceResolverContext.TheResolverPassesTheContextItWasGiven"
+ },
+ {
+  "file": "netwerk/dns/TRR.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthTRRRequest.h\"  // STEALTH-HOOK(network/doh)",
+  "test": "gtest:TestStealthTRRContext.TheRequestOfAContextGivesItsChannelTheContext"
+ },
+ {
+  "file": "netwerk/dns/TRR.cpp",
+  "function": "nsresult TRR::SendHTTPRequest() {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  if (StealthTRRApplyContext(mOriginSuffix, channel, &rv)) return rv;  // STEALTH-HOOK(network/doh)",
+  "test": "gtest:TestStealthTRRContext.TheRequestOfAContextGivesItsChannelTheContext",
+  "anchor": "if (NS_FAILED(rv) || !channel) {...}  (the check of the channel Mozilla makes)",
+  "why": "the channel is made in two places (ohttpService->NewChannel or DNSUtils::CreateChannelHelper), so no expression wrap covers both; the load info to change exists only after, and Mozilla's AsyncOpen uses it"
+ },
+ {
+  "file": "netwerk/dns/TRR.cpp",
+  "function": "nsresult TRR::SendHTTPRequest() {",
+  "kind": "rewrite",
+  "form": "wrap-expression",
+  "line": "      StealthTRRConnInfoUsable(mOriginSuffix, StaticPrefs::network_trr_async_connInfo())) {  // STEALTH-HOOK(network/doh)",
+  "removed": "      StaticPrefs::network_trr_async_connInfo()) {",
+  "test": "gtest:TestStealthTRRContext.TheCachedConnectionInfoServesOnlyTheDefaultContextBehindThePref"
+ },
+ {
+  "file": "netwerk/dns/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"StealthSessionResolver.cpp\", \"StealthTRRRequest.cpp\"]  # STEALTH-HOOK(network/doh)",
+  "test": "gtest:TestStealthTRRContext.TheRequestOfAContextGivesItsChannelTheContext"
+ },
+ {
+  "file": "netwerk/dns/nsHostResolver.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthSessionResolver.h\"  // STEALTH-HOOK(network/doh)",
+  "test": "gtest:TestStealthSessionResolver.TheHookAppliesTheFlagsThroughTheirAddress"
+ },
+ {
+  "file": "netwerk/dns/nsHostResolver.cpp",
+  "function": "nsresult nsHostResolver::ResolveHost(const nsACString& aHost,",
+  "kind": "add",
+  "form": "notice",
+  "line": "  StealthApplySessionFlags(aHost, aOriginAttributes, &flags);  // STEALTH-HOOK(network/doh)",
+  "test": "gtest:TestStealthSessionResolver.TheHookAppliesTheFlagsThroughTheirAddress"
+ },
+ {
+  "file": "netwerk/dns/nsHostResolver.cpp",
+  "function": "void nsHostResolver::DetachCallback(",
+  "kind": "add",
+  "form": "notice",
+  "line": "  StealthApplySessionFlags(host, aOriginAttributes, &flags);  // STEALTH-HOOK(network/doh)",
+  "test": "gtest:TestStealthSessionResolver.TheHookAppliesTheFlagsThroughTheirAddress"
+ },
+ {
+  "file": "netwerk/protocol/http/TLSTransportLayer.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/net/StealthTRRContext.h\"  // STEALTH-HOOK(network/doh)",
+  "test": "gtest:TestStealthTRRContext.ATlsOverATunnelTakesTheContextOfItsTransport"
+ },
+ {
+  "file": "netwerk/protocol/http/TLSTransportLayer.cpp",
+  "function": "bool TLSTransportLayer::Init(const char* aTLSHost, int32_t aTLSPort) {",
+  "kind": "rewrite",
+  "form": "wrap-expression",
+  "line": "      PR_AF_INET, aTLSHost, aTLSPort, nullptr, StealthTransportContext(this, OriginAttributes()), 0, 0, mFD,  // STEALTH-HOOK(network/doh)",
+  "removed": "      PR_AF_INET, aTLSHost, aTLSPort, nullptr, OriginAttributes(), 0, 0, mFD,",
+  "test": "gtest:TestStealthTRRContext.ATlsOverATunnelTakesTheContextOfItsTransport"
+ },
+ {
+  "file": "netwerk/protocol/http/TRRServiceChannel.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/net/StealthTRRContext.h\"  // STEALTH-HOOK(network/doh)",
+  "test": "gtest:TestStealthTRRContext.AFailedLookupOfAServiceChannelEndsItAndGivesOkToItsCaller"
+ },
+ {
+  "file": "netwerk/protocol/http/TRRServiceChannel.cpp",
+  "function": "nsresult TRRServiceChannel::MaybeResolveProxyAndBeginConnect() {",
+  "kind": "rewrite",
+  "form": "wrap-expression",
+  "line": "      NS_SUCCEEDED(StealthTRRServiceProxyLookup(this, ResolveProxy()))) {  // STEALTH-HOOK(network/doh)",
+  "removed": "      NS_SUCCEEDED(ResolveProxy())) {",
+  "test": "gtest:TestStealthTRRContext.AFailedLookupOfAServiceChannelEndsItAndGivesOkToItsCaller"
+ },
+ {
+  "file": "netwerk/protocol/http/TRRServiceChannel.cpp",
+  "function": "nsresult TRRServiceChannel::ResolveProxy() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "      getter_AddRefs(proxyRequest), Nothing(), StealthTRRContextOf(this));  // STEALTH-HOOK(network/doh)",
+  "removed": "      getter_AddRefs(proxyRequest));",
+  "test": "gtest:TestStealthTRRContext.TheContextOfAChannelIsTheContextOfItsLoadInfo",
+  "exception": "adds two arguments to ProxyConfigLookup::Create: no form of the contract adds arguments to a call (PM-DECISIONS network/doh 1, G9)",
+  "pm": "approvato"
+ },
+ {
+  "file": "netwerk/protocol/http/TRRServiceChannel.cpp",
+  "function": "TRRServiceChannel::OnProxyAvailable(nsICancelable* request, nsIChannel* channel,",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  if (StealthTRRServiceOnProxyAnswer(this, status, pi)) return NS_OK;  // STEALTH-HOOK(network/doh)",
+  "test": "gtest:TestStealthTRRContext.AnAnswerOfAServiceChannelWithNoProxyInfoEndsIt",
+  "anchor": "nsresult rv;",
+  "why": "at the head of the function it still runs on the wrong thread (it is re-dispatched) and before mProxyRequest is cleared; AsyncAbort must be called on the channel's thread after the clearing"
+ },
+ {
+  "file": "netwerk/protocol/http/TRRServiceChannel.cpp",
+  "function": "nsresult TRRServiceChannel::BeginConnect() {",
+  "kind": "rewrite",
+  "form": "wrap-expression",
+  "line": "      host, port, \"\"_ns, mUsername, proxyInfo, StealthTRRConnectionAttributes(this, OriginAttributes()), isHttps);  // STEALTH-HOOK(network/doh)",
+  "removed": "      host, port, \"\"_ns, mUsername, proxyInfo, OriginAttributes(), isHttps);",
+  "test": "gtest:TestStealthTRRContext.TheConnectionInfoOfAChannelCarriesTheContextOfItsLoadInfo"
+ },
+ {
+  "file": "netwerk/protocol/http/TRRServiceChannel.cpp",
+  "function": "nsresult TRRServiceChannel::BeginConnect() {",
+  "kind": "rewrite",
+  "form": "wrap-expression",
+  "line": "                               StealthTRRConnectionAttributes(this, OriginAttributes()));  // STEALTH-HOOK(network/doh)",
+  "removed": "                               OriginAttributes());",
+  "test": "gtest:TestStealthTRRContext.TheConnectionInfoOfAChannelCarriesTheContextOfItsLoadInfo"
+ },
+ {
+  "file": "netwerk/protocol/http/nsHttpChannel.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/net/StealthTRRContext.h\"  // STEALTH-HOOK(network/doh)",
+  "test": "gtest:TestStealthTRRContext.AFailedLookupOfADoHHttpChannelClosesItsCacheEntryAndEndsIt"
+ },
+ {
+  "file": "netwerk/protocol/http/nsHttpChannel.cpp",
+  "function": "void nsHttpChannel::MaybeResolveProxyAndBeginConnect() {",
+  "kind": "rewrite",
+  "form": "wrap-expression",
+  "line": "    } else if (NS_SUCCEEDED(StealthChannelProxyLookup(this, ResolveProxy()))) {  // STEALTH-HOOK(network/doh)",
+  "removed": "    } else if (NS_SUCCEEDED(ResolveProxy())) {",
+  "test": "gtest:TestStealthTRRContext.AFailedLookupOfADoHHttpChannelClosesItsCacheEntryAndEndsIt"
+ },
+ {
+  "file": "netwerk/protocol/http/nsHttpChannel.cpp",
+  "function": "nsHttpChannel::OnProxyAvailable(nsICancelable* request, nsIChannel* channel,",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  if (StealthChannelOnProxyAnswer(this, status, pi)) return NS_OK;  // STEALTH-HOOK(network/doh)",
+  "test": "gtest:TestStealthTRRContext.ADirectAnswerEndsADoHHttpChannelAndNotAPageChannel",
+  "anchor": "nsresult rv;",
+  "why": "a guard above `mProxyRequest = nullptr` would leave the reference to the finished lookup after AsyncAbort, visible to a later Cancel"
+ },
+ {
+  "file": "security/manager/ssl/nsNSSCallbacks.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/net/StealthTRRContext.h\"  // STEALTH-HOOK(network/doh)",
+  "test": "gtest:TestStealthTRRContext.TheOcspRequestKeepsTheContextOfThePage"
+ },
+ {
+  "file": "security/manager/ssl/nsNSSCallbacks.cpp",
+  "function": "OCSPRequest::Run() {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "    mozilla::net::StealthKeepRequestContext(mOriginAttributes, attrs);  // STEALTH-HOOK(network/doh)",
+  "test": "gtest:TestStealthTRRContext.TheOcspRequestKeepsTheContextOfThePage",
+  "anchor": "attrs.mPrivateBrowsingId = mOriginAttributes.mPrivateBrowsingId;",
+  "why": "the call completes the attributes Mozilla just copied and before Mozilla's SetOriginAttributes(attrs) reads them: a pure addition (G51)"
+ },
+ {
+  "file": "toolkit/components/parentalcontrols/nsParentalControlsServiceWin.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthParentalControls.h\"  // STEALTH-HOOK(network/doh)",
+  "test": "node:juggler/tests/parental_controls_are_declared_off_where_the_os_is_read.test.mjs#the declaration comes before the first OS call"
+ },
+ {
+  "file": "toolkit/components/parentalcontrols/nsParentalControlsServiceWin.cpp",
+  "function": "static nsAutoString GetUserSid() {",
+  "kind": "add",
+  "form": "guard",
+  "line": "  if (StealthParentalControlsDeclared()) return;  // STEALTH-HOOK(network/doh)",
+  "test": "node:juggler/tests/parental_controls_are_declared_off_where_the_os_is_read.test.mjs#the declaration comes before the first OS call"
+ },
+ {
+  "file": "toolkit/components/url-classifier/UrlClassifierHashCompleter.sys.mjs",
+  "function": "import { XPCOMUtils } from \"resource://gre/modules/XPCOMUtils.sys.mjs\";",
+  "kind": "add",
+  "form": "registration",
+  "line": "import { stealthApplyContext, stealthCompleteInContext } from \"resource://gre/modules/StealthHashCompleterContext.sys.mjs\";  // STEALTH-HOOK(network/doh)",
+  "test": "node:juggler/tests/the_safebrowsing_completion_keeps_the_context_of_the_page.test.mjs#a completion of another context goes to a completer of that context, one per context, never mixed"
+ },
+ {
+  "file": "toolkit/components/url-classifier/UrlClassifierHashCompleter.sys.mjs",
+  "function": "export class HashCompleter {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    if (stealthCompleteInContext(this, aPartialHash, aGethashUrl, aTableName, aCallback)) { return; }  // STEALTH-HOOK(network/doh)",
+  "test": "node:juggler/tests/the_safebrowsing_completion_keeps_the_context_of_the_page.test.mjs#a completion of another context goes to a completer of that context, one per context, never mixed"
+ },
+ {
+  "file": "toolkit/components/url-classifier/UrlClassifierHashCompleter.sys.mjs",
+  "function": "class HashCompleterRequestBase {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "    stealthApplyContext(channel, this);  // STEALTH-HOOK(network/doh)",
+  "test": "node:juggler/tests/the_safebrowsing_completion_keeps_the_context_of_the_page.test.mjs#the channel of a completer of a context carries the context and keeps the first party domain",
+  "anchor": "channel.loadInfo.originAttributes = {...};  (the assignment that gives the first party domain of Safe Browsing)",
+  "why": "an expression wrap of the assignment is not one line: its object literal spans 5 lines with two Mozilla comments inside"
+ },
+ {
+  "file": "toolkit/components/url-classifier/moz.build",
+  "function": "EXTRA_JS_MODULES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "EXTRA_JS_MODULES += [\"StealthHashCompleterContext.sys.mjs\"]  # STEALTH-HOOK(network/doh)",
+  "test": "node:juggler/tests/the_safebrowsing_completion_keeps_the_context_of_the_page.test.mjs#a completion of another context goes to a completer of that context, one per context, never mixed"
+ },
+ {
+  "file": "toolkit/components/url-classifier/nsIUrlClassifierHashCompleter.idl",
+  "function": "interface nsIUrlClassifierHashCompleterCallback : nsISupports",
+  "kind": "add",
+  "form": "member",
+  "line": "  readonly attribute uint32_t userContextId;  // STEALTH-HOOK(network/doh)",
+  "test": "node:juggler/tests/the_safebrowsing_completion_keeps_the_context_of_the_page.test.mjs#the interface of the completion callback gives the context, one line beside the lines of Mozilla"
+ },
+ {
+  "file": "toolkit/components/url-classifier/nsUrlClassifierDBService.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/net/StealthTRRContext.h\"  // STEALTH-HOOK(network/doh)",
+  "test": "gtest:TestStealthTRRContext.ALookupScopeCarriesTheContextOfThePrincipalAndRestores"
+ },
+ {
+  "file": "toolkit/components/url-classifier/nsUrlClassifierDBService.cpp",
+  "function": "class nsUrlClassifierHashCompleterBase",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  uint32_t mStealthUserContextId = mozilla::net::StealthCurrentLookupContext();  // STEALTH-HOOK(network/doh)",
+  "test": "gtest:TestStealthTRRContext.ALookupScopeCarriesTheContextOfThePrincipalAndRestores"
+ },
+ {
+  "file": "toolkit/components/url-classifier/nsUrlClassifierDBService.cpp",
+  "function": "class nsUrlClassifierHashCompleterBase",
+  "kind": "add",
+  "form": "unknown",
+  "line": "NS_IMETHODIMP nsUrlClassifierHashCompleterBase::GetUserContextId(uint32_t* aId) { return mozilla::net::StealthLookupContextOut(mStealthUserContextId, aId); }  // STEALTH-HOOK(network/doh)",
+  "test": "gtest:TestStealthTRRContext.TheLookupContextGetterGivesTheContextAndRefusesNull"
+ },
+ {
+  "file": "toolkit/components/url-classifier/nsUrlClassifierDBService.cpp",
+  "function": "nsUrlClassifierDBService::Classify(nsIPrincipal* aPrincipal,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  mozilla::net::StealthLookupContextScope stealthScope(aPrincipal);  // STEALTH-HOOK(network/doh)",
+  "test": "gtest:TestStealthTRRContext.ALookupScopeCarriesTheContextOfThePrincipalAndRestores"
+ },
+ {
+  "file": "toolkit/components/url-classifier/tests/unit/xpcshell.toml",
+  "function": "tags = \"remote-settings\"",
+  "kind": "add",
+  "form": "unknown",
+  "line": "[\"test_stealth_hashcompleter_context.js\"]  # STEALTH-HOOK(network/doh)",
+  "test": "node:juggler/tests/the_safebrowsing_completion_keeps_the_context_of_the_page.test.mjs#the xpcshell test is registered and asks for one request per context"
+ },
+ {
+  "file": "toolkit/profile/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "unknown",
+  "line": "DEFINES[\"MOZ_PROXY_BYPASS_PROTECTION\"] = True  # STEALTH-HOOK(network/doh)",
+  "test": "node:juggler/tests/the_profile_lock_looks_up_no_host_name.test.mjs#the lookup of the host name in the symlink lock is compiled out for the directory by the define of its moz.build, and the only reader of the symbol is that block"
+ }
+]

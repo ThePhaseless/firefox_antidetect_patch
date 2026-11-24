@@ -27,6 +27,15 @@ inline uint64_t StealthEstimateLimit(uint64_t aLimit, bool aOriginScope) {
   return mb > 0 ? uint64_t(mb) * 1024 * 1024 : aLimit;
 }
 
+// The same, for the scope enum of EstimateOp (private to OriginOperations.cpp,
+// so a template: the hook passes mScope as it is, and the comparison with
+// Scope::Origin is made here). The scope comes first, as an extra leading
+// argument before Mozilla's expression.
+template <typename Scope>
+inline uint64_t StealthEstimateLimit(Scope aScope, uint64_t aLimit) {
+  return StealthEstimateLimit(aLimit, aScope == Scope::Origin);
+}
+
 }  // namespace mozilla::dom::quota
 
 #endif  // DOM_QUOTA_STEALTHQUOTAESTIMATE_H_

@@ -2,7 +2,7 @@
 
 Category: spoof
 Prefs: webgl.msaa-samples
-Test: gfx/gl/gtest/TestStealthGLMultisample.cpp (StealthGLMultisample.TheDeclaredSampleCountDecides, StealthGLMultisample.BasicRenderDriverBlendsIntoAMultisampledTarget, Windows only); the WebGL surface of the host gate (webgl1/webgl2 attributes.antialias, SAMPLES) on the Windows runner, which has no GPU.
+Test: gfx/gl/gtest/TestStealthGLMultisample.cpp (StealthGLMultisample.TheDeclaredSampleCountDecides, StealthGLMultisample.BasicRenderDriverBlendsIntoAMultisampledTarget and StealthGLMultisample.BasicRenderDriverDropsMultisampleWhenNothingIsDeclared, the negative control with webgl.msaa-samples=0; Windows only); the WebGL surface of the host gate (webgl1/webgl2 attributes.antialias, SAMPLES) on the Windows runner, which has no GPU.
 
 ## What it does
 
@@ -20,9 +20,19 @@ draws one and reads the resolved pixel on the Windows CI host, which has no GPU.
 
 ## Hooks in Mozilla files
 
-- `gfx/gl/GLContext.cpp` (after #include "GLContext.h", after InitFeatures() in GLContext::InitImpl, and after the closing brace of its driver-workaround block, already-hook): The multisample feature as the driver reports it is kept before the workarounds and put back after them when the core declares samples (webgl.msaa-samples > 0, StealthDeclaredMultisample): the declaration decides, not the host renderer.
-- `gfx/gl/gtest/moz.build` (after the UNIFIED_SOURCES list (TestColorspaces.cpp), already-hook): Builds TestStealthGLMultisample.cpp.
-- `gfx/gl/moz.build` (after the SOURCES list (GLScreenBuffer.cpp), already-hook): Builds StealthGLMultisample.cpp.
+Both hooks of `GLContext::InitImpl` are anchors: the feature as the driver
+reports it exists only between `InitFeatures()` and the driver workarounds, and
+`MarkUnsupported` also clears four extension bits (ANGLE_/APPLE_/EXT_framebuffer_multisample,
+EXT_multisampled_render_to_texture) that a page reads in the extension list; the
+hooks keep exactly the old effect (the feature bit back, the extension bits
+cleared), so no single wrap or guard gives the same bits.
+
+- `gfx/gl/GLContext.cpp`, anchor after `InitFeatures();`: `StealthNoteReportedMultisample(this, mStealthReportedMultisample);` notes the feature as the driver reports it, before Mozilla's driver workarounds run.
+- `gfx/gl/GLContext.cpp`, anchor after the `if (WorkAroundDriverBugs()) { ... }` block: `StealthRestoreMultisample(mAvailableFeatures, mStealthReportedMultisample);` puts the feature bit back when the core declares samples (webgl.msaa-samples > 0, StealthDeclaredMultisample): the declaration decides, not the host renderer. Never more than the driver reports.
+- `gfx/gl/GLContext.h`, member after `mAvailableFeatures`: `bool mStealthReportedMultisample = false;`, the field the two anchors share (the value is written and read in the same call of InitImpl).
+- `gfx/gl/GLContext.cpp`: the include of `StealthGLMultisample.h`, in a block of ours after Mozilla's includes.
+- `gfx/gl/gtest/moz.build`: builds TestStealthGLMultisample.cpp.
+- `gfx/gl/moz.build`: builds StealthGLMultisample.cpp.
 
 ## Our own files
 

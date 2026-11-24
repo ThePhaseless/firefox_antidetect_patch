@@ -1,0 +1,20 @@
+[
+ {
+  "file": "dom/media/CubebUtils.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthSampleRate.h\"  // STEALTH-HOOK(fingerprint/audio/sample-rate)",
+  "test": "wrapper:tests/test_audio_sample_rate_is_declared_e2e.py::test_the_audio_context_answers_the_declared_sample_rate"
+ },
+ {
+  "file": "dom/media/CubebUtils.cpp",
+  "function": "uint32_t PreferredSampleRate(bool aShouldResistFingerprinting) {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  if (uint32_t stealth; StealthDeclaredSampleRate(&stealth)) return stealth;  // STEALTH-HOOK(fingerprint/audio/sample-rate)",
+  "test": "wrapper:tests/test_audio_sample_rate_is_declared_e2e.py::test_the_audio_context_answers_the_declared_sample_rate",
+  "anchor": "if (sCubebForcedSampleRate) {\n    return sCubebForcedSampleRate;\n  }",
+  "why": "A guard at the head of PreferredSampleRate would invert the order with Mozilla's test-only pref media.cubeb.force_sample_rate when that pref is set (never from the core, but not provably the same), so the hook stays right after the forced-rate return, before the resist-fingerprinting 44100 and the cubeb device read (G18/G28)."
+ }
+]

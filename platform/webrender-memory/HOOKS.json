@@ -1,0 +1,42 @@
+[
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "use crate::util::{MaxRect, Recycler, VecHelper, drain_filter};",
+  "kind": "add",
+  "form": "registration",
+  "line": "mod stealth_shared_fonts;  // STEALTH-HOOK(platform/webrender-memory)",
+  "test": "wrapper:tests/test_web_fonts_of_closed_contexts_e2e.py::test_the_web_fonts_of_closed_contexts_leave_the_shared_archive"
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "pub struct RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    stealth_fonts: stealth_shared_fonts::RememberedFonts,  // STEALTH-HOOK(platform/webrender-memory)",
+  "test": "wrapper:tests/test_web_fonts_of_closed_contexts_e2e.py::test_the_web_fonts_of_closed_contexts_leave_the_shared_archive"
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "            stealth_fonts: stealth_shared_fonts::RememberedFonts::empty(),  // STEALTH-HOOK(platform/webrender-memory)",
+  "test": "wrapper:tests/test_web_fonts_of_closed_contexts_e2e.py::test_the_web_fonts_of_closed_contexts_leave_the_shared_archive"
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "notice",
+  "line": "        stealth_shared_fonts::remember_fonts(self, &reg);  // STEALTH-HOOK(platform/webrender-memory)",
+  "test": "wrapper:tests/test_web_fonts_of_closed_contexts_e2e.py::test_the_web_fonts_of_closed_contexts_leave_the_shared_archive"
+ },
+ {
+  "file": "gfx/wr/webrender/src/render_backend.rs",
+  "function": "impl RenderBackend {",
+  "kind": "add",
+  "form": "notice",
+  "line": "        stealth_shared_fonts::clear_when_window_left(self, &msg);  // STEALTH-HOOK(platform/webrender-memory)",
+  "test": "wrapper:tests/test_web_fonts_of_closed_contexts_e2e.py::test_the_web_fonts_of_closed_contexts_leave_the_shared_archive"
+ }
+]

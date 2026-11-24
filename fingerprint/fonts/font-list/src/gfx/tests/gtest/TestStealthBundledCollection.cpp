@@ -17,6 +17,8 @@
 #include <cstring>
 
 #include "StealthBundleFontList.h"
+#include "TestStealthBundleHooks.h"
+#include "TestStealthFontListHooks.h"
 #include "gfxFontUtils.h"
 #include "mozilla/Preferences.h"
 #include "nsString.h"
@@ -274,23 +276,4 @@ TEST(StealthTtcFace, SingleFaceFontIgnoresTheIndex)
   }
   // The two-argument form still works (default face 0).
   EXPECT_NE(gfxFontUtils::FindTableDirEntry(buf, tag), nullptr);
-}
-
-TEST(StealthBundledFamilyFilter, HostFamilyIsDroppedUnderBundleOnly)
-{
-  nsTHashSet<nsCStringHashKey> bundled;
-  bundled.Insert("Segoe UI"_ns);
-  EXPECT_FALSE(StealthDropFamily(true, bundled, "Segoe UI"_ns));
-  EXPECT_TRUE(StealthDropFamily(true, bundled, "Helvetica Neue"_ns));
-}
-
-TEST(StealthBundledFamilyFilter, NothingIsDroppedWithoutBundleOnly)
-{
-  nsTHashSet<nsCStringHashKey> bundled;
-  EXPECT_FALSE(StealthDropFamily(false, bundled, "Helvetica Neue"_ns));
-}
-
-TEST(StealthBundledFamilyFilter, DefaultUiFamilyIsTheWindowsPersona)
-{
-  EXPECT_TRUE(StealthUiFamily().EqualsLiteral("Segoe UI"));
 }

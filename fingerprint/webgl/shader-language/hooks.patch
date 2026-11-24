@@ -1,109 +1,98 @@
 diff --git a/dom/canvas/WebGLContext.cpp b/dom/canvas/WebGLContext.cpp
-index ee2efa6b904273b7cc10a1a0c91515a93d9c15f4..a699c076da40b1969fd1e676a6cb5c6304f8a37f 100644
+index ee2efa6b904273b7cc10a1a0c91515a93d9c15f4..52b5c202ab5cf6684531b97c36e037a5dc22d093 100644
 --- a/dom/canvas/WebGLContext.cpp
 +++ b/dom/canvas/WebGLContext.cpp
-@@ -2763,7 +2763,10 @@ webgl::CompileResult WebGLContext::GetCompileResult(
+@@ -2763,7 +2763,7 @@ webgl::CompileResult WebGLContext::GetCompileResult(
        return;
      }
      // TODO: These could be large and should be made fallible.
 -    ret.translatedSource = ToCString(info->mObjectCode);
-+    // STEALTH-HOOK(fingerprint/webgl/shader-language)
-+    const auto& perLaPagina = shader.ObjectCodePerLaPagina();
-+    ret.translatedSource = ToCString(
-+        perLaPagina.empty() ? info->mObjectCode : perLaPagina);
++    ret.translatedSource = ToCString(StealthPageObjectCode(shader, info->mObjectCode));  // STEALTH-HOOK(fingerprint/webgl/shader-language)
      ret.log = ToCString(shader.CompileLog());
      if (!shader.IsCompiled()) return;
      ret.success = true;
 diff --git a/dom/canvas/WebGLContext.h b/dom/canvas/WebGLContext.h
-index c05f835489beab0ef0ac3d7581223930b5d6cec8..498ea4900e0e2ba23a414794058770c3abbdcf9f 100644
+index c05f835489beab0ef0ac3d7581223930b5d6cec8..ed1a759987c0e78f32e302ed2098dbbe0a202dd8 100644
 --- a/dom/canvas/WebGLContext.h
 +++ b/dom/canvas/WebGLContext.h
-@@ -955,8 +955,9 @@ class WebGLContext : public VRefCounted, public SupportsWeakPtr {
+@@ -954,6 +954,7 @@ class WebGLContext : public VRefCounted, public SupportsWeakPtr {
+   GLenum mDefaultFB_ReadBuffer = LOCAL_GL_BACK;
  
    mutable GLenum mWebGLError = 0;
++  bool mStealthPerPage = false;  // STEALTH-HOOK(fingerprint/webgl/shader-language)
  
-+  // STEALTH-HOOK(fingerprint/webgl/shader-language)
    std::unique_ptr<webgl::ShaderValidator> CreateShaderValidator(
--      GLenum shaderType) const;
-+      GLenum shaderType, bool aPerLaPagina = false) const;
- 
-   // some GL constants
-   uint32_t mGLMaxFragmentUniformVectors = 0;
+       GLenum shaderType) const;
 diff --git a/dom/canvas/WebGLShader.cpp b/dom/canvas/WebGLShader.cpp
-index 2969307257181915e675a4d1b23a40282b619e48..2794018db76965348fcb40d1da148b3de3488e3d 100644
+index 2969307257181915e675a4d1b23a40282b619e48..81c87b9e991dbbc0836d2e3d9fe8edac8186d418 100644
 --- a/dom/canvas/WebGLShader.cpp
 +++ b/dom/canvas/WebGLShader.cpp
-@@ -106,6 +106,8 @@ void WebGLShader::CompileShader() {
+@@ -106,6 +106,7 @@ void WebGLShader::CompileShader() {
      printf_stderr("\n==== end ====\n");
    }
  
-+  // STEALTH-HOOK(fingerprint/webgl/shader-language)
-+  mObjectCodePerLaPagina = StealthPerPageObjectCode(success);
++  mObjectCodePerLaPagina = StealthPerPageObjectCode(success);  // STEALTH-HOOK(fingerprint/webgl/shader-language)
    if (!success) return;
  
    const std::array<const char*, 1> parts = {
 diff --git a/dom/canvas/WebGLShader.h b/dom/canvas/WebGLShader.h
-index 2fbffc4442274b679c8849643341b445b6060d08..145250eae1382db0557ca9d60e60b82a13b39cfa 100644
+index 2fbffc4442274b679c8849643341b445b6060d08..4c5e1db652c7c7dac9df02ff8cf202cfaad3ff91 100644
 --- a/dom/canvas/WebGLShader.h
 +++ b/dom/canvas/WebGLShader.h
-@@ -43,6 +43,8 @@ class WebGLShader final : public WebGLContextBoundObject {
+@@ -42,11 +42,13 @@ class WebGLShader final : public WebGLContextBoundObject {
+ 
    const auto& CompileResults() const { return mCompileResults; }
    const auto& CompileLog() const { return mCompilationLog; }
++  const std::string& ObjectCodePerLaPagina() const;  // STEALTH-HOOK(fingerprint/webgl/shader-language)
    bool IsCompiled() const { return mCompilationSuccessful; }
-+  // STEALTH-HOOK(fingerprint/webgl/shader-language)
-+  const std::string& ObjectCodePerLaPagina() const;
  
   private:
    void BindAttribLocation(GLuint prog, const std::string& userName,
-@@ -66,6 +68,9 @@ class WebGLShader final : public WebGLContextBoundObject {
+                           GLuint index) const;
++  std::string StealthPerPageObjectCode(bool aValid);  // STEALTH-HOOK(fingerprint/webgl/shader-language)
+   void MapTransformFeedbackVaryings(
+       const std::vector<std::string>& varyings,
+       std::vector<std::string>* out_mappedVaryings) const;
+@@ -65,6 +67,7 @@ class WebGLShader final : public WebGLContextBoundObject {
+   std::unique_ptr<const webgl::ShaderValidatorResults>
        mCompileResults;  // Never null.
    bool mCompilationSuccessful = false;
++  std::string mObjectCodePerLaPagina;  // STEALTH-HOOK(fingerprint/webgl/shader-language)
    std::string mCompilationLog;
-+  // STEALTH-HOOK(fingerprint/webgl/shader-language)
-+  std::string StealthPerPageObjectCode(bool aValid);
-+  std::string mObjectCodePerLaPagina;
  };
  
- }  // namespace mozilla
 diff --git a/dom/canvas/WebGLShaderValidator.cpp b/dom/canvas/WebGLShaderValidator.cpp
-index dca28d797ca1dd44b0eec5b7747739051e62c5b0..0da592ab63743a00cf152a58183123950f9125ba 100644
+index dca28d797ca1dd44b0eec5b7747739051e62c5b0..8d55314f948ea26b4e626c96bcce95b460f310f0 100644
 --- a/dom/canvas/WebGLShaderValidator.cpp
 +++ b/dom/canvas/WebGLShaderValidator.cpp
-@@ -84,7 +84,8 @@ static ShCompileOptions ChooseValidatorCompileOptions(
+@@ -84,7 +84,7 @@ static ShCompileOptions ChooseValidatorCompileOptions(
  
  ////////////////////////////////////////
  
 -static ShShaderOutput ShaderOutput(gl::GLContext* gl) {
-+// STEALTH-HOOK(fingerprint/webgl/shader-language)
-+ShShaderOutput webgl::ShaderOutputPerIlDriver(gl::GLContext* gl) {
++ShShaderOutput ShaderOutputPerIlDriver(gl::GLContext* gl) {  // STEALTH-HOOK(fingerprint/webgl/shader-language)
    if (gl->IsGLES()) {
      return SH_ESSL_OUTPUT;
    }
-@@ -117,9 +118,12 @@ static ShShaderOutput ShaderOutput(gl::GLContext* gl) {
- }
- 
+@@ -119,7 +119,7 @@ static ShShaderOutput ShaderOutput(gl::GLContext* gl) {
  std::unique_ptr<webgl::ShaderValidator> WebGLContext::CreateShaderValidator(
--    GLenum shaderType) const {
-+    // STEALTH-HOOK(fingerprint/webgl/shader-language)
-+    GLenum shaderType, bool aPerLaPagina) const {
+     GLenum shaderType) const {
    const auto spec = (IsWebGL2() ? SH_WEBGL2_SPEC : SH_WEBGL_SPEC);
 -  const auto outputLanguage = ShaderOutput(gl);
-+  // STEALTH-HOOK(fingerprint/webgl/shader-language)
-+  const auto outputLanguage =
-+      webgl::StealthShaderOutputLanguage(gl, aPerLaPagina);
++  const auto outputLanguage = StealthShaderOutputLanguage(gl, mStealthPerPage);  // STEALTH-HOOK(fingerprint/webgl/shader-language)
  
    ShBuiltInResources resources;
    sh::InitBuiltInResources(&resources);
 diff --git a/dom/canvas/WebGLShaderValidator.h b/dom/canvas/WebGLShaderValidator.h
-index 1f16b1042ebf1759056be5cecc1aae85faca9546..178acfdb589b13822c4db5b4415d84de06e3f347 100644
+index 1f16b1042ebf1759056be5cecc1aae85faca9546..6a8603a857835daa932ab012791cd9dce56872b1 100644
 --- a/dom/canvas/WebGLShaderValidator.h
 +++ b/dom/canvas/WebGLShaderValidator.h
-@@ -11,6 +11,8 @@
- 
- #include "GLDefs.h"
+@@ -13,6 +13,8 @@
  #include "GLSLANG/ShaderLang.h"
-+// STEALTH-HOOK(fingerprint/webgl/shader-language)
-+#include "StealthWebGLShaderLanguage.h"
  #include "nsString.h"
  
++#include "StealthWebGLShaderLanguage.h"  // STEALTH-HOOK(fingerprint/webgl/shader-language)
++
  namespace mozilla::webgl {
+ 
+ class ShaderValidatorResults final {

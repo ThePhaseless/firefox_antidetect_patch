@@ -40,6 +40,12 @@ namespace mozilla::dom {
  *
  * With the engine off this is byte-for-byte upstream behaviour.
  *
+ * The getter takes the caller's principal: Element.webidl declares the
+ * `shadowRoot` attribute with NeedsSubjectPrincipal (and the unchanged
+ * BinaryName), so the generated binding passes it. Same attribute, same name,
+ * same spec answer for the page - nothing new appears on Element.prototype,
+ * which is what makes this invisible where a new accessor would be the tell.
+ *
  * It lives in a header, and is inline, on purpose: the first two tests below
  * are the content path, and what content pays there is readable from JS (see
  * the principal test), so it must compile to what it did when it sat inside

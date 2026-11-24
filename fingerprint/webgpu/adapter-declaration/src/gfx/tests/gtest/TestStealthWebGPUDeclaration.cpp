@@ -8,10 +8,14 @@
 // have, must be refused: anything it did not set would keep the host's value,
 // which is the leak the declaration exists against.
 
+#include <cstring>
+
+#include "gfxPlatform.h"
 #include "gtest/gtest.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/ScopeExit.h"
 #include "mozilla/dom/WebGPUBinding.h"
+#include "mozilla/gfx/gfxVars.h"
 #include "mozilla/webgpu/StealthWebGPUDeclaration.h"
 #include "mozilla/webgpu/SupportedLimits.h"
 #include "mozilla/webgpu/ffi/wgpu.h"
@@ -142,6 +146,49 @@ TEST(StealthWebGPUDeclaration, FeaturesAreFirefoxsOwnNames)
                   .isNothing());
 }
 
+// Adapter::RequestDevice hands wgpu a descriptor clamped to the host adapter
+// (StealthWebGPUClampToReal): the page may ask for a declared maximum the host
+// lacks and still gets a device. Every "max" limit goes down to the host's,
+// every "min" limit up to it, and the features are cut to the host's.
+TEST(StealthWebGPUDeclaration, RequestDeviceIsClampedToTheRealAdapter)
+{
+  auto restore =
+      MakeScopeExit([] { Preferences::ClearUser("zoom.stealth.fpp.hw_seed"); });
+  ffi::WGPUAdapterInformation real = {};
+  real.features = 0x5;
+  SetLimit(&real.limits, Limit::MaxTextureDimension2D, 8192);
+  SetLimit(&real.limits, Limit::MinUniformBufferOffsetAlignment, 64);
+  const auto asked = [] {
+    ffi::WGPUFfiDeviceDescriptor desc = {};
+    desc.required_features = 0x7;
+    SetLimit(&desc.required_limits, Limit::MaxTextureDimension2D, 16384);
+    SetLimit(&desc.required_limits, Limit::MinUniformBufferOffsetAlignment,
+             32);
+    return desc;
+  };
+
+  // Engine on: the descriptor is the AND of the features, the lower "max" and
+  // the higher "min".
+  Preferences::SetInt("zoom.stealth.fpp.hw_seed", 7);
+  ffi::WGPUFfiDeviceDescriptor desc = asked();
+  StealthWebGPUClampToReal(desc, real, Key);
+  EXPECT_EQ(desc.required_features, real.features);
+  EXPECT_EQ(GetLimit(desc.required_limits, Limit::MaxTextureDimension2D),
+            8192u);
+  EXPECT_EQ(GetLimit(desc.required_limits, Limit::MinUniformBufferOffsetAlignment),
+            64u);
+
+  // Negative control, engine off: Firefox's descriptor is left as it is.
+  Preferences::ClearUser("zoom.stealth.fpp.hw_seed");
+  desc = asked();
+  StealthWebGPUClampToReal(desc, real, Key);
+  EXPECT_EQ(desc.required_features, asked().required_features);
+  EXPECT_EQ(GetLimit(desc.required_limits, Limit::MaxTextureDimension2D),
+            16384u);
+  EXPECT_EQ(GetLimit(desc.required_limits, Limit::MinUniformBufferOffsetAlignment),
+            32u);
+}
+
 #ifdef XP_WIN
 
 // The adapter on a Windows host without a GPU (gfx/wgpu_bindings/src/
@@ -161,6 +208,24 @@ TEST(StealthWebGPUAdapter, NoCompositorAdapterIsTheSoftwareOne)
   auto restore = MakeScopeExit([] { Preferences::ClearUser(kSeedPref); });
   Preferences::SetInt(kSeedPref, 7);
   EXPECT_EQ(stealth_wgpu_adapter_after_search(false), 1u);
+}
+
+// The server asks the GPU process for the compositor's adapter LUID
+// (wgpu_parent_get_compositor_device_luid, dom/webgpu/ipc/WebGPUParent.cpp) into
+// memory it has not initialised. Without a compositor device Firefox's code
+// writes nothing, so what the server reads is whatever was there: the same
+// call must give the same LUID whatever the memory held before. Without the
+// zeroing a prefilled LUID stays prefilled where there is no compositor device
+// (the CI runner has none), and the two calls differ.
+TEST(StealthWebGPUAdapter, NoCompositorDeviceLeavesNoUninitialisedLuid)
+{
+  gfxPlatform::GetPlatform();
+  ffi::WGPUFfiLUID fromZero = {};
+  ffi::WGPUFfiLUID fromGarbage;
+  memset(&fromGarbage, 0xA5, sizeof(fromGarbage));
+  ffi::wgpu_parent_get_compositor_device_luid(&fromZero);
+  ffi::wgpu_parent_get_compositor_device_luid(&fromGarbage);
+  EXPECT_EQ(memcmp(&fromZero, &fromGarbage, sizeof(fromZero)), 0);
 }
 
 TEST(StealthWebGPUAdapter, EngineOffKeepsMozillasNull)
@@ -282,6 +347,42 @@ TEST(StealthWebGPUBundledVulkan, TheAdapterIsOursAndHoldsTheDeclaration)
   const char* names = reinterpret_cast<const char*>(badNames);
   EXPECT_EQ(LimitNames(names), known) << names;
   EXPECT_EQ(static_cast<size_t>(badLimits), known.size()) << names;
+}
+
+// gfxPlatform::InitWebGPUConfig calls StealthWebGPUPlatformInit: with the
+// engine on the bundled driver is mapped under the loader's name and WebGPU
+// stays as Firefox decided (it is turned off only when the driver cannot be
+// mapped, never left to a host driver). Engine off: nothing is mapped here and
+// the answer is Firefox's.
+TEST(StealthWebGPUBundledVulkan, AllowWebGPUFollowsTheBundledVulkan)
+{
+  gfxPlatform::GetPlatform();
+  const bool before = gfx::gfxVars::AllowWebGPU();
+  auto restore = MakeScopeExit([before] {
+    Preferences::ClearUser("zoom.stealth.fpp.hw_seed");
+    gfx::gfxVars::SetAllowWebGPU(before);
+  });
+
+  // Negative control, engine off: Firefox's value is left alone.
+  Preferences::ClearUser("zoom.stealth.fpp.hw_seed");
+  gfx::gfxVars::SetAllowWebGPU(true);
+  StealthWebGPUPlatformInit();
+  EXPECT_TRUE(gfx::gfxVars::AllowWebGPU());
+
+  // Engine on: the driver is ours, and WebGPU stays on.
+  Preferences::SetInt("zoom.stealth.fpp.hw_seed", 7);
+  gfx::gfxVars::SetAllowWebGPU(true);
+  StealthWebGPUPlatformInit();
+  EXPECT_TRUE(gfx::gfxVars::AllowWebGPU());
+  void* byName = dlopen("libvulkan.so.1", RTLD_NOW | RTLD_NOLOAD);
+  ASSERT_TRUE(byName);
+  Dl_info info = {};
+  ASSERT_TRUE(dladdr(dlsym(byName, "vkGetInstanceProcAddr"), &info));
+  dlclose(byName);
+  ASSERT_TRUE(info.dli_fname);
+  EXPECT_NE(std::string(info.dli_fname).find("/lavapipe/libvulkan_lvp.so"),
+            std::string::npos)
+      << info.dli_fname;
 }
 
 // No library of the host's Vulkan stack is mapped in this process: the only

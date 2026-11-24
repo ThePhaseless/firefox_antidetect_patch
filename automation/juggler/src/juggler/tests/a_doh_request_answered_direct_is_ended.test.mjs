@@ -21,36 +21,38 @@ const TAG = '  // STEALTH-HOOK(network/doh)';
 test('TRRServiceChannel::OnProxyAvailable hands the answer, not only the status, to the fail-closed rule', () => {
   const text = read('netwerk/protocol/http/TRRServiceChannel.cpp');
   const body = text.slice(text.indexOf('TRRServiceChannel::OnProxyAvailable('));
-  const line = 'if (StealthTRRServiceFailClosed(this, StealthTRRProxyAnswer(status, pi, true), mCanceled)) { return NS_OK; }' + TAG;
+  const line = 'if (StealthTRRServiceOnProxyAnswer(this, status, pi)) return NS_OK;' + TAG;
   const hook = body.indexOf(line);
   assert.ok(hook > 0, 'the hook does not read the answer');
   assert.ok(body.indexOf('if (NS_SUCCEEDED(status)) mProxyInfo = pi;') > hook, 'the answer is used before the rule');
   assert.ok(body.indexOf('rv = BeginConnect();') > hook, 'the connection begins before the rule');
+  // The answer is turned into a status by one call, in the template, for a channel that is a DoH one by construction.
+  const header = read('netwerk/ipc/StealthTRRContext.h');
+  const fn = header.match(/bool StealthTRRServiceOnProxyAnswer\([\s\S]*?\n}\n/)[0];
+  assert.match(fn, /StealthTRRProxyAnswer\(aStatus, aProxyInfo, true\)/);
 });
 
 test('nsHttpChannel::OnProxyAvailable does the same for the DoH channel, and for it alone', () => {
   const text = read('netwerk/protocol/http/nsHttpChannel.cpp');
   const body = text.slice(text.indexOf('nsHttpChannel::OnProxyAvailable('));
-  const line = 'if (StealthTRRFailClosed(this, StealthTRRProxyAnswer(status, pi, LoadIsTRRServiceChannel()), ' +
-      'StealthProxyIsMandatory(LoadIsTRRServiceChannel(), mLoadInfo.get()), mCanceled)) { return NS_OK; }' + TAG;
+  const line = 'if (StealthChannelOnProxyAnswer(this, status, pi)) return NS_OK;' + TAG;
   const hook = body.indexOf(line);
   assert.ok(hook > 0, 'the hook does not read the answer');
   assert.ok(body.indexOf('if (NS_SUCCEEDED(status)) {\n    mProxyInfo = pi;') > hook, 'the answer is used before the rule');
-  // The DIRECT answer of a page channel is legitimate (a bypass list): the third argument says which channel it is.
-  assert.doesNotMatch(text, /StealthTRRProxyAnswer\(status, pi, true\)/);
+  // The DIRECT answer of a page channel is legitimate (a bypass list): the template passes the kind of channel it is.
+  assert.doesNotMatch(text, /StealthTRRProxyAnswer\(/);
+  const header = read('netwerk/ipc/StealthTRRContext.h');
+  const fn = header.match(/bool StealthChannelOnProxyAnswer\([\s\S]*?\n}\n/)[0];
+  assert.match(fn, /StealthTRRProxyAnswer\(aStatus, aProxyInfo, isTRR\)/);
+  assert.doesNotMatch(fn, /aProxyInfo, true\)/);
 });
 
-test('no tagged line is added: the two Mozilla files keep the lines their budget allows', () => {
-  const tagged = text => text.split('\n').filter(l => /STEALTH-HOOK\(network\/doh\)/.test(l)).length;
-  assert.equal(tagged(read('netwerk/protocol/http/TRRServiceChannel.cpp')), 9);
-  assert.equal(tagged(read('netwerk/protocol/http/nsHttpChannel.cpp')), 5);
-  // The answer is read by the call that already existed, not by a call of its own.
-  for (const file of ['netwerk/protocol/http/TRRServiceChannel.cpp', 'netwerk/protocol/http/nsHttpChannel.cpp']) {
-    const lines = read(file).split('\n').filter(l => l.includes('StealthTRRProxyAnswer('));
-    assert.equal(lines.length, 1, file);
-    assert.match(lines[0], /FailClosed\(this, StealthTRRProxyAnswer\(/, file);
-    assert.ok(lines[0].endsWith(TAG), file);
-  }
+test('the answer of a proxy lookup is read by the templates of our header alone, never by a call in the two Mozilla files', () => {
+  // The only callers of StealthTRRProxyAnswer are the two templates that hand a channel's answer to the rule.
+  for (const file of ['netwerk/protocol/http/TRRServiceChannel.cpp', 'netwerk/protocol/http/nsHttpChannel.cpp'])
+    assert.doesNotMatch(read(file), /StealthTRRProxyAnswer\(/, file);
+  const header = read('netwerk/ipc/StealthTRRContext.h');
+  assert.equal(header.split(/StealthTRRProxyAnswer\(aStatus/).length - 1, 2);
 });
 
 test('the two functions are declared where the Mozilla files include them and defined with the resolver', () => {

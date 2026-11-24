@@ -2,11 +2,13 @@
 // override sent by Browser.setGeolocationOverride). The engine never reads the
 // host for a position. The Windows location provider (WindowsLocationProvider and
 // the actors of the WINDOWS_UTILS utility process: geolocation.dll,
-// locationframeworkps.dll) is not in the tree any more: its files are deleted and
-// no moz.build, IPDL list or source names it, so nothing can start it. The hook
-// StealthSelectGeolocationProvider only keeps the Linux (Portal, GeoClue), macOS
-// (CoreLocation) and Android providers out. A watchPosition reaches the PARENT's
-// global service even with an override (Geolocation.cpp StartDevice ->
+// locationframeworkps.dll) is in the tree exactly as Mozilla wrote it, and cannot
+// be reached: GeolocationService::Init() returns below our guard before the only
+// `new WindowsLocationProvider()`, and the provider is the only caller of
+// UtilityProcessManager::GetWindowsUtilsPromise, the only way the process starts.
+// The hook StealthSelectGeolocationProvider keeps every host provider out (Windows,
+// Linux Portal and GeoClue, macOS CoreLocation, Android). A watchPosition reaches
+// the PARENT's global service even with an override (Geolocation.cpp StartDevice ->
 // AddGeolocationListener -> ContentParent.cpp RecvAddGeolocationListener).
 //
 // ACCEPTANCE CONTRACT for the end-to-end of the whole family (hooks A, B, C, D;
@@ -39,8 +41,8 @@
 //      "Unknown error acquiring position") within about 100 ms, and items 3 and 4
 //      hold as well.
 //
-// This file pins hook A (the provider is never the Windows one, nor any other
-// host provider); B, C and D have their own tests.
+// This file pins THE ONLY ENTRY of the host providers (a second entry that Mozilla
+// adds in a later version fails it); B, C and D have their own tests.
 //
 // Run: node --test juggler/tests/*.test.mjs
 
@@ -62,39 +64,6 @@ const service = read(SERVICE);
 const init = service.slice(service.indexOf('nsresult GeolocationService::Init()'),
   service.indexOf('GeolocationService::~GeolocationService()'));
 
-test('Init() carries the hook: an include and a call with an early return, marked STEALTH-HOOK', () => {
-  assert.ok(service.includes(
-    `#include "mozilla/StealthGeolocation.h"  // STEALTH-HOOK(${FOLDER})\n`));
-  assert.ok(init.includes(
-    `  // STEALTH-HOOK(${FOLDER}): the provider is the network one, never a host one.\n` +
-    '  if (StealthSelectGeolocationProvider(mProvider)) {\n' +
-    '    return NS_OK;\n' +
-    '  }\n'));
-  const hookLines = service.split('\n').filter(l => l.includes('STEALTH-HOOK'));
-  assert.equal(hookLines.length, 2);
-  const added = ['#include "mozilla/StealthGeolocation.h"', 'StealthSelectGeolocationProvider', 'return NS_OK;'];
-  assert.ok(added.length <= 5);
-});
-
-test('the hook runs after the shutdown observer and before every provider Mozilla selects', () => {
-  const hook = init.indexOf('StealthSelectGeolocationProvider(mProvider)');
-  assert.ok(hook > 0);
-  assert.ok(init.indexOf('obs->AddObserver(this, "xpcom-shutdown", false);') < hook);
-  for (const marker of ['#ifdef MOZ_WIDGET_ANDROID', 'geo.provider.use_mls',
-    'MOZ_WIDGET_COCOA', 'new PortalLocationProvider()', 'new GeoclueLocationProvider()'])
-    assert.ok(init.indexOf(marker) > hook, marker + ' must come after the hook');
-});
-
-// The Windows provider is removed from the build and the tree. These are the only
-// places that may still carry one of its names: dead names (a metric's description,
-// the module ownership map, the permission path's own helper), and the files that
-// say it is gone.
-const DEAD_NAME_LEAVES = new Set([
-  'dom/geolocation/GeolocationSystemWin.cpp',      // OpenWindowsLocationSettings: the OS settings page, not the provider
-  'dom/geolocation/metrics.yaml',                  // windows_failure metric description
-  'mots.yaml',                                     // ownership glob
-  'remote/test/puppeteer/packages/browsers/src/browser-data/chrome.ts',  // getChromeWindowsLocation: unrelated
-]);
 const gitGrep = args => {
   try {
     return execFileSync('git', ['grep', ...args], { cwd: TREE, encoding: 'utf8' });
@@ -103,42 +72,65 @@ const gitGrep = args => {
     throw e;
   }
 };
+const lines = out => out.trim().split('\n').filter(Boolean);
 
-test("the Windows provider's files do not exist and no list names them", () => {
-  for (const f of ['WindowsLocationProvider.cpp', 'WindowsLocationProvider.h', 'WindowsLocationChild.cpp',
-    'WindowsLocationChild.h', 'WindowsLocationParent.cpp', 'WindowsLocationParent.h',
-    'WindowsLegacyLocationChild.cpp', 'WindowsLegacyLocationChild.h', 'WindowsRuntimeLocationChild.cpp',
-    'WindowsRuntimeLocationChild.h', 'PWindowsLocation.ipdl', 'moz.build'])
-    assert.ok(!fs.existsSync(path.join(TREE, 'dom/system/windows/location', f)), f);
-  assert.ok(!fs.existsSync(path.join(TREE, 'dom/system/windows/location')));
-  // No build file, IPDL list, jar or test manifest mentions the directory (mots.yaml is an ownership glob).
-  const lists = gitGrep(['-n', 'windows/location', '--', '*.build', '*.mozbuild', '*.ipdl', '*.ipdlh',
-    '*.toml', '*.ini', '*.mn', '*.conf', '*.py', '*.txt', '*.json', '*.yaml', ':!mots.yaml', ':!juggler/tests/*']);
-  assert.equal(lists, '');
-  for (const rel of ['dom/system/windows/moz.build', 'toolkit/components/geolocation/moz.build'])
-    assert.doesNotMatch(read(rel), /windows\/location|DIRS \+= \["location"\]|MOZ_WIDGET_TOOLKIT"\] == "windows"/, rel);
+test('the hook runs after the shutdown observer and before every provider Mozilla selects, the Windows one included', () => {
+  const hook = init.indexOf('StealthSelectGeolocationProvider(mProvider)');
+  assert.ok(hook > 0);
+  assert.equal(init.split('StealthSelectGeolocationProvider(').length, 2);
+  assert.ok(init.indexOf('obs->AddObserver(this, "xpcom-shutdown", false);') < hook);
+  for (const marker of ['#ifdef MOZ_WIDGET_ANDROID', 'geo.provider.use_mls',
+    'MOZ_WIDGET_COCOA', 'new PortalLocationProvider()', 'new GeoclueLocationProvider()',
+    '#ifdef XP_WIN', 'ms-windows-location', 'new WindowsLocationProvider()'])
+    assert.ok(init.indexOf(marker) > hook, marker + ' must come after the hook');
 });
 
-test('no source names the provider or its actors, outside the dead-name leaves', () => {
-  const out = gitGrep(['-lE', 'WindowsLocationProvider|PWindowsLocation|WindowsLocation(Child|Parent)|WindowsRuntimeLocation|WindowsLegacyLocation|getChromeWindowsLocation|OpenWindowsLocationSettings',
-    '--', '.', ':!juggler/tests/*']);
-  for (const rel of out.trim().split('\n').filter(Boolean))
-    assert.ok(DEAD_NAME_LEAVES.has(rel), rel + ' still names the Windows provider');
-  // The two Mozilla files that built it no longer do.
-  assert.doesNotMatch(read(SERVICE), /WindowsLocation|ms-windows-location|#ifdef XP_WIN/);
-  assert.doesNotMatch(read('dom/system/windows/WindowsUtilsChild.h'), /Location/);
-  assert.doesNotMatch(read('dom/system/windows/PWindowsUtils.ipdl'), /Location|manages/);
+test('the only `new WindowsLocationProvider` of the tree is in GeolocationService::Init, below our guard', () => {
+  const out = lines(gitGrep(['-nE', 'new +WindowsLocationProvider', '--', '.', ':!juggler/tests/*']));
+  assert.equal(out.length, 1, out.join('\n'));
+  assert.ok(out[0].startsWith(SERVICE + ':'), out[0]);
+  const at = service.indexOf('new WindowsLocationProvider()');
+  assert.ok(at > service.indexOf('nsresult GeolocationService::Init()'));
+  assert.ok(at < service.indexOf('GeolocationService::~GeolocationService()'));
+  assert.ok(at > service.indexOf('StealthSelectGeolocationProvider(mProvider)'));
+  // The guard is a return: nothing between it and the block can run.
+  assert.match(init, /if \(StealthSelectGeolocationProvider\(mProvider\)\) return NS_OK;/);
+  // No other file names the provider's class (its own files and the include of Init aside).
+  const names = gitGrep(['-lE', 'WindowsLocationProvider', '--', '.', ':!juggler/tests/*']);
+  for (const f of lines(names))
+    assert.ok(f === SERVICE || f.startsWith('dom/system/windows/location/'), f);
 });
 
-test('the WINDOWS_UTILS process kind has no caller left (its definition may remain)', () => {
+test('the only caller of GetWindowsUtilsPromise (the only start of the WINDOWS_UTILS process) is WindowsLocationProvider', () => {
   const out = gitGrep(['-nE', 'GetWindowsUtilsPromise|ReleaseWindowsUtils', '--', '*.cpp', '*.h', '*.mm', '*.js', '*.mjs', ':!juggler/tests/*']);
-  for (const line of out.trim().split('\n').filter(Boolean))
-    assert.match(line, /^ipc\/glue\/UtilityProcessManager\.(cpp|h):/, line);
+  for (const line of lines(out))
+    assert.match(line, /^(ipc\/glue\/UtilityProcessManager\.(cpp|h)|dom\/system\/windows\/location\/WindowsLocationProvider\.cpp):/, line);
+  const callers = lines(out).filter(l => l.startsWith('dom/system/windows/location/WindowsLocationProvider.cpp:'));
+  assert.equal(callers.length, 2, 'one GetWindowsUtilsPromise and one ReleaseWindowsUtils');
   // Inside the manager, the only uses are the definitions themselves.
   const cpp = read('ipc/glue/UtilityProcessManager.cpp');
   const calls = cpp.split('\n').filter(l => /GetWindowsUtilsPromise|ReleaseWindowsUtils/.test(l) &&
     !/^UtilityProcessManager::GetWindowsUtilsPromise\(\) \{|^void UtilityProcessManager::ReleaseWindowsUtils|"UtilityProcessManager::GetWindowsUtilsPromise"|LaunchError\("GetWindowsUtilsPromise|PWindowsUtils|WindowsUtilsPromise>/.test(l));
   assert.deepEqual(calls, []);
+  // The process kind starts in one place, and the parent actor that asks for it is made in one place.
+  assert.deepEqual([...new Set(lines(gitGrep(['-nE', '(Sandboxing|Sbox)Kind::WINDOWS_UTILS', '--', '*.cpp', '*.h', ':!juggler/tests/*']))
+    .map(l => l.split(':')[0]))].sort(), [
+    'ipc/glue/UtilityProcessManager.cpp', 'security/sandbox/win/src/sandboxbroker/sandboxBroker.cpp',
+    'toolkit/xre/nsAppRunner.cpp'].sort());
+  assert.deepEqual(lines(gitGrep(['-lE', 'new +dom::WindowsUtilsParent|SendStartWindowsUtilsService', '--', '*.cpp', '*.h', ':!juggler/tests/*'])).sort(), [
+    'dom/system/windows/WindowsUtilsParent.h', 'ipc/glue/UtilityProcessManager.cpp'].sort());
+});
+
+test("geo.provider.ms-windows-location is read only by Init, below the guard; its default is Mozilla's", () => {
+  const out = lines(gitGrep(['-n', 'ms-windows-location', '--', '.', ':!juggler/tests/*']));
+  assert.deepEqual([...new Set(out.map(l => l.split(':')[0]))].sort(), ['modules/libpref/init/all.js', SERVICE]);
+  assert.ok(init.indexOf('ms-windows-location') > init.indexOf('StealthSelectGeolocationProvider(mProvider)'));
+});
+
+test('the actors of the provider are named only by the provider, the utility child Mozilla wrote for it, and a metric description', () => {
+  const out = gitGrep(['-lE', 'PWindowsLocation|WindowsLocation(Child|Parent)|WindowsRuntimeLocation|WindowsLegacyLocation',
+    '--', '.', ':!juggler/tests/*', ':!dom/system/windows/*']);
+  for (const f of lines(out)) assert.equal(f, 'dom/geolocation/metrics.yaml', f);
 });
 
 test('the own file picks the network provider by contract and reads neither a pref nor the host', () => {

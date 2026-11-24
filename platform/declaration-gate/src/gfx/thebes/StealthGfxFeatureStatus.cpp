@@ -7,13 +7,19 @@
 
 #include "GfxInfoBase.h"
 #include "StealthDeclarationGate.h"
+#include "mozilla/Atomics.h"
 #include "mozilla/StaticMutex.h"
 #include "mozilla/StaticPrefs_zoom.h"
 #include "mozilla/StaticPtr.h"
 #include "mozilla/UniquePtr.h"
 #include "mozilla/gfx/StealthRefuse.h"
+#include "nsCharSeparatedTokenizer.h"
 #include "nsIGfxInfo.h"
 #include "nsXULAppAPI.h"
+
+#ifdef MOZ_WIDGET_GTK
+#  include "mozilla/WidgetUtilsGtk.h"
+#endif
 
 namespace mozilla::gfx {
 
@@ -192,8 +198,8 @@ bool StealthParseGfxFeatureStatus(const nsACString& aDeclaration,
 }
 
 bool StealthAnswerGfxFeature(const StealthGfxFeatureTable& aTable,
-                             int32_t aFeature, bool aGLProbeSucceeded,
-                             nsACString& aFailureId, int32_t* aStatus) {
+                             int32_t aFeature, nsACString& aFailureId,
+                             int32_t* aStatus) {
   if (!IsLive(aFeature) || size_t(aFeature) >= aTable.Length() ||
       aTable[aFeature].isNothing()) {
     return false;
@@ -201,13 +207,7 @@ bool StealthAnswerGfxFeature(const StealthGfxFeatureTable& aTable,
   int32_t asked = aFeature;
 #ifdef MOZ_WIDGET_GTK
   if (aFeature == nsIGfxInfo::FEATURE_WEBGL_OPENGL) {
-    if (!aGLProbeSucceeded) {
-      // The host has no GL at all: a host fact Mozilla's own answer states,
-      // WebGL stays unavailable.
-      *aStatus = nsIGfxInfo::FEATURE_BLOCKED_DEVICE;
-      aFailureId.AssignLiteral("FEATURE_FAILURE_GLXTEST_FAILED");
-      return true;
-    }
+    // The host is not probed: the declared WebGL answer is the answer.
     asked = nsIGfxInfo::FEATURE_WEBGL;
   }
 #endif
@@ -217,7 +217,7 @@ bool StealthAnswerGfxFeature(const StealthGfxFeatureTable& aTable,
   return true;
 }
 
-bool StealthGfxDeclaredStatus(nsIGfxInfo* aGfxInfo, int32_t aFeature,
+bool StealthGfxDeclaredStatus(nsIGfxInfo* /* aGfxInfo */, int32_t aFeature,
                               nsACString& aFailureId, int32_t* aStatus) {
   if (!StealthEngineActive() || !IsLive(aFeature)) {
     return false;
@@ -236,14 +236,6 @@ bool StealthGfxDeclaredStatus(nsIGfxInfo* aGfxInfo, int32_t aFeature,
     }
     return false;
   }
-  bool probe = true;
-#ifdef MOZ_WIDGET_GTK
-  if (aFeature == nsIGfxInfo::FEATURE_WEBGL_OPENGL && aGfxInfo) {
-    nsAutoString testType;
-    probe = NS_SUCCEEDED(aGfxInfo->GetTestType(testType)) &&
-            !testType.IsEmpty();
-  }
-#endif
   StaticMutexAutoLock lock(sMutex);
   if (!sTable) {
     nsAutoCString declaration;
@@ -265,9 +257,45 @@ bool StealthGfxDeclaredStatus(nsIGfxInfo* aGfxInfo, int32_t aFeature,
     }
     sTable = table.release();
   }
-  return StealthAnswerGfxFeature(*sTable, aFeature, probe, aFailureId,
-                                 aStatus);
+  return StealthAnswerGfxFeature(*sTable, aFeature, aFailureId, aStatus);
 }
+
+// Set once, on the main thread, by the hook right after
+// XREMain::XRE_mainRun's InitializeUserPrefs; read wherever GfxInfo is.
+static Atomic<bool> sStealthUserPrefsRead(false);
+
+void StealthMarkUserPrefsRead() { sStealthUserPrefsRead = true; }
+
+bool StealthUserPrefsRead() { return sStealthUserPrefsRead; }
+
+void StealthSetUserPrefsReadForTesting(bool aRead) {
+  sStealthUserPrefsRead = aRead;
+}
+
+#ifdef MOZ_WIDGET_GTK
+bool StealthNoHostGLProbe() {
+  // Before the profile's preferences are read the declaration is unknown
+  // (StealthEngineActive() reads the defaults): no probe. After, only stock
+  // Firefox (engine off) probes; GfxInfo::GetData fires it then.
+  return !StealthUserPrefsRead() || StealthEngineActive();
+}
+
+bool StealthFillGtkGfxInfoWithoutHost(nsACString& aTestType,
+                                      bool& aGlxTestError,
+                                      uint32_t& aAdapterRAM, bool& aIsWayland,
+                                      bool& aIsXWayland) {
+  if (StealthUserPrefsRead() && !StealthEngineActive()) {
+    return false;  // stock Firefox: Mozilla's GetData reads its glxtest
+  }
+  aTestType.AssignLiteral("EGL");
+  aGlxTestError = false;
+  aAdapterRAM = 0;
+  // The display connection, as GfxInfo::GetData computes them after glxtest.
+  aIsWayland = widget::GdkIsWaylandDisplay();
+  aIsXWayland = widget::IsXWaylandProtocol();
+  return true;
+}
+#endif
 
 bool StealthGfxDeclarationActive() { return StealthEngineActive(); }
 

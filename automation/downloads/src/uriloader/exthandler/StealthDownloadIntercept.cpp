@@ -15,6 +15,16 @@
 #include "nsIURI.h"
 #include "nsNetCID.h"
 
+// Install or replace the Juggler-side download interceptor (called from
+// juggler/TargetRegistry.js at startup). It is only stored here: Start asks it
+// on each download and Complete tells it when the download ended. Declared by
+// nsIExternalHelperAppService.setDownloadInterceptor.
+NS_IMETHODIMP nsExternalHelperAppService::SetDownloadInterceptor(
+    nsIDownloadInterceptor* interceptor) {
+  mInterceptor = interceptor;
+  return NS_OK;
+}
+
 // Same saver setup as nsExternalAppHandler::SetUpTempFile, but the target is
 // the file the interceptor chose and it is final: no ".part", no rename.
 // static

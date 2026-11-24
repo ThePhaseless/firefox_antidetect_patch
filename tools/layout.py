@@ -155,6 +155,8 @@ FEATURES = {
 
 # Files we add to Firefox's tree, first match wins.
 OWN_FILES = [
+    (r"^dom/base/test/gtest/TestStealthStackFrames\.cpp$", "fingerprint/js-surface/stack-frames"),
+    (r"^dom/media/webrtc/transport/mdns_service/src/stealth_tests\.rs$", "fingerprint/webrtc/declared-network"),
     (r"^build/stealth_check_build_files\.", "platform/build-tools"),
     (r"^build/stealth_check_sources\.", "platform/build-tools"),
     (r"^modules/libpref/test/test_stealth_prefs_declared_once\.", "platform/prefs"),
@@ -165,6 +167,7 @@ OWN_FILES = [
     (r"^gfx/thebes/StealthFcFontList\.", "fingerprint/fonts/font-list"),
     (r"^dom/canvas/StealthWebGLReadback\.", "fingerprint/canvas/noise-projection"),
     (r"^dom/canvas/StealthWebGLParams\.", "fingerprint/webgl/parameters"),
+    (r"^dom/canvas/gtest/TestStealthWebGLParams\.cpp$", "fingerprint/webgl/parameters"),
     (r"^gfx/gl/StealthGLMultisample\.", "fingerprint/webgl/multisample"),
     (r"^gfx/gl/gtest/TestStealthGLMultisample\.cpp$", "fingerprint/webgl/multisample"),
     (r"^gfx/gl/StealthOwnGL\.", "fingerprint/webgl/own-gl"),
@@ -269,6 +272,62 @@ OWN_FILES = [
     (r"^browser/components/tests/unit/test_stealth_launch_counter\.", "platform/launch-counter"),
     (r"^browser/components/StealthLaunchCounter\.sys\.", "platform/launch-counter"),
     (r"^browser/app/winlauncher/StealthJugglerPipe\.", "automation/pipe"),
+    # Own files of the reworked folders (exact paths; what each folder's branch adds).
+    (r"^dom/html/StealthFileChooser\.h$", "automation/file-chooser"),
+    (r"^js/xpconnect/tests/unit/test_stealth_hybrid_xrays_options\.js$", "automation/hybrid-xrays"),
+    (r"^security/manager/ssl/StealthIgnoreHTTPSErrors\.h$", "automation/ignore-https-errors"),
+    (r"^(dom/events/StealthDragGesture\.h|dom/ipc/StealthJugglerCoalesce\.h|"
+     r"dom/ipc/gtest/TestStealthDragGesture\.cpp|dom/ipc/gtest/TestStealthJugglerCoalesce\.cpp|"
+     r"dom/ipc/gtest/TestStealthMouseEventIPC\.cpp|layout/base/gtest/TestStealthJugglerMouseAck\.cpp)$", "automation/input"),
+    (r"^(docshell/base/test/gtest/TestStealthNavigation\.cpp|docshell/base/test/gtest/stealth\.build|"
+     r"netwerk/base/StealthLoadInfo\.cpp|netwerk/base/StealthLoadInfo\.h|netwerk/ipc/StealthLoadIdentifier\.h)$", "automation/navigation"),
+    (r"^dom/media/webaudio/StealthAudioContextValues\.h$", "fingerprint/audio/context-values"),
+    (r"^dom/media/StealthSampleRate\.h$", "fingerprint/audio/sample-rate"),
+    (r"^(dom/canvas/StealthCanvasUtils\.h|gfx/2d/StealthRecordingProjectedSurface\.inc\.h)$", "fingerprint/canvas/noise-projection"),
+    (r"^gfx/tests/gtest/TestStealthBundleHooks\.h$", "fingerprint/fonts/bundle"),
+    (r"^(gfx/tests/gtest/TestStealthFontListHooks\.h|gfx/thebes/StealthFontListHooks\.cpp|"
+     r"gfx/thebes/StealthFontListHooks\.h)$", "fingerprint/fonts/font-list"),
+    (r"^gfx/thebes/StealthDesignFontAccess\.h$", "fingerprint/fonts/metrics"),
+    (r"^dom/workers/StealthHardwareConcurrency\.h$", "fingerprint/hardware/concurrency"),
+    (r"^dom/base/StealthHardwareProfile\.h$", "fingerprint/hardware/profile"),
+    (r"^(netwerk/protocol/res/gtest/TestStealthBranding\.cpp|netwerk/protocol/res/gtest/moz\.build|"
+     r"security/sandbox/linux/broker/StealthLinuxSandboxBranding\.h|"
+     r"security/sandbox/linux/gtest/TestStealthBrandingPolicy\.cpp)$", "fingerprint/js-surface/branding"),
+    (r"^(devtools/shared/heapsnapshot/tests/gtest/TestStealthDebugger\.cpp|"
+     r"juggler/tests/a_forced_detach_returns_before_the_thread_attaches\.test\.mjs)$", "fingerprint/js-surface/debugger"),
+    (r"^js/src/debugger/StealthEvalName\.h$", "fingerprint/js-surface/eval-name"),
+    (r"^(dom/file/StealthNativeEOL\.h|dom/serializers/StealthPlainTextLineBreak\.h)$", "fingerprint/js-surface/line-endings"),
+    (r"^netwerk/protocol/http/StealthAcceptLanguage\.h$", "fingerprint/locale-time/accept-language"),
+    (r"^intl/locale/tests/gtest/TestStealthRegionalLocales\.cpp$", "fingerprint/locale-time/language"),
+    (r"^dom/base/test/gtest/TestStealthTimezone\.cpp$", "fingerprint/locale-time/timezone"),
+    (r"^(dom/serviceworkers/StealthServiceWorkerDeclaration\.cpp|"
+     r"dom/serviceworkers/StealthServiceWorkerDeclaration\.h|dom/worklet/StealthWorkletDeclaration\.h)$", "fingerprint/locale-time/workers"),
+    (r"^xpfe/appshell/StealthAppWindowFocus\.h$", "fingerprint/screen-window/focus"),
+    (r"^widget/gtk/StealthOcclusion\.h$", "fingerprint/screen-window/occlusion"),
+    (r"^layout/base/StealthInnerSizeSync\.h$", "fingerprint/screen-window/screen"),
+    (r"^(dom/media/webrtc/transport/test/gtest/TestStealthDeclaredNetworkBirth\.cpp|"
+     r"dom/media/webrtc/transport/test/nr_stealth_test_network\.h|"
+     r"dom/media/webrtc/transport/third_party/nICEr/src/stun/nr_stealth_addrs\.h|"
+     r"juggler/tests/the_host_network_is_read_nowhere_and_ports_are_the_connections\.test\.mjs)$", "fingerprint/webrtc/declared-network"),
+    (r"^(netwerk/dns/StealthTRRRequest\.cpp|netwerk/dns/StealthTRRRequest\.h)$", "network/doh"),
+    (r"^(dom/media/webrtc/jsapi/StealthPcProxyConfig\.h|"
+     r"dom/media/webrtc/transport/ipc/StealthWebrtcTcpSocket\.h|"
+     r"dom/media/webrtc/transport/test/gtest/TestStealthUdpSocketOfPcRefused\.cpp|"
+     r"netwerk/protocol/http/StealthHttp3Socks\.cpp|netwerk/protocol/http/StealthHttp3Socks\.h|"
+     r"netwerk/test/gtest/TestStealthHttp3Socks\.cpp|toolkit/xre/StealthIcePrefs\.cpp|"
+     r"toolkit/xre/StealthIcePrefs\.h)$", "network/proxy-udp"),
+    (r"^(python/mozbuild/mozbuild/stealth_build_tools\.py|scripts/ci/test_stealth_build_tools\.py)$", "platform/build-tools"),
+    (r"^(dom/media/webrtc/tests/gtest/TestStealthWindowInputDesktop\.cpp|"
+     r"dom/media/webrtc/tests/gtest/moz\.build)$", "platform/hidden-desktop"),
+    (r"^(modules/libpref/StealthPrefSanitize\.cpp|modules/libpref/StealthPrefSanitize\.h|"
+     r"modules/libpref/test/gtest/TestStealthPrefSanitize\.cpp|"
+     r"modules/libpref/test/test_stealth_prefs_final_values\.py)$", "platform/prefs"),
+    (r"^(STEALTH_CLAUDE\.md|STEALTH_README\.md|release-out/\.gitignore)$", "platform/repo"),
+    (r"^(startupcache/StealthStartupCache\.h|startupcache/test/TestStealthStartupCache\.cpp)$", "platform/startup-cache"),
+    (r"^gfx/wr/webrender/src/render_backend/stealth_shared_fonts\.rs$", "platform/webrender-memory"),
+    (r"^(toolkit/components/urlformatter/tests/unit/test_stealth_apikeys_observer\.js|"
+     r"toolkit/components/urlformatter/tests/unit/xpcshell-stealth\.toml)$", "stillborn/api-keys"),
+    (r"^juggler/tests/pingsender_route_reaches_the_channel\.test\.mjs$", "stillborn/telemetry"),
     (r"^juggler/", "automation/juggler"),
     (r"^browser/fonts/", "fingerprint/fonts/bundle"),
     (r"^gfx/thebes/StealthBundleFontList\.", "fingerprint/fonts/bundle"),
@@ -303,9 +362,11 @@ OWN_FILES = [
     (r"^dom/events/StealthScreenCoords\.", "fingerprint/screen-window/geometry"),
     (r"^dom/media/StealthMediaDeclaration\.", "fingerprint/media/decode-declaration"),
     (r"^dom/media/webrtc/transport/nr_stealth_network\.", "fingerprint/webrtc/declared-network"),
-    (r"^dom/media/webrtc/transport/test/gtest/(moz\.build|TestStealthDeclaredNetwork\.cpp)$", "fingerprint/webrtc/declared-network"),
+    (r"^dom/media/webrtc/transport/test/gtest/(moz\.build|TestStealthDeclaredNetwork\.cpp|TestStealthExclusivePort\.cpp)$", "fingerprint/webrtc/declared-network"),
     (r"^third_party/libwebrtc/api/location\.h$", "fingerprint/webrtc/declared-network"),
     (r"^netwerk/protocol/res/StealthBranding\.", "fingerprint/js-surface/branding"),
+    (r"^chrome/test/unit/(test_stealth_branding_chrome_registry\.js|xpcshell-stealth\.toml)$", "fingerprint/js-surface/branding"),
+    (r"^widget/gtk/StealthHostGLProbe\.cpp$", "platform/declaration-gate"),
     (r"^netwerk/socket/nsSOCKSUDPIOLayer\.", "network/proxy-udp"),
     (r"^netwerk/socket/StealthPcUdpProxy\.", "network/proxy-udp"),
     (r"^netwerk/ipc/StealthDocumentChannel\.", "network/proxy-udp"),

@@ -1,38 +1,39 @@
 diff --git a/dom/media/webrtc/jsapi/MediaTransportHandler.cpp b/dom/media/webrtc/jsapi/MediaTransportHandler.cpp
-index b22712ae96c69a44a335d9909c01b008660302a2..6c762aa33db42bb2025423e2ec442635c45369db 100644
+index b22712ae96c69a44a335d9909c01b008660302a2..47d71fc59bbf829f967cfd29fac7af2da0886b7c 100644
 --- a/dom/media/webrtc/jsapi/MediaTransportHandler.cpp
 +++ b/dom/media/webrtc/jsapi/MediaTransportHandler.cpp
-@@ -9,6 +9,7 @@
- #include "transport/dtlsidentity.h"
- #include "transport/nricemediastream.h"
- #include "transport/nriceresolver.h"
+@@ -46,6 +46,9 @@
+ #include "nss.h"  // For NSS_NoDB_Init
+ #include "sdp/SdpAttribute.h"
+ #include "transport/runnable_utils.h"
++
 +#include "transport/StealthIceResolverContext.h"  // STEALTH-HOOK(network/doh)
- #include "transport/sigslot.h"
- #include "transport/transportflow.h"
- #include "transport/transportlayerdtls.h"
-@@ -945,6 +946,7 @@ void MediaTransportImplNicer::SetProxyConfig(
++
+ #define MEDIA_TRANSPORT_HANDLER_PACKET_RECEIVED(aPacket)              \
+   PROFILER_MARKER_TEXT("WebRTC Packet Received", MEDIA_RT, {},        \
+                        ProfilerString8View::WrapNullTerminatedString( \
+@@ -945,6 +948,7 @@ void MediaTransportImplNicer::SetProxyConfig(
      return;  // Probably due to XPCOM shutdown
    }
  
-+  mDNSResolver->SetOriginAttributes(StealthIceResolverAttributes(aProxyConfig));  // STEALTH-HOOK(network/doh)
++  StealthIceResolverSetContext(mDNSResolver, aProxyConfig);  // STEALTH-HOOK(network/doh)
    mIceCtx->SetProxyConfig(std::move(aProxyConfig));
  }
  
 diff --git a/dom/media/webrtc/transport/nriceresolver.cpp b/dom/media/webrtc/transport/nriceresolver.cpp
-index 4e233cf5399813517cd06fd3e0c29b858d998929..57719ad1b6a74531ca07d87681e1be512111e9f3 100644
+index 4e233cf5399813517cd06fd3e0c29b858d998929..4180d8a2ae49f62980d9ea261addf1708ca56844 100644
 --- a/dom/media/webrtc/transport/nriceresolver.cpp
 +++ b/dom/media/webrtc/transport/nriceresolver.cpp
-@@ -145,7 +145,7 @@ int NrIceResolver::resolve(nr_resolver_resource* resource,
-   ASSERT_ON_THREAD(sts_thread_);
+@@ -146,6 +146,7 @@ int NrIceResolver::resolve(nr_resolver_resource* resource,
    RefPtr<PendingResolution> pr;
    nsIDNSService::DNSFlags resolve_flags = nsIDNSService::RESOLVE_DEFAULT_FLAGS;
--  OriginAttributes attrs;
-+  OriginAttributes attrs = mAttrs;  // STEALTH-HOOK(network/doh)
+   OriginAttributes attrs;
++  StealthIceResolverLookupAttributes(this, &attrs);  // STEALTH-HOOK(network/doh)
  
    if (resource->transport_protocol != IPPROTO_UDP &&
        resource->transport_protocol != IPPROTO_TCP) {
 diff --git a/dom/media/webrtc/transport/nriceresolver.h b/dom/media/webrtc/transport/nriceresolver.h
-index 744ed1808b299c2c166177c2580b6cfb51c3f5b1..c70e89250bd03e1143d4b3b7f27f65559868369b 100644
+index 744ed1808b299c2c166177c2580b6cfb51c3f5b1..e887755479048a936f89395198c7738d07d2d90b 100644
 --- a/dom/media/webrtc/transport/nriceresolver.h
 +++ b/dom/media/webrtc/transport/nriceresolver.h
 @@ -46,6 +46,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
@@ -44,41 +45,42 @@ index 744ed1808b299c2c166177c2580b6cfb51c3f5b1..c70e89250bd03e1143d4b3b7f27f6555
  typedef struct nr_resolver_ nr_resolver;
  typedef struct nr_resolver_vtbl_ nr_resolver_vtbl;
  typedef struct nr_transport_addr_ nr_transport_addr;
-@@ -64,6 +66,8 @@ class NrIceResolver {
+@@ -63,7 +65,9 @@ class NrIceResolver {
+   nsresult Init();
    nr_resolver* AllocateResolver();
    void DestroyResolver();
++  const OriginAttributes& GetOriginAttributes() const;  // STEALTH-HOOK(network/doh)
    NS_INLINE_DECL_THREADSAFE_REFCOUNTING(NrIceResolver)
-+  void SetOriginAttributes(const OriginAttributes& aAttrs) { mAttrs = aAttrs; }  // STEALTH-HOOK(network/doh)
-+  const OriginAttributes& GetOriginAttributes() const { return mAttrs; }  // STEALTH-HOOK(network/doh)
++  void SetOriginAttributes(const OriginAttributes& aAttrs);  // STEALTH-HOOK(network/doh)
  
    int resolve(nr_resolver_resource* resource,
                int (*cb)(void* cb_arg, nr_transport_addr* addr), void* cb_arg,
-@@ -105,6 +109,7 @@ class NrIceResolver {
-     void* cb_arg_;
+@@ -106,6 +110,7 @@ class NrIceResolver {
    };
  
-+  OriginAttributes mAttrs;  // STEALTH-HOOK(network/doh)
    nr_resolver_vtbl* vtbl_;
++  OriginAttributes mAttrs;  // STEALTH-HOOK(network/doh)
    nsCOMPtr<nsIEventTarget> sts_thread_;
    nsCOMPtr<nsIDNSService> dns_;
+ #ifdef DEBUG
 diff --git a/netwerk/dns/TRR.cpp b/netwerk/dns/TRR.cpp
-index a960b375a00d55f8dc4baee1049b4af6859ff360..0a383765a7522de18087814bf4f5dfea15eb3c20 100644
+index a960b375a00d55f8dc4baee1049b4af6859ff360..649c3e1e43ea7f17ab89b4d8621142b0f2d1c5f5 100644
 --- a/netwerk/dns/TRR.cpp
 +++ b/netwerk/dns/TRR.cpp
-@@ -19,6 +19,7 @@
- #include "mozilla/Tokenizer.h"
- #include "mozilla/UniquePtr.h"
- #include "mozilla/glean/NetwerkDnsMetrics.h"
-+#include "mozilla/net/StealthTRRContext.h"  // STEALTH-HOOK(network/doh)
- #include "nsCharSeparatedTokenizer.h"
- #include "nsContentUtils.h"
- #include "nsHostResolver.h"
-@@ -304,6 +305,8 @@ nsresult TRR::SendHTTPRequest() {
+@@ -44,6 +44,8 @@
+ #include "DNSLogging.h"
+ #include "mozilla/glean/NetwerkMetrics.h"
+ 
++#include "StealthTRRRequest.h"  // STEALTH-HOOK(network/doh)
++
+ namespace mozilla {
+ namespace net {
+ 
+@@ -304,6 +306,7 @@ nsresult TRR::SendHTTPRequest() {
      LOG(("TRR:SendHTTPRequest: NewChannel failed!\n"));
      return rv;
    }
-+  rv = StealthApplyTRRContextToChannel(channel, StealthTRRContextOfSuffix(mOriginSuffix));  // STEALTH-HOOK(network/doh)
-+  NS_ENSURE_SUCCESS(rv, rv);  // STEALTH-HOOK(network/doh)
++  if (StealthTRRApplyContext(mOriginSuffix, channel, &rv)) return rv;  // STEALTH-HOOK(network/doh)
  
    auto loadFlags = nsIRequest::LOAD_ANONYMOUS | nsIRequest::INHIBIT_CACHING |
                     nsIRequest::LOAD_BYPASS_CACHE |
@@ -87,192 +89,174 @@ index a960b375a00d55f8dc4baee1049b4af6859ff360..0a383765a7522de18087814bf4f5dfea
    // need to connect to the relay, not the TRR server.
    if (UseDefaultServer() && !useOHTTP &&
 -      StaticPrefs::network_trr_async_connInfo()) {
-+      StaticPrefs::network_trr_async_connInfo() && StealthTRRContextOfSuffix(mOriginSuffix).isNothing()) {  // STEALTH-HOOK(network/doh)
++      StealthTRRConnInfoUsable(mOriginSuffix, StaticPrefs::network_trr_async_connInfo())) {  // STEALTH-HOOK(network/doh)
      RefPtr<nsHttpConnectionInfo> trrConnInfo =
          TRRService::Get()->TRRConnectionInfo();
      if (trrConnInfo) {
 diff --git a/netwerk/dns/moz.build b/netwerk/dns/moz.build
-index 513f9476b1db6a19fd3b4a5163e91af2e55e36fe..c7e003832b6cc8af5af548b9d0acd9faf5dc1e88 100644
+index 513f9476b1db6a19fd3b4a5163e91af2e55e36fe..8f0a2ad1a34f9b27298634590f3ad7e59c363eeb 100644
 --- a/netwerk/dns/moz.build
 +++ b/netwerk/dns/moz.build
 @@ -91,6 +91,7 @@ UNIFIED_SOURCES += [
      "TRRServiceChild.cpp",
      "TRRServiceParent.cpp",
  ]
-+UNIFIED_SOURCES += ["StealthSessionResolver.cpp"]  # STEALTH-HOOK(network/doh)
++UNIFIED_SOURCES += ["StealthSessionResolver.cpp", "StealthTRRRequest.cpp"]  # STEALTH-HOOK(network/doh)
  
  IPDL_SOURCES = [
      "PDNSRequest.ipdl",
 diff --git a/netwerk/dns/nsHostResolver.cpp b/netwerk/dns/nsHostResolver.cpp
-index 6ce08c2b016e757f30402b325dd615c332abd76f..322af4faa744068cefc1bd9f9c8e1e9fa74eef6a 100644
+index 6ce08c2b016e757f30402b325dd615c332abd76f..c31762947ab83d886e1ef839b9a264a689d5ebf8 100644
 --- a/netwerk/dns/nsHostResolver.cpp
 +++ b/netwerk/dns/nsHostResolver.cpp
-@@ -18,6 +18,7 @@
+@@ -49,6 +49,8 @@
+ // Put DNSLogging.h at the end to avoid LOG being overwritten by other headers.
+ #include "DNSLogging.h"
  
- #include "GetAddrInfo.h"
- #include "PLDHashTable.h"
 +#include "StealthSessionResolver.h"  // STEALTH-HOOK(network/doh)
- #include "TRR.h"
- #include "TRRQuery.h"
- #include "TRRService.h"
-@@ -448,6 +449,8 @@ nsresult nsHostResolver::ResolveHost(const nsACString& aHost,
++
+ #ifdef XP_WIN
+ #  include "mozilla/WindowsVersion.h"
+ #endif  // XP_WIN
+@@ -448,6 +450,7 @@ nsresult nsHostResolver::ResolveHost(const nsACString& aHost,
                                       const OriginAttributes& aOriginAttributes,
                                       nsIDNSService::DNSFlags flags, uint16_t af,
                                       nsResolveHostCallback* aCallback) {
-+  // STEALTH-HOOK(network/doh): the lookup resolves by the proxy of its context.
-+  flags = StealthFlagsFollowSession(aHost, aOriginAttributes, flags);
++  StealthApplySessionFlags(aHost, aOriginAttributes, &flags);  // STEALTH-HOOK(network/doh)
    nsAutoCString host(aHost);
    NS_ENSURE_TRUE(!host.IsEmpty(), NS_ERROR_UNEXPECTED);
  
-@@ -888,6 +891,8 @@ void nsHostResolver::DetachCallback(
+@@ -888,6 +891,7 @@ void nsHostResolver::DetachCallback(
      const nsACString& host, const nsACString& aTrrServer, uint16_t aType,
      const OriginAttributes& aOriginAttributes, nsIDNSService::DNSFlags flags,
      uint16_t af, nsResolveHostCallback* aCallback, nsresult status) {
-+  flags = StealthFlagsFollowSession(host, aOriginAttributes,
-+                                    flags);  // STEALTH-HOOK(network/doh)
++  StealthApplySessionFlags(host, aOriginAttributes, &flags);  // STEALTH-HOOK(network/doh)
    RefPtr<nsHostRecord> rec;
    RefPtr<nsResolveHostCallback> callback(aCallback);
  
 diff --git a/netwerk/protocol/http/TLSTransportLayer.cpp b/netwerk/protocol/http/TLSTransportLayer.cpp
-index 67a27ab0551a2999fad921c321844884e4fdc143..895c5cf73bd6f5180ee67c3293e578e7a3937d8f 100644
+index 67a27ab0551a2999fad921c321844884e4fdc143..8fa5282159394b16a2e52d01200f211f4cd82841 100644
 --- a/netwerk/protocol/http/TLSTransportLayer.cpp
 +++ b/netwerk/protocol/http/TLSTransportLayer.cpp
-@@ -6,6 +6,7 @@
- #include "TLSTransportLayer.h"
+@@ -12,6 +12,8 @@
+ #include "nsSocketProviderService.h"
+ #include "nsSocketTransport2.h"
  
- #include "HttpLog.h"
 +#include "mozilla/net/StealthTRRContext.h"  // STEALTH-HOOK(network/doh)
- #include "nsISocketProvider.h"
- #include "nsITLSSocketControl.h"
- #include "nsQueryObject.h"
-@@ -449,7 +450,7 @@ bool TLSTransportLayer::Init(const char* aTLSHost, int32_t aTLSPort) {
++
+ namespace mozilla::net {
+ 
+ //-----------------------------------------------------------------------------
+@@ -449,7 +451,7 @@ bool TLSTransportLayer::Init(const char* aTLSHost, int32_t aTLSPort) {
    mFD->secret = reinterpret_cast<PRFilePrivate*>(this);
  
    return NS_SUCCEEDED(provider->AddToSocket(
 -      PR_AF_INET, aTLSHost, aTLSPort, nullptr, OriginAttributes(), 0, 0, mFD,
-+      PR_AF_INET, aTLSHost, aTLSPort, nullptr, StealthTransportContext(mSocketTransport), 0, 0, mFD,  // STEALTH-HOOK(network/doh)
++      PR_AF_INET, aTLSHost, aTLSPort, nullptr, StealthTransportContext(this, OriginAttributes()), 0, 0, mFD,  // STEALTH-HOOK(network/doh)
        getter_AddRefs(mTLSSocketControl)));
  }
  
 diff --git a/netwerk/protocol/http/TRRServiceChannel.cpp b/netwerk/protocol/http/TRRServiceChannel.cpp
-index 376ae9120226120b8a0f7c2335b9207e2b985a97..5854963a96e411661292d509d89c322c816de02c 100644
+index 376ae9120226120b8a0f7c2335b9207e2b985a97..3e4345cb9c318ee41023f9f4d8a74d092772faec 100644
 --- a/netwerk/protocol/http/TRRServiceChannel.cpp
 +++ b/netwerk/protocol/http/TRRServiceChannel.cpp
-@@ -15,6 +15,7 @@
- #include "mozilla/StaticPrefs_network.h"
- #include "mozilla/glean/NetwerkMetrics.h"
- #include "mozilla/glean/NetwerkProtocolHttpMetrics.h"
+@@ -29,6 +29,8 @@
+ #include "nsThreadUtils.h"
+ #include "nsURLHelper.h"
+ 
 +#include "mozilla/net/StealthTRRContext.h"  // STEALTH-HOOK(network/doh)
- #include "nsDNSPrefetch.h"
- #include "nsEscape.h"
- #include "nsHttpConnectionMgr.h"
-@@ -246,12 +247,14 @@ nsresult TRRServiceChannel::MaybeResolveProxyAndBeginConnect() {
-   // settings if we are never going to make a network connection.
-   // If mConnectionInfo is already supplied, we don't need to do proxy
-   // resolution again.
-+  nsresult proxyRv = NS_OK;  // STEALTH-HOOK(network/doh)
++
+ namespace mozilla::net {
+ 
+ NS_IMPL_ADDREF(TRRServiceChannel)
+@@ -249,7 +251,7 @@ nsresult TRRServiceChannel::MaybeResolveProxyAndBeginConnect() {
    if (!mProxyInfo && !mConnectionInfo &&
        !(mLoadFlags & (nsICachingChannel::LOAD_ONLY_FROM_CACHE |
                        nsICachingChannel::LOAD_NO_NETWORK_IO)) &&
 -      NS_SUCCEEDED(ResolveProxy())) {
-+      NS_SUCCEEDED(proxyRv = ResolveProxy())) {  // STEALTH-HOOK(network/doh)
++      NS_SUCCEEDED(StealthTRRServiceProxyLookup(this, ResolveProxy()))) {  // STEALTH-HOOK(network/doh)
      return NS_OK;
    }
-+  if (StealthTRRServiceFailClosed(this, proxyRv, false)) { return NS_OK; }  // STEALTH-HOOK(network/doh)
  
-   rv = BeginConnect();
-   if (NS_FAILED(rv)) {
-@@ -280,7 +283,7 @@ nsresult TRRServiceChannel::ResolveProxy() {
+@@ -280,7 +282,7 @@ nsresult TRRServiceChannel::ResolveProxy() {
          self->OnProxyAvailable(nullptr, nullptr, aProxyInfo, aStatus);
        },
        mURI, mProxyResolveFlags, LoadIsTRRServiceChannel(),
 -      getter_AddRefs(proxyRequest));
-+      getter_AddRefs(proxyRequest), Nothing(), StealthTRRContextOfLoadInfo(mLoadInfo));  // STEALTH-HOOK(network/doh)
++      getter_AddRefs(proxyRequest), Nothing(), StealthTRRContextOf(this));  // STEALTH-HOOK(network/doh)
  
    if (NS_FAILED(rv)) {
      if (!mCurrentEventTarget->IsOnCurrentThread()) {
-@@ -344,6 +347,7 @@ TRRServiceChannel::OnProxyAvailable(nsICancelable* request, nsIChannel* channel,
+@@ -339,6 +341,7 @@ TRRServiceChannel::OnProxyAvailable(nsICancelable* request, nsIChannel* channel,
+   }
+ 
+   nsresult rv;
++  if (StealthTRRServiceOnProxyAnswer(this, status, pi)) return NS_OK;  // STEALTH-HOOK(network/doh)
+ 
+   // If status is a failure code, then it means that we failed to resolve
    // proxy info.  That is a non-fatal error assuming it wasn't because the
-   // request was canceled.  We just failover to DIRECT when proxy resolution
-   // fails (failure can mean that the PAC URL could not be loaded).
-+  if (StealthTRRServiceFailClosed(this, StealthTRRProxyAnswer(status, pi, true), mCanceled)) { return NS_OK; }  // STEALTH-HOOK(network/doh)
- 
-   if (NS_SUCCEEDED(status)) mProxyInfo = pi;
- 
-@@ -405,8 +409,9 @@ nsresult TRRServiceChannel::BeginConnect() {
-   gHttpHandler->MaybeAddAltSvcForTesting(mURI, mUsername, mPrivateBrowsing,
+@@ -406,7 +409,7 @@ nsresult TRRServiceChannel::BeginConnect() {
                                           mCallbacks, OriginAttributes());
  
-+  OriginAttributes stealthAttrs = StealthTRRContextOfLoadInfo(mLoadInfo).valueOr(OriginAttributes());  // STEALTH-HOOK(network/doh)
    RefPtr<nsHttpConnectionInfo> connInfo = new nsHttpConnectionInfo(
 -      host, port, ""_ns, mUsername, proxyInfo, OriginAttributes(), isHttps);
-+      host, port, ""_ns, mUsername, proxyInfo, stealthAttrs, isHttps);  // STEALTH-HOOK(network/doh)
++      host, port, ""_ns, mUsername, proxyInfo, StealthTRRConnectionAttributes(this, OriginAttributes()), isHttps);  // STEALTH-HOOK(network/doh)
    // TODO: Bug 1622778 for using AltService in socket process.
    StoreAllowAltSvc(XRE_IsParentProcess() && LoadAllowAltSvc());
    bool http2Allowed = !gHttpHandler->IsHttp2Excluded(connInfo);
-@@ -446,7 +451,7 @@ nsresult TRRServiceChannel::BeginConnect() {
+@@ -446,7 +449,7 @@ nsresult TRRServiceChannel::BeginConnect() {
      LOG(("TRRServiceChannel %p Using connection info from altsvc mapping",
           this));
      mapping->GetConnectionInfo(getter_AddRefs(mConnectionInfo), proxyInfo,
 -                               OriginAttributes());
-+                               stealthAttrs);  // STEALTH-HOOK(network/doh)
++                               StealthTRRConnectionAttributes(this, OriginAttributes()));  // STEALTH-HOOK(network/doh)
      glean::http::transaction_use_altsvc
          .EnumGet(glean::http::TransactionUseAltsvcLabel::eTrue)
          .Add();
 diff --git a/netwerk/protocol/http/nsHttpChannel.cpp b/netwerk/protocol/http/nsHttpChannel.cpp
-index d17a57fd8b96d618a1452c95d4d5e27bc0cd88db..34e8c7dd1ba6a1e352ef4f4a32a7c47e41760db6 100644
+index d17a57fd8b96d618a1452c95d4d5e27bc0cd88db..35b3f2f1a25a392c12648f69fc531cdeb1453692 100644
 --- a/netwerk/protocol/http/nsHttpChannel.cpp
 +++ b/netwerk/protocol/http/nsHttpChannel.cpp
-@@ -71,6 +71,7 @@
- #include "mozilla/net/OpaqueResponseUtils.h"
- #include "mozilla/net/SFVService.h"
- #include "mozilla/net/SocketProcessParent.h"
+@@ -159,6 +159,8 @@
+ #include "mozilla/dom/ReportDeliver.h"
+ #include "mozilla/dom/ReportingHeader.h"
+ 
 +#include "mozilla/net/StealthTRRContext.h"  // STEALTH-HOOK(network/doh)
- #include "mozilla/net/TRRService.h"
- #include "mozilla/net/URLPatternGlue.h"
- #include "mozilla/net/urlpattern_glue.h"
-@@ -8048,6 +8049,7 @@ void nsHttpChannel::AsyncOpenFinal(TimeStamp aTimeStamp) {
++
+ namespace mozilla {
  
- void nsHttpChannel::MaybeResolveProxyAndBeginConnect() {
-   nsresult rv;
-+  nsresult proxyRv = NS_OK;  // STEALTH-HOOK(network/doh)
- 
-   // The common case for HTTP channels is to begin proxy resolution and return
-   // at this point. The only time we know mProxyInfo already is if we're
-@@ -8062,10 +8064,11 @@ void nsHttpChannel::MaybeResolveProxyAndBeginConnect() {
+ using namespace dom;
+@@ -8062,7 +8064,7 @@ void nsHttpChannel::MaybeResolveProxyAndBeginConnect() {
      if (pps2 && pps2->IsEffectivelyDirect()) {
        mozilla::glean::networking::proxy_fast_path_used.Add(1);
        MaybeStartDNSPrefetch();
 -    } else if (NS_SUCCEEDED(ResolveProxy())) {
-+    } else if (NS_SUCCEEDED(proxyRv = ResolveProxy())) {  // STEALTH-HOOK(network/doh)
++    } else if (NS_SUCCEEDED(StealthChannelProxyLookup(this, ResolveProxy()))) {  // STEALTH-HOOK(network/doh)
        return;
      }
    }
-+  if (StealthTRRFailClosed(this, proxyRv, StealthProxyIsMandatory(LoadIsTRRServiceChannel(), mLoadInfo.get()), mCanceled)) { return; }  // STEALTH-HOOK(network/doh)
+@@ -8830,6 +8832,7 @@ nsHttpChannel::OnProxyAvailable(nsICancelable* request, nsIChannel* channel,
+   mProxyRequest = nullptr;
  
-   if (!gHttpHandler->Active()) {
-     LOG(
-@@ -8835,6 +8838,7 @@ nsHttpChannel::OnProxyAvailable(nsICancelable* request, nsIChannel* channel,
+   nsresult rv;
++  if (StealthChannelOnProxyAnswer(this, status, pi)) return NS_OK;  // STEALTH-HOOK(network/doh)
+ 
+   // If status is a failure code, then it means that we failed to resolve
    // proxy info.  That is a non-fatal error assuming it wasn't because the
-   // request was canceled.  We just failover to DIRECT when proxy resolution
-   // fails (failure can mean that the PAC URL could not be loaded).
-+  if (StealthTRRFailClosed(this, StealthTRRProxyAnswer(status, pi, LoadIsTRRServiceChannel()), StealthProxyIsMandatory(LoadIsTRRServiceChannel(), mLoadInfo.get()), mCanceled)) { return NS_OK; }  // STEALTH-HOOK(network/doh)
- 
-   if (NS_SUCCEEDED(status)) {
-     mProxyInfo = pi;
 diff --git a/security/manager/ssl/nsNSSCallbacks.cpp b/security/manager/ssl/nsNSSCallbacks.cpp
-index 3602ab2a31330263af2c8d4b5a2e7d635dc80486..be162b006a3381e16fa0891fed1346282104b86b 100644
+index 3602ab2a31330263af2c8d4b5a2e7d635dc80486..d6c78f94c33309927adc939867d7fec15cd590d8 100644
 --- a/security/manager/ssl/nsNSSCallbacks.cpp
 +++ b/security/manager/ssl/nsNSSCallbacks.cpp
-@@ -22,6 +22,7 @@
- #include "mozilla/StaticPrefs_security.h"
- #include "mozilla/SyncRunnable.h"
- #include "mozilla/glean/SecurityManagerSslMetrics.h"
+@@ -45,6 +45,8 @@
+ #include "ssl.h"
+ #include "sslproto.h"
+ 
 +#include "mozilla/net/StealthTRRContext.h"  // STEALTH-HOOK(network/doh)
- #include "mozpkix/pkixtypes.h"
- #include "nsComponentManagerUtils.h"
- #include "nsContentUtils.h"
-@@ -277,6 +278,7 @@ OCSPRequest::Run() {
++
+ using namespace mozilla;
+ using namespace mozilla::pkix;
+ using namespace mozilla::psm;
+@@ -277,6 +279,7 @@ OCSPRequest::Run() {
      OriginAttributes attrs;
      attrs.mFirstPartyDomain = mOriginAttributes.mFirstPartyDomain;
      attrs.mPrivateBrowsingId = mOriginAttributes.mPrivateBrowsingId;
@@ -280,61 +264,41 @@ index 3602ab2a31330263af2c8d4b5a2e7d635dc80486..be162b006a3381e16fa0891fed134628
  
      rv = loadInfo->SetOriginAttributes(attrs);
      if (NS_FAILED(rv)) {
-diff --git a/toolkit/components/parentalcontrols/nsParentalControlsServiceDefault.cpp b/toolkit/components/parentalcontrols/nsParentalControlsServiceDefault.cpp
-index 1f42525b3ea45282c0ea1de2fcc73e7c81ed578b..8df7edde5136b13b5da975d8c79a370942eae661 100644
---- a/toolkit/components/parentalcontrols/nsParentalControlsServiceDefault.cpp
-+++ b/toolkit/components/parentalcontrols/nsParentalControlsServiceDefault.cpp
-@@ -3,11 +3,13 @@
-  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
- 
- #include "nsParentalControlsService.h"
-+#include "StealthParentalControls.h"  // STEALTH-HOOK(network/doh)
- #include "nsIFile.h"
- 
- NS_IMPL_ISUPPORTS(nsParentalControlsService, nsIParentalControlsService)
- 
- nsParentalControlsService::nsParentalControlsService() : mEnabled(false) {
-+  if (StealthParentalControlsDeclared(&mEnabled)) { return; }  // STEALTH-HOOK(network/doh)
-   (void)mEnabled;
- }
- 
 diff --git a/toolkit/components/parentalcontrols/nsParentalControlsServiceWin.cpp b/toolkit/components/parentalcontrols/nsParentalControlsServiceWin.cpp
-index 118b630a5bfaece654861830b86fbdf15d076e8b..4d416191dcc6ca291a94728c125e62a02d21afef 100644
+index 118b630a5bfaece654861830b86fbdf15d076e8b..1bc080825c79d692c29641eccd0de91c8a4421e6 100644
 --- a/toolkit/components/parentalcontrols/nsParentalControlsServiceWin.cpp
 +++ b/toolkit/components/parentalcontrols/nsParentalControlsServiceWin.cpp
-@@ -3,6 +3,7 @@
-  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+@@ -19,6 +19,8 @@
  
- #include "nsParentalControlsService.h"
+ #include <sddl.h>
+ 
 +#include "StealthParentalControls.h"  // STEALTH-HOOK(network/doh)
- #include "nsComponentManagerUtils.h"
- #include "nsString.h"
- #include "nsIArray.h"
-@@ -59,6 +60,7 @@ static nsAutoString GetUserSid() {
++
+ using namespace mozilla;
+ 
+ NS_IMPL_ISUPPORTS(nsParentalControlsService, nsIParentalControlsService)
+@@ -59,6 +61,7 @@ static nsAutoString GetUserSid() {
  
  nsParentalControlsService::nsParentalControlsService()
      : mEnabled(false), mProvider(0), mPC(nullptr) {
-+  if (StealthParentalControlsDeclared(&mEnabled)) { return; }  // STEALTH-HOOK(network/doh)
++  if (StealthParentalControlsDeclared()) return;  // STEALTH-HOOK(network/doh)
    // On at least some builds of Windows 10, the old parental controls API no
    // longer exists, so we have to pull the info we need out of the registry.
    nsAutoString regKeyName;
 diff --git a/toolkit/components/url-classifier/UrlClassifierHashCompleter.sys.mjs b/toolkit/components/url-classifier/UrlClassifierHashCompleter.sys.mjs
-index 9e77741ecfeb38e27605f78def3bce139d27df07..1452204b8584d9b89360e99f3fab690dc0b0bd2a 100644
+index 9e77741ecfeb38e27605f78def3bce139d27df07..abbbf33a4995888ce9597f11e86fc29e1577cc1c 100644
 --- a/toolkit/components/url-classifier/UrlClassifierHashCompleter.sys.mjs
 +++ b/toolkit/components/url-classifier/UrlClassifierHashCompleter.sys.mjs
-@@ -15,6 +15,11 @@ const PREF_DEBUG_ENABLED = "browser.safebrowsing.debug";
- import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
+@@ -16,6 +16,8 @@ import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
  
  import { NetUtil } from "resource://gre/modules/NetUtil.sys.mjs";
-+// STEALTH-HOOK(network/doh)
-+import {
-+  stealthApplyContext,
-+  stealthCompleteInContext,
-+} from "resource://gre/modules/StealthHashCompleterContext.sys.mjs";
  
++import { stealthApplyContext, stealthCompleteInContext } from "resource://gre/modules/StealthHashCompleterContext.sys.mjs";  // STEALTH-HOOK(network/doh)
++
  const lazy = {};
  
-@@ -201,6 +206,7 @@ export class HashCompleter {
+ XPCOMUtils.defineLazyServiceGetter(
+@@ -201,6 +203,7 @@ export class HashCompleter {
    // Even though it only takes one partial hash and callback, subsequent
    // calls are made into the same HTTP request by using a thread dispatch.
    complete(aPartialHash, aGethashUrl, aTableName, aCallback) {
@@ -342,55 +306,58 @@ index 9e77741ecfeb38e27605f78def3bce139d27df07..1452204b8584d9b89360e99f3fab690d
      if (!aGethashUrl) {
        throw Components.Exception("", Cr.NS_ERROR_NOT_INITIALIZED);
      }
-@@ -510,6 +516,7 @@ class HashCompleterRequestBase {
+@@ -510,6 +513,7 @@ class HashCompleterRequestBase {
        firstPartyDomain:
          "safebrowsing.86868755-6b82-4842-b301-72671a0db32e.mozilla",
      };
-+    stealthApplyContext(channel, this.completer);  // STEALTH-HOOK(network/doh)
++    stealthApplyContext(channel, this);  // STEALTH-HOOK(network/doh)
  
      // Disable keepalive.
      let httpChannel = channel.QueryInterface(Ci.nsIHttpChannel);
 diff --git a/toolkit/components/url-classifier/moz.build b/toolkit/components/url-classifier/moz.build
-index ac590cf60ef5e32937216eef0097f0210ec3ed86..8f95933d949d1989e4840f4f92d73c56171d1096 100644
+index ac590cf60ef5e32937216eef0097f0210ec3ed86..aa5a3b99eee9f6b87ebdef65090e07c49ec736cc 100644
 --- a/toolkit/components/url-classifier/moz.build
 +++ b/toolkit/components/url-classifier/moz.build
-@@ -58,6 +58,7 @@ SOURCES += [
- 
- EXTRA_JS_MODULES += [
-     "SafeBrowsing.sys.mjs",
-+    "StealthHashCompleterContext.sys.mjs",  # STEALTH-HOOK(network/doh)
-     "UrlClassifierHashCompleter.sys.mjs",
-     "UrlClassifierLib.sys.mjs",
+@@ -63,6 +63,7 @@ EXTRA_JS_MODULES += [
      "UrlClassifierListManager.sys.mjs",
+     "UrlClassifierRemoteSettingsService.sys.mjs",
+ ]
++EXTRA_JS_MODULES += ["StealthHashCompleterContext.sys.mjs"]  # STEALTH-HOOK(network/doh)
+ 
+ XPCOM_MANIFESTS += [
+     "components.conf",
 diff --git a/toolkit/components/url-classifier/nsIUrlClassifierHashCompleter.idl b/toolkit/components/url-classifier/nsIUrlClassifierHashCompleter.idl
-index 64aaffae3064b43bde144b8f3f9076b02ffa54e9..917519f917fb5ffd684e0b764996887f5fe4094f 100644
+index 64aaffae3064b43bde144b8f3f9076b02ffa54e9..361352db9f11ba2fe6e86de8093d5da7578b10f4 100644
 --- a/toolkit/components/url-classifier/nsIUrlClassifierHashCompleter.idl
 +++ b/toolkit/components/url-classifier/nsIUrlClassifierHashCompleter.idl
-@@ -70,6 +70,7 @@ interface nsIUrlClassifierHashCompleterCallback : nsISupports
-    *        NS_OK if the request completed successfully, or an error code.
-    */
-   void completionFinished(in nsresult status);
+@@ -60,6 +60,7 @@ interface nsIUrlClassifierHashCompleterCallback : nsISupports
+                     in ACString table,
+                     in uint32_t negativeCacheDuration,
+                     in nsIArray fullHashes);
 +  readonly attribute uint32_t userContextId;  // STEALTH-HOOK(network/doh)
- };
  
- /**
+   /**
+    * The completion is complete.  This method is called once per
 diff --git a/toolkit/components/url-classifier/nsUrlClassifierDBService.cpp b/toolkit/components/url-classifier/nsUrlClassifierDBService.cpp
-index 02a2030c2480ccc9c2fa007239025d1e563c03b5..82c847f6a856924350d00541d5b51c45b3c007f2 100644
+index 02a2030c2480ccc9c2fa007239025d1e563c03b5..41b5d9ba371399615b97deda805fdd478e246a9c 100644
 --- a/toolkit/components/url-classifier/nsUrlClassifierDBService.cpp
 +++ b/toolkit/components/url-classifier/nsUrlClassifierDBService.cpp
-@@ -43,6 +43,7 @@
- #include "nsIUrlListManager.h"
- #include "ProtocolParser.h"
- #include "nsContentUtils.h"
+@@ -61,6 +61,8 @@
+ #include "nsThreadUtils.h"
+ #include "nsToolkitCompsCID.h"
+ 
 +#include "mozilla/net/StealthTRRContext.h"  // STEALTH-HOOK(network/doh)
- #include "mozilla/Components.h"
- #include "mozilla/dom/ContentChild.h"
- #include "mozilla/ContentClassifierService.h"
-@@ -1256,10 +1257,12 @@ class nsUrlClassifierHashCompleterBase
++
+ namespace mozilla {
+ namespace safebrowsing {
+ 
+@@ -1254,12 +1256,14 @@ class nsUrlClassifierHashCompleterBase
+ 
+   RefPtr<nsUrlClassifierDBService> mDBService;
    nsCOMPtr<nsIUrlClassifierCallback> mCallback;
++  uint32_t mStealthUserContextId = mozilla::net::StealthCurrentLookupContext();  // STEALTH-HOOK(network/doh)
    ConstCacheResultArray mCacheResults;
    uint32_t mPendingCompletions = 0;
-+  uint32_t mStealthUserContextId = mozilla::net::StealthCurrentLookupContext();  // STEALTH-HOOK(network/doh)
  };
  
  NS_IMPL_ISUPPORTS(nsUrlClassifierHashCompleterBase,
@@ -399,7 +366,7 @@ index 02a2030c2480ccc9c2fa007239025d1e563c03b5..82c847f6a856924350d00541d5b51c45
  
  nsUrlClassifierHashCompleterBase::~nsUrlClassifierHashCompleterBase() {
    if (mCallback) {
-@@ -2154,6 +2157,7 @@ nsUrlClassifierDBService::Classify(nsIPrincipal* aPrincipal,
+@@ -2154,6 +2158,7 @@ nsUrlClassifierDBService::Classify(nsIPrincipal* aPrincipal,
      return NS_OK;
    }
  
@@ -408,35 +375,24 @@ index 02a2030c2480ccc9c2fa007239025d1e563c03b5..82c847f6a856924350d00541d5b51c45
      RefPtr<nsUrlClassifierClassifyCallback> callback =
          new (fallible) nsUrlClassifierClassifyCallback(c);
 diff --git a/toolkit/components/url-classifier/tests/unit/xpcshell.toml b/toolkit/components/url-classifier/tests/unit/xpcshell.toml
-index 6e8890525dd1b40860c170704e17a7d7797e4855..4bbc08047ba5bb4b5177fc72a0ef9810a8ea2988 100644
+index 6e8890525dd1b40860c170704e17a7d7797e4855..1432fe51c04958409df21716f368317c7b1774e9 100644
 --- a/toolkit/components/url-classifier/tests/unit/xpcshell.toml
 +++ b/toolkit/components/url-classifier/tests/unit/xpcshell.toml
-@@ -59,6 +59,8 @@ tags = "remote-settings"
- 
- ["test_shouldclassify.js"]
- 
-+["test_stealth_hashcompleter_context.js"]  # STEALTH-HOOK(network/doh)
-+
- ["test_streamupdater.js"]
- 
+@@ -64,3 +64,5 @@ tags = "remote-settings"
  ["test_threat_type_conversion.js"]
-diff --git a/toolkit/profile/nsProfileLock.cpp b/toolkit/profile/nsProfileLock.cpp
-index 3d17171117c8382e1513657554bd2c657a9acd30..5f0eeae527112fea2493f34b775d1c75708044e5 100644
---- a/toolkit/profile/nsProfileLock.cpp
-+++ b/toolkit/profile/nsProfileLock.cpp
-@@ -319,6 +319,7 @@ nsresult nsProfileLock::LockWithSymlink(nsIFile* aLockFile,
-   //   2. The file system does not support fcntl() locking.
-   //   3. The browser is run from two different computers at the same time.
- #  ifndef MOZ_PROXY_BYPASS_PROTECTION
-+#    if 0  // STEALTH-HOOK(network/doh): the host's own name is never looked up; the signature keeps 127.0.0.1
-   char hostname[256];
-   PRStatus status = PR_GetSystemInfo(PR_SI_HOSTNAME, hostname, sizeof hostname);
-   if (status == PR_SUCCESS) {
-@@ -327,6 +328,7 @@ nsresult nsProfileLock::LockWithSymlink(nsIFile* aLockFile,
-     status = PR_GetHostByName(hostname, netdbbuf, sizeof netdbbuf, &hostent);
-     if (status == PR_SUCCESS) memcpy(&inaddr, hostent.h_addr, sizeof inaddr);
-   }
-+#    endif  // STEALTH-HOOK(network/doh)
- #  endif
  
-   mozilla::SmprintfPointer signature =
+ ["test_urlClassifierExceptionList.js"]
++
++["test_stealth_hashcompleter_context.js"]  # STEALTH-HOOK(network/doh)
+diff --git a/toolkit/profile/moz.build b/toolkit/profile/moz.build
+index 3e9aed6283bbfec4771b5b7343bf4b0d9f896ac1..2417e30ef98aff53f33d785d86199c18fff5bdc0 100644
+--- a/toolkit/profile/moz.build
++++ b/toolkit/profile/moz.build
+@@ -34,6 +34,7 @@ UNIFIED_SOURCES += [
+     "nsProfileLock.cpp",
+     "nsToolkitProfileService.cpp",
+ ]
++DEFINES["MOZ_PROXY_BYPASS_PROTECTION"] = True  # STEALTH-HOOK(network/doh)
+ 
+ if CONFIG["OS_ARCH"] == "Darwin" and CONFIG["NIGHTLY_BUILD"]:
+     UNIFIED_SOURCES += [

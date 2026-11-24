@@ -1,36 +1,29 @@
 diff --git a/dom/media/webaudio/AudioContext.cpp b/dom/media/webaudio/AudioContext.cpp
-index 6e7f17e7c3a42a75b7e7d50758db1a0b99ab9c8f..6091b1010ea02ee32f5f963dbbc5a92ba5a8b928 100644
+index 6e7f17e7c3a42a75b7e7d50758db1a0b99ab9c8f..a6c5e9662540f39bc419d1a95a212eb2ca836714 100644
 --- a/dom/media/webaudio/AudioContext.cpp
 +++ b/dom/media/webaudio/AudioContext.cpp
-@@ -41,6 +41,7 @@
- #include "mozilla/Preferences.h"
- #include "mozilla/RefPtr.h"
- #include "mozilla/StaticPrefs_media.h"
-+#include "mozilla/StaticPrefs_zoom.h"
- #include "mozilla/dom/AnalyserNode.h"
- #include "mozilla/dom/AnalyserNodeBinding.h"
- #include "mozilla/dom/AudioBufferSourceNodeBinding.h"
-@@ -559,6 +560,11 @@ double AudioContext::OutputLatency() {
+@@ -82,6 +82,8 @@
+ #include "nsPrintfCString.h"
+ #include "nsRFPService.h"
+ 
++#include "StealthAudioContextValues.h"  // STEALTH-HOOK(fingerprint/audio/context-values)
++
+ extern mozilla::LazyLogModule gAutoplayPermissionLog;
+ 
+ #define AUTOPLAY_LOG(msg, ...) \
+@@ -559,6 +561,7 @@ double AudioContext::OutputLatency() {
    if (mIsShutDown) {
      return 0.0;
    }
-+  // STEALTH-HOOK(fingerprint/audio/context-values)
-+  {
-+    int32_t latency_ms = mozilla::StaticPrefs::zoom_stealth_audio_output_latency_ms();
-+    if (latency_ms > 0) return latency_ms / 1000.0;
-+  }
++  if (double stealth; StealthAudioOutputLatency(&stealth)) return stealth;  // STEALTH-HOOK(fingerprint/audio/context-values)
    // When reduceFingerprinting is enabled, return a latency figure that is
    // fixed, but plausible for the platform.
    double latency_s = 0.0;
-@@ -714,6 +720,11 @@ void AudioContext::UnregisterActiveNode(AudioNode* aNode) {
+@@ -714,6 +717,7 @@ void AudioContext::UnregisterActiveNode(AudioNode* aNode) {
  }
  
  uint32_t AudioContext::MaxChannelCount() const {
-+  // STEALTH-HOOK(fingerprint/audio/context-values)
-+  {
-+    int32_t ch = mozilla::StaticPrefs::zoom_stealth_audio_max_channel_count();
-+    if (ch > 0) return (uint32_t)ch;
-+  }
++  if (uint32_t stealth; StealthAudioMaxChannelCount(&stealth)) return stealth;  // STEALTH-HOOK(fingerprint/audio/context-values)
    if (mShouldResistFingerprinting) {
      return 2;
    }

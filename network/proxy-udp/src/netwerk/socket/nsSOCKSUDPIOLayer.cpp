@@ -58,6 +58,7 @@
 #include "nsXULAppAPI.h"
 #include "nsIOService.h"
 #include "mozilla/net/SocketProcessParent.h"
+#include "mozilla/net/SocketProcessChild.h"
 
 namespace mozilla {
 namespace net {
@@ -1793,6 +1794,22 @@ bool nsSOCKSUDPIOLayerHasFailed(PRFileDesc* aFd) {
 bool nsSOCKSUDPIOLayerIsOn(PRFileDesc* aFd) {
   return aFd && gIdentity != PR_INVALID_IO_LAYER &&
          PR_GetIdentitiesLayer(aFd, gIdentity) != nullptr;
+}
+
+bool StealthSocksUdpLayerFailed(PRFileDesc* aFd, nsIProxyInfo* aSocksProxy) {
+  return aSocksProxy && NS_FAILED(StealthPutSocksUdpLayer(aFd, aSocksProxy));
+}
+
+void StealthSocksUdpBorn(PRFileDesc* aFd) { nsSOCKSUDPIOLayerSocketBorn(aFd); }
+
+bool StealthSocksUdpHasNoHandle(PRFileDesc* aFd) { return nsSOCKSUDPIOLayerIsOn(aFd); }
+
+// A SOCKS5 proxy the parent opened a connection to, whose UDP the session measured coherent: the pool of UDP associations of that
+// proxy is made HERE, where the sockets of the PeerConnections are. Endpoint and credentials travel in this message only.
+mozilla::ipc::IPCResult SocketProcessChild::RecvStealthWarmSocksUdp(const nsACString& aHost, const int32_t& aPort,
+                                                                    const nsACString& aUser, const nsACString& aPass) {
+  nsSOCKSUDPIOLayerWarm(aHost, aPort, aUser, aPass);
+  return IPC_OK();
 }
 
 }  // namespace net

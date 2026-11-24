@@ -1,0 +1,20 @@
+[
+ {
+  "file": "security/manager/ssl/nsCertOverrideService.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthIgnoreHTTPSErrors.h\"  // STEALTH-HOOK(automation/ignore-https-errors)",
+  "test": "wrapper:tests/test_ignore_https_errors_e2e.py::test_ignore_https_errors_loads_a_self_signed_page"
+ },
+ {
+  "file": "security/manager/ssl/nsCertOverrideService.cpp",
+  "function": "void nsCertOverrideService::CountPermanentOverrideTelemetry(",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  if (StealthJugglerPipeConnected()) return true;  // STEALTH-HOOK(automation/ignore-https-errors)",
+  "test": "wrapper:tests/test_ignore_https_errors_e2e.py::test_ignore_https_errors_loads_a_self_signed_page",
+  "anchor": "#ifdef ENABLE_WEBDRIVER (the first line of IsDebugger)",
+  "why": "the gate must run before the Marionette and Remote Agent lookups and inside the same #ifdef as they are, so the preprocessor line is the statement it follows and it is not the first statement of the function"
+ }
+]

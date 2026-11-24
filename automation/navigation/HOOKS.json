@@ -1,0 +1,210 @@
+[
+ {
+  "file": "docshell/base/CanonicalBrowsingContext.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthNavigationEvents.h\"  // STEALTH-HOOK(automation/navigation)",
+  "test": "wrapper:tests/test_navigation_response.py::test_navigation_answers_with_a_real_response"
+ },
+ {
+  "file": "docshell/base/CanonicalBrowsingContext.cpp",
+  "function": "void CanonicalBrowsingContext::LoadURI(nsIURI* aURI,",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  StealthNotifyNavigationStarted(this, loadState);  // STEALTH-HOOK(automation/navigation)",
+  "test": "wrapper:tests/test_navigation_response.py::test_navigation_answers_with_a_real_response",
+  "anchor": "if (loadState->GetIsCaptivePortalTab()) {...}",
+  "why": "needs the local loadState, an out-parameter of CreateFromLoadURIOptions born inside the function: a guard at the top has nothing to read; a wrap of the function is impossible (the funnel is BrowsingContext::LoadURI(nsDocShellLoadState*, bool), shared by many callers that must not notify); a wrap of the creation would fire before the MALFORMED_URI/NS_FAILED checks and before SetIsCaptivePortalTab"
+ },
+ {
+  "file": "docshell/base/CanonicalBrowsingContext.cpp",
+  "function": "void CanonicalBrowsingContext::FixupAndLoadURIString(",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  StealthNotifyNavigationStarted(this, loadState);  // STEALTH-HOOK(automation/navigation)",
+  "test": "wrapper:tests/test_navigation_response.py::test_navigation_answers_with_a_real_response",
+  "anchor": "if (loadState->GetIsCaptivePortalTab()) {...}",
+  "why": "needs the local loadState, an out-parameter of CreateFromLoadURIOptions born inside the function: a guard at the top has nothing to read; a wrap of the function is impossible (the funnel is BrowsingContext::LoadURI(nsDocShellLoadState*, bool), shared by many callers that must not notify); a wrap of the creation would fire before the MALFORMED_URI/NS_FAILED checks and before SetIsCaptivePortalTab"
+ },
+ {
+  "file": "docshell/base/nsDocShell.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthNavigation.h\"  // STEALTH-HOOK(automation/navigation)",
+  "test": "wrapper:tests/test_navigation_response.py::test_navigation_answers_with_a_real_response"
+ },
+ {
+  "file": "docshell/base/nsDocShell.cpp",
+  "function": "nsresult nsDocShell::InternalLoad(nsDocShellLoadState* aLoadState,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  StealthNavigationLoad stealthLoad(this, aLoadState, !isJavaScript && !sameDocument);  // STEALTH-HOOK(automation/navigation)",
+  "test": "wrapper:tests/test_a_goto_to_a_refused_port_ends_with_its_reason_e2e.py::test_a_goto_to_a_refused_port_ends_with_its_reason",
+  "anchor": "nsCOMPtr<nsIRequest> req; (in InternalLoad, before rv = DoURILoad(...))",
+  "why": "needs isJavaScript and sameDocument, two locals Mozilla computes in InternalLoad: a wrap of DoURILoad would recompute them and follow Mozilla's rule silently only until it changes"
+ },
+ {
+  "file": "docshell/base/nsDocShell.cpp",
+  "function": "nsresult nsDocShell::InternalLoad(nsDocShellLoadState* aLoadState,",
+  "kind": "add",
+  "form": "anchor",
+  "line": "    stealthLoad.Failed(rv);  // STEALTH-HOOK(automation/navigation)",
+  "test": "wrapper:tests/test_a_goto_to_a_refused_port_ends_with_its_reason_e2e.py::test_a_goto_to_a_refused_port_ends_with_its_reason",
+  "anchor": "if (NS_FAILED(rv)) {... (the error branch after DoURILoad, before DisplayLoadError)",
+  "why": "reports the failure with its status before InternalLoad shows the error page; it needs stealthLoad, which lives in InternalLoad's scope"
+ },
+ {
+  "file": "docshell/base/nsDocShell.cpp",
+  "function": "class OnLinkClickEvent : public CancelableRunnable, public SupportsWeakPtr {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "      mStealth.StealthSetRunning(true);  // STEALTH-HOOK(automation/navigation)",
+  "test": "wrapper:tests/test_a_click_waits_for_the_navigation_it_plans_e2e.py::test_a_click_that_submits_a_form_returns_on_the_posted_page",
+  "anchor": "if (!mLoadState->HasSourceElement()) {...}",
+  "why": "brackets the call of OnLinkClickSync, a private member of nsDocShell reachable only by the friend class OnLinkClickEvent: neither a wrap of the call from our file nor a wrap of the function is possible, and a notice at the top of Run would run before jsapi.Init and SetSourceElement"
+ },
+ {
+  "file": "docshell/base/nsDocShell.cpp",
+  "function": "class OnLinkClickEvent : public CancelableRunnable, public SupportsWeakPtr {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "      mStealth.StealthSetRunning(false);  // STEALTH-HOOK(automation/navigation)",
+  "test": "wrapper:tests/test_a_click_waits_for_the_navigation_it_plans_e2e.py::test_a_click_that_submits_a_form_returns_on_the_posted_page",
+  "anchor": "mHandler->OnLinkClickSync(...);",
+  "why": "the end of the bracket of the call of OnLinkClickSync: it must run right after that statement, which a wrap cannot reach (private member of nsDocShell)"
+ },
+ {
+  "file": "docshell/base/nsDocShell.cpp",
+  "function": "class OnLinkClickEvent : public CancelableRunnable, public SupportsWeakPtr {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "    mStealth.Done(mContent);  // STEALTH-HOOK(automation/navigation)",
+  "test": "wrapper:tests/test_a_click_waits_for_the_navigation_it_plans_e2e.py::test_a_click_that_submits_a_form_returns_on_the_posted_page",
+  "anchor": "return NS_OK; (the final return of OnLinkClickEvent::Run)",
+  "why": "a notice before Mozilla's return: it must run after OnLinkClickSync, while Run's AutoJSAPI is alive; the member is private to OnLinkClickEvent"
+ },
+ {
+  "file": "docshell/base/nsDocShell.cpp",
+  "function": "class OnLinkClickEvent : public CancelableRunnable, public SupportsWeakPtr {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "    mStealth.StealthCancelled(mContent);  // STEALTH-HOOK(automation/navigation)",
+  "test": "wrapper:tests/test_a_click_waits_for_the_navigation_it_plans_e2e.py::test_a_click_that_submits_a_form_returns_on_the_posted_page",
+  "anchor": "mCancelled = true;",
+  "why": "a notice at the top would send the notification before mCancelled = true; the state it reads is the one Cancel leaves"
+ },
+ {
+  "file": "docshell/base/nsDocShell.cpp",
+  "function": "class OnLinkClickEvent : public CancelableRunnable, public SupportsWeakPtr {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  StealthLinkClickAfter mStealth;  // STEALTH-HOOK(automation/navigation)",
+  "test": "wrapper:tests/test_a_click_waits_for_the_navigation_it_plans_e2e.py::test_a_click_that_submits_a_form_returns_on_the_posted_page"
+ },
+ {
+  "file": "docshell/base/nsDocShell.cpp",
+  "function": "Result<RefPtr<OnLinkClickEvent>, nsresult> nsDocShell::OnLinkClickWithLoadState(",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  StealthLinkClickBefore(aContent);  // STEALTH-HOOK(automation/navigation)",
+  "test": "wrapper:tests/test_a_click_waits_for_the_navigation_it_plans_e2e.py::test_a_click_that_submits_a_form_returns_on_the_posted_page",
+  "anchor": "return ev; (OnLinkClickWithLoadState, after the Dispatch succeeded)",
+  "why": "a notice before Mozilla's return, only after the Dispatch succeeded, so never for a click that planned nothing; aContent is a parameter"
+ },
+ {
+  "file": "docshell/base/test/gtest/moz.build",
+  "function": "",
+  "kind": "add",
+  "form": "unknown",
+  "line": "include(\"stealth.build\")  # STEALTH-HOOK(automation/navigation)",
+  "test": "gtest:TestStealthLinkClickAfter.DoneSendsTheAfterOnce"
+ },
+ {
+  "file": "netwerk/base/LoadInfo.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthLoadInfo.h\"  // STEALTH-HOOK(automation/navigation)",
+  "test": "gtest:TestStealthLoadInfo.EveryCopyOfALoadInfoKeepsItsLoadIdentifier"
+ },
+ {
+  "file": "netwerk/base/LoadInfo.cpp",
+  "function": "LoadInfo::LoadInfo(const LoadInfo& rhs)",
+  "kind": "add",
+  "form": "notice",
+  "line": "  StealthLoadInfoCopied(this, rhs);  // STEALTH-HOOK(automation/navigation)",
+  "test": "gtest:TestStealthLoadInfo.EveryCopyOfALoadInfoKeepsItsLoadIdentifier",
+  "anchor": "the closing line of LoadInfo::LoadInfo(const LoadInfo& rhs): the last member initialiser `mSkipHTTPSUpgrade(rhs.mSkipHTTPSUpgrade) {` opens the body, which Mozilla leaves empty",
+  "why": "a copy of a LoadInfo must keep its load identifier: the notice goes in the otherwise empty body of the copy constructor, after the member initialisers, so it cannot be a guard or a wrap of a Mozilla statement"
+ },
+ {
+  "file": "netwerk/base/LoadInfo.h",
+  "function": "class LoadInfo final : public nsILoadInfo {",
+  "kind": "add",
+  "form": "member",
+  "line": "  uint64_t mJugglerLoadIdentifier = 0;  // STEALTH-HOOK(automation/navigation)",
+  "test": "gtest:TestStealthLoadInfo.EveryCopyOfALoadInfoKeepsItsLoadIdentifier"
+ },
+ {
+  "file": "netwerk/base/TRRLoadInfo.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthLoadInfo.h\"  // STEALTH-HOOK(network/doh)",
+  "test": "gtest:TestStealthTRRContext.ATRRLoadInfoStoresWhatItIsGiven"
+ },
+ {
+  "file": "netwerk/base/TRRLoadInfo.cpp",
+  "function": "TRRLoadInfo::TRRLoadInfo(nsIURI* aResultPrincipalURI,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  static_cast<TRRLoadInfo*>(loadInfo.get())->mOriginAttributes = mOriginAttributes;  // STEALTH-HOOK(network/doh)",
+  "test": "gtest:TestStealthTRRContext.TheCloneOfATRRLoadInfoKeepsTheContext",
+  "anchor": "return loadInfo.forget(); (TRRLoadInfo::Clone)",
+  "why": "carries the context of the DNS-over-HTTPS lookup into the clone; the clone is a local of Clone"
+ },
+ {
+  "file": "netwerk/base/TRRLoadInfo.cpp",
+  "function": "nsresult TRRLoadInfo::GetOriginAttributes(",
+  "kind": "add",
+  "form": "guard",
+  "line": "  if (nsresult rv; StealthTRRSetOriginAttributes(mOriginAttributes, aOriginAttributes, &rv)) return rv;  // STEALTH-HOOK(network/doh)",
+  "test": "gtest:TestStealthTRRContext.ATRRLoadInfoStoresWhatItIsGiven"
+ },
+ {
+  "file": "netwerk/base/nsILoadInfo.idl",
+  "function": "interface nsILoadInfo : nsISupports",
+  "kind": "add",
+  "form": "member",
+  "line": "  [infallible] attribute unsigned long long jugglerLoadIdentifier;  // STEALTH-HOOK(automation/navigation)",
+  "test": "gtest:TestStealthLoadInfo.EveryCopyOfALoadInfoKeepsItsLoadIdentifier"
+ },
+ {
+  "file": "netwerk/ipc/DocumentLoadListener.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"../../docshell/base/StealthNavigationEvents.h\"  // STEALTH-HOOK(automation/navigation)",
+  "test": "wrapper:tests/test_a_navigation_that_moved_is_told_by_the_engine_e2e.py::test_a_cross_site_goto_is_told_moved_by_the_engine_with_the_process_it_left"
+ },
+ {
+  "file": "netwerk/ipc/DocumentLoadListener.cpp",
+  "function": "static auto CreateDocumentLoadInfo(CanonicalBrowsingContext* aBrowsingContext,",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  loadInfo->SetJugglerLoadIdentifier(aLoadState->GetLoadIdentifier());  // STEALTH-HOOK(automation/navigation)",
+  "test": "wrapper:tests/test_goto_script_redirect_e2e.py::test_goto_returns_on_the_page_that_replaced_itself_from_script",
+  "anchor": "return loadInfo.forget(); (CreateDocumentLoadInfo)",
+  "why": "sets the identifier on the LoadInfo built here, right before it leaves; aLoadState is a parameter, the LoadInfo a local of this static function"
+ },
+ {
+  "file": "netwerk/ipc/DocumentLoadListener.cpp",
+  "function": "bool DocumentLoadListener::MaybeTriggerProcessSwitch(",
+  "kind": "add",
+  "form": "notice",
+  "line": "  StealthNotifyNavigationMoved(aContext, mContentParent, mLoadIdentifier, mIsDocumentLoad, aIsNewTab);  // STEALTH-HOOK(automation/navigation)",
+  "test": "wrapper:tests/test_a_navigation_that_moved_is_told_by_the_engine_e2e.py::test_a_cross_site_goto_is_told_moved_by_the_engine_with_the_process_it_left"
+ }
+]

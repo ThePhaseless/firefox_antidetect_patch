@@ -1,0 +1,54 @@
+[
+ {
+  "file": "js/xpconnect/loader/ScriptPreloader.cpp",
+  "function": "nsresult ScriptPreloader::CollectReports(nsIHandleReportCallback* aHandleReport,",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  StealthReportWrittenCache(aHandleReport, aData);  // STEALTH-HOOK(platform/script-cache)",
+  "test": "wrapper:tests/test_script_cache_written_is_adopted_e2e.py::test_a_fresh_profile_reports_its_written_cache_as_mapped",
+  "anchor": "the `if (XRE_IsParentProcess()) { ... } else { ... }` statement of ScriptPreloader::CollectReports (the last MOZ_COLLECT_REPORT block, just before `return NS_OK;`)",
+  "why": "design row moved (head of function, order of report callbacks changes): kept where it is today (G28/G18)"
+ },
+ {
+  "file": "js/xpconnect/loader/ScriptPreloader.cpp",
+  "function": "Result<Ok, nsresult> ScriptPreloader::WriteCache() {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  StealthAdoptWrittenCache(cacheFile);  // STEALTH-HOOK(platform/script-cache)",
+  "test": "wrapper:tests/test_script_cache_written_is_adopted_e2e.py::test_a_fresh_profile_reports_its_written_cache_as_mapped",
+  "anchor": "MOZ_TRY(cacheFile->MoveTo(nullptr, mBaseName + u\".bin\"_ns));",
+  "why": "needs the local cacheFile after MoveTo updated it to the final path, and only on the path that wrote a file; a head guard or a wrap of WriteCache cannot tell that a file was written"
+ },
+ {
+  "file": "js/xpconnect/loader/ScriptPreloader.cpp",
+  "function": "NS_IMPL_ISUPPORTS(ScriptPreloader, nsIObserver, nsIRunnable, nsIMemoryReporter,",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthScriptCache-inl.h\"  // STEALTH-HOOK(platform/script-cache)",
+  "test": "wrapper:tests/test_script_cache_written_is_adopted_e2e.py::test_a_fresh_profile_reports_its_written_cache_as_mapped"
+ },
+ {
+  "file": "js/xpconnect/loader/ScriptPreloader.h",
+  "function": "class ScriptPreloader : public nsIObserver,",
+  "kind": "add",
+  "form": "member",
+  "line": "  void StealthReportWrittenCache(nsIHandleReportCallback* aHandleReport, nsISupports* aData);  // STEALTH-HOOK(platform/script-cache)",
+  "test": "wrapper:tests/test_script_cache_written_is_adopted_e2e.py::test_a_fresh_profile_reports_its_written_cache_as_mapped"
+ },
+ {
+  "file": "js/xpconnect/loader/ScriptPreloader.h",
+  "function": "class ScriptPreloader : public nsIObserver,",
+  "kind": "add",
+  "form": "member",
+  "line": "  void StealthAdoptWrittenCache(nsIFile* aCacheFile);  // STEALTH-HOOK(platform/script-cache)",
+  "test": "wrapper:tests/test_script_cache_written_is_adopted_e2e.py::test_a_fresh_profile_reports_its_written_cache_as_mapped"
+ },
+ {
+  "file": "js/xpconnect/loader/ScriptPreloader.h",
+  "function": "class ScriptPreloader : public nsIObserver,",
+  "kind": "add",
+  "form": "member",
+  "line": "  AutoMemMap mStealthWrittenCacheData;  // STEALTH-HOOK(platform/script-cache)",
+  "test": "wrapper:tests/test_script_cache_written_is_adopted_e2e.py::test_a_fresh_profile_reports_its_written_cache_as_mapped"
+ }
+]

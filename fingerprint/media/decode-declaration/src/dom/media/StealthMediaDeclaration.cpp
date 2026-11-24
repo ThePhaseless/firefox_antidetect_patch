@@ -8,6 +8,7 @@
 #include "DecoderTraits.h"
 #include "MediaContainerType.h"
 #include "MediaMIMETypes.h"
+#include "PlatformDecoderModule.h"
 #include "PlatformEncoderModule.h"
 #include "mozilla/CheckedInt.h"
 #include "mozilla/Logging.h"
@@ -161,6 +162,15 @@ Maybe<bool> StealthDeclaredSoftwareH264() {
   return Some(decodeSw && encodeSw);
 }
 
+bool StealthDeclaredSoftwareH264(bool* aOut) {
+  const Maybe<bool> declared = StealthDeclaredSoftwareH264();
+  if (!declared) {
+    return false;
+  }
+  *aOut = *declared;
+  return true;
+}
+
 size_t StealthDeclaredNumberOfProcessors() {
   const int32_t declared = StaticPrefs::zoom_stealth_hw_concurrency();
   return declared > 0 ? size_t(declared) : GetNumberOfProcessors();
@@ -181,6 +191,33 @@ Maybe<media::DecodeSupportSet> StealthDeclaredDecodeSupportSet(
     declared += media::DecodeSupport::HardwareDecode;
   }
   return Some(declared);
+}
+
+bool StealthDeclaredDecodeSupportFor(const SupportDecoderParams& aParams,
+                                     media::DecodeSupportSet* aOut) {
+  const Maybe<media::DecodeSupportSet> declared =
+      StealthDeclaredDecodeSupportSet(aParams.MimeType());
+  if (!declared) {
+    return false;
+  }
+  *aOut = *declared;
+  return true;
+}
+
+static_assert(std::is_same_v<StealthDecodeSupportPromise,
+                             PlatformDecoderModule::SupportsDecoderPromise>);
+
+RefPtr<StealthDecodeSupportPromise> StealthDeclaredDecodeSupportAsyncFor(
+    const SupportDecoderParams& aParams) {
+  const Maybe<media::DecodeSupportSet> declared =
+      StealthDeclaredDecodeSupportSet(aParams.MimeType());
+  if (!declared) {
+    return nullptr;
+  }
+  // "SupportsAsync" is the __func__ of PDMFactory::SupportsAsync, which the
+  // promise carried as its creation site before the hook moved here.
+  return StealthDecodeSupportPromise::CreateAndResolve(*declared,
+                                                       "SupportsAsync");
 }
 
 bool StealthDeclaredDecodingInfo(const nsACString& aContainerMimeType,

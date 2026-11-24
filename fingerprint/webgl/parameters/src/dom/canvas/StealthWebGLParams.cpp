@@ -10,7 +10,10 @@
 #include <vector>
 
 #include "ClientWebGLContext.h"
+#include "GLContext.h"
+#include "WebGLContext.h"
 #include "js/Value.h"
+#include "mozilla/RefPtr.h"
 #include "mozilla/StaticPrefs_webgl.h"
 #include "mozilla/StaticPrefs_zoom.h"
 #include "mozilla/dom/TypedArray.h"
@@ -248,6 +251,19 @@ Maybe<webgl::ShaderPrecisionFormat> StealthWebGLShaderPrecision(
   return Nothing();
 }
 
+bool StealthWebGLShaderPrecisionFormat(
+    const GLenum aShaderType, const GLenum aPrecisionType,
+    already_AddRefed<WebGLShaderPrecisionFormatJS>* const aOut) {
+  const auto fake = StealthWebGLShaderPrecision(aShaderType, aPrecisionType);
+  if (!fake) {
+    return false;
+  }
+  // Born with its reference (a RefCounted starts at 0): wrapped without one,
+  // the binding's first release frees it under the JS reflector.
+  *aOut = MakeAndAddRef<WebGLShaderPrecisionFormatJS>(*fake);
+  return true;
+}
+
 Maybe<bool> StealthWebGLExtensionVerdict(const bool aIsWebGL2,
                                          const WebGLExtensionID aExt) {
   auto whitelist = GetStealthExtensionWhitelist(aIsWebGL2);
@@ -265,6 +281,42 @@ bool StealthDeclaredExtension(const bool aIsWebGL2, const WebGLExtensionID aExt,
                               const bool aServed) {
   const auto verdict = StealthWebGLExtensionVerdict(aIsWebGL2, aExt);
   return verdict ? *verdict : aServed;
+}
+
+void StealthDeclareLimits(const WebGLContext& aWebGL, webgl::Limits* aLimits) {
+  StealthDeclareExtensions(aWebGL.IsWebGL2(), aLimits->supportedExtensions);
+}
+
+bool StealthWebGLExtensionServed(const WebGLContext* const aCtx,
+                                 const WebGLExtensionID aExt) {
+  return StealthWebGLExtensionVerdict(aCtx->IsWebGL2(), aExt) == Some(true);
+}
+
+bool StealthWebGLExtensionUnserved(const WebGLContext* const aCtx,
+                                   const WebGLExtensionID aExt) {
+  return !aCtx->IsExtensionSupported(aExt);
+}
+
+bool StealthWebGLDrawBuffersIndexedMissing(const WebGLContext* const aCtx) {
+  return !aCtx->IsExtensionEnabled(WebGLExtensionID::OES_draw_buffers_indexed);
+}
+
+bool StealthWebGLPolygonOffsetClampMissing(const WebGLContext* const aCtx) {
+  return !aCtx->IsExtensionEnabled(WebGLExtensionID::EXT_polygon_offset_clamp);
+}
+
+bool StealthWebGLProvokingVertexMissing(const WebGLContext* const aCtx) {
+  return !aCtx->IsExtensionEnabled(WebGLExtensionID::WEBGL_provoking_vertex);
+}
+
+bool StealthWebGLClipControlMissing(const WebGLContext* const aCtx) {
+  return !aCtx->IsExtensionEnabled(WebGLExtensionID::EXT_clip_control);
+}
+
+void StealthInitStencilMasks(GLuint& aValueMaskFront, GLuint& aValueMaskBack,
+                             GLuint& aWriteMaskFront, GLuint& aWriteMaskBack) {
+  aValueMaskFront = aValueMaskBack = aWriteMaskFront = aWriteMaskBack =
+      UINT32_MAX;
 }
 
 }  // namespace mozilla

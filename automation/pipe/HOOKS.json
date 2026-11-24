@@ -1,0 +1,38 @@
+[
+ {
+  "file": "browser/app/winlauncher/LauncherProcessWin.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthJugglerPipe.h\"  // STEALTH-HOOK(automation/pipe)",
+  "test": "wrapper:tests/test_first_launch_from_a_new_path.py::test_the_first_launch_from_a_new_path_works"
+ },
+ {
+  "file": "browser/app/winlauncher/LauncherProcessWin.cpp",
+  "function": "Maybe<int> LauncherMain(int& argc, wchar_t* argv[]) {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  StealthAddJugglerPipeHandles(argc, argv, attrs);  // STEALTH-HOOK(automation/pipe)",
+  "test": "wrapper:tests/test_first_launch_from_a_new_path.py::test_the_first_launch_from_a_new_path_works",
+  "anchor": "attrs.AddInheritableHandles(stdHandles);",
+  "why": "attrs is a local built in the middle of LauncherMain and must already hold the standard handles; a head guard cannot see it and a wrap of LauncherMain cannot reach the creation of the child"
+ },
+ {
+  "file": "toolkit/xre/nsWindowsWMain.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthPipeStdio.h\"  // STEALTH-HOOK(automation/pipe)",
+  "test": "wrapper:tests/test_first_launch_from_a_new_path.py::test_the_first_launch_from_a_new_path_works"
+ },
+ {
+  "file": "toolkit/xre/nsWindowsWMain.cpp",
+  "function": "static void FreeAllocStrings(int argc, char** argv) {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  StealthJugglerPipeStdio(argc, argv);  // STEALTH-HOOK(automation/pipe)",
+  "test": "wrapper:tests/test_first_launch_from_a_new_path.py::test_the_first_launch_from_a_new_path_works",
+  "anchor": "SetDllDirectoryW(L\"\");",
+  "why": "design row moved (notice to the head of wmain, G10): left where it is today, as the brief asks for moved rows"
+ }
+]

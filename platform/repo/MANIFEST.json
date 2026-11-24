@@ -1,39 +1,21 @@
 {
  "modified": [
-  ".gitignore",
   "CLAUDE.md",
   "README.md"
  ],
  "added": {
-  "STEALTH_BRANCH_README.md": "100644"
+  "STEALTH_BRANCH_README.md": "100644",
+  "STEALTH_CLAUDE.md": "100644",
+  "STEALTH_README.md": "100644",
+  "release-out/.gitignore": "100644"
  },
  "inventory": [
-  {
-   "file": ".gitignore",
-   "category": "build",
-   "feature": "release-output-ignore",
-   "prefs": [],
-   "added": 1,
-   "removed": 0,
-   "hunks": 1,
-   "inline_logic_lines": 0,
-   "hookable": "already-hook",
-   "anchor": "(top-level ignore rules)",
-   "evidence": [
-    "+release-out/"
-   ],
-   "notes": "Ignores the local release output directory. Repo hygiene only; no Firefox code affected.",
-   "verifier": {
-    "changed": [],
-    "why": "Checked against the diff; no correction needed."
-   }
-  },
   {
    "file": "CLAUDE.md",
    "category": "other",
    "feature": "agent-instructions-fork",
    "prefs": [],
-   "added": 76,
+   "added": 1,
    "removed": 0,
    "hunks": 1,
    "inline_logic_lines": 0,
@@ -57,9 +39,9 @@
    "category": "other",
    "feature": "readme-fork-disclosure",
    "prefs": [],
-   "added": 94,
-   "removed": 3,
-   "hunks": 2,
+   "added": 2,
+   "removed": 0,
+   "hunks": 1,
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "(top-level document)",

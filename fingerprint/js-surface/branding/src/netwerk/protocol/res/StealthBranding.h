@@ -47,14 +47,24 @@ namespace mozilla::net {
 
 /**
  * Called by the chrome registry, in the parent and in every content process,
- * whenever a package's content directory is registered. Only the branding
- * package is kept. A registry reset re-registers every package, so the last
- * registration wins and nothing needs clearing. The content process resolves
- * branding URIs itself, so it needs to know where the branding directory is
- * too: nsChromeRegistryContent::RegisterPackage calls this for every package
- * with a content directory, so the content processes register it as well.
+ * whenever a package's content directory is registered
+ * (nsChromeRegistryChrome::ManifestContent after it records the package,
+ * nsChromeRegistryContent::RegisterPackage after it resolves the directory).
+ * Only the branding package is kept: where the branding directory is, for the
+ * declared-branding redirect. A registry reset re-registers every package, so
+ * the last registration wins and nothing needs clearing. The content process
+ * resolves branding URIs itself, so it needs to know where the branding
+ * directory is too: it calls this for every package with a content directory,
+ * and a package that has none in this process (aBase null) is ignored.
  */
 void StealthBrandingRegisterPackage(const nsACString& aPackage, nsIURI* aBase);
+
+/**
+ * The content directory the registries last recorded for the branding package
+ * (ends with '/'), for the tests: false when none has been recorded in this
+ * process.
+ */
+bool StealthBrandingRecordedDirectory(nsACString& aDirectory);
 
 /**
  * Rewrites a resolved URI spec that points into the branding package's content
@@ -65,29 +75,29 @@ void StealthBrandingRegisterPackage(const nsACString& aPackage, nsIURI* aBase);
  * or malformed. Safe on any thread: ResolveURI is called off the main thread
  * too.
  *
- * SubstitutingProtocolHandler::ResolveURI calls it at two places: on the result
- * of ResolveSpecialCases, so the declared branding applies on every way a URI
- * can reach the branding directory, special cases included; and after the
- * normal resolution, because resource://usercontext-content/branding/ reaches
- * the branding directory too and must read the same declared set as
- * chrome://branding/content/.
+ * SubstitutingProtocolHandler::ResolveURI (defined in StealthBranding.cpp, around
+ * Mozilla's ResolveURI_Mozilla) calls it on every successful resolution, the
+ * special cases included, so the declared branding applies on every way a URI
+ * can reach the branding directory, and resource://usercontext-content/branding/
+ * reads the same declared set as chrome://branding/content/. A failed
+ * resolution is returned as it is, not redirected.
  */
 nsresult StealthBrandingRedirect(nsACString& aResolvedSpec);
 
 /**
- * The body of nsChromeRegistry::ConvertChromeURL's last step. Resolves aPath
- * against aBase (the package's registered content directory) exactly as the
- * stock code does, then runs the resolved spec through StealthBrandingRedirect
- * so that chrome://branding/content/ reads the set invisible_core declares,
+ * Wraps the URI nsChromeRegistry::ConvertChromeURL resolves in its last step
+ * (aRv is the result of NS_NewURI(aResult, path, nullptr, baseURI), which has
+ * written *aResult). Runs the resolved spec through StealthBrandingRedirect so
+ * that chrome://branding/content/ reads the set invisible_core declares,
  * through the same function as resource://usercontext-content/branding/. The
  * two ways a page reaches the branding cannot disagree. When the redirect leaves
  * the spec unchanged (engine off, or not a branding URI) the URI resolved by the
  * stock call is returned as is, with no second parse. Otherwise a new URI is
- * built from the declared spec. Any failure of the resolve, of GetSpec or of
- * the redirect is returned unchanged. Runs on the thread of its caller.
+ * built from the declared spec and the resolved one is released. A failed aRv,
+ * or a failure of GetSpec or of the redirect, is returned with *aResult empty,
+ * as when the registry itself fails. Runs on the thread of its caller.
  */
-nsresult StealthBrandingResolveChromeURL(const nsACString& aPath,
-                                         nsIURI* aBase, nsIURI** aResult);
+nsresult StealthBrandingChromeURL(nsresult aRv, nsIURI** aResult);
 
 /**
  * Whether a declaration is well formed: a file: URI of a file, i.e. starting

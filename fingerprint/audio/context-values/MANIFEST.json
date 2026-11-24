@@ -2,7 +2,9 @@
  "modified": [
   "dom/media/webaudio/AudioContext.cpp"
  ],
- "added": {},
+ "added": {
+  "dom/media/webaudio/StealthAudioContextValues.h": "100644"
+ },
  "inventory": [
   {
    "file": "dom/media/webaudio/AudioContext.cpp",
@@ -12,7 +14,7 @@
     "zoom.stealth.audio.output_latency_ms",
     "zoom.stealth.audio.max_channel_count"
    ],
-   "added": 11,
+   "added": 4,
    "removed": 0,
    "hunks": 3,
    "inline_logic_lines": 4,

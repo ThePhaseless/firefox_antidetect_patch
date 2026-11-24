@@ -46,6 +46,11 @@ Maybe<OriginAttributes> StealthTRRContextOfLoadInfo(nsILoadInfo* aLoadInfo) {
   return StealthContextOfAttributes(attrs);
 }
 
+Maybe<OriginAttributes> StealthTRRContextOf(nsIChannel* aChannel) {
+  nsCOMPtr<nsILoadInfo> loadInfo = aChannel->LoadInfo();
+  return StealthTRRContextOfLoadInfo(loadInfo);
+}
+
 nsresult StealthApplyTRRContext(nsILoadInfo* aLoadInfo,
                                 const Maybe<OriginAttributes>& aContext) {
   if (aContext.isNothing()) {
@@ -71,11 +76,22 @@ void StealthKeepRequestContext(const OriginAttributes& aPage,
 }
 
 OriginAttributes StealthTransportContext(nsISocketTransport* aTransport) {
-  OriginAttributes attrs;
+  return StealthTransportContext(aTransport, OriginAttributes());
+}
+
+OriginAttributes StealthTransportContext(nsISocketTransport* aTransport,
+                                         const OriginAttributes& aUpstream) {
+  OriginAttributes attrs = aUpstream;
   if (aTransport) {
     (void)aTransport->GetOriginAttributes(&attrs);
   }
   return attrs;
+}
+
+OriginAttributes StealthTRRConnectionAttributes(
+    nsIChannel* aChannel, const OriginAttributes& aUpstream) {
+  nsCOMPtr<nsILoadInfo> loadInfo = aChannel->LoadInfo();
+  return StealthTRRContextOfLoadInfo(loadInfo).valueOr(aUpstream);
 }
 
 nsresult StealthTRRProxyFailure(nsresult aProxyStatus) {

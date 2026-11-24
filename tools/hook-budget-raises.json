@@ -18,5 +18,25 @@
   "decided_by": "pm 22/11 (disegno della correzione glxtest, finestra chiusa per costruzione)",
   "date": "2026-11-22",
   "test": "gtest:StealthGfxFeatureStatus.NothingProbesTheHostBeforeTheProfilePrefsAreRead"
+ },
+ {
+  "file": "toolkit/xre/nsAppRunner.cpp",
+  "from": 6,
+  "to": 7,
+  "folder": "platform/declaration-gate",
+  "reason": "la sonda GL di Mozilla a motore spento torna a partire presto, dopo la lettura delle preferenze: regressione della correzione a37f10c1ee, WebGL bloccato sotto carico (gate-only 45206303882)",
+  "decided_by": "pm",
+  "date": "2026-11-23",
+  "test": "gtest:StealthGfxFeatureStatus.TheHostProbeIsLaunchedAsSoonAsThePrefsAreReadWithTheEngineOff"
+ },
+ {
+  "file": "widget/gtk/moz.build",
+  "from": 1,
+  "to": 2,
+  "folder": "platform/declaration-gate",
+  "reason": "la sonda GL di Mozilla a motore spento torna a partire presto, dopo la lettura delle preferenze: regressione della correzione a37f10c1ee, WebGL bloccato sotto carico (gate-only 45206303882)",
+  "decided_by": "pm",
+  "date": "2026-11-23",
+  "test": "gtest:StealthGfxFeatureStatus.TheHostProbeIsLaunchedAsSoonAsThePrefsAreReadWithTheEngineOff"
  }
 ]

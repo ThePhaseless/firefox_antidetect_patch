@@ -19,6 +19,11 @@ deciding again from the event and the inputs.
              DRAFT under a `firefox-N` tag, the tag checked here before any build
              starts.
 
+A candidate can stop early (`stop_after=objects`): the compile-only run. It builds the objects of every
+directory the series touches (scripts/ci/objects_first.py) and stops there: no link, no package, no gtest
+run, no gate. Only a candidate by hand, on a `latitude/*` branch (the branches the proofs run on); the
+plan refuses it anywhere else, and it turns the gtests off, as a run that does not link has none to run.
+
 The compile cache (`compile_cache`) is decided here too, for the same reason.
 Every run compiles through sccache with GitHub's Actions cache behind it, so a
 run after a fix recompiles only what the fix touched instead of the whole tree
@@ -84,11 +89,23 @@ DEFAULT_GTEST_FILTER = ("StealthGfxFeatureStatus.*:StealthWebGPUAdapter.*:"
                         "StealthWebGPUDeclaration.*:StealthWebGPUBundledVulkan.*:"
                         "StealthWebGPUInstanceEnv.*:StealthFullscreen.*:"
                         "StealthScaleDeclaration.*:StealthWindowGeometry.*:"
-                        "StealthGLMultisample.*:StealthFrameCrash.*:"
+                        "StealthGLMultisample.*:StealthWebGLParams.*:StealthFrameCrash.*:"
                         "StealthJugglerEventId.*:StealthSessionUdpProxy.*:StealthDeclaredNetwork.*:StealthSocksUdpPool.*:TestStealthTRRContext.*:TestStealthSocksCredentials.*:TestStealthSessionResolver.*:StealthIceResolverContext.*:StealthUdpProxyBirth.*:StealthNrSocketBirth.*:"
                         "StealthPcUdpProxyKinds.*:StealthTcpProxyRoad.*:StealthPcProxyConfig.*:"
-                        "StealthInputEventBirth.*:StealthKeyBirthScope.*:StealthBirthOrder.*:StealthFcBundleFonts.*")
+                        "StealthInputEventBirth.*:StealthKeyBirthScope.*:StealthBirthOrder.*:StealthFcBundleFonts.*:"
+                        "StealthAudioNoise.*:StealthBundledCollection.*:"
+                        "StealthGlyphCoverage.*:StealthBundleHooks.*:StealthFontListHooks.*:StealthDebugger.*:StealthWindowInputDesktop.*:StealthPrefSanitize.*:TestStealthLinkClickAfter.*:TestStealthLoadInfo.*:TestStealthDocShellDefaults.*:"
+                        "StealthCanvasProjection.*:StealthDocumentLanguage.*:StealthFallbackNames.*:StealthFcFontList.*:"
+                        "StealthFontList.*:StealthFontMetrics.*:StealthMediaDeclaration.*:StealthOwnBinaries.*:"
+                        "StealthQuotaEstimate.*:StealthTextQuality.*:StealthTtcFace.*:StealthWebGPUExternalTexture.*:"
+                        "Intl_Locale_StealthSystemLocales.*:Idwr.*:"
+                        "StealthBranding.*:StealthCanvasUtils.*:StealthDragGesture.*:StealthHttp3Socks.*:StealthJugglerCoalesce.*:"
+                        "StealthJugglerMouseAck.*:StealthMouseEventCopy.*:StealthMouseEventIPC.*:StealthNsProxyInfoKinds.*:StealthSocksUdpLayer.*:StealthStackFrames.*:StealthStartupCache.*:StealthTimezone.*:StealthExclusivePort.*")
 DEFAULT_REF = "main"
+# What `stop_after` can say: nothing (the whole run), or the objects of the touched directories.
+STOP_AFTERS = ("", "objects")
+# The only branches a compile-only run starts from: the ones the proofs run on.
+STOP_AFTER_BRANCH_PREFIX = "latitude/"
 
 
 class PlanError(ValueError):
@@ -98,7 +115,7 @@ class PlanError(ValueError):
 def plan(event: str, kind: str, release_tag: str, ref_name: str,
          compile_cache: str = "", ref_type: str = "", gtests: str = "",
          gtest_filter: str = "", core_ref: str = "", wrapper_ref: str = "",
-         last_release: str = "") -> dict[str, str]:
+         last_release: str = "", stop_after: str = "") -> dict[str, str]:
     """The outputs of a run, or PlanError.
 
     compile_cache is the run's request: "" takes the default. ref_type is what the
@@ -106,12 +123,13 @@ def plan(event: str, kind: str, release_tag: str, ref_name: str,
     gtests, gtest_filter, core_ref and wrapper_ref are the run's inputs, empty on an
     automatic run: it is a candidate from main with the gtests and the defaults.
     last_release is the number N of the last published `firefox-N` (the workflow reads
-    it from the tags): a candidate is the engine after it."""
+    it from the tags): a candidate is the engine after it. stop_after is "" or "objects":
+    only a candidate by hand on a `latitude/*` branch may stop after the objects."""
     if event in AUTOMATIC_EVENTS:
         if ref_type != "branch" or ref_name != RELEASE_BRANCH:
             raise PlanError(f"a run by itself is a candidate from the branch {RELEASE_BRANCH}, "
                             f"not from {ref_name!r} ({ref_type or 'no ref type'})")
-        if kind or release_tag or compile_cache:
+        if kind or release_tag or compile_cache or stop_after:
             raise PlanError("a run by itself takes no inputs: it is a candidate with the cache")
         kind, gtests = "candidate", "true"
     elif event != "workflow_dispatch":
@@ -122,6 +140,16 @@ def plan(event: str, kind: str, release_tag: str, ref_name: str,
               "core_ref": core_ref or DEFAULT_REF, "wrapper_ref": wrapper_ref or DEFAULT_REF}
     if kind not in KINDS:
         raise PlanError(f"kind must be one of {', '.join(KINDS)}, got {kind!r}")
+    if stop_after not in STOP_AFTERS:
+        raise PlanError(f"stop_after must be empty or one of {', '.join(STOP_AFTERS[1:])}, got {stop_after!r}")
+    if stop_after:
+        if kind != "candidate":
+            raise PlanError(f"stop_after={stop_after} is for a candidate: a release is never cut short (kind={kind!r})")
+        if ref_type != "branch" or not ref_name.startswith(STOP_AFTER_BRANCH_PREFIX):
+            raise PlanError(f"stop_after={stop_after} runs from a {STOP_AFTER_BRANCH_PREFIX}* branch, "
+                            f"not from {ref_name!r} ({ref_type or 'no ref type'})")
+        # No link, so no gtest binary to run: the gtests are off whatever the input said.
+        common["gtests"] = "false"
     if compile_cache and compile_cache not in COMPILE_CACHES:
         raise PlanError(f"compile_cache must be one of {', '.join(COMPILE_CACHES)}, "
                         f"got {compile_cache!r}")
@@ -143,14 +171,14 @@ def plan(event: str, kind: str, release_tag: str, ref_name: str,
                             f"release: the number of the last release is needed (got {last_release!r})")
         return {"kind": "candidate", "tag": "", "num": "", "prevtag": "",
                 "seal_tag": CANDIDATE_SEAL_TAG.format(n=int(last_release) + 1),
-                "compile_cache": compile_cache or "gha", **common}
+                "compile_cache": compile_cache or "gha", "stop_after": stop_after, **common}
     try:
         n = check_release_tag(release_tag)
     except SealBuildError as exc:
         raise PlanError(f"a release needs a firefox-N tag: {exc}") from None
     return {"kind": "release", "tag": release_tag, "num": str(n),
             "prevtag": f"firefox-{n - 1}" if n > 0 else "", "seal_tag": release_tag,
-            "compile_cache": compile_cache or "gha", **common}
+            "compile_cache": compile_cache or "gha", "stop_after": "", **common}
 
 
 def main(argv=None) -> int:
@@ -165,13 +193,14 @@ def main(argv=None) -> int:
     ap.add_argument("--gtest-filter", default="")
     ap.add_argument("--core-ref", default="")
     ap.add_argument("--wrapper-ref", default="")
+    ap.add_argument("--stop-after", default="", help="objects: a compile-only candidate on a latitude/* branch")
     ap.add_argument("--last-release", default="", help="N of the last published firefox-N tag (a candidate is N+1)")
     a = ap.parse_args(argv)
     try:
         outputs = plan(a.event, a.kind, a.release_tag.strip(), a.ref_name,
                        a.compile_cache.strip(), a.ref_type.strip(), a.gtests.strip(),
                        a.gtest_filter.strip(), a.core_ref.strip(), a.wrapper_ref.strip(),
-                       a.last_release.strip())
+                       a.last_release.strip(), a.stop_after.strip())
     except PlanError as exc:
         print(f"PLAN REFUSED: {exc}", file=sys.stderr)
         return 1

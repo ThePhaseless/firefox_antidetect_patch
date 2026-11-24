@@ -1,27 +1,25 @@
 diff --git a/dom/webgpu/Adapter.cpp b/dom/webgpu/Adapter.cpp
-index 2814b6354a43690a2550e13a0bc312183609bb97..aab5b2f63e68094308a883911c75fd65757c018b 100644
+index 2814b6354a43690a2550e13a0bc312183609bb97..1d7b318a97fb5281da0468bc0d2c53d74a9e0357 100644
 --- a/dom/webgpu/Adapter.cpp
 +++ b/dom/webgpu/Adapter.cpp
-@@ -11,6 +11,7 @@
- #include "Instance.h"
- #include "SupportedFeatures.h"
- #include "SupportedLimits.h"
+@@ -17,6 +17,8 @@
+ #include "mozilla/dom/WebGPUBinding.h"
+ #include "mozilla/webgpu/ffi/wgpu.h"
+ 
 +#include "StealthWebGPUDeclaration.h"  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)
- #include "ipc/WebGPUChild.h"
- #include "mozilla/dom/BindingDeclarations.h"
- #include "mozilla/dom/Promise.h"
-@@ -69,6 +70,10 @@ uint32_t AdapterInfo::SubgroupMaxSize() const {
++
+ namespace mozilla::webgpu {
+ 
+ GPU_IMPL_CYCLE_COLLECTION(AdapterInfo, mParent)
+@@ -69,6 +71,7 @@ uint32_t AdapterInfo::SubgroupMaxSize() const {
  }
  
  bool AdapterInfo::IsFallbackAdapter() const {
-+  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)
-+  if (const auto declared = StealthWebGPUDeclaredIsFallback(mParent.get())) {
-+    return *declared;
-+  }
++  if (StealthWebGPUDeclared()) return StealthWebGPUIsFallback(mParent.get());  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)
    if (GetParentObject()->ShouldResistFingerprinting(
            RFPTarget::WebGPUIsFallbackAdapter)) {
      // Always report hardware support for WebGPU.
-@@ -252,6 +257,8 @@ struct FeatureImplementationStatus {
+@@ -252,6 +255,8 @@ struct FeatureImplementationStatus {
    }
  };
  
@@ -30,17 +28,15 @@ index 2814b6354a43690a2550e13a0bc312183609bb97..aab5b2f63e68094308a883911c75fd65
  Adapter::Adapter(Instance* const aParent, WebGPUChild* const aChild,
                   const std::shared_ptr<ffi::WGPUAdapterInformation>& aInfo)
      : ObjectBase(aChild, aInfo->id, ffi::wgpu_client_drop_adapter),
-@@ -308,6 +315,9 @@ Adapter::Adapter(Instance* const aParent, WebGPUChild* const aChild,
+@@ -308,6 +313,7 @@ Adapter::Adapter(Instance* const aParent, WebGPUChild* const aChild,
        // feature.
      }
    }
-+  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)
-+  StealthWebGPUDeclareAdapter(this, aParent, aInfo->id, mFeatures,
-+                              *mLimits->mFfi, StealthAdaptLimitKey<ToJsKey>);
++  StealthWebGPUDeclareAdapter(this, aParent, aInfo->id, mFeatures, *mLimits->mFfi, StealthAdaptLimitKey<ToJsKey>);  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)
    // TODO: Once we implement compat mode (see
    // <https://bugzilla.mozilla.org/show_bug.cgi?id=1905951>), do not report this
    // unconditionally.
-@@ -611,6 +621,7 @@ already_AddRefed<dom::Promise> Adapter::RequestDevice(
+@@ -611,6 +617,7 @@ already_AddRefed<dom::Promise> Adapter::RequestDevice(
      ffiDesc.required_features = featureBits;
      ffiDesc.required_limits = deviceLimits;
  
@@ -49,26 +45,23 @@ index 2814b6354a43690a2550e13a0bc312183609bb97..aab5b2f63e68094308a883911c75fd65
          ffi::wgpu_client_request_device(GetClient(), GetId(), &ffiDesc);
  
 diff --git a/dom/webgpu/Instance.cpp b/dom/webgpu/Instance.cpp
-index d07fa7a9c96565a18f218be8d48438c21afe1a65..26df09d8e792bd041802a1b0d3915298cd00a43c 100644
+index d07fa7a9c96565a18f218be8d48438c21afe1a65..d3853b99f26e276d748de96dd81d43e64c9af1c0 100644
 --- a/dom/webgpu/Instance.cpp
 +++ b/dom/webgpu/Instance.cpp
-@@ -8,6 +8,7 @@
- #include <string_view>
+@@ -25,6 +25,8 @@
+ #include "nsString.h"
+ #include "nsStringFwd.h"
  
- #include "Adapter.h"
 +#include "StealthWebGPUDeclaration.h"  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)
- #include "ipc/WebGPUChild.h"
- #include "ipc/WebGPUTypes.h"
- #include "js/Value.h"
-@@ -222,9 +223,15 @@ already_AddRefed<dom::Promise> Instance::RequestAdapter(
++
+ namespace mozilla::webgpu {
+ 
+ GPU_IMPL_CYCLE_COLLECTION(WGSLLanguageFeatures, mParent)
+@@ -222,9 +224,11 @@ already_AddRefed<dom::Promise> Instance::RequestAdapter(
      power_preference = ffi::WGPUPowerPreference_None;
    }
  
-+  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)
-+  if (StealthWebGPUNoAdapter()) {
-+    promise->MaybeResolve(JS::NullValue());
-+    return promise.forget();
-+  }
++  if (StealthWebGPUNoAdapter(promise)) return promise.forget();  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)
    RawId adapter_id = ffi::wgpu_client_request_adapter(
        child->GetClient(), power_preference, aOptions.mForceFallbackAdapter);
  
@@ -77,14 +70,23 @@ index d07fa7a9c96565a18f218be8d48438c21afe1a65..26df09d8e792bd041802a1b0d3915298
        PendingRequestAdapterPromise{promise, this, adapter_id});
  
 diff --git a/dom/webgpu/ipc/WebGPUParent.cpp b/dom/webgpu/ipc/WebGPUParent.cpp
-index a5587e0c02b9fc062e32be9329f1699376abc96f..98d1a347032f9b193d8ac24d57164f1f96fd036b 100644
+index a5587e0c02b9fc062e32be9329f1699376abc96f..0f7a6e103cfbb6242e2b3db75f277c3332c0b36f 100644
 --- a/dom/webgpu/ipc/WebGPUParent.cpp
 +++ b/dom/webgpu/ipc/WebGPUParent.cpp
-@@ -317,6 +317,7 @@ extern void wgpu_parent_swap_chain_drop(
+@@ -32,6 +32,8 @@
+ #  include "mozilla/webgpu/SharedTextureMacIOSurface.h"
+ #endif
+ 
++#include "mozilla/webgpu/StealthWebGPUDeclaration.h"  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)
++
+ namespace mozilla::webgpu {
+ 
+ const uint64_t POLL_TIME_MS = 100;
+@@ -317,6 +319,7 @@ extern void wgpu_parent_swap_chain_drop(
  #ifdef XP_WIN
  extern void wgpu_parent_get_compositor_device_luid(
      struct WGPUFfiLUID* aOutLuid) {
-+  *aOutLuid = {};  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)
++  StealthWebGPUZeroLuid(aOutLuid);  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)
    auto luid = WebGPUParent::GetCompositorDeviceLuid();
    if (luid.isSome()) {
      *aOutLuid = luid.extract();
@@ -102,49 +104,61 @@ index a0d0ceba2c0d4615e259d7a04bed61adaff26203..1007a9714304e0c383c2b7ba242b4fef
  IPDL_SOURCES += [
      "ipc/PWebGPU.ipdl",
 diff --git a/gfx/thebes/gfxPlatform.cpp b/gfx/thebes/gfxPlatform.cpp
-index 9385c82abed17b64c4dd7a45f15d1d0a26cc791c..9c9e17407a6ad8daf6199e66269e553e3f3789e4 100644
+index 9385c82abed17b64c4dd7a45f15d1d0a26cc791c..27b4c0bbda0cef5c8fed9b59feac7bc872883d84 100644
 --- a/gfx/thebes/gfxPlatform.cpp
 +++ b/gfx/thebes/gfxPlatform.cpp
-@@ -3,6 +3,7 @@
-  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+@@ -152,6 +152,8 @@ static const uint32_t kDefaultGlyphCacheSize = -1;
+ #include "nscore.h"  // for NS_FREE_PERMANENT_DATA
+ #include "prsystem.h"
  
- #include "gfxPlatform.h"
 +#include "mozilla/webgpu/StealthWebGPUDeclaration.h"  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)
- 
- #include "GfxDriverInfo.h"
- #include "VRProcessManager.h"
-@@ -3238,7 +3239,8 @@ void gfxPlatform::InitWebGPUConfig() {
++
+ using namespace mozilla;
+ using namespace mozilla::layers;
+ using namespace mozilla::gl;
+@@ -3238,7 +3240,8 @@ void gfxPlatform::InitWebGPUConfig() {
      featureExternalTexture.Disable(FeatureStatus::Blocklisted, message.get(),
                                     failureId);
    }
 -#if !defined(XP_WIN) && !defined(XP_MACOSX)
-+  mozilla::webgpu::StealthWebGPUPlatformInit();  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration): Linux's Vulkan driver is ours; external textures are on as on Windows
-+#if !defined(XP_WIN) && !defined(XP_MACOSX) && 0
++  mozilla::webgpu::StealthWebGPUPlatformInit();  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)
++#if !defined(XP_WIN) && !defined(XP_MACOSX) && 0  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)
    featureExternalTexture.ForceDisable(
        FeatureStatus::Blocked,
        "WebGPU external textures are not supported on this Operating System",
 diff --git a/gfx/wgpu_bindings/src/server.rs b/gfx/wgpu_bindings/src/server.rs
-index b4ee977ca56ca3afa98cfcf2215b7790b97bd4fe..b6c44065a3a5a85899096b9ad988c2c21d88feab 100644
+index b4ee977ca56ca3afa98cfcf2215b7790b97bd4fe..3103555abcc436c4cbbf3c63dc2ddc9eeecc1412 100644
 --- a/gfx/wgpu_bindings/src/server.rs
 +++ b/gfx/wgpu_bindings/src/server.rs
-@@ -339,6 +339,7 @@ pub extern "C" fn wgpu_server_new(owner: WebGPUParentPtr) -> *mut Global {
+@@ -48,6 +48,10 @@ use windows::Win32::{Foundation, Graphics::Direct3D12};
+ #[cfg(target_os = "linux")]
+ use ash::{khr, vk};
+ 
++#[path = "stealth_webgpu_env.rs"] mod stealth_webgpu_env; // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)
++
++#[path = "stealth_webgpu_adapter.rs"] mod stealth_webgpu_adapter; // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)
++
+ // The seemingly redundant u64 suffix helps cbindgen with generating the right C++ code.
+ // See https://github.com/mozilla/cbindgen/issues/849#issuecomment-4759987548.
+ 
+@@ -339,6 +343,7 @@ pub extern "C" fn wgpu_server_new(owner: WebGPUParentPtr) -> *mut Global {
          | wgt::InstanceFlags::AUTOMATIC_TIMESTAMP_NORMALIZATION
          | wgt::InstanceFlags::STRICT_WEBGPU_COMPLIANCE)
          .with_env();
-+    #[path = "stealth_webgpu_env.rs"] mod stealth_webgpu_env; stealth_webgpu_env::without_host_env(&mut instance_flags); // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)
++    stealth_webgpu_env::without_host_env(&mut instance_flags); // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)
      if !static_prefs::pref!("dom.webgpu.hal-labels") {
          instance_flags.insert(wgt::InstanceFlags::DISCARD_HAL_LABELS);
      }
-@@ -2745,6 +2746,7 @@ unsafe fn process_message(
+@@ -2745,6 +2750,7 @@ unsafe fn process_message(
                      }
                  }
              }
-+            #[path = "stealth_webgpu_adapter.rs"] mod stealth_webgpu_adapter; stealth_webgpu_adapter::settle(global, &desc, adapter_id, &mut result); // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)
++            stealth_webgpu_adapter::settle(global, &desc, adapter_id, &mut result); // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)
  
              if result.is_none() {
                  let created = match global.request_adapter(
 diff --git a/modules/libpref/init/StaticPrefList.yaml b/modules/libpref/init/StaticPrefList.yaml
-index 80be46d83cc04eb081ce58b4e322c8da15143c1c..905d26642b3be37545ff20f2e362857428c6f291 100644
+index 80be46d83cc04eb081ce58b4e322c8da15143c1c..faadfa6fb77dd0a4c9fa2441df91c0f9eeeb7de0 100644
 --- a/modules/libpref/init/StaticPrefList.yaml
 +++ b/modules/libpref/init/StaticPrefList.yaml
 @@ -6248,7 +6248,7 @@
@@ -152,7 +166,7 @@ index 80be46d83cc04eb081ce58b4e322c8da15143c1c..905d26642b3be37545ff20f2e3628574
    value: true
  #else
 -  value: false
-+  value: true  # STEALTH-HOOK(fingerprint/webgpu/adapter-declaration): Windows' value on every OS
++  value: true  # STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)
  #endif
    mirror: once
  
@@ -161,7 +175,7 @@ index 80be46d83cc04eb081ce58b4e322c8da15143c1c..905d26642b3be37545ff20f2e3628574
  - name: network.proxy.type
    type: RelaxedAtomicUint32
 -  value: 5
-+  value: 0  # STEALTH-HOOK(network/proxy): direct, the host's proxy settings are never read
++  value: 0  # STEALTH-HOOK(network/proxy)
    mirror: always
  
  # Whether to use WPAD while configuring proxy with system settings
@@ -170,7 +184,7 @@ index 80be46d83cc04eb081ce58b4e322c8da15143c1c..905d26642b3be37545ff20f2e3628574
  - name: network.trr.request_timeout_ms
    type: RelaxedAtomicUint32
 -  value: 1500
-+  value: 30000  # STEALTH-HOOK(network/doh): the TRR-only timeout; a proxied lookup is TRR_ONLY per request in global mode 0
++  value: 30000  # STEALTH-HOOK(network/doh)
    mirror: always
  
  # Single TRR request timeout, in milliseconds for mode 3
@@ -179,7 +193,7 @@ index 80be46d83cc04eb081ce58b4e322c8da15143c1c..905d26642b3be37545ff20f2e3628574
  - name: network.trr.exclude-etc-hosts
    type: RelaxedAtomicBool
 -  value: true
-+  value: false  # STEALTH-HOOK(network/doh): the host's hosts file is never read, not even at start-up
++  value: false  # STEALTH-HOOK(network/doh)
    mirror: always
  
  # Whether to add padding in the doh dns queries (rfc 7830)

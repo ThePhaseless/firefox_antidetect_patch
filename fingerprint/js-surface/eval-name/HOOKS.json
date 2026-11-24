@@ -1,0 +1,20 @@
+[
+ {
+  "file": "js/src/debugger/Frame.cpp",
+  "function": "static bool EvaluateInEnv(",
+  "kind": "rewrite",
+  "form": "declared-value",
+  "line": "      evalOptions.filename() ? evalOptions.filename() : \"eval code\";  // STEALTH-HOOK(fingerprint/js-surface/eval-name)",
+  "removed": "      evalOptions.filename() ? evalOptions.filename() : \"debugger eval code\";",
+  "test": "wrapper:tests/test_the_evaluated_code_has_no_debugger_name_e2e.py::test_the_evaluated_code_has_no_debugger_name"
+ },
+ {
+  "file": "js/src/debugger/Frame.cpp",
+  "function": "static bool EvaluateInEnv(",
+  "kind": "rewrite",
+  "form": "declared-value",
+  "line": "      .setIntroductionType(\"eval\")  // STEALTH-HOOK(fingerprint/js-surface/eval-name)",
+  "removed": "      .setIntroductionType(\"debugger eval\")",
+  "test": "wrapper:tests/test_the_evaluated_code_has_no_debugger_name_e2e.py::test_the_evaluated_code_has_no_debugger_name"
+ }
+]

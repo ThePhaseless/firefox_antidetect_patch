@@ -5,6 +5,7 @@
 #ifndef GFX_GL_STEALTH_OWN_GL_H_
 #define GFX_GL_STEALTH_OWN_GL_H_
 
+#include "GLContextProvider.h"
 #include "GLLibraryEGL.h"
 #include "StealthDeclarationGate.h"
 #include "nsString.h"
@@ -40,12 +41,13 @@ inline bool StealthOwnGLRequired() {
 // next to the executable where the package puts them (package_linux.sh), as
 // WebGPU finds its lavapipe. By path, so a host libEGL already mapped under the
 // same name is never the one answered; each finds its libgallium beside it
-// (RUNPATH $ORIGIN). False, with the reason, when a file is missing: EGL then
-// stays unloaded. True and nothing done when the engine is off.
-inline bool StealthLoadOwnGLOrRefuse(PRLibrary** aEGL, PRLibrary** aGL,
-                                     nsACString* aFailureId) {
+// (RUNPATH $ORIGIN). True, with the reason, when a file is missing: EGL then
+// stays unloaded (ours or none: the hook in GLLibraryEGL::Init returns false).
+// False and nothing done when the engine is off.
+inline bool StealthOwnGLRefused(PRLibrary** aEGL, PRLibrary** aGL,
+                                nsACString* aFailureId) {
   if (!StealthOwnGLRequired()) {
-    return true;
+    return false;
   }
 #if defined(MOZ_WIDGET_GTK)
   char exe[4096];
@@ -60,7 +62,7 @@ inline bool StealthLoadOwnGLOrRefuse(PRLibrary** aEGL, PRLibrary** aGL,
     if (egl && gles) {
       *aEGL = egl;
       *aGL = gles;
-      return true;
+      return false;
     }
     if (egl) {
       PR_UnloadLibrary(egl);
@@ -68,15 +70,19 @@ inline bool StealthLoadOwnGLOrRefuse(PRLibrary** aEGL, PRLibrary** aGL,
   }
 #endif
   aFailureId->AssignLiteral("FEATURE_FAILURE_EGL_LOAD_3");
-  return false;
+  return true;
 }
 
-// EGL's surfaceless platform, asked for as EGL defines it: with no native
-// display. Mozilla's EGL_DEFAULT_DISPLAY is the X11 display wherever there is
-// one (GLLibraryEGL.h), and Mozilla's own surfaceless path runs only where there
-// is none. The engine asks for it under X11 too (Xvfb), where Mesa answers a
-// native display with EGL_BAD_PARAMETER: candidate 42484125583 had no WebGL on
-// the Linux gate. Otherwise as GetAndInitSurfacelessDisplay.
+// The display of GLLibraryEGL::CreateDisplayLocked, surfaceless only: EGL's
+// surfaceless platform, asked for as EGL defines it: with no native display.
+// Mozilla's EGL_DEFAULT_DISPLAY is the X11 display wherever there is one
+// (GLLibraryEGL.h), and Mozilla's own surfaceless path runs only where there is
+// none. The engine asks for it under X11 too (Xvfb), where Mesa answers a native
+// display with EGL_BAD_PARAMETER: candidate 42484125583 had no WebGL on the
+// Linux gate. Otherwise as GetAndInitSurfacelessDisplay. The hook is the first
+// statement of the function: with the engine on the EGL is our llvmpipe, which
+// never advertises ANGLE_platform_angle_d3d, so the branch this used to open was
+// the only one reached.
 inline std::shared_ptr<EglDisplay> StealthOwnGLSurfacelessDisplay(
     GLLibraryEGL& aEgl, const StaticMutexAutoLock& aProofOfLock) {
   if (!aEgl.IsExtensionSupported(EGLLibExtension::MESA_platform_surfaceless)) {
@@ -89,6 +95,13 @@ inline std::shared_ptr<EglDisplay> StealthOwnGLSurfacelessDisplay(
     return nullptr;
   }
   return EglDisplay::Create(aEgl, display, true, aProofOfLock);
+}
+
+// Always EGL, never GLX (GLContextProviderLinux::CreateHeadless): the static
+// the Linux provider already called through its file-scope instance.
+inline already_AddRefed<GLContext> StealthOwnGLCreateHeadless(
+    const GLContextCreateDesc& aDesc, nsACString* const aFailureId) {
+  return GLContextProviderEGL::CreateHeadless(aDesc, aFailureId);
 }
 
 }  // namespace mozilla::gl

@@ -228,3 +228,63 @@ test('a document request that finishes after a cut the content told sends the ba
     ['Page.navigationAborted', 'nav-28', 'NS_BINDING_ABORTED'],
   ]);
 });
+
+// The parent's decision that a navigation leaves the docShell that started it (juggler-navigation-moved, told by
+// DocumentLoadListener::TriggerProcessSwitch) reaches the registry, and the cut that docShell tells afterwards, with its
+// reporter, is not the end of the navigation: the request ends, no barrier is sent, the navigation is not aborted.
+test('a cut of the docShell the parent moved the navigation from is not held behind a barrier', async () => {
+  const top = context();
+  const { handler, obs, events, registered } = construct(top);
+  const frameId = 'mainframe-9';
+  const barriers = [];
+  handler._contentPage.send = (method, params) => { barriers.push([method, params.frameId]); return Promise.resolve(); };
+  handler._handleNetworkEvent('Network.requestWillBeSent', { requestId: '30', navigationId: 'nav-40', url: 'http://c.test/moved' }, frameId);
+  obs.notify(top, 'juggler-navigation-moved', '40 5555');
+  registered.frames.frameNavigationAborted({ frameId, navigationId: 'nav-40', errorText: 'NS_BINDING_ABORTED',
+                                             reporter: { browsingContextId: top.id, childId: 5555 } });
+  events.length = 0;
+  handler._handleNetworkEvent('Network.requestFinished', { requestId: '30', documentEnded: 'nav-40' }, frameId);
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.deepEqual(barriers, []);
+  assert.deepEqual(events.map(([name]) => name), ['Network.requestFinished']);
+  assert.equal(handler._frameNavigations.pendingNavigationId(frameId), 'nav-40');
+});
+
+test('a cut of the process that takes the document, or told with no reporter, is held as it was', async () => {
+  const top = context();
+  const { handler, obs, events, registered } = construct(top);
+  const frameId = 'mainframe-9';
+  const barriers = [];
+  handler._contentPage.send = (method, params) => { barriers.push([method, params.frameId]); return Promise.resolve(); };
+  handler._handleNetworkEvent('Network.requestWillBeSent', { requestId: '31', navigationId: 'nav-41', url: 'http://c.test/moved' }, frameId);
+  obs.notify(top, 'juggler-navigation-moved', '41 5555');
+  registered.frames.frameNavigationAborted({ frameId, navigationId: 'nav-41', errorText: 'NS_BINDING_ABORTED',
+                                             reporter: { browsingContextId: top.id, childId: 6666 } });
+  events.length = 0;
+  handler._handleNetworkEvent('Network.requestFinished', { requestId: '31', documentEnded: 'nav-41' }, frameId);
+  assert.deepEqual(barriers, [['barrier', frameId]]);
+});
+
+test('the decision for a browsing context of another page is not this page\'s', async () => {
+  const top = context();
+  const { handler, obs, registered } = construct(top);
+  const other = context({ browserId: 10 });
+  const frameId = 'mainframe-9';
+  const barriers = [];
+  handler._contentPage.send = (method, params) => { barriers.push([method, params.frameId]); return Promise.resolve(); };
+  handler._handleNetworkEvent('Network.requestWillBeSent', { requestId: '32', navigationId: 'nav-42', url: 'http://c.test/moved' }, frameId);
+  obs.notify(other, 'juggler-navigation-moved', '42 5555');
+  registered.frames.frameNavigationAborted({ frameId, navigationId: 'nav-42', errorText: 'NS_BINDING_ABORTED',
+                                             reporter: { browsingContextId: other.id, childId: 5555 } });
+  handler._handleNetworkEvent('Network.requestFinished', { requestId: '32', documentEnded: 'nav-42' }, frameId);
+  assert.deepEqual(barriers, [['barrier', frameId]]);
+});
+
+test('the observer of the decision goes with the handler', async () => {
+  const top = context();
+  const { handler, obs } = construct(top);
+  assert.equal(obs.count('juggler-navigation-moved'), 1);
+  await handler.dispose();
+  assert.equal(obs.count('juggler-navigation-moved'), 0);
+});

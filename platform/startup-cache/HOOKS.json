@@ -1,0 +1,35 @@
+[
+ {
+  "file": "startupcache/StartupCache.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthStartupCache.h\"  // STEALTH-HOOK(platform/startup-cache)",
+  "test": "gtest:StealthStartupCache.AWriteNeverLowersItsIOPriority"
+ },
+ {
+  "file": "startupcache/StartupCache.cpp",
+  "function": "void StartupCache::MaybeWriteOffMainThread(WriteType aWriteType,",
+  "kind": "rewrite",
+  "form": "wrap-expression",
+  "line": "        if (StealthWritesMayLowerIOPriority(aUseLowPriorityIO)) {  // STEALTH-HOOK(platform/startup-cache)",
+  "removed": "        if (aUseLowPriorityIO) {",
+  "test": "gtest:StealthStartupCache.AWriteNeverLowersItsIOPriority"
+ },
+ {
+  "file": "startupcache/moz.build",
+  "function": "EXPORTS.mozilla.scache += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "EXPORTS.mozilla.scache += [\"StealthStartupCache.h\"]  # STEALTH-HOOK(platform/startup-cache)",
+  "test": "gtest:StealthStartupCache.AWriteNeverLowersItsIOPriority"
+ },
+ {
+  "file": "startupcache/test/moz.build",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"TestStealthStartupCache.cpp\"]  # STEALTH-HOOK(platform/startup-cache)",
+  "test": "gtest:StealthStartupCache.AWriteNeverLowersItsIOPriority"
+ }
+]

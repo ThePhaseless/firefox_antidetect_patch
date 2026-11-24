@@ -11,18 +11,22 @@ namespace mozilla {
 
 class ModuleVersionInfo;
 
-// STEALTH: whether aDllPath lies in the directory of aExePath (or below),
-// case-insensitively. GetVersionAndVendorInfo skips the signature lookup for
-// those modules that also carry firefox.exe's version (this build's own;
-// the signed C++ runtime beside them keeps it): they carry no Authenticode
+// STEALTH: whether aModulePath lies in the directory of aExeFilePath (or below),
+// case-insensitively (see StealthSkipsSignatureLookup).
+bool StealthIsInDirectoryOf(const nsAString& aModulePath,
+                            const nsAString& aExeFilePath);
+
+// STEALTH: GetVersionAndVendorInfo skips the signature lookup for the modules
+// of the directory of the running exe that also carry firefox.exe's version
+// (this build's own; the signed C++ runtime beside them keeps it): they carry no Authenticode
 // signature, so the lookup always fell through to the catalog search, which
 // hashes the whole file and walks every system catalog - 1.26 s of CPU per
 // launch in the "Untrusted Modules" thread, on a 2026-10-27 profile, for an
 // answer that cannot exist. GetTrust then classifies them as it already did:
 // FirefoxDirectory (+AndVersion), from their path and version resource.
 //
-// ModuleRecord::IsInDirectoryOf (declared in UntrustedModulesData.h, defined in
-// StealthOwnBinaries.cpp) is the path test; this is the whole decision.
+// StealthIsInDirectoryOf is the path test; StealthSkipsSignatureLookup is the
+// whole decision.
 //
 // True when the signature lookup of the module at aPath must be skipped: it
 // has a version resource (aHasVersion, the result of aVerInfo.GetFromImage)

@@ -38,9 +38,10 @@ test('the milestone of this build is a release', () => {
 
 test('the cached connection info is used only behind that pref, and not for another context', () => {
   const text = read('netwerk/dns/TRR.cpp');
-  // One Mozilla line is rewritten (registered): the last operand of the condition
-  // is Mozilla's, and the lookup's own proxy is a plain operand after it.
-  assert.match(text, /  if \(UseDefaultServer\(\) && !useOHTTP &&\n      StaticPrefs::network_trr_async_connInfo\(\) && StealthTRRContextOfSuffix\(mOriginSuffix\)\.isNothing\(\)\) \{  \/\/ STEALTH-HOOK\(network\/doh\)/);
+  // One Mozilla line is rewritten (registered): the pref is Mozilla's, handed to our function, which adds the lookup's
+  // own context after it.
+  assert.match(text, /  if \(UseDefaultServer\(\) && !useOHTTP &&\n      StealthTRRConnInfoUsable\(mOriginSuffix, StaticPrefs::network_trr_async_connInfo\(\)\)\) \{  \/\/ STEALTH-HOOK\(network\/doh\)/);
+  assert.match(read('netwerk/dns/StealthTRRRequest.cpp'), /return aPrefValue && StealthTRRContextOfSuffix\(aOriginSuffix\)\.isNothing\(\);/);
   // The only reader of the cached info that opens a connection (the preconnect)
   // is on application-foreground, which desktop never fires.
   assert.match(read('modules/libpref/init/StaticPrefList.yaml'),

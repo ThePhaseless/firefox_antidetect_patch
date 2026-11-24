@@ -1,16 +1,17 @@
 diff --git a/toolkit/xre/dllservices/UntrustedModulesData.cpp b/toolkit/xre/dllservices/UntrustedModulesData.cpp
-index 49df9886436395e75b660ffaafcc3ad9607003a1..371d29486f31872cca1ebda988d0809d8821d3cb 100644
+index 49df9886436395e75b660ffaafcc3ad9607003a1..e1b3ef5e87f0359720fabbb5a7b65d4ca796321c 100644
 --- a/toolkit/xre/dllservices/UntrustedModulesData.cpp
 +++ b/toolkit/xre/dllservices/UntrustedModulesData.cpp
-@@ -18,6 +18,7 @@
- #include "nsCOMPtr.h"
- #include "nsDebug.h"
+@@ -20,6 +20,8 @@
  #include "nsXULAppAPI.h"
-+#include "StealthOwnBinaries.h"  // STEALTH-HOOK(platform/untrusted-modules)
  #include "WinUtils.h"
  
++#include "StealthOwnBinaries.h"  // STEALTH-HOOK(platform/untrusted-modules)
++
  // Some utility functions
-@@ -114,20 +115,26 @@ ModuleRecord::ModuleRecord(const nsAString& aResolvedNtPath)
+ 
+ static LONGLONG GetQPCFreq() {
+@@ -114,20 +116,26 @@ ModuleRecord::ModuleRecord(const nsAString& aResolvedNtPath)
  void ModuleRecord::GetVersionAndVendorInfo(const nsAString& aPath) {
    RefPtr<DllServices> dllSvc(DllServices::Get());
  
@@ -41,21 +42,6 @@ index 49df9886436395e75b660ffaafcc3ad9607003a1..371d29486f31872cca1ebda988d0809d
 +  if (!hasVersion) {
      return;
    }
- 
-diff --git a/toolkit/xre/dllservices/UntrustedModulesData.h b/toolkit/xre/dllservices/UntrustedModulesData.h
-index 08c39c8c2874b828ee74f4f4571fbf96a6f75971..b58c0291aeae9c33b1870d855b06eab5d193bd5b 100644
---- a/toolkit/xre/dllservices/UntrustedModulesData.h
-+++ b/toolkit/xre/dllservices/UntrustedModulesData.h
-@@ -88,6 +88,10 @@ class ModuleRecord final {
-   bool IsXUL() const;
-   bool IsTrusted() const;
- 
-+  // STEALTH-HOOK(platform/untrusted-modules)
-+  static bool IsInDirectoryOf(const nsAString& aDllPath,
-+                              const nsAString& aExePath);
-+
-   ModuleRecord(const ModuleRecord&) = delete;
-   ModuleRecord(ModuleRecord&&) = delete;
  
 diff --git a/toolkit/xre/dllservices/moz.build b/toolkit/xre/dllservices/moz.build
 index 5ece47afcc859ac8bc0eb76bef6645eb2f7067e5..1c93f2928ceccfeb7bf475f7426e9d84dc10c63d 100644

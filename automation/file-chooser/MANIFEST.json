@@ -2,14 +2,16 @@
  "modified": [
   "dom/html/HTMLInputElement.cpp"
  ],
- "added": {},
+ "added": {
+  "dom/html/StealthFileChooser.h": "100644"
+ },
  "inventory": [
   {
    "file": "dom/html/HTMLInputElement.cpp",
    "category": "juggler",
    "feature": "file-chooser-intercept",
    "prefs": [],
-   "added": 10,
+   "added": 4,
    "removed": 0,
    "hunks": 2,
    "inline_logic_lines": 5,

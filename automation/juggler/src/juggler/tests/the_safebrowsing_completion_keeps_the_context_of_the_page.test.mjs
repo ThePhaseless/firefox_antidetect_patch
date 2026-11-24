@@ -37,26 +37,29 @@ const TAG = 'STEALTH-HOOK(network/doh)';
 const count = (text, needle) => text.split(needle).length - 1;
 const lines = text => text.split(/\r?\n/);
 
-test('the interface of the completion callback gives the context, one line beside Mozilla\'s', () => {
+test('the interface of the completion callback gives the context, one line beside the lines of Mozilla', () => {
   const text = read(IDL);
   const hook = '  readonly attribute uint32_t userContextId;  // ' + TAG + '\n';
   assert.equal(count(text, hook), 1);
-  assert.equal(count(text, TAG), 1);
   const callback = text.match(/interface nsIUrlClassifierHashCompleterCallback : nsISupports\n\{[\s\S]*?\n\};\n/)[0];
   assert.ok(callback.includes(hook), 'the attribute is not in the callback interface');
-  assert.ok(callback.indexOf('void completionFinished(in nsresult status);\n') < callback.indexOf(hook), 'the line is not after Mozilla\'s last method');
+  // After an existing member of Mozilla's (the last statement of completionV4), not the last line of the interface.
+  assert.ok(callback.includes('in nsIArray fullHashes);\n' + hook), 'the line is not right after completionV4');
+  assert.ok(callback.indexOf(hook) < callback.indexOf('void completionFinished(in nsresult status);\n'), 'the line is the last of the interface');
   assert.ok(/\[scriptable, uuid\(da16de40-df26-414d-bde7-c4faf4504868\)\]\ninterface nsIUrlClassifierHashCompleterCallback/.test(text), 'Mozilla\'s interface line was rewritten');
 });
 
 test('the completion callbacks of a lookup read the context the lookup was made in, beside Mozilla\'s lines', () => {
   const text = read(DB);
-  assert.equal(count(text, TAG), 4, 'the include, the member, the getter and the scope are the only hooks of this file');
-  assert.ok(text.includes('#include "mozilla/net/StealthTRRContext.h"  // ' + TAG + '\n'), 'the include is missing');
+  assert.ok(text.includes('#include "nsToolkitCompsCID.h"\n\n#include "mozilla/net/StealthTRRContext.h"  // ' + TAG + '\n\nnamespace mozilla {\nnamespace safebrowsing {'), 'the include is missing');
+  // The only reader of the lookup context of the thread is the member of the completer base class.
+  assert.equal(count(text, 'StealthCurrentLookupContext('), 1, 'the context is read outside the callback that is made in the lookup');
 
   const base = text.match(/class nsUrlClassifierHashCompleterBase\n[\s\S]*?\n\};\n/)[0];
   const member = '  uint32_t mStealthUserContextId = mozilla::net::StealthCurrentLookupContext();  // ' + TAG + '\n';
   assert.ok(base.includes(member), 'the context is not read where the callback is made');
-  assert.ok(base.indexOf('  uint32_t mPendingCompletions = 0;\n') < base.indexOf(member), 'the member is not beside Mozilla\'s members');
+  assert.ok(base.indexOf('  nsCOMPtr<nsIUrlClassifierCallback> mCallback;\n' + member) > 0, 'the member is not right after one of Mozilla\'s members');
+  assert.ok(base.indexOf(member) < base.indexOf('  uint32_t mPendingCompletions = 0;\n'), 'the member is the last of the class');
   assert.ok(base.includes('  NS_DECL_NSIURLCLASSIFIERHASHCOMPLETERCALLBACK\n'));
 
   const getter = 'NS_IMETHODIMP nsUrlClassifierHashCompleterBase::GetUserContextId(uint32_t* aId) { return mozilla::net::StealthLookupContextOut(mStealthUserContextId, aId); }  // ' + TAG + '\n';
@@ -85,27 +88,28 @@ test('Classify opens the scope with the page\'s principal before any callback is
 
 test('the JS completer hands a completion to the completer of its context, and its channel carries the context', () => {
   const text = read(COMPLETER);
-  assert.equal(count(text, TAG), 3, 'the import, the hand-over and the channel are the only hooks of this file');
 
-  const imp = '// ' + TAG + '\nimport {\n  stealthApplyContext,\n  stealthCompleteInContext,\n} from "resource://gre/modules/StealthHashCompleterContext.sys.mjs";\n';
-  assert.ok(text.includes('import { NetUtil } from "resource://gre/modules/NetUtil.sys.mjs";\n' + imp), 'the import is not right after Mozilla\'s imports');
+  const imp = '\nimport { stealthApplyContext, stealthCompleteInContext } from "resource://gre/modules/StealthHashCompleterContext.sys.mjs";  // ' + TAG + '\n';
+  assert.ok(text.includes('import { NetUtil } from "resource://gre/modules/NetUtil.sys.mjs";\n' + imp + '\nconst lazy = {};'), 'the import is not right after Mozilla\'s imports, on one line');
+  assert.equal(count(text, 'StealthHashCompleterContext.sys.mjs'), 1, 'the module is imported twice');
 
   const handOver = '    if (stealthCompleteInContext(this, aPartialHash, aGethashUrl, aTableName, aCallback)) { return; }  // ' + TAG + '\n';
   assert.ok(text.includes('  complete(aPartialHash, aGethashUrl, aTableName, aCallback) {\n' + handOver + '    if (!aGethashUrl) {\n'), 'the hand-over is not the first line of complete()');
+  assert.equal(count(text, 'stealthCompleteInContext('), 1, 'a second entry hands a completion over');
 
-  const channel = '        "safebrowsing.86868755-6b82-4842-b301-72671a0db32e.mozilla",\n    };\n    stealthApplyContext(channel, this.completer);  // ' + TAG + '\n';
+  const channel = '        "safebrowsing.86868755-6b82-4842-b301-72671a0db32e.mozilla",\n    };\n    stealthApplyContext(channel, this);  // ' + TAG + '\n';
   assert.ok(text.includes(channel), 'the channel does not get the context right after Mozilla\'s attributes');
+  assert.equal(count(text, 'NetUtil.newChannel('), 1, 'a second channel of the completer would need the same context');
   const open = text.match(/  openChannel\(\) \{[\s\S]*?\n  \}\n/)[0];
-  assert.ok(open.indexOf('stealthApplyContext(channel, this.completer);') < open.indexOf('channel.asyncOpen(this);'), 'the context is given after the channel is opened');
+  assert.ok(open.indexOf('stealthApplyContext(channel, this);') < open.indexOf('channel.asyncOpen(this);'), 'the context is given after the channel is opened');
   assert.ok(open.indexOf('loadUsingSystemPrincipal: true,') < open.indexOf('stealthApplyContext'));
   assert.doesNotMatch(text, /userContextId/, 'the logic is in our file, not in Mozilla\'s');
 });
 
 test('the helper module is registered beside Mozilla\'s modules', () => {
   const text = read(DIR + 'moz.build');
-  assert.equal(count(text, TAG), 1);
-  assert.ok(text.includes('    "SafeBrowsing.sys.mjs",\n    "StealthHashCompleterContext.sys.mjs",  # ' + TAG + '\n    "UrlClassifierHashCompleter.sys.mjs",\n'));
-  assert.ok(text.match(/EXTRA_JS_MODULES \+= \[[\s\S]*?StealthHashCompleterContext\.sys\.mjs[\s\S]*?\]/), 'the module is not in EXTRA_JS_MODULES');
+  assert.ok(text.includes('    "UrlClassifierRemoteSettingsService.sys.mjs",\n]\nEXTRA_JS_MODULES += ["StealthHashCompleterContext.sys.mjs"]  # ' + TAG + '\n'), 'the registration is not right after the list of Mozilla\'s modules');
+  assert.equal(count(text, 'StealthHashCompleterContext.sys.mjs'), 1, 'the module is registered twice');
 });
 
 test('the xpcshell test is registered and asks for one request per context', () => {
@@ -208,18 +212,18 @@ test('the completer of a context runs upstream\'s code, and is the same one for 
 
 test('the channel of a completer of a context carries the context and keeps the first party domain', () => {
   const channel = { loadInfo: { originAttributes: { firstPartyDomain: 'safebrowsing.x.mozilla', userContextId: 0 } } };
-  stealthApplyContext(channel, { stealthUserContextId: 7 });
+  stealthApplyContext(channel, { completer: { stealthUserContextId: 7 } });
   assert.deepEqual(channel.loadInfo.originAttributes, { firstPartyDomain: 'safebrowsing.x.mozilla', userContextId: 7 });
 });
 
 test('the channel of the default completer is left as upstream made it', () => {
   const original = { firstPartyDomain: 'safebrowsing.x.mozilla' };
   const channel = { loadInfo: { originAttributes: original } };
-  stealthApplyContext(channel, {});
+  stealthApplyContext(channel, { completer: {} });
   assert.equal(channel.loadInfo.originAttributes, original);
 });
 
 test('a channel that refuses the context fails the request, it is not swallowed', () => {
   const channel = { loadInfo: { get originAttributes() { return { firstPartyDomain: 'f' }; }, set originAttributes(v) { throw new Error('refused'); } } };
-  assert.throws(() => stealthApplyContext(channel, { stealthUserContextId: 7 }), /refused/);
+  assert.throws(() => stealthApplyContext(channel, { completer: { stealthUserContextId: 7 } }), /refused/);
 });

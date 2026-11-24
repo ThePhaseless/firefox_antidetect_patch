@@ -7,11 +7,15 @@
 #define xpc_StealthSandbox_h
 
 #include "ExpandedPrincipal.h"
-#include "mozilla/BasePrincipal.h"
-#include "nsIPrincipal.h"
 #include "xpcprivate.h"
+#include "StealthHybridXray.h"
+#include "mozilla/BasePrincipal.h"
+#include "mozilla/Maybe.h"
+#include "nsIPrincipal.h"
 
 #include "js/ErrorReport.h"  // JS_ReportErrorASCII
+#include "js/PropertyDescriptor.h"
+#include "js/RootingAPI.h"
 #include "js/TypeDecls.h"
 
 namespace xpc {
@@ -20,26 +24,41 @@ namespace xpc {
  * STEALTHFOX [B322]: what js/xpconnect/src/Sandbox.cpp needs for the caller's
  * world (the `hybridXrays` option of Cu.Sandbox, which only Juggler passes;
  * the compartment flag is CompartmentPrivate::hybridXrays in xpcprivate.h and
- * the wrapper rule is written above HybridXrayWrapper in XrayWrapper.h).
+ * the wrapper rule is written above HybridXrayWrapper in StealthHybridXray.h).
  *
  * Sections, one per hook in Sandbox.cpp:
  *
- *   getPropertyDescriptorImpl (SandboxProxyHandler): in a caller's world the
- *   prototype is the page's window behind a hybrid Xray, and a bare name
- *   (`document`, the page's `myFunction`, its top-level `const config`)
- *   resolves by the hybrid rule, in the order the page's realm resolves it
- *   (HybridXrayGetBareName, XrayWrapper.h). Walking the wrapper generically
- *   would join the two views level by level, so a property the page put on
- *   the window could hide a standard one.
+ *   getPropertyDescriptorImpl (SandboxProxyHandler): StealthGetPropertyDescriptor.
  *
- *   CreateSandboxObject: StealthCheckHybridXrays, below.
+ *   CreateSandboxObject: StealthCheckHybridXrays (before the options are
+ *   used). The compartment flag is checked (reused compartment) or stored
+ *   (new compartment) in place, next to wantXrays.
  *
- *   CreateSandboxObject (compartment flag) and SandboxOptions::Parse: the
- *   flag is read from the option, checked against a reused compartment
- *   (MOZ_RELEASE_ASSERT) and stored on the new one, next to wantXrays.
+ *   SandboxOptions::Parse reads the option in place (hybridXrays, in
+ *   xpcprivate.h, defaults to false).
  *
  * Main thread.
  */
+
+// The property descriptor of `id` on `obj`, as SandboxProxyHandler wants it,
+// in place of Mozilla's JS_GetPropertyDescriptorById. In a caller's world the
+// prototype is the page's window behind a hybrid Xray, and a bare name
+// (`document`, the page's `myFunction`, its top-level `const config`)
+// resolves by the hybrid rule, in the order the page's realm resolves it
+// (HybridXrayGetBareName, StealthHybridXray.h). Walking the wrapper
+// generically would join the two views level by level, so a property the page
+// put on the window could hide a standard one, and the page's traps would
+// run. For any other object it is Mozilla's call, unchanged (holder is not
+// used afterwards for a hybrid Xray).
+inline bool StealthGetPropertyDescriptor(
+    JSContext* aCx, JS::HandleObject aObj, JS::HandleId aId,
+    JS::MutableHandle<mozilla::Maybe<JS::PropertyDescriptor>> aDesc,
+    JS::MutableHandleObject aHolder) {
+  if (IsHybridXrayWrapper(aObj)) {
+    return HybridXrayGetBareName(aCx, aObj, aId, aDesc);
+  }
+  return JS_GetPropertyDescriptorById(aCx, aObj, aId, aDesc, aHolder);
+}
 
 // Checks the `hybridXrays` option of a sandbox about to be created. A
 // caller's world has the page's own principal, and `hybridXrays` replaces

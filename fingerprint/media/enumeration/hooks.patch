@@ -1,61 +1,53 @@
 diff --git a/dom/media/MediaManager.cpp b/dom/media/MediaManager.cpp
-index a3d6a13aa50e48125243e7e15c0322e5e97f5937..8d7344de4fb5bb974839c303e0a7e241b1c6b63c 100644
+index a3d6a13aa50e48125243e7e15c0322e5e97f5937..22581d27fbaf149ed3adc6e46eb0aa9eeea809fa 100644
 --- a/dom/media/MediaManager.cpp
 +++ b/dom/media/MediaManager.cpp
-@@ -13,6 +13,8 @@
- #include "MediaTrackConstraints.h"
- #include "MediaTrackGraph.h"
- #include "MediaTrackListener.h"
-+// STEALTH-HOOK(fingerprint/media/enumeration)
-+#include "StealthMediaEnumeration.h"
- #include "Tracing.h"
- #include "VideoStreamTrack.h"
- #include "VideoUtils.h"
-@@ -2151,7 +2153,9 @@ bool MediaManager::EnumerationParams::RealDeviceRequested() const {
+@@ -76,6 +76,8 @@
+ #  include <objbase.h>
+ #endif
+ 
++#include "StealthMediaEnumeration.h"  // STEALTH-HOOK(fingerprint/media/enumeration)
++
+ // A specialization of nsMainThreadPtrHolder for
+ // mozilla::dom::CallbackObjectHolder.  See documentation for
+ // nsMainThreadPtrHolder in nsProxyRelease.h.  This specialization lets us avoid
+@@ -2151,7 +2153,7 @@ bool MediaManager::EnumerationParams::RealDeviceRequested() const {
    auto isReal = [](const auto& aDev) { return aDev.mType == DeviceType::Real; };
    return mVideo.map(isReal).valueOr(false) ||
           mAudio.map(isReal).valueOr(false) ||
 -         mFlags.contains(EnumerationFlag::EnumerateAudioOutputs);
-+         // STEALTH-HOOK(fingerprint/media/enumeration)
-+         StealthHostSpeakersRequested(
-+             mFlags.contains(EnumerationFlag::EnumerateAudioOutputs));
++         StealthHostSpeakersRequested(mFlags.contains(EnumerationFlag::EnumerateAudioOutputs));  // STEALTH-HOOK(fingerprint/media/enumeration)
  }
  
  MediaSourceEnum MediaManager::EnumerationParams::VideoInputType() const {
-@@ -2261,8 +2265,9 @@ MediaManager::MaybeRequestPermissionAndEnumerateRawDevices(
- 
+@@ -2262,7 +2264,7 @@ MediaManager::MaybeRequestPermissionAndEnumerateRawDevices(
    const bool hasVideo = aParams.mVideo.isSome();
    const bool hasAudio = aParams.mAudio.isSome();
--  const bool hasAudioOutput =
+   const bool hasAudioOutput =
 -      aParams.mFlags.contains(EnumerationFlag::EnumerateAudioOutputs);
-+  // STEALTH-HOOK(fingerprint/media/enumeration)
-+  const bool hasAudioOutput = StealthHostSpeakersRequested(
-+      aParams.mFlags.contains(EnumerationFlag::EnumerateAudioOutputs));
++      StealthHostSpeakersRequested(aParams.mFlags.contains(EnumerationFlag::EnumerateAudioOutputs));  // STEALTH-HOOK(fingerprint/media/enumeration)
    const bool hasFakeCams = aParams.HasFakeCams();
    const bool hasFakeMics = aParams.HasFakeMics();
    // True if at least one of video input or audio input is a real device
-@@ -2410,7 +2415,9 @@ MediaManager::EnumerateRawDevices(EnumerationParams aParams) {
+@@ -2410,7 +2412,7 @@ MediaManager::EnumerateRawDevices(EnumerationParams aParams) {
                      video->mForcedDeviceName.get());
      devices->AppendElements(std::move(videos));
    }
 -  if (aParams.mFlags.contains(EnumerationFlag::EnumerateAudioOutputs)) {
-+  // STEALTH-HOOK(fingerprint/media/enumeration)
-+  if (StealthHostSpeakersRequested(
-+          aParams.mFlags.contains(EnumerationFlag::EnumerateAudioOutputs))) {
++  if (StealthHostSpeakersRequested(aParams.mFlags.contains(EnumerationFlag::EnumerateAudioOutputs))) {  // STEALTH-HOOK(fingerprint/media/enumeration)
      MediaDeviceSet outputs;
      MOZ_ASSERT(realBackend);
      realBackend->EnumerateDevices(MediaSourceEnum::Other,
-@@ -2438,7 +2445,8 @@ MediaManager::EnumerateRawDevices(EnumerationParams aParams) {
+@@ -2438,7 +2440,7 @@ MediaManager::EnumerateRawDevices(EnumerationParams aParams) {
        GetMediaDevices(videoBackend, MediaSourceEnum::Microphone, audios,
                        aParams.mVideo->mForcedMicrophoneName.get());
      }
 -    if (videoBackend == realBackend) {
-+    // STEALTH-HOOK(fingerprint/media/enumeration)
-+    if (videoBackend == realBackend && StealthHostSpeakersMayBeAsked()) {
++    if (StealthHostSpeakersForCorrelation(videoBackend == realBackend)) {  // STEALTH-HOOK(fingerprint/media/enumeration)
        // When using the real backend for video, there could also be
        // speakers to correlate with. There are no fake speakers.
        if (speakers.isSome()) {
-@@ -2474,14 +2482,20 @@ RefPtr<ConstDeviceSetPromise> MediaManager::GetPhysicalDevices() {
+@@ -2474,14 +2476,20 @@ RefPtr<ConstDeviceSetPromise> MediaManager::GetPhysicalDevices() {
            GetCurrentSerialEventTarget(), __func__,
            [self = RefPtr(this), this, promises = mPendingDevicesPromises](
                RefPtr<MediaDeviceSetRefCnt> aDevices) mutable {

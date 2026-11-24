@@ -4,8 +4,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 // STEALTHFOX [B322]: hybrid Xrays and the caller's objects. Declarations only;
-// the definitions are in StealthHybridXray.cpp. Included at the end of
-// XrayWrapper.h.
+// the definitions are in StealthHybridXray.cpp. Included by the files that use
+// them (WrapperFactory.cpp, StealthSandbox.h, StealthHybridXray.cpp).
 
 #ifndef StealthHybridXray_h
 #define StealthHybridXray_h
@@ -18,9 +18,6 @@
 #include "js/TypeDecls.h"  // JS::HandleObject, JS::MutableHandleIdVector, ...
 #include "js/Wrapper.h"    // js::CrossCompartmentWrapper
 
-// Works when this header is included first too: the guard above is already
-// defined when XrayWrapper.h includes us back, so we are skipped there and
-// continue here once XrayWrapper.h is complete.
 #include "XrayWrapper.h"
 
 class JSObject;
@@ -156,23 +153,18 @@ bool HybridXrayGetBareName(
     JSContext* cx, JS::HandleObject wrapper, JS::HandleId id,
     JS::MutableHandle<mozilla::Maybe<JS::PropertyDescriptor>> desc);
 
-// What WrapperFactory::Rewrap asks of the two compartments before it picks a
-// wrapper.
-struct StealthXrayFlags {
-  // The compartment the wrapper is made for is a caller's world.
-  bool targetHybrid;
-  // The origin compartment forces Xrays on whoever reads it.
-  bool originForcesXrays;
-  // The target compartment forces Xrays on what it reads.
-  bool targetForcesXrays;
-};
+// STEALTHFOX [B322]: whether the compartment WrapperFactory::Rewrap makes a
+// wrapper for forces Xrays on what it reads: Gecko's `wantXrays`, or the
+// caller's world (`hybridXrays`), which wants Xrays when IT reads the page but
+// does not impose them on the page reading ITS objects (the page sees those
+// transparently, as it saw them when the caller's code ran in the page's own
+// realm). Hence the target's term is `wantXrays || hybridXrays` while the
+// origin's stays Gecko's `wantXrays`. The context realm is the compartment
+// read.
+bool StealthTargetWantsXrays(JSContext* aCx, bool aWantXrays);
 
-// STEALTHFOX [B322]: the caller's world (`hybridXrays`) wants Xrays when IT
-// reads the page, as a `wantXrays` compartment does, but it does not impose
-// them on the page reading ITS objects: the page sees those transparently,
-// as it saw them when the caller's code ran in the page's own realm. Hence
-// two flags where Gecko had one symmetric test.
-StealthXrayFlags StealthComputeXrayFlags(JS::Realm* origin, JS::Realm* target);
+// Whether the context realm (the target of the wrapper) is a caller's world.
+bool StealthTargetIsHybrid(JSContext* aCx);
 
 // STEALTHFOX [B322]: a caller's object, read by the page it shares a
 // principal with. It goes BEFORE the web-object case in Rewrap, which would

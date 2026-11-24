@@ -7,7 +7,10 @@
 // where each is read (fileInputInterceptionEnabled by HTMLInputElement, the
 // file picker; bypassCSPEnabled by CSP_IsBypassedFor in nsCSPUtils). They are
 // declared by NS_DECL_NSIDOCSHELL and backed by two bit-fields of nsDocShell
-// that its constructor initialises to false.
+// that are false from construction (a default member initialiser in the
+// header): a docshell the automation never wrote to neither intercepts a file
+// picker nor bypasses a policy. The IDL declares the pair after
+// synchronizeLayoutHistoryState and persistLayoutHistoryState.
 
 #include "nsDocShell.h"
 

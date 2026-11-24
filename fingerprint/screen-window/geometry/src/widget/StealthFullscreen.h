@@ -30,6 +30,15 @@ Maybe<DesktopRect> StealthFullscreenRect(
 // origin of the screen the widget is on. Nothing() with the engine off.
 Maybe<DesktopRect> StealthDeclaredFullscreenRect(nsIWidget& aWidget);
 
+// What nsIWidget::InfallibleMakeFullScreen moves the window to: aDeclared when
+// there is one, otherwise aMozilla, the rectangle Firefox chose (the host's
+// monitor). The widget form asks StealthDeclaredFullscreenRect itself, so with
+// the engine off it answers aMozilla and Firefox's own path runs unchanged.
+DesktopRect StealthFullscreenRectOr(const Maybe<DesktopRect>& aDeclared,
+                                    const DesktopRect& aMozilla);
+DesktopRect StealthFullscreenRectOr(nsIWidget& aWidget,
+                                    const DesktopRect& aMozilla);
+
 // The same rectangle in device pixels, rounded as Windows sizes a window.
 Maybe<LayoutDeviceIntRect> StealthDeclaredFullscreenDeviceRect(
     nsIWidget& aWidget);

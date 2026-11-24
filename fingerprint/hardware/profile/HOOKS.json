@@ -1,0 +1,28 @@
+[
+ {
+  "file": "dom/base/Navigator.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthHardwareProfile.h\"  // STEALTH-HOOK(fingerprint/hardware/profile)",
+  "test": "wrapper:tests/test_hardware_values_are_declared_e2e.py::test_hardware_concurrency_is_the_declared_count_in_the_page_the_worker_and_the_iframe"
+ },
+ {
+  "file": "dom/base/Navigator.cpp",
+  "function": "bool Navigator::GlobalPrivacyControl() {",
+  "kind": "add",
+  "form": "guard",
+  "line": "  if (uint64_t stealthCores; StealthHardwareConcurrency(&stealthCores)) return stealthCores;  // STEALTH-HOOK(fingerprint/hardware/profile)",
+  "test": "wrapper:tests/test_hardware_values_are_declared_e2e.py::test_hardware_concurrency_is_the_declared_count_in_the_page_the_worker_and_the_iframe"
+ },
+ {
+  "file": "dom/base/Navigator.cpp",
+  "function": "uint32_t Navigator::MaxTouchPoints(CallerType aCallerType) {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  if (uint32_t stealthTouch; StealthMaxTouchPoints(aCallerType, &stealthTouch)) return stealthTouch;  // STEALTH-HOOK(fingerprint/hardware/profile)",
+  "test": "wrapper:tests/test_hardware_values_are_declared_e2e.py::test_max_touch_points_is_the_pinned_count_while_the_engine_is_active",
+  "anchor": "if (bc && bc->Top()->InRDMPane()) {\n    return bc->Top()->GetMaxTouchPointsOverride();\n  }",
+  "why": "the hook needs this (aCallerType) and a parameter but must run after the Responsive Design Mode branch: at the top, a page in an RDM pane of an engine-on browser would get the declared value instead of the devtools override (a different result in that one case)"
+ }
+]

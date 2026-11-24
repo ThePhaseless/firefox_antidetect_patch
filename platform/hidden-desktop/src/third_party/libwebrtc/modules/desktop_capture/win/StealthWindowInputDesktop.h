@@ -17,11 +17,10 @@
 namespace webrtc {
 
 // STEALTHFOX_HIDDEN_DESKTOP: whether the window lives on the desktop the
-// screen shows (the input desktop). This is the body of
-// WindowCaptureHelperWin::IsWindowOnInputDesktop (window_capture_utils.h). A
-// window of this process created on another Win32 desktop object passes every
-// visibility check of WindowCaptureHelperWin (IsWindowVisibleOnCurrentDesktop
-// and the others) and is still not on the screen, so nothing cropped from the
+// screen shows (the input desktop). A window of this process created on
+// another Win32 desktop object passes every visibility check of
+// WindowCaptureHelperWin (IsWindowVisibleOnCurrentDesktop and the others) and
+// is still not on the screen, so nothing cropped from the
 // screen can contain it. The desktop of the window's own thread is compared
 // by name with the input desktop; the comparison is case-insensitive
 // (_wcsicmp), unlike Desktop::IsSame, which compares the names with
@@ -55,6 +54,26 @@ inline bool StealthIsWindowOnInputDesktop(HWND hwnd) {
     return true;
   }
   return _wcsicmp(window_desktop_name, input_desktop_name.c_str()) == 0;
+}
+
+// The hook of CroppingWindowCapturerWin::ShouldUseScreenCapturer
+// (cropping_window_capturer_win.cc), which stands right after its
+// IsWindowVisibleOnCurrentDesktop check, before the layered-window check, and
+// says "not through the screen capturer" for a window that is off the input
+// desktop.
+//
+// A window created on a Win32 desktop object other than the input desktop
+// passes the check above it in ShouldUseScreenCapturer
+// (IsWindowVisibleOnCurrentDesktop): it is visible, not iconic, not cloaked,
+// and the shell's virtual desktop manager has no opinion about it. Yet the
+// screen shows the input desktop only, so a crop of the screen can never
+// contain it. Worse, the screen capturers move this thread onto the input
+// desktop, after which the window capturer cannot read the window either: the
+// capture ends with no frame at all. PrintWindow with PW_RENDERFULLCONTENT
+// reads such a window in full from a thread on its own desktop (measured
+// 2026-09-20), so the window capturer is the only path that can deliver.
+inline bool StealthIsOffInputDesktop(HWND hwnd) {
+  return !StealthIsWindowOnInputDesktop(hwnd);
 }
 
 }  // namespace webrtc

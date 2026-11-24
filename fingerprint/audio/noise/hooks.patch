@@ -12,76 +12,73 @@ index 392fef3d32dd2835fc68c1411910feeec77e2ab5..546c548b995a55a882f5de8afdc4f2f1
  if CONFIG["MOZ_WEBRTC"]:
      LOCAL_INCLUDES += [
 diff --git a/dom/media/webaudio/AnalyserNode.cpp b/dom/media/webaudio/AnalyserNode.cpp
-index 3c80514a1d51c10d677c971647eea6dbcf5d15c4..cb611688dc068cd53e99fb2a674d6c155ef048b4 100644
+index 3c80514a1d51c10d677c971647eea6dbcf5d15c4..ed7935783c2f9409730fd8bb012a3fed82b5908c 100644
 --- a/dom/media/webaudio/AnalyserNode.cpp
 +++ b/dom/media/webaudio/AnalyserNode.cpp
-@@ -6,6 +6,7 @@
+@@ -12,6 +12,8 @@
+ #include "mozilla/dom/AnalyserNodeBinding.h"
+ #include "nsMathUtils.h"
  
- #include "AudioNodeEngine.h"
- #include "AudioNodeTrack.h"
 +#include "StealthAudioNoise.h"  // STEALTH-HOOK(fingerprint/audio/noise)
- #include "Tracing.h"
- #include "mozilla/Mutex.h"
- #include "mozilla/PodOperations.h"
-@@ -221,6 +222,8 @@ void AnalyserNode::GetFloatFrequencyData(const Float32Array& aArray) {
++
+ namespace mozilla {
+ 
+ static const uint32_t MAX_FFT_SIZE = 32768;
+@@ -221,6 +223,7 @@ void AnalyserNode::GetFloatFrequencyData(const Float32Array& aArray) {
        aData[i] = WebAudioUtils::ConvertLinearToDecibels(
            mOutputBuffer[i], -std::numeric_limits<float>::infinity());
      }
-+    // STEALTH-HOOK(fingerprint/audio/noise)
-+    StealthAddFrequencyNoise(aData, length);
++    StealthAddFrequencyNoise(aData, length);  // STEALTH-HOOK(fingerprint/audio/noise)
    });
  }
  
-@@ -253,6 +256,8 @@ void AnalyserNode::GetFloatTimeDomainData(const Float32Array& aArray) {
+@@ -253,6 +256,7 @@ void AnalyserNode::GetFloatTimeDomainData(const Float32Array& aArray) {
      size_t length = std::min(aData.Length(), size_t(FftSize()));
  
      GetTimeDomainData(aData.Elements(), length);
-+    // STEALTH-HOOK(fingerprint/audio/noise)
-+    StealthAddTimeDomainNoise(aData, length);
++    StealthAddTimeDomainNoise(aData, length);  // STEALTH-HOOK(fingerprint/audio/noise)
    });
  }
  
 diff --git a/dom/media/webaudio/AudioDestinationNode.cpp b/dom/media/webaudio/AudioDestinationNode.cpp
-index b179d24565e7e85571614cfecd3363e24d0efef7..991d3fbb58736654e44de483b84d6228bd81866c 100644
+index b179d24565e7e85571614cfecd3363e24d0efef7..9cc7ba119e2a854eba8fb41bc30e03d4c4ffe667 100644
 --- a/dom/media/webaudio/AudioDestinationNode.cpp
 +++ b/dom/media/webaudio/AudioDestinationNode.cpp
-@@ -11,6 +11,7 @@
- #include "AudioNodeTrack.h"
- #include "CubebUtils.h"
- #include "MediaTrackGraph.h"
+@@ -29,6 +29,8 @@
+ #include "nsGlobalWindowInner.h"
+ #include "nsPIDOMWindowInlines.h"
+ 
 +#include "StealthAudioNoise.h"  // STEALTH-HOOK(fingerprint/audio/noise)
- #include "Tracing.h"
- #include "mozilla/StaticPrefs_dom.h"
- #include "mozilla/StaticPrefs_media.h"
-@@ -131,6 +132,9 @@ class OfflineDestinationNodeEngine final : public AudioNodeEngine {
++
+ extern mozilla::LazyLogModule gAudioChannelLog;
+ 
+ #define AUDIO_CHANNEL_LOG(msg, ...) \
+@@ -131,6 +133,7 @@ class OfflineDestinationNodeEngine final : public AudioNodeEngine {
            }
          }
        }
-+      // STEALTH-HOOK(fingerprint/audio/noise)
-+      StealthAddOfflineAudioNoise(aInput.IsNull(), i, inputChannelCount,
-+                                  mWriteIndex, mLength, duration, outputData);
++      StealthAddOfflineAudioNoise(aInput.IsNull(), i, inputChannelCount, mWriteIndex, mLength, duration, outputData);  // STEALTH-HOOK(fingerprint/audio/noise)
      }
      mWriteIndex += duration;
  
 diff --git a/dom/media/webaudio/DynamicsCompressorNode.h b/dom/media/webaudio/DynamicsCompressorNode.h
-index 3fb9120f92a8d853bd10d600b7525ed796962c25..46c3b0ae803f1fb4bf40fe540f4fcd59eec26615 100644
+index 3fb9120f92a8d853bd10d600b7525ed796962c25..757891ac777fb620f328a242fe2f636ff466027d 100644
 --- a/dom/media/webaudio/DynamicsCompressorNode.h
 +++ b/dom/media/webaudio/DynamicsCompressorNode.h
-@@ -12,6 +12,8 @@ namespace mozilla::dom {
- 
+@@ -13,6 +13,8 @@ namespace mozilla::dom {
  class AudioContext;
  struct DynamicsCompressorOptions;
-+// STEALTH-HOOK(fingerprint/audio/noise)
-+float StealthPerturbCompressorReduction(float aReduction);
  
++float StealthPerturbCompressorReduction(float aReduction);  // STEALTH-HOOK(fingerprint/audio/noise)
++
  class DynamicsCompressorNode final : public AudioNode {
   public:
-@@ -51,6 +53,8 @@ class DynamicsCompressorNode final : public AudioNode {
+   static already_AddRefed<DynamicsCompressorNode> Create(
+@@ -51,6 +53,7 @@ class DynamicsCompressorNode final : public AudioNode {
  
    void SetReduction(float aReduction) {
      MOZ_ASSERT(NS_IsMainThread());
-+    // STEALTH-HOOK(fingerprint/audio/noise)
-+    aReduction = StealthPerturbCompressorReduction(aReduction);
++    aReduction = StealthPerturbCompressorReduction(aReduction);  // STEALTH-HOOK(fingerprint/audio/noise)
      mReduction = aReduction;
    }
  

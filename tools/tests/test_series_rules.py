@@ -30,13 +30,13 @@ def _with_budget(tmp_path, monkeypatch, change):
 
 def test_a_mozilla_file_that_grows_past_its_budget_fails(tmp_path, monkeypatch):
     def shrink(b):
-        b["startupcache/StartupCache.h"] -= 1
+        b["browser/components/moz.build"] -= 1
     found = _with_budget(tmp_path, monkeypatch, shrink)
-    assert any("startupcache/StartupCache.h" in p and "budget is" in p for p in found), found
+    assert any("browser/components/moz.build" in p and "budget is" in p for p in found), found
 
 
 def test_a_newly_patched_mozilla_file_needs_a_budget(tmp_path, monkeypatch):
-    found = _with_budget(tmp_path, monkeypatch, lambda b: b.pop("startupcache/StartupCache.h"))
+    found = _with_budget(tmp_path, monkeypatch, lambda b: b.pop("browser/components/moz.build"))
     assert any("no hook budget" in p for p in found), found
 
 
@@ -53,14 +53,14 @@ def test_series_must_list_exactly_the_folders_on_disk(tmp_path, monkeypatch):
 
 def test_the_budget_only_goes_down(tmp_path, monkeypatch):
     budget = json.loads(engine.BUDGET.read_text(encoding="utf-8"))
-    budget["startupcache/StartupCache.h"] += 40
+    budget["browser/components/moz.build"] += 40
     path = tmp_path / "hook-budget.json"
     path.write_text(json.dumps(budget), encoding="utf-8")
     monkeypatch.setattr(engine, "BUDGET", path)
     monkeypatch.setattr(engine, "REMOVED_BUDGET", _copy_removed_budget(tmp_path, lambda b: None))
     engine.shrink_budget()
     after = json.loads(path.read_text(encoding="utf-8"))
-    assert after["startupcache/StartupCache.h"] == budget["startupcache/StartupCache.h"] - 40
+    assert after["browser/components/moz.build"] == budget["browser/components/moz.build"] - 40
 
 
 # The second budget: Mozilla's lines we remove or rewrite. Such a line conflicts at a
@@ -101,7 +101,7 @@ def test_a_removed_budget_for_a_file_no_longer_patched_must_go(tmp_path, monkeyp
 def test_the_removed_budget_only_goes_down_and_drops_files_at_zero(tmp_path, monkeypatch):
     def loosen(b):
         b[FILE] += 40
-        b["startupcache/StartupCache.h"] = 7  # patched, removes nothing
+        b["browser/components/moz.build"] = 7  # patched, removes nothing
     path = _copy_removed_budget(tmp_path, loosen)
     monkeypatch.setattr(engine, "REMOVED_BUDGET", path)
     hook = tmp_path / "hook-budget.json"
@@ -111,7 +111,7 @@ def test_the_removed_budget_only_goes_down_and_drops_files_at_zero(tmp_path, mon
     after = json.loads(path.read_text(encoding="utf-8"))
     real = json.loads(engine.REMOVED_BUDGET.read_text(encoding="utf-8"))
     assert after[FILE] == real[FILE]
-    assert "startupcache/StartupCache.h" not in after
+    assert "browser/components/moz.build" not in after
 
 
 def test_lines_are_counted_inside_hunks_only(tmp_path):
@@ -294,7 +294,7 @@ def test_every_record_as_committed_has_the_counts_of_its_patch():
 
 def test_the_record_of_the_accept_language_hook_is_its_own():
     record = _record(HTTP_HANDLER)
-    assert (record["added"], record["removed"], record["hunks"]) == (11, 3, 2)
+    assert (record["added"], record["removed"], record["hunks"]) == (3, 1, 2)
     assert any("PrepareAcceptLanguages" in e for e in record["evidence"])
     assert not any("ParentalControls" in e for e in record["evidence"])
 
@@ -302,7 +302,7 @@ def test_the_record_of_the_accept_language_hook_is_its_own():
 def test_a_record_with_the_counts_of_another_feature_fails():
     record = dict(_record(HTTP_HANDLER), added=18, hunks=6)
     found = engine.record_count_problems([record], _counts())
-    assert any(HTTP_HANDLER in p and "says added 18, removed 3, hunks 6" in p and "has 11, 3, 2" in p
+    assert any(HTTP_HANDLER in p and "says added 18, removed 1, hunks 6" in p and "has 3, 1, 2" in p
                for p in found), found
 
 
@@ -322,3 +322,77 @@ def test_hunks_are_counted_per_file(tmp_path):
     patch.write_bytes(b"diff --git a/a.cpp b/a.cpp\n--- a/a.cpp\n+++ b/a.cpp\n@@ -1,1 +1,2 @@\n x\n+y\n@@ -9,1 +10,2 @@\n z\n+w\n"
                       b"diff --git a/b.cpp b/b.cpp\n--- a/b.cpp\n+++ b/b.cpp\n@@ -1,1 +1,2 @@\n x\n+y\n")
     assert engine.hunk_counts(patch) == {"a.cpp": 2, "b.cpp": 1}
+
+
+# No carriage return enters the series. A file resolved by hand on Windows through a text-mode
+# stream entered with CRLF on every line, and every gate was green: .gitattributes only keeps git from
+# converting, and the C++ check looks inside literals.
+def _fake_series(tmp_path, monkeypatch, src=None, patch=None):
+    d = tmp_path / "platform" / "f"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "MANIFEST.json").write_text(json.dumps({"added": [], "modified": [], "inventory": []}), encoding="utf-8")
+    for rel, data in (src or {}).items():
+        (d / "src" / rel).parent.mkdir(parents=True, exist_ok=True)
+        (d / "src" / rel).write_bytes(data)
+    if patch is not None:
+        (d / "hooks.patch").write_bytes(patch)
+    monkeypatch.setattr(engine, "ROOT", tmp_path)
+    monkeypatch.setattr(engine, "existing_folders", lambda: ["platform/f"])
+    return engine.own_cr_problems()
+
+
+def test_a_crlf_file_of_ours_under_src_is_refused(tmp_path, monkeypatch):
+    found = _fake_series(tmp_path, monkeypatch, src={"a/b.py": b"x = 1\r\ny = 2\r\n"})
+    assert len(found) == 1 and "platform/f/src/a/b.py has 2 carriage return" in found[0] and "first on line 1" in found[0], found
+    assert "newline=" in found[0], found
+
+
+def test_lf_and_binary_files_of_ours_are_not_refused(tmp_path, monkeypatch):
+    assert _fake_series(tmp_path, monkeypatch, src={"a.py": b"x = 1\ny = 2\n", "b.ttf": b"\0\r\n\r\x00"}) == []
+
+
+def test_a_crlf_file_the_manifest_calls_a_backport_is_not_judged(tmp_path, monkeypatch):
+    _fake_series(tmp_path, monkeypatch)
+    manifest = tmp_path / "platform" / "f" / "MANIFEST.json"
+    manifest.write_text(json.dumps({"added": [], "modified": [], "inventory": [{"file": "u.rs", "category": "backport"}]}),
+                        encoding="utf-8")
+    (tmp_path / "platform" / "f" / "src").mkdir()
+    (tmp_path / "platform" / "f" / "src" / "u.rs").write_bytes(b"a\r\n")
+    assert engine.own_cr_problems() == []
+
+
+HEAD = b"diff --git a/x.bat b/x.bat\n--- a/x.bat\n+++ b/x.bat\n"
+
+
+def test_a_hooks_patch_line_ending_in_crlf_is_refused(tmp_path, monkeypatch):
+    _fake_series(tmp_path, monkeypatch)
+    found = engine.patch_cr_problems("f", HEAD + b"@@ -1,2 +1,3 @@\n keep\n+added\r\n keep2\n")
+    assert len(found) == 1 and "f/hooks.patch:6 (adds to x.bat)" in found[0] and "not CRLF" in found[0], found
+
+
+def test_a_hooks_patch_adding_a_crlf_line_to_a_crlf_hunk_passes(tmp_path, monkeypatch):
+    patch = HEAD + b"@@ -1,2 +1,3 @@\n keep\r\n+added\r\n keep2\r\n"
+    assert engine.patch_cr_problems("f", patch) == []
+    # the context of the hunk being CRLF excuses only a line that is a plain CRLF line, and only the lines of a CRLF hunk
+    assert engine.patch_cr_problems("f", HEAD + b"@@ -1,2 +1,3 @@\n keep\r\n+a\rb\r\n keep2\r\n")
+    assert engine.patch_cr_problems("f", HEAD + b"@@ -1,2 +1,3 @@\n keep\r\n+added\r\n keep2\n")
+    assert engine.patch_cr_problems("f", HEAD + b"@@ -1,1 +1,2 @@\n+only added\r\n")
+
+
+def test_a_carriage_return_in_a_line_mozilla_wrote_is_not_judged():
+    assert engine.patch_cr_problems("f", HEAD + b"@@ -1,2 +1,2 @@\n-old\r\n+new\n keep\r\n") == []
+
+
+def test_problems_runs_both_cr_rules(monkeypatch):
+    monkeypatch.setattr(engine, "own_cr_problems", lambda: ["src stub"])
+    monkeypatch.setattr(engine, "patch_cr_problems", lambda folder, data: ["%s/hooks.patch:1 stub" % folder])
+    found = engine.problems()
+    assert "src stub" in found and any("hooks.patch:1 stub" in p for p in found)
+
+
+def test_the_series_as_committed_has_no_carriage_return():
+    assert engine.own_cr_problems() == []
+    for f in engine.existing_folders():
+        patch = engine.ROOT / f / "hooks.patch"
+        if patch.exists():
+            assert engine.patch_cr_problems(f, patch.read_bytes()) == [], f

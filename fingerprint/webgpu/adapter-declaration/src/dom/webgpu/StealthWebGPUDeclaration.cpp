@@ -15,7 +15,9 @@
 #include "mozilla/ErrorResult.h"
 #include "mozilla/StaticMutex.h"
 #include "mozilla/StaticPrefs_zoom.h"
+#include "js/Value.h"
 #include "mozilla/dom/BindingUtils.h"
+#include "mozilla/dom/Promise.h"
 #include "mozilla/dom/WebGPUBinding.h"
 #include "mozilla/gfx/StealthRefuse.h"
 #include "mozilla/webgpu/ffi/wgpu.h"
@@ -65,15 +67,14 @@ void StealthWebGPUNoteRequest(const Instance* aInstance, RawId aAdapter,
   PendingRequests()[{aInstance, aAdapter}] = aForceFallback;
 }
 
-Maybe<bool> StealthWebGPUDeclaredIsFallback(const Adapter* aAdapter) {
-  if (!StealthEngineActive()) {
-    return Nothing();
-  }
+bool StealthWebGPUDeclared() { return StealthEngineActive(); }
+
+bool StealthWebGPUIsFallback(const Adapter* aAdapter) {
   StaticMutexAutoLock lock(sFallbackLock);
   const auto it = AdapterAnswers().find(aAdapter);
   // An adapter the constructor declared always has an entry; one it did not
   // (none exists with the engine on) answers as a hardware adapter.
-  return Some(it != AdapterAnswers().end() && it->second);
+  return it != AdapterAnswers().end() && it->second;
 }
 
 // -
@@ -158,12 +159,13 @@ void StealthWebGPUPlatformInit() {
 #endif
 }
 
-bool StealthWebGPUNoAdapter() {
+bool StealthWebGPUNoAdapter(RefPtr<dom::Promise>& aPromise) {
   if (!StealthEngineActive()) {
     return false;
   }
   const nsAutoCString adapter = DeclaredAdapter();
   if (adapter.EqualsLiteral("none")) {
+    aPromise->MaybeResolve(JS::NullValue());
     return true;
   }
   if (!adapter.EqualsLiteral("d3d12")) {

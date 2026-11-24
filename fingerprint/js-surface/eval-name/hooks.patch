@@ -1,23 +1,19 @@
 diff --git a/js/src/debugger/Frame.cpp b/js/src/debugger/Frame.cpp
-index f02ae572b20867b1c1339a82337e5c9144c57617..dae1a4709bc3763008993762963ab9b84ba6d361 100644
+index f02ae572b20867b1c1339a82337e5c9144c57617..07686007ec8c70e424b532df093f5bda18e55f7c 100644
 --- a/js/src/debugger/Frame.cpp
 +++ b/js/src/debugger/Frame.cpp
-@@ -1053,13 +1053,16 @@ static bool EvaluateInEnv(
-   AutoSetBypassCSPForDebugger setFlag(cx, evalOptions.bypassCSP());
+@@ -1054,12 +1054,12 @@ static bool EvaluateInEnv(
  
    CompileOptions options(cx);
-+  // Stealth: use generic filename instead of "debugger eval code" to prevent
-+  // a commercial fingerprinting service from detecting automation via
-+  // Error.stack analysis.
    const char* filename =
 -      evalOptions.filename() ? evalOptions.filename() : "debugger eval code";
-+      evalOptions.filename() ? evalOptions.filename() : "eval code";
++      evalOptions.filename() ? evalOptions.filename() : "eval code";  // STEALTH-HOOK(fingerprint/js-surface/eval-name)
    options.setIsRunOnce(true)
        .setNoScriptRval(false)
        .setFileAndLine(filename, evalOptions.lineno())
        .setHideScriptFromDebugger(evalOptions.hideFromDebugger())
 -      .setIntroductionType("debugger eval")
-+      .setIntroductionType("eval")
++      .setIntroductionType("eval")  // STEALTH-HOOK(fingerprint/js-surface/eval-name)
        /* Do not perform the Javascript filename validation security check for
         * javascript executions sent through the debugger. Besides making up
         * a filename for these codepaths, we must allow arbitrary JS execution

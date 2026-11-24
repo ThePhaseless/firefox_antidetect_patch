@@ -1,0 +1,169 @@
+[
+ {
+  "file": "docshell/base/BrowsingContext.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/dom/StealthSessionDeclaration.h\"  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "test": "wrapper:tests/test_context_locale_e2e.py::test_a_context_locale_reaches_navigator_intl_and_the_header"
+ },
+ {
+  "file": "docshell/base/BrowsingContext.cpp",
+  "function": "void BrowsingContext::Attach(bool aFromIPC, ContentParent* aOriginProcess) {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  SeedDeclaredTimezoneAndLanguage(this);  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "test": "wrapper:tests/test_context_locale_e2e.py::test_a_context_locale_reaches_navigator_intl_and_the_header",
+  "anchor": "if (XRE_IsParentProcess()) { Canonical()->CanonicalAttach(); } (the last statement of BrowsingContext::Attach)",
+  "why": "G30: the seed must run after the last statement of Mozilla's body, which is the end of the function"
+ },
+ {
+  "file": "docshell/base/BrowsingContext.cpp",
+  "function": "void BrowsingContext::DidSet(FieldIndex<IDX_LanguageOverride>,",
+  "kind": "rewrite",
+  "form": "wrap-expression",
+  "line": "  const nsCString& languageOverride = StealthLanguageOrSession(GetLanguageOverride());  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "removed": "  const nsCString& languageOverride = GetLanguageOverride();",
+  "test": "wrapper:tests/test_context_locale_e2e.py::test_a_context_locale_reaches_navigator_intl_and_the_header"
+ },
+ {
+  "file": "docshell/base/BrowsingContext.cpp",
+  "function": "void BrowsingContext::DidSet(FieldIndex<IDX_LanguageOverride>,",
+  "kind": "rewrite",
+  "form": "wrap-expression",
+  "line": "              realm, StealthRealmLocale(realm, PromiseFlatCString(languageOverride)).get());  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "removed": "              realm, PromiseFlatCString(languageOverride).get());",
+  "test": "wrapper:tests/test_context_locale_e2e.py::test_a_context_locale_reaches_navigator_intl_and_the_header"
+ },
+ {
+  "file": "docshell/base/BrowsingContext.cpp",
+  "function": "void BrowsingContext::DidSet(FieldIndex<IDX_TimezoneOverride>,",
+  "kind": "rewrite",
+  "form": "wrap-expression",
+  "line": "  const nsString& timezoneOverride = StealthTimezoneOrSession(GetTimezoneOverride());  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "removed": "  const nsString& timezoneOverride = GetTimezoneOverride();",
+  "test": "wrapper:tests/test_a_launch_and_a_context_timezone_reach_the_page_e2e.py::test_a_launch_and_a_context_timezone_reach_the_page"
+ },
+ {
+  "file": "dom/base/Document.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/dom/StealthSessionDeclaration.h\"  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "test": "gtest:StealthDocumentLanguage.WithNoContextTheSessionsLanguageIsTheDocumentsOne"
+ },
+ {
+  "file": "dom/base/Document.cpp",
+  "function": "nsresult Document::InitCSP(nsIChannel* aChannel) {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  if (CSP_IsBypassedFor(*this)) return NS_OK;  // STEALTH-HOOK(automation/bypass-csp)",
+  "test": "wrapper:tests/test_bypass_csp_e2e.py::test_bypass_csp_lifts_the_page_policy_and_its_absence_keeps_it",
+  "anchor": "the block `if (principal->IsSystemPrincipal() ...) {...}` of Document::InitCSP (the statement just before)",
+  "why": "an early return that must come after the baseline CSP block, which still runs even when the automation lifts the page's policies; a guard at the head of the function would skip it"
+ },
+ {
+  "file": "dom/base/Document.cpp",
+  "function": "void Document::SetDocumentURI(nsIURI* aURI) {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "                                   const Document* aDocument,  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "test": "wrapper:tests/test_a_launch_and_a_context_timezone_reach_the_page_e2e.py::test_a_launch_and_a_context_timezone_reach_the_page",
+  "exception": "a parameter of ours in the signature of Mozilla's static GetFormattedTimeString, which does not receive the document and cannot be wrapped; the line is a pure addition between two Mozilla lines (G35, approved by the pm in PM-DECISIONS.md: fingerprint/locale-time/timezone)",
+  "pm": "approvato"
+ },
+ {
+  "file": "dom/base/Document.cpp",
+  "function": "void Document::SetDocumentURI(nsIURI* aURI) {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  StealthExplodeTime(aDocument, aTime, aUniversal ? PR_GMTParameters : PR_LocalTimeParameters, &prtime);  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "removed": "  PR_ExplodeTime(aTime, aUniversal ? PR_GMTParameters : PR_LocalTimeParameters,\n                 &prtime);",
+  "test": "wrapper:tests/test_a_launch_and_a_context_timezone_reach_the_page_e2e.py::test_a_launch_and_a_context_timezone_reach_the_page",
+  "exception": "the explode call of the same static takes our document in front of Mozilla's own arguments; the two Mozilla lines of the call become one (G35, approved by the pm in PM-DECISIONS.md)",
+  "pm": "approvato"
+ },
+ {
+  "file": "dom/base/Document.cpp",
+  "function": "void Document::GetLastModified(nsAString& aLastModified) const {",
+  "kind": "rewrite",
+  "form": "wrap-call",
+  "line": "                           this, aLastModified);  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "removed": "                           aLastModified);",
+  "test": "wrapper:tests/test_a_launch_and_a_context_timezone_reach_the_page_e2e.py::test_a_launch_and_a_context_timezone_reach_the_page",
+  "why": "G9: the call of Mozilla's static gains the document, `this`, as its argument (the parameter itself is the G35 exception above); the line stays rewritten"
+ },
+ {
+  "file": "dom/base/Document.cpp",
+  "function": "void Document::SetContainer(nsDocShell* aContainer) {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  StealthDocumentContainerSet(this, aContainer);  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "test": "gtest:StealthDocumentLanguage.WithNoContextTheSessionsLanguageIsTheDocumentsOne",
+  "anchor": "mInChromeDocShell = aContainer && aContainer->GetBrowsingContext()->IsChrome();",
+  "why": "it needs the container that statement has just stored, and a wrap of the function would run after NotifyActivityChanged, which reads the language"
+ },
+ {
+  "file": "dom/base/Document.cpp",
+  "function": "void Document::RetrieveRelevantHeaders(nsIChannel* aChannel) {",
+  "kind": "rewrite",
+  "form": "wrap-call",
+  "line": "                           this, mLastModified);  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "removed": "                           mLastModified);",
+  "test": "wrapper:tests/test_a_launch_and_a_context_timezone_reach_the_page_e2e.py::test_a_launch_and_a_context_timezone_reach_the_page",
+  "why": "G9: the call of Mozilla's static gains the document, `this`, as its argument (the parameter itself is the G35 exception above); the line stays rewritten"
+ },
+ {
+  "file": "dom/base/Document.cpp",
+  "function": "const LangGroupFontPrefs* Document::GetFontPrefsForLang(",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  language = DocumentCharsetLanguage(this, language);  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "test": "gtest:StealthDocumentLanguage.WithNoContextTheSessionsLanguageIsTheDocumentsOne"
+ },
+ {
+  "file": "dom/base/Document.h",
+  "function": "class Document : public nsINode,",
+  "kind": "add",
+  "form": "member",
+  "line": "  friend class StealthDocumentAccess;  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "test": "gtest:StealthDocumentLanguage.WithNoContextTheSessionsLanguageIsTheDocumentsOne"
+ },
+ {
+  "file": "dom/xslt/xslt/txEXSLTFunctions.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/dom/StealthSessionDeclaration.h\"  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "test": "wrapper:tests/test_a_launch_and_a_context_timezone_reach_the_page_e2e.py::test_a_launch_and_a_context_timezone_reach_the_page"
+ },
+ {
+  "file": "dom/xslt/xslt/txEXSLTFunctions.cpp",
+  "function": "nsresult txEXSLTFunctionCall::evaluate(txIEvalContext* aContext,",
+  "kind": "rewrite",
+  "form": "wrap-call",
+  "line": "      StealthExplodeTime(sourceDoc, time, timezone, &prtime);  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "removed": "      PR_ExplodeTime(time, timezone, &prtime);",
+  "test": "wrapper:tests/test_a_launch_and_a_context_timezone_reach_the_page_e2e.py::test_a_launch_and_a_context_timezone_reach_the_page",
+  "exception": "the call of EXSLT's date:date-time() gains sourceDoc, a local born by getSourceDocument (a static of the file), so it is neither `this` nor a parameter (G9 does not cover it): G35, approved by the pm in PM-DECISIONS.md",
+  "pm": "approvato"
+ },
+ {
+  "file": "js/xpconnect/src/nsXPConnect.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/dom/StealthSessionDeclaration.h\"  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "test": "wrapper:tests/test_context_locale_e2e.py::test_a_context_locale_reaches_navigator_intl_and_the_header"
+ },
+ {
+  "file": "js/xpconnect/src/nsXPConnect.cpp",
+  "function": "void InitGlobalObjectOptions(JS::RealmOptions& aOptions,",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  mozilla::dom::SetDeclaredRealmTimeAndLanguage(aOptions, aForceUTC, aLocaleEnUS, aLanguageOverride, aTimezoneOverride);  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "test": "wrapper:tests/test_context_locale_e2e.py::test_a_context_locale_reaches_navigator_intl_and_the_header",
+  "anchor": "the if (aLocaleEnUS) {...} else if (!aLanguageOverride.IsEmpty()) {...} chain (the last statement of xpc::InitGlobalObjectOptions)",
+  "why": "G30: the declaration of the realm's zone and language must follow Mozilla's own choices, which end the function"
+ }
+]

@@ -29,6 +29,7 @@
 
 #include <cstdint>
 #include <cstring>
+#include <utility>
 #include <vector>
 
 #include "CanvasUtils.h"
@@ -40,6 +41,7 @@
 #include "mozilla/Maybe.h"
 #include "mozilla/RefPtr.h"
 #include "mozilla/Span.h"
+#include "mozilla/dom/StealthCanvasUtils.h"
 #include "mozilla/gfx/StealthCanvasProjection.h"
 
 #define STEALTH_WEBGL_RPROC(_METHOD) \
@@ -48,13 +50,14 @@
 namespace mozilla {
 
 // A friend of ClientWebGLContext (the declaration is in ClientWebGLContext.h):
-// it reaches mNotLost, Run and DoReadPixels.
+// it reaches mNotLost, Run, DoReadPixels and mStealthReadPixelsResult.
 struct StealthWebGLReadback final {
   StealthWebGLReadback() = delete;
 
   // toDataURL/toBlob (GetImageBuffer and GetInputStream): the canvas noise, as
-  // every reader of this canvas reads. aAlphaType is the alpha type
-  // GetSurfaceSnapshot reported for aSnapshot. The snapshot itself is left
+  // every reader of this canvas reads. The hook sits right after Mozilla's
+  // `if (!snapshot)` check and receives its two locals: aAlphaType is the alpha
+  // type GetSurfaceSnapshot reported for aSnapshot. The snapshot itself is left
   // untouched; the result is a new surface, or aSnapshot again when the seed
   // is 0.
   static already_AddRefed<gfx::SourceSurface> ProjectReaderSnapshot(
@@ -72,29 +75,48 @@ struct StealthWebGLReadback final {
   // again (the same contract is stated where it is enforced, in
   // HTMLCanvasElement.cpp).
   //
-  // aPremultiplied is the alpha type GetImageBuffer passes: only an alpha
-  // context that is not premultiplied is NonPremult, that is
-  // `!options.alpha || options.premultipliedAlpha`, computed when the read is
-  // asked for.
+  // The alpha type is the one GetImageBuffer gets from GetSurfaceSnapshot:
+  // only an alpha context that is not premultiplied is NonPremult, that is
+  // `!options.alpha || options.premultipliedAlpha`, a function of the
+  // context's options, which are fixed at creation and outlive a context loss.
   static RefPtr<gfx::SourceSurface> ProjectAsyncSnapshot(
-      const ClientWebGLContext& aCtx, gfx::SourceSurface* aSurface,
-      const bool aPremultiplied) {
-    return CanvasUtils::StealthProjectSnapshot(aSurface, aPremultiplied,
-                                               aCtx.PrincipalOrNull());
+      const ClientWebGLContext& aCtx, RefPtr<gfx::SourceSurface> aSurface) {
+    const auto& options = aCtx.GetContextOptions();
+    RefPtr<gfx::SourceSurface> result = CanvasUtils::StealthProjectSnapshot(
+        aSurface, !options.alpha || options.premultipliedAlpha,
+        aCtx.PrincipalOrNull());
+    return result;
   }
 
-  // readPixels into an array: the read itself (ClientWebGLContext::
-  // DoReadPixels), then the noise on the bytes the page receives. Returns what
-  // DoReadPixels returned.
-  static bool ReadPixels(const ClientWebGLContext& aCtx,
-                         const webgl::ReadPixelsDesc& aDesc,
-                         const Span<uint8_t> aDest) {
-    webgl::ReadPixelsResult written;
-    if (!aCtx.DoReadPixels(aDesc, aDest, &written)) {
+  // readPixels into an array: the noise on the bytes the page receives, after
+  // the read itself. The hook wraps Mozilla's own call
+  // `DoReadPixels(desc, *range)`, so aSucceeded is what it returned and the
+  // read has run, on this thread, a moment ago: the anchor in its body left
+  // what it wrote in the context's field. Returns aSucceeded.
+  static bool ProjectReadPixels(const ClientWebGLContext& aCtx,
+                                const webgl::ReadPixelsDesc& aDesc,
+                                const Span<uint8_t> aDest,
+                                const bool aSucceeded) {
+    if (!aSucceeded) {
       return false;
     }
+    const webgl::ReadPixelsResult written = TakeReadPixelsResult(aCtx);
     ProjectReadPixels(aCtx, aDesc, aDest, written);
     return true;
+  }
+
+  // The anchor in ClientWebGLContext::DoReadPixels, after the loop that copies
+  // the rows into the page's destination: what the read wrote, the part of the
+  // requested rectangle inside the framebuffer and the row stride, both locals
+  // of Mozilla's body, into a private field of the context. It is read right
+  // after the call, on the same thread, by TakeReadPixelsResult (which also
+  // zeroes it), and DoReadPixels sets it whenever it returns true, so a value
+  // left by another caller of DoReadPixels (BackBufferSnapshot) is overwritten
+  // before it is read.
+  static void NoteReadPixels(const ClientWebGLContext& aCtx,
+                             const gfx::IntRect& aSubrect,
+                             const size_t aByteStride) {
+    aCtx.mStealthReadPixelsResult = webgl::ReadPixelsResult{aSubrect, aByteStride};
   }
 
   // The canvas noise for a readPixels into a PIXEL_PACK_BUFFER, after the host
@@ -146,7 +168,7 @@ struct StealthWebGLReadback final {
     aCtx.Run<STEALTH_WEBGL_RPROC(BindBuffer)>(LOCAL_GL_PIXEL_PACK_BUFFER, 0);
     webgl::ReadPixelsResult written;
     const bool read =
-        aCtx.DoReadPixels(tight, Span<uint8_t>(bytes), &written);
+        DoReadPixelsNoted(aCtx, tight, Span<uint8_t>(bytes), written);
     if (read) {
       ProjectReadPixels(aCtx, tight, Span<uint8_t>(bytes), written);
     }
@@ -171,6 +193,30 @@ struct StealthWebGLReadback final {
   }
 
  private:
+  // What the last successful DoReadPixels wrote, out of the field the anchor
+  // fills, which is zeroed as it is taken: the projection reads again (a wider
+  // rectangle) and that read fills it anew.
+  static webgl::ReadPixelsResult TakeReadPixelsResult(
+      const ClientWebGLContext& aCtx) {
+    const webgl::ReadPixelsResult result = aCtx.mStealthReadPixelsResult;
+    aCtx.mStealthReadPixelsResult = webgl::ReadPixelsResult{};
+    return result;
+  }
+
+  // ClientWebGLContext::DoReadPixels and what it wrote, in aWritten (left
+  // untouched when the read fails). The field is zeroed before the call.
+  static bool DoReadPixelsNoted(const ClientWebGLContext& aCtx,
+                                const webgl::ReadPixelsDesc& aDesc,
+                                const Span<uint8_t> aDest,
+                                webgl::ReadPixelsResult& aWritten) {
+    aCtx.mStealthReadPixelsResult = webgl::ReadPixelsResult{};
+    if (!aCtx.DoReadPixels(aDesc, aDest)) {
+      return false;
+    }
+    aWritten = TakeReadPixelsResult(aCtx);
+    return true;
+  }
+
   // The canvas noise on what a page's readPixels wrote into aDest
   // (gfx::StealthProjectPixels on the framebuffer's stored pixels).
   // aWritten is what the read wrote: the part of the requested rectangle
@@ -204,7 +250,7 @@ struct StealthWebGLReadback final {
     const size_t wideStride = size_t(wide.size.x) * 4;
     std::vector<uint8_t> wideBytes(wideStride * wide.size.y);
     webgl::ReadPixelsResult wideRead;
-    if (!aCtx.DoReadPixels(wide, Span<uint8_t>(wideBytes), &wideRead) ||
+    if (!DoReadPixelsNoted(aCtx, wide, Span<uint8_t>(wideBytes), wideRead) ||
         wideRead.subrect.IsEmpty() || wideRead.byteStride != wideStride) {
       return;
     }
@@ -268,6 +314,30 @@ struct StealthWebGLReadback final {
     return ret;
   }
 };
+
+// What the hooks in ClientWebGLContext.cpp call where they wrap one of
+// Mozilla's expressions or take its locals (the hook's callee is named
+// Stealth<What>): thin
+// forwards to the roads above.
+inline already_AddRefed<gfx::SourceSurface> StealthWebGLProjectReaderSnapshot(
+    const ClientWebGLContext& aCtx, gfx::SourceSurface* aSnapshot,
+    const gfxAlphaType aAlphaType) {
+  return StealthWebGLReadback::ProjectReaderSnapshot(aCtx, aSnapshot,
+                                                     aAlphaType);
+}
+
+inline RefPtr<gfx::SourceSurface> StealthWebGLProjectAsyncSnapshot(
+    const ClientWebGLContext& aCtx, RefPtr<gfx::SourceSurface> aSurface) {
+  return StealthWebGLReadback::ProjectAsyncSnapshot(aCtx, std::move(aSurface));
+}
+
+inline bool StealthWebGLProjectReadPixels(const ClientWebGLContext& aCtx,
+                                          const webgl::ReadPixelsDesc& aDesc,
+                                          const Span<uint8_t> aDest,
+                                          const bool aSucceeded) {
+  return StealthWebGLReadback::ProjectReadPixels(aCtx, aDesc, aDest,
+                                                 aSucceeded);
+}
 
 }  // namespace mozilla
 

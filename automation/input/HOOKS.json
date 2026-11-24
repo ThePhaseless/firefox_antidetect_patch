@@ -1,0 +1,255 @@
+[
+ {
+  "file": "dom/base/nsDOMWindowUtils.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthCanvasAsDrawn.h\"  // STEALTH-HOOK(fingerprint/canvas/as-drawn)",
+  "test": "wrapper:tests/test_canvas_reads_as_drawn.py::test_random_pixels_read_back_as_drawn"
+ },
+ {
+  "file": "dom/base/nsDOMWindowUtils.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthInputEventBirth.h\"  // STEALTH-HOOK(fingerprint/input/event-birth)",
+  "test": "wrapper:tests/test_input_is_born_before_the_page_sees_it_e2e.py::test_every_key_and_move_is_born_before_its_handler_runs"
+ },
+ {
+  "file": "dom/base/nsDOMWindowUtils.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthJugglerInput.h\"  // STEALTH-HOOK(automation/input)",
+  "test": "wrapper:tests/test_a_pointer_event_is_handled_before_the_call_returns_e2e.py::test_each_pointer_call_answers_after_the_page_handled_its_event"
+ },
+ {
+  "file": "dom/base/nsDOMWindowUtils.cpp",
+  "function": "nsDOMWindowUtils::SendWheelEvent(float aX, float aY, double aDeltaX,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "                                 nsISynthesizedEventCallback* aCallback,",
+  "removed": "                                 nsISynthesizedEventCallback* aCallback) {",
+  "test": "wrapper:tests/test_input_is_born_before_the_page_sees_it_e2e.py::test_every_key_and_move_is_born_before_its_handler_runs",
+  "exception": "G35, approved in PM-DECISIONS (automation/input): aLatency is a parameter of ours in the signature of a Mozilla method; the C++ signature of an XPIDL method is generated from the IDL, so the IDL line and this one are one change; it is the interface that Juggler and the minimal driver use",
+  "pm": "approvato"
+ },
+ {
+  "file": "dom/base/nsDOMWindowUtils.cpp",
+  "function": "nsDOMWindowUtils::SendWheelEvent(float aX, float aY, double aDeltaX,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "                                 double aLatency) {  // STEALTH-HOOK(fingerprint/input/event-birth)",
+  "test": "wrapper:tests/test_input_is_born_before_the_page_sees_it_e2e.py::test_every_key_and_move_is_born_before_its_handler_runs",
+  "exception": "G35, approved in PM-DECISIONS (automation/input): aLatency is a parameter of ours in the signature of a Mozilla method; the C++ signature of an XPIDL method is generated from the IDL, so the IDL line and this one are one change; it is the interface that Juggler and the minimal driver use",
+  "pm": "approvato"
+ },
+ {
+  "file": "dom/base/nsDOMWindowUtils.cpp",
+  "function": "nsDOMWindowUtils::SendWheelEvent(float aX, float aY, double aDeltaX,",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  StealthSetInputEventBirth(wheelEvent, aLatency, GetDocument());  // STEALTH-HOOK(fingerprint/input/event-birth)",
+  "test": "wrapper:tests/test_input_is_born_before_the_page_sees_it_e2e.py::test_every_key_and_move_is_born_before_its_handler_runs",
+  "anchor": "wheelEvent.mFlags.mIsSynthesizedForTests = true;",
+  "why": "the hook stamps the local wheelEvent, which exists only inside SendWheelEvent: a guard at the top has nothing to stamp, a function wrap cannot reach a local, and the event is a constructor declaration, not an expression to wrap; GetDocument() is a protected member of this, so the template cannot take this"
+ },
+ {
+  "file": "dom/base/nsDOMWindowUtils.cpp",
+  "function": "nsDOMWindowUtils::NodesFromRect(float aX, float aY, float aTopSize,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  SurfaceFromElementResult result = StealthSurfaceFromCanvasAsDrawn(aCanvas);  // STEALTH-HOOK(fingerprint/canvas/as-drawn)",
+  "removed": "  SurfaceFromElementResult result = nsLayoutUtils::SurfaceFromElement(aCanvas);",
+  "test": "wrapper:tests/test_canvas_reads_as_drawn.py::test_random_pixels_read_back_as_drawn",
+  "exception": "G29 (PM-DECISIONS 22/11 morning, read by the pm against the tag): one Mozilla line, only the called function changes",
+  "pm": "approvato"
+ },
+ {
+  "file": "dom/events/EventStateManager.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthDragGesture.h\"  // STEALTH-HOOK(automation/input)",
+  "test": "gtest:StealthDragGesture.ThePressOfJugglerDecidesWhichMovesContinueTheGesture"
+ },
+ {
+  "file": "dom/events/EventStateManager.cpp",
+  "function": "void EventStateManager::BeginTrackingDragGesture(",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  StealthDragGestureBegin(mGestureDownFromJuggler, aMouseDownOrTouchDragEvent);  // STEALTH-HOOK(automation/input)",
+  "test": "gtest:StealthDragGesture.ThePressOfJugglerDecidesWhichMovesContinueTheGesture",
+  "anchor": "mGestureDownButton = aMouseDownOrTouchDragEvent.mButton;",
+  "why": "a notice at the top would also run when the early return on a null mWidget leaves without starting a gesture, and would overwrite the flag of a gesture already being tracked; the flag belongs with the gesture fields set after that return"
+ },
+ {
+  "file": "dom/events/EventStateManager.cpp",
+  "function": "void EventStateManager::GenerateDragGesture(",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  if (StealthSkipDragGesture(mGestureDownFromJuggler, aMouseOrTouchOrPointerEvent)) return;  // STEALTH-HOOK(automation/input)",
+  "test": "gtest:StealthDragGesture.ThePressOfJugglerDecidesWhichMovesContinueTheGesture",
+  "anchor": "if (!IsTrackingDragGesture()) { return; }",
+  "why": "the decision applies only while a gesture is tracked: a guard at the top would decide before the IsTrackingDragGesture check, and the return comes from the middle of the function"
+ },
+ {
+  "file": "dom/events/EventStateManager.h",
+  "function": "class EventStateManager : public nsSupportsWeakReference, public nsIObserver {",
+  "kind": "add",
+  "form": "member",
+  "line": "  bool mGestureDownFromJuggler = false;  // STEALTH-HOOK(automation/input)",
+  "test": "gtest:StealthDragGesture.ThePressOfJugglerDecidesWhichMovesContinueTheGesture"
+ },
+ {
+  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
+  "function": "interface nsIDOMWindowUtils : nsISupports {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "                      [optional] in nsISynthesizedEventCallback aCallback,",
+  "removed": "                      [optional] in nsISynthesizedEventCallback aCallback);",
+  "test": "wrapper:tests/test_input_is_born_before_the_page_sees_it_e2e.py::test_every_key_and_move_is_born_before_its_handler_runs",
+  "exception": "G35, approved in PM-DECISIONS (automation/input): aLatency is a parameter of ours in the signature of a Mozilla method; the C++ signature of an XPIDL method is generated from the IDL, so the IDL line and this one are one change; it is the interface that Juggler and the minimal driver use",
+  "pm": "approvato"
+ },
+ {
+  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
+  "function": "interface nsIDOMWindowUtils : nsISupports {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "                      [optional] in double aLatency);  // STEALTH-HOOK(fingerprint/input/event-birth)",
+  "test": "wrapper:tests/test_input_is_born_before_the_page_sees_it_e2e.py::test_every_key_and_move_is_born_before_its_handler_runs",
+  "exception": "G35, approved in PM-DECISIONS (automation/input): aLatency is a parameter of ours in the signature of a Mozilla method; the C++ signature of an XPIDL method is generated from the IDL, so the IDL line and this one are one change; it is the interface that Juggler and the minimal driver use",
+  "pm": "approvato"
+ },
+ {
+  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
+  "function": "interface nsIDOMWindowUtils : nsISupports {",
+  "kind": "add",
+  "form": "member",
+  "line": "  [can_run_script] unsigned long jugglerSendMouseEvent(in AString aType, in float aX, in float aY, in long aButton, in long aClickCount, in long aModifiers, in boolean aIgnoreRootScrollFrame, in float aPressure, in unsigned short aInputSourceArg, in boolean aIsDOMEventSynthesized, in boolean aIsWidgetEventSynthesized, in long aButtons, in unsigned long aIdentifier, in double aLatency);  // STEALTH-HOOK(automation/input)",
+  "test": "wrapper:tests/test_a_pointer_event_is_handled_before_the_call_returns_e2e.py::test_each_pointer_call_answers_after_the_page_handled_its_event"
+ },
+ {
+  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
+  "function": "interface nsIDOMWindowUtils : nsISupports {",
+  "kind": "add",
+  "form": "member",
+  "line": "  [can_run_script] void jugglerSendDragEvent(in AString aType, in float aX, in float aY, in long aModifiers);  // STEALTH-HOOK(automation/input)",
+  "test": "wrapper:tests/test_a_pointer_event_is_handled_before_the_call_returns_e2e.py::test_each_pointer_call_answers_after_the_page_handled_its_event"
+ },
+ {
+  "file": "dom/ipc/CoalescedMouseData.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthJugglerCoalesce.h\"  // STEALTH-HOOK(automation/input)",
+  "test": "gtest:StealthJugglerCoalesce.TheLastIdFoldedInWins"
+ },
+ {
+  "file": "dom/ipc/CoalescedMouseData.cpp",
+  "function": "void CoalescedMouseData::Coalesce(const WidgetMouseEvent& aMouseOrPointerEvent,",
+  "kind": "add",
+  "form": "anchor",
+  "line": "    StealthCoalesceJugglerEventId(*mCoalescedInputEvent, aMouseOrPointerEvent);  // STEALTH-HOOK(automation/input)",
+  "test": "gtest:StealthJugglerCoalesce.TheLastIdFoldedInWins",
+  "anchor": "mCoalescedInputEvent->mPressure = aMouseOrPointerEvent.mPressure;",
+  "why": "only the else branch has a coalesced event: a call at the top would dereference null on the first event of a run"
+ },
+ {
+  "file": "dom/ipc/gtest/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"TestStealthDragGesture.cpp\", \"TestStealthJugglerCoalesce.cpp\", \"TestStealthMouseEventIPC.cpp\"]  # STEALTH-HOOK(automation/input)",
+  "test": "gtest:StealthDragGesture.ThePressOfJugglerDecidesWhichMovesContinueTheGesture"
+ },
+ {
+  "file": "dom/ipc/gtest/moz.build",
+  "function": "FINAL_LIBRARY = \"xul-gtest\"",
+  "kind": "add",
+  "form": "registration",
+  "line": "LOCAL_INCLUDES += [\"/dom/events\"]  # STEALTH-HOOK(automation/input)",
+  "test": "gtest:StealthDragGesture.ThePressOfJugglerDecidesWhichMovesContinueTheGesture"
+ },
+ {
+  "file": "layout/base/PresShell.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthJugglerAck.h\"  // STEALTH-HOOK(automation/input)",
+  "test": "gtest:StealthJugglerMouseAck.AnEventWithAnIdIsAckedOnceWhenTheScopeEnds"
+ },
+ {
+  "file": "layout/base/PresShell.cpp",
+  "function": "nsresult PresShell::HandleEvent(nsIFrame* aFrameForPresShell,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  StealthJugglerMouseAck jugglerMouseAck(aGUIEvent);  // STEALTH-HOOK(automation/input)",
+  "test": "gtest:StealthJugglerMouseAck.AnEventWithAnIdIsAckedOnceWhenTheScopeEnds"
+ },
+ {
+  "file": "layout/base/gtest/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"TestStealthJugglerMouseAck.cpp\"]  # STEALTH-HOOK(automation/input)",
+  "test": "gtest:StealthJugglerMouseAck.AnEventWithAnIdIsAckedOnceWhenTheScopeEnds"
+ },
+ {
+  "file": "widget/MouseEvents.h",
+  "function": "class WidgetMouseEventBase : public WidgetInputEvent {",
+  "kind": "add",
+  "form": "member",
+  "line": "  uint32_t mJugglerEventId = 0;  // STEALTH-HOOK(automation/input)",
+  "test": "gtest:StealthMouseEventIPC.TheIdSurvivesTheMessage"
+ },
+ {
+  "file": "widget/MouseEvents.h",
+  "function": "class WidgetMouseEventBase : public WidgetInputEvent {",
+  "kind": "add",
+  "form": "member",
+  "line": "    mJugglerEventId = aEvent.mJugglerEventId;  // STEALTH-HOOK(automation/input)",
+  "test": "gtest:StealthMouseEventCopy.DuplicateKeepsTheId"
+ },
+ {
+  "file": "widget/nsGUIEventIPC.h",
+  "function": "struct ParamTraits<mozilla::WidgetMouseEventBase> {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "    WriteParam(aWriter, aParam.mJugglerEventId);  // STEALTH-HOOK(automation/input)",
+  "test": "gtest:StealthMouseEventIPC.TheIdSurvivesTheMessage",
+  "anchor": "WriteParam(aWriter, aParam.mInputSource);",
+  "why": "the id is written after the last field of the block (G30: the last line of a block): at the head it would move in the stream, and the reader of ReadForDerivedClass reads it last"
+ },
+ {
+  "file": "widget/nsGUIEventIPC.h",
+  "function": "struct ParamTraits<mozilla::WidgetMouseEventBase> {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "           ReadParam(aReader, &aResult->mInputSource) &&",
+  "removed": "           ReadParam(aReader, &aResult->mInputSource);",
+  "test": "gtest:StealthMouseEventIPC.TheIdSurvivesTheMessage",
+  "exception": "G44 (approved in PM-DECISIONS): the read of the id must be the last link of the && chain of ReadForDerivedClass, a single return expression; a read at the head would not match the write and would move the id in the stream",
+  "pm": "approvato"
+ },
+ {
+  "file": "widget/nsGUIEventIPC.h",
+  "function": "struct ParamTraits<mozilla::WidgetMouseEventBase> {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "           ReadParam(aReader, &aResult->mJugglerEventId);  // STEALTH-HOOK(automation/input)",
+  "test": "gtest:StealthMouseEventIPC.TheIdSurvivesTheMessage",
+  "exception": "G44 (approved in PM-DECISIONS): the read of the id must be the last link of the && chain of ReadForDerivedClass, a single return expression; a read at the head would not match the write and would move the id in the stream",
+  "pm": "approvato"
+ },
+ {
+  "file": "xpcom/reflect/xptinfo/xptinfo.h",
+  "function": "static_assert(sizeof(nsXPTMethodInfo) == 8, \"wrong size\");",
+  "kind": "rewrite",
+  "form": "declared-value",
+  "line": "#  define PARAM_BUFFER_COUNT 15  // STEALTH-HOOK(automation/input)",
+  "removed": "#  define PARAM_BUFFER_COUNT 14",
+  "test": "wrapper:tests/test_a_pointer_event_is_handled_before_the_call_returns_e2e.py::test_each_pointer_call_answers_after_the_page_handled_its_event"
+ }
+]

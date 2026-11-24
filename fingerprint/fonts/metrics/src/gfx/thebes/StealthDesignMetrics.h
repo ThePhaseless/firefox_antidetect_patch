@@ -12,6 +12,7 @@
 #include <stdint.h>
 
 #include "StealthDeclarationGate.h"
+#include "StealthDesignFontAccess.h"
 #include "StealthTextMeasuring.h"
 #include "gfxFT2FontBase.h"
 #include "gfxFont.h"
@@ -31,12 +32,16 @@ namespace gfx {
  * The advance of glyph aGID the way DirectWrite scales it: the DESIGN advance
  * times the size the font was asked for, not the size FreeType rounded it to.
  *
- * Called from gfxFT2FontBase::GetFTGlyphExtents, before the FreeType advance
- * is read. Returns true when it has written the final value to *aAdvance (the
- * caller must then skip its own computation, including the hint rounding and
- * the extentsScale multiply, because this value is already at the desired
- * size). Returns false, writing nothing, when the engine is off or the design
- * advance cannot be read; the caller then runs stock code.
+ * Called from gfxFT2FontBase::GetFTGlyphExtents right after Mozilla's own
+ * advance block, with *aAdvance holding the FreeType value (and aAdvance
+ * possibly null, when only the bounds were asked for). With the engine on and
+ * the design advance readable it overwrites *aAdvance with the final value,
+ * already at the desired size (so it skips the hint rounding and the
+ * extentsScale multiply that the FreeType value went through, and nothing later
+ * in the caller scales it again). Otherwise, the engine off or the design
+ * advance unreadable, it writes nothing and the FreeType value stands. The
+ * FreeType block that ran before is pure arithmetic on the loaded glyph slot, so
+ * the final value is the same as when that block was skipped.
  *
  * aBoldX is the synthetic-bold strength in 26.6 (bold.x in the caller); it is
  * added after the scaling exactly as the stock FreeType path adds it.
@@ -61,25 +66,25 @@ namespace gfx {
  * rule 7). The first version asked FreeType for the design advance and fell
  * through to the rasterised one whenever the face was not scalable or the call
  * failed - the same hole the ink box had, and the ink box's version of it was
- * measured leaking on every CFF webfont. GetDesignAdvance asks HarfBuzz's own
- * OpenType implementation, which reads glyf, CFF and CFF2 alike and needs no
- * FreeType face at all, so a CFF or a bitmap-strike face is served by the same
- * code as a bundled TrueType one. The false return is therefore not a second
- * path to rely on: it covers only a missing shaper, a font with no usable
- * unitsPerEm, or an unreadable design advance, none of which is expected for a
- * font the engine can shape.
+ * measured leaking on every CFF webfont. StealthDesignFontAccess::Advance asks
+ * HarfBuzz's own OpenType implementation, which reads glyf, CFF and CFF2 alike
+ * and needs no FreeType face at all, so a CFF or a bitmap-strike face is served
+ * by the same code as a bundled TrueType one. Leaving the FreeType value
+ * standing is therefore not a second path to rely on: it covers only a missing
+ * shaper, a font with no usable unitsPerEm, or an unreadable design advance,
+ * none of which is expected for a font the engine can shape.
  */
-inline bool StealthDesignAdvance(gfxFT2FontBase& aFont, uint16_t aGID,
+inline void StealthDesignAdvance(gfxFT2FontBase& aFont, uint16_t aGID,
                                  FT_Pos aBoldX, int32_t* aAdvance) {
-  MOZ_ASSERT(aAdvance);
-  if (!StealthEngineActive() || !(aFont.GetAdjustedSize() > 0.0)) {
-    return false;
+  if (!aAdvance || !StealthEngineActive() || !(aFont.GetAdjustedSize() > 0.0)) {
+    return;
   }
   gfxHarfBuzzShaper* shaper = aFont.GetHarfBuzzShaper();
   const uint16_t upem = aFont.GetFontEntry()->UnitsPerEm();
   int32_t designAdvance = 0;
-  if (!shaper || !upem || !shaper->GetDesignAdvance(aGID, designAdvance)) {
-    return false;
+  if (!shaper || !upem ||
+      !StealthDesignFontAccess::Advance(*shaper, aGID, designAdvance)) {
+    return;
   }
   // The design advance arrives in FONT UNITS, so this is the only place the
   // unrounded size enters, and 65536 puts it in the 16.16 the caller speaks.
@@ -91,7 +96,6 @@ inline bool StealthDesignAdvance(gfxFT2FontBase& aFont, uint16_t aGID,
   // Already at the desired size, so it must not go through GetAdjustedSize() /
   // mFTSize a second time.
   *aAdvance = NS_lround(advance);
-  return true;
 }
 
 /**
@@ -126,8 +130,8 @@ inline bool StealthDesignAdvance(gfxFT2FontBase& aFont, uint16_t aGID,
  * a corner: measured 2026-08-09 on a purpose-built CFF face, 108 of 150
  * measureText fields diverged between Windows and Linux, with Linux handing
  * back whole integers because FreeType had grid-fitted them.
- * GetDesignGlyphExtents asks HarfBuzz's own OpenType implementation, which
- * reads glyf, CFF and CFF2 alike, so no ordinary font reaches the false return.
+ * StealthDesignFontAccess::GlyphExtents asks HarfBuzz's own OpenType
+ * implementation, which reads glyf, CFF and CFF2 alike, so no ordinary font reaches the false return.
  * It remains only for a missing shaper or a font with no usable unitsPerEm at
  * all, where the number computed here would be meaningless too.
  *
@@ -152,7 +156,8 @@ inline bool StealthDesignGlyphBounds(gfxFT2FontBase& aFont, uint16_t aGID,
   gfxHarfBuzzShaper* shaper = aFont.GetHarfBuzzShaper();
   const uint16_t upem = aFont.GetFontEntry()->UnitsPerEm();
   int32_t xb, yb, w, h;
-  if (!shaper || !upem || !shaper->GetDesignGlyphExtents(aGID, xb, yb, w, h)) {
+  if (!shaper || !upem ||
+      !StealthDesignFontAccess::GlyphExtents(*shaper, aGID, xb, yb, w, h)) {
     return false;
   }
   const float conv = float(aFont.GetAdjustedSize() / gfxFloat(upem));
@@ -179,7 +184,7 @@ inline bool StealthDesignGlyphBounds(gfxFT2FontBase& aFont, uint16_t aGID,
  *   UpdateClearTypeVars takes the mode from
  *   gfx.font_rendering.cleartype_params.rendering_mode when it is 0-5 and
  *   otherwise leaves DWRITE_RENDERING_MODE_DEFAULT (0); with the engine on the
- *   system's own default is never asked (StealthCreateRenderingParams).
+ *   system's own default is never asked (StealthDWriteFactoryProxy).
  * - GetForceGDIClassic() can force GDI classic per family, but only for the
  *   families in gfx.font_rendering.cleartype_params.force_gdi_classic_for_families,
  *   which Firefox ships empty ("We no longer force GDI Classic mode on any
@@ -215,7 +220,8 @@ inline gfxFloat StealthDWriteCharAdvance(gfxFT2FontBase& aFont,
   gfxHarfBuzzShaper* shaper = aFont.GetHarfBuzzShaper();
   const hb_codepoint_t gid = shaper ? shaper->GetNominalGlyph(aChar) : 0;
   int32_t design = 0;
-  if (!gid || !shaper->GetDesignAdvance(uint16_t(gid), design)) {
+  if (!gid ||
+      !StealthDesignFontAccess::Advance(*shaper, uint16_t(gid), design)) {
     return -1.0;
   }
   const float scaled = design * aConv;
@@ -293,7 +299,8 @@ inline void StealthDWriteAveCharWidth(gfxFT2FontBase& aFont,
     const hb_codepoint_t gid = shaper ? shaper->GetNominalGlyph('x') : 0;
     int32_t xb = 0, yb = 0, w = 0, h = 0;
     if (xHeight <= 0 && gid &&
-        shaper->GetDesignGlyphExtents(uint16_t(gid), xb, yb, w, h)) {
+        StealthDesignFontAccess::GlyphExtents(*shaper, uint16_t(gid), xb, yb, w,
+                                              h)) {
       xHeight = yb;
     }
     ave = xHeight > 0 ? gfxFloat(uint16_t(xHeight) * conv) : 0.0;

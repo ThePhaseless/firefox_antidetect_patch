@@ -1,0 +1,108 @@
+[
+ {
+  "file": "dom/media/mediacapabilities/MediaCapabilities.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthMediaDeclaration.h\"  // STEALTH-HOOK(fingerprint/media/decode-declaration)",
+  "test": "gtest:StealthMediaDeclaration.DecodingInfoOfAFileAnswersFromTheDeclaration"
+ },
+ {
+  "file": "dom/media/mediacapabilities/MediaCapabilities.cpp",
+  "function": "static uint32_t Vp8EncoderThreads(const uint32_t aPixels,",
+  "kind": "add",
+  "form": "shadow",
+  "line": "  const auto GetNumberOfProcessors = StealthDeclaredNumberOfProcessors;  // STEALTH-HOOK(fingerprint/media/decode-declaration)",
+  "test": "gtest:StealthMediaDeclaration.WebrtcAv1EncodeSmoothFollowsTheDeclaredCores"
+ },
+ {
+  "file": "dom/media/mediacapabilities/MediaCapabilities.cpp",
+  "function": "void MediaCapabilities::CreateNonWebRTCDecodingInfo(",
+  "kind": "add",
+  "form": "anchor",
+  "line": "               if (auto d = StealthDeclaredDecodingInfoFor(aConfiguration)) return promise->MaybeResolve(std::move(*d));  // STEALTH-HOOK(fingerprint/media/decode-declaration)",
+  "test": "gtest:StealthMediaDeclaration.DecodingInfoOfAFileAnswersFromTheDeclaration",
+  "anchor": "NS_ENSURE_TRUE_VOID(global); (inside the lambda of CreateNonWebRTCDecodingInfo)",
+  "why": "it sits inside a lambda of Mozilla's function, after holder->Complete() and the global check and before the reject test, where `promise` and `aConfiguration` are in scope; the lambda has no head of its own to guard (PM-DECISIONS media/decode-declaration 1: one line added after NS_ENSURE_TRUE_VOID(global))"
+ },
+ {
+  "file": "dom/media/moz.build",
+  "function": "EXPORTS += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "EXPORTS += [\"StealthMediaDeclaration.h\"]  # STEALTH-HOOK(fingerprint/media/decode-declaration)",
+  "test": "gtest:StealthMediaDeclaration.SupportsAsyncAnswersFromTheDeclaration"
+ },
+ {
+  "file": "dom/media/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"StealthMediaDeclaration.cpp\"]  # STEALTH-HOOK(fingerprint/media/decode-declaration)",
+  "test": "gtest:StealthMediaDeclaration.SupportsAsyncAnswersFromTheDeclaration"
+ },
+ {
+  "file": "dom/media/platforms/PDMFactory.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthMediaDeclaration.h\"  // STEALTH-HOOK(fingerprint/media/decode-declaration)",
+  "test": "gtest:StealthMediaDeclaration.SupportsAndSupportsAsyncAgree"
+ },
+ {
+  "file": "dom/media/platforms/PDMFactory.cpp",
+  "function": "DecodeSupportSet PDMFactory::SupportsMimeType(",
+  "kind": "add",
+  "form": "guard",
+  "line": "  if (DecodeSupportSet declared; StealthDeclaredDecodeSupportFor(aParams, &declared)) return declared;  // STEALTH-HOOK(fingerprint/media/decode-declaration)",
+  "test": "gtest:StealthMediaDeclaration.SupportsAndSupportsAsyncAgree"
+ },
+ {
+  "file": "dom/media/platforms/PDMFactory.cpp",
+  "function": "DecodeSupportSet PDMFactory::Supports(",
+  "kind": "add",
+  "form": "guard",
+  "line": "  if (auto declared = StealthDeclaredDecodeSupportAsyncFor(aParams)) return declared;  // STEALTH-HOOK(fingerprint/media/decode-declaration)",
+  "test": "gtest:StealthMediaDeclaration.SupportsAsyncAnswersFromTheDeclaration"
+ },
+ {
+  "file": "dom/media/webrtc/jsapi/DefaultCodecPreferences.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthMediaDeclaration.h\"  // STEALTH-HOOK(fingerprint/media/decode-declaration)",
+  "test": "gtest:StealthMediaDeclaration.DeclaredH264GateIgnoresThePlugin"
+ },
+ {
+  "file": "dom/media/webrtc/jsapi/DefaultCodecPreferences.cpp",
+  "function": "bool DefaultCodecPreferences::H264EnabledStatic() {",
+  "kind": "add",
+  "form": "guard",
+  "line": "  if (bool declared; StealthDeclaredSoftwareH264(&declared)) return declared;  // STEALTH-HOOK(fingerprint/media/decode-declaration)",
+  "test": "gtest:StealthMediaDeclaration.DeclaredH264GateIgnoresThePlugin"
+ },
+ {
+  "file": "dom/media/webrtc/jsapi/DefaultCodecPreferences.cpp",
+  "function": "bool DefaultCodecPreferences::HardwareH264EnabledStatic() {",
+  "kind": "add",
+  "form": "guard",
+  "line": "  if (bool declared; StealthDeclaredSoftwareH264(&declared)) return declared;  // STEALTH-HOOK(fingerprint/media/decode-declaration)",
+  "test": "gtest:StealthMediaDeclaration.DeclaredH264GateIgnoresThePlugin"
+ },
+ {
+  "file": "dom/media/webrtc/libwebrtcglue/WebrtcVideoCodecFactory.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthMediaDeclaration.h\"  // STEALTH-HOOK(fingerprint/media/decode-declaration)",
+  "test": "gtest:StealthMediaDeclaration.EncodeSupportAnswersFromTheDeclaration"
+ },
+ {
+  "file": "dom/media/webrtc/libwebrtcglue/WebrtcVideoCodecFactory.cpp",
+  "function": "PlatformEncodeSupportOrNone(const EncoderConfig& aConfig) {",
+  "kind": "add",
+  "form": "guard",
+  "line": "  if (auto declared = StealthDeclaredWebrtcEncodeSupport(aConfig)) return declared;  // STEALTH-HOOK(fingerprint/media/decode-declaration)",
+  "test": "gtest:StealthMediaDeclaration.EncodeSupportAnswersFromTheDeclaration"
+ }
+]

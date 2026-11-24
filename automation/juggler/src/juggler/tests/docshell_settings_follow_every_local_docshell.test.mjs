@@ -44,7 +44,7 @@ const bc = (id, parent) => ({ id, parent: parent || null, browserId: 7, docShell
 const frameOf = browsingContext => ({
   _browsingContext: browsingContext,
   docShell: () => browsingContext.docShell,
-  _onGlobalObjectCleared() { this.cleared = true; },
+  _onGlobalCreated() { this.cleared = true; },
 });
 
 // A tree with a main frame, a local iframe, and a frame of another process (no docShell).

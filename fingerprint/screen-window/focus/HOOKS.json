@@ -1,0 +1,28 @@
+[
+ {
+  "file": "xpfe/appshell/AppWindow.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthAppWindowFocus.h\"  // STEALTH-HOOK(fingerprint/screen-window/focus)",
+  "test": "wrapper:tests/test_focus_survives_os_deactivation_e2e.py::test_a_page_keeps_focus_when_another_session_takes_the_display"
+ },
+ {
+  "file": "xpfe/appshell/AppWindow.cpp",
+  "function": "void AppWindow::WindowActivated() {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "        StealthLowerActiveWindow(window, fm);  // STEALTH-HOOK(fingerprint/screen-window/focus)",
+  "test": "wrapper:tests/test_focus_survives_os_deactivation_e2e.py::test_a_page_keeps_focus_when_another_session_takes_the_display",
+  "anchor": "RefPtr<nsFocusManager> fm = nsFocusManager::GetFocusManager()",
+  "why": "A notice at the top of WindowActivated would run before Mozilla re-reads mDocShell->GetWindow() and the focus manager, and the lowering runs blur handlers that can close the window: the statements after the hook read what the hook can change. window and fm are the locals the anchor statement produced."
+ },
+ {
+  "file": "xpfe/appshell/AppWindow.cpp",
+  "function": "void AppWindow::WindowActivated() {",
+  "kind": "add",
+  "form": "guard",
+  "line": "  if (StealthKeepsActivation()) return;  // STEALTH-HOOK(fingerprint/screen-window/focus)",
+  "test": "wrapper:tests/test_focus_survives_os_deactivation_e2e.py::test_a_page_keeps_focus_when_another_session_takes_the_display"
+ }
+]

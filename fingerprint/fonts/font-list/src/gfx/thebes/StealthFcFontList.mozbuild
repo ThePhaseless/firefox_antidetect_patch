@@ -4,6 +4,11 @@
 
 # Read by gfx/thebes/moz.build (one include line).
 
+# The hooks of the three font lists (every platform).
+SOURCES += [
+    "StealthFontListHooks.cpp",
+]
+
 if CONFIG["MOZ_WIDGET_TOOLKIT"] == "gtk":
     SOURCES += [
         "StealthFcFontList.cpp",

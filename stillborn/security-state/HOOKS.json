@@ -1,0 +1,18 @@
+[
+ {
+  "file": "security/manager/ssl/RemoteSecuritySettings.sys.mjs",
+  "function": "export var RemoteSecuritySettings = {",
+  "kind": "add",
+  "form": "guard",
+  "line": "    if (ChromeUtils.importESModule(\"resource://gre/modules/psm/StealthSecurityState.sys.mjs\").StealthSecurityState.ownsSync()) return this;  // STEALTH-HOOK(stillborn/security-state)",
+  "test": "py:security/manager/ssl/stealth/test/run_stealth_security_state_gate.py::case:poller"
+ },
+ {
+  "file": "security/manager/ssl/moz.build",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "DIRS += [\"stealth\"]  # STEALTH-HOOK(stillborn/security-state)",
+  "test": "py:security/manager/ssl/stealth/test/run_stealth_security_state_gate.py::case:never_asked"
+ }
+]

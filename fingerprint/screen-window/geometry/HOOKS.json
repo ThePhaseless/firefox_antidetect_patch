@@ -1,0 +1,195 @@
+[
+ {
+  "file": "dom/base/nsGlobalWindowOuter.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/dom/StealthSessionDeclaration.h\"  // STEALTH-HOOK(fingerprint/locale-time/session-declaration)",
+  "test": "wrapper:tests/test_context_locale_e2e.py::test_intl_in_the_page_realm_follows_the_language_and_zone_of_its_context"
+ },
+ {
+  "file": "dom/base/nsGlobalWindowOuter.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthWindowGeometry.h\"  // STEALTH-HOOK(fingerprint/screen-window/geometry)",
+  "test": "wrapper:tests/test_popup_geometry_is_the_declared_frame_e2e.py::test_a_popup_is_its_inner_size_plus_the_declared_frame"
+ },
+ {
+  "file": "dom/base/nsGlobalWindowOuter.cpp",
+  "function": "static nsresult CreateNativeGlobalForInner(",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "      GetDeclaredRealmLanguage(aDocument), GetDeclaredRealmTimezone(aDocument));  // STEALTH-HOOK(fingerprint/locale-time/session-declaration)",
+  "removed": "      aDocument->GetBrowsingContext()->Top()->GetLanguageOverride(),\n      aDocument->GetBrowsingContext()->Top()->GetTimezoneOverride());",
+  "test": "wrapper:tests/test_context_locale_e2e.py::test_intl_in_the_page_realm_follows_the_language_and_zone_of_its_context",
+  "exception": "G35, approved by the pm (PM-DECISIONS.md, 22/11): the two Mozilla arguments GetLanguageOverride()/GetTimezoneOverride() are replaced by the declared language and zone, as on the base; keeping Mozilla's tokens inside a wrap would change the call and its order of evaluation with no gain in portability (the same two Mozilla lines stay touched). To review at the port to 160.",
+  "pm": "approvato"
+ },
+ {
+  "file": "dom/base/nsGlobalWindowOuter.cpp",
+  "function": "CSSIntSize nsGlobalWindowOuter::GetOuterSize(CallerType aCallerType,",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  if (CSSIntSize size; StealthOuterSize(*this, size, aError)) return size;  // STEALTH-HOOK(fingerprint/screen-window/geometry)",
+  "test": "wrapper:tests/test_popup_geometry_is_the_declared_frame_e2e.py::test_a_popup_is_its_inner_size_plus_the_declared_frame",
+  "anchor": "the `if (nsIGlobalObject::ShouldResistFingerprinting(aCallerType, RFPTarget::WindowOuterSize)) {...}` block of Mozilla",
+  "why": "G32: privacy.resistFingerprinting is only the core's default (an extra_prefs overlay can set it true), not locked by code, so a guard at the head of GetOuterSize would answer before Mozilla's RFP check; the hook stays right after it, where it is today."
+ },
+ {
+  "file": "dom/base/nsGlobalWindowOuter.cpp",
+  "function": "CSSIntPoint nsGlobalWindowOuter::GetScreenXY(CallerType aCallerType,",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  if (CSSIntPoint point; StealthScreenXY(*this, treeOwnerAsWin, point)) return point;  // STEALTH-HOOK(fingerprint/screen-window/geometry)",
+  "test": "wrapper:tests/test_popup_geometry_is_the_declared_frame_e2e.py::test_a_popup_is_its_inner_size_plus_the_declared_frame",
+  "anchor": "the `if (!treeOwnerAsWin) {...}` check of Mozilla",
+  "why": "needs Mozilla's local treeOwnerAsWin (the helper scales with it) and must answer after the RFP check (G32: RFP is only a default) and after the no-tree-owner error: a head guard would change both."
+ },
+ {
+  "file": "dom/base/nsGlobalWindowOuter.cpp",
+  "function": "float nsGlobalWindowOuter::GetMozInnerScreenXOuter(CallerType aCallerType) {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  if (const Maybe<float> x = StealthMozInnerScreenX(*this, r)) return *x;  // STEALTH-HOOK(fingerprint/screen-window/geometry)",
+  "test": "wrapper:tests/test_a_click_in_an_iframe_lands_at_the_frames_own_screen_origin_e2e.py::test_a_real_click_in_an_iframe_has_the_screen_origin_of_the_iframe",
+  "anchor": "`nsRect r = GetInnerScreenRect();` of Mozilla",
+  "why": "the helper adds the declared shift to Mozilla's local rect r, which is computed after the RFP check (G32: RFP is only a default); a head guard would run GetInnerScreenRect twice and before the RFP check."
+ },
+ {
+  "file": "dom/base/nsGlobalWindowOuter.cpp",
+  "function": "float nsGlobalWindowOuter::GetMozInnerScreenYOuter(CallerType aCallerType) {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  if (const Maybe<float> y = StealthMozInnerScreenY(*this, r)) return *y;  // STEALTH-HOOK(fingerprint/screen-window/geometry)",
+  "test": "wrapper:tests/test_a_click_in_an_iframe_lands_at_the_frames_own_screen_origin_e2e.py::test_a_real_click_in_an_iframe_has_the_screen_origin_of_the_iframe",
+  "anchor": "`nsRect r = GetInnerScreenRect();` of Mozilla",
+  "why": "same as mozInnerScreenX, for y."
+ },
+ {
+  "file": "dom/events/Event.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthScreenCoords.h\"  // STEALTH-HOOK(fingerprint/screen-window/geometry)",
+  "test": "wrapper:tests/test_a_click_in_an_iframe_lands_at_the_frames_own_screen_origin_e2e.py::test_a_real_click_in_an_iframe_has_the_screen_origin_of_the_iframe"
+ },
+ {
+  "file": "dom/events/Event.cpp",
+  "function": "Maybe<CSSDoublePoint> Event::GetScreenCoords(",
+  "kind": "add",
+  "form": "wrap-expression",
+  "line": "      StealthWithContentOrigin(aPresContext,  // STEALTH-HOOK(fingerprint/screen-window/geometry)",
+  "test": "wrapper:tests/test_a_click_in_an_iframe_lands_at_the_frames_own_screen_origin_e2e.py::test_a_real_click_in_an_iframe_has_the_screen_origin_of_the_iframe"
+ },
+ {
+  "file": "dom/events/Event.cpp",
+  "function": "Maybe<CSSDoublePoint> Event::GetScreenCoords(",
+  "kind": "rewrite",
+  "form": "wrap-expression",
+  "line": "          aPresContext->DeviceContext()->AppUnitsPerDevPixel())));  // STEALTH-HOOK(fingerprint/screen-window/geometry)",
+  "removed": "          aPresContext->DeviceContext()->AppUnitsPerDevPixel()));",
+  "test": "wrapper:tests/test_a_click_in_an_iframe_lands_at_the_frames_own_screen_origin_e2e.py::test_a_real_click_in_an_iframe_has_the_screen_origin_of_the_iframe"
+ },
+ {
+  "file": "dom/events/test/gtest/moz.build",
+  "function": "with Files(\"**\"):",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"TestStealthWindowGeometry.cpp\"]  # STEALTH-HOOK(fingerprint/screen-window/geometry)",
+  "test": "gtest:StealthWindowGeometry.FullscreenContentStartsAtTheScreenOrigin"
+ },
+ {
+  "file": "widget/gtk/moz.build",
+  "function": "SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "SOURCES += [\"StealthFullscreenGtk.cpp\"]  # STEALTH-HOOK(fingerprint/screen-window/geometry)",
+  "test": "wrapper:scripts/ci_host_gate.py::invariant:fullscreen_is_the_screen"
+ },
+ {
+  "file": "widget/gtk/moz.build",
+  "function": "SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "SOURCES += [\"StealthHostGLProbe.cpp\"]  # STEALTH-HOOK(platform/declaration-gate)",
+  "test": "gtest:StealthGfxFeatureStatus.TheHostProbeIsLaunchedAsSoonAsThePrefsAreReadWithTheEngineOff"
+ },
+ {
+  "file": "widget/gtk/nsWindow.h",
+  "function": "class nsWindow : public nsIWidget {",
+  "kind": "add",
+  "form": "member",
+  "line": "  bool StealthMakeFullScreenWithoutWM(bool aFullScreen);  // STEALTH-HOOK(fingerprint/screen-window/geometry)",
+  "test": "wrapper:scripts/ci_host_gate.py::invariant:fullscreen_is_the_screen"
+ },
+ {
+  "file": "widget/moz.build",
+  "function": "SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"StealthFullscreen.cpp\"]  # STEALTH-HOOK(fingerprint/screen-window/geometry)",
+  "test": "gtest:StealthFullscreen.TheRectOrTakesTheDeclaredScreenAndElseMozillas"
+ },
+ {
+  "file": "widget/nsIWidget.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthFullscreen.h\"  // STEALTH-HOOK(fingerprint/screen-window/geometry)",
+  "test": "gtest:StealthFullscreen.TheRectOrTakesTheDeclaredScreenAndElseMozillas"
+ },
+ {
+  "file": "widget/nsIWidget.cpp",
+  "function": "void nsIWidget::InfallibleMakeFullScreen(bool aFullScreen) {",
+  "kind": "rewrite",
+  "form": "wrap-expression",
+  "line": "    doReposition(mozilla::widget::StealthFullscreenRectOr(*this, DesktopRect(screen->GetRectDisplayPix())));  // STEALTH-HOOK(fingerprint/screen-window/geometry)",
+  "removed": "    doReposition(DesktopRect(screen->GetRectDisplayPix()));",
+  "test": "gtest:StealthFullscreen.TheRectOrTakesTheDeclaredScreenAndElseMozillas"
+ },
+ {
+  "file": "widget/tests/gtest/moz.build",
+  "function": "UNIFIED_SOURCES = [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"TestStealthFullscreen.cpp\"]  # STEALTH-HOOK(fingerprint/screen-window/geometry)",
+  "test": "gtest:StealthFullscreen.TheDeclaredScreenAtTheDeclaredScale"
+ },
+ {
+  "file": "widget/windows/moz.build",
+  "function": "SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "SOURCES += [\"StealthFullscreenWin.cpp\"]  # STEALTH-HOOK(fingerprint/screen-window/geometry)",
+  "test": "wrapper:scripts/ci_host_gate.py::invariant:fullscreen_is_the_screen"
+ },
+ {
+  "file": "widget/windows/nsWindow.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthFullscreenWin.h\"  // STEALTH-HOOK(fingerprint/screen-window/geometry)",
+  "test": "wrapper:scripts/ci_host_gate.py::invariant:fullscreen_is_the_screen"
+ },
+ {
+  "file": "widget/windows/nsWindow.cpp",
+  "function": "bool nsWindow::ProcessMessageInternal(UINT msg, WPARAM& wParam, LPARAM& lParam,",
+  "kind": "add",
+  "form": "anchor",
+  "line": "      mozilla::widget::StealthDeclaredFullscreenTrackSize(*this, lParam);  // STEALTH-HOOK(fingerprint/screen-window/geometry)",
+  "test": "wrapper:scripts/ci_host_gate.py::invariant:fullscreen_is_the_screen",
+  "anchor": "`mmi->ptMaxTrackSize.y = std::min((int32_t)mmi->ptMaxTrackSize.y, maxH);` of the case WM_GETMINMAXINFO",
+  "why": "G30: it takes the maximum of Mozilla's four finished assignments and the declared rectangle, so it must run after them; a guard cannot (it needs their result) and moving it earlier gives min(max(P,D),maxW) instead of max(min(P,maxW),D); it is the last statement of the case block, the one exception to rule 5."
+ },
+ {
+  "file": "widget/windows/nsWindow.cpp",
+  "function": "void nsWindow::OnWindowPosChanging(WINDOWPOS* info) {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  mozilla::widget::StealthHoldDeclaredFullscreen(*this, info);  // STEALTH-HOOK(fingerprint/screen-window/geometry)",
+  "test": "wrapper:scripts/ci_host_gate.py::invariant:fullscreen_is_the_screen",
+  "anchor": "the closing brace of the forced-fullscreen block of nsWindow::OnWindowPosChanging (before the DWM unhide block)",
+  "why": "it holds the declared fullscreen size on the WINDOWPOS Mozilla's block has just adjusted and before the DWM block reads it; it does not move (PM-DECISIONS geometry, G28), so it stays an anchor in the middle of the function"
+ }
+]

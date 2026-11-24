@@ -32,11 +32,10 @@
 
 #include <functional>
 
+#include "nsIProxyInfo.h"
 #include "nsString.h"
 #include "nscore.h"
 #include "prio.h"
-
-class nsIProxyInfo;
 
 namespace mozilla {
 namespace net {
@@ -125,6 +124,24 @@ bool nsSOCKSUDPIOLayerSocketProcessMakesTheIceSockets();
  * calls nsSOCKSUDPIOLayerSocketBorn after its bind worked.
  */
 nsresult StealthPutSocksUdpLayer(PRFileDesc* aFd, nsIProxyInfo* aProxyInfo);
+
+/*
+ * The three places nsUDPSocket::InitWithAddress gives an HTTP/3 socket its SOCKS5 UDP layer (the proxy is the one the connection that
+ * owns the socket learned, nsUDPSocket::SetSocksProxy). Each takes the field of the socket, so Mozilla's statements stay as they are.
+ *
+ * StealthSocksUdpLayerFailed: the layer for aSocksProxy is put on the socket NSPR just opened, before the options and the bind. No
+ * proxy: nothing is done. True when the layer cannot be pushed: the socket must not be used (a plain one would send direct), and
+ * InitWithAddress closes it.
+ *
+ * StealthSocksUdpBorn: after a bind that worked the socket takes its association (nsSOCKSUDPIOLayerSocketBorn); a refused bind never
+ * gets here, so it takes nothing from the pool.
+ *
+ * StealthSocksUdpHasNoHandle: nsUDPSocket::GetFileDescriptor of a socket with the layer gives no OS handle: what writes on it
+ * (neqo's own I/O) would go direct.
+ */
+bool StealthSocksUdpLayerFailed(PRFileDesc* aFd, nsIProxyInfo* aSocksProxy);
+void StealthSocksUdpBorn(PRFileDesc* aFd);
+bool StealthSocksUdpHasNoHandle(PRFileDesc* aFd);
 
 // Test only: the associations are started as if the socket transport service were gone (a browser that is shutting down).
 void nsSOCKSUDPIOLayerNoSocketThreadForTests(bool aMissing);

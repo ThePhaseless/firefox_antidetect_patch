@@ -2,14 +2,16 @@
  "modified": [
   "security/manager/ssl/nsCertOverrideService.cpp"
  ],
- "added": {},
+ "added": {
+  "security/manager/ssl/StealthIgnoreHTTPSErrors.h": "100644"
+ },
  "inventory": [
   {
    "file": "security/manager/ssl/nsCertOverrideService.cpp",
    "category": "juggler",
    "feature": "juggler-ignore-https-errors",
    "prefs": [],
-   "added": 6,
+   "added": 3,
    "removed": 0,
    "hunks": 2,
    "inline_logic_lines": 7,

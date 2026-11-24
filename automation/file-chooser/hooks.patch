@@ -1,27 +1,21 @@
 diff --git a/dom/html/HTMLInputElement.cpp b/dom/html/HTMLInputElement.cpp
-index b5b4573e81ab313175680f97c1f309d54e34e40b..80a38c39131e126cd07c2b8b879febab0dc460f4 100644
+index b5b4573e81ab313175680f97c1f309d54e34e40b..f840b9ddd53faa8db98ee024948737c0edd2a4f0 100644
 --- a/dom/html/HTMLInputElement.cpp
 +++ b/dom/html/HTMLInputElement.cpp
-@@ -97,6 +97,7 @@
- #include "mozilla/dom/FileSystemEntry.h"
- #include "nsDirectoryServiceDefs.h"
- #include "nsIContentPrefService2.h"
-+#include "nsIDocShell.h"
- #include "nsIFile.h"
- #include "nsIMIMEService.h"
- #include "nsIObserverService.h"
-@@ -997,6 +998,15 @@ nsresult HTMLInputElement::InitFilePicker(FilePickerType aType) {
+@@ -125,6 +125,8 @@
+ #  include "nsAccessibilityService.h"
+ #endif
+ 
++#include "StealthFileChooser.h"  // STEALTH-HOOK(automation/file-chooser)
++
+ NS_IMPL_NS_NEW_HTML_ELEMENT_CHECK_PARSER(Input)
+ 
+ // XXX align=left, hspace, vspace, border? other nav4 attrs
+@@ -997,6 +999,8 @@ nsresult HTMLInputElement::InitFilePicker(FilePickerType aType) {
                           nullptr);
    }
  
-+  // STEALTH-HOOK(automation/file-chooser)
-+  if (nsIDocShell* ds = doc->GetDocShell()) {
-+    bool interceptFileChooser = false;
-+    ds->GetFileInputInterceptionEnabled(&interceptFileChooser);
-+    if (interceptFileChooser) {
-+      return NS_OK;
-+    }
-+  }
++  if (StealthFileChooserIntercepted(doc)) return NS_OK;  // STEALTH-HOOK(automation/file-chooser)
 +
    if (!oldFiles.IsEmpty() && aType != FILE_PICKER_DIRECTORY) {
      nsAutoString path;

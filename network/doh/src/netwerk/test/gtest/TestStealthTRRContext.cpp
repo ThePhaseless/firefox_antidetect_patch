@@ -7,11 +7,14 @@
 // travels from the TRR request to the proxy lookup, and the proxy filter of the
 // session sees it on the stand-in channel.
 
+#include "StealthTRRRequest.h"
 #include "TRRLoadInfo.h"
 #include "gtest/gtest.h"
 #include "mozilla/BasePrincipal.h"
 #include "mozilla/Maybe.h"
 #include "mozilla/OriginAttributes.h"
+#include "mozilla/Preferences.h"
+#include "mozilla/RefPtr.h"
 #include "mozilla/SpinEventLoopUntil.h"
 #include "mozilla/net/ProxyConfigLookup.h"
 #include "mozilla/net/StealthTRRContext.h"
@@ -26,9 +29,12 @@
 #include "nsIParentalControlsService.h"
 #include "nsIPrincipal.h"
 #include "nsIProxyInfo.h"
+#include "nsISocketTransport.h"
+#include "nsISocketTransportService.h"
 #include "nsNetUtil.h"
 #include "nsServiceManagerUtils.h"
 #include "nsString.h"
+#include "nsTArray.h"
 
 namespace mozilla::net {
 
@@ -392,6 +398,266 @@ TEST(TestStealthTRRContext, ParentalControlsServiceReportsEverythingOff)
   if (NS_SUCCEEDED(pcs->GetLoggingEnabled(&logging))) {
     EXPECT_FALSE(logging);
   }
+}
+
+// ---- the hooks as the Mozilla files call them --------------------------------------------------------------------------
+
+namespace {
+
+// The value of network.trr.stealth.contexts for the length of a test, put back as it was.
+class ContextsPrefScope {
+ public:
+  explicit ContextsPrefScope(const nsACString& aValue) {
+    mHad = NS_SUCCEEDED(Preferences::GetCString(kPref, mOld));
+    Preferences::SetCString(kPref, aValue);
+  }
+  ~ContextsPrefScope() {
+    if (mHad) {
+      Preferences::SetCString(kPref, mOld);
+    } else {
+      Preferences::ClearUser(kPref);
+    }
+  }
+
+ private:
+  static constexpr const char* kPref = "network.trr.stealth.contexts";
+  nsAutoCString mOld;
+  bool mHad = false;
+};
+
+// What the templates read from a channel of the two classes besides what FakeChannel does: its cancellation, whether it is a
+// DoH request, and its load info.
+struct FakeHttpChannel : FakeChannel {
+  bool mCanceled = false;
+  bool mIsTRR = false;
+  RefPtr<TRRLoadInfo> mLoadInfo =
+      new TRRLoadInfo(nullptr, nsIContentPolicy::TYPE_OTHER);
+  nsresult GetCanceled(bool* aCanceled) {
+    *aCanceled = mCanceled;
+    return NS_OK;
+  }
+  nsresult GetIsTRRServiceChannel(bool* aIsTRR) {
+    *aIsTRR = mIsTRR;
+    return NS_OK;
+  }
+  already_AddRefed<nsILoadInfo> LoadInfo() {
+    nsCOMPtr<nsILoadInfo> loadInfo = mLoadInfo.get();
+    return loadInfo.forget();
+  }
+};
+
+already_AddRefed<nsIChannel> NewDoHChannel() {
+  nsCOMPtr<nsIURI> uri;
+  if (NS_FAILED(NS_NewURI(getter_AddRefs(uri), "https://example.com/dns-query"_ns))) {
+    return nullptr;
+  }
+  nsCOMPtr<nsIChannel> channel;
+  if (NS_FAILED(NS_NewChannel(getter_AddRefs(channel), uri,
+                              nsContentUtils::GetSystemPrincipal(),
+                              nsILoadInfo::SEC_ALLOW_CROSS_ORIGIN_SEC_CONTEXT_IS_NULL,
+                              nsIContentPolicy::TYPE_OTHER))) {
+    return nullptr;
+  }
+  return channel.forget();
+}
+
+}  // namespace
+
+// TRRServiceChannel::MaybeResolveProxyAndBeginConnect: the lookup that failed ends the request and gives the caller NS_OK,
+// which it returns as it does for a lookup that went well; a lookup that went well is left as it is.
+TEST(TestStealthTRRContext, AFailedLookupOfAServiceChannelEndsItAndGivesOkToItsCaller)
+{
+  FakeChannel channel;
+  EXPECT_EQ(StealthTRRServiceProxyLookup(&channel, NS_ERROR_FAILURE), NS_OK);
+  EXPECT_EQ(channel.mAborted, 1);
+  EXPECT_EQ(channel.mAbortStatus, NS_ERROR_PROXY_CONNECTION_REFUSED);
+}
+
+TEST(TestStealthTRRContext, ALookupOfAServiceChannelThatWentWellIsLeftAlone)
+{
+  FakeChannel channel;
+  EXPECT_EQ(StealthTRRServiceProxyLookup(&channel, NS_OK), NS_OK);
+  EXPECT_EQ(channel.mAborted, 0);
+}
+
+// TRRServiceChannel::OnProxyAvailable: the answer, not only the status: an answer with no proxy info is refused, and a
+// cancellation is read from the channel.
+TEST(TestStealthTRRContext, AnAnswerOfAServiceChannelWithNoProxyInfoEndsIt)
+{
+  FakeHttpChannel channel;
+  EXPECT_TRUE(StealthTRRServiceOnProxyAnswer(&channel, NS_OK, nullptr));
+  EXPECT_EQ(channel.mAborted, 1);
+  EXPECT_EQ(channel.mAbortStatus, NS_ERROR_PROXY_CONNECTION_REFUSED);
+}
+
+TEST(TestStealthTRRContext, ACancelledServiceChannelGoesOnAsUpstream)
+{
+  FakeHttpChannel channel;
+  channel.mCanceled = true;
+  EXPECT_FALSE(StealthTRRServiceOnProxyAnswer(&channel, NS_ERROR_FAILURE, nullptr));
+  EXPECT_EQ(channel.mAborted, 0);
+}
+
+// nsHttpChannel::MaybeResolveProxyAndBeginConnect: a DoH request whose lookup failed is closed and ended; a channel of a
+// context with a proxy too; any other channel keeps upstream's failover; a cancelled one goes on.
+TEST(TestStealthTRRContext, AFailedLookupOfADoHHttpChannelClosesItsCacheEntryAndEndsIt)
+{
+  FakeHttpChannel channel;
+  channel.mIsTRR = true;
+  EXPECT_EQ(StealthChannelProxyLookup(&channel, NS_ERROR_FAILURE), NS_OK);
+  EXPECT_EQ(channel.mClosed, 1);
+  EXPECT_EQ(channel.mAborted, 1);
+  EXPECT_EQ(channel.mAbortStatus, NS_ERROR_PROXY_CONNECTION_REFUSED);
+}
+
+TEST(TestStealthTRRContext, AFailedLookupOfAnOrdinaryChannelKeepsUpstreamUnlessItsContextHasAProxy)
+{
+  ContextsPrefScope list("7"_ns);
+  FakeHttpChannel plain;  // the default context, not in the list
+  EXPECT_EQ(StealthChannelProxyLookup(&plain, NS_ERROR_FAILURE), NS_ERROR_FAILURE);
+  EXPECT_EQ(plain.mAborted, 0);
+
+  FakeHttpChannel proxied;
+  ASSERT_EQ(StealthApplyTRRContext(proxied.mLoadInfo, ContextOf(7)), NS_OK);
+  EXPECT_EQ(StealthChannelProxyLookup(&proxied, NS_ERROR_FAILURE), NS_OK);
+  EXPECT_EQ(proxied.mClosed, 1);
+  EXPECT_EQ(proxied.mAborted, 1);
+}
+
+TEST(TestStealthTRRContext, ALookupThatWentWellOrWasCancelledIsLeftToUpstream)
+{
+  FakeHttpChannel channel;
+  channel.mIsTRR = true;
+  EXPECT_EQ(StealthChannelProxyLookup(&channel, NS_OK), NS_OK);
+  EXPECT_EQ(channel.mAborted, 0);
+  channel.mCanceled = true;
+  EXPECT_EQ(StealthChannelProxyLookup(&channel, NS_ERROR_FAILURE), NS_ERROR_FAILURE);
+  EXPECT_EQ(channel.mAborted, 0);
+}
+
+// nsHttpChannel::OnProxyAvailable: the same for the answer; the DIRECT answer of a page channel is legitimate (a bypass
+// list matched its host), the one of a DoH request is not.
+TEST(TestStealthTRRContext, ADirectAnswerEndsADoHHttpChannelAndNotAPageChannel)
+{
+  ContextsPrefScope list(""_ns);
+  FakeHttpChannel doh;
+  doh.mIsTRR = true;
+  EXPECT_TRUE(StealthChannelOnProxyAnswer(&doh, NS_OK, nullptr));
+  EXPECT_EQ(doh.mClosed, 1);
+  EXPECT_EQ(doh.mAborted, 1);
+
+  FakeHttpChannel page;
+  EXPECT_FALSE(StealthChannelOnProxyAnswer(&page, NS_OK, nullptr));
+  EXPECT_FALSE(StealthChannelOnProxyAnswer(&page, NS_ERROR_FAILURE, nullptr));
+  EXPECT_EQ(page.mAborted, 0);
+}
+
+TEST(TestStealthTRRContext, AFailedAnswerEndsAPageChannelOfAContextWithAProxy)
+{
+  ContextsPrefScope list("7"_ns);
+  FakeHttpChannel page;
+  ASSERT_EQ(StealthApplyTRRContext(page.mLoadInfo, ContextOf(7)), NS_OK);
+  EXPECT_TRUE(StealthChannelOnProxyAnswer(&page, NS_ERROR_FAILURE, nullptr));
+  EXPECT_EQ(page.mClosed, 1);
+  EXPECT_EQ(page.mAborted, 1);
+}
+
+// TRR::SendHTTPRequest: the channel of the request takes the context of its lookup (the origin suffix of its record); the
+// default context leaves it as it is; a channel that cannot take the context ends the request.
+TEST(TestStealthTRRContext, TheRequestOfAContextGivesItsChannelTheContext)
+{
+  nsCOMPtr<nsIChannel> channel = NewDoHChannel();
+  ASSERT_TRUE(channel);
+  nsresult rv = NS_ERROR_FAILURE;
+  EXPECT_FALSE(StealthTRRApplyContext("^userContextId=7"_ns, channel, &rv));
+  EXPECT_EQ(rv, NS_OK);
+  nsCOMPtr<nsILoadInfo> loadInfo = channel->LoadInfo();
+  EXPECT_EQ(loadInfo->GetOriginAttributes().mUserContextId, 7u);
+}
+
+TEST(TestStealthTRRContext, TheRequestOfTheDefaultContextLeavesItsChannelAsItIs)
+{
+  nsCOMPtr<nsIChannel> channel = NewDoHChannel();
+  ASSERT_TRUE(channel);
+  nsresult rv = NS_ERROR_FAILURE;
+  EXPECT_FALSE(StealthTRRApplyContext(""_ns, channel, &rv));
+  EXPECT_EQ(rv, NS_OK);
+  nsCOMPtr<nsILoadInfo> loadInfo = channel->LoadInfo();
+  EXPECT_EQ(loadInfo->GetOriginAttributes().mUserContextId, 0u);
+}
+
+TEST(TestStealthTRRContext, AChannelThatCannotTakeTheContextEndsTheRequest)
+{
+  nsresult rv = NS_OK;
+  EXPECT_TRUE(StealthTRRApplyContext("^userContextId=7"_ns, nullptr, &rv));
+  EXPECT_EQ(rv, NS_ERROR_UNEXPECTED);
+  rv = NS_ERROR_FAILURE;
+  EXPECT_FALSE(StealthTRRApplyContext(""_ns, nullptr, &rv));
+  EXPECT_EQ(rv, NS_OK);
+}
+
+// TRR::SendHTTPRequest: the cached connection info is of the default context and the browser's proxy, so it serves a lookup
+// of the default context only, and only behind the pref.
+TEST(TestStealthTRRContext, TheCachedConnectionInfoServesOnlyTheDefaultContextBehindThePref)
+{
+  EXPECT_TRUE(StealthTRRConnInfoUsable(""_ns, true));
+  EXPECT_FALSE(StealthTRRConnInfoUsable("^userContextId=7"_ns, true));
+  EXPECT_FALSE(StealthTRRConnInfoUsable(""_ns, false));
+  EXPECT_FALSE(StealthTRRConnInfoUsable("^userContextId=7"_ns, false));
+}
+
+// TRRServiceChannel::BeginConnect: the connection info of a DoH channel carries the context of its load info, so the tunnel
+// is not shared between contexts; the default context gets the attributes Mozilla's code passes.
+TEST(TestStealthTRRContext, TheConnectionInfoOfAChannelCarriesTheContextOfItsLoadInfo)
+{
+  nsCOMPtr<nsIChannel> channel = NewDoHChannel();
+  ASSERT_TRUE(channel);
+  EXPECT_TRUE(StealthTRRConnectionAttributes(channel, OriginAttributes()) == OriginAttributes());
+  ASSERT_EQ(StealthApplyTRRContextToChannel(channel, ContextOf(7)), NS_OK);
+  EXPECT_EQ(StealthTRRConnectionAttributes(channel, OriginAttributes()).mUserContextId, 7u);
+
+  // The default context keeps what Mozilla passes.
+  OriginAttributes upstream;
+  upstream.mPrivateBrowsingId = 1;
+  nsCOMPtr<nsIChannel> plain = NewDoHChannel();
+  ASSERT_TRUE(plain);
+  EXPECT_TRUE(StealthTRRConnectionAttributes(plain, upstream) == upstream);
+}
+
+// TLSTransportLayer::Init: the TLS over a tunnel takes the context of the transport it runs over; with no transport, or one
+// with no context, the attributes Mozilla's code passes.
+TEST(TestStealthTRRContext, ATlsOverATunnelTakesTheContextOfItsTransport)
+{
+  nsCOMPtr<nsISocketTransportService> service =
+      do_GetService("@mozilla.org/network/socket-transport-service;1");
+  ASSERT_TRUE(service);
+  nsCOMPtr<nsISocketTransport> transport;
+  ASSERT_EQ(service->CreateTransport(nsTArray<nsCString>(), "a.test"_ns, 443,
+                                     nullptr, nullptr,
+                                     getter_AddRefs(transport)),
+            NS_OK);
+  EXPECT_TRUE(StealthTransportContext(transport, OriginAttributes()) == OriginAttributes());
+  OriginAttributes attrs;
+  attrs.mUserContextId = 7;
+  ASSERT_EQ(transport->SetOriginAttributes(attrs), NS_OK);
+  EXPECT_EQ(StealthTransportContext(transport, OriginAttributes()).mUserContextId, 7u);
+
+  OriginAttributes upstream;
+  upstream.mPrivateBrowsingId = 1;
+  EXPECT_TRUE(StealthTransportContext(nullptr, upstream) == upstream);
+}
+
+// TRRServiceChannel::ResolveProxy passes itself: the context a channel gives its proxy lookup is the one of its load info,
+// Nothing for the default context.
+TEST(TestStealthTRRContext, TheContextOfAChannelIsTheContextOfItsLoadInfo)
+{
+  nsCOMPtr<nsIChannel> channel = NewDoHChannel();
+  ASSERT_TRUE(channel);
+  EXPECT_TRUE(StealthTRRContextOf(channel).isNothing());
+  ASSERT_EQ(StealthApplyTRRContextToChannel(channel, ContextOf(7)), NS_OK);
+  Maybe<OriginAttributes> context = StealthTRRContextOf(channel);
+  ASSERT_TRUE(context.isSome());
+  EXPECT_EQ(context->mUserContextId, 7u);
 }
 
 }  // namespace mozilla::net

@@ -1,24 +1,21 @@
 diff --git a/security/manager/ssl/nsCertOverrideService.cpp b/security/manager/ssl/nsCertOverrideService.cpp
-index 30ca5460270a85687a4ebdd1188719b5c64ac47b..97316a2f6952cc9606338160c178e23966341b58 100644
+index 30ca5460270a85687a4ebdd1188719b5c64ac47b..8a8e0a73cbab60040aac844c4419de80df190d7e 100644
 --- a/security/manager/ssl/nsCertOverrideService.cpp
 +++ b/security/manager/ssl/nsCertOverrideService.cpp
-@@ -24,6 +24,8 @@
- #include "nsIOutputStream.h"
- #ifdef ENABLE_WEBDRIVER
- #  include "nsIRemoteAgent.h"
-+// STEALTH-HOOK(automation/ignore-https-errors)
-+#  include "StealthJugglerGate.h"
- #endif
- #include "SSLTokensCache.h"
- #include "nsISafeOutputStream.h"
-@@ -617,6 +619,10 @@ void nsCertOverrideService::CountPermanentOverrideTelemetry(
+@@ -34,6 +34,8 @@
+ #include "nsThreadUtils.h"
+ #include "prenv.h"
+ 
++#include "StealthIgnoreHTTPSErrors.h"  // STEALTH-HOOK(automation/ignore-https-errors)
++
+ using namespace mozilla;
+ using namespace mozilla::psm;
+ 
+@@ -617,6 +619,7 @@ void nsCertOverrideService::CountPermanentOverrideTelemetry(
  
  static bool IsDebugger() {
  #ifdef ENABLE_WEBDRIVER
-+  // STEALTH-HOOK(automation/ignore-https-errors)
-+  if (StealthJugglerPipeConnected()) {
-+    return true;
-+  }
++  if (StealthJugglerPipeConnected()) return true;  // STEALTH-HOOK(automation/ignore-https-errors)
    nsCOMPtr<nsIMarionette> marionette = do_GetService(NS_MARIONETTE_CONTRACTID);
    if (marionette) {
      bool marionetteRunning = false;

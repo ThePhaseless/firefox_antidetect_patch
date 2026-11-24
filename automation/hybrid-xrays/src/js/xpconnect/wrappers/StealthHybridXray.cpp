@@ -648,12 +648,12 @@ const js::Wrapper* StealthHybridWrapper(XrayType xrayType) {
   return &js::CrossCompartmentWrapper::singleton;
 }
 
-StealthXrayFlags StealthComputeXrayFlags(JS::Realm* origin, JS::Realm* target) {
-  CompartmentPrivate* originPrivate = CompartmentPrivate::Get(origin);
-  CompartmentPrivate* targetPrivate = CompartmentPrivate::Get(target);
-  bool targetHybrid = targetPrivate->hybridXrays;
-  return {targetHybrid, originPrivate->wantXrays,
-          targetPrivate->wantXrays || targetHybrid};
+bool StealthTargetWantsXrays(JSContext* aCx, bool aWantXrays) {
+  return aWantXrays || StealthTargetIsHybrid(aCx);
+}
+
+bool StealthTargetIsHybrid(JSContext* aCx) {
+  return CompartmentPrivate::Get(js::GetContextRealm(aCx))->hybridXrays;
 }
 
 bool StealthCallerObjectApplies(JS::Realm* origin, JS::Realm* target,
@@ -661,8 +661,7 @@ bool StealthCallerObjectApplies(JS::Realm* origin, JS::Realm* target,
                                 bool targetSubsumesOrigin) {
   CompartmentPrivate* originPrivate = CompartmentPrivate::Get(origin);
   CompartmentPrivate* targetPrivate = CompartmentPrivate::Get(target);
-  // The same five terms as the branch had inline; "the target forces Xrays"
-  // is wantXrays || hybridXrays.
+  // "The target forces Xrays" is wantXrays || hybridXrays.
   return originPrivate->hybridXrays && !targetPrivate->hybridXrays &&
          !targetIsChrome && targetSubsumesOrigin && !targetPrivate->wantXrays;
 }

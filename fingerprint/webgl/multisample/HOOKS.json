@@ -1,0 +1,54 @@
+[
+ {
+  "file": "gfx/gl/GLContext.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthGLMultisample.h\"  // STEALTH-HOOK(fingerprint/webgl/multisample)",
+  "test": "gtest:StealthGLMultisample.BasicRenderDriverBlendsIntoAMultisampledTarget"
+ },
+ {
+  "file": "gfx/gl/GLContext.cpp",
+  "function": "bool GLContext::InitImpl() {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  StealthNoteReportedMultisample(this, mStealthReportedMultisample);  // STEALTH-HOOK(fingerprint/webgl/multisample)",
+  "test": "gtest:StealthGLMultisample.BasicRenderDriverBlendsIntoAMultisampledTarget",
+  "anchor": "InitFeatures();",
+  "why": "the hook needs the feature as the driver reports it, which InitFeatures() has just computed and the workarounds below may clear; no guard or wrap at the head of the function or around an expression can see that value. The pm ruled (PM-DECISIONS, 13 small folders) the fused wrap does not keep the four extension bits of MarkUnsupported, so both hooks stay anchors"
+ },
+ {
+  "file": "gfx/gl/GLContext.cpp",
+  "function": "bool GLContext::InitImpl() {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  StealthRestoreMultisample(mAvailableFeatures, mStealthReportedMultisample);  // STEALTH-HOOK(fingerprint/webgl/multisample)",
+  "test": "gtest:StealthGLMultisample.BasicRenderDriverBlendsIntoAMultisampledTarget",
+  "anchor": "if (WorkAroundDriverBugs()) { ... } (the driver-workaround block)",
+  "why": "the feature is put back after Mozilla's last workaround ran, as the last statement before the block's value is read (G30: right after the block statement); the extension bits cleared by MarkUnsupported stay cleared, so the effect is bit for bit the old one"
+ },
+ {
+  "file": "gfx/gl/GLContext.h",
+  "function": "class GLContext : public GenericAtomicRefCounted, public SupportsWeakPtr {",
+  "kind": "add",
+  "form": "member",
+  "line": "  bool mStealthReportedMultisample = false;  // STEALTH-HOOK(fingerprint/webgl/multisample)",
+  "test": "gtest:StealthGLMultisample.BasicRenderDriverBlendsIntoAMultisampledTarget"
+ },
+ {
+  "file": "gfx/gl/gtest/moz.build",
+  "function": "include(\"/ipc/chromium/chromium-config.mozbuild\")",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"TestStealthGLMultisample.cpp\"]  # STEALTH-HOOK(fingerprint/webgl/multisample)",
+  "test": "gtest:StealthGLMultisample.BasicRenderDriverBlendsIntoAMultisampledTarget"
+ },
+ {
+  "file": "gfx/gl/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"StealthGLMultisample.cpp\"]  # STEALTH-HOOK(fingerprint/webgl/multisample)",
+  "test": "gtest:StealthGLMultisample.BasicRenderDriverBlendsIntoAMultisampledTarget"
+ }
+]

@@ -18,9 +18,13 @@
 
 #include "StealthBundleFontList.h"
 #include "StealthFcFontList.h"
+#include "StealthFontListHooks.h"
+#include "TestStealthBundleHooks.h"
+#include "TestStealthFontListHooks.h"
 #include "gfxPlatform.h"
 #include "gfxPlatformFontList.h"
 #include "mozilla/Preferences.h"
+#include "nsIMemoryReporter.h"
 #include "nsString.h"
 #include "nsTArray.h"
 #include "nsXULAppAPI.h"
@@ -188,6 +192,23 @@ TEST(StealthFcFontList, TextOptions)
 TEST(StealthFcFontList, TableFaceIndex)
 {
   EXPECT_EQ(0u, StealthTableFaceIndex(nullptr));
+}
+
+// AddPatternToFontList and InitFontListForPlatform.
+TEST(StealthFcFontList, PatternWithoutFamily)
+{
+  RefPtr<gfxFontconfigFontFamily> none;
+  EXPECT_TRUE(StealthDropPatternWithoutFamily(none));
+  RefPtr<gfxFontconfigFontFamily> family =
+      new gfxFontconfigFontFamily("family"_ns, FontVisibility::Base);
+  EXPECT_FALSE(StealthDropPatternWithoutFamily(family));
+}
+
+TEST(StealthFcFontList, SkipsSystemFontSet)
+{
+  EXPECT_TRUE(StealthSkipsSystemFontSetCore(true));
+  // Negative control: stock Firefox enumerates the system font set.
+  EXPECT_FALSE(StealthSkipsSystemFontSetCore(false));
 }
 
 TEST(StealthFcFontList, PreferFileUnscaledFont)
@@ -397,4 +418,115 @@ TEST_F(StealthFcBundleFonts, EachFaceOfACollectionIsMadeWithItsOwnIndex)
   EXPECT_EQ(0u, wrong) << wrong << " of " << collectionFaces
                        << " faces of collections were not made as asked:"
                        << report.get();
+}
+
+// The hooks of the font list that read the manifest (the Linux gtest run has the
+// bundle, as the two tests above need it).
+TEST_F(StealthFcBundleFonts, FacesForFamilyComeFromTheManifestOnlyUnderBundleOnly)
+{
+  StealthBundleFontList* bundle = StealthBundleFontList::Get();
+  ASSERT_FALSE(bundle->Families().IsEmpty());
+  const auto& family = bundle->Families()[0];
+  // Negative control: stock Firefox asks the platform, so the hook appends
+  // nothing.
+  nsTArray<mozilla::fontlist::Face::InitData> none;
+  EXPECT_FALSE(StealthFacesForFamilyCore(false, family.mName, none));
+  EXPECT_TRUE(none.IsEmpty());
+  nsTArray<mozilla::fontlist::Face::InitData> faces;
+  EXPECT_TRUE(StealthFacesForFamilyCore(true, family.mName, faces));
+  EXPECT_FALSE(faces.IsEmpty());
+}
+
+TEST_F(StealthFcBundleFonts, CommonFallbackIsTheManifestListUnderBundleOnly)
+{
+  StealthBundleFontList* bundle = StealthBundleFontList::Get();
+  nsTArray<const char*> expected;
+  ASSERT_TRUE(bundle->GetCommonFallback(int16_t(mozilla::intl::Script::LATIN),
+                                        false, false, expected));
+  ASSERT_FALSE(expected.IsEmpty());
+  nsTArray<const char*> list;
+  list.AppendElement("Platform");
+  StealthReplaceCommonFallbackFontsCore(
+      true, 'a', mozilla::intl::Script::LATIN, FontPresentation::Any, list);
+  ASSERT_EQ(expected.Length(), list.Length());
+  for (size_t i = 0; i < expected.Length(); ++i) {
+    EXPECT_STREQ(expected[i], list[i]);
+  }
+}
+
+namespace {
+
+class StealthCountingReport final : public nsIHandleReportCallback {
+ public:
+  NS_DECL_ISUPPORTS
+
+  explicit StealthCountingReport(nsTArray<nsCString>& aPaths)
+      : mPaths(aPaths) {}
+
+  NS_IMETHOD Callback(const nsACString& aProcess, const nsACString& aPath,
+                      int32_t aKind, int32_t aUnits, int64_t aAmount,
+                      const nsACString& aDescription,
+                      nsISupports* aData) override {
+    mPaths.AppendElement(nsCString(aPath));
+    return NS_OK;
+  }
+
+ private:
+  ~StealthCountingReport() = default;
+  nsTArray<nsCString>& mPaths;
+};
+
+NS_IMPL_ISUPPORTS(StealthCountingReport, nsIHandleReportCallback)
+
+}  // namespace
+
+// about:memory: the bundled font files are reported (the heap entry always; the
+// mapped one only when a file is mapped), and nothing else is.
+TEST_F(StealthFcBundleFonts, ReportBundleFiles)
+{
+  nsTArray<nsCString> paths;
+  RefPtr<StealthCountingReport> report = new StealthCountingReport(paths);
+  StealthReportBundleFiles(report, nullptr);
+  ASSERT_FALSE(paths.IsEmpty());
+  EXPECT_TRUE(paths[0].EqualsLiteral("explicit/gfx/font-bundle-files"));
+  for (const auto& path : paths) {
+    EXPECT_TRUE(path.EqualsLiteral("explicit/gfx/font-bundle-files") ||
+                path.EqualsLiteral("font-bundle-files-mapped"))
+        << path.get();
+  }
+}
+
+// HasFontTableInternal and GetFontTableInternal: the guard answers only for a
+// face made from data, at a face index above 0 (StealthTtcFace.* in
+// TestStealthBundledCollection.cpp covers the table lookup of a face of a
+// collection). A face made from a FILE has no font data: the guard says no and
+// Mozilla's own lines run.
+TEST_F(StealthFcBundleFonts, FaceDataTableFallsThroughForAFaceWithAFile)
+{
+  nsCString unresolved;
+  nsTArray<BundleFace> faces = BundleFaces(unresolved);
+  ASSERT_FALSE(faces.IsEmpty());
+  ScopedFcPattern p;
+  FcPatternAddString(p.mPattern, FC_FILE,
+                     reinterpret_cast<const FcChar8*>(faces[0].mPath.get()));
+  FcPatternAddInteger(p.mPattern, FC_INDEX, int(faces[0].mIndex));
+  RefPtr<gfxFontconfigFontEntry> entry =
+      new gfxFontconfigFontEntry("file"_ns, p.mPattern);
+  bool has = true;
+  EXPECT_FALSE(StealthFaceDataHasTable(entry, 0x636d6170 /* cmap */, &has));
+  EXPECT_TRUE(has);  // untouched: the guard did not answer
+  hb_blob_t* blob = nullptr;
+  EXPECT_FALSE(StealthFaceDataTable(entry, 0x636d6170, &blob));
+  EXPECT_EQ(nullptr, blob);
+}
+
+// gfxTextRun.cpp: gfxFontGroup::FindFallbackFaceForChar asks the same predicate
+// as GlobalFontFallback; with the font list built (bundle-only) it never
+// defers, whatever the async pref says. The negative control is the
+// aBundleOnly = false row of StealthFontListHooks.MayDeferCmapLoading.
+TEST_F(StealthFcBundleFonts, FallbackNeverDefersUnderBundleOnly)
+{
+  ASSERT_TRUE(gfxPlatformFontList::PlatformFontList()->StealthBundleOnly());
+  EXPECT_FALSE(StealthFallbackMayDefer(true));
+  EXPECT_FALSE(StealthFallbackMayDefer(false));
 }

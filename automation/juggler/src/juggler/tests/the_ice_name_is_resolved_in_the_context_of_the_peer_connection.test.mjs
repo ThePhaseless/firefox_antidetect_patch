@@ -38,28 +38,40 @@ const TCP = T + 'ipc/WebrtcTCPSocket.cpp';
 
 test('the resolver looks the name up with the attributes it was given, never with a bare default', () => {
   const text = read(T + 'nriceresolver.cpp');
-  assert.doesNotMatch(text, /\n\s*OriginAttributes attrs;\n/);
-  assert.match(text, /\n\s*OriginAttributes attrs = mAttrs;  \/\/ STEALTH-HOOK\(network\/doh\)\n/);
+  // Mozilla's declaration and its argument stay; one line of ours fills the attributes right after the declaration.
+  assert.match(text, /\n\s*OriginAttributes attrs;\n  StealthIceResolverLookupAttributes\(this, &attrs\);  \/\/ STEALTH-HOOK\(network\/doh\)\n/);
   assert.match(text, /sts_thread_, attrs, getter_AddRefs\(pr->request_\)/);
   assert.equal(text.match(/AsyncResolveNative/g).length, 1, 'one lookup path in the class');
+  const code = read(T + 'StealthIceResolverContext.cpp');
+  assert.match(code, /void StealthIceResolverLookupAttributes\(const NrIceResolver\* aResolver,\s+OriginAttributes\* aAttrs\) \{\n  if \(aResolver\) \{\n    \*aAttrs = aResolver->GetOriginAttributes\(\);\n  \}\n\}/);
 });
 
 test('the resolver holds the attributes and gives them back', () => {
   const text = read(T + 'nriceresolver.h');
   assert.match(text, /#include "StealthIceResolverContext\.h"  \/\/ STEALTH-HOOK\(network\/doh\)/);
-  assert.match(text, /void SetOriginAttributes\(const OriginAttributes& aAttrs\) \{ mAttrs = aAttrs; \}  \/\/ STEALTH-HOOK\(network\/doh\)/);
-  assert.match(text, /const OriginAttributes& GetOriginAttributes\(\) const \{ return mAttrs; \}  \/\/ STEALTH-HOOK\(network\/doh\)/);
-  assert.match(text, /OriginAttributes mAttrs;  \/\/ STEALTH-HOOK\(network\/doh\)/);
+  assert.match(text, /void SetOriginAttributes\(const OriginAttributes& aAttrs\);  \/\/ STEALTH-HOOK\(network\/doh\)/);
+  assert.match(text, /const OriginAttributes& GetOriginAttributes\(\) const;  \/\/ STEALTH-HOOK\(network\/doh\)/);
+  assert.match(text, /nr_resolver_vtbl\* vtbl_;\n  OriginAttributes mAttrs;  \/\/ STEALTH-HOOK\(network\/doh\)/);
+  // The class of Mozilla holds no body of ours: the two methods are defined in our file.
+  assert.doesNotMatch(text, /\{ mAttrs = aAttrs; \}|\{ return mAttrs; \}/);
+  const code = read(T + 'StealthIceResolverContext.cpp');
+  assert.match(code, /void NrIceResolver::SetOriginAttributes\(const OriginAttributes& aAttrs\) \{\n  mAttrs = aAttrs;\n\}/);
+  assert.match(code, /const OriginAttributes& NrIceResolver::GetOriginAttributes\(\) const \{\n  return mAttrs;\n\}/);
 });
 
 test('SetProxyConfig gives the resolver the attributes of the PeerConnection before the config is moved away', () => {
   const text = read('dom/media/webrtc/jsapi/MediaTransportHandler.cpp');
-  assert.match(text, /#include "transport\/StealthIceResolverContext\.h"  \/\/ STEALTH-HOOK\(network\/doh\)/);
+  assert.match(text, /\n#include "transport\/runnable_utils\.h"\n\n#include "transport\/StealthIceResolverContext\.h"  \/\/ STEALTH-HOOK\(network\/doh\)\n\n/);
   const body = text.match(/void MediaTransportImplNicer::SetProxyConfig\([\s\S]*?\n}\n/)[0];
-  const set = body.indexOf('StealthIceResolverAttributes(aProxyConfig)');
+  const set = body.indexOf('StealthIceResolverSetContext(mDNSResolver, aProxyConfig);  // STEALTH-HOOK(network/doh)');
   assert.ok(set > 0, 'the resolver is not given the attributes');
-  assert.match(body, /mDNSResolver->SetOriginAttributes\(StealthIceResolverAttributes\(aProxyConfig\)\);  \/\/ STEALTH-HOOK\(network\/doh\)/);
+  assert.ok(set > body.indexOf('if (!mIceCtx) {'), 'the call runs on the closing road, before Mozilla\'s check of the ICE context');
   assert.ok(set < body.indexOf('std::move(aProxyConfig)'), 'the config is read after it was moved');
+  // The only entry that gives the resolver of a PeerConnection its attributes.
+  assert.equal(text.match(/SetOriginAttributes\(/g), null, 'a resolver given its attributes outside our function');
+  const code = read(T + 'StealthIceResolverContext.cpp');
+  assert.match(code, /void StealthIceResolverSetContext\(const RefPtr<NrIceResolver>& aResolver,\s+const NrSocketProxyConfig& aConfig\) \{\n  StealthIceResolverSetContext\(\s+aResolver, aConfig\.GetConfig\(\)\.loadInfoArgs\(\)\.originAttributes\(\)\);\n\}/);
+  assert.match(code, /if \(aResolver\) \{\n    aResolver->SetOriginAttributes\(\s+StealthIceResolverAttributes\(aPeerConnection\)\);\n  \}/);
 });
 
 test('our function reads the attributes of the load info of the config and keeps the user context alone', () => {
@@ -74,18 +86,22 @@ test('our function reads the attributes of the load info of the config and keeps
 test('a TURN server given by name over TCP is resolved in the context of the PeerConnection: no query reaches the system resolver', () => {
   const text = read(TCP);
   const body = text.match(/void WebrtcTCPSocket::OpenWithoutHttpProxy\([\s\S]*?\n}\n/)[0];
-  // One call gives the transport its context and the family of its bind address (StealthTcpSocketBorn): the hook of the
-  // context and the hook of the bind address of this function are one line, so the file keeps its number of lines.
-  const hook = '\n  if (NS_WARN_IF(!mozilla::StealthTcpSocketBorn(mTransport, mProxyConfig.ptrOr(nullptr), mLocalAddress.get(), mLocalPort, &prAddr))) {  // STEALTH-HOOK(fingerprint/webrtc/declared-network)\n';
+  // One call gives the transport its context and the family of its bind address (StealthTcpSocketBorn), after Mozilla parsed the
+  // local address and before the bind: the transport refuses its attributes once its socket exists.
+  const hook = '\n  StealthTcpSocketBorn(this, &prAddr);  // STEALTH-HOOK(fingerprint/webrtc/declared-network)\n';
   assert.ok(body.includes(hook), 'the transport of the TCP socket is not given the attributes of the PeerConnection');
-  assert.equal(text.match(/StealthTcpSocketBorn\(/g).length, 1);
-  assert.doesNotMatch(text, /StealthTcpNameContext\(/, 'the context has its own line again: the merge is undone');
+  assert.equal(text.match(/StealthTcpSocketBorn\(/g).length, 1, 'the only entry of the context is this call');
+  assert.doesNotMatch(text, /StealthTcpNameContext\(/, 'the context has its own line again');
   const at = body.indexOf(hook);
   const created = body.indexOf('sts->CreateTransport(');
   assert.ok(created > 0 && created < at, 'the attributes are set on a transport that does not exist yet');
+  assert.ok(body.indexOf('PR_StringToNetAddr(mLocalAddress.get(), &prAddr)') < at, 'the address is parsed by Mozilla first');
   assert.ok(at < body.indexOf('mTransport->Bind('), 'the transport refuses its attributes once it is bound');
   assert.ok(at < body.indexOf('OpenInputStream('), 'the lookup starts when the streams open');
   assert.ok(body.indexOf('CloseWithReason(rv);', created) < at, 'a transport that was not created is not used');
+  // Our access: the transport and the config of the socket, handed to the one function that sets the attributes.
+  const access = read(T + 'ipc/StealthWebrtcTcpSocket.h');
+  assert.match(access, /mozilla::StealthTcpSocketBorn\(aSocket->mTransport, aSocket->mProxyConfig\.ptrOr\(nullptr\),\n\s+aSocket->mLocalAddress\.get\(\), aSocket->mLocalPort, aAddr\);/);
   // The function itself: the attributes the resolver of the UDP names uses, taken from the load info of the config.
   const own = read(T + 'StealthIceResolverContext.cpp');
   const fn = own.match(/void StealthTcpNameContext\([\s\S]*?\n}\n/)[0];
@@ -104,10 +120,11 @@ test('a TURN name over TCP does not go through NrIceResolver in the process that
   assert.equal(read(TCP).match(/CreateTransport\(/g).length, 1, 'a second transport of the TCP socket would need the same attributes');
 });
 
-test('the function is declared in a header the TCP socket already includes, so its file gains one line and no include', () => {
+test('the functions are declared in the header our file of the TCP socket includes, so Mozilla\'s file has one include of ours', () => {
   assert.match(read(T + 'nr_stealth_network.h'), /\nvoid StealthTcpNameContext\(nsISocketTransport\* aTransport, const net::WebrtcProxyConfig\* aConfig\);\n/);
+  assert.match(read(T + 'ipc/StealthWebrtcTcpSocket.h'), /#include "transport\/nr_stealth_network\.h"/);
   const text = read(TCP);
-  assert.match(text, /\n#include "transport\/nr_stealth_network\.h"/);
+  assert.match(text, /\n#include "StealthWebrtcTcpSocket\.h"  \/\/ STEALTH-HOOK\(network\/proxy-udp\)\n/);
   assert.doesNotMatch(text, /StealthIceResolverContext\.h/);
   assert.doesNotMatch(read(T + 'build/moz.build'), /StealthIceResolverContext/);
 });

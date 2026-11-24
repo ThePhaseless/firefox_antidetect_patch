@@ -161,6 +161,20 @@ inline auto StealthSetInputEventBirth(WidgetEventTime& aEvent,
 }
 
 /**
+ * Stealthfox [B299] [B301]: the hook of nsContentUtils::SynthesizeMouseEvent.
+ * Reads the latency the caller declared (aData.mLatency, a member of the
+ * dictionary of the call) and stamps the mouse or pointer event that is about
+ * to be dispatched, for the page of aSource (the PresShell at hand). A
+ * template on both, so the hook in Mozilla's file stays one line and passes the
+ * parameters it has; the field is read here.
+ */
+template <class Data, class Source>
+inline void StealthSetMouseEventBirth(WidgetEventTime& aEvent,
+                                      const Data& aData, Source* aSource) {
+  StealthSetInputEventBirth(aEvent, aData.mLatency, aSource);
+}
+
+/**
  * Stealthfox [B299]: the birth of a key event the caller sent with a latency,
  * for nsITextInputProcessor (chrome only; nothing is added to the web-exposed
  * KeyboardEventInit). A null stamp when no latency was declared (0, less, NaN
@@ -177,10 +191,13 @@ inline TimeStamp StealthInputEventBirthOrNull(double aLatencyMs,
 /**
  * Stealthfox [B299]: the birth of the key that nsITextInputProcessor is
  * delivering. The caller declares the latency of the NEXT key with
- * setNextKeyLatency() (stored in the processor, mStealthNextKeyLatencyMs);
- * keydown(), keyup() and commitCompositionWith() each open this scope, which
- * takes the declared latency (one use: it is cleared) and holds the birth for
- * the duration of the call. KeydownInternal() and KeyupInternal() stamp their
+ * setNextKeyLatency() (stored in the processor, mStealthKeyBirth);
+ * keydown(), keyup() and commitCompositionWith() each open this scope as the
+ * first statement of the method, passing the field; it takes the declared
+ * latency (one use: it is cleared) and holds the birth for the duration of the
+ * call. Only two release assertions of Mozilla (the argument pointer and
+ * IsCallerChrome) come after the scope's opening; they read nothing of it and
+ * end the process when they fail. KeydownInternal() and KeyupInternal() stamp their
  * copy of the key event through Stamp(); TextEventDispatcher copies the stamp
  * with AssignKeyEventData, and the keypress events are copies of the keydown,
  * so every key event of the call carries the birth. With no latency declared the
@@ -240,8 +257,10 @@ inline nsresult StealthSetNextKeyLatency(Birth& aField, double aLatencyMs,
 
 /**
  * Stealthfox [B299]: what setNextKeyLatency() declares for the next key. The
- * processor's header (a Mozilla file with a budget of one line) holds a struct
- * of this shape, declared where its member is, without an include.
+ * processor's header (a Mozilla file with a budget of one line) holds an
+ * anonymous struct of this shape as its member mStealthKeyBirth, declared
+ * where the member is, without an include. A gtest holds the two to the same
+ * shape (StealthKeyBirthScope.TheMemberOfTheProcessorHasTheShapeOfTheDeclaration).
  */
 struct StealthKeyBirth {
   double mLatencyMs = 0;

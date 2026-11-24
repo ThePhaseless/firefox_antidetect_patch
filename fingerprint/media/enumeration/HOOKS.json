@@ -1,0 +1,187 @@
+[
+ {
+  "file": "dom/media/MediaManager.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthMediaEnumeration.h\"  // STEALTH-HOOK(fingerprint/media/enumeration)",
+  "test": "wrapper:tests/test_the_device_enumeration_takes_the_declared_time_e2e.py::test_the_engine_waits_the_declared_time_and_never_asks_the_host"
+ },
+ {
+  "file": "dom/media/MediaManager.cpp",
+  "function": "bool MediaManager::EnumerationParams::RealDeviceRequested() const {",
+  "kind": "rewrite",
+  "form": "wrap-expression",
+  "line": "         StealthHostSpeakersRequested(mFlags.contains(EnumerationFlag::EnumerateAudioOutputs));  // STEALTH-HOOK(fingerprint/media/enumeration)",
+  "removed": "         mFlags.contains(EnumerationFlag::EnumerateAudioOutputs);",
+  "test": "wrapper:tests/test_the_device_enumeration_takes_the_declared_time_e2e.py::test_the_engine_waits_the_declared_time_and_never_asks_the_host"
+ },
+ {
+  "file": "dom/media/MediaManager.cpp",
+  "function": "MediaManager::MaybeRequestPermissionAndEnumerateRawDevices(",
+  "kind": "rewrite",
+  "form": "wrap-expression",
+  "line": "      StealthHostSpeakersRequested(aParams.mFlags.contains(EnumerationFlag::EnumerateAudioOutputs));  // STEALTH-HOOK(fingerprint/media/enumeration)",
+  "removed": "      aParams.mFlags.contains(EnumerationFlag::EnumerateAudioOutputs);",
+  "test": "wrapper:tests/test_the_device_enumeration_takes_the_declared_time_e2e.py::test_the_engine_waits_the_declared_time_and_never_asks_the_host"
+ },
+ {
+  "file": "dom/media/MediaManager.cpp",
+  "function": "MediaManager::EnumerateRawDevices(EnumerationParams aParams) {",
+  "kind": "rewrite",
+  "form": "wrap-expression",
+  "line": "  if (StealthHostSpeakersRequested(aParams.mFlags.contains(EnumerationFlag::EnumerateAudioOutputs))) {  // STEALTH-HOOK(fingerprint/media/enumeration)",
+  "removed": "  if (aParams.mFlags.contains(EnumerationFlag::EnumerateAudioOutputs)) {",
+  "test": "wrapper:tests/test_the_device_enumeration_takes_the_declared_time_e2e.py::test_the_engine_waits_the_declared_time_and_never_asks_the_host"
+ },
+ {
+  "file": "dom/media/MediaManager.cpp",
+  "function": "MediaManager::EnumerateRawDevices(EnumerationParams aParams) {",
+  "kind": "rewrite",
+  "form": "wrap-expression",
+  "line": "    if (StealthHostSpeakersForCorrelation(videoBackend == realBackend)) {  // STEALTH-HOOK(fingerprint/media/enumeration)",
+  "removed": "    if (videoBackend == realBackend) {",
+  "test": "wrapper:tests/test_the_device_enumeration_takes_the_declared_time_e2e.py::test_the_camera_only_enumeration_never_asks_the_host_speakers"
+ },
+ {
+  "file": "dom/media/MediaManager.cpp",
+  "function": "RefPtr<ConstDeviceSetPromise> MediaManager::GetPhysicalDevices() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "            auto resolve = [self, this, promises,",
+  "removed": "            for (auto& promiseHolder : *promises) {\n              promiseHolder.Resolve(aDevices, __func__);\n            }\n            // mPendingDevicesPromises may have changed if devices have changed.\n            if (promises == mPendingDevicesPromises) {\n              mPendingDevicesPromises = nullptr;\n              mPhysicalDevices = std::move(aDevices);\n            }",
+  "test": "wrapper:tests/test_the_device_enumeration_takes_the_declared_time_e2e.py::test_the_first_enumeration_takes_the_declared_time",
+  "exception": "the resolve step of GetPhysicalDevices is wrapped in a lambda handed to our function; the delay through the Then target would read the pref one event-loop hop earlier and delay the reject lambda (G28(a) not provable)",
+  "pm": "approvato"
+ },
+ {
+  "file": "dom/media/MediaManager.cpp",
+  "function": "RefPtr<ConstDeviceSetPromise> MediaManager::GetPhysicalDevices() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "                            aDevices = std::move(aDevices)]() mutable {",
+  "test": "wrapper:tests/test_the_device_enumeration_takes_the_declared_time_e2e.py::test_the_first_enumeration_takes_the_declared_time",
+  "exception": "the resolve step of GetPhysicalDevices is wrapped in a lambda handed to our function; the delay through the Then target would read the pref one event-loop hop earlier and delay the reject lambda (G28(a) not provable)",
+  "pm": "approvato"
+ },
+ {
+  "file": "dom/media/MediaManager.cpp",
+  "function": "RefPtr<ConstDeviceSetPromise> MediaManager::GetPhysicalDevices() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "              for (auto& promiseHolder : *promises) {",
+  "test": "wrapper:tests/test_the_device_enumeration_takes_the_declared_time_e2e.py::test_the_first_enumeration_takes_the_declared_time",
+  "exception": "the resolve step of GetPhysicalDevices is wrapped in a lambda handed to our function; the delay through the Then target would read the pref one event-loop hop earlier and delay the reject lambda (G28(a) not provable)",
+  "pm": "approvato"
+ },
+ {
+  "file": "dom/media/MediaManager.cpp",
+  "function": "RefPtr<ConstDeviceSetPromise> MediaManager::GetPhysicalDevices() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "                promiseHolder.Resolve(aDevices, __func__);",
+  "test": "wrapper:tests/test_the_device_enumeration_takes_the_declared_time_e2e.py::test_the_first_enumeration_takes_the_declared_time",
+  "exception": "the resolve step of GetPhysicalDevices is wrapped in a lambda handed to our function; the delay through the Then target would read the pref one event-loop hop earlier and delay the reject lambda (G28(a) not provable)",
+  "pm": "approvato"
+ },
+ {
+  "file": "dom/media/MediaManager.cpp",
+  "function": "RefPtr<ConstDeviceSetPromise> MediaManager::GetPhysicalDevices() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "              }",
+  "test": "wrapper:tests/test_the_device_enumeration_takes_the_declared_time_e2e.py::test_the_first_enumeration_takes_the_declared_time",
+  "exception": "the resolve step of GetPhysicalDevices is wrapped in a lambda handed to our function; the delay through the Then target would read the pref one event-loop hop earlier and delay the reject lambda (G28(a) not provable)",
+  "pm": "approvato"
+ },
+ {
+  "file": "dom/media/MediaManager.cpp",
+  "function": "RefPtr<ConstDeviceSetPromise> MediaManager::GetPhysicalDevices() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "              // mPendingDevicesPromises may have changed if devices have",
+  "test": "wrapper:tests/test_the_device_enumeration_takes_the_declared_time_e2e.py::test_the_first_enumeration_takes_the_declared_time",
+  "exception": "the resolve step of GetPhysicalDevices is wrapped in a lambda handed to our function; the delay through the Then target would read the pref one event-loop hop earlier and delay the reject lambda (G28(a) not provable)",
+  "pm": "approvato"
+ },
+ {
+  "file": "dom/media/MediaManager.cpp",
+  "function": "RefPtr<ConstDeviceSetPromise> MediaManager::GetPhysicalDevices() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "              // changed.",
+  "test": "wrapper:tests/test_the_device_enumeration_takes_the_declared_time_e2e.py::test_the_first_enumeration_takes_the_declared_time",
+  "exception": "the resolve step of GetPhysicalDevices is wrapped in a lambda handed to our function; the delay through the Then target would read the pref one event-loop hop earlier and delay the reject lambda (G28(a) not provable)",
+  "pm": "approvato"
+ },
+ {
+  "file": "dom/media/MediaManager.cpp",
+  "function": "RefPtr<ConstDeviceSetPromise> MediaManager::GetPhysicalDevices() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "              if (promises == mPendingDevicesPromises) {",
+  "test": "wrapper:tests/test_the_device_enumeration_takes_the_declared_time_e2e.py::test_the_first_enumeration_takes_the_declared_time",
+  "exception": "the resolve step of GetPhysicalDevices is wrapped in a lambda handed to our function; the delay through the Then target would read the pref one event-loop hop earlier and delay the reject lambda (G28(a) not provable)",
+  "pm": "approvato"
+ },
+ {
+  "file": "dom/media/MediaManager.cpp",
+  "function": "RefPtr<ConstDeviceSetPromise> MediaManager::GetPhysicalDevices() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "                mPendingDevicesPromises = nullptr;",
+  "test": "wrapper:tests/test_the_device_enumeration_takes_the_declared_time_e2e.py::test_the_first_enumeration_takes_the_declared_time",
+  "exception": "the resolve step of GetPhysicalDevices is wrapped in a lambda handed to our function; the delay through the Then target would read the pref one event-loop hop earlier and delay the reject lambda (G28(a) not provable)",
+  "pm": "approvato"
+ },
+ {
+  "file": "dom/media/MediaManager.cpp",
+  "function": "RefPtr<ConstDeviceSetPromise> MediaManager::GetPhysicalDevices() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "                mPhysicalDevices = std::move(aDevices);",
+  "test": "wrapper:tests/test_the_device_enumeration_takes_the_declared_time_e2e.py::test_the_first_enumeration_takes_the_declared_time",
+  "exception": "the resolve step of GetPhysicalDevices is wrapped in a lambda handed to our function; the delay through the Then target would read the pref one event-loop hop earlier and delay the reject lambda (G28(a) not provable)",
+  "pm": "approvato"
+ },
+ {
+  "file": "dom/media/MediaManager.cpp",
+  "function": "RefPtr<ConstDeviceSetPromise> MediaManager::GetPhysicalDevices() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "              }",
+  "test": "wrapper:tests/test_the_device_enumeration_takes_the_declared_time_e2e.py::test_the_first_enumeration_takes_the_declared_time",
+  "exception": "the resolve step of GetPhysicalDevices is wrapped in a lambda handed to our function; the delay through the Then target would read the pref one event-loop hop earlier and delay the reject lambda (G28(a) not provable)",
+  "pm": "approvato"
+ },
+ {
+  "file": "dom/media/MediaManager.cpp",
+  "function": "RefPtr<ConstDeviceSetPromise> MediaManager::GetPhysicalDevices() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "            };",
+  "test": "wrapper:tests/test_the_device_enumeration_takes_the_declared_time_e2e.py::test_the_first_enumeration_takes_the_declared_time",
+  "exception": "the resolve step of GetPhysicalDevices is wrapped in a lambda handed to our function; the delay through the Then target would read the pref one event-loop hop earlier and delay the reject lambda (G28(a) not provable)",
+  "pm": "approvato"
+ },
+ {
+  "file": "dom/media/MediaManager.cpp",
+  "function": "RefPtr<ConstDeviceSetPromise> MediaManager::GetPhysicalDevices() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "            // STEALTH-HOOK(fingerprint/media/enumeration)",
+  "test": "wrapper:tests/test_the_device_enumeration_takes_the_declared_time_e2e.py::test_the_first_enumeration_takes_the_declared_time",
+  "exception": "the resolve step of GetPhysicalDevices is wrapped in a lambda handed to our function; the delay through the Then target would read the pref one event-loop hop earlier and delay the reject lambda (G28(a) not provable)",
+  "pm": "approvato"
+ },
+ {
+  "file": "dom/media/MediaManager.cpp",
+  "function": "RefPtr<ConstDeviceSetPromise> MediaManager::GetPhysicalDevices() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "            StealthDeclaredEnumeration(std::move(resolve));",
+  "test": "wrapper:tests/test_the_device_enumeration_takes_the_declared_time_e2e.py::test_the_first_enumeration_takes_the_declared_time",
+  "exception": "the resolve step of GetPhysicalDevices is wrapped in a lambda handed to our function; the delay through the Then target would read the pref one event-loop hop earlier and delay the reject lambda (G28(a) not provable)",
+  "pm": "approvato"
+ }
+]

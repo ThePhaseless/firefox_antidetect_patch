@@ -1,16 +1,17 @@
 diff --git a/dom/media/mediacapabilities/MediaCapabilities.cpp b/dom/media/mediacapabilities/MediaCapabilities.cpp
-index b25c2e748f7f8f02a14bfb5d476cdc52cbaf3e01..1e8bf067a48a742132c0831a491b431504aa1606 100644
+index b25c2e748f7f8f02a14bfb5d476cdc52cbaf3e01..d24a135386d359ad42cbcd8e1ce11dd014fff730 100644
 --- a/dom/media/mediacapabilities/MediaCapabilities.cpp
 +++ b/dom/media/mediacapabilities/MediaCapabilities.cpp
-@@ -13,6 +13,7 @@
- #include "MediaInfo.h"
- #include "MediaRecorder.h"
- #include "PDMFactorySupport.h"
+@@ -39,6 +39,8 @@
+ #include "nsContentUtils.h"
+ #include "nsIPrincipal.h"
+ 
 +#include "StealthMediaDeclaration.h"  // STEALTH-HOOK(fingerprint/media/decode-declaration)
- #include "VPXDecoder.h"
- #include "WindowRenderer.h"
- #include "mozilla/CheckedInt.h"
-@@ -527,6 +528,7 @@ static uint32_t Vp8EncoderThreads(const uint32_t aPixels,
++
+ namespace mozilla::dom {
+ enum class CodecSupport : uint8_t { Supported, Unsupported, Unknown };
+ static const char* EnumValueToString(const CodecSupport& aEnum) {
+@@ -527,6 +529,7 @@ static uint32_t Vp8EncoderThreads(const uint32_t aPixels,
  }
  static bool IsSWEncodeSmooth(const CodecType aCodec,
                               const VideoConfiguration& aConfig) {
@@ -18,14 +19,11 @@ index b25c2e748f7f8f02a14bfb5d476cdc52cbaf3e01..1e8bf067a48a742132c0831a491b4315
    // ratio = clip_duration / wall_time at 60fps: >1.0 means faster than
    // real-time. threads = libwebrtc thread count used during measurement. For
    // non-standard resolutions: rounds up to nearest standard bucket
-@@ -1213,6 +1215,10 @@ void MediaCapabilities::CreateNonWebRTCDecodingInfo(
+@@ -1213,6 +1216,7 @@ void MediaCapabilities::CreateNonWebRTCDecodingInfo(
                 holder->Complete();
                 nsIGlobalObject* global = holder->GetParentObject();
                 NS_ENSURE_TRUE_VOID(global);
-+               // STEALTH-HOOK(fingerprint/media/decode-declaration)
-+               if (auto d = StealthDeclaredDecodingInfoFor(aConfiguration)) {
-+                 return promise->MaybeResolve(std::move(*d));
-+               }
++               if (auto d = StealthDeclaredDecodingInfoFor(aConfiguration)) return promise->MaybeResolve(std::move(*d));  // STEALTH-HOOK(fingerprint/media/decode-declaration)
                 if (aValue.IsReject()) {
                   MediaCapabilitiesDecodingInfo info;
                   info.mSupported = false;
@@ -50,85 +48,81 @@ index af9a8c99f02dcd2ea94b067014503121a7344aca..dec9e76391a7e92852d0b9e82f4d637d
  if CONFIG["OS_TARGET"] == "Linux":
      UNIFIED_SOURCES += ["UnderrunHandlerLinux.cpp"]
 diff --git a/dom/media/platforms/PDMFactory.cpp b/dom/media/platforms/PDMFactory.cpp
-index a886e9fe820e8a554f2492163a268bd36b668cac..ed03b77a283e3fc265a652844438c117c5fcf0cd 100644
+index a886e9fe820e8a554f2492163a268bd36b668cac..ae5ca09472f516995a2a4853519540f12effd2c3 100644
 --- a/dom/media/platforms/PDMFactory.cpp
 +++ b/dom/media/platforms/PDMFactory.cpp
-@@ -30,6 +30,7 @@
- #include "mozilla/TaskQueue.h"
- #include "mozilla/gfx/gfxVars.h"
- #include "mozilla/ipc/UtilityMediaServiceParent.h"
-+#include "StealthMediaDeclaration.h"
- #include "nsIXULRuntime.h"  // for BrowserTabsRemoteAutostart
- #include "nsPrintfCString.h"
+@@ -58,6 +58,8 @@
  
-@@ -470,6 +471,10 @@ DecodeSupportSet PDMFactory::SupportsMimeType(
+ #include "FFVPXRuntimeLinker.h"
+ 
++#include "StealthMediaDeclaration.h"  // STEALTH-HOOK(fingerprint/media/decode-declaration)
++
+ using DecodeSupport = mozilla::media::DecodeSupport;
+ using DecodeSupportSet = mozilla::media::DecodeSupportSet;
+ using MediaCodec = mozilla::media::MediaCodec;
+@@ -470,6 +472,7 @@ DecodeSupportSet PDMFactory::SupportsMimeType(
  DecodeSupportSet PDMFactory::Supports(
      const SupportDecoderParams& aParams,
      DecoderDoctorDiagnostics* aDiagnostics) const {
-+  // STEALTH-HOOK(fingerprint/media/decode-declaration)
-+  if (auto declared = StealthDeclaredDecodeSupportSet(aParams.MimeType())) {
-+    return *declared;
-+  }
++  if (DecodeSupportSet declared; StealthDeclaredDecodeSupportFor(aParams, &declared)) return declared;  // STEALTH-HOOK(fingerprint/media/decode-declaration)
    if (mEMEPDM) {
      return mEMEPDM->Supports(aParams, aDiagnostics);
    }
-@@ -487,6 +492,10 @@ DecodeSupportSet PDMFactory::Supports(
+@@ -487,6 +490,7 @@ DecodeSupportSet PDMFactory::Supports(
  
  RefPtr<PDMSupportsDecoderPromise> PDMFactory::SupportsAsync(
      const SupportDecoderParams& aParams) const {
-+  // STEALTH-HOOK(fingerprint/media/decode-declaration)
-+  if (auto declared = StealthDeclaredDecodeSupportSet(aParams.MimeType())) {
-+    return PDMSupportsDecoderPromise::CreateAndResolve(*declared, __func__);
-+  }
++  if (auto declared = StealthDeclaredDecodeSupportAsyncFor(aParams)) return declared;  // STEALTH-HOOK(fingerprint/media/decode-declaration)
    if (mEMEPDM) {
      return mEMEPDM->SupportsAsync(aParams);
    }
 diff --git a/dom/media/webrtc/jsapi/DefaultCodecPreferences.cpp b/dom/media/webrtc/jsapi/DefaultCodecPreferences.cpp
-index 95dae38e2d794f05aeaaf7b725245902b35ff09c..caff7a67009a28c318a2e0f6c93dc6d05ffaeb66 100644
+index 95dae38e2d794f05aeaaf7b725245902b35ff09c..a6d25da4b958b4116a479de7ed6cd6c712a79456 100644
 --- a/dom/media/webrtc/jsapi/DefaultCodecPreferences.cpp
 +++ b/dom/media/webrtc/jsapi/DefaultCodecPreferences.cpp
-@@ -4,6 +4,7 @@
- 
- #include "DefaultCodecPreferences.h"
+@@ -9,6 +9,8 @@
+ #include "mozilla/StaticPrefs_media.h"
+ #include "nsTArray.h"
  
 +#include "StealthMediaDeclaration.h"  // STEALTH-HOOK(fingerprint/media/decode-declaration)
- #include "gmp/GMPUtils.h"
- #include "libwebrtcglue/VideoConduit.h"
- #include "mozilla/StaticPrefs_media.h"
-@@ -25,6 +26,7 @@ bool DefaultCodecPreferences::H264EnabledStatic() {
++
+ namespace mozilla {
+ 
+ bool DefaultCodecPreferences::AV1EnabledStatic() {
+@@ -25,6 +27,7 @@ bool DefaultCodecPreferences::H264EnabledStatic() {
  }
  
  bool DefaultCodecPreferences::SoftwareH264EnabledStatic() {
-+  if (auto d = StealthDeclaredSoftwareH264()) return *d;  // STEALTH-HOOK(fingerprint/media/decode-declaration)
++  if (bool declared; StealthDeclaredSoftwareH264(&declared)) return declared;  // STEALTH-HOOK(fingerprint/media/decode-declaration)
  #ifdef MOZ_WIDGET_ANDROID
    // Although Play Store policy doesn't allow GMP plugin, Android has H.264 SW
    // codec.
-@@ -44,6 +46,7 @@ bool DefaultCodecPreferences::HardwareH264EnabledStatic() {
+@@ -44,6 +47,7 @@ bool DefaultCodecPreferences::HardwareH264EnabledStatic() {
  
  bool DefaultCodecPreferences::
      SendingH264PacketizationModeZeroSupportedStatic() {
-+  if (auto d = StealthDeclaredSoftwareH264()) return *d;  // STEALTH-HOOK(fingerprint/media/decode-declaration)
++  if (bool declared; StealthDeclaredSoftwareH264(&declared)) return declared;  // STEALTH-HOOK(fingerprint/media/decode-declaration)
    // Packetization mode 0 is unsupported by MediaDataEncoder.
    return HaveGMPFor("encode-video"_ns, {"h264"_ns});
  }
 diff --git a/dom/media/webrtc/libwebrtcglue/WebrtcVideoCodecFactory.cpp b/dom/media/webrtc/libwebrtcglue/WebrtcVideoCodecFactory.cpp
-index 842047269ae5de1c828f8153386b2d047a23e909..6a69c5ee8989a8f9f4fc78c613c0f5bfb53debbe 100644
+index 842047269ae5de1c828f8153386b2d047a23e909..899ca28f03e693c7e09ebca09ee6b7239483ba76 100644
 --- a/dom/media/webrtc/libwebrtcglue/WebrtcVideoCodecFactory.cpp
 +++ b/dom/media/webrtc/libwebrtcglue/WebrtcVideoCodecFactory.cpp
-@@ -7,6 +7,7 @@
- #include "GmpVideoCodec.h"
- #include "MediaDataCodec.h"
- #include "MediaMIMETypes.h"
+@@ -23,6 +23,8 @@
+ #include "modules/video_coding/codecs/vp8/include/vp8.h"
+ #include "modules/video_coding/codecs/vp9/include/vp9.h"
+ 
 +#include "StealthMediaDeclaration.h"  // STEALTH-HOOK(fingerprint/media/decode-declaration)
- #include "VideoConduit.h"
- #include "WebrtcGmpVideoCodec.h"
- #include "WebrtcMediaDataDecoderCodec.h"
-@@ -118,6 +119,8 @@ PlatformEncodeSupportOrNone(const EncoderConfig& aConfig) {
++
+ namespace mozilla {
+ 
+ // Keep in sync with the doc comment on media.webrtc.encoder_creation_strategy
+@@ -118,6 +120,7 @@ PlatformEncodeSupportOrNone(const EncoderConfig& aConfig) {
  /* static */
  RefPtr<PlatformEncoderModule::SupportsEncoderPromise>
  WebrtcVideoEncoderFactory::SupportsCodec(const EncoderConfig& aConfig) {
-+  // STEALTH-HOOK(fingerprint/media/decode-declaration)
-+  if (auto declared = StealthDeclaredWebrtcEncodeSupport(aConfig)) return declared;
++  if (auto declared = StealthDeclaredWebrtcEncodeSupport(aConfig)) return declared;  // STEALTH-HOOK(fingerprint/media/decode-declaration)
    const auto strategy = static_cast<EncoderCreationStrategy>(
        StaticPrefs::media_webrtc_encoder_creation_strategy());
    const media::EncodeSupportSet libwebrtcSupport =

@@ -1,62 +1,57 @@
 diff --git a/netwerk/base/moz.build b/netwerk/base/moz.build
-index dde0f0da60377e61b8987663f87304ebd63b4958..55fd5a35e3ca508fe805649f39f2cea47239fa6a 100644
+index dde0f0da60377e61b8987663f87304ebd63b4958..30e745c90cfcaf80d9469bb02dd07ee1b641be1f 100644
 --- a/netwerk/base/moz.build
 +++ b/netwerk/base/moz.build
-@@ -257,6 +257,8 @@ UNIFIED_SOURCES += [
+@@ -257,6 +257,9 @@ UNIFIED_SOURCES += [
      "TLSServerSocket.cpp",
      "TRRLoadInfo.cpp",
  ]
 +UNIFIED_SOURCES += ["StealthIPv6Literal.cpp"]  # STEALTH-HOOK(network/ipv6-literal)
++UNIFIED_SOURCES += ["StealthLoadInfo.cpp"]  # STEALTH-HOOK(automation/navigation)
 +UNIFIED_SOURCES += ["StealthSocksCredentials.cpp"]  # STEALTH-HOOK(network/socks)
  
  if CONFIG["FUZZING"]:
      SOURCES += [
 diff --git a/netwerk/base/nsProtocolProxyService.cpp b/netwerk/base/nsProtocolProxyService.cpp
-index dcf0dca2de86ab0c8defbf9353fab40fb5c29d3b..28d14770ecde9f4a7e1e20901ee7db6a9590a8fc 100644
+index dcf0dca2de86ab0c8defbf9353fab40fb5c29d3b..3d22dfb8bc53e5547e4d1f32bce52a7504e37c1f 100644
 --- a/netwerk/base/nsProtocolProxyService.cpp
 +++ b/netwerk/base/nsProtocolProxyService.cpp
-@@ -5,6 +5,7 @@
- #include "nsProtocolProxyService.h"
+@@ -40,6 +40,8 @@
+ #include "nsThreadUtils.h"
+ #include "prnetdb.h"
  
- #include "SimpleChannel.h"
-+#include "StealthSocksCredentials.h"
- #include "mozilla/AutoRestore.h"
- #include "mozilla/CondVar.h"
- #include "mozilla/Logging.h"
-@@ -1079,6 +1080,9 @@ void nsProtocolProxyService::PrefsChanged(nsIPrefBranch* prefBranch,
-     }
-   }
++#include "StealthSocksCredentials.h"  // STEALTH-HOOK(network/socks)
++
+ //----------------------------------------------------------------------------
  
-+  // STEALTH-HOOK(network/socks)
-+  StealthSocksPrefsChanged(prefBranch, pref, mSOCKSProxyUsername,
-+                           mSOCKSProxyPassword);
-   if (!pref || !strcmp(pref, PROXY_PREF("socks_remote_dns"))) {
-     proxy_GetBoolPref(prefBranch, PROXY_PREF("socks_remote_dns"),
-                       mSOCKS4ProxyRemoteDNS);
-@@ -2316,9 +2320,10 @@ nsresult nsProtocolProxyService::Resolve_Internal(nsIChannel* channel,
+ namespace mozilla {
+@@ -1005,6 +1007,7 @@ nsProtocolProxyService::GetName(nsACString& aName) {
+ 
+ void nsProtocolProxyService::PrefsChanged(nsIPrefBranch* prefBranch,
+                                           const char* pref) {
++  StealthSocksPrefsChanged(prefBranch, pref, mSOCKSProxyUsername, mSOCKSProxyPassword);  // STEALTH-HOOK(network/socks)
+   nsresult rv = NS_OK;
+   bool reloadPAC = false;
+   nsAutoCString tempString;
+@@ -2316,7 +2319,7 @@ nsresult nsProtocolProxyService::Resolve_Internal(nsIChannel* channel,
    }
  
    if (type) {
 -    rv = NewProxyInfo_Internal(type, *host, port, ""_ns, ""_ns, ""_ns, ""_ns,
--                               ""_ns, proxyFlags, UINT32_MAX, nullptr, flags,
--                               result);
-+    // STEALTH-HOOK(network/socks)
-+    rv = NewProxyInfo_Internal(type, *host, port, ""_ns, mSOCKSProxyUsername,
-+                               mSOCKSProxyPassword, ""_ns, ""_ns, proxyFlags,
-+                               UINT32_MAX, nullptr, flags, result);
++    rv = NewProxyInfo_Internal(type, *host, port, ""_ns, mSOCKSProxyUsername, mSOCKSProxyPassword, ""_ns,  // STEALTH-HOOK(network/socks)
+                                ""_ns, proxyFlags, UINT32_MAX, nullptr, flags,
+                                result);
      if (NS_FAILED(rv)) return rv;
-   }
- 
 diff --git a/netwerk/base/nsProtocolProxyService.h b/netwerk/base/nsProtocolProxyService.h
-index 104a1a6a88e6b34de77c15866bf715f23658f663..6ad5a9d516e1176aa60e55b5014f7ce3bc803473 100644
+index 104a1a6a88e6b34de77c15866bf715f23658f663..b5ac17a18b6eb8b92b24e45063bcc35aa7b8670b 100644
 --- a/netwerk/base/nsProtocolProxyService.h
 +++ b/netwerk/base/nsProtocolProxyService.h
 @@ -399,6 +399,8 @@ class nsProtocolProxyService final : public nsIProtocolProxyService2,
    nsCString mSOCKSProxyTarget;
    int32_t mSOCKSProxyPort{-1};
    int32_t mSOCKSProxyVersion{nsIProxyInfo::SOCKS_V4};
-+  nsCString mSOCKSProxyUsername;
-+  nsCString mSOCKSProxyPassword;
++  nsCString mSOCKSProxyUsername;  // STEALTH-HOOK(network/socks)
++  nsCString mSOCKSProxyPassword;  // STEALTH-HOOK(network/socks)
    bool mSOCKS4ProxyRemoteDNS{false};
    bool mSOCKS5ProxyRemoteDNS{false};
    bool mProxyOverTLS{true};

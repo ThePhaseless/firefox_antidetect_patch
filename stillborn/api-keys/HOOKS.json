@@ -1,0 +1,62 @@
+[
+ {
+  "file": "toolkit/components/url-classifier/SafeBrowsing.sys.mjs",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "import { StealthObserveApiKey } from \"resource://gre/modules/StealthApiKeys.sys.mjs\";  // STEALTH-HOOK(stillborn/api-keys)",
+  "test": "xpcshell:toolkit/components/urlformatter/tests/unit/test_stealth_apikeys_observer.js#test_declaration_after_init_enables_the_provider"
+ },
+ {
+  "file": "toolkit/components/url-classifier/SafeBrowsing.sys.mjs",
+  "function": "export var SafeBrowsing = {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "    StealthObserveApiKey(this);  // STEALTH-HOOK(stillborn/api-keys)",
+  "test": "xpcshell:toolkit/components/urlformatter/tests/unit/test_stealth_apikeys_observer.js#test_declaration_after_init_enables_the_provider",
+  "anchor": "Services.prefs.addObserver(\"urlclassifier\", this);",
+  "why": "the Mozilla observers above must run first, and a guard or notice in the head of init() would run before the 'Already initialized' return: the moment changes, so it stays where it is today (G28)"
+ },
+ {
+  "file": "toolkit/components/urlformatter/URLFormatter.sys.mjs",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "import { StealthApplyApiKeys, StealthTrimApiKeys } from \"resource://gre/modules/StealthApiKeys.sys.mjs\";  // STEALTH-HOOK(stillborn/api-keys)",
+  "test": "xpcshell:toolkit/components/urlformatter/tests/unit/test_stealth_apikeys.js#test_declared_keys"
+ },
+ {
+  "file": "toolkit/components/urlformatter/URLFormatter.sys.mjs",
+  "function": "nsURLFormatterService.prototype = {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    aMsg = StealthTrimApiKeys(aMsg);  // STEALTH-HOOK(stillborn/api-keys)",
+  "test": "xpcshell:toolkit/components/urlformatter/tests/unit/test_stealth_apikeys.js#test_declared_keys"
+ },
+ {
+  "file": "toolkit/components/urlformatter/URLFormatter.sys.mjs",
+  "function": "nsURLFormatterService.prototype = {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "StealthApplyApiKeys(nsURLFormatterService.prototype);  // STEALTH-HOOK(stillborn/api-keys)",
+  "test": "xpcshell:toolkit/components/urlformatter/tests/unit/test_stealth_apikeys.js#test_declared_keys",
+  "anchor": "};  (closing of nsURLFormatterService.prototype, last Mozilla statement of the module)",
+  "why": "the call must run after the whole prototype is defined: end of a JS module (G33); no guard fits, there is no function to host it"
+ },
+ {
+  "file": "toolkit/components/urlformatter/moz.build",
+  "function": "with Files(\"**\"):",
+  "kind": "add",
+  "form": "registration",
+  "line": "XPCSHELL_TESTS_MANIFESTS += [\"tests/unit/xpcshell-stealth.toml\"]  # STEALTH-HOOK(stillborn/api-keys)",
+  "test": "xpcshell:toolkit/components/urlformatter/tests/unit/test_stealth_apikeys.js#test_declared_keys"
+ },
+ {
+  "file": "toolkit/components/urlformatter/moz.build",
+  "function": "XPIDL_MODULE = \"urlformatter\"",
+  "kind": "add",
+  "form": "registration",
+  "line": "EXTRA_JS_MODULES += [\"StealthApiKeys.sys.mjs\"]  # STEALTH-HOOK(stillborn/api-keys)",
+  "test": "xpcshell:toolkit/components/urlformatter/tests/unit/test_stealth_apikeys.js#test_declared_keys"
+ }
+]

@@ -1,108 +1,105 @@
 diff --git a/chrome/nsChromeRegistry.cpp b/chrome/nsChromeRegistry.cpp
-index fe6aa49a19eb361730b430376dcdfe283e0503dd..9f51e1e620e1887fc16398c1c4d83d2944f4887a 100644
+index fe6aa49a19eb361730b430376dcdfe283e0503dd..9c25e70b96f6637b430198fe5d00540987c44939 100644
 --- a/chrome/nsChromeRegistry.cpp
 +++ b/chrome/nsChromeRegistry.cpp
-@@ -5,6 +5,7 @@
- #include "nsChromeRegistry.h"
- #include "nsChromeRegistryChrome.h"
- #include "nsChromeRegistryContent.h"
-+#include "mozilla/net/StealthBranding.h"  // STEALTH-HOOK(fingerprint/js-surface/branding)
+@@ -28,6 +28,8 @@
+ #include "mozilla/StyleSheetInlines.h"
+ #include "mozilla/dom/Location.h"
  
- #include "nsCOMPtr.h"
- #include "nsComponentManagerUtils.h"
-@@ -266,7 +267,8 @@ nsChromeRegistry::ConvertChromeURL(nsIURI* aChromeURI, nsIURI** aResult) {
++#include "mozilla/net/StealthBranding.h"  // STEALTH-HOOK(fingerprint/js-surface/branding)
++
+ nsChromeRegistry* nsChromeRegistry::gChromeRegistry;
+ 
+ // DO NOT use namespace mozilla; it'll break due to a naming conflict between
+@@ -266,7 +268,7 @@ nsChromeRegistry::ConvertChromeURL(nsIURI* aChromeURI, nsIURI** aResult) {
      return NS_ERROR_FILE_NOT_FOUND;
    }
  
 -  return NS_NewURI(aResult, path, nullptr, baseURI);
-+  // STEALTH-HOOK(fingerprint/js-surface/branding)
-+  return mozilla::net::StealthBrandingResolveChromeURL(path, baseURI, aResult);
++  return mozilla::net::StealthBrandingChromeURL(NS_NewURI(aResult, path, nullptr, baseURI), aResult);  // STEALTH-HOOK(fingerprint/js-surface/branding)
  }
  
  ////////////////////////////////////////////////////////////////////////
 diff --git a/chrome/nsChromeRegistryChrome.cpp b/chrome/nsChromeRegistryChrome.cpp
-index b28f2b7ff80949bb81bedc8574a41187e047f7a4..b05a7868b4e181f92a977780f9ddf38f63420a76 100644
+index b28f2b7ff80949bb81bedc8574a41187e047f7a4..29cb2ecf3e69a9522abbe2f4c10e3e45fe45deea 100644
 --- a/chrome/nsChromeRegistryChrome.cpp
 +++ b/chrome/nsChromeRegistryChrome.cpp
-@@ -7,6 +7,7 @@
- #include "nsResProtocolHandler.h"
+@@ -32,6 +32,8 @@
+ #include "nsIScriptError.h"
+ #include "nsIXULRuntime.h"
  
- #include "nsChromeRegistryChrome.h"
-+#include "mozilla/net/StealthBranding.h"
++#include "mozilla/net/StealthBranding.h"  // STEALTH-HOOK(fingerprint/js-surface/branding)
++
+ #define PACKAGE_OVERRIDE_BRANCH "chrome.override_package."
+ #define SKIN "classic/1.0"_ns
  
- #if defined(XP_WIN)
- #  include <windows.h>
-@@ -480,6 +481,9 @@ void nsChromeRegistryChrome::ManifestContent(ManifestProcessingContext& cx,
+@@ -480,6 +482,7 @@ void nsChromeRegistryChrome::ManifestContent(ManifestProcessingContext& cx,
    PackageEntry* entry = mPackagesHash.GetOrInsertNew(packageName);
    entry->baseURI = std::move(resolved);
    entry->flags = flags;
-+  // STEALTH: where the branding directory is, for the declared-branding
-+  // redirect. StealthBranding.h.
-+  mozilla::net::StealthBrandingRegisterPackage(packageName, entry->baseURI);
++  mozilla::net::StealthBrandingRegisterPackage(packageName, entry->baseURI);  // STEALTH-HOOK(fingerprint/js-surface/branding)
  
    if (mDynamicRegistration) {
      ChromePackage chromePackage;
 diff --git a/chrome/nsChromeRegistryContent.cpp b/chrome/nsChromeRegistryContent.cpp
-index 0eb6421cfc024e377d4e4ce1ad69959a9bab45c5..0c9eaa00f8794f19afb376fec616ef56560c8c15 100644
+index 0eb6421cfc024e377d4e4ce1ad69959a9bab45c5..633236aa045e7a5f6ccf86403afe090cc993542c 100644
 --- a/chrome/nsChromeRegistryContent.cpp
 +++ b/chrome/nsChromeRegistryContent.cpp
-@@ -4,6 +4,7 @@
- 
- #include "RegistryMessageUtils.h"
- #include "nsChromeRegistryContent.h"
-+#include "mozilla/net/StealthBranding.h"
- #include "nsISubstitutingProtocolHandler.h"
- #include "nsString.h"
+@@ -9,6 +9,8 @@
  #include "nsNetUtil.h"
-@@ -60,6 +61,11 @@ void nsChromeRegistryContent::RegisterPackage(const ChromePackage& aPackage) {
+ #include "mozilla/UniquePtr.h"
+ 
++#include "mozilla/net/StealthBranding.h"  // STEALTH-HOOK(fingerprint/js-surface/branding)
++
+ nsChromeRegistryContent::nsChromeRegistryContent() = default;
+ 
+ void nsChromeRegistryContent::RegisterRemoteChrome(
+@@ -60,6 +62,8 @@ void nsChromeRegistryContent::RegisterPackage(const ChromePackage& aPackage) {
      if (NS_FAILED(rv)) return;
    }
  
-+  // STEALTH-HOOK(fingerprint/js-surface/branding)
-+  if (content) {
-+    mozilla::net::StealthBrandingRegisterPackage(aPackage.package, content);
-+  }
++  mozilla::net::StealthBrandingRegisterPackage(aPackage.package, content);  // STEALTH-HOOK(fingerprint/js-surface/branding)
 +
    mozilla::UniquePtr<PackageEntry> entry = mozilla::MakeUnique<PackageEntry>();
    entry->flags = aPackage.flags;
    entry->contentBaseURI = std::move(content);
+diff --git a/chrome/test/moz.build b/chrome/test/moz.build
+index ce61f87f901e725ca147187f549db85ea6ce8951..0da9d381c7785fa110ad0e3a55cd8e08bf018c55 100644
+--- a/chrome/test/moz.build
++++ b/chrome/test/moz.build
+@@ -6,3 +6,5 @@ XPCSHELL_TESTS_MANIFESTS += [
+     "unit/xpcshell.toml",
+     "unit_ipc/xpcshell.toml",
+ ]
++
++XPCSHELL_TESTS_MANIFESTS += ["unit/xpcshell-stealth.toml"]  # STEALTH-HOOK(fingerprint/js-surface/branding)
 diff --git a/netwerk/protocol/res/SubstitutingProtocolHandler.cpp b/netwerk/protocol/res/SubstitutingProtocolHandler.cpp
-index 0a89a2eb98c19f1c971bf463d90dc51e11d868d7..af61009941046ce29849c902258429706de30eff 100644
+index 0a89a2eb98c19f1c971bf463d90dc51e11d868d7..e26c764d3a47f780982513bbc69bb9aafc10b192 100644
 --- a/netwerk/protocol/res/SubstitutingProtocolHandler.cpp
 +++ b/netwerk/protocol/res/SubstitutingProtocolHandler.cpp
-@@ -10,6 +10,7 @@
- #include "mozilla/chrome/RegistryMessageUtils.h"
- #include "mozilla/dom/ContentParent.h"
- #include "mozilla/ipc/URIUtils.h"
-+#include "mozilla/net/StealthBranding.h"
- #include "nsEscape.h"
- #include "nsIChannel.h"
- #include "nsIClassInfoImpl.h"
-@@ -700,7 +701,8 @@ nsresult SubstitutingProtocolHandler::ResolveURI(nsIURI* uri,
-   if (NS_FAILED(rv)) return rv;
+@@ -677,7 +677,7 @@ nsresult SubstitutingProtocolHandler::HasSubstitution(
+   return NS_OK;
+ }
  
-   if (ResolveSpecialCases(host, path, pathname, result)) {
--    return NS_OK;
-+    // STEALTH-HOOK(fingerprint/js-surface/branding)
-+    return StealthBrandingRedirect(result);
-   }
+-nsresult SubstitutingProtocolHandler::ResolveURI(nsIURI* uri,
++nsresult SubstitutingProtocolHandler::ResolveURI_Mozilla(nsIURI* uri,  // STEALTH-HOOK(fingerprint/js-surface/branding)
+                                                  nsACString& result) {
+   nsresult rv;
  
-   nsCOMPtr<nsIURI> baseURI;
-@@ -748,6 +750,12 @@ nsresult SubstitutingProtocolHandler::ResolveURI(nsIURI* uri,
-     return rv;
-   }
+diff --git a/netwerk/protocol/res/SubstitutingProtocolHandler.h b/netwerk/protocol/res/SubstitutingProtocolHandler.h
+index 32d65b093e89a15929fb4e4bad97f2157e27ecb4..f16d32eaa2c18996432ba0bb9ed86111cc29a1f6 100644
+--- a/netwerk/protocol/res/SubstitutingProtocolHandler.h
++++ b/netwerk/protocol/res/SubstitutingProtocolHandler.h
+@@ -30,6 +30,7 @@ class SubstitutingProtocolHandler {
+   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(SubstitutingProtocolHandler);
+   NS_DECL_NON_VIRTUAL_NSIPROTOCOLHANDLER;
+   NS_DECL_NON_VIRTUAL_NSISUBSTITUTINGPROTOCOLHANDLER;
++  nsresult ResolveURI_Mozilla(nsIURI* aResURI, nsACString& aResult);  // STEALTH-HOOK(fingerprint/js-surface/branding)
  
-+  // STEALTH-HOOK(fingerprint/js-surface/branding)
-+  rv = StealthBrandingRedirect(result);
-+  if (NS_FAILED(rv)) {
-+    return rv;
-+  }
-+
-   if (MOZ_LOG_TEST(gResLog, LogLevel::Debug)) {
-     nsAutoCString spec;
-     uri->GetAsciiSpec(spec);
+   bool HasSubstitution(const nsACString& aRoot) const {
+     AutoReadLock lock(const_cast<RWLock&>(mSubstitutionsLock));
 diff --git a/netwerk/protocol/res/moz.build b/netwerk/protocol/res/moz.build
-index 99ded3530e154b10e55d4a9dabf656294c243570..74ffc48c86851a223e077cefc316b47f18b86731 100644
+index 99ded3530e154b10e55d4a9dabf656294c243570..848750b559fc3cee671cc227cbcdff321a7d89ba 100644
 --- a/netwerk/protocol/res/moz.build
 +++ b/netwerk/protocol/res/moz.build
 @@ -19,6 +19,7 @@ EXPORTS.mozilla.net += [
@@ -113,60 +110,67 @@ index 99ded3530e154b10e55d4a9dabf656294c243570..74ffc48c86851a223e077cefc316b47f
  
  EXPORTS += [
      "nsResProtocolHandler.h",
-@@ -33,6 +34,7 @@ UNIFIED_SOURCES += [
+@@ -33,6 +34,9 @@ UNIFIED_SOURCES += [
      "RemoteStreamGetter.cpp",
      "SubstitutingProtocolHandler.cpp",
  ]
 +UNIFIED_SOURCES += ["StealthBranding.cpp"]  # STEALTH-HOOK(fingerprint/js-surface/branding)
++
++TEST_DIRS += ["gtest"]  # STEALTH-HOOK(fingerprint/js-surface/branding)
  
  include("/ipc/chromium/chromium-config.mozbuild")
  
 diff --git a/security/sandbox/linux/broker/SandboxBrokerPolicyFactory.cpp b/security/sandbox/linux/broker/SandboxBrokerPolicyFactory.cpp
-index ad29a0509d34034e3d752dc05121a5cf817ed6ba..d3525639dd691f13fc089041815d5a2856d4d842 100644
+index ad29a0509d34034e3d752dc05121a5cf817ed6ba..9d03b5b8516a89602cc0de550331f281e41ab760 100644
 --- a/security/sandbox/linux/broker/SandboxBrokerPolicyFactory.cpp
 +++ b/security/sandbox/linux/broker/SandboxBrokerPolicyFactory.cpp
-@@ -3,6 +3,7 @@
-  * You can obtain one at http://mozilla.org/MPL/2.0/. */
+@@ -66,6 +66,8 @@
+ #  include "cutils/properties.h"
+ #endif
  
- #include "SandboxBrokerPolicyFactory.h"
-+#include "mozilla/net/StealthBranding.h"
++#include "StealthLinuxSandboxBranding.h"  // STEALTH-HOOK(fingerprint/js-surface/branding)
++
+ namespace mozilla {
  
- #ifdef MOZ_PROFILE_GENERATE
- #  include <string>
-@@ -746,6 +747,15 @@ void SandboxBrokerPolicyFactory::InitContentPolicy() {
+ namespace {
+@@ -745,6 +747,7 @@ void SandboxBrokerPolicyFactory::InitContentPolicy() {
+   // Whitelisted for reading by the user/distro
    AddDynamicPathList(policy, "security.sandbox.content.read_path_whitelist",
                       rdonly);
++  StealthBrandingAddReadRule(policy);  // STEALTH-HOOK(fingerprint/js-surface/branding)
  
-+  // STEALTH-HOOK(fingerprint/js-surface/branding)
-+  if (nsCOMPtr<nsIFile> branding =
-+          mozilla::net::StealthBrandingDeclaredArchive()) {
-+    nsAutoCString brandingPath;
-+    if (NS_SUCCEEDED(branding->GetNativePath(brandingPath))) {
-+      policy->AddPath(rdonly, brandingPath.get());
-+    }
-+  }
-+
    // userContent.css and the extensions dir sit in the profile, which is
    // normally blocked.
-   nsCOMPtr<nsIFile> profileDir;
+diff --git a/security/sandbox/linux/gtest/moz.build b/security/sandbox/linux/gtest/moz.build
+index 13d4371ae62de892ccb05e13529ec414fecdf0ec..dfb37c14e5030aebf4fd1bd4c70b78cc48499bf1 100644
+--- a/security/sandbox/linux/gtest/moz.build
++++ b/security/sandbox/linux/gtest/moz.build
+@@ -11,6 +11,7 @@ UNIFIED_SOURCES = [
+     "TestBrokerPolicy.cpp",
+     "TestLogging.cpp",
+ ]
++UNIFIED_SOURCES += ["TestStealthBrandingPolicy.cpp"]  # STEALTH-HOOK(fingerprint/js-surface/branding)
+ 
+ LOCAL_INCLUDES += [
+     "/security/sandbox/linux",
 diff --git a/security/sandbox/win/src/sandboxbroker/sandboxBroker.cpp b/security/sandbox/win/src/sandboxbroker/sandboxBroker.cpp
-index 74c0e5486b855849ca9298ae08ab0f32d0d61cb6..914544eb0902d2b1b138d8b007993bd8074354a9 100644
+index 74c0e5486b855849ca9298ae08ab0f32d0d61cb6..3156d51fbd6e9ae53fc8f95f663ecf57d8ab52b3 100644
 --- a/security/sandbox/win/src/sandboxbroker/sandboxBroker.cpp
 +++ b/security/sandbox/win/src/sandboxbroker/sandboxBroker.cpp
-@@ -14,6 +14,7 @@
+@@ -51,6 +51,8 @@
+ #include "sandbox/win/src/sandbox.h"
+ #include "sandbox/win/src/security_level.h"
  
- #include "ConfigHelpers.h"
- #include "GfxDriverInfo.h"
 +#include "StealthSandboxBranding.h"  // STEALTH-HOOK(fingerprint/js-surface/branding)
- #include "WinUtils.h"
- #include "base/win/sid.h"
- #include "base/win/windows_version.h"
-@@ -1195,6 +1196,8 @@ void SandboxBroker::SetSecurityLevelForContentProcess(int32_t aSandboxLevel,
++
+ #define SANDBOX_SUCCEED_OR_CRASH(x)                                   \
+   do {                                                                \
+     sandbox::ResultCode result = (x);                                 \
+@@ -1194,6 +1196,7 @@ void SandboxBroker::SetSecurityLevelForContentProcess(int32_t aSandboxLevel,
+     // Add rule to allow read access to the chrome directory within profile.
      AddCachedDirRule(config, sandbox::FileSemantics::kAllowReadonly,
                       sProfileDir, u"\\chrome\\*"_ns);
++    StealthBrandingAddReadRule(config);  // STEALTH-HOOK(fingerprint/js-surface/branding)
  
-+    // STEALTH-HOOK(fingerprint/js-surface/branding)
-+    AddDeclaredBrandingReadRule(config);
      // Add rule to allow read access to the extensions directory within profile.
      AddCachedDirRule(config, sandbox::FileSemantics::kAllowReadonly,
-                      sProfileDir, u"\\extensions\\*"_ns);

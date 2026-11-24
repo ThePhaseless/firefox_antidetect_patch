@@ -1,0 +1,18 @@
+[
+ {
+  "file": "dom/workers/WorkerNavigator.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthHardwareConcurrency.h\"  // STEALTH-HOOK(fingerprint/hardware/concurrency)",
+  "test": "wrapper:tests/test_hardware_values_are_declared_e2e.py::test_hardware_concurrency_is_the_declared_count_in_the_page_the_worker_and_the_iframe"
+ },
+ {
+  "file": "dom/workers/WorkerNavigator.cpp",
+  "function": "void WorkerNavigator::GetUserAgent(nsCString& aUserAgent,",
+  "kind": "add",
+  "form": "guard",
+  "line": "  if (uint64_t stealth; StealthWorkerHardwareConcurrency(&stealth)) return stealth;  // STEALTH-HOOK(fingerprint/hardware/concurrency)",
+  "test": "wrapper:tests/test_hardware_values_are_declared_e2e.py::test_hardware_concurrency_is_the_declared_count_in_the_page_the_worker_and_the_iframe"
+ }
+]

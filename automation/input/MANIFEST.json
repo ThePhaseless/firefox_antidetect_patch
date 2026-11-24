@@ -5,7 +5,9 @@
   "dom/events/EventStateManager.h",
   "dom/interfaces/base/nsIDOMWindowUtils.idl",
   "dom/ipc/CoalescedMouseData.cpp",
+  "dom/ipc/gtest/moz.build",
   "layout/base/PresShell.cpp",
+  "layout/base/gtest/moz.build",
   "widget/MouseEvents.h",
   "widget/nsGUIEventIPC.h",
   "xpcom/reflect/xptinfo/xptinfo.h"
@@ -13,7 +15,13 @@
  "added": {
   "dom/base/StealthJugglerEventId.h": "100644",
   "dom/base/StealthJugglerInput.h": "100644",
-  "layout/base/StealthJugglerAck.h": "100644"
+  "dom/events/StealthDragGesture.h": "100644",
+  "dom/ipc/StealthJugglerCoalesce.h": "100644",
+  "dom/ipc/gtest/TestStealthDragGesture.cpp": "100644",
+  "dom/ipc/gtest/TestStealthJugglerCoalesce.cpp": "100644",
+  "dom/ipc/gtest/TestStealthMouseEventIPC.cpp": "100644",
+  "layout/base/StealthJugglerAck.h": "100644",
+  "layout/base/gtest/TestStealthJugglerMouseAck.cpp": "100644"
  },
  "inventory": [
   {
@@ -21,7 +29,7 @@
    "category": "juggler",
    "feature": "juggler-input-dispatch",
    "prefs": [],
-   "added": 12,
+   "added": 8,
    "removed": 2,
    "hunks": 4,
    "inline_logic_lines": 80,
@@ -45,9 +53,9 @@
    "category": "juggler",
    "feature": "juggler-drag-gesture",
    "prefs": [],
-   "added": 9,
+   "added": 4,
    "removed": 0,
-   "hunks": 2,
+   "hunks": 3,
    "inline_logic_lines": 5,
    "hookable": "already-hook",
    "anchor": "EventStateManager::BeginTrackingDragGesture; EventStateManager::GenerateDragGesture",
@@ -69,7 +77,7 @@
    "category": "juggler",
    "feature": "juggler-drag-gesture",
    "prefs": [],
-   "added": 4,
+   "added": 1,
    "removed": 0,
    "hunks": 1,
    "inline_logic_lines": 1,
@@ -89,7 +97,7 @@
    "category": "juggler",
    "feature": "juggler-input-dispatch",
    "prefs": [],
-   "added": 26,
+   "added": 5,
    "removed": 1,
    "hunks": 2,
    "inline_logic_lines": 0,
@@ -113,9 +121,9 @@
    "category": "juggler",
    "feature": "juggler-event-id",
    "prefs": [],
-   "added": 4,
+   "added": 3,
    "removed": 0,
-   "hunks": 1,
+   "hunks": 2,
    "inline_logic_lines": 2,
    "hookable": "already-hook",
    "anchor": "CoalescedMouseData::Coalesce",
@@ -127,6 +135,27 @@
    "verifier": {
     "changed": [],
     "why": "Checked against the diff and source; no correction needed."
+   }
+  },
+  {
+   "file": "dom/ipc/gtest/moz.build",
+   "category": "juggler",
+   "feature": "juggler-input-dispatch",
+   "prefs": [],
+   "added": 2,
+   "removed": 0,
+   "hunks": 2,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "after the UNIFIED_SOURCES list (RemoteTypeTest.cpp); after the LOCAL_INCLUDES list",
+   "evidence": [
+    "+UNIFIED_SOURCES += [\"TestStealthDragGesture.cpp\", \"TestStealthJugglerCoalesce.cpp\", \"TestStealthMouseEventIPC.cpp\"]  # STEALTH-HOOK(automation/input)",
+    "+LOCAL_INCLUDES += [\"/dom/events\"]  # STEALTH-HOOK(automation/input)"
+   ],
+   "notes": "Builds the gtests of the drag decision, the id through IPC and copy, and the coalescing of the Juggler id; /dom/events is where StealthDragGesture.h is.",
+   "verifier": {
+    "changed": [],
+    "why": "Written with the hook, 2026-11-21."
    }
   },
   {
@@ -156,11 +185,31 @@
    }
   },
   {
+   "file": "layout/base/gtest/moz.build",
+   "category": "juggler",
+   "feature": "juggler-input-dispatch",
+   "prefs": [],
+   "added": 1,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "after the UNIFIED_SOURCES list (TestUniqueOrNonOwningPtr.cpp)",
+   "evidence": [
+    "+UNIFIED_SOURCES += [\"TestStealthJugglerMouseAck.cpp\"]  # STEALTH-HOOK(automation/input)"
+   ],
+   "notes": "Builds the gtest of StealthJugglerMouseAck (layout/base is already in its local includes).",
+   "verifier": {
+    "changed": [],
+    "why": "Written with the hook, 2026-11-21."
+   }
+  },
+  {
    "file": "widget/MouseEvents.h",
    "category": "juggler",
    "feature": "juggler-mouse-event-id",
    "prefs": [],
-   "added": 4,
+   "added": 2,
    "removed": 0,
    "hunks": 2,
    "inline_logic_lines": 2,
@@ -202,7 +251,7 @@
    "category": "juggler",
    "feature": "juggler-param-buffer",
    "prefs": [],
-   "added": 2,
+   "added": 1,
    "removed": 1,
    "hunks": 1,
    "inline_logic_lines": 1,

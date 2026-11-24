@@ -1,14 +1,15 @@
 {
  "modified": [
   "js/xpconnect/src/Sandbox.cpp",
-  "js/xpconnect/src/XPCJSRuntime.cpp",
   "js/xpconnect/src/xpcprivate.h",
+  "js/xpconnect/tests/unit/xpcshell.toml",
   "js/xpconnect/wrappers/WrapperFactory.cpp",
   "js/xpconnect/wrappers/XrayWrapper.h",
   "js/xpconnect/wrappers/moz.build"
  ],
  "added": {
   "js/xpconnect/src/StealthSandbox.h": "100644",
+  "js/xpconnect/tests/unit/test_stealth_hybrid_xrays_options.js": "100644",
   "js/xpconnect/wrappers/StealthHybridXray.cpp": "100644",
   "js/xpconnect/wrappers/StealthHybridXray.h": "100644"
  },
@@ -18,9 +19,9 @@
    "category": "juggler",
    "feature": "hybrid-xrays",
    "prefs": [],
-   "added": 22,
-   "removed": 2,
-   "hunks": 8,
+   "added": 13,
+   "removed": 3,
+   "hunks": 7,
    "inline_logic_lines": 22,
    "hookable": "movable",
    "anchor": "SandboxProxyHandler::getPropertyDescriptorImpl; xpc::CreateSandboxObject; SandboxOptions::Parse",
@@ -38,33 +39,13 @@
    }
   },
   {
-   "file": "js/xpconnect/src/XPCJSRuntime.cpp",
-   "category": "juggler",
-   "feature": "hybrid-xrays",
-   "prefs": [],
-   "added": 1,
-   "removed": 0,
-   "hunks": 1,
-   "inline_logic_lines": 1,
-   "hookable": "already-hook",
-   "anchor": "CompartmentPrivate::CompartmentPrivate",
-   "evidence": [
-    "+      hybridXrays(false),"
-   ],
-   "notes": "Initialiser for the new CompartmentPrivate member. It must stay in declaration order (right after wantXrays in xpcprivate.h), or the compiler warns about reordered initialisers.",
-   "verifier": {
-    "changed": [],
-    "why": "Checked against the diff and tree: category, feature, prefs, anchor, counts and evidence hold."
-   }
-  },
-  {
    "file": "js/xpconnect/src/xpcprivate.h",
    "category": "juggler",
    "feature": "hybrid-xrays",
    "prefs": [],
-   "added": 7,
-   "removed": 1,
-   "hunks": 4,
+   "added": 4,
+   "removed": 0,
+   "hunks": 3,
    "inline_logic_lines": 1,
    "hookable": "already-hook",
    "anchor": "SandboxOptions::SandboxOptions (constructor); class SandboxOptions (member); CompartmentPrivate::CanShareCompartmentWith; class CompartmentPrivate (member)",
@@ -80,12 +61,32 @@
    }
   },
   {
+   "file": "js/xpconnect/tests/unit/xpcshell.toml",
+   "category": "juggler",
+   "feature": "hybrid-xrays",
+   "prefs": [],
+   "added": 2,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "[\"test_scriptable_nsIClassInfo.js\"]",
+   "evidence": [
+    "+[\"test_stealth_hybrid_xrays_options.js\"]  # STEALTH-HOOK(automation/hybrid-xrays)"
+   ],
+   "notes": "Registration of our xpcshell test of the hybridXrays option of Cu.Sandbox (js/xpconnect/tests/unit/test_stealth_hybrid_xrays_options.js).",
+   "verifier": {
+    "changed": [],
+    "why": "Checked against the diff; one registration line and its blank line."
+   }
+  },
+  {
    "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
    "category": "spoof",
    "feature": "hybrid-xrays",
    "prefs": [],
-   "added": 18,
-   "removed": 7,
+   "added": 11,
+   "removed": 4,
    "hunks": 6,
    "inline_logic_lines": 80,
    "hookable": "hard",
@@ -108,9 +109,9 @@
    "category": "juggler",
    "feature": "hybrid-xrays",
    "prefs": [],
-   "added": 4,
+   "added": 1,
    "removed": 0,
-   "hunks": 2,
+   "hunks": 1,
    "inline_logic_lines": 20,
    "hookable": "movable",
    "anchor": "class XrayWrapper (new protected constructor); new class HybridXrayWrapper; free functions IsHybridXrayWrapper and HybridXrayGetBareName (declarations)",

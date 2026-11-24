@@ -17,12 +17,14 @@
 #include <stdint.h>
 
 #include "mozilla/OriginAttributes.h"
+#include "mozilla/RefPtr.h"
 
 class nsIPrincipal;
 class nsPIDOMWindowInner;
 
 namespace mozilla {
 
+class NrIceResolver;
 class NrSocketProxyConfig;
 
 /**
@@ -42,6 +44,27 @@ OriginAttributes StealthIceResolverAttributes(
  */
 OriginAttributes StealthIceResolverAttributes(
     const NrSocketProxyConfig& aConfig);
+
+/**
+ * Gives the resolver of a PeerConnection the attributes its lookups carry, from the
+ * proxy config the PeerConnection gives its ICE context (called first by
+ * MediaTransportImplNicer::SetProxyConfig, which passes its resolver: the class is
+ * local to that file). No resolver (the transport is shut down), nothing to do. The
+ * second form takes the attributes of the PeerConnection themselves.
+ */
+void StealthIceResolverSetContext(const RefPtr<NrIceResolver>& aResolver,
+                                  const NrSocketProxyConfig& aConfig);
+void StealthIceResolverSetContext(const RefPtr<NrIceResolver>& aResolver,
+                                  const OriginAttributes& aPeerConnection);
+
+/**
+ * Fills the attributes the lookup of an ICE server name is made with (called by
+ * NrIceResolver::resolve right after Mozilla's declaration of them, which stays):
+ * those the resolver was given. They stay as Mozilla made them when there is no
+ * resolver.
+ */
+void StealthIceResolverLookupAttributes(const NrIceResolver* aResolver,
+                                        OriginAttributes* aAttrs);
 
 // STEALTH-HOOK(network/proxy-udp): the config of a PeerConnection always exists.
 //

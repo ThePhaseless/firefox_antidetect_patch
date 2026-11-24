@@ -1,0 +1,19 @@
+[
+ {
+  "file": "netwerk/protocol/http/nsHttpHandler.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthAcceptLanguage.h\"  // STEALTH-HOOK(fingerprint/locale-time/accept-language)",
+  "test": "wrapper:tests/test_accept_language_on_the_wire_e2e.py::test_every_request_of_a_session_carries_the_retail_accept_language"
+ },
+ {
+  "file": "netwerk/protocol/http/nsHttpHandler.cpp",
+  "function": "nsresult nsHttpHandler::AddStandardRequestHeaders(",
+  "kind": "rewrite",
+  "form": "wrap-expression",
+  "line": "    acceptLanguage.Assign(StealthPrepareAcceptLanguages(aLanguageOverride.get()));  // STEALTH-HOOK(fingerprint/locale-time/accept-language)",
+  "removed": "    acceptLanguage.Assign(aLanguageOverride.get());",
+  "test": "wrapper:tests/test_accept_language_on_the_wire_e2e.py::test_every_request_of_a_session_carries_the_retail_accept_language"
+ }
+]

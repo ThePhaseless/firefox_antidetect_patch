@@ -1,0 +1,235 @@
+[
+ {
+  "file": "dom/media/webrtc/transport/build/moz.build",
+  "function": "EXPORTS.transport += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "EXPORTS.transport += [\"../nr_stealth_network.h\"]  # STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "test": "gtest:StealthDeclaredNetwork.TheHostSocketsOfAConnectionTakeItsPortsInOrderAndSkipARefusedOne"
+ },
+ {
+  "file": "dom/media/webrtc/transport/common.build",
+  "function": "transport_lcppsrcs = [",
+  "kind": "add",
+  "form": "registration",
+  "line": "transport_lcppsrcs += [\"StealthIceResolverContext.cpp\"]  # STEALTH-HOOK(network/doh)",
+  "test": "node:juggler/tests/the_ice_name_is_resolved_in_the_context_of_the_peer_connection.test.mjs#the files are built"
+ },
+ {
+  "file": "dom/media/webrtc/transport/common.build",
+  "function": "transport_lcppsrcs = [",
+  "kind": "add",
+  "form": "registration",
+  "line": "transport_lcppsrcs += [\"nr_stealth_network.cpp\"]  # STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "test": "gtest:StealthDeclaredNetwork.TheInterfaceListIsTheDeclarationOfTheEnvironment"
+ },
+ {
+  "file": "dom/media/webrtc/transport/ipc/StunAddrsRequestParent.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"transport/nr_stealth_network.h\"  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "test": "gtest:StealthDeclaredNetwork.TheResponderJoinsAndSpeaksOnTheLoopback"
+ },
+ {
+  "file": "dom/media/webrtc/transport/ipc/StunAddrsRequestParent.cpp",
+  "function": "void StunAddrsRequestParent::SendStunAddrs(const NrIceStunAddrArray& addrs) {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "    (void)MDNSServiceWrapper::EnsureInstance(nr_stealth_mdns_interfaces());  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "removed": "    std::ostringstream o;\n    char buffer[16];\n    for (auto& addr : addrs) {\n      nr_local_addr localAddr;\n      addr.toNrLocalAddr(localAddr);\n      if (localAddr.addr.ip_version == NR_IPV4 &&\n          !nr_transport_addr_is_loopback(&localAddr.addr)) {\n        nr_transport_addr_get_addrstring(&localAddr.addr, buffer, 16);\n        o << buffer << \";\";\n      }\n    }\n    std::string addrstring = o.str();\n    if (!addrstring.empty()) {\n      (void)MDNSServiceWrapper::EnsureInstance(addrstring);\n    }",
+  "test": "gtest:StealthDeclaredNetwork.TheResponderJoinsAndSpeaksOnTheLoopback",
+  "exception": "an anchor of one line is not possible: the Mozilla block that built the address list of the adapters is replaced by one call, and Mozilla creates the instance only when that list has an IPv4 address (a condition our call does not have); moving it to StartIfRequired is G18 (a change of when our code runs)",
+  "pm": "approvato"
+ },
+ {
+  "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
+  "function": "const MAX_NAME_LENGTH: usize = 255;",
+  "kind": "add",
+  "form": "unknown",
+  "line": "#[cfg(test)] mod stealth_tests;  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "test": "cargo:mdns_service::stealth_tests::stealth_responder_on_the_loopback_hears_its_own_query"
+ },
+ {
+  "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
+  "function": "impl MDNSService {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "        for addr in &addrs {  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "removed": "        for addr in addrs {",
+  "test": "cargo:mdns_service::stealth_tests::stealth_responder_on_the_loopback_hears_its_own_query",
+  "exception": "an anchor of one line is not possible: the join loop consumes `addrs` (its two lines iterate by reference so that the first address stays for the call after it), and moving the call before the loop inverts the order of two socket options (G18)",
+  "pm": "approvato"
+ },
+ {
+  "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
+  "function": "impl MDNSService {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "            if let Err(err) = socket.join_multicast_v4(&mdns_addr, addr) {",
+  "removed": "            if let Err(err) = socket.join_multicast_v4(&mdns_addr, &addr) {",
+  "test": "cargo:mdns_service::stealth_tests::stealth_responder_on_the_loopback_hears_its_own_query",
+  "exception": "an anchor of one line is not possible: the join loop consumes `addrs` (its two lines iterate by reference so that the first address stays for the call after it), and moving the call before the loop inverts the order of two socket options (G18)",
+  "pm": "approvato"
+ },
+ {
+  "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
+  "function": "impl MDNSService {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        if let Some(addr) = addrs.first() {  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "test": "cargo:mdns_service::stealth_tests::stealth_responder_on_the_loopback_hears_its_own_query",
+  "exception": "an anchor of one line is not possible: the join loop consumes `addrs` (its two lines iterate by reference so that the first address stays for the call after it), and moving the call before the loop inverts the order of two socket options (G18)",
+  "pm": "approvato"
+ },
+ {
+  "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
+  "function": "impl MDNSService {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "            if let Err(err) = socket2::SockRef::from(&socket).set_multicast_if_v4(addr) {",
+  "test": "cargo:mdns_service::stealth_tests::stealth_responder_on_the_loopback_hears_its_own_query",
+  "exception": "an anchor of one line is not possible: the join loop consumes `addrs` (its two lines iterate by reference so that the first address stays for the call after it), and moving the call before the loop inverts the order of two socket options (G18)",
+  "pm": "approvato"
+ },
+ {
+  "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
+  "function": "impl MDNSService {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "                warn!(\"Could not send multicast through interface: {:?}: {}\", addr, err);",
+  "test": "cargo:mdns_service::stealth_tests::stealth_responder_on_the_loopback_hears_its_own_query",
+  "exception": "an anchor of one line is not possible: the join loop consumes `addrs` (its two lines iterate by reference so that the first address stays for the call after it), and moving the call before the loop inverts the order of two socket options (G18)",
+  "pm": "approvato"
+ },
+ {
+  "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
+  "function": "impl MDNSService {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "            }",
+  "test": "cargo:mdns_service::stealth_tests::stealth_responder_on_the_loopback_hears_its_own_query",
+  "exception": "an anchor of one line is not possible: the join loop consumes `addrs` (its two lines iterate by reference so that the first address stays for the call after it), and moving the call before the loop inverts the order of two socket options (G18)",
+  "pm": "approvato"
+ },
+ {
+  "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
+  "function": "impl MDNSService {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "        }",
+  "test": "cargo:mdns_service::stealth_tests::stealth_responder_on_the_loopback_hears_its_own_query",
+  "exception": "an anchor of one line is not possible: the join loop consumes `addrs` (its two lines iterate by reference so that the first address stays for the call after it), and moving the call before the loop inverts the order of two socket options (G18)",
+  "pm": "approvato"
+ },
+ {
+  "file": "dom/media/webrtc/transport/moz.build",
+  "function": "include(\"/tools/fuzzing/libfuzzer-config.mozbuild\")",
+  "kind": "add",
+  "form": "registration",
+  "line": "TEST_DIRS += [\"test/gtest\"]  # STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "test": "gtest:StealthDeclaredNetwork.TheInterfaceListIsTheDeclarationOfTheEnvironment"
+ },
+ {
+  "file": "dom/media/webrtc/transport/nricectx.cpp",
+  "function": "void nr_ice_compute_codeword(char* buf, int len, char* codeword) {",
+  "kind": "rewrite",
+  "form": "wrap-function",
+  "line": "int nr_socket_local_create_Mozilla(void* obj, nr_transport_addr* addr,  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "removed": "int nr_socket_local_create(void* obj, nr_transport_addr* addr,",
+  "test": "gtest:StealthDeclaredNetwork.TheHostSocketsOfAConnectionTakeItsPortsInOrderAndSkipARefusedOne"
+ },
+ {
+  "file": "dom/media/webrtc/transport/nricectx.h",
+  "function": "OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"nr_stealth_network.h\"  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "test": "gtest:StealthDeclaredNetwork.TheHostSocketsOfAConnectionTakeItsPortsInOrderAndSkipARefusedOne"
+ },
+ {
+  "file": "dom/media/webrtc/transport/nricectx.h",
+  "function": "class NrIceCtx {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  StealthHostPorts& StealthPorts() { return host_ports_; }  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "test": "gtest:StealthDeclaredNetwork.TheHostSocketsOfAConnectionTakeItsPortsInOrderAndSkipARefusedOne"
+ },
+ {
+  "file": "dom/media/webrtc/transport/nricectx.h",
+  "function": "class NrIceCtx {",
+  "kind": "add",
+  "form": "member",
+  "line": "  StealthHostPorts host_ports_;  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "test": "gtest:StealthDeclaredNetwork.TheHostSocketsOfAConnectionTakeItsPortsInOrderAndSkipARefusedOne"
+ },
+ {
+  "file": "dom/media/webrtc/transport/test/gtest_utils.h",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"nr_stealth_test_network.h\"  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "test": "gtest:StealthDeclaredNetwork.TheInterfaceListIsTheDeclarationOfTheEnvironment"
+ },
+ {
+  "file": "dom/media/webrtc/transport/test/gtest_utils.h",
+  "function": "class MtransportTest : public ::testing::Test {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "    StealthDeclareTestNetwork();  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "test": "gtest:StealthDeclaredNetwork.TheInterfaceListIsTheDeclarationOfTheEnvironment",
+  "anchor": "NR_reg_init(); (in MtransportTest::SetUp)",
+  "why": "the declared test network is set after the registry is initialised and before the environment of the test is read; nothing before it reads STEALTHFOX_WEBRTC_NETWORK, which is read only at gather"
+ },
+ {
+  "file": "dom/media/webrtc/transport/third_party/nICEr/src/ice/ice_ctx.cpp",
+  "function": "OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"nr_stealth_addrs.h\"  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "test": "gtest:StealthDeclaredNetwork.TheDefaultAddressesAreTheDeclaredOnesAndNoRouteIsProbed"
+ },
+ {
+  "file": "dom/media/webrtc/transport/third_party/nICEr/src/ice/ice_ctx.cpp",
+  "function": "static int nr_ice_get_default_local_address(nr_ice_ctx *ctx, int ip_version, nr_",
+  "kind": "add",
+  "form": "anchor",
+  "line": "    if (int rv; nr_stealth_default_local_address_guard(ctx, ip_version, addrs, addr_ct, addrp, &rv)) return rv;  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "test": "gtest:StealthDeclaredNetwork.TheDefaultAddressesAreTheDeclaredOnesAndNoRouteIsProbed",
+  "anchor": "int i; (the last local declaration of nr_ice_get_default_local_address)",
+  "why": "this is C: the guard has to follow Mozilla's declarations; it takes its result through its own out-parameter (G15) and never a Mozilla local, and it returns before the probe of the route (G49: before the host is read)"
+ },
+ {
+  "file": "dom/media/webrtc/transport/third_party/nICEr/src/stun/addrs.cpp",
+  "function": "OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"nr_stealth_addrs.h\"  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "test": "gtest:StealthDeclaredNetwork.TheInterfaceListIsTheDeclarationOfTheEnvironment"
+ },
+ {
+  "file": "dom/media/webrtc/transport/third_party/nICEr/src/stun/addrs.cpp",
+  "function": "nr_stun_get_addrs(nr_local_addr addrs[], int maxaddrs, int *count)",
+  "kind": "rewrite",
+  "form": "wrap-call",
+  "line": "    _status = nr_stealth_declared_addrs(addrs, maxaddrs, count);  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "removed": "    _status = stun_getaddrs_filtered(addrs, maxaddrs, count);",
+  "test": "gtest:StealthDeclaredNetwork.TheInterfaceListIsTheDeclarationOfTheEnvironment"
+ },
+ {
+  "file": "netwerk/base/nsIOService.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthIPv6Literal.h\"  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "test": "node:juggler/tests/ipv6_is_one_fact_of_the_declared_network.test.mjs#the hook is one call at the top of nsIOService::Init, tagged; the parent-only rule lives in our file"
+ },
+ {
+  "file": "netwerk/base/nsIOService.cpp",
+  "function": "static const char* gCallbackSecurityPrefs[] = {",
+  "kind": "add",
+  "form": "notice",
+  "line": "  StealthApplyDeclaredNetwork();  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "test": "gtest:StealthDeclaredNetwork.NoIPv6InTheDeclarationIsNoIPv6NameLookup"
+ }
+]

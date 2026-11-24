@@ -11,6 +11,7 @@
 #include "nsCharSeparatedTokenizer.h"
 #include "nsString.h"
 #include "nsTArray.h"
+#include "skia/src/core/SkGlyph.h"
 
 namespace mozilla {
 namespace gfx {
@@ -81,6 +82,16 @@ void StealthQuantiseGlyphCoverage(uint8_t* aImage, int32_t aWidth,
       row[x] = map[row[x]];
     }
   }
+}
+
+void StealthQuantiseGlyphCoverage(const SkGlyph& aGlyph) {
+  const SkMask mask = aGlyph.mask();
+  if (mask.fFormat != SkMask::kA8_Format) {
+    return;
+  }
+  StealthQuantiseGlyphCoverage(const_cast<uint8_t*>(mask.fImage),
+                               mask.fBounds.width(), mask.fBounds.height(),
+                               mask.fRowBytes);
 }
 
 }  // namespace gfx

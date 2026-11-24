@@ -42,6 +42,7 @@ extern "C" {
 
 struct nr_local_addr_;
 struct nr_transport_addr_;
+struct nr_socket_;
 
 /* Parses a declaration into at most `maxaddrs` entries; `iid` is the temporary interface identifier of the IPv6
  * address (8 bytes). 0 and *count = 1 or 2 on success; an error and *count = 0 for a missing or malformed one. */
@@ -79,6 +80,8 @@ int nr_stealth_addr_is_wildcard_ip(const struct nr_transport_addr_* addr);
 
 #  include <set>
 
+#  include "nscore.h"
+
 // NSPR's address union. Not <prnetdb.h>: this header is included by nICEr's C++ files, which are compiled without the NSPR
 // include path (run 43161344648: "prnetdb.h file not found" in ice_ctx.o and addrs.o); a file that uses the type includes it.
 union PRNetAddr;
@@ -106,6 +109,10 @@ class StealthHostPorts final {
  public:
   static constexpr uint32_t kFirst = 49152;
   static constexpr uint32_t kLast = 65535;
+
+  /* A new connection: the base is drawn here, from the process's generator (mozilla::RandomUint64OrDie), when the owner
+   * (NrIceCtx, a member) is constructed. */
+  StealthHostPorts();
 
   /* `aRandom`: a random number from the caller's generator (mozilla::RandomUint64). */
   explicit StealthHostPorts(uint64_t aRandom)
@@ -161,6 +168,55 @@ class StealthOwnPorts final {
  * parse as an address. `aNicerPort` is the port nICEr proposed, only logged (WebrtcTCPSocket log module). */
 bool StealthTcpBindAddress(const char* aDeclaredAddress, uint16_t aNicerPort, union PRNetAddr* aOut);
 
+/* R3, NrSocket (nr_socket_prsock.cpp): the hooks of NrSocket::create, ::sendto, ::recvfrom and ::close call these. The private state of the socket (its address, the port registered as one of ours) is
+ * passed as those fields, never by a friend of ours: the hook line names the field. */
+
+/* The declared host sockets of this process: the ports their datagrams to our own declared address must reach on the
+ * loopback. Every NrSocket lives on the socket transport thread, so no lock. A function-local static, as it was inline. */
+StealthOwnPorts& StealthOwnPortsOfThisProcess();
+
+/* NrSocket::create, right after Mozilla's nr_transport_addr_to_praddr(addr, &naddr): the address of a candidate is declared,
+ * not the host's, so unless it is the wildcard or the loopback the kernel socket is bound to the wildcard of the candidate's
+ * family on the candidate's port: `aNaddr` becomes that. True on failure (the port cannot be read or the address set): the
+ * caller aborts with R_INTERNAL. */
+bool StealthBindAddress(const struct nr_transport_addr_* aAddr, union PRNetAddr* aNaddr);
+
+/* NrSocket::create, first line inside the failed bind: the port is not available (another socket holds it, or the system
+ * keeps it: Windows reserves ranges of the dynamic range and answers "access denied"), by the NSPR error of the bind. The
+ * caller aborts with R_ALREADY and nr_socket_local_create takes the next port, as the kernel would. */
+bool StealthBindPortNotAvailable();
+
+/* NrSocket::create, around Mozilla's nr_praddr_to_transport_addr(..., &my_addr_, ...) of the wildcard-port block: `aMozillaResult`
+ * is its answer, returned unchanged when it failed or when the candidate is the wildcard (the kernel's address is then the
+ * socket's). For a declared address the kernel's port is taken, and the socket reports the declared address with it: `aMyAddr`
+ * (the socket's my_addr_) is the declared address `aAddr` with the port it now holds. */
+int StealthDeclaredAddressKept(struct nr_transport_addr_* aMyAddr, const struct nr_transport_addr_* aAddr, int aMozillaResult);
+
+/* NrSocket::create, before Mozilla's AttachSocket: tests only, the next UDP create (once) finds the socket transport service
+ * refusing the socket (StealthFailNextSocketAttachForTests). True = abort with R_INTERNAL. */
+bool StealthSocketAttachRefusedForTests(const struct nr_transport_addr_* aAddr);
+
+/* NrSocket::create, around Mozilla's `stservice->AttachSocket(fd_, this)`: `aMozillaResult` is its answer, returned unchanged. A
+ * declared UDP host socket is one of ours once the socket transport service took it, as the LAST step of create: when the answer
+ * succeeded and `aAddr` is UDP and the socket's address `aMyAddr` is neither wildcard nor loopback and has a port, the port is
+ * registered (StealthOwnPortsOfThisProcess) and kept in `aOwnPort` (the socket's stealth_own_port_). A create that aborts before
+ * leaves nothing in the set. */
+nsresult StealthSocketAttached(const struct nr_transport_addr_* aMyAddr, uint16_t* aOwnPort,
+                               const struct nr_transport_addr_* aAddr, nsresult aMozillaResult);
+
+/* NrSocket::sendto, first statement: `to = StealthOwnPeerToKernel(&my_addr_, to);`. The destination as the kernel needs it: to
+ * another socket of this browser at our declared address (`aMyAddr` is the socket's my_addr_) it is the loopback, same port, in a
+ * buffer of this thread valid until the next call; else `aTo` itself. */
+const struct nr_transport_addr_* StealthOwnPeerToKernel(const struct nr_transport_addr_* aMyAddr,
+                                                        const struct nr_transport_addr_* aTo);
+
+/* NrSocket::recvfrom, after Mozilla's conversion of the sender into `aFrom`: from the loopback and one of our ports, the peer is
+ * our declared address. */
+void StealthOwnPeerFromKernel(const struct nr_transport_addr_* aMyAddr, struct nr_transport_addr_* aFrom);
+
+/* NrSocket::close: the port registered by StealthSocketAttached is removed and `aOwnPort` is zeroed. */
+void StealthOwnPortReleased(const struct nr_transport_addr_* aMyAddr, uint16_t* aOwnPort);
+
 namespace net {
 class WebrtcProxyConfig;
 }
@@ -190,7 +246,9 @@ bool StealthTcpSocketBorn(nsISocketTransport* aTransport, const net::WebrtcProxy
 void StealthFailNextSocketAttachForTests(bool aFail);
 bool StealthTakeFailNextSocketAttachForTests();
 
-/* The bind of NrSocket::create (R3: the wildcard of the candidate's family, on the candidate's port): PR_Bind, true when it bound. Tests
+/* The bind of NrSocket::create (R3: the wildcard of the candidate's family, on the candidate's port): PR_Bind, true when it bound. On Windows
+ * a UDP socket bound to a port that is not the kernel's choice is bound with SO_EXCLUSIVEADDRUSE: no other socket holds that port on any address,
+ * and none can take it afterwards (a port another socket holds is the caller's next port). Tests
  * only: StealthFailNextBindForTests(aError) makes the next one (once) fail with the NSPR error aError (e.g. PR_NO_ACCESS_RIGHTS_ERROR, which
  * Windows answers for the ranges of the dynamic range it reserves and Linux for a privileged port), so the mapping of that answer is
  * asserted on every machine, not only on one that happens to refuse a port. 0 = none. */
@@ -198,6 +256,16 @@ bool StealthBind(struct PRFileDesc* aFd, const union PRNetAddr* aAddr);
 void StealthFailNextBindForTests(int32_t aError);
 
 }  // namespace mozilla
+
+/* The body of Mozilla's nr_socket_local_create (nricectx.cpp), whose name it takes. nr_socket_local_create itself is ours
+ * (nr_stealth_network.cpp): the nICEr socket factory of every NrIceCtx calls it (ctx_socket_factory_vtbl). A host UDP
+ * socket of a declared address takes the next port of its connection (R3; NrIceCtx::StealthPorts): the base address is
+ * copied with that port and the body of Mozilla's function runs on it, whole and unchanged, once per try; a busy port
+ * (R_ALREADY from NrSocket::create) is skipped as the kernel skips it, any other answer is the answer. 16384 busy ports
+ * are R_ALREADY, a copy that fails is R_INTERNAL. A socket with no connection (`obj` null: stunserver, tests), a TCP one,
+ * and one on the wildcard or the loopback go straight to the body of Mozilla's function with the address they were given.
+ * C++ linkage, as nr_socket_local.h declares the wrapper. */
+int nr_socket_local_create_Mozilla(void* obj, struct nr_transport_addr_* addr, struct nr_socket_** sockp);
 
 /* For a socket whose identity is `self` (the declared address and its bound port): the peer of a datagram as the
  * kernel needs it (to) and as ICE must see it (from). Each returns 1 when it rewrote `addr`, 0 when it left it. */

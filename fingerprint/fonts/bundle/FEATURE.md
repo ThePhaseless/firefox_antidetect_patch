@@ -2,28 +2,66 @@
 
 Category: build, other, spoof
 Prefs: none read directly
-Test: TODO
+Test: gtest StealthBundleHooks.BorrowedFontDataIsNotFreed, StealthBundleHooks.FallbackNamesTakeThePresentation, StealthBundleHooks.TwoArgumentLookupReadsFaceZeroOfACollection, StealthBundleHooks.CollectionWithNoFaceFindsNothing (TestStealthBundleHooks.h, included by TestStealthFcFontList.cpp on Linux and TestStealthBundledCollection.cpp on Windows), StealthFcBundleFonts.FallbackNeverDefersUnderBundleOnly, StealthTtcFace.* and StealthFallbackNames.* (TestStealthBundledCollection.cpp, TestStealthFcFontList.cpp, folder fingerprint/fonts/font-list); wrapper e2e test_system_fonts_and_colors_are_windows_e2e.py, test_canvas_text_is_windows_e2e.py, test_screenshot_of_text_returns_linux_e2e.py; to write in the wrapper: test_text_widths_do_not_depend_on_load_order_e2e.py
 
 ## What it does
 
-TODO: one paragraph, from the notes below.
+The Windows retail fonts (121 files, 218.7 MB) travel in the package under `fonts/` and are the only fonts
+the browser has, on every host. DirectWrite and FreeType read each file through ONE shared mapping of the file
+(`StealthBundleFontList`, a cache that lives for the process), lent to every face of that file as a borrowed
+`FontData` that does not free it. The faces of a `.ttc` are addressed by index (`gfxFontUtils` table lookup
+with a face index, `gfxDWriteFontEntry::mBundleFaceIndex`). On Windows the path of the file travels with the
+`UnscaledFontDWrite`, so WebRender receives the path and not 65.9 MB of bytes. On Linux the Windows
+fallback names come first (`gfxPlatformGtk::GetCommonFallbackFonts`), and the cmap of a bundled face is
+published to the shared font list. The font-list side (which faces, which families, which generics) is
+fingerprint/fonts/font-list.
 
 ## Hooks in Mozilla files
 
-- `browser/fonts/moz.build` ((top level of browser/fonts/moz.build), already-hook): Replaces the single TwemojiMozilla.ttf install with a FINAL_TARGET_FILES list of 121 quoted entries (bundled Windows core fonts plus bundle-fonts.list and TwemojiMozilla.ttf, which stays in the list). Adds cocoa to the platform condition. The list is hand-maintained here and must stay in sync with the bundle manifest. The comment says macOS also needs --enable-bundled-fonts in its mozconfig. The f
-- `browser/installer/package-manifest.in` ((packaging manifest, fonts entry), already-hook): Packages @RESPATH@/fonts/* on macOS as well (upstream: Windows and GTK only). Packaging condition only; supports the bundled font set on every host.
-- `gfx/2d/ScaledFontDWrite.cpp` (UnscaledFontDWrite::GetFontDescriptor, already-hook): Returns the declared file path (UTF-16 with NUL terminator, same convention as the Mozilla file-name path) when one was passed to the constructor. Otherwise it falls through to Mozilla's own `if (!mFont) return false;` guard, which is left unchanged. The comment reports 65.9 MB sent to WebRender as bytes instead of a path ([B154]). Category is other, not spoof: the change alters what gfx passes to
-- `gfx/2d/UnscaledFontDWrite.h` (UnscaledFontDWrite constructor and member list (class UnscaledFontDWrite final : public UnscaledFont), already-hook): Adds an optional aFilePath argument with an empty default, so existing callers keep the upstream behaviour. Adds member mPercorsoDichiarato (std::wstring, ours) and the <string> include. Comment cross-references [B154].
-- `gfx/thebes/FontData.h` (class FontData (Borrowed constructor, destructor, member mBorrowed), already-hook): A borrowed FontData does not free its bytes. The bundle path wraps the bytes lent by StealthBundleFontList in one: on FreeType builds it goes to Mozilla's FTUserFontData(FontData*), whose CloneFace opens it as it opens any FontData; on Windows to Mozilla's gfxDWriteFontFileLoader::CreateCustomFontFile, whose stream reads it as it reads any FontData. The bytes must outlive every face, which holds only because the bundle cache is immortal.
-- `gfx/thebes/gfxDWriteFontList.h` (gfxDWriteFontEntry (class members mBundleFaceIndex and mBundleFilePath), already-hook): Two members: mBundleFaceIndex (feature font-ttc-face-index, index inside a .ttc) and mBundleFilePath (feature font-bundle-file-path, the path given to WebRender). Only the path member is in this file's primary feature. Adds the <string> include.
-- `gfx/thebes/gfxFcPlatformFontList.h` (gfxFontconfigFontEntry::gfxFontconfigFontEntry (explicit constructor for data fonts), already-hook): Adds defaulted aFile and aIndex arguments, so upstream data-font callers compile unchanged. The bundle path passes both. Comment cross-references [B154].
-- `gfx/thebes/gfxFontEntry.cpp` (gfxFontEntry::ShouldPublishCharacterMap (new, placed before gfxFontEntry::TrySetShmemCharacterMap), movable): One predicate replaces the four copies of '!IsUserFont() && mShmemFace' in the ReadCMAP paths (CoreText, DirectWrite, FreeType, fontconfig). It returns false for a non-shared-list face and for local() borrows, true for installed system faces, and for data faces only under bundle-only. Movable: the 8 logic lines can move into a free function in our own file.
-- `gfx/thebes/gfxFontEntry.h` (gfxFontEntry::AutoHBFace (conversion operator); gfxFontEntry (class, new ShouldPublishCharacterMap declaration), already-hook): Primary feature hb-face-lifetime: the conversion operator is ref-qualified (const&, and const&& deleted), so binding the result of GetHBFace() to a raw pointer becomes a compile error. This fixes a dangling pointer in the stealth GetDesignFont (gfxHarfBuzzShaper.cpp), not a Firefox upstream problem; the comment reports crashes before the fix. Also adds the ShouldPublishCharacterMap declaration (fe
-- `gfx/thebes/gfxFontUtils.cpp` (gfxFontUtils::FindSfntOffset (new static); gfxFontUtils::FindTableDirEntry; gfxFontUtils::GetTableFromFontData, movable): Generic .ttc support: table lookup and table blob now resolve through the requested face's offset inside the collection. Before this change the lookup read the file header only, so only the first face could be read. The default aFaceIndex = 0 keeps old callers unchanged. Not stealth-specific in principle; it is needed for the bundle's .ttc files. Movable: FindSfntOffset can move to our own file.
-- `gfx/thebes/gfxFontUtils.h` (gfxFontUtils (static declarations FindSfntOffset, FindTableDirEntry, GetTableFromFontData), already-hook): Declarations match gfxFontUtils.cpp. aFaceIndex defaults to 0 on the two existing functions.
-- `gfx/thebes/gfxPlatformGtk.cpp` (gfxPlatformGtk::GetCommonFallbackFonts, movable): Puts the Windows persona fallback names first (Segoe UI Emoji when colour is preferred, then Arial, Segoe UI, Segoe UI Symbol, Cambria Math), before the upstream Linux names, which are not in the bundle. The order is stated in the comment as a measured requirement. Since CommonFontFallback now takes names from the manifest first, this list is only reached when the manifest returns nothing. Movable
-- `gfx/thebes/gfxTextRun.cpp` (gfxFontGroup::FindFallbackFaceForChar, already-hook): The async-fallback condition is replaced by pfl->MayDeferCmapLoading(), the same predicate GlobalFontFallback uses. Comment: this site was missing the bundle-only condition before. Feature gfx.font_rendering.fallback.async is read through that predicate.
-- `gfx/thebes/moz.build` ((top level of gfx/thebes/moz.build: EXPORTS += [ ... ] and a new SOURCES += [ ... ] block after UNIFIED_SOURCES), already-hook): Exports StealthBundleFontList.h and StealthDeclarationGate.h, and compiles StealthBundleFontList.cpp and StealthDeclarationGate.cpp as non-unified SOURCES (the comment says short file-static helpers could collide in a unified build). The comment says dom/canvas reads the coverage ladder through the exported header. Those two .cpp/.h files are our own and are not in this diff.
+One line each, with the marker `// STEALTH-HOOK(fingerprint/fonts/bundle)` on it (the one of gfx/thebes/moz.build
+sits beside the lines of the other folders):
+
+- `browser/fonts/moz.build`: `include("StealthFonts.mozbuild")` after Mozilla's last statement (registration).
+- `gfx/2d/ScaledFontDWrite.cpp`: guard `if (StealthGetSeededDescriptor(aCb, aBaton)) return true;` as the first
+  statement of `UnscaledFontDWrite::GetFontDescriptor`. The declared path lives where Mozilla keeps the file
+  name (`mFontFileName`: path plus terminator), so the callback gets the bytes, the face index and the `true`
+  of the block that was here before. For a font that was never seeded the guard says no and Mozilla's lines run.
+  Firefox 160 fills `mFontFileName` itself in `CreateFromFontDescriptor`; the hook becomes redundant at the port.
+- `gfx/2d/UnscaledFontDWrite.h`: `#include <string>` in a block of ours; two member declarations, `void
+  StealthSeedFilePath(const std::wstring&)` and `bool StealthGetSeededDescriptor(FontDescriptorOutput, void*)`
+  (defined in StealthDWriteFontList.cpp). Mozilla's two-argument constructor is back, and the data member
+  `mPercorsoDichiarato` is gone.
+- `gfx/thebes/FontData.h`: members `enum class Borrowed`, the declaration of the `Borrowed` constructor
+  (`explicit`, defined in StealthBundleFontList.cpp), `friend uint8_t* StealthFontDataOwned(...)`, `bool const
+  mBorrowed`, and the wrap in the destructor: `free(StealthFontDataOwned(this, const_cast<uint8_t*>(mData)))`
+  (one Mozilla line rewritten: `free(nullptr)` is a no-op, so a borrowed FontData frees nothing).
+- `gfx/thebes/gfxDWriteFontList.h`: `#include <string>` in a block of ours, the members `mBundleFaceIndex`
+  and `mBundleFilePath` and the declaration of `CreateStealthBundleFontEntry` (members, one line each).
+- `gfx/thebes/gfxFcPlatformFontList.h`: `friend struct StealthFcAccess;` (marker fingerprint/fonts/font-list: the struct
+  is in StealthFcFontList.cpp), after Mozilla's first friend.
+- `gfx/thebes/gfxFontEntry.h`: member `bool ShouldPublishCharacterMap() const;` (defined in
+  StealthBundleFontList.cpp; the back ends' hooks use the same rule through `StealthPublishCharacterMap`,
+  fingerprint/fonts/font-list). Declared exception (G35): `AutoHBFace` conversion operators, see below.
+- `gfx/thebes/gfxFontUtils.cpp`: `#include "StealthBundleFontList.h"` in a block of ours, and one wrap in Mozilla's
+  `FindTableDirEntry`: `const SFNTHeader* header = StealthSfntHeader(reinterpret_cast<const SFNTHeader*>(aFontData));`.
+  `GetTableFromFontData` is Mozilla's again. For a collection the two-argument form reads face 0, as the
+  three-argument form with index 0 did.
+- `gfx/thebes/gfxFontUtils.h`: three members, `FindSfntOffset(const void*, uint32_t)` and the three-argument
+  `FindTableDirEntry` and `GetTableFromFontData` (no default argument; the two-argument forms are Mozilla's).
+- `gfx/thebes/gfxPlatformGtk.cpp`: `#include "StealthBundleFontList.h"` in a block of ours and the notice
+  `StealthAppendWindowsFallbackNames(aPresentation, aFontList);` as the first statement of
+  `GetCommonFallbackFonts` (the overload that takes the presentation calls the bool one on `PrefersColor`).
+- `gfx/thebes/gfxTextRun.cpp`: `#include "StealthBundleFontList.h"` in a block of ours and one wrap in
+  `FindFallbackFaceForChar`: `StealthFallbackMayDefer(StaticPrefs::gfx_font_rendering_fallback_async()) &&`
+  as the middle operand of Mozilla's condition (its other two lines are Mozilla's again).
+- `gfx/thebes/moz.build`: `include("StealthBundleFontList.mozbuild")`.
+
+Files that left the series: `gfx/thebes/gfxFontEntry.cpp` (the definition of `ShouldPublishCharacterMap` is in our
+file) and `browser/installer/package-manifest.in` (the macOS term of the `#if` is dead: macOS support ended on
+2026-08-26, and Linux and Windows define `MOZ_WIDGET_GTK` and `XP_WIN`, so the packaged archives are the same).
+The CoreText-only helpers (`GetPsname`, and in the font-list folder `StealthDropFamily`,
+`StealthSetBundledFamilyNames`, `StealthBundledCTFontEntry`, `StealthUiFamily`) left our files with
+`CoreTextFontList.cpp`: no leg of the series builds it (G25).
 
 ## Our own files
 
@@ -32,6 +70,7 @@ TODO: one paragraph, from the notes below.
 - `browser/fonts/L_10646.TTF`
 - `browser/fonts/Nirmala.ttf`
 - `browser/fonts/SitkaSmall.ttf`
+- `browser/fonts/StealthFonts.mozbuild`
 - `browser/fonts/arial7_04.ttf`
 - `browser/fonts/arialbd7_04.ttf`
 - `browser/fonts/arialbi7_04.ttf`
@@ -147,88 +186,80 @@ TODO: one paragraph, from the notes below.
 - `browser/fonts/webdings5_01.ttf`
 - `browser/fonts/wingding5_01.ttf`
 - `browser/fonts/yugothm1_95.ttc`
+- `gfx/tests/gtest/TestStealthBundleHooks.h`
 - `gfx/thebes/StealthBundleFontList.cpp`
 - `gfx/thebes/StealthBundleFontList.h`
+- `gfx/thebes/StealthBundleFontList.mozbuild`
+- `gfx/thebes/StealthDWriteFontList.cpp`
 
 ## Why StealthBundleFontList.h is exported
 
 StealthBundleFontList.h is exported because dom/canvas reads the coverage ladder from it (the alpha-quantisation hook in CanvasRenderingContext2D).
 
 
+
+
 ## gfx/thebes/FontData.h: the Borrowed constructor
 
-Hook: `FontData(const uint8_t*, uint32_t, Borrowed)`, the `mBorrowed` member and
-the destructor that frees only what it owns. Until 2026-10-29 the borrow lived
-in `FTUserFontData` (gfx/2d/2D.h, a constructor tagged `Prestito`, members
-`mBorrowedData` / `mBorrowedLength`) with a second branch in its `CloneFace`
-(gfx/2d/Factory.cpp). Firefox 159 removes `FTUserFontData`, and those two
-hooks were the largest conflict of the 157 -> 159 merge (94 of our lines);
-`FontData.h` is unchanged across those releases. Mozilla's `CloneFace` opens
-a FontData with the same `FT_New_Memory_Face` on the same bytes and selects
-the charmap, so the faces are the same.
+Hooks: the `Borrowed` enum and constructor, the `mBorrowed` member, `StealthFontDataOwned` and the destructor that
+frees only what it owns. Until 2026-10-29 the borrow lived in `FTUserFontData` (gfx/2d/2D.h, a constructor tagged
+`Prestito`) with a second branch in its `CloneFace` (gfx/2d/Factory.cpp). Firefox 159 removes `FTUserFontData`, and
+those two hooks were the largest conflict of the 157 -> 159 merge (94 of our lines); `FontData.h` is unchanged across
+those releases. Mozilla's `CloneFace` opens a FontData with the same `FT_New_Memory_Face` on the same bytes and
+selects the charmap, so the faces are the same.
 
-The comment that stood on the constructor in 2D.h, kept unchanged:
+The comment that stood on the constructor, kept unchanged:
 
 STEALTH: i byte appartengono a QUALCUN ALTRO e non vanno liberati qui.
 
-Simmetrico al costruttore in prestito di `gfxDWriteFontFileStream` (§5.2l):
-su ENTRAMBE le piattaforme una sola mappatura per FILE viene prestata a
-tutte le facce di quel file, invece di una copia per faccia. Il prestito e'
-sicuro per la stessa ragione di la': la cache di `StealthBundleFontList` e'
-immortale per costruzione - l'oggetto e' volutamente leaked e non svuota mai
-`mFileCache` - e il valore della mappa e' un `RefPtr`, quindi se la tabella
+Simmetrico al costruttore in prestito di `gfxDWriteFontFileStream` (§5.2l): su ENTRAMBE le piattaforme una sola
+mappatura per FILE viene prestata a tutte le facce di quel file, invece di una copia per faccia. Il prestito e'
+sicuro per la stessa ragione di la': la cache di `StealthBundleFontList` e' immortale per costruzione - l'oggetto
+e' volutamente leaked e non svuota mai `mFileCache` - e il valore della mappa e' un `RefPtr`, quindi se la tabella
 hash rialloca a spostarsi e' il puntatore e mai i byte.
 
-`FontData` was the owner that calls `free()` on its bytes, which is why the
-first version needed a second pair of members in `FTUserFontData`; the
-Borrowed constructor marks the bytes as not owned instead, so every caller
-downstream sees an ordinary FontData.
+The destructor of Mozilla's class calls `free()` on what `StealthFontDataOwned` returns: null for a borrowed
+FontData (a no-op), the pointer for an owning one. The `friend` gives the function access to `mBorrowed`; it is
+found by argument-dependent lookup inside the destructor. `mBorrowed` sits after `mData` and before `mLength`, and
+Mozilla's constructor leaves it at its default (false).
 
 ## gfx/2d/ScaledFontDWrite.cpp: UnscaledFontDWrite::GetFontDescriptor
 
-Hook: the early `if (!mPercorsoDichiarato.empty())` block that hands the declared
-file path to the callback. The comment that stood on it in ScaledFontDWrite.cpp,
-moved here unchanged except that "qui sotto" is replaced by the spot it named:
+Hook: the guard `StealthGetSeededDescriptor` as the first statement. The comment that stood on the old block,
+moved here:
 
 STEALTH: se il percorso e' DICHIARATO, si usa quello e si salta il resto.
 
-La guardia `!mFont` che segue il blocco, in `GetFontDescriptor`, e' un PROXY:
-"non e' un font di sistema" sta
-per "non ha un file", e il commento al punto di costruzione lo dice
-esplicitamente ("this signals whether or not we can safely query a
-descriptor"). Per un font scaricato da una pagina e' corretto, perche' li'
-un file non esiste. Per le nostre facce imbarcate e' falso: il file esiste
-e lo conosciamo, e tacerlo fa mandare a WebRender i BYTE del font invece
-del percorso. Misurati 65,9 MB nel processo padre su Linux, dove la stessa
-correzione e' stata fatta per prima - `70-known-bugs.md` [B154].
+La guardia `!mFont` che segue, in `GetFontDescriptor`, e' un PROXY: "non e' un font di sistema" sta per "non ha un
+file", e il commento al punto di costruzione lo dice esplicitamente ("this signals whether or not we can safely
+query a descriptor"). Per un font scaricato da una pagina e' corretto, perche' li' un file non esiste. Per le
+nostre facce imbarcate e' falso: il file esiste e lo conosciamo, e tacerlo fa mandare a WebRender i BYTE del font
+invece del percorso. Misurati 65,9 MB nel processo padre su Linux, dove la stessa correzione e' stata fatta per
+prima - `70-known-bugs.md` [B154].
 
-Non si passa da `GetFontFileName` perche' quella pretende un
-`IDWriteLocalFontFileLoader`, e il nostro caricatore presta byte in
-memoria: non e' locale e non lo sara'. La convenzione dei byte e' la stessa
-che usa lei, terminatore nullo compreso.
+Non si passa da `GetFontFileName` perche' quella pretende un `IDWriteLocalFontFileLoader`, e il nostro caricatore
+presta byte in memoria: non e' locale e non lo sara'. La convenzione dei byte e' la stessa che usa lei, terminatore
+nullo compreso (`mFontFileName` e' il suo posto).
 
-## gfx/2d/UnscaledFontDWrite.h: UnscaledFontDWrite constructor and mPercorsoDichiarato
+## gfx/2d/UnscaledFontDWrite.h: the seeded file name
 
-Hook: the optional constructor argument `aFilePath` (default empty), the member
-`std::wstring mPercorsoDichiarato` and the `<string>` include. The comment on the
-constructor, moved here unchanged:
+Hooks: `StealthSeedFilePath` (called by `StealthWithBundlePath`, fingerprint/fonts/font-list, on the object Mozilla
+just built in `gfxDWriteFontEntry::CreateFontInstance`) and `StealthGetSeededDescriptor`, both defined in
+StealthDWriteFontList.cpp, plus the `<string>` include. Until now the path was a third constructor argument and a
+member `mPercorsoDichiarato`; it now goes into `mFontFileName`, which is where Mozilla keeps the file name (path plus
+terminator), so the descriptor callback gets the same bytes. Mozilla's two-argument constructor is back, so
+`ScaledFontDWrite.cpp` and `Moz2DImageRenderer.cpp` bind to it as in the tag. The comment that stood on the old
+constructor, moved here:
 
 STEALTH: `aFilePath` e' il file da cui questa faccia viene, quando esiste.
 
-Serve perche' `GetFontDescriptor` non riesce a ricavarlo da solo per le
-nostre facce: quel percorso passa da `IDWriteLocalFontFileLoader`, e il
-nostro caricatore presta byte in memoria, quindi non e' locale. Senza il
-percorso Gecko ripiega sui BYTE del font verso WebRender - misurati 65,9 MB
-nel processo padre su Linux, dove lo stesso difetto e' stato corretto per
-primo. Vedi `70-known-bugs.md` [B154].
+Serve perche' `GetFontDescriptor` non riesce a ricavarlo da solo per le nostre facce: quel percorso passa da
+`IDWriteLocalFontFileLoader`, e il nostro caricatore presta byte in memoria, quindi non e' locale. Senza il percorso
+Gecko ripiega sui BYTE del font verso WebRender - misurati 65,9 MB nel processo padre su Linux, dove lo stesso difetto
+e' stato corretto per primo. Vedi `70-known-bugs.md` [B154].
 
-Chi non passa un percorso non vede nessuna differenza: resta il
-comportamento upstream, che per un font scaricato da una pagina e' quello
-giusto perche' li' un file non esiste davvero.
-
-The comment on the member `mPercorsoDichiarato`:
-
-STEALTH: vuoto per ogni font che non sia dei nostri imbarcati.
+Chi non passa un percorso non vede nessuna differenza: resta il comportamento upstream, che per un font scaricato da
+una pagina e' quello giusto perche' li' un file non esiste davvero.
 
 ## Windows: the DirectWrite stream lends through FontData
 
@@ -249,6 +280,7 @@ user font entry will account for that"). For a lent FontData that is also
 right: the bundle cache is where those bytes belong and where they are
 reported, and counting them again would double-count them in about:memory.
 
+
 ## gfx/thebes/gfxDWriteFontList.h: gfxDWriteFontEntry::mBundleFaceIndex and mBundleFilePath
 
 Hook: the two members (and the `<string>` include). The comments that stood on them
@@ -259,83 +291,78 @@ for system fonts. Lets a .ttc face be addressed by index in CreateFontFace.
 
 mBundleFilePath: Bundle file path; see StealthDWriteFontList.cpp (CreateFontInstance).
 
-## gfx/thebes/gfxFontEntry.h: gfxFontEntry::AutoHBFace conversion operator
 
-Hook: `operator hb_face_t*() const&` and the deleted `operator hb_face_t*() const&&`
-(feature hb-face-lifetime). The comment that stood on it in gfxFontEntry.h, moved
-here unchanged:
+## gfx/thebes/gfxFontEntry.h: gfxFontEntry::AutoHBFace conversion operator (declared exception)
 
-La conversione vale solo su un LVALUE. Legarsi a un temporaneo e'
-vietato dal TIPO, non da una convenzione:
+Hook: `operator hb_face_t*() const&` and the deleted `operator hb_face_t*() const&&` (feature hb-face-lifetime).
+It is a change of the type of a Mozilla class, not a hook, and no form expresses it (a lone `const&& = delete` next to
+Mozilla's unqualified operator is ill-formed), so the two lines stay as they are, as a declared exception approved
+by the pm (G35, G24). The consequence is in fingerprint/fonts/font-list: `gfxFontconfigFontEntry::GetHBFace` and
+`GetFontTableInternal` cannot keep Mozilla's `hb_face_reference(gfxFontEntry::GetHBFace())` and
+`hb_face_reference_table(GetHBFace(), ...)`, which bind the temporary, so two lines there are rewritten
+(`StealthBaseHBFaceRef`, `StealthHBFaceTable`).
+
+Where it comes from: commit 098cf5f777 (fingerprint/fonts/bundle, 2026-10-05) introduced it (found with `git log -S`),
+after the one wrong caller of fourteen, `gfxHarfBuzzShaper::GetDesignFont`, left a dangling pointer. The comment
+that stood on it, moved here unchanged:
+
+La conversione vale solo su un LVALUE. Legarsi a un temporaneo e' vietato dal TIPO, non da una convenzione:
 
         hb_face_t* f = entry->GetHBFace();   // non compila
         const auto f(entry->GetHBFace());    // corretto
 
-GetHBFace() torna per valore, quindi scrivendo la prima forma il
-temporaneo si converte e viene distrutto alla fine di quella stessa
-istruzione: il puntatore e' penzolante dalla riga dopo, e chi lo usa
-scrive dentro memoria liberata. Misurato il 2026-08-10 su
-gfxHarfBuzzShaper::GetDesignFont(), che era l'unico dei quattordici
-chiamanti a sbagliarlo: 6 sessioni di navigazione morte su 10 contro 0
-dopo la correzione. Il difetto era silenzioso perche' la memoria appena
-liberata resta quasi sempre leggibile, e il segmentation fault arrivava
-altrove e molto dopo.
+GetHBFace() torna per valore, quindi scrivendo la prima forma il temporaneo si converte e viene distrutto alla fine
+di quella stessa istruzione: il puntatore e' penzolante dalla riga dopo, e chi lo usa scrive dentro memoria liberata.
+Misurato il 2026-08-10 su gfxHarfBuzzShaper::GetDesignFont(), che era l'unico dei quattordici chiamanti a
+sbagliarlo: 6 sessioni di navigazione morte su 10 contro 0 dopo la correzione. Il difetto era silenzioso perche' la
+memoria appena liberata resta quasi sempre leggibile, e il segmentation fault arrivava altrove e molto dopo.
 
-Sta nel TIPO e non solo in un gate perche' il progetto sapeva gia' la
-regola in tredici punti su quattordici e il quattordicesimo e' stato
-scritto sbagliato lo stesso: qui il compilatore lo rifiuta.
+Sta nel TIPO e non solo in un gate perche' il progetto sapeva gia' la regola in tredici punti su quattordici e il
+quattordicesimo e' stato scritto sbagliato lo stesso: qui il compilatore lo rifiuta.
 
 ## gfx/thebes/gfxFontEntry.h: gfxFontEntry::ShouldPublishCharacterMap declaration
 
-Hook: the declaration `bool ShouldPublishCharacterMap() const;` (defined in
-gfxFontEntry.cpp, forwarding to `StealthBundleFontList::ShouldPublishCharacterMap`
-in gfx/thebes/StealthBundleFontList.cpp, which explains each branch of the predicate
-in its own comments). The comment
-that stood on the declaration, moved here unchanged:
+Hook: the declaration `bool ShouldPublishCharacterMap() const;`, defined in StealthBundleFontList.cpp (it forwards to
+`StealthBundleFontList::ShouldPublishCharacterMap`, which answers `mShmemFace && StealthPublishCharacterMap(...)`, the rule
+of fingerprint/fonts/font-list). The hooks of the back ends no longer call it: `ReadCMAP` calls
+`StealthPublishCharacterMap(this, !IsUserFont())`, so the member is a candidate to remove in a separate decision (G24). The
+comment that stood on the declaration, moved here unchanged:
 
-Stealth: does this entry's character map belong in the shared font list?
-Every backend's ReadCMAP asked `!IsUserFont() && mShmemFace`, four copies of
-one rule, and that rule is WRONG for a bundled face: it is constructed from
-file data (so IsUserFont() is true) while being one of the list's own faces.
-The consequence was that no bundled face's cmap ever reached shared memory.
-One predicate, four readers.
+Stealth: does this entry's character map belong in the shared font list? Every backend's ReadCMAP asked
+`!IsUserFont() && mShmemFace`, four copies of one rule, and that rule is WRONG for a bundled face: it is constructed
+from file data (so IsUserFont() is true) while being one of the list's own faces. The consequence was that no bundled
+face's cmap ever reached shared memory. One predicate, four readers.
 
-## gfx/thebes/gfxFontUtils.h: FindTableDirEntry and GetTableFromFontData (aFaceIndex)
+## gfx/thebes/gfxFontUtils: the face index of a .ttc
 
-Hook: the new parameter `uint32_t aFaceIndex = 0` on `FindTableDirEntry` and
-`GetTableFromFontData`, and the declaration of `FindSfntOffset` (defined in
-gfx/thebes/StealthBundleFontList.cpp). In gfxFontUtils.h we had edited Mozilla's
-doc comments of the two functions; Mozilla's wording is restored there and our
-version is kept here, unchanged.
+Hooks: `StealthSfntHeader` (the wrap in Mozilla's `FindTableDirEntry`) and the three members. A collection's table
+lookup reads the sfnt header of the requested face; table offsets are relative to the start of the file in every face,
+so the blob of `GetTableFromFontData` is made from the file start and the entry's offset. `StealthSfntHeader` returns
+the header it was given for a single-face sfnt, the header of face 0 for a collection, and an empty header
+(numTables 0, so nothing is found) for a collection that lists no face. The three-argument forms call
+`FindSfntOffset` and then Mozilla's two-argument function on the face header. In gfxFontUtils.h we had edited
+Mozilla's doc comments of the two functions; Mozilla's wording is restored there and our version is kept here:
 
-FindTableDirEntry:
-
-Find the table directory entry for a given table tag, in a (validated)
-buffer of font data (single-face sfnt or .ttc collection). aFaceIndex
-selects the face within a .ttc (ignored for single-face fonts).
+FindTableDirEntry: find the table directory entry for a given table tag, in a (validated) buffer of font data
+(single-face sfnt or .ttc collection). aFaceIndex selects the face within a .ttc (ignored for single-face fonts).
 Returns null if the tag is not present.
 
-GetTableFromFontData:
-
-Return a blob that wraps a table found within a buffer of font data
-(single-face sfnt or .ttc collection). aFaceIndex selects the face
-within a .ttc (ignored for single-face fonts). Table offsets are
-relative to the beginning of the file, so the blob points into aFontData.
-The blob does NOT own its data; caller guarantees that the buffer
-will remain valid at least as long as the blob.
-Returns null if the specified table is not found.
-This method assumes aFontData is valid font data; before using this,
-caller is responsible to do any sanitization/validation necessary.
+GetTableFromFontData: return a blob that wraps a table found within a buffer of font data (single-face sfnt or .ttc
+collection). aFaceIndex selects the face within a .ttc (ignored for single-face fonts). Table offsets are relative to
+the beginning of the file, so the blob points into aFontData. The blob does NOT own its data; caller guarantees that
+the buffer will remain valid at least as long as the blob. Returns null if the specified table is not found. This
+method assumes aFontData is valid font data; before using this, caller is responsible to do any sanitization/validation
+necessary.
 
 ## gfx/thebes/gfxTextRun.cpp: gfxFontGroup::FindFallbackFaceForChar
 
-Hook: the condition `pfl->MayDeferCmapLoading()` in place of the three-part
-async-fallback condition. The comment that stood on it (the same text now also sits
-at `gfxPlatformFontList::MayDeferCmapLoading` in gfx/thebes/StealthBundleFontList.cpp,
-the function the hook calls):
+Hook: the middle operand of the three-part async-fallback condition goes through `StealthFallbackMayDefer`, which
+answers `aAsyncPref && !bundleOnly`. `GlobalFontFallback` (fingerprint/fonts/font-list) asks the same predicate
+(`StealthMayDeferCmapLoadingCore`), so both sites agree. The comment that stood on it:
 
-Stealth: this is the site the bundle-only condition was missing from. The
-twin site in GlobalFontFallback spelled it out by hand, this one (FindFallbackFaceForChar) did not, and
-under bundle-only NO family is ever fully initialized - so every text run
-that needed a fallback face within a family took this early return in the
-content process. MayDeferCmapLoading is now the single answer for both.
+Stealth: this is the site the bundle-only condition was missing from. The twin site in GlobalFontFallback spelled it
+out by hand, this one (FindFallbackFaceForChar) did not, and under bundle-only NO family is ever fully initialized -
+so every text run that needed a fallback face within a family took this early return in the content process.
+`StealthFallbackMayDefer` is now the single answer for both. Measured 2026-08-07: the regional-indicator pair through
+"Arial" gave 52.63 on both platforms when it was the first thing a fresh page measured and 63.53 (Windows) against 80.07
+(Linux) after other families had been measured: the divergence was the load order.

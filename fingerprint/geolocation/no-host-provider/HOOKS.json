@@ -1,0 +1,76 @@
+[
+ {
+  "file": "dom/geolocation/GeolocationSystemWin.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/StealthGeolocation.h\"  // STEALTH-HOOK(fingerprint/geolocation/no-host-provider)",
+  "test": "gtest:StealthDeclaredNetwork.TheSystemLocationSwitchIsDeclaredOn"
+ },
+ {
+  "file": "dom/geolocation/GeolocationSystemWin.cpp",
+  "function": "NS_IMPL_ISUPPORTS(LocationPermissionWifiScanListener, nsIWifiListener)",
+  "kind": "add",
+  "form": "guard",
+  "line": "  if (StealthSystemLocationDeclaredOn()) return SystemGeolocationPermissionBehavior::NoPrompt;  // STEALTH-HOOK(fingerprint/geolocation/no-host-provider)",
+  "test": "wrapper:tests/test_geolocation_reads_nothing_of_the_host_windows_e2e.py::test_no_host_location_module_loads_and_no_windows_utils_process_starts"
+ },
+ {
+  "file": "dom/permission/PermissionObserver.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/StealthGeolocation.h\"  // STEALTH-HOOK(fingerprint/geolocation/no-host-provider)",
+  "test": "gtest:StealthDeclaredNetwork.OnlyTheGeolocationPermissionSkipsItsOsMonitor"
+ },
+ {
+  "file": "dom/permission/PermissionObserver.cpp",
+  "function": "void PermissionObserver::RemoveSink(PermissionStatusSink* aSink) {",
+  "kind": "add",
+  "form": "guard",
+  "line": "  if (StealthSkipsPermissionMonitor(aName)) return;  // STEALTH-HOOK(fingerprint/geolocation/no-host-provider)",
+  "test": "wrapper:tests/test_geolocation_reads_nothing_of_the_host_windows_e2e.py::test_no_host_location_module_loads_and_no_windows_utils_process_starts"
+ },
+ {
+  "file": "toolkit/components/geolocation/GeolocationService.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/StealthGeolocation.h\"  // STEALTH-HOOK(fingerprint/geolocation/no-host-provider)",
+  "test": "gtest:StealthDeclaredNetwork.GeolocationProviderIsTheNetworkProviderOnEveryOS"
+ },
+ {
+  "file": "toolkit/components/geolocation/GeolocationService.cpp",
+  "function": "nsresult GeolocationService::Init() {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  if (StealthSelectGeolocationProvider(mProvider)) return NS_OK;  // STEALTH-HOOK(fingerprint/geolocation/no-host-provider)",
+  "test": "wrapper:tests/test_geolocation_reads_nothing_of_the_host_windows_e2e.py::test_no_host_location_module_loads_and_no_windows_utils_process_starts",
+  "anchor": "`obs->AddObserver(this, \"xpcom-shutdown\", false);` in GeolocationService::Init",
+  "why": "Mozilla's three early returns of Init (geo.enabled off, content process, no observer service) and the observer registration must run first, and Init must return before the Android, Portal, GeoClue, CoreLocation, Windows and MLS blocks; a guard in the head would copy those checks, a function wrap would let Portal and GeoClue read the host before the provider is replaced, and an advice in the head would load the provider in content processes"
+ },
+ {
+  "file": "toolkit/components/geolocation/moz.build",
+  "function": "with Files(\"**\"):",
+  "kind": "add",
+  "form": "registration",
+  "line": "EXPORTS.mozilla += [\"StealthGeolocation.h\"]  # STEALTH-HOOK(fingerprint/geolocation/no-host-provider)",
+  "test": "gtest:StealthDeclaredNetwork.TheSystemLocationSwitchIsDeclaredOn"
+ },
+ {
+  "file": "toolkit/components/geolocation/moz.build",
+  "function": "with Files(\"**\"):",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"StealthGeolocation.cpp\"]  # STEALTH-HOOK(fingerprint/geolocation/no-host-provider)",
+  "test": "gtest:StealthDeclaredNetwork.TheSystemLocationSwitchIsDeclaredOn"
+ },
+ {
+  "file": "toolkit/components/geolocation/moz.build",
+  "function": "XPCOM_MANIFESTS += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "TEST_DIRS += [\"test/gtest\"]  # STEALTH-HOOK(fingerprint/geolocation/no-host-provider)",
+  "test": "gtest:StealthDeclaredNetwork.TheSystemLocationSwitchIsDeclaredOn"
+ }
+]

@@ -62,39 +62,49 @@ test('the stand-in channel of the lookup is given the context before the proxy i
 test('the TRR request takes the context of its lookup, right after its channel is made', () => {
   const text = read('netwerk/dns/TRR.cpp');
   const made = text.indexOf('rv = DNSUtils::CreateChannelHelper(dnsURI, getter_AddRefs(channel));');
-  // The hook sits between the call that makes the channel and upstream's check of it.
-  const apply = text.indexOf('rv = StealthApplyTRRContextToChannel(channel, StealthTRRContextOfSuffix(mOriginSuffix));  // STEALTH-HOOK(network/doh)\n  NS_ENSURE_SUCCESS(rv, rv);  // STEALTH-HOOK(network/doh)');
+  // The hook sits right after the check of the channel Mozilla makes, which stays as Mozilla wrote it.
+  const apply = text.indexOf('if (StealthTRRApplyContext(mOriginSuffix, channel, &rv)) return rv;  // STEALTH-HOOK(network/doh)');
   const open = text.indexOf('rv = httpChannel->AsyncOpen(this);');
   assert.ok(made > 0 && apply > made, 'the context is not applied after the channel is made');
   assert.ok(open > apply, 'the channel is opened before it has its context');
+  assert.equal(text.split('StealthApplyTRRContextToChannel(').length - 1, 0, 'the context is given by the one function of ours');
 });
 
 test('the cached connection info of the default context never serves another context', () => {
   const text = read('netwerk/dns/TRR.cpp');
-  assert.match(text, /  if \(UseDefaultServer\(\) && !useOHTTP &&\n      StaticPrefs::network_trr_async_connInfo\(\) && StealthTRRContextOfSuffix\(mOriginSuffix\)\.isNothing\(\)\) \{  \/\/ STEALTH-HOOK\(network\/doh\)/);
+  assert.match(text, /  if \(UseDefaultServer\(\) && !useOHTTP &&\n      StealthTRRConnInfoUsable\(mOriginSuffix, StaticPrefs::network_trr_async_connInfo\(\)\)\) \{  \/\/ STEALTH-HOOK\(network\/doh\)/);
+  // The pref is read by that condition alone in TRR.cpp.
+  assert.equal(text.split('async_connInfo()').length - 1, 1);
+});
+
+test('the file of the two TRR.cpp functions is registered next to the resolver\'s, and TRR.cpp reaches it through one include of ours after Mozilla\'s', () => {
+  assert.match(read('netwerk/dns/moz.build'), /\]\nUNIFIED_SOURCES \+= \["StealthSessionResolver\.cpp", "StealthTRRRequest\.cpp"\]  # STEALTH-HOOK\(network\/doh\)\n/);
+  assert.match(read('netwerk/dns/TRR.cpp'), /\n#include "mozilla\/glean\/NetwerkMetrics\.h"\n\n#include "StealthTRRRequest\.h"  \/\/ STEALTH-HOOK\(network\/doh\)\n\nnamespace mozilla \{/);
+  const code = read('netwerk/dns/StealthTRRRequest.cpp');
+  assert.match(code, /StealthApplyTRRContextToChannel\(\s*aChannel, StealthTRRContextOfSuffix\(aOriginSuffix\)\)/);
+  assert.match(code, /return aPrefValue && StealthTRRContextOfSuffix\(aOriginSuffix\)\.isNothing\(\);/);
 });
 
 test('the TRR channel asks the proxy lookup with the context of its load info', () => {
   const text = read('netwerk/protocol/http/TRRServiceChannel.cpp');
   const resolve = text.slice(text.indexOf('nsresult TRRServiceChannel::ResolveProxy()'));
   assert.match(resolve.slice(0, 1200),
-      /getter_AddRefs\(proxyRequest\), Nothing\(\), StealthTRRContextOfLoadInfo\(mLoadInfo\)\);  \/\/ STEALTH-HOOK\(network\/doh\)/);
+      /getter_AddRefs\(proxyRequest\), Nothing\(\), StealthTRRContextOf\(this\)\);  \/\/ STEALTH-HOOK\(network\/doh\)/);
 });
 
 test('a TRR load info keeps the context, and its clone (a redirect) too', () => {
   const text = read('netwerk/base/TRRLoadInfo.cpp');
   const set = text.slice(text.indexOf('nsresult TRRLoadInfo::SetOriginAttributes('));
-  // The setter stores the attributes; the line of Mozilla's that refused is gone
-  // (a rewritten line, registered: no way to keep it without a dead `return`).
+  // The setter is answered by the guard at its top; Mozilla's refusal stays below it, as in the tag.
   assert.match(set.slice(0, set.indexOf('\n}\n') + 3),
-      /\{\n  mOriginAttributes = aOriginAttributes;  \/\/ STEALTH-HOOK\(network\/doh\)\n  return NS_OK;  \/\/ STEALTH-HOOK\(network\/doh\)\n\}\n/);
+      /\{\n  if \(nsresult rv; StealthTRRSetOriginAttributes\(mOriginAttributes, aOriginAttributes, &rv\)\) return rv;  \/\/ STEALTH-HOOK\(network\/doh\)\n  return NS_ERROR_NOT_IMPLEMENTED;\n\}\n/);
   const clone = text.slice(text.indexOf('TRRLoadInfo::Clone()'), text.indexOf('TRRLoadInfo::GetLoadingPrincipal'));
   assert.match(clone, /->mOriginAttributes = mOriginAttributes;  \/\/ STEALTH-HOOK\(network\/doh\)/);
 });
 
 test('our file and its gtest are registered', () => {
-  assert.match(read('netwerk/ipc/moz.build'), /"StealthTRRContext\.h",  # STEALTH-HOOK\(network\/doh\)/);
-  assert.match(read('netwerk/ipc/moz.build'), /"StealthTRRContext\.cpp",  # STEALTH-HOOK\(network\/doh\)/);
+  assert.match(read('netwerk/ipc/moz.build'), /EXPORTS\.mozilla\.net \+= \["StealthTRRContext\.h"\]  # STEALTH-HOOK\(network\/doh\)/);
+  assert.match(read('netwerk/ipc/moz.build'), /UNIFIED_SOURCES \+= \["StealthTRRContext\.cpp"\]  # STEALTH-HOOK\(network\/doh\)/);
   // The gtests of the network line are listed in stealth.build, which Mozilla's moz.build includes with one line.
   assert.match(read('netwerk/test/gtest/moz.build'), /include\("stealth\.build"\)  # STEALTH-HOOK\(network\/socks\)/);
   assert.match(read('netwerk/test/gtest/stealth.build'), /SOURCES \+= \[[^\]]*"TestStealthTRRContext\.cpp",/);

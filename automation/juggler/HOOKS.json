@@ -1,0 +1,27 @@
+[
+ {
+  "file": "dom/base/nsFrameLoader.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthFrameCrash.h\"  // STEALTH-HOOK(automation/juggler)",
+  "test": "wrapper:tests/test_fission_iframe_crash_e2e.py::test_the_crash_of_an_iframe_s_process_leaves_the_tab"
+ },
+ {
+  "file": "dom/base/nsFrameLoader.cpp",
+  "function": "void nsFrameLoader::MaybeNotifyCrashed(BrowsingContext* aBrowsingContext,",
+  "kind": "rewrite",
+  "form": "wrap-expression",
+  "line": "  os->NotifyObservers(ToSupports(this), \"oop-frameloader-crashed\", StealthCrashedContextScope(aBrowsingContext, nullptr));  // STEALTH-HOOK(automation/juggler)",
+  "removed": "  os->NotifyObservers(ToSupports(this), \"oop-frameloader-crashed\", nullptr);",
+  "test": "wrapper:tests/test_fission_iframe_crash_e2e.py::test_the_crash_of_an_iframe_s_process_leaves_the_tab"
+ },
+ {
+  "file": "toolkit/toolkit.mozbuild",
+  "function": "if CONFIG[\"ENABLE_WEBDRIVER\"]:",
+  "kind": "add",
+  "form": "registration",
+  "line": "    DIRS += [\"/juggler\"]  # STEALTH-HOOK(automation/juggler)",
+  "test": "wrapper:tests/test_fission_iframe_crash_e2e.py::test_the_crash_of_an_iframe_s_process_leaves_the_tab"
+ }
+]

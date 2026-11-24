@@ -20,6 +20,11 @@ build file or #included by another file. StealthFontFileStream.cpp was split
 out of gfxDWriteCommon.cpp and listed nowhere: Linux does not need it, and the
 Windows link failed on its symbols an hour and a quarter into the build.
 
+And a source of ours that reaches a header generated from IPDL, directly or
+through a header of ours, needs chromium-config in its directory's moz.build:
+that is what puts ipc/ipdl/_ipdlheaders on the include path. The sessions
+directory lacked it and stopped on mozilla/dom/PrefsTypes.h 80 minutes in.
+
 Run: python build/stealth_check_build_files.py   (exit 1 on any problem)
      python build/stealth_check_build_files.py <file>...   (only those)
      python build/stealth_check_build_files.py --self-test
@@ -32,7 +37,7 @@ import subprocess
 import sys
 
 TREE = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-for p in ["python/mozbuild", "python/mach", "python/mozversioncontrol", "python/mozterm", "python/mozboot"] + [
+for p in ["python/mozbuild", "python/mach", "python/mozversioncontrol", "python/mozterm", "python/mozboot", "layout/tools/reftest"] + [
     os.path.relpath(d, TREE) for d in glob.glob(os.path.join(TREE, "testing/mozbase/*")) + glob.glob(os.path.join(TREE, "third_party/python/*"))
 ]:
     for sub in ("", "lib", "src"):
@@ -45,8 +50,8 @@ from mozbuild.frontend.reader import BuildReader, EmptyConfig  # noqa: E402
 
 TARGETS = {
     "windows": {"OS_TARGET": "WINNT", "OS_ARCH": "WINNT", "MOZ_WIDGET_TOOLKIT": "windows", "TARGET_CPU": "x86_64", "CC_TYPE": "clang-cl", "TARGET_KERNEL": "WINNT"},
-    "linux": {"OS_TARGET": "Linux", "OS_ARCH": "Linux", "MOZ_WIDGET_TOOLKIT": "gtk", "TARGET_CPU": "x86_64", "CC_TYPE": "clang", "TARGET_KERNEL": "Linux", "MOZ_X11": "1", "MOZ_WAYLAND": "1"},
-    "macos": {"OS_TARGET": "Darwin", "OS_ARCH": "Darwin", "MOZ_WIDGET_TOOLKIT": "cocoa", "TARGET_CPU": "aarch64", "CC_TYPE": "clang", "TARGET_KERNEL": "Darwin"},
+    "linux": {"OS_TARGET": "Linux", "OS_ARCH": "Linux", "MOZ_WIDGET_TOOLKIT": "gtk", "TARGET_CPU": "x86_64", "CC_TYPE": "clang", "CC_VERSION": "19.1.0", "TARGET_KERNEL": "Linux", "MOZ_X11": "1", "MOZ_WAYLAND": "1"},
+    "macos": {"OS_TARGET": "Darwin", "OS_ARCH": "Darwin", "MOZ_WIDGET_TOOLKIT": "cocoa", "TARGET_CPU": "aarch64", "CC_TYPE": "clang", "CC_VERSION": "19.1.0", "TARGET_KERNEL": "Darwin"},
 }
 # Lists whose entries are files of the source directory (a leading "!" is the
 # objdir, a leading "/" the top of the tree).
@@ -54,6 +59,7 @@ FILE_LISTS = ("SOURCES", "UNIFIED_SOURCES", "EXPORTS", "EXTRA_JS_MODULES", "XPID
               "WEBIDL_FILES", "IPDL_SOURCES", "MOZ_SRC_FILES", "FINAL_TARGET_FILES", "JS_PREFERENCE_PP_FILES")
 OURS = re.compile(r"STEALTH-HOOK|Stealth[A-Z]\w*\.(cpp|h|mm|c|cc|sys\.mjs|js|mozbuild|yaml)")
 OUR_SOURCE = re.compile(r"(^|/)((Test)?Stealth[A-Za-z0-9]*|nr_stealth\w*)\.(c|cc|cpp|mm)$")
+OUR_HEADER = re.compile(r"(^|/)(Stealth[A-Za-z0-9]*|nr_stealth\w*)\.h$")
 BUILD_FILES = ("*moz.build", "*.mozbuild", "*.build", "*.gyp", "*.gypi")
 
 
@@ -79,6 +85,57 @@ def orphan_problems():
     include_text = git("grep", "-hE", r'#\s*include\s*"[^"]*(%s)"' % names)
     return [f"{s}: no build file lists it and nothing #includes it"
             for s in orphans(sources, build_text, include_text)]
+
+
+def missing_ipc_config(sources, read, generated, build_text):
+    """The sources that reach a generated IPC header while their directory's
+    moz.build does not include chromium-config. read(name) gives the text of a
+    source or header of ours (None for anyone else's); build_text(dir) the
+    moz.build of that directory (None when a parent's lists the source)."""
+    out = []
+    for s in sources:
+        seen, todo, reached = set(), [read(s)], False
+        while todo:
+            for inc in re.findall(r'#\s*include\s*"([^"]+)"', todo.pop() or ""):
+                base = inc.rsplit("/", 1)[-1]
+                reached = reached or base in generated
+                if base not in seen:
+                    seen.add(base)
+                    todo.append(read(base))
+        build = build_text(os.path.dirname(s))
+        if reached and build is not None and "chromium-config" not in build:
+            out.append(s)
+    return out
+
+
+def ipc_config_problems():
+    files = git("ls-files", "-z").split("\0")
+    generated = set()
+    for f in files:
+        stem, ext = os.path.splitext(os.path.basename(f))
+        if ext == ".ipdlh":
+            generated.add(stem + ".h")
+        elif ext == ".ipdl":
+            generated.update((stem + ".h", stem + "Parent.h", stem + "Child.h"))
+    ours = {}
+    for f in files:
+        if OUR_SOURCE.search(f) or OUR_HEADER.search(f):
+            ours[f] = ours[os.path.basename(f)] = f
+
+    def text(rel):
+        try:
+            return open(os.path.join(TREE, rel), encoding="utf-8", errors="replace").read()
+        except OSError:
+            return None
+
+    def read(name):
+        return text(ours[name]) if name in ours else None
+
+    def build_text(d):
+        return text(os.path.join(d, "moz.build"))
+
+    return [f"{s}: reaches a header generated from IPDL, and its moz.build does not include chromium-config"
+            for s in missing_ipc_config([f for f in files if OUR_SOURCE.search(f)], read, generated, build_text)]
 
 
 def our_build_files():
@@ -162,6 +219,7 @@ def main(argv):
             problems += check(p, target, substs)
     if not argv:
         problems += orphan_problems()
+        problems += ipc_config_problems()
     problems = sorted(set(problems))
     for line in problems:
         print(line)
@@ -177,6 +235,14 @@ def self_test():
              "# StealthE.cpp, named in a comment only\n")
     got = orphans(srcs, build, '#include "y/StealthD.cpp"\n')
     assert got == ["z/StealthE.cpp"], got
+    texts = {"a/StealthA.cpp": '#include "mozilla/StealthA.h"\n', "StealthA.h": '#include "mozilla/dom/PrefsTypes.h"\n',
+             "b/StealthB.cpp": '#include "mozilla/Foo.h"\n', "c/StealthC.cpp": '#include "mozilla/dom/PrefsTypes.h"\n',
+             "d/StealthD.cpp": '#include "mozilla/dom/PrefsTypes.h"\n'}
+    builds = {"a": "FINAL_LIBRARY = 'xul'\n", "b": "FINAL_LIBRARY = 'xul'\n",
+              "c": 'include("/ipc/chromium/chromium-config.mozbuild")\n'}
+    got = missing_ipc_config(["a/StealthA.cpp", "b/StealthB.cpp", "c/StealthC.cpp", "d/StealthD.cpp"],
+                             texts.get, {"PrefsTypes.h"}, builds.get)
+    assert got == ["a/StealthA.cpp"], got
     print("self-test ok")
 
 

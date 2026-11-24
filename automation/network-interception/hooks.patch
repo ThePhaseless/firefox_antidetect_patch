@@ -1,45 +1,55 @@
 diff --git a/netwerk/base/nsINetworkInterceptController.idl b/netwerk/base/nsINetworkInterceptController.idl
-index 3654f3ed20f6b22d36c4238be40417e77e8f6867..4afd7f40c5d32f86c4f0330fca47e6374b3c4bcc 100644
+index 3654f3ed20f6b22d36c4238be40417e77e8f6867..792e6a7e76a29f8a96db31f91d77a4450f024efa 100644
 --- a/netwerk/base/nsINetworkInterceptController.idl
 +++ b/netwerk/base/nsINetworkInterceptController.idl
-@@ -59,6 +59,10 @@ interface nsIInterceptedChannel : nsISupports
+@@ -58,12 +58,14 @@ interface nsIInterceptedChannel : nsISupports
+      * results in the resulting client not being controlled.
       */
      void resetInterception(in boolean bypass);
++    void resetInterceptionWithURI(in nsIURI aURI);  // STEALTH-HOOK(automation/network-interception)
  
-+    // STEALTH-HOOK(automation/network-interception): see FEATURE.md
-+    void resetInterceptionWithURI(in nsIURI aURI);
-+    void interceptAfterServiceWorkerResets();
-+
      /**
       * Set the status and reason for the forthcoming synthesized response.
       * Multiple calls overwrite existing values.
+      */
+     void synthesizeStatus(in uint16_t status, in ACString reason);
++    void interceptAfterServiceWorkerResets();  // STEALTH-HOOK(automation/network-interception)
+ 
+     /**
+      * Attach a header name/value pair to the forthcoming synthesized response.
 diff --git a/netwerk/protocol/http/InterceptedHttpChannel.cpp b/netwerk/protocol/http/InterceptedHttpChannel.cpp
-index 551ed5ba8e3ac370957ca9f95ae376608d38097f..22b9d40120b51eb994994fb89b24314578a8dc7e 100644
+index 551ed5ba8e3ac370957ca9f95ae376608d38097f..4e53656ea7317c3f6e30dc407c7e6af0a895df28 100644
 --- a/netwerk/protocol/http/InterceptedHttpChannel.cpp
 +++ b/netwerk/protocol/http/InterceptedHttpChannel.cpp
-@@ -739,6 +739,10 @@ NS_IMETHODIMP
+@@ -739,6 +739,7 @@ NS_IMETHODIMP
  InterceptedHttpChannel::ResetInterception(bool aBypass) {
    INTERCEPTED_LOG(("InterceptedHttpChannel::ResetInterception [%p] bypass: %s",
                     this, aBypass ? "true" : "false"));
-+  // STEALTH-HOOK(automation/network-interception)
-+  if (mInterceptAfterServiceWorkerResets) {
-+    return StealthInterceptAgain(aBypass);
-+  }
++  if (StealthOwnsInterception()) return StealthInterceptAgain(aBypass);  // STEALTH-HOOK(automation/network-interception)
    if (mCanceled) {
      return mStatus;
    }
 diff --git a/netwerk/protocol/http/InterceptedHttpChannel.h b/netwerk/protocol/http/InterceptedHttpChannel.h
-index ab440756a6745ce3c4785f211db32173c6bd27c5..9192a83d12236bb18262b062b0298dacf5b359dc 100644
+index ab440756a6745ce3c4785f211db32173c6bd27c5..82b8b11b8e7b348dce28f75e19d41e663ab1e59b 100644
 --- a/netwerk/protocol/http/InterceptedHttpChannel.h
 +++ b/netwerk/protocol/http/InterceptedHttpChannel.h
-@@ -88,6 +88,10 @@ class InterceptedHttpChannel final
+@@ -66,6 +66,8 @@ class InterceptedHttpChannel final
+ 
+  private:
+   friend class HttpAsyncAborter<InterceptedHttpChannel>;
++  bool StealthOwnsInterception();  // STEALTH-HOOK(automation/network-interception)
++  nsresult StealthInterceptAgain(bool aBypass);  // STEALTH-HOOK(automation/network-interception)
+ 
+   UniquePtr<nsHttpResponseHead> mSynthesizedResponseHead;
+   nsCOMPtr<nsIChannel> mRedirectChannel;
+@@ -86,8 +88,10 @@ class InterceptedHttpChannel final
+   uint64_t mResumeStartPos;
+   nsCString mResumeEntityId;
    nsString mStatusHost;
++  bool mServiceWorkerResetBypass{true};  // STEALTH-HOOK(automation/network-interception)
    Atomic<bool> mCallingStatusAndProgress;
    bool mInterceptionReset{false};
-+  // STEALTH-HOOK(automation/network-interception)
-+  bool mInterceptAfterServiceWorkerResets{false};
-+  bool mServiceWorkerResetBypass{true};
-+  nsresult StealthInterceptAgain(bool aBypass);
++  bool mInterceptAfterServiceWorkerResets{false};  // STEALTH-HOOK(automation/network-interception)
  
    /**
     *  InterceptionTimeStamps is used to record the time stamps of the

@@ -144,17 +144,24 @@ test('the declared latency is taken back whatever happens: try/finally, setNextK
   assert.deepEqual(calls, [['setNextKeyLatency', 30, PAGE], ['setNextKeyLatency', 0]]);
 });
 
-test('the scope opens right after the chrome assert, before any early return, and zeroes the declared latency', () => {
+test('the only entries that deliver a key open the scope first of all, and nothing else of the processor opens one', () => {
   const code = strip(readTree('dom/base/TextInputProcessor.cpp'));
-  for (const header of ['TextInputProcessor::Keydown(Event* aDOMKeyEvent', 'TextInputProcessor::Keyup(Event* aDOMKeyEvent',
-                        'TextInputProcessor::CommitCompositionWith(const nsAString& aCommitString']) {
+  const entries = ['TextInputProcessor::Keydown(Event* aDOMKeyEvent', 'TextInputProcessor::Keyup(Event* aDOMKeyEvent',
+                   'TextInputProcessor::CommitCompositionWith(const nsAString& aCommitString'];
+  for (const header of entries) {
     const body = bodyOf(code, header);
-    const scope = body.indexOf('StealthKeyBirthScope stealthBirth(mStealthKeyBirth);');
-    const assertAt = body.indexOf('MOZ_RELEASE_ASSERT(nsContentUtils::IsCallerChrome());');
-    assert.ok(assertAt >= 0 && scope > assertAt, header + ': the scope follows the chrome assert');
-    assert.equal(body.slice(assertAt, scope).replace(/MOZ_RELEASE_ASSERT\(nsContentUtils::IsCallerChrome\(\)\);/, '').trim(), '',
-                 header + ': nothing between the assert and the scope');
-    assert.doesNotMatch(body.slice(0, scope), /\breturn\b/, header + ': no early return before the scope');
+    // the first statement of the method: no early return and no assertion of Mozilla's runs before the scope takes the latency
+    const open = body.indexOf('{', body.indexOf(')')) + 1;
+    assert.ok(body.slice(open).trimStart().startsWith('StealthKeyBirthScope stealthBirth(mStealthKeyBirth);'),
+              header + ': the scope is the first statement');
+  }
+  // one scope per entry, and no other function of the processor opens one (a second entry that delivers a key with no
+  // scope, or with one in the wrong place, is a key born at its dispatch)
+  assert.equal((code.match(/StealthKeyBirthScope\s+\w+\(/g) || []).length, entries.length);
+  // the only stamps are those of the two functions that copy the key event to deliver it
+  assert.equal((code.match(/StealthKeyBirthScope::Stamp\(/g) || []).length, 2);
+  for (const header of ['nsresult TextInputProcessor::KeydownInternal(', 'nsresult TextInputProcessor::KeyupInternal(']) {
+    assert.match(bodyOf(code, header), /StealthKeyBirthScope::Stamp\(keyEvent\);/, header + ' stamps');
   }
 });
 
@@ -169,7 +176,7 @@ test('the latency stays the optional protocol field of the three key commands', 
 
 test('the interface gets one method; keydown, keyup and commitCompositionWith keep Mozilla\'s signatures', () => {
   const raw = readTree('dom/interfaces/base/nsITextInputProcessor.idl');
-  assert.match(raw, /^ *void setNextKeyLatency\(in double aLatencyMs, \[optional\] in unsigned long long aPageId\);  \/\/ STEALTH-HOOK\(fingerprint\/input\/event-birth\)$/m);
+  assert.match(raw, /^ *void setNextKeyLatency\(in double aLatencyMs, \[optional\] in unsigned long long aPageId\);/m);
   const flat = strip(raw).replace(/\s+/g, ' ');
   assert.match(flat, /unsigned long keydown\(in Event aKeyboardEvent, \[optional\] in unsigned long aKeyFlags\);/);
   assert.match(flat, /boolean keyup\(in Event aKeyboardEvent, \[optional\] in unsigned long aKeyFlags\);/);
@@ -177,13 +184,12 @@ test('the interface gets one method; keydown, keyup and commitCompositionWith ke
   assert.doesNotMatch(flat, /aLatencyMs\);.*aLatencyMs\);/, 'one declaration of the latency, not one per method');
 });
 
-test('the processor opens a birth scope in the three key methods and stamps the copy before it is dispatched', () => {
+test('the processor stamps the copy of the key before it is dispatched, and setNextKeyLatency has one definition, in our file', () => {
   const cpp = readTree('dom/base/TextInputProcessor.cpp');
   const code = strip(cpp);
   for (const header of ['TextInputProcessor::Keydown(Event* aDOMKeyEvent', 'TextInputProcessor::Keyup(Event* aDOMKeyEvent',
                         'TextInputProcessor::CommitCompositionWith(const nsAString& aCommitString']) {
     const body = bodyOf(code, header);
-    assert.match(body, /StealthKeyBirthScope stealthBirth\(mStealthKeyBirth\);/, header + ' opens the scope');
     assert.ok(body.indexOf('StealthKeyBirthScope') < body.indexOf('Internal('), header + ': the scope is open before the key is delivered');
   }
   for (const [header, dispatch] of [['nsresult TextInputProcessor::KeydownInternal(', 'DispatchKeyboardEvent(eKeyDown'],
@@ -194,12 +200,12 @@ test('the processor opens a birth scope in the three key methods and stamps the 
     assert.ok(stamp < body.indexOf(dispatch), header + ' stamps before the dispatch');
     assert.ok(stamp > body.indexOf('WidgetKeyboardEvent keyEvent(aKeyboardEvent);'), header + ' stamps the copy, never the event it was given');
   }
-  assert.match(code, /StealthSetNextKeyLatency\(mStealthKeyBirth, aLatencyMs, aPageId, nsContentUtils::IsCallerChrome\(\)\)/);
+  // the only definition of the declaring method is in our file: it asserts the chrome caller and stores in the field
+  assert.doesNotMatch(code, /TextInputProcessor::SetNextKeyLatency/);
+  const own = strip(readTree('dom/base/StealthInputEventBirth.cpp'));
+  assert.equal((own.match(/TextInputProcessor::SetNextKeyLatency\(/g) || []).length, 1);
+  assert.match(own, /StealthSetNextKeyLatency\(mStealthKeyBirth, aLatencyMs, aPageId,\s*nsContentUtils::IsCallerChrome\(\)\)/);
   assert.doesNotMatch(code, /setTimeout|NS_NewTimer|NS_DelayedDispatch/);
-  // every line of ours in this Mozilla file is tagged
-  for (const line of cpp.split('\n').filter(l => /Stealth/.test(l)))
-    assert.match(line, /STEALTH-HOOK\(fingerprint\/input\/event-birth\)/, line);
-  assert.match(readTree('dom/base/TextInputProcessor.h'), /double mLatencyMs = 0; uint64_t mPageId = 0; \} mStealthKeyBirth;  \/\/ STEALTH-HOOK\(fingerprint\/input\/event-birth\)/);
 });
 
 test('the birth lives in our header: one use, no cap on the latency, nothing for a latency of 0', () => {

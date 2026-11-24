@@ -10,6 +10,15 @@ const { ChannelEventSinkFactory } = ChromeUtils.importESModule("resource://gre/m
 const { say } = ChromeUtils.importESModule('resource://gre/modules/juggler/Say.js');
 const { sayWhenHeldTooLong } = ChromeUtils.importESModule('resource://gre/modules/juggler/EarlyProxyHold.js');
 const { newProxyInfoFor } = ChromeUtils.importESModule('resource://gre/modules/juggler/SessionRoute.js');
+// A diagnostic trace, off unless the parent's environment asks for it (Trace.js). Tolerant: a file loaded
+// where there is no Gecko (a node test) traces nothing. It says how each request began and ended: the line that was
+// missing when a request was announced and the client never heard its end.
+let traceNetwork = () => {};
+try {
+  const traceNetworkModule = ChromeUtils.importESModule('resource://gre/modules/juggler/Trace.js');
+  if (traceNetworkModule && typeof traceNetworkModule.trace === 'function')
+    traceNetwork = (...args) => { try { traceNetworkModule.trace(...args); } catch (e) {} };
+} catch (e) {}
 
 
 const Cc = Components.classes;
@@ -160,6 +169,8 @@ class NetworkRequest {
       // Finish previous request now. Since we inherit the listener, we could in theory
       // use onStopRequest, but that will only happen after the last redirect has finished.
       redirectedFrom._sendOnRequestFinished(true);
+      // The channel the redirect arrives on is adopted (this request listens to it): the old request has nothing to follow.
+      redirectedFrom._hopChannel = undefined;
     }
     // In case of proxy auth, we get two requests with the same channel:
     // - one is pre-auth
@@ -187,6 +198,16 @@ class NetworkRequest {
     this._sentOnRequest = false;
     this._sentOnResponse = false;
     this._fulfilled = false;
+    // The end of a request is told once (`_end`), and only for a request whose start the client was told (`_startUnsaid`
+    // goes down when it is).
+    this._startUnsaid = true;
+    this._endSaid = false;
+    // The channel a redirect of this request arrives on, until it is adopted by the request that follows (`redirectedFrom`),
+    // HTTP or not: if it dies first, or is not HTTP, what it says reaches this request, the listener it inherited.
+    this._hopChannel = undefined;
+    // An internal redirect replaced the channel and the replacement has not reached http-on-modify-request yet (when it
+    // is a resume of ours, `_expectingResumedRequest` says so).
+    this._replacementPending = false;
 
     if (this._overriddenHeadersForRedirect)
       overrideRequestHeaders(httpChannel, this._overriddenHeadersForRedirect);
@@ -264,10 +285,14 @@ class NetworkRequest {
     this._replacedChannel = this.httpChannel;
     this.httpChannel = newChannel;
     this._networkObserver._channelToRequest.set(this.httpChannel, this);
+    if (!this._expectingResumedRequest)
+      this._replacementPending = true;
   }
 
   // Instrumentation called by NetworkObserver.
   _onInternalRedirectReady() {
+    // The replacement started: the channel it replaced is not the one to wait for any more.
+    this._replacementPending = false;
     // Resumed request is first internally redirected to a new request,
     // and then the new request is ready to be updated.
     if (!this._expectingResumedRequest)
@@ -426,13 +451,38 @@ class NetworkRequest {
       this.resume();
   }
 
+  // The channel `aRequest` is, for this request: the one it follows (`current`), the one an internal redirect replaced
+  // (`replaced`), the one a redirect of it arrives on and nobody adopted yet (`hop`), or none of them (`foreign`: a
+  // webcompat shim redirects to a SimpleChannel, see https://github.com/microsoft/playwright/issues/9418#issuecomment-944836244).
+  _whichChannel(aRequest) {
+    if (aRequest === this.httpChannel)
+      return 'current';
+    if (aRequest && aRequest === this._hopChannel)
+      return 'hop';
+    if (aRequest && aRequest === this._replacedChannel)
+      return 'replaced';
+    return 'foreign';
+  }
+
+  // What a channel that is not the current one says reaches the listener this request inherited, as it would through the
+  // chain without us. Its stop ends this request (see `onStopRequest`): nothing else follows that channel.
+  _forwardToOriginalListener(method, ...args) {
+    try {
+      this._originalListener[method](...args);
+    } catch (e) {
+      // Be ready to original listener exceptions.
+    }
+  }
+
   // nsIStreamListener
   onDataAvailable(aRequest, aInputStream, aOffset, aCount) {
-    // Turns out webcompat shims might redirect to
-    // SimpleChannel, so we get requests from a different channel.
-    // See https://github.com/microsoft/playwright/issues/9418#issuecomment-944836244
-    if (aRequest !== this.httpChannel)
+    const which = this._whichChannel(aRequest);
+    if (which === 'foreign')
       return;
+    if (which !== 'current') {
+      this._forwardToOriginalListener('onDataAvailable', aRequest, aInputStream, aOffset, aCount);
+      return;
+    }
     // For requests with internal redirect (e.g. intercepted by Service Worker),
     // we do not get onResponse normally, but we do get nsIStreamListener notifications.
     this._sendOnResponse(false);
@@ -459,11 +509,13 @@ class NetworkRequest {
 
   // nsIStreamListener
   onStartRequest(aRequest) {
-    // Turns out webcompat shims might redirect to
-    // SimpleChannel, so we get requests from a different channel.
-    // See https://github.com/microsoft/playwright/issues/9418#issuecomment-944836244
-    if (aRequest !== this.httpChannel)
+    const which = this._whichChannel(aRequest);
+    if (which === 'foreign')
       return;
+    if (which !== 'current') {
+      this._forwardToOriginalListener('onStartRequest', aRequest);
+      return;
+    }
     this._sendOnRequest(false);
     try {
       this._originalListener.onStartRequest(aRequest);
@@ -474,22 +526,30 @@ class NetworkRequest {
 
   // nsIStreamListener
   onStopRequest(aRequest, aStatusCode) {
-    // Turns out webcompat shims might redirect to
-    // SimpleChannel, so we get requests from a different channel.
-    // See https://github.com/microsoft/playwright/issues/9418#issuecomment-944836244
-    if (aRequest !== this.httpChannel) {
-      // A resumed request is replaced by an internal redirect. When the channel it replaced is cancelled (a beacon whose document
-      // went away) before the replacement ever started, the replacement never reaches http-on-modify-request and nothing else
-      // ends the request: the client waited for it for ever. Playwright's own Firefox reports it failed, here as the channel says.
-      if (aRequest === this._replacedChannel && aStatusCode !== 0 && this._expectingResumedRequest)
+    const which = this._whichChannel(aRequest);
+    traceNetwork('network', 'stop', {requestId: this.requestId, which, status: aStatusCode, ended: this._endSaid});
+    if (which === 'foreign')
+      return;
+    if (which !== 'current') {
+      this._forwardToOriginalListener('onStopRequest', aRequest, aStatusCode);
+      if (which === 'hop') {
+        // The channel a redirect of this request arrives on was stopped before anyone adopted it (it died, or it is not
+        // HTTP and no request will ever follow it): nothing else ends this request, so this does, as the channel says.
+        if (aStatusCode === 0)
+          this._sendOnRequestFinished();
+        else
+          this._sendOnRequestFailed(aStatusCode);
+      } else if (aStatusCode !== 0 && (this._expectingResumedRequest || this._replacementPending)) {
+        // The channel an internal redirect replaced is cancelled (a beacon whose document went away) before the
+        // replacement ever started: the replacement never reaches http-on-modify-request and nothing else ends the
+        // request. Playwright's own Firefox reports it failed, here as the channel says.
         this._sendOnRequestFailed(aStatusCode);
+      }
       return;
     }
-    try {
-      this._originalListener.onStopRequest(aRequest, aStatusCode);
-    } catch (e) {
-      // Be ready to original listener exceptions.
-    }
+    this._forwardToOriginalListener('onStopRequest', aRequest, aStatusCode);
+    if (this._endSaid)
+      return;
 
     if (aStatusCode === 0) {
       // For requests with internal redirect (e.g. intercepted by Service Worker),
@@ -545,10 +605,15 @@ class NetworkRequest {
       return;
     }
     this._sentOnRequest = true;
+    // A request that ended is not announced after its end: the client would wait for an end that was said.
+    if (this._endSaid)
+      return;
 
     const pageNetwork = this._pageNetwork;
     if (!pageNetwork)
       return;
+    this._startUnsaid = false;
+    traceNetwork('network', 'announce', {requestId: this.requestId, frameId: this._frameId, redirectedFrom: this.redirectedFromId, isIntercepted});
     if (this.navigationId && !this.redirectedFromId)
       pageNetwork._responseStorage?.noteNavigationStart(this.navigationId);
     const loadInfo = this.httpChannel.loadInfo;
@@ -640,8 +705,7 @@ class NetworkRequest {
   }
 
   _sendOnRequestFailed(error) {
-    const pageNetwork = this._pageNetwork;
-    if (pageNetwork) {
+    this._end(pageNetwork => {
       // `navigationId` is not part of what the client is told (PageHandler takes it off): it is how the parent ends the
       // navigation of a document request that was CUT (NS_BINDING_ABORTED), and of no other failure. Any other error
       // (a connection that drops half way through the body, a partial transfer) can come after the document appeared in
@@ -666,7 +730,21 @@ class NetworkRequest {
       if (!cut && this.navigationId)
         failure.documentEnded = this.navigationId;
       pageNetwork.emit(PageNetwork.Events.RequestFailed, failure, this._frameId);
-    }
+    });
+  }
+
+  // THE ONE EXIT OF THE END OF A REQUEST. Every request the client was told of (`requestWillBeSent`) ends once, with a
+  // `requestFinished` or a `requestFailed`: a client that waits for the network to be idle counts it until then. Said once
+  // (a request that ended does not end again, whatever stop comes for it after), and only if its start was said (the client
+  // has nothing to end for a request it never heard of). The request is let go either way. `say` is told the page network
+  // and emits the event of the end.
+  _end(say) {
+    if (this._endSaid)
+      return;
+    this._endSaid = true;
+    const pageNetwork = this._pageNetwork;
+    if (pageNetwork && !this._startUnsaid)
+      say(pageNetwork);
     this._ended();
   }
 
@@ -688,12 +766,17 @@ class NetworkRequest {
   // `hop`: a redirect hop of the request finishes; the request goes on. Only the last request of a document says its
   // navigation (`documentEnded`, _sendOnRequestFailed).
   _sendOnRequestFinished(hop = false) {
-    const pageNetwork = this._pageNetwork;
-    // Undefined |responseEndTime| means there has been no response yet.
-    // This happens when request interception API is used to redirect
-    // the request to a different URL.
-    // In this case, we should not emit "requestFinished" event.
-    if (pageNetwork && this.httpChannel.responseEndTime !== undefined) {
+    this._end(pageNetwork => {
+      // The end does not depend on a response time: a number the channel does not have is 0. Only a hop with no response
+      // at all says nothing: that is the request interception API redirecting the request to another URL, and the request
+      // that follows is the one the client hears of.
+      let responseEndTime = this.httpChannel.responseEndTime;
+      if (!Number.isFinite(responseEndTime)) {
+        traceNetwork('network', 'finish-mute', {requestId: this.requestId, hop, responseEndTime: String(responseEndTime)});
+        if (hop)
+          return;
+        responseEndTime = 0;
+      }
       let protocolVersion = undefined;
       try {
         protocolVersion = this.httpChannel.protocolVersion;
@@ -702,7 +785,7 @@ class NetworkRequest {
       };
       const finished = {
         requestId: this.requestId,
-        responseEndTime: this.httpChannel.responseEndTime,
+        responseEndTime,
         transferSize: this.httpChannel.transferSize,
         encodedBodySize: this.httpChannel.encodedBodySize,
         protocolVersion,
@@ -710,8 +793,7 @@ class NetworkRequest {
       if (!hop && this.navigationId)
         finished.documentEnded = this.navigationId;
       pageNetwork.emit(PageNetwork.Events.RequestFinished, finished, this._frameId);
-    }
-    this._ended();
+    });
   }
 }
 
@@ -846,11 +928,22 @@ export class NetworkObserver {
   }
 
   _onRedirect(oldChannel, newChannel, flags) {
-    if (!(oldChannel instanceof Ci.nsIHttpChannel) || !(newChannel instanceof Ci.nsIHttpChannel))
+    if (!(oldChannel instanceof Ci.nsIHttpChannel))
       return;
     const oldHttpChannel = oldChannel.QueryInterface(Ci.nsIHttpChannel);
-    const newHttpChannel = newChannel.QueryInterface(Ci.nsIHttpChannel);
     const request = this._channelToRequest.get(oldHttpChannel);
+    if (!(newChannel instanceof Ci.nsIHttpChannel)) {
+      // A redirect to a channel that is not HTTP: no request will ever follow it, so what it says reaches this request
+      // (the listener it inherited) and its stop ends it (NetworkRequest.onStopRequest).
+      if (request && !(flags & Ci.nsIChannelEventSink.REDIRECT_INTERNAL)) {
+        request._hopChannel = newChannel;
+        traceNetwork('network', 'redirect', {requestId: request.requestId, http: false, flags});
+      }
+      return;
+    }
+    const newHttpChannel = newChannel.QueryInterface(Ci.nsIHttpChannel);
+    if (request)
+      traceNetwork('network', 'redirect', {requestId: request.requestId, to: newHttpChannel.channelId + '', http: true, flags});
     if (flags & Ci.nsIChannelEventSink.REDIRECT_INTERNAL) {
       if (request)
         request._onInternalRedirect(newHttpChannel);
@@ -860,11 +953,16 @@ export class NetworkObserver {
         // equivalent https request is sent. We forge 307 redirect to follow Chromium here:
         // https://source.chromium.org/chromium/chromium/src/+/main:net/url_request/url_request_http_job.cc;l=211
         request._sendOnResponse(false, 307, 'Temporary Redirect');
+        request._hopChannel = newHttpChannel;
         this._expectRedirect(newHttpChannel.channelId + '', request);
       }
     } else {
-      if (request)
+      if (request) {
+        // The channel the redirect arrives on is remembered until a request adopts it: if it dies before it reaches
+        // http-on-modify-request, its stop reaches this request and ends it.
+        request._hopChannel = newHttpChannel;
         this._expectRedirect(newHttpChannel.channelId + '', request);
+      }
     }
   }
 

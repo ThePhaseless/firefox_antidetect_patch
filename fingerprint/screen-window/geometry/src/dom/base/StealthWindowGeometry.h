@@ -14,12 +14,15 @@
 // This file holds the definitions too, and is included by
 // nsGlobalWindowOuter.cpp ONLY: dom/base/moz.build registers no source file
 // for it, so the hooks in nsGlobalWindowOuter.cpp add no line to a shared
-// build file. Do not include it from another translation unit.
+// build file. Do not include it from another translation unit. The content
+// origin shift both mozInnerScreenX/Y and the mouse events use is in
+// dom/events/StealthScreenCoords.h (StealthContentOriginShift).
 //
 // No compiled value anywhere: a missing declaration refuses in
 // StealthDeclarationGate instead of being papered over here.
 
 #include "StealthDeclarationGate.h"
+#include "StealthScreenCoords.h"
 #include "Units.h"
 #include "mozilla/DimensionRequest.h"
 #include "mozilla/ErrorResult.h"
@@ -59,7 +62,7 @@ inline bool StealthIsFullscreen(const nsGlobalWindowOuter& aWindow) {
 inline Maybe<nsPoint> StealthShiftOf(nsGlobalWindowOuter& aWindow) {
   nsIDocShell* docShell = aWindow.GetDocShell();
   RefPtr<nsPresContext> pc = docShell ? docShell->GetPresContext() : nullptr;
-  return nsGlobalWindowOuter::StealthContentOriginShift(pc);
+  return StealthContentOriginShift(pc);
 }
 
 }  // namespace
@@ -210,65 +213,5 @@ inline Maybe<float> StealthMozInnerScreenY(nsGlobalWindowOuter& aWindow,
 }
 
 }  // namespace mozilla::dom
-
-// Lo scarto fra l'origine reale del contenuto di primo livello (l'offset su
-// schermo del root widget, cio' che mozInnerScreenX riportava prima di
-// diventare una dichiarazione) e quella dichiarata, in app units; Nothing()
-// col motore spento. UNA funzione per mozInnerScreenX/Y e per gli eventi
-// (Event.cpp): e' cosi' che screenX - clientX == mozInnerScreenX resta vero
-// anche nei popup e negli iframe. Un sottoframe somma lo scarto al PROPRIO
-// rettangolo, non lo sostituisce.
-//
-// Declared in nsGlobalWindowOuter.h, defined here at global scope: it is not
-// inline, so this header must stay included by one translation unit only.
-// Member bodies at global scope do not see mozilla::dom, so every name below
-// is qualified.
-/* static */
-mozilla::Maybe<nsPoint> nsGlobalWindowOuter::StealthContentOriginShift(
-    nsPresContext* aPresContext) {
-  if (!aPresContext || !mozilla::gfx::StealthEngineActive()) {
-    return mozilla::Nothing();
-  }
-  // L'origine reale e' l'offset su schermo del root widget: nel processo di
-  // contenuto e' il PuppetWidget, il cui offset e' l'origine dell'area di
-  // contenuto di primo livello - per il documento top coincide con
-  // GetInnerScreenRect(), per un sottoframe no, ed e' proprio quella
-  // differenza che va conservata. Solo chiamate al widget, niente layout:
-  // Event.cpp chiama questa funzione per ogni evento del mouse.
-  nsCOMPtr<nsIWidget> rootWidget = aPresContext->GetRootWidget();
-  if (!rootWidget) {
-    return mozilla::Nothing();
-  }
-  const int32_t auPerDevPx = aPresContext->AppUnitsPerDevPixel();
-  const nsPoint real = mozilla::LayoutDevicePixel::ToAppUnits(
-      rootWidget->WidgetToScreenOffset(), auPerDevPx);
-  // Un popup si dichiara dalla sua posizione REALE: il rettangolo esterno della
-  // finestra di primo livello, che BrowserChild riceve dal genitore - anche in
-  // un iframe fuori processo, dove arriva dall'embedder. E' la stessa fonte di
-  // GetScreenXY (nsIBaseWindow::GetPosition del tree owner).
-  mozilla::Maybe<mozilla::LayoutDeviceIntPoint> popupOrigin;
-  mozilla::dom::Document* doc = aPresContext->Document();
-  mozilla::dom::BrowsingContext* bc =
-      doc ? doc->GetBrowsingContext() : nullptr;
-  if (bc && bc->Top()->GetIsPopupRequested()) {
-    mozilla::dom::BrowserChild* child = rootWidget->GetOwningBrowserChild();
-    if (!child) {
-      // Il processo genitore non serve pagine: niente da dichiarare.
-      return mozilla::Nothing();
-    }
-    mozilla::LayoutDeviceIntPoint outer;
-    if (NS_FAILED(child->GetDimensions(mozilla::DimensionKind::Outer,
-                                       &outer.x.value, &outer.y.value, nullptr,
-                                       nullptr))) {
-      return mozilla::Nothing();
-    }
-    popupOrigin = mozilla::Some(outer);
-  }
-  // In fullscreen the content is the screen. Same source as Fullscreen() in a
-  // content process: the puppet widget's size mode.
-  const bool fullscreen = rootWidget->SizeMode() == nsSizeMode_Fullscreen;
-  return mozilla::gfx::StealthDeclaredOriginShift(real, popupOrigin, fullscreen,
-                                                  auPerDevPx);
-}
 
 #endif  // mozilla_dom_StealthWindowGeometry_h

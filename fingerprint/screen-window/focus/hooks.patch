@@ -1,37 +1,29 @@
 diff --git a/xpfe/appshell/AppWindow.cpp b/xpfe/appshell/AppWindow.cpp
-index 30846e962723cc7103b22531fa72cae88db70a96..a28dfbd33a6b29c328d8cd3b144b78a98d07c739 100644
+index 30846e962723cc7103b22531fa72cae88db70a96..c34c79478cb9c14089102e13432e0368b974e279 100644
 --- a/xpfe/appshell/AppWindow.cpp
 +++ b/xpfe/appshell/AppWindow.cpp
-@@ -59,6 +59,7 @@
- #include "mozilla/Services.h"
- #include "mozilla/SpinEventLoopUntil.h"
- #include "mozilla/StaticPrefs_browser.h"
-+#include "mozilla/StaticPrefs_zoom.h"
- #include "mozilla/dom/BarProps.h"
- #include "mozilla/dom/DOMRect.h"
- #include "mozilla/dom/Element.h"
-@@ -2756,6 +2757,13 @@ void AppWindow::WindowActivated() {
+@@ -83,6 +83,8 @@
+ #  define USE_NATIVE_MENUS
+ #endif
+ 
++#include "StealthAppWindowFocus.h"  // STEALTH-HOOK(fingerprint/screen-window/focus)
++
+ #define SIZEMODE_NORMAL u"normal"_ns
+ #define SIZEMODE_MAXIMIZED u"maximized"_ns
+ #define SIZEMODE_MINIMIZED u"minimized"_ns
+@@ -2756,6 +2758,7 @@ void AppWindow::WindowActivated() {
    if (mDocShell) {
      if (nsCOMPtr<nsPIDOMWindowOuter> window = mDocShell->GetWindow()) {
        if (RefPtr<nsFocusManager> fm = nsFocusManager::GetFocusManager()) {
-+        // STEALTH-HOOK(fingerprint/screen-window/focus)
-+        if (StaticPrefs::zoom_stealth_focus_ignore_os_deactivation()) {
-+          nsCOMPtr<nsPIDOMWindowOuter> active = fm->GetActiveWindow();
-+          if (active && active != window) {
-+            fm->WindowLowered(active, nsFocusManager::GenerateFocusActionId());
-+          }
-+        }
++        StealthLowerActiveWindow(window, fm);  // STEALTH-HOOK(fingerprint/screen-window/focus)
          fm->WindowRaised(window, nsFocusManager::GenerateFocusActionId());
        }
      }
-@@ -2767,6 +2775,10 @@ void AppWindow::WindowActivated() {
+@@ -2767,6 +2770,7 @@ void AppWindow::WindowActivated() {
  }
  
  void AppWindow::WindowDeactivated() {
-+  // STEALTH-HOOK(fingerprint/screen-window/focus)
-+  if (StaticPrefs::zoom_stealth_focus_ignore_os_deactivation()) {
-+    return;
-+  }
++  if (StealthKeepsActivation()) return;  // STEALTH-HOOK(fingerprint/screen-window/focus)
    if (mDocShell) {
      if (nsCOMPtr<nsPIDOMWindowOuter> window = mDocShell->GetWindow()) {
        if (RefPtr<nsFocusManager> fm = nsFocusManager::GetFocusManager()) {

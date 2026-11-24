@@ -2,25 +2,20 @@
 
 Category: spoof
 Prefs: zoom.stealth.screen.color_depth, zoom.stealth.screen.height, zoom.stealth.screen.taskbar_px, zoom.stealth.screen.width
-Test: TODO
+Test: wrapper:tests/test_fingerprint_surface.py::test_pin_screen_width_lands_in_screen_object, wrapper:tests/test_fingerprint_surface.py::test_fpjs_screen_color_depth_realistic, wrapper:tests/test_fingerprint_surface.py::test_a_declared_screen_that_no_runner_has_is_what_the_page_reads, wrapper:tests/test_fingerprint_surface.py::test_the_inner_size_of_the_top_is_synced_with_the_engine_active_and_not_without
 
 ## What it does
 
-TODO: one paragraph, from the notes below.
+`screen.pixelDepth`, `screen.width`/`height` and `screen.availWidth`/`availHeight` are the values the core declares (`zoom.stealth.screen.*`), not the host's; the available height is the declared height minus `zoom.stealth.screen.taskbar_px`. The synced inner size of a top-level browsing context (`BrowsingContext::InnerSizeSpoofedForRFP`) is also filled when the stealth engine is active, not only under resist-fingerprinting: the content of a stealth popup or of an out-of-process iframe reads the top level's inner size from it (B258). Every other reader of the field is gated on resist-fingerprinting; the reader of a stealth popup (`nsGlobalWindowOuter`, `IsInStealthPopup`) is gated on the engine.
+
+The declared values come from `gfx::StealthDeclaredPixelDepth`, `gfx::StealthDeclaredScreenRect` and `gfx::StealthDeclaredAvailRect` (own files of another folder: `gfx/thebes/StealthDeclarationGate.h/.cpp`; they return nothing when the engine is off, so a bare binary is stock Firefox). The inner-size condition is in `layout/base/StealthInnerSizeSync.h`: `StealthRfpOrEngineActive(bool aRfp)` returns `aRfp || gfx::StealthEngineActive()`; Mozilla's early return fires when it is false, which is the old `!RFP && !Engine`.
 
 ## Hooks in Mozilla files
 
-- `dom/base/nsScreen.cpp` (nsScreen::PixelDepth; nsScreen::GetRect; nsScreen::GetAvailRect, movable): Declared color depth, screen rect and avail rect from prefs; avail height is reduced by zoom.stealth.screen_taskbar_px. GetAvailRect has about 6 logic lines and reads StaticPrefs directly, so it is movable behind one call. The file adds #include mozilla/StaticPrefs_zoom.h twice (hunk 1 and again at the end of the include block); remove one. Comments mention invisible_core and a document outside th
-- `layout/base/nsPresContext.cpp` (nsPresContext::UpdateInnerSizeSpoofedForRFP, already-hook): The synced top-level inner size is now also filled when the stealth engine is active, not only under RFP. The comment's claim that every other reader of the field gates on RFP is MOSTLY CONFIRMED: nsScreen.cpp:100 and :161 (via GetTopWindowInnerRectForRFP, nsScreen.cpp:271), nsGlobalWindowInner.cpp:7584-7586, ScreenOrientation.cpp:706-771 and nsGlobalWindowOuter.cpp:3531-3535 all sit behind Should
+`dom/base/nsScreen.cpp`:
+- include of `StealthDeclarationGate.h` in a block of ours after Mozilla's includes (registration).
+- first statement of `nsScreen::PixelDepth`, `nsScreen::GetRect`, `nsScreen::GetAvailRect`: guard `if (auto declared = gfx::StealthDeclared...()) return ...;`. The declaration of the local in the condition is part of the one line (no `&&`, no ternary); the answer is ours, so Mozilla's code below stays untouched.
 
-## layout/base/nsPresContext.cpp: nsPresContext::UpdateInnerSizeSpoofedForRFP (condition of the early return)
-
-Stealth: the same synced field (BrowsingContext::SetInnerSizeSpoofedForRFP, filled by nsPresContext::UpdateInnerSizeSpoofedForRFP) carries the top-level inner size when the
-stealth engine is on, because a popup's declared outerWidth is that size
-plus its frame, and an out-of-process iframe inside the popup has no other
-way to know it (its BrowserChild knows the top's OUTER rect and its own
-inner size, not the top's inner size). Every other reader of the field -
-ScreenOrientation, window.orientation, nsScreen, the RFP branch of
-GetOuterSize - reads it only under ShouldResistFingerprinting, so filling
-it in UpdateInnerSizeSpoofedForRFP changes nothing for them. One synced copy of one fact, instead of
-a second field for the same number. 70-known-bugs.md B258.
+`layout/base/nsPresContext.cpp`:
+- include of `StealthInnerSizeSync.h` in a block of ours after Mozilla's includes (registration).
+- `nsPresContext::UpdateInnerSizeSpoofedForRFP`: the first operand of the early return, Mozilla's `ShouldResistFingerprinting(RFPTarget::WindowOuterSize)` call, is the argument of `StealthRfpOrEngineActive(...)` (wrap-expression; Mozilla's line is rewritten, a conflict at a version change is the signal).

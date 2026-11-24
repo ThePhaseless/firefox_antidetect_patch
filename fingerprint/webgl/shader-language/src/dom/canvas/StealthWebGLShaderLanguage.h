@@ -8,14 +8,18 @@
 #ifndef DOM_CANVAS_STEALTHWEBGLSHADERLANGUAGE_H_
 #define DOM_CANVAS_STEALTHWEBGLSHADERLANGUAGE_H_
 
+#include <string>
+
 #include "GLSLANG/ShaderLang.h"
 #include "mozilla/Maybe.h"
 
-namespace mozilla::gl {
-class GLContext;
-}
+namespace mozilla {
 
-namespace mozilla::webgl {
+class WebGLShader;
+
+namespace gl {
+class GLContext;
+}  // namespace gl
 
 // La lingua che il CONTESTO GL impone, cioe' quella con cui si compila per il
 // driver, e non e' una nostra scelta. Era `static ShaderOutput`: e' diventata
@@ -26,19 +30,33 @@ namespace mozilla::webgl {
 // La definizione resta in WebGLShaderValidator.cpp (e' codice di Mozilla).
 ShShaderOutput ShaderOutputPerIlDriver(gl::GLContext* gl);
 
+namespace webgl {
+
 // La lingua che la PAGINA deve vedere, dichiarata da invisible_core con
 // `zoom.stealth.webgl.shader_output_language`. `Nothing()` = nessuna
 // dichiarazione, e allora vale quella del driver. Dominio finito con un
 // elemento solo: si dichiara la LINGUA, mai la stringa.
 Maybe<ShShaderOutput> StealthDeclaredShaderOutput();
 
+}  // namespace webgl
+
 // La lingua con cui compilare: quella dichiarata solo se `aPerLaPagina` e se
 // c'e' una dichiarazione, altrimenti quella del contesto GL. Legge sempre la
 // pref, anche sul percorso del driver, cosi' l'avviso per un nome sconosciuto
-// parte a ogni costruzione del validatore.
+// parte a ogni costruzione del validatore. `aPerLaPagina` e' il campo
+// `WebGLContext::mStealthPerPage`, vero solo mentre
+// `WebGLShader::StealthPerPageObjectCode` costruisce il validatore della
+// seconda traduzione.
 ShShaderOutput StealthShaderOutputLanguage(gl::GLContext* gl,
                                            bool aPerLaPagina);
 
-}  // namespace mozilla::webgl
+// Quello che la PAGINA legge come codice tradotto di uno shader
+// (`WebGLContext::GetCompileResult`): la resa nella lingua dichiarata se
+// `aShader` ne ha una, altrimenti quella del driver (`aDriverObjectCode`).
+// Pura: nessun effetto, nessuna lettura di pref.
+const std::string& StealthPageObjectCode(const WebGLShader& aShader,
+                                         const std::string& aDriverObjectCode);
+
+}  // namespace mozilla
 
 #endif  // DOM_CANVAS_STEALTHWEBGLSHADERLANGUAGE_H_

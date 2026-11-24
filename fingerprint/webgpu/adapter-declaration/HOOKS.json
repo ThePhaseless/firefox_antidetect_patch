@@ -1,0 +1,211 @@
+[
+ {
+  "file": "dom/webgpu/Adapter.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthWebGPUDeclaration.h\"  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
+  "test": "wrapper:tests/test_webgpu_adapter_is_declared_e2e.py::test_the_page_sees_the_declared_adapter_e2e"
+ },
+ {
+  "file": "dom/webgpu/Adapter.cpp",
+  "function": "uint32_t AdapterInfo::SubgroupMaxSize() const {",
+  "kind": "add",
+  "form": "guard",
+  "line": "  if (StealthWebGPUDeclared()) return StealthWebGPUIsFallback(mParent.get());  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
+  "test": "wrapper:tests/test_webgpu_adapter_is_declared_e2e.py::test_the_page_sees_the_declared_adapter_e2e"
+ },
+ {
+  "file": "dom/webgpu/Adapter.cpp",
+  "function": "struct FeatureImplementationStatus {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "static std::string_view ToJsKey(const Limit limit);  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
+  "test": "wrapper:tests/test_webgpu_adapter_is_declared_e2e.py::test_the_page_sees_the_declared_adapter_e2e"
+ },
+ {
+  "file": "dom/webgpu/Adapter.cpp",
+  "function": "Adapter::Adapter(Instance* const aParent, WebGPUChild* const aChild,",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  StealthWebGPUDeclareAdapter(this, aParent, aInfo->id, mFeatures, *mLimits->mFfi, StealthAdaptLimitKey<ToJsKey>);  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
+  "test": "wrapper:tests/test_webgpu_adapter_is_declared_e2e.py::test_the_page_sees_the_declared_adapter_e2e",
+  "anchor": "while (remainingFeatureBits) { ... } (the loop that fills mFeatures from the host adapter)",
+  "why": "the declared set replaces what the loop filled and must come before Core_features_and_limits and the RFP clamp that Mozilla applies after; a head guard would see the loop fill mFeatures again with the host features, and a tail hook would change the order with RFP"
+ },
+ {
+  "file": "dom/webgpu/Adapter.cpp",
+  "function": "already_AddRefed<dom::Promise> Adapter::RequestDevice(",
+  "kind": "add",
+  "form": "anchor",
+  "line": "    StealthWebGPUClampToReal(ffiDesc, *mInfoInner, StealthAdaptLimitKey<ToJsKey>);  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
+  "test": "gtest:StealthWebGPUDeclaration.RequestDeviceIsClampedToTheRealAdapter",
+  "anchor": "ffiDesc.required_limits = deviceLimits;",
+  "why": "the hook changes ffiDesc, the local of the lambda that Mozilla passes to wgpu_client_request_device on the next line; two fields are assigned on two separate lines, so there is no single value to wrap"
+ },
+ {
+  "file": "dom/webgpu/Instance.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthWebGPUDeclaration.h\"  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
+  "test": "wrapper:tests/test_webgpu_adapter_is_declared_e2e.py::test_a_gpu_without_d3d12_has_no_adapter_e2e"
+ },
+ {
+  "file": "dom/webgpu/Instance.cpp",
+  "function": "already_AddRefed<dom::Promise> Instance::RequestAdapter(",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  if (StealthWebGPUNoAdapter(promise)) return promise.forget();  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
+  "test": "wrapper:tests/test_webgpu_adapter_is_declared_e2e.py::test_a_gpu_without_d3d12_has_no_adapter_e2e",
+  "anchor": "the if/else that computes power_preference (ends with power_preference = ffi::WGPUPowerPreference_None; })",
+  "why": "a guard with a return in the middle of RequestAdapter: it must run after Mozilla's own checks (rejectIf, JS::WarnUTF8 for featureLevel and xrCompatible, null for an unknown featureLevel) and before wgpu_client_request_adapter; a head guard would change rejections and warnings visible to the page (pm: accepted as guard anchor)"
+ },
+ {
+  "file": "dom/webgpu/Instance.cpp",
+  "function": "already_AddRefed<dom::Promise> Instance::RequestAdapter(",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  StealthWebGPUNoteRequest(this, adapter_id, aOptions.mForceFallbackAdapter);  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
+  "test": "wrapper:tests/test_webgpu_adapter_is_declared_e2e.py::test_the_page_sees_the_declared_adapter_e2e",
+  "anchor": "RawId adapter_id = ffi::wgpu_client_request_adapter(...);",
+  "why": "needs adapter_id, which is born in the previous statement, and must precede EnqueueRequestAdapterPromise because the Adapter constructor consumes the note"
+ },
+ {
+  "file": "dom/webgpu/ipc/WebGPUParent.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/webgpu/StealthWebGPUDeclaration.h\"  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
+  "test": "gtest:StealthWebGPUAdapter.NoCompositorDeviceLeavesNoUninitialisedLuid"
+ },
+ {
+  "file": "dom/webgpu/ipc/WebGPUParent.cpp",
+  "function": "extern void wgpu_parent_swap_chain_drop(",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  StealthWebGPUZeroLuid(aOutLuid);  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
+  "test": "gtest:StealthWebGPUAdapter.NoCompositorDeviceLeavesNoUninitialisedLuid",
+  "anchor": "extern void wgpu_parent_get_compositor_device_luid(struct WGPUFfiLUID* aOutLuid) { (inside #ifdef XP_WIN)",
+  "why": "it is the first statement of the function body (the design's `notice`); the tool reads it as mid-function because the extern signature is on two lines inside the #ifdef"
+ },
+ {
+  "file": "dom/webgpu/moz.build",
+  "function": "h_and_cpp = [",
+  "kind": "add",
+  "form": "registration",
+  "line": "EXPORTS.mozilla.webgpu += [\"StealthWebGPUDeclaration.h\"]  # STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
+  "test": "wrapper:tests/test_webgpu_adapter_is_declared_e2e.py::test_the_page_sees_the_declared_adapter_e2e"
+ },
+ {
+  "file": "dom/webgpu/moz.build",
+  "function": "h_and_cpp = [",
+  "kind": "add",
+  "form": "registration",
+  "line": "SOURCES += [\"StealthWebGPUDeclaration.cpp\"]  # STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
+  "test": "wrapper:tests/test_webgpu_adapter_is_declared_e2e.py::test_the_page_sees_the_declared_adapter_e2e"
+ },
+ {
+  "file": "gfx/thebes/gfxPlatform.cpp",
+  "function": "static const uint32_t kDefaultGlyphCacheSize = -1;",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/webgpu/StealthWebGPUDeclaration.h\"  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
+  "test": "gtest:StealthWebGPUBundledVulkan.AllowWebGPUFollowsTheBundledVulkan"
+ },
+ {
+  "file": "gfx/thebes/gfxPlatform.cpp",
+  "function": "void gfxPlatform::InitWebGPUConfig() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "  mozilla::webgpu::StealthWebGPUPlatformInit();  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
+  "removed": "#if !defined(XP_WIN) && !defined(XP_MACOSX)",
+  "test": "gtest:StealthWebGPUBundledVulkan.AllowWebGPUFollowsTheBundledVulkan",
+  "anchor": "if (!IsGfxInfoStatusOkay(nsIGfxInfo::FEATURE_WEBGPU_EXTERNAL_TEXTURE, ...)) { ... }",
+  "why": "the preload fails if a host Vulkan loader is already mapped, and gfxInfo of the external texture may open one: moving it higher (wrapping SetAllowWebGPU) could change the outcome (G18); it must stay before the force-disable #if",
+  "exception": "same hunk as the approved `#if ... && 0` line (PM-DECISIONS fingerprint/webgpu/adapter-declaration, 2b, G35): the pair is one rewrite of Mozilla's `#if` line, which stays as it is today",
+  "pm": "approvato"
+ },
+ {
+  "file": "gfx/thebes/gfxPlatform.cpp",
+  "function": "void gfxPlatform::InitWebGPUConfig() {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "#if !defined(XP_WIN) && !defined(XP_MACOSX) && 0  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
+  "test": "wrapper:tests/test_webgpu_external_texture_e2e.py::test_importexternaltexture_exists_on_every_os_e2e",
+  "exception": "the #if of Mozilla's ForceDisable of WebGPU external textures off Windows and macOS is rewritten with && 0: restoring it and wrapping SetAllowWebGPUExternalTexture is not provably identical (user pref false, gfxInfo blocklist)",
+  "pm": "approvato"
+ },
+ {
+  "file": "gfx/wgpu_bindings/src/server.rs",
+  "function": "use windows::Win32::{Foundation, Graphics::Direct3D12};",
+  "kind": "add",
+  "form": "unknown",
+  "line": "#[path = \"stealth_webgpu_env.rs\"] mod stealth_webgpu_env; // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
+  "test": "gtest:StealthWebGPUInstanceEnv.TheHostsVariablesDoNotReachTheInstance"
+ },
+ {
+  "file": "gfx/wgpu_bindings/src/server.rs",
+  "function": "use windows::Win32::{Foundation, Graphics::Direct3D12};",
+  "kind": "add",
+  "form": "unknown",
+  "line": "#[path = \"stealth_webgpu_adapter.rs\"] mod stealth_webgpu_adapter; // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
+  "test": "gtest:StealthWebGPUAdapter.NoCompositorAdapterIsTheSoftwareOne"
+ },
+ {
+  "file": "gfx/wgpu_bindings/src/server.rs",
+  "function": "pub extern \"C\" fn wgpu_server_new(owner: WebGPUParentPtr) -> *mut Global {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "    stealth_webgpu_env::without_host_env(&mut instance_flags); // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
+  "test": "gtest:StealthWebGPUInstanceEnv.TheHostsVariablesDoNotReachTheInstance",
+  "anchor": "let mut instance_flags = (...).with_env();",
+  "why": "with_env() reads the host WGPU_* variables and the hook overwrites the result (FINDINGS.md, G37); not calling with_env() means rewriting a 4-line Mozilla statement, which no form does"
+ },
+ {
+  "file": "gfx/wgpu_bindings/src/server.rs",
+  "function": "unsafe fn process_message(",
+  "kind": "add",
+  "form": "anchor",
+  "line": "            stealth_webgpu_adapter::settle(global, &desc, adapter_id, &mut result); // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
+  "test": "gtest:StealthWebGPUAdapter.NoCompositorAdapterIsTheSoftwareOne",
+  "anchor": "the #[cfg(target_os = \"windows\")] block that looks for the compositor adapter by LUID",
+  "why": "it modifies result, the search outcome that Mozilla reads in the next statement (if result.is_none()); the branch lives inside a function of several hundred lines"
+ },
+ {
+  "file": "modules/libpref/init/StaticPrefList.yaml",
+  "function": "",
+  "kind": "rewrite",
+  "form": "declared-value",
+  "line": "  value: true  # STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
+  "removed": "  value: false",
+  "test": "wrapper:tests/test_webgpu_external_texture_e2e.py::test_importexternaltexture_exists_on_every_os_e2e"
+ },
+ {
+  "file": "modules/libpref/init/StaticPrefList.yaml",
+  "function": "",
+  "kind": "rewrite",
+  "form": "declared-value",
+  "line": "  value: 0  # STEALTH-HOOK(network/proxy)",
+  "removed": "  value: 5",
+  "test": "node:juggler/tests/system_proxy_is_off_by_default.test.mjs#network.proxy.type defaults to 0 and the hook is on the value line"
+ },
+ {
+  "file": "modules/libpref/init/StaticPrefList.yaml",
+  "function": "",
+  "kind": "rewrite",
+  "form": "declared-value",
+  "line": "  value: 30000  # STEALTH-HOOK(network/doh)",
+  "removed": "  value: 1500",
+  "test": "node:juggler/tests/a_proxied_doh_lookup_has_the_trr_only_timeout.test.mjs#the hook is on the value line of the pref of Mozilla, which is declared nowhere else"
+ },
+ {
+  "file": "modules/libpref/init/StaticPrefList.yaml",
+  "function": "",
+  "kind": "rewrite",
+  "form": "declared-value",
+  "line": "  value: false  # STEALTH-HOOK(network/doh)",
+  "removed": "  value: true",
+  "test": "node:juggler/tests/etc_hosts_exclusion_is_off.test.mjs#with network.trr.exclude-etc-hosts=false the hosts file is never read"
+ }
+]

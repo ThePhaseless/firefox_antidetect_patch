@@ -2,38 +2,16 @@
 
 Category: spoof
 Prefs: zoom.stealth.audio.max_channel_count, zoom.stealth.audio.output_latency_ms
-Test: TODO
+Test: wrapper:tests/test_audio_context_values_are_declared_e2e.py::test_output_latency_and_max_channel_count_are_the_declared_ones (the existing wrapper:tests/test_fingerprint_surface.py::test_pin_audio_max_channels_lands_in_destination also covers maxChannelCount)
 
 ## What it does
 
-TODO: one paragraph, from the notes below.
+`AudioContext.outputLatency` and `AudioDestinationNode.maxChannelCount` are values Firefox reads from the audio backend (cubeb) of the host. The launcher declares them with `zoom.stealth.audio.output_latency_ms` (milliseconds) and `zoom.stealth.audio.max_channel_count`; when a pref is > 0 the page gets the declared value, before Mozilla's reduceFingerprinting branch and before the backend is read, so the host value is never read. With a pref <= 0 (the default) Mozilla's own computation runs unchanged.
 
 ## Hooks in Mozilla files
 
-- `dom/media/webaudio/AudioContext.cpp` (AudioContext::OutputLatency and AudioContext::MaxChannelCount, already-hook): Two values under one feature name: outputLatency and maxChannelCount. Each returns the pref when it is > 0, before the resistFingerprinting branch. The include hunk adds two stray blank lines after StaticPrefs_zoom.h (cosmetic).
+All in `dom/media/webaudio/AudioContext.cpp`; own code in `dom/media/webaudio/StealthAudioContextValues.h` (header only, inline `StealthAudioOutputLatency(double*)` and `StealthAudioMaxChannelCount(uint32_t*)`, each true and the value when its pref is > 0).
 
-## dom/media/webaudio/AudioContext.cpp: AudioContext::OutputLatency
-
-Stealth: outputLatency from pref set by Python at launch
-
-The block is the first statement after the mIsShutDown check, marked
-`// STEALTH-HOOK(fingerprint/audio/context-values)`: it reads
-`mozilla::StaticPrefs::zoom_stealth_audio_output_latency_ms()` into
-`latency_ms` and, when it is > 0, returns `latency_ms / 1000.0`, before
-Mozilla's reduceFingerprinting branch.
-
-## dom/media/webaudio/AudioContext.cpp: AudioContext::MaxChannelCount
-
-Stealth: maxChannelCount from pref set by Python at launch
-
-The block is the first statement of the function, marked
-`// STEALTH-HOOK(fingerprint/audio/context-values)`: it reads
-`mozilla::StaticPrefs::zoom_stealth_audio_max_channel_count()` into `ch`
-and, when it is > 0, returns `(uint32_t)ch`, before Mozilla's
-`mShouldResistFingerprinting` branch (which returns 2).
-
-## dom/media/webaudio/AudioContext.cpp: includes
-
-`#include "mozilla/StaticPrefs_zoom.h"` is added after StaticPrefs_media.h
-for the two prefs above. The patch had also added two stray blank lines after
-it; they are gone.
+- registration: `#include "StealthAudioContextValues.h"` in our block after Mozilla's includes.
+- anchor, `AudioContext::OutputLatency`: `if (double stealth; StealthAudioOutputLatency(&stealth)) return stealth;` right after Mozilla's `if (mIsShutDown) { return 0.0; }` block. It is an anchor, not a head guard, because the head guard would have to redo Mozilla's shut-down check (a shut-down context answers 0.0 even when a latency is declared); the value and the position are those of the patch before the rework.
+- guard, `AudioContext::MaxChannelCount`: `if (uint32_t stealth; StealthAudioMaxChannelCount(&stealth)) return stealth;` as the first statement, before Mozilla's resistFingerprinting branch (which returns 2) and the cubeb read (`CubebUtils::MaxNumberOfChannels`).

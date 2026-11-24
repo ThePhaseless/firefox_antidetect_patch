@@ -1,0 +1,376 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# xpcshell.yml — OUR xpcshell tests on the candidate's packaged binary, `firefox -xpcshell`, on each leg's native runner. No build, no network
+# beyond GitHub: the package has the shell (browser/app/nsBrowserApp.cpp handles `-xpcshell` before anything else) and not Mozilla's harness, so
+# scripts/ci/xpcshell_run.py is the part of testing/xpcshell/runxpcshelltests.py that the package needs (the command line, the environment, the
+# profile, the structured log) and scripts/ci/xpcshell_support.json locks the unmodified Mozilla files that the tests import (head.js, the modules of
+# resource://testing-common/, the head files of the manifests: a path and a sha256 each, at the tag of the series' UPSTREAM.json).
+#
+# WHERE THE FILES COME FROM. Ours (the tests): the series, checked out at the commit under test, sparse (`<group>/<folder>/src/**/tests/`).
+# Mozilla's: raw.githubusercontent.com/mozilla-firefox/firefox/<tag>/<path>, one request per file (27 files, 4.2 MB, the biggest is sinon 3.7 MB),
+# each checked against the lock. A clone of the tag (even blobless and depth 1: every tree of Firefox) or a source archive is hundreds of MB for what
+# is a handful of files, and GitHub is already the one host the legs read. No cache entry: the repository's Actions cache is capped and release.yml's
+# entries must not be evicted for 4 MB that take seconds to fetch.
+#
+# THE VERDICT is this job's: red when a test fails or is skipped, a process exits non-zero or hangs, a declared file collects no test, a support file is
+# not the locked one, or fewer tests were collected than `min_tests` of scripts/ci/xpcshell_tests.json. The list grows as the folders land.
+#
+# WHICH ENGINE. The gate calls this with the candidate's build_run_id: the candidate's own archives are what runs. Alone, a push to a branch
+# `latitude/<name>-oracles` (the measurement) runs the PUBLISHED engine, firefox-68 unless `published_tag` says another: the release's archives are
+# downloaded with `gh release download` and checked against the sha256 of the release's seal.json (xpcshell_run.py verify-asset), so the verdict of a
+# push is that of the engine users have, with the tests of the series at the commit pushed. `build_run_id` is for the gate call and for a dispatch
+# that names a candidate run; a `published_tag` that is set wins over it.
+#
+# THE LIST IS THE SET. Before anything is downloaded, `xpcshell_run.py check` computes from the series checkout the xpcshell tests of OURS (test_*.js in
+# an xpcshell folder of a feature's src/) and compares them with scripts/ci/xpcshell_tests.json: a test of ours that the list does not run is red, so
+# is a listed file that the series does not have. `run` makes the same comparison again, so the verdict carries it.
+#
+# Called by gate.yml (workflow_call), and run alone for a MEASUREMENT. The seconds of every file and of every test are in the result JSON and in the
+# job's summary.
+# ─────────────────────────────────────────────────────────────────────────────
+name: xpcshell
+run-name: xpcshell, our tests on the packaged binary (${{ inputs.build_run_id || github.ref_name }})
+
+on:
+  workflow_call:
+    inputs:
+      build_run_id:
+        description: the run whose asset-* artifacts to test (the caller's own, or another's)
+        type: string
+        required: true
+      wrapper_ref:
+        description: unused here; the gate passes it to every workflow it calls
+        type: string
+        default: main
+      published_tag:
+        description: a release tag whose archives to test instead of the run's (empty for the candidate's own)
+        type: string
+        default: ''
+  push:
+    branches: ['latitude/*-oracles']
+  workflow_dispatch:
+    inputs:
+      build_run_id:
+        description: the run whose asset-* artifacts to test
+        type: string
+        default: '44921963200'
+      published_tag:
+        description: a release tag whose archives to test instead of the run's artifacts (empty for the run's)
+        type: string
+        default: ''
+
+permissions: { actions: read, contents: read }
+
+jobs:
+  # The Ubuntu packages of the Linux legs, from Ubuntu's archive once per runner image and list (linux-deps.yml), never by a leg.
+  linux-deps:
+    name: linux-deps-xpcshell
+    uses: ./.github/workflows/linux-deps.yml
+    with:
+      name: xpcshell
+      packages_no_recommends: xvfb libgtk-3-0t64 libdbus-glib-1-2 libxt6t64 libasound2t64 libx11-xcb1
+
+  xpcshell:
+    name: xpcshell-${{ matrix.leg }}
+    needs: linux-deps
+    runs-on: ${{ matrix.runner }}
+    # TEMP and TMP on D:\a\_temp (see gate.yml): every run makes a profile in TEMP and on C: they saturate the disk.
+    env:
+      TEMP: ${{ startsWith(matrix.runner, 'windows') && 'D:\a\_temp' || '/tmp' }}
+      TMP: ${{ startsWith(matrix.runner, 'windows') && 'D:\a\_temp' || '/tmp' }}
+      # The release whose archives run: the input, else firefox-68 on this workflow's own push (the measurement), else none (the run's artifacts).
+      # A call from the gate has github.event_name of ITS caller (release.yml is also run by a push) and always has build_run_id: only a push of this
+      # workflow has none, so that is what says "the measurement", never the event name alone.
+      PUBLISHED_TAG: ${{ inputs.published_tag || (inputs.build_run_id == '' && github.event_name == 'push' && 'firefox-68' || '') }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { leg: linux-x86_64, runner: ubuntu-24.04, kind: linux }
+          - { leg: win-x86_64, runner: windows-latest, kind: win }
+    steps:
+      # The tests are ours and live in the series, and so does the runner: the commit under test, sparse, as gate.yml does for the tests of the
+      # security state. `/*/*/src/**/tests/` is every tests folder of every folder of the series; UPSTREAM.json names the Mozilla tag.
+      - name: Checkout the series (our tests, the runner, the Mozilla tag)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ github.sha }}
+          path: engine-series
+          fetch-depth: 1
+          sparse-checkout: |
+            /UPSTREAM.json
+            /platform/ci/src/scripts/ci/xpcshell_*
+            /*/*/src/**/tests/
+            /*/*/src/**/test/
+            /*/*/*/src/**/tests/
+            /*/*/*/src/**/test/
+          sparse-checkout-cone-mode: false
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with: { python-version: '3.11' }
+      # No download, no install: the list and the series, in the first seconds of the job.
+      - name: The declared list is exactly the set of our xpcshell tests
+        shell: bash
+        run: python engine-series/platform/ci/src/scripts/ci/xpcshell_run.py check --series engine-series --list engine-series/platform/ci/src/scripts/ci/xpcshell_tests.json
+      - name: Download asset (the run's)
+        if: env.PUBLISHED_TAG == ''
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: asset-${{ matrix.leg }}
+          path: art
+          # another run's artifacts need the token; this run's do not. A push to latitude/*-oracles has no input: the measurement's candidate.
+          run-id: ${{ inputs.build_run_id || '44921963200' }}
+          github-token: ${{ (inputs.build_run_id || '44921963200') != github.run_id && github.token || '' }}
+      # The published engine: the release's seal.json and this leg's archive, the archive's sha256 checked against the seal (as the core does).
+      - name: Download asset (the published engine's, as sealed)
+        if: env.PUBLISHED_TAG != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          mkdir -p art
+          gh release download "$PUBLISHED_TAG" -R "$GITHUB_REPOSITORY" --pattern seal.json --pattern "firefox-*-stealth-${{ matrix.leg }}.*" --dir art
+          python engine-series/platform/ci/src/scripts/ci/xpcshell_run.py verify-asset --dir art --leg ${{ matrix.leg }}
+      - name: The Linux packages (the run's linux-deps job, no mirror)
+        if: matrix.kind == 'linux'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ${{ needs.linux-deps.outputs.artifact }}
+          path: /tmp/linux-deps
+      - name: Linux libraries and a display for the shell
+        if: matrix.kind == 'linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The run's linux-deps repository and nothing else: apt reads only its sources list and lists folder, the files are already in apt's archives,
+          # and the roots are installed by name with --no-download: a package the repository does not hold is named here and red, never fetched.
+          read -r OS VER < /tmp/linux-deps/image.txt
+          echo "the repository was read on $OS $VER; this runner is $ImageOS $ImageVersion"
+          sudo mkdir -p /tmp/linux-deps-apt/lists/partial /tmp/linux-deps-apt/parts
+          echo "deb [trusted=yes] file:/tmp/linux-deps ./" | sudo tee /tmp/linux-deps-apt/sources.list >/dev/null
+          APT="-o Dir::Etc::SourceList=/tmp/linux-deps-apt/sources.list -o Dir::Etc::SourceParts=/tmp/linux-deps-apt/parts -o Dir::State::Lists=/tmp/linux-deps-apt/lists -o Acquire::Languages=none"
+          sudo apt-get $APT update
+          sudo cp /tmp/linux-deps/*.deb /var/cache/apt/archives/
+          sudo apt-get $APT install -y --no-download --no-install-recommends $(cat /tmp/linux-deps/roots.txt)
+      - name: Extract + locate firefox binary
+        shell: bash
+        run: |
+          set -e
+          mkdir -p ff
+          # The one archive of this leg, whatever version it carries (scripts/ci/legs.py derives the name at build time).
+          set -- art/firefox-*-stealth-${{ matrix.leg }}.*
+          [ "$#" -eq 1 ] && [ -e "$1" ] || { echo "ERROR: expected one firefox-*-stealth-${{ matrix.leg }} archive in art/, found: $*"; exit 1; }
+          A="$1"
+          case "${{ matrix.kind }}" in
+            win)   python -c "import zipfile; zipfile.ZipFile('$A').extractall('ff')"; EXE="ff/firefox.exe";;
+            linux) tar xzf "$A" -C ff; EXE="ff/firefox";;
+          esac
+          [ -e "$EXE" ] || { echo "ERROR: firefox binary not found at $EXE"; exit 1; }
+          chmod +x "$EXE" 2>/dev/null || true
+          echo "FF_EXE=$EXE" >> "$GITHUB_ENV"
+          echo "located: $EXE"
+      # The package ships its own NSS, its own libmozsandbox and the rest: ldd must see the package's folder, as the shell does (the runner sets
+      # LD_LIBRARY_PATH to it), or it reports the runner's older libnss3 and every library of the package as missing. What counts is a library
+      # that is neither found nor in the package.
+      - name: The shared libraries of the binary are all there
+        if: matrix.kind == 'linux'
+        run: |
+          missing="$(LD_LIBRARY_PATH="$PWD/ff" ldd ff/firefox ff/libxul.so 2>&1 | grep -E '=> not found|version .* not found' | sed -E 's/^[[:space:]]*([^ ]+) =>.*/\1/' | sort -u | while read -r lib; do [ -e "ff/$lib" ] || echo "$lib"; done)"
+          [ -z "$missing" ] || { echo "missing libraries:"; echo "$missing"; exit 1; }
+      - name: Mozilla's unmodified test files, at the tag, as locked
+        shell: bash
+        run: python engine-series/platform/ci/src/scripts/ci/xpcshell_run.py fetch --series engine-series --into xpc-support
+      - name: Our xpcshell tests on the packaged binary - every listed test runs and passes
+        shell: bash
+        run: |
+          PREFIX=""; [ "${{ matrix.kind }}" = linux ] && PREFIX="xvfb-run -a"
+          $PREFIX python engine-series/platform/ci/src/scripts/ci/xpcshell_run.py run --binary "$FF_EXE" --series engine-series --support xpc-support --out xpcshell-result
+      - name: The seconds of every file and test
+        if: always()
+        shell: bash
+        run: |
+          [ -f xpcshell-result/xpcshell-summary.md ] && { echo "### xpcshell ${{ matrix.leg }}"; cat xpcshell-result/xpcshell-summary.md; } >> "$GITHUB_STEP_SUMMARY" || true
+      - name: Keep the result
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: xpcshell-${{ matrix.leg }}
+          path: xpcshell-result
+          if-no-files-found: warn
+          retention-days: 14
+      # THE JUNIT for the named hook tests judge (the artifact `junit-xpcshell`, put together by the `junit` job below): one file per xpcshell test file,
+      # written by xpcshell_run.py at xpcshell-result/junit-xpcshell/<path>.xml, here under this leg's name. It runs whatever the tests said and does not
+      # change the verdict.
+      - name: This leg's junit, one file per test file
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p junit-xpcshell
+          if [ -d xpcshell-result/junit-xpcshell ]; then cp -R xpcshell-result/junit-xpcshell "junit-xpcshell/${{ matrix.leg }}"; fi
+      - name: Keep the junit (this leg's part of junit-xpcshell)
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: junitpart-xpcshell-${{ matrix.leg }}
+          path: junit-xpcshell
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # THE ARTIFACT `junit-xpcshell`, one for the run (an artifact name is one per run, and the two legs cannot both write it): the legs' parts, put together
+  # as junit-xpcshell/<leg>/<path of the test file>.xml. The judge reads `junit-*` folders by their name, so a part is named `junitpart-*`, which it does not
+  # read. This job reads and uploads only: its steps do not fail it, so the verdict of the workflow stays the legs'.
+  junit:
+    name: junit-xpcshell
+    needs: xpcshell
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Both legs' junit
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: junitpart-xpcshell-*
+          path: junit-xpcshell
+          merge-multiple: true
+      - name: Keep junit-xpcshell
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: junit-xpcshell
+          path: junit-xpcshell
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  # prefs: EVERY preference the packaged engine has, the published firefox-68 against the candidate, ZERO differences allowed.
+  #
+  # scripts/ci/prefs_dump.js runs in `firefox -xpcshell` (the same command line and environment as the legs above, a fresh empty profile folder) and
+  # writes the default branch (name, type, value, locked) and the user branch of that fresh profile. `xpcshell_run.py prefs-compare` is red on every
+  # added, missing or changed preference and says its name and both values: there is no list of expected differences.
+  #
+  # THE CONTROL COMES FIRST. The published engine is dumped TWICE and the two are compared (the A/A): a difference there is "broken control" (exit 2),
+  # the dump is not repeatable, and nothing is read from the candidate. Both engines are extracted to the same folder (`ff`) and dumped with the same
+  # profile folder, so that no value that holds a path can differ between them. The published engine is the release's archive, checked against the
+  # sha256 of its seal.json (verify-asset); the candidate is the run's asset-<leg> artifact (build_run_id; a push to latitude/*-oracles has none and uses
+  # the dispatch's default). `published_tag` is for the legs above: the baseline here is PREFS_BASE_TAG.
+  # ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  prefs:
+    name: prefs-${{ matrix.leg }}
+    needs: linux-deps
+    runs-on: ${{ matrix.runner }}
+    env:
+      TEMP: ${{ startsWith(matrix.runner, 'windows') && 'D:\a\_temp' || '/tmp' }}
+      TMP: ${{ startsWith(matrix.runner, 'windows') && 'D:\a\_temp' || '/tmp' }}
+      PREFS_BASE_TAG: firefox-68
+      PREFS_PY: engine-series/platform/ci/src/scripts/ci/xpcshell_run.py
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { leg: linux-x86_64, runner: ubuntu-24.04, kind: linux }
+          - { leg: win-x86_64, runner: windows-latest, kind: win }
+    steps:
+      - name: Checkout the series (the runner and the dump script)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ github.sha }}
+          path: engine-series
+          fetch-depth: 1
+          sparse-checkout: |
+            /UPSTREAM.json
+            /platform/ci/src/scripts/ci/xpcshell_*
+            /platform/ci/src/scripts/ci/prefs_dump.js
+          sparse-checkout-cone-mode: false
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with: { python-version: '3.11' }
+      - name: Download the candidate (the run's asset)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: asset-${{ matrix.leg }}
+          path: art-cand
+          run-id: ${{ inputs.build_run_id || '44921963200' }}
+          github-token: ${{ (inputs.build_run_id || '44921963200') != github.run_id && github.token || '' }}
+      - name: Download the published engine (as sealed)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          mkdir -p art-pub
+          gh release download "$PREFS_BASE_TAG" -R "$GITHUB_REPOSITORY" --pattern seal.json --pattern "firefox-*-stealth-${{ matrix.leg }}.*" --dir art-pub
+          python "$PREFS_PY" verify-asset --dir art-pub --leg ${{ matrix.leg }}
+      - name: The Linux packages (the run's linux-deps job, no mirror)
+        if: matrix.kind == 'linux'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ${{ needs.linux-deps.outputs.artifact }}
+          path: /tmp/linux-deps
+      - name: Linux libraries and a display for the shell
+        if: matrix.kind == 'linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The run's linux-deps repository and nothing else: apt reads only its sources list and lists folder, the files are already in apt's archives,
+          # and the roots are installed by name with --no-download: a package the repository does not hold is named here and red, never fetched.
+          read -r OS VER < /tmp/linux-deps/image.txt
+          echo "the repository was read on $OS $VER; this runner is $ImageOS $ImageVersion"
+          sudo mkdir -p /tmp/linux-deps-apt/lists/partial /tmp/linux-deps-apt/parts
+          echo "deb [trusted=yes] file:/tmp/linux-deps ./" | sudo tee /tmp/linux-deps-apt/sources.list >/dev/null
+          APT="-o Dir::Etc::SourceList=/tmp/linux-deps-apt/sources.list -o Dir::Etc::SourceParts=/tmp/linux-deps-apt/parts -o Dir::State::Lists=/tmp/linux-deps-apt/lists -o Acquire::Languages=none"
+          sudo apt-get $APT update
+          sudo cp /tmp/linux-deps/*.deb /var/cache/apt/archives/
+          sudo apt-get $APT install -y --no-download --no-install-recommends $(cat /tmp/linux-deps/roots.txt)
+      # The control: the published engine twice. Red here (exit 2, "BROKEN CONTROL") means the dump is not repeatable: the candidate is not read.
+      - name: Control (A/A) - the published engine dumped twice must not differ
+        shell: bash
+        run: |
+          set -e
+          rm -rf ff; mkdir -p ff prefs-out
+          set -- art-pub/firefox-*-stealth-${{ matrix.leg }}.*
+          [ "$#" -eq 1 ] && [ -e "$1" ] || { echo "ERROR: expected one archive in art-pub/, found: $*"; exit 1; }
+          case "${{ matrix.kind }}" in
+            win)   python -c "import sys, zipfile; zipfile.ZipFile(sys.argv[1]).extractall('ff')" "$1"; EXE="ff/firefox.exe";;
+            linux) tar xzf "$1" -C ff; EXE="ff/firefox";;
+          esac
+          [ -e "$EXE" ] || { echo "ERROR: firefox binary not found at $EXE"; exit 1; }
+          chmod +x "$EXE" 2>/dev/null || true
+          PREFIX=""; [ "${{ matrix.kind }}" = linux ] && PREFIX="xvfb-run -a"
+          $PREFIX python "$PREFS_PY" prefs --binary "$EXE" --out prefs-out/published-1.json --root prefs-profile
+          $PREFIX python "$PREFS_PY" prefs --binary "$EXE" --out prefs-out/published-2.json --root prefs-profile
+          python "$PREFS_PY" prefs-compare prefs-out/published-1.json prefs-out/published-2.json --control --out prefs-out/control-diff.json
+      - name: Candidate - dumped with the same command, folders and profile path
+        shell: bash
+        run: |
+          set -e
+          rm -rf ff; mkdir -p ff
+          set -- art-cand/firefox-*-stealth-${{ matrix.leg }}.*
+          [ "$#" -eq 1 ] && [ -e "$1" ] || { echo "ERROR: expected one archive in art-cand/, found: $*"; exit 1; }
+          case "${{ matrix.kind }}" in
+            win)   python -c "import sys, zipfile; zipfile.ZipFile(sys.argv[1]).extractall('ff')" "$1"; EXE="ff/firefox.exe";;
+            linux) tar xzf "$1" -C ff; EXE="ff/firefox";;
+          esac
+          [ -e "$EXE" ] || { echo "ERROR: firefox binary not found at $EXE"; exit 1; }
+          chmod +x "$EXE" 2>/dev/null || true
+          PREFIX=""; [ "${{ matrix.kind }}" = linux ] && PREFIX="xvfb-run -a"
+          $PREFIX python "$PREFS_PY" prefs --binary "$EXE" --out prefs-out/candidate.json --root prefs-profile
+      - name: Published against candidate - zero differences
+        shell: bash
+        run: python "$PREFS_PY" prefs-compare prefs-out/published-1.json prefs-out/candidate.json --out prefs-out/diff.json
+      - name: The differences
+        if: always()
+        shell: bash
+        run: python "$PREFS_PY" prefs-summary prefs-out --title "prefs ${{ matrix.leg }}" >> "$GITHUB_STEP_SUMMARY" || true
+      - name: Keep the dumps and the diff
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: prefs-${{ matrix.leg }}
+          path: prefs-out
+          if-no-files-found: warn
+          retention-days: 14

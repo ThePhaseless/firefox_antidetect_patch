@@ -3,14 +3,23 @@
   "chrome/nsChromeRegistry.cpp",
   "chrome/nsChromeRegistryChrome.cpp",
   "chrome/nsChromeRegistryContent.cpp",
+  "chrome/test/moz.build",
   "netwerk/protocol/res/SubstitutingProtocolHandler.cpp",
+  "netwerk/protocol/res/SubstitutingProtocolHandler.h",
   "netwerk/protocol/res/moz.build",
   "security/sandbox/linux/broker/SandboxBrokerPolicyFactory.cpp",
+  "security/sandbox/linux/gtest/moz.build",
   "security/sandbox/win/src/sandboxbroker/sandboxBroker.cpp"
  ],
  "added": {
+  "chrome/test/unit/test_stealth_branding_chrome_registry.js": "100644",
+  "chrome/test/unit/xpcshell-stealth.toml": "100644",
   "netwerk/protocol/res/StealthBranding.cpp": "100644",
   "netwerk/protocol/res/StealthBranding.h": "100644",
+  "netwerk/protocol/res/gtest/TestStealthBranding.cpp": "100644",
+  "netwerk/protocol/res/gtest/moz.build": "100644",
+  "security/sandbox/linux/broker/StealthLinuxSandboxBranding.h": "100644",
+  "security/sandbox/linux/gtest/TestStealthBrandingPolicy.cpp": "100644",
   "security/sandbox/win/src/sandboxbroker/StealthSandboxBranding.h": "100644"
  },
  "inventory": [
@@ -45,7 +54,7 @@
    "category": "spoof",
    "feature": "stealth-branding-redirect",
    "prefs": [],
-   "added": 4,
+   "added": 3,
    "removed": 0,
    "hunks": 2,
    "inline_logic_lines": 1,
@@ -67,7 +76,7 @@
    "category": "spoof",
    "feature": "stealth-branding-redirect",
    "prefs": [],
-   "added": 6,
+   "added": 4,
    "removed": 0,
    "hunks": 2,
    "inline_logic_lines": 2,
@@ -85,13 +94,35 @@
    }
   },
   {
+   "file": "chrome/test/moz.build",
+   "category": "spoof",
+   "feature": "stealth-branding-redirect",
+   "prefs": [
+    "zoom.stealth.branding.archive"
+   ],
+   "added": 2,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "after the XPCSHELL_TESTS_MANIFESTS list (unit_ipc/xpcshell.toml)",
+   "evidence": [
+    "+XPCSHELL_TESTS_MANIFESTS += [\"unit/xpcshell-stealth.toml\"]  # STEALTH-HOOK(fingerprint/js-surface/branding)"
+   ],
+   "notes": "Registers the xpcshell test that the chrome registry serves the declared branding jar, on the packaged binary.",
+   "verifier": {
+    "changed": [],
+    "why": "Written with the hook, 2026-11-22."
+   }
+  },
+  {
    "file": "netwerk/protocol/res/SubstitutingProtocolHandler.cpp",
    "category": "spoof",
    "feature": "stealth-branding-redirect",
    "prefs": [],
-   "added": 9,
+   "added": 1,
    "removed": 1,
-   "hunks": 3,
+   "hunks": 1,
    "inline_logic_lines": 4,
    "hookable": "already-hook",
    "anchor": "SubstitutingProtocolHandler::ResolveURI",
@@ -110,11 +141,31 @@
    }
   },
   {
+   "file": "netwerk/protocol/res/SubstitutingProtocolHandler.h",
+   "category": "spoof",
+   "feature": "stealth-branding-redirect",
+   "prefs": [],
+   "added": 1,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "class SubstitutingProtocolHandler, after NS_DECL_NON_VIRTUAL_NSISUBSTITUTINGPROTOCOLHANDLER",
+   "evidence": [
+    "+  nsresult ResolveURI_Mozilla(nsIURI* aResURI, nsACString& aResult);  // STEALTH-HOOK(fingerprint/js-surface/branding)"
+   ],
+   "notes": "Declaration of Mozilla's ResolveURI body under its new name (function wrap): ResolveURI itself is ours, defined in netwerk/protocol/res/StealthBranding.cpp, and redirects every successful resolution to the declared branding archive.",
+   "verifier": {
+    "changed": [],
+    "why": "written by the hook rework, not by the first inventory"
+   }
+  },
+  {
    "file": "netwerk/protocol/res/moz.build",
    "category": "build",
    "feature": "stealth-branding-redirect",
    "prefs": [],
-   "added": 2,
+   "added": 4,
    "removed": 0,
    "hunks": 2,
    "inline_logic_lines": 0,
@@ -135,7 +186,7 @@
    "category": "other",
    "feature": "stealth-branding-redirect",
    "prefs": [],
-   "added": 10,
+   "added": 3,
    "removed": 0,
    "hunks": 2,
    "inline_logic_lines": 5,
@@ -149,6 +200,26 @@
    "verifier": {
     "changed": [],
     "why": "all fields checked against the diff; no change"
+   }
+  },
+  {
+   "file": "security/sandbox/linux/gtest/moz.build",
+   "category": "build",
+   "feature": "stealth-branding-redirect",
+   "prefs": [],
+   "added": 1,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "UNIFIED_SOURCES list of the sandbox gtests",
+   "evidence": [
+    "+UNIFIED_SOURCES += [\"TestStealthBrandingPolicy.cpp\"]  # STEALTH-HOOK(fingerprint/js-surface/branding)"
+   ],
+   "notes": "Registers our gtest of the content sandbox's branding read rule, after the closing bracket of Mozilla's list.",
+   "verifier": {
+    "changed": [],
+    "why": "written by the hook rework, not by the first inventory"
    }
   },
   {

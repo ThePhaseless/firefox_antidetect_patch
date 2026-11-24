@@ -45,7 +45,23 @@ SUITE = re.compile(r"(\S+)\.(  # .*)?")
 # on one platform whose cause the sources do not say.
 LOGGED = {"StealthSessionUdpProxy": "sync,SOCKS-UDP:5,nsHostResolver:5"}
 # Named by the default filter and compiled for one platform only, from run 41402916724's logs.
-NOT_ON = {"linux": {"StealthWebGPUAdapter", "StealthWebGPUInstanceEnv"}, "win": {"StealthWebGPUBundledVulkan", "StealthFcBundleFonts"}}
+# From the moz.build of each gtest directory: the font-list suites of Windows (TestStealthBundledCollection.cpp, TestStealthTextQuality.cpp, the
+# DirectWrite ones) and the untrusted-modules one (toolkit/xre/dllservices, Windows only) are not built on Linux; fontconfig's are GTK's.
+WINDOWS_ONLY = {"StealthBundledCollection", "StealthFallbackNames", "StealthFontList", "StealthTtcFace",
+                "StealthTextQuality", "StealthOwnBinaries", "StealthWindowInputDesktop", "StealthExclusivePort"}
+LINUX_ONLY = {"StealthFcFontList", "StealthFontMetrics", "StealthGlyphCoverage"}
+NOT_ON = {"linux": {"StealthWebGPUAdapter", "StealthWebGPUInstanceEnv"} | WINDOWS_ONLY,
+          "win": {"StealthWebGPUBundledVulkan", "StealthFcBundleFonts"} | LINUX_ONLY}
+# Single tests that exist on one platform only inside a suite that exists on both ("Suite.Name"), read by the named hook tests judge
+# (tools/hook_tests_judge.py) and by nothing else here: NOT_ON above stays the table of suites. Each is under a platform condition in its source:
+# TheHostIsNotProbedWhileDeclared under #ifdef MOZ_WIDGET_GTK (gfx/thebes/gtest/TestStealthGfxFeatureStatus.cpp), SandboxPolicyAllowsTheDeclaredArchive
+# in security/sandbox/linux/gtest (built only where security/sandbox/moz.build has OS_ARCH == "Linux"), the multisample one under #ifdef XP_WIN
+# (gfx/gl/gtest/TestStealthGLMultisample.cpp). An entry for a test that ran on that platform makes the judge red.
+NOT_ON_TESTS = {"linux": {"StealthGLMultisample.BasicRenderDriverBlendsIntoAMultisampledTarget"},
+                "win": {"StealthGfxFeatureStatus.TheHostIsNotProbedWhileDeclared", "StealthGfxFeatureStatus.NothingProbesTheHostBeforeTheProfilePrefsAreRead",
+                         "StealthGfxFeatureStatus.TheHostProbeIsLaunchedAsSoonAsThePrefsAreReadWithTheEngineOff",
+                         "StealthGfxFeatureStatus.TheHostProbeIsNotLaunchedWithTheEngineOnOrBeforeThePrefsAreRead",
+                         "StealthBranding.SandboxPolicyAllowsTheDeclaredArchive"}}
 
 
 def suite_names(listing: str) -> list:

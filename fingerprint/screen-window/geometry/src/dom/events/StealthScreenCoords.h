@@ -8,32 +8,95 @@
 
 // Defined here, not in a source file of its own: dom/events/moz.build
 // registers none for it, so the hook in Event.cpp adds no line to a shared
-// build file. Included by Event.cpp only.
+// build file. Included by Event.cpp and, through StealthWindowGeometry.h, by
+// nsGlobalWindowOuter.cpp: everything below is inline, so each translation
+// unit sees one definition.
 
+#include "StealthDeclarationGate.h"
+#include "Units.h"
+#include "mozilla/DimensionRequest.h"
 #include "mozilla/Maybe.h"
-#include "nsGlobalWindowOuter.h"
+#include "mozilla/RefPtr.h"
+#include "mozilla/dom/BrowserChild.h"
+#include "mozilla/dom/BrowsingContext.h"
+#include "mozilla/dom/Document.h"
+#include "nsCOMPtr.h"
+#include "nsIWidget.h"
 #include "nsPoint.h"
-
-class nsPresContext;
+#include "nsPresContext.h"
 
 namespace mozilla::dom {
 
-// The declared content origin, in app units, that Event::GetScreenCoords adds
-// to the screen point of a mouse event so that
+// Lo scarto fra l'origine reale del contenuto di primo livello (l'offset su
+// schermo del root widget, cio' che mozInnerScreenX riportava prima di
+// diventare una dichiarazione) e quella dichiarata, in app units; Nothing()
+// col motore spento. UNA funzione per mozInnerScreenX/Y e per gli eventi
+// (Event.cpp): e' cosi' che screenX - clientX == mozInnerScreenX resta vero
+// anche nei popup e negli iframe. Un sottoframe somma lo scarto al PROPRIO
+// rettangolo, non lo sostituisce.
+//
+// Main thread only. Every call it makes is on a public API: nsPresContext,
+// nsIWidget, BrowsingContext, BrowserChild::GetDimensions.
+inline Maybe<nsPoint> StealthContentOriginShift(nsPresContext* aPresContext) {
+  if (!aPresContext || !gfx::StealthEngineActive()) {
+    return Nothing();
+  }
+  // L'origine reale e' l'offset su schermo del root widget: nel processo di
+  // contenuto e' il PuppetWidget, il cui offset e' l'origine dell'area di
+  // contenuto di primo livello - per il documento top coincide con
+  // GetInnerScreenRect(), per un sottoframe no, ed e' proprio quella
+  // differenza che va conservata. Solo chiamate al widget, niente layout:
+  // Event.cpp chiama questa funzione per ogni evento del mouse.
+  nsCOMPtr<nsIWidget> rootWidget = aPresContext->GetRootWidget();
+  if (!rootWidget) {
+    return Nothing();
+  }
+  const int32_t auPerDevPx = aPresContext->AppUnitsPerDevPixel();
+  const nsPoint real = LayoutDevicePixel::ToAppUnits(
+      rootWidget->WidgetToScreenOffset(), auPerDevPx);
+  // Un popup si dichiara dalla sua posizione REALE: il rettangolo esterno della
+  // finestra di primo livello, che BrowserChild riceve dal genitore - anche in
+  // un iframe fuori processo, dove arriva dall'embedder. E' la stessa fonte di
+  // GetScreenXY (nsIBaseWindow::GetPosition del tree owner).
+  Maybe<LayoutDeviceIntPoint> popupOrigin;
+  Document* doc = aPresContext->Document();
+  BrowsingContext* bc = doc ? doc->GetBrowsingContext() : nullptr;
+  if (bc && bc->Top()->GetIsPopupRequested()) {
+    BrowserChild* child = rootWidget->GetOwningBrowserChild();
+    if (!child) {
+      // Il processo genitore non serve pagine: niente da dichiarare.
+      return Nothing();
+    }
+    LayoutDeviceIntPoint outer;
+    if (NS_FAILED(child->GetDimensions(DimensionKind::Outer, &outer.x.value,
+                                       &outer.y.value, nullptr, nullptr))) {
+      return Nothing();
+    }
+    popupOrigin = Some(outer);
+  }
+  // In fullscreen the content is the screen. Same source as Fullscreen() in a
+  // content process: the puppet widget's size mode.
+  const bool fullscreen = rootWidget->SizeMode() == nsSizeMode_Fullscreen;
+  return gfx::StealthDeclaredOriginShift(real, popupOrigin, fullscreen,
+                                         auPerDevPx);
+}
+
+// aScreenPoint (the last term of the sum Event::GetScreenCoords forms: the
+// widget's offset on the screen, in app units) plus the declared content origin shift, so that
 //
 //     event.screenX - event.clientX === window.mozInnerScreenX
 //
-// stays true. (0, 0) when the engine is off, or when there is nothing to
-// declare: the sum in Event.cpp is then exactly stock Firefox's.
+// stays true. aScreenPoint itself when the engine is off, or when there is
+// nothing to declare: the value is then exactly stock Firefox's.
 //
-// It asks nsGlobalWindowOuter::StealthContentOriginShift, the one function
-// mozInnerScreenX and mozInnerScreenY ask too. Main thread only, like its
-// caller. Arithmetic and widget queries only, no layout: this runs for every
-// trusted mouse and wheel event.
+// It asks StealthContentOriginShift, the one function mozInnerScreenX and
+// mozInnerScreenY ask too. Main thread only, like its caller. Arithmetic and
+// widget queries only, no layout: this runs for every trusted mouse and wheel
+// event.
 //
 // The text below was written in Event::GetScreenCoords, where this sum is
 // formed: "this function", "here" and "up here" mean that function, which
-// calls this one for the last term.
+// calls this one around the last term of that sum.
 //
 // Stealth: the origin comes from the SAME function mozInnerScreenX answers
 // with, and that is the whole point of it being a function.
@@ -95,11 +158,16 @@ namespace mozilla::dom {
 // mozInnerScreenY. Quando l'aritmetica stava soltanto qui, la sostituzione
 // secca in nsGlobalWindowOuter ha ricreato dentro gli iframe la contraddizione
 // che questo blocco toglie al primo livello - misurato il 2026-08-10.
-inline nsPoint StealthScreenOriginShift(nsPresContext* aPresContext) {
+//
+// The sum stays in integer app units (A + (B + shift): integer addition, the
+// same value as (A + B) + shift), and the caller converts to CSS pixels once, exactly as before: no float
+// addition is introduced.
+inline nsPoint StealthWithContentOrigin(nsPresContext* aPresContext,
+                                        const nsPoint& aScreenPoint) {
   // Nothing() (engine off, no PresContext, no root widget, a parent process
   // popup) is the zero shift: the sum then equals stock Firefox's.
-  return nsGlobalWindowOuter::StealthContentOriginShift(aPresContext)
-      .valueOr(nsPoint());
+  return aScreenPoint +
+         StealthContentOriginShift(aPresContext).valueOr(nsPoint());
 }
 
 }  // namespace mozilla::dom

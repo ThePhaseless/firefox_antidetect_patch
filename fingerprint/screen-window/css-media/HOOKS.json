@@ -1,0 +1,28 @@
+[
+ {
+  "file": "layout/style/nsMediaFeatures.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthMediaFeatures.h\"  // STEALTH-HOOK(fingerprint/screen-window/css-media)",
+  "test": "wrapper:tests/test_css_media_reads_the_declared_screen_and_pointer_e2e.py::test_the_device_size_media_queries_read_the_declared_screen"
+ },
+ {
+  "file": "layout/style/nsMediaFeatures.cpp",
+  "function": "static nsSize GetSize(const Document& aDocument) {",
+  "kind": "add",
+  "form": "guard",
+  "line": "  if (nsSize stealth; StealthDeclaredDeviceSize(&stealth)) return stealth;  // STEALTH-HOOK(fingerprint/screen-window/css-media)",
+  "test": "wrapper:tests/test_css_media_reads_the_declared_screen_and_pointer_e2e.py::test_the_device_size_media_queries_read_the_declared_screen"
+ },
+ {
+  "file": "layout/style/nsMediaFeatures.cpp",
+  "function": "static PointerCapabilities GetPointerCapabilities(const Document* aDocument,",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  if (PointerCapabilities stealth; StealthDeclaredPointerCapabilities(aID, &stealth)) return stealth;  // STEALTH-HOOK(fingerprint/screen-window/css-media)",
+  "test": "wrapper:tests/test_css_media_reads_the_declared_screen_and_pointer_e2e.py::test_a_declared_pointer_is_what_the_media_queries_read",
+  "anchor": "if (dom::BrowsingContext* bc = aDocument->GetBrowsingContext()) { if (bc->TouchEventsOverride() == dom::TouchEventsOverride::Enabled) { return PointerCapabilities::Coarse; } }",
+  "why": "It must run after Mozilla's TouchEventsOverride == Enabled return (reachable: Juggler sets the override from has_touch), so a guard at the top of the function would let the declared pointer win over that override; and before the resistFingerprinting branch and the LookAndFeel::GetInt host read."
+ }
+]

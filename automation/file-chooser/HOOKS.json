@@ -1,0 +1,20 @@
+[
+ {
+  "file": "dom/html/HTMLInputElement.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthFileChooser.h\"  // STEALTH-HOOK(automation/file-chooser)",
+  "test": "wrapper:tests/test_file_chooser.py::test_expect_file_chooser_receives_the_event"
+ },
+ {
+  "file": "dom/html/HTMLInputElement.cpp",
+  "function": "nsresult HTMLInputElement::InitFilePicker(FilePickerType aType) {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  if (StealthFileChooserIntercepted(doc)) return NS_OK;  // STEALTH-HOOK(automation/file-chooser)",
+  "test": "wrapper:tests/test_file_chooser.py::test_expect_file_chooser_receives_the_event",
+  "anchor": "obs->NotifyObservers(ToSupports(this), \"file-input-picker-opening\", nullptr); (the `if (obs) {...}` block)",
+  "why": "A guard at the top of InitFilePicker would skip the file-input-picker-opening notification, which the Juggler listens to (PageAgent.js) and which is the event expect_file_chooser() receives, and the file picker setup before it (different effects and error paths); there is no value to wrap."
+ }
+]

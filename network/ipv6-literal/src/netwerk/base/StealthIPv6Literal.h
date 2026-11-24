@@ -7,6 +7,7 @@
 
 #include "mozilla/net/DNS.h"
 #include "prerror.h"
+#include "nsStringFwd.h"
 #include "prio.h"
 
 namespace mozilla::net {
@@ -73,6 +74,18 @@ PRErrorCode StealthConnectError(const NetAddr& aAddr,
 PRStatus StealthConnect(PRFileDesc* aFd, const NetAddr& aAddr,
                         StealthConnectTarget aTarget, const PRNetAddr* aPrAddr,
                         PRIntervalTime aTimeout);
+
+/**
+ * The connect of nsSocketTransport::InitiateSocket (every direct TCP connection: pages, fetch, XHR, WebSocket,
+ * Happy Eyeballs, DoH, a connection to an HTTP proxy), in place of PR_Connect(aFd, aPrAddr, aTimeout). It takes the
+ * transport's own fields and decides the target as the transport knows it: when the transport is transparent
+ * (aProxyTransparent) and has a proxy host (aProxyHost not empty), aAddr is the destination of a connection a SOCKS
+ * proxy makes, which the proxy reaches, not this host (kBehindSocksProxy); otherwise it is a direct connection
+ * (kDirect). Then it is the connect above with that target.
+ */
+PRStatus StealthConnect(const NetAddr& aAddr, bool aProxyTransparent,
+                        const nsACString& aProxyHost, PRFileDesc* aFd,
+                        const PRNetAddr* aPrAddr, PRIntervalTime aTimeout);
 
 /**
  * Parent process, once, at the top of nsIOService::Init and before any lookup:

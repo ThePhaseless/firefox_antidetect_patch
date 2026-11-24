@@ -1,38 +1,44 @@
 diff --git a/dom/file/BlobSet.cpp b/dom/file/BlobSet.cpp
-index 69e3559310e717fa7e6d5e149f43f102e38dc992..ff05c3d5d16455dde9636f3c890449dbdffe62f1 100644
+index 69e3559310e717fa7e6d5e149f43f102e38dc992..d49c002f116edd76057f73576d734f5d1a00fd6b 100644
 --- a/dom/file/BlobSet.cpp
 +++ b/dom/file/BlobSet.cpp
-@@ -50,12 +50,14 @@ nsresult BlobSet::AppendUTF8String(const nsACString& aUTF8String,
+@@ -9,6 +9,8 @@
+ #include "StringBlobImpl.h"
+ #include "mozilla/dom/File.h"
+ 
++#include "StealthNativeEOL.h"  // STEALTH-HOOK(fingerprint/js-surface/line-endings)
++
+ namespace mozilla::dom {
+ 
+ nsresult BlobSet::AppendVoidPtr(const void* aData, uint32_t aLength) {
+@@ -50,7 +52,7 @@ nsresult BlobSet::AppendUTF8String(const nsACString& aUTF8String,
          return NS_ERROR_OUT_OF_MEMORY;
        }
      }
 -#ifdef XP_WIN
-+    // Native line endings are Windows' on every build: the browser this one
-+    // stands for is a Windows Firefox, and a page reads the platform from
-+    // new Blob(['\n'], {endings: 'native'}).size, 2 there and 1 on Linux
-+    // [B294].
++#if STEALTH_NATIVE_EOL_IS_CRLF  // STEALTH-HOOK(fingerprint/js-surface/line-endings)
      if (NS_WARN_IF(
              !utf8Str.ReplaceSubstring("\n", "\r\n", mozilla::fallible))) {
        return NS_ERROR_OUT_OF_MEMORY;
-     }
--#endif
-   }
- 
-   RefPtr<StringBlobImpl> blobImpl = StringBlobImpl::Create(utf8Str, u""_ns);
 diff --git a/dom/serializers/nsPlainTextSerializer.cpp b/dom/serializers/nsPlainTextSerializer.cpp
-index 0b4ba7625b6c4d878ade61be1c2f986809969189..1ec5821c63355ebf52c87880aeb78ef8dfb8449e 100644
+index 0b4ba7625b6c4d878ade61be1c2f986809969189..e5b45d05897453736c62caf558062e14672fe29f 100644
 --- a/dom/serializers/nsPlainTextSerializer.cpp
 +++ b/dom/serializers/nsPlainTextSerializer.cpp
-@@ -99,8 +99,10 @@ static void DetermineLineBreak(const int32_t aFlags, nsAString& aLineBreak) {
-     // Unix/DOM
+@@ -36,6 +36,8 @@
+ #include "nsUnicharUtils.h"
+ #include "nsUnicodeProperties.h"
+ 
++#include "StealthPlainTextLineBreak.h"  // STEALTH-HOOK(fingerprint/js-surface/line-endings)
++
+ namespace mozilla {
+ class Encoding;
+ }
+@@ -100,7 +102,7 @@ static void DetermineLineBreak(const int32_t aFlags, nsAString& aLineBreak) {
      aLineBreak.AssignLiteral(u"\n");
    } else {
--    // Platform/default
+     // Platform/default
 -    aLineBreak.AssignLiteral(NS_ULINEBREAK);
-+    // Platform/default, which is Windows' on every build: a page reads it
-+    // from getSelection().toString() across two blocks, "\r\n" on a Windows
-+    // Firefox and "\n" on Linux [B294].
-+    aLineBreak.AssignLiteral(u"\r\n");
++    aLineBreak.AssignLiteral(STEALTH_NATIVE_ULINEBREAK);  // STEALTH-HOOK(fingerprint/js-surface/line-endings)
    }
  }
  

@@ -4,7 +4,11 @@
 
 /* The stealth declarations that nsMediaFeatures.cpp reads: the device size and
  * the pointer capabilities. Logic and comments live here; the Mozilla file only
- * carries STEALTH-HOOK(fingerprint/screen-window/css-media) calls. */
+ * carries STEALTH-HOOK(fingerprint/screen-window/css-media) calls.
+ *
+ * Each function returns true and writes the declared value when something is
+ * declared; false means nothing is declared and Mozilla's code goes on. They
+ * are called as `if (T stealth; f(&stealth)) return stealth;`. */
 
 #ifndef LAYOUT_STYLE_STEALTHMEDIAFEATURES_H_
 #define LAYOUT_STYLE_STEALTHMEDIAFEATURES_H_
@@ -14,7 +18,7 @@
 #include "StealthDeclarationGate.h"
 #include "Units.h"
 #include "mozilla/LookAndFeel.h"
-#include "mozilla/Maybe.h"
+#include "mozilla/ServoTypes.h"
 #include "mozilla/StaticPrefs_zoom.h"
 #include "nsSize.h"
 
@@ -22,30 +26,37 @@ namespace mozilla {
 
 /**
  * The device size declared by the launcher (zoom.stealth.screen.width and
- * zoom.stealth.screen.height), in app units, or Nothing() when it is not
- * declared (either value <= 0).
+ * zoom.stealth.screen.height), in app units: true and *aOut, or false when it
+ * is not declared (either value <= 0). Called as the first statement of
+ * GetDeviceSize, before Mozilla's resistFingerprinting and RDM branches.
  *
  * Deliberately NOT gated on gfx::StealthEngineActive() and it does not call
  * gfx::StealthAssertDeclarationsComplete(): that is how this block always
  * behaved, and nsScreen::GetRect (dom/base/nsScreen.cpp) reads the same two
  * prefs the same way. Changing either would change what a page sees.
  */
-inline Maybe<nsSize> StealthDeclaredDeviceSize() {
+inline bool StealthDeclaredDeviceSize(nsSize* aOut) {
   // Stealth: spoof device size from prefs set by Python at launch
   const int32_t w = StaticPrefs::zoom_stealth_screen_width();
   const int32_t h = StaticPrefs::zoom_stealth_screen_height();
   if (w > 0 && h > 0) {
-    return Some(CSSPixel::ToAppUnits(CSSIntSize(w, h)));
+    *aOut = CSSPixel::ToAppUnits(CSSIntSize(w, h));
+    return true;
   }
-  return Nothing();
+  return false;
 }
 
 /**
- * The pointer capabilities declared for aID, as the raw bitmask of
- * PointerCapabilities, or Nothing() when the engine is off or the pref for
+ * The pointer capabilities declared for aID, as a PointerCapabilities
+ * bitmask: true and *aOut, or false when the engine is off or the pref for
  * this ID is < 0 (not declared): the caller then falls through to the compiled
  * default. Pointer capabilities are DECLARED, one value for the primary
  * pointer and one for the union of all of them.
+ *
+ * Called in GetPointerCapabilities right after Mozilla's
+ * `TouchEventsOverride == Enabled` return (Juggler sets that override from
+ * has_touch, so a declaration in front of it would beat the override) and
+ * before the resistFingerprinting branch and the LookAndFeel::GetInt host read.
  *
  * This used to be a compiled `Fine | Hover` for both, with the comment
  * "always report desktop pointer, consistent with maxTouchPoints=0". The
@@ -67,10 +78,10 @@ inline Maybe<nsSize> StealthDeclaredDeviceSize() {
  * The prefs are read ONLY when the engine is active, and the declaration set
  * is asserted complete only when a value was actually declared.
  */
-inline Maybe<int32_t> StealthDeclaredPointerCapabilities(
-    LookAndFeel::IntID aID) {
+inline bool StealthDeclaredPointerCapabilities(LookAndFeel::IntID aID,
+                                               PointerCapabilities* aOut) {
   if (!gfx::StealthEngineActive()) {
-    return Nothing();
+    return false;
   }
   const int32_t declared =
       aID == LookAndFeel::IntID::PrimaryPointerCapabilities
@@ -78,9 +89,10 @@ inline Maybe<int32_t> StealthDeclaredPointerCapabilities(
           : StaticPrefs::zoom_stealth_pointer_all();
   if (declared >= 0) {
     gfx::StealthAssertDeclarationsComplete();
-    return Some(declared);
+    *aOut = static_cast<PointerCapabilities>(declared);
+    return true;
   }
-  return Nothing();
+  return false;
 }
 
 }  // namespace mozilla

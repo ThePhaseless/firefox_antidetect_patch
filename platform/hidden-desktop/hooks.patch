@@ -1,52 +1,35 @@
+diff --git a/dom/media/webrtc/moz.build b/dom/media/webrtc/moz.build
+index 21b2626541d051ab49983b39bea61e45f2d03091..ec890526baf4f82e02521583931d89ab670d8be5 100644
+--- a/dom/media/webrtc/moz.build
++++ b/dom/media/webrtc/moz.build
+@@ -125,6 +125,8 @@ EXPORTS.mozilla.media.webrtc += [
+     "H264FmtpParser.h",
+ ]
+ 
++TEST_DIRS += ["tests/gtest"]  # STEALTH-HOOK(platform/hidden-desktop)
++
+ include("/ipc/chromium/chromium-config.mozbuild")
+ 
+ # Suppress some GCC/clang warnings being treated as errors:
 diff --git a/third_party/libwebrtc/modules/desktop_capture/cropping_window_capturer_win.cc b/third_party/libwebrtc/modules/desktop_capture/cropping_window_capturer_win.cc
-index 7ea6c8526b351e0e9dff092515a8583bb6d59767..4271caaec2d09460a178b7585117c8e83f351013 100644
+index 7ea6c8526b351e0e9dff092515a8583bb6d59767..5253c56a61cf7b62bb3affa0aa7060231eb0a924 100644
 --- a/third_party/libwebrtc/modules/desktop_capture/cropping_window_capturer_win.cc
 +++ b/third_party/libwebrtc/modules/desktop_capture/cropping_window_capturer_win.cc
-@@ -220,6 +220,11 @@ bool CroppingWindowCapturerWin::ShouldUseScreenCapturer() {
+@@ -28,6 +28,8 @@
+ #include "rtc_base/trace_event.h"
+ #include "rtc_base/win/windows_version.h"
+ 
++#include "modules/desktop_capture/win/StealthWindowInputDesktop.h"  // STEALTH-HOOK(platform/hidden-desktop)
++
+ namespace webrtc {
+ 
+ namespace {
+@@ -220,6 +222,8 @@ bool CroppingWindowCapturerWin::ShouldUseScreenCapturer() {
      return false;
    }
  
-+  // STEALTH-HOOK(platform/hidden-desktop)
-+  if (!window_capture_helper_.IsWindowOnInputDesktop(selected)) {
-+    return false;
-+  }
++  if (StealthIsOffInputDesktop(selected)) return false;  // STEALTH-HOOK(platform/hidden-desktop)
 +
    // Check if the window is a translucent layered window.
    const LONG window_ex_style = GetWindowLong(selected, GWL_EXSTYLE);
    if (window_ex_style & WS_EX_LAYERED) {
-diff --git a/third_party/libwebrtc/modules/desktop_capture/win/window_capture_utils.cc b/third_party/libwebrtc/modules/desktop_capture/win/window_capture_utils.cc
-index d1b5c4bdde7a768a67074502ad2007fc67585253..279ab288fba49f2b502a0e8a2f796b7bc414a01e 100644
---- a/third_party/libwebrtc/modules/desktop_capture/win/window_capture_utils.cc
-+++ b/third_party/libwebrtc/modules/desktop_capture/win/window_capture_utils.cc
-@@ -22,6 +22,7 @@
- #include "modules/desktop_capture/desktop_capture_types.h"
- #include "modules/desktop_capture/desktop_capturer.h"
- #include "modules/desktop_capture/desktop_geometry.h"
-+#include "modules/desktop_capture/win/StealthWindowInputDesktop.h"  // STEALTH-HOOK(platform/hidden-desktop)
- #include "modules/desktop_capture/win/scoped_gdi_object.h"
- #include "rtc_base/checks.h"
- #include "rtc_base/logging.h"
-@@ -452,6 +453,10 @@ bool WindowCaptureHelperWin::IsWindowVisibleOnCurrentDesktop(HWND hwnd) {
-          !IsWindowCloaked(hwnd);
- }
- 
-+bool WindowCaptureHelperWin::IsWindowOnInputDesktop(HWND hwnd) {  // STEALTH-HOOK(platform/hidden-desktop)
-+  return StealthIsWindowOnInputDesktop(hwnd);
-+}
-+
- // A cloaked window is composited but not visible to the user.
- // Example: Cortana or the Action Center when collapsed.
- bool WindowCaptureHelperWin::IsWindowCloaked(HWND hwnd) {
-diff --git a/third_party/libwebrtc/modules/desktop_capture/win/window_capture_utils.h b/third_party/libwebrtc/modules/desktop_capture/win/window_capture_utils.h
-index a69bc79874f2bc033fa062b1b499967e00117c4e..609eed529164da96120cab5da9a554fb3f682ecc 100644
---- a/third_party/libwebrtc/modules/desktop_capture/win/window_capture_utils.h
-+++ b/third_party/libwebrtc/modules/desktop_capture/win/window_capture_utils.h
-@@ -114,6 +114,8 @@ class WindowCaptureHelperWin {
-   bool IsWindowOnCurrentDesktop(HWND hwnd);
-   bool IsWindowVisibleOnCurrentDesktop(HWND hwnd);
-   bool IsWindowCloaked(HWND hwnd);
-+  // STEALTH-HOOK(platform/hidden-desktop)
-+  bool IsWindowOnInputDesktop(HWND hwnd);
- 
-   // The optional `ex_style_filters` parameter allows callers to provide
-   // extended window styles (e.g. WS_EX_TOOLWINDOW) and prevent windows that

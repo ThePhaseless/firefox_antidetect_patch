@@ -37,6 +37,27 @@ inline const char16_t* StealthCrashedContextData(
   return StealthCrashedContextData(aBrowsingContext->Id(), aBuffer);
 }
 
+/**
+ * The data of the notification as an expression, in the place of the argument
+ * Mozilla passes (`aWhenUnknown`, the data Mozilla's call has without us): the
+ * digits of the crashed context's id, or `aWhenUnknown` when there is no
+ * BrowsingContext. The digits live in the temporary's own buffer, so they last
+ * to the end of the full expression that notifies (the notification is
+ * synchronous).
+ */
+struct StealthCrashedContextScope {
+  StealthCrashedContextScope(dom::BrowsingContext* aBrowsingContext,
+                             const char16_t* aWhenUnknown)
+      : mData(aBrowsingContext
+                  ? StealthCrashedContextData(aBrowsingContext, mBuffer)
+                  : aWhenUnknown) {}
+
+  operator const char16_t*() const { return mData; }
+
+  nsAutoString mBuffer;
+  const char16_t* mData;
+};
+
 }  // namespace mozilla
 
 #endif  // mozilla_StealthFrameCrash_h

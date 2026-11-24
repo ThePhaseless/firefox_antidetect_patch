@@ -28,6 +28,20 @@ let restoredDocuments = 0;
 // declaration; Frame._globalForWorld says what each one is.
 const WORLD_KINDS = new Set(['isolated', 'caller']);
 
+// Who tells the end of a navigation, for the parent: the browsing context of the docShell and this process, by its child id
+// (Services.appinfo.uniqueProcessID, which is what the parent reads as ContentParent::ChildID, and 0 in the parent process): the
+// system pid is not the same on both sides when a sandbox gives the child a pid namespace of its own. The parent knows
+// where it moved a navigation from (FrameNavigations.onNavigationMoved), and what that docShell says of it afterwards is not
+// the navigation's end. Both are compared there: a browsing context replaced in the same process changes only the id.
+// A docShell that cannot say who it is (it is going away) tells nothing, and the parent takes the end as it always did.
+function reporterOf(docShell) {
+  try {
+    return { browsingContextId: docShell.browsingContext.id, childId: Services.appinfo.uniqueProcessID };
+  } catch (e) {
+    return undefined;
+  }
+}
+
 export class FrameTree {
   constructor(rootBrowsingContext) {
     helper.decorateAsEventEmitter(this);
@@ -249,7 +263,7 @@ export class FrameTree {
     // (and its contexts are made by the announcement: they are not made twice).
     if (this._announceIfLocal(frame))
       return;
-    frame._onGlobalObjectCleared();
+    frame._onGlobalCreated();
   }
 
   // The docShell settings (bypassCSP, interceptFileChooser) of every docShell of this tree that is here
@@ -475,7 +489,7 @@ export class FrameTree {
     frame._suppressedAbort = null;
     if (heldAbort && navigationId && heldAbort.navigationId !== navigationId) {
       traceFrameTree('frame-tree', 'held abort told: another navigation\'s document came', {frameId: frame._frameId, heldNavigationId: heldAbort.navigationId, navigationId});
-      this.emit(FrameTree.Events.NavigationAborted, frame, heldAbort.navigationId, heldAbort.errorText);
+      this.emit(FrameTree.Events.NavigationAborted, frame, heldAbort.navigationId, heldAbort.errorText, heldAbort.reporter);
     }
     if (navigationId) {
       docShell.QueryInterface(Ci.nsIWebNavigation);
@@ -485,6 +499,11 @@ export class FrameTree {
     // Said to the parent for every document, with the navigation this process had in flight for it, if it had one
     // (the navigation may have begun in another process, and then the parent knows its id).
     this.emit(FrameTree.Events.DocumentInserted, frame, navigationId || undefined);
+
+    // The page is ready with the document of its first navigation, said AFTER that document: the client announces the
+    // page when it is ready and reads the address of the commit it has heard of by then.
+    if (navigationId && this._isPageMain(frame))
+      this.forcePageReady();
 
     // The listeners that record where a pointer event landed are on the chrome event handler of the ROOT of this
     // tree: the page's main frame, or the root of a fragment in another process (an <iframe> of another site).
@@ -503,7 +522,9 @@ export class FrameTree {
   }
 
   // The commit itself, without what a NEW document does to the tree: a
-  // document restored from the back-forward cache keeps its children.
+  // document restored from the back-forward cache keeps its children. It does
+  // not force the page ready: the ready of a page follows the document that
+  // made it ready, so each caller forces it once it has said that document.
   _commit(frame, url) {
     const navigationId = frame._pendingNavigationId;
     traceFrameTree('frame-tree', '_commit', {frameId: frame._frameId, navigationId, url});
@@ -511,8 +532,6 @@ export class FrameTree {
     frame._lastCommittedNavigationId = navigationId;
     frame._url = url;
     this.emit(FrameTree.Events.NavigationCommitted, frame);
-    if (this._isPageMain(frame))
-      this.forcePageReady();
   }
 
   onStateChange(progress, request, flag, status) {
@@ -537,7 +556,9 @@ export class FrameTree {
       frame._pendingNavigationId = null;
       // Always report download navigation as failure to match other browsers.
       const errorText = helper.getNetworkErrorStatusText(status);
-      traceFrameTree('frame-tree', 'onStateChange abort', {frameId: frame._frameId, navigationId, status, errorText, bindingAborted: status === Cr.NS_BINDING_ABORTED});
+      // Told now, from this docShell: it may be gone when the decision below is made.
+      const reporter = reporterOf(docShell);
+      traceFrameTree('frame-tree', 'onStateChange abort', {frameId: frame._frameId, navigationId, status, errorText, bindingAborted: status === Cr.NS_BINDING_ABORTED, reporter});
       // Stealthfox [B302]: the main frame's NS_BINDING_ABORTED is SPURIOUS
       // when a Fission process swap takes the navigation to another process:
       // the old channel is disconnected there, by
@@ -570,18 +591,18 @@ export class FrameTree {
           }
           traceFrameTree('frame-tree', 'abort decided', {frameId: frame._frameId, navigationId, swapped, suppressed: swapped});
           if (!swapped) {
-            this.emit(FrameTree.Events.NavigationAborted, frame, navigationId, errorText);
+            this.emit(FrameTree.Events.NavigationAborted, frame, navigationId, errorText, reporter);
             return;
           }
           // Not reported now: if this navigation's own document follows, the abort was the swap's. But a document
           // that is not this navigation's can follow instead (the page's own location.replace, restarted under its
           // own load identifier while this navigation was cancelled): then this navigation is over, and nothing
           // else would say so. The next document inserted in the frame decides (onWindowEvent).
-          frame._suppressedAbort = { navigationId, errorText };
+          frame._suppressedAbort = { navigationId, errorText, reporter };
         });
         return;
       }
-      this.emit(FrameTree.Events.NavigationAborted, frame, navigationId, errorText);
+      this.emit(FrameTree.Events.NavigationAborted, frame, navigationId, errorText, reporter);
       if (this._isPageMain(frame) && status !== Cr.NS_BINDING_ABORTED)
         this.forcePageReady();
     }
@@ -603,7 +624,7 @@ export class FrameTree {
       return;
     frame._pendingNavigationId = null;
     this.emit(FrameTree.Events.NavigationAborted, frame, navigationId,
-              helper.getNetworkErrorStatusText(+status));
+              helper.getNetworkErrorStatusText(+status), reporterOf(docShell));
     if (this._isPageMain(frame))
       this.forcePageReady();
   }
@@ -662,6 +683,9 @@ export class FrameTree {
     // protocol events is PageAgent's, which is why this is an event and not a
     // call into the agent.
     this.emit(FrameTree.Events.DocumentRestored, frame);
+    // A tree that is new (the page came back in a top-level context of its own) is not ready yet: the restored
+    // document makes it ready, said after the document.
+    this.forcePageReady();
   }
 
   _onBrowsingContextAttached(browsingContext) {
@@ -977,6 +1001,7 @@ class Frame {
         this._runtime.destroyExecutionContext(context);
     } finally {
       this._worldNameToContext.clear();
+      this._contextsOfGlobal = null;
       // la sandbox di serializzazione appartiene al documento, come i contesti
       this._serializationSandbox = null;
       this._textInputProcessor = null;
@@ -1022,6 +1047,9 @@ class Frame {
     // principal the page's additions disappear, with the page's principal and
     // no Xrays its replacements stay in the way.
     this._createWorldContext('', 'main');
+    // The global these contexts belong to, and the scripts that ran on it: _onGlobalCreated reads it.
+    const made = {innerWindowId: dw.windowGlobalChild.innerWindowId, document: dw.document, scriptsRun: 0};
+    this._contextsOfGlobal = made;
     for (const [name, world] of this._frameTree._isolatedWorlds) {
       if (name)
         this._createIsolatedContext(name);
@@ -1029,10 +1057,54 @@ class Frame {
       // Add bindings before evaluating scripts.
       for (const [name, script] of world._bindings)
         executionContext.addBinding(name, script);
-      for (const script of world._scriptsToEvaluateOnNewDocument)
+      for (const script of world._scriptsToEvaluateOnNewDocument) {
+        made.scriptsRun++;
         executionContext.evaluateScriptSafely(script);
+      }
     }
 
+    this._commitInitialBlank();
+  }
+
+  // The notification that a window was created (`content-document-global-created`, once per inner window). The
+  // contexts this frame made for THIS window before it (the tree is born while the first window of a root is, and
+  // makes its contexts then) are in the process and have been said to the parent, and nobody has used them: the
+  // notification completes them instead of replacing them. Each world that has no context gets it with its bindings,
+  // and the init scripts of every world run, once, where they ran before: here, after the bindings and before any
+  // script of the page. A destroyed context was announced before anyone could use it: the client woke on the first
+  // announcement and evaluated in a context that was gone. Only when the contexts are of this inner window and this
+  // document, and no script has run on them; in every other case the contexts are made again.
+  _onGlobalCreated() {
+    const dw = this.domWindow();
+    const made = this._contextsOfGlobal;
+    if (!made || !dw || !dw.windowGlobalChild || !this._worldNameToContext.has('') ||
+        made.innerWindowId !== dw.windowGlobalChild.innerWindowId || made.document !== dw.document ||
+        made.scriptsRun !== 0) {
+      this._onGlobalObjectCleared();
+      return;
+    }
+    traceFrameTree('frame-tree', 'contexts kept for their window', {
+      frameId: this._frameId,
+      innerWindowId: made.innerWindowId,
+      worlds: [...this._worldNameToContext.keys()],
+    });
+    for (const [name, world] of this._frameTree._isolatedWorlds) {
+      let executionContext = this._worldNameToContext.get(name);
+      if (!executionContext) {
+        // A world declared that has no context here: it gets its bindings with it. The contexts that exist have theirs.
+        executionContext = this._createIsolatedContext(name);
+        for (const [bindingName, script] of world._bindings)
+          executionContext.addBinding(bindingName, script);
+      }
+      for (const script of world._scriptsToEvaluateOnNewDocument) {
+        made.scriptsRun++;
+        executionContext.evaluateScriptSafely(script);
+      }
+    }
+    this._commitInitialBlank();
+  }
+
+  _commitInitialBlank() {
     const url = this.domWindow().location?.href;
     if (url === 'about:blank' && !this._url) {
       // Sometimes FrameTree is created too early, before the location has been set.

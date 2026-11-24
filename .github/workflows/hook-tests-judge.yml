@@ -1,0 +1,77 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# hook-tests-judge.yml: every test a HOOKS.json names exists in the results of this run and passed. Called by release.yml (`hook-tests-judge`,
+# and `hook-tests-judge-reuse` for a run that reused a green build), after the gate and the gtests; it reads the run's own artifacts and nothing else.
+#
+# THE JUDGE IS MAIN'S, not the candidate's: a candidate that edits tools/hook_tests_judge.py does not judge itself. Main has no judge yet: the job says so and
+# FAILS (closed), and the candidate's own copy never runs in its place. Only the list (the HOOKS.json of the series, this commit) and the table of suites
+# that do not exist on a platform (gtest_run.py's NOT_ON, data) are the candidate's. The judge is a tool of the series (tools/hook_tests_judge.py) and its cases are the series' (tools/tests/test_hook_tests_judge.py); the structure of this job is held by scripts/ci/test_hook_tests_judge_job.py.
+# ─────────────────────────────────────────────────────────────────────────────
+name: hook-tests-judge
+
+on:
+  workflow_call:
+    inputs:
+      gtests:
+        description: "'true' when the run ran the gtests (the plan's)"
+        type: string
+        required: true
+      gtest_filter:
+        description: the gtest filter of the run (the plan's)
+        type: string
+        required: true
+      reuse_run_id:
+        description: the run whose gtest reports are this tree's, when this run reused a green build; empty otherwise
+        type: string
+        default: ''
+
+jobs:
+  judge:
+    name: hook-tests-judge
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    # `actions: read` for the gtest reports of the run a reuse found.
+    permissions: { actions: read, contents: read }
+    steps:
+      - name: The series (this repository, this commit), with the list of named tests
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with: { path: .series, fetch-depth: 1 }
+      - name: The series on main (the judge)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          repository: ${{ github.repository }}
+          ref: main
+          path: .series-main
+          fetch-depth: 1
+          sparse-checkout: tools
+      - name: The gate's verdicts, with the junit of the wrapper legs
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: result-*
+          path: results
+      # The gtests of this run, or of the run a reuse found: they are that tree's.
+      - name: The gtest reports of both legs
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: gtest-reports-*
+          path: gtest-reports
+          run-id: ${{ inputs.reuse_run_id || github.run_id }}
+          github-token: ${{ github.token }}
+      - name: The junit of Juggler's tests (and of any other kind of test a leg keeps as junit-*)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: junit-*
+          path: junit
+      - name: Every named test exists in this run and passed
+        shell: bash
+        env:
+          GTESTS: ${{ inputs.gtests }}
+          GTEST_FILTER_INPUT: ${{ inputs.gtest_filter }}
+        run: |
+          JUDGE=.series-main/tools/hook_tests_judge.py
+          if [ ! -f "$JUDGE" ]; then
+            SAID="main of ${GITHUB_REPOSITORY} has no tools/hook_tests_judge.py yet: the named hook tests cannot be judged, and the candidate's own copy does not judge itself (the first merge to main ends this)"
+            echo "::error::$SAID"
+            echo "**$SAID**" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          python3 "$JUDGE" --series .series --results results --gtest-reports gtest-reports --junit junit             --gtest-filter "$GTEST_FILTER_INPUT" --gtests "$GTESTS"             --gtest-run .series/platform/ci/src/scripts/ci/gtest_run.py

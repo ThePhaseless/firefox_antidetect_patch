@@ -13,8 +13,8 @@
    "prefs": [
     "zoom.stealth.media.enumeration_ms"
    ],
-   "added": 27,
-   "removed": 13,
+   "added": 20,
+   "removed": 12,
    "hunks": 6,
    "inline_logic_lines": 23,
    "hookable": "movable",

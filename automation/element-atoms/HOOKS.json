@@ -1,0 +1,10 @@
+[
+ {
+  "file": "remote/marionette/atom.sys.mjs",
+  "function": "const ATOMS = {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "export const ATOM_SOURCES = ATOMS;  // STEALTH-HOOK(automation/element-atoms)",
+  "test": "wrapper:tests/test_page_element_atoms_run_in_a_sandbox_e2e.py::test_the_atoms_run_in_a_sandbox_and_tell_a_visible_element_from_a_hidden_one"
+ }
+]

@@ -1,270 +1,248 @@
 diff --git a/dom/canvas/ClientWebGLContext.cpp b/dom/canvas/ClientWebGLContext.cpp
-index 097d20229785c61c89dc5c7e4c22799c48fb7c12..7881cda52315b89e03603c34468991f5dde6f375 100644
+index 097d20229785c61c89dc5c7e4c22799c48fb7c12..f682300f3d311d59c8aa34c1b5342c29e3985738 100644
 --- a/dom/canvas/ClientWebGLContext.cpp
 +++ b/dom/canvas/ClientWebGLContext.cpp
-@@ -10,6 +10,8 @@
+@@ -46,6 +46,9 @@
+ #include "nsContentUtils.h"
+ #include "nsDisplayList.h"
  
- #include "ClientWebGLExtensions.h"
- #include "HostWebGLContext.h"
-+#include "StealthWebGLParams.h"    // STEALTH-HOOK(fingerprint/webgl/parameters)
-+#include "StealthWebGLReadback.h"  // STEALTH-HOOK(fingerprint/webgl/parameters)
- #include "TexUnpackBlob.h"
- #include "WebGLChild.h"
- #include "WebGLFormats.h"
-@@ -1361,6 +1363,8 @@ UniquePtr<uint8_t[]> ClientWebGLContext::GetImageBuffer(
++#include "StealthWebGLParams.h"  // STEALTH-HOOK(fingerprint/webgl/parameters)
++#include "StealthWebGLReadback.h"  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
++
+ namespace mozilla {
+ 
+ namespace webgl {
+@@ -1361,6 +1364,7 @@ UniquePtr<uint8_t[]> ClientWebGLContext::GetImageBuffer(
    gfxAlphaType any;
    RefPtr<gfx::SourceSurface> snapshot = GetSurfaceSnapshot(&any);
    if (!snapshot) return nullptr;
-+  // STEALTH-HOOK(fingerprint/webgl/parameters)
-+  snapshot = StealthWebGLReadback::ProjectReaderSnapshot(*this, snapshot, any);
++  snapshot = StealthWebGLProjectReaderSnapshot(*this, snapshot, any);  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
  
    RefPtr<gfx::DataSourceSurface> dataSurface = snapshot->GetDataSurface();
  
-@@ -1391,6 +1395,8 @@ ClientWebGLContext::GetInputStream(
+@@ -1391,6 +1395,7 @@ ClientWebGLContext::GetInputStream(
    gfxAlphaType any;
    RefPtr<gfx::SourceSurface> snapshot = GetSurfaceSnapshot(&any);
    if (!snapshot) return NS_ERROR_FAILURE;
-+  // STEALTH-HOOK(fingerprint/webgl/parameters)
-+  snapshot = StealthWebGLReadback::ProjectReaderSnapshot(*this, snapshot, any);
++  snapshot = StealthWebGLProjectReaderSnapshot(*this, snapshot, any);  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
  
    RefPtr<gfx::DataSourceSurface> dataSurface = snapshot->GetDataSurface();
    const auto& premultAlpha = notLost->info.options.premultipliedAlpha;
-@@ -2177,6 +2183,8 @@ void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,
+@@ -2177,6 +2182,7 @@ void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,
    }
    const auto& limits = Limits();
    const auto& state = State();
-+  // STEALTH-HOOK(fingerprint/webgl/parameters)
-+  const StealthWebGLParameterAnswer stealthAnswer(*this, cx, pname, retval, rv);
++  const StealthWebGLParameterAnswer stealthAnswer(*this, cx, pname, retval, rv);  // STEALTH-HOOK(fingerprint/webgl/parameters)
  
    // -
  
-@@ -2464,6 +2472,8 @@ void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,
+@@ -2464,6 +2470,7 @@ void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,
          break;
  
        case LOCAL_GL_RENDERER: {
-+        // STEALTH-HOOK(fingerprint/webgl/parameters)
-+        if (StealthWebGLRendererOverride(ret)) break;
++        if (StealthWebGLRendererOverride(ret)) break;  // STEALTH-HOOK(fingerprint/webgl/parameters)
          bool allowRenderer = StaticPrefs::webgl_enable_renderer_query();
          if (ShouldResistFingerprinting(RFPTarget::WebGLRenderInfo) ||
              ShouldResistFingerprinting(RFPTarget::WebGLRendererConstant)) {
-@@ -2506,6 +2516,8 @@ void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,
+@@ -2506,6 +2513,7 @@ void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,
  
          switch (pname) {
            case dom::WEBGL_debug_renderer_info_Binding::UNMASKED_RENDERER_WEBGL:
-+            // STEALTH-HOOK(fingerprint/webgl/parameters)
-+            if (StealthWebGLUnmaskedRendererOverride(ret)) break;
++            if (StealthWebGLUnmaskedRendererOverride(ret)) break;  // STEALTH-HOOK(fingerprint/webgl/parameters)
              if (ShouldResistFingerprinting(RFPTarget::WebGLRenderInfo) ||
                  ShouldResistFingerprinting(RFPTarget::WebGLRendererConstant)) {
                ret = Some("Mozilla"_ns);
-@@ -2518,6 +2530,8 @@ void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,
+@@ -2518,6 +2526,7 @@ void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,
              break;
  
            case dom::WEBGL_debug_renderer_info_Binding::UNMASKED_VENDOR_WEBGL:
-+            // STEALTH-HOOK(fingerprint/webgl/parameters)
-+            if (StealthWebGLUnmaskedVendorOverride(ret)) break;
++            if (StealthWebGLUnmaskedVendorOverride(ret)) break;  // STEALTH-HOOK(fingerprint/webgl/parameters)
              if (ShouldResistFingerprinting(RFPTarget::WebGLRenderInfo)) {
                ret = Some("Mozilla"_ns);
              } else if (ShouldResistFingerprinting(
-@@ -3019,6 +3033,9 @@ ClientWebGLContext::GetShaderPrecisionFormat(const GLenum shadertype,
+@@ -3019,6 +3028,7 @@ ClientWebGLContext::GetShaderPrecisionFormat(const GLenum shadertype,
    if (!notLost) {
      return nullptr;
    }
-+  // STEALTH-HOOK(fingerprint/webgl/parameters)
-+  if (const auto fake = StealthWebGLShaderPrecision(shadertype, precisiontype))
-+    return AsAddRefed(new WebGLShaderPrecisionFormatJS(*fake));
++  if (already_AddRefed<WebGLShaderPrecisionFormatJS> rv; StealthWebGLShaderPrecisionFormat(shadertype, precisiontype, &rv)) return rv;  // STEALTH-HOOK(fingerprint/webgl/parameters)
  
    const auto& shaderPrecisions = *notLost->info.shaderPrecisions;
    const auto args =
-@@ -5416,6 +5433,8 @@ void ClientWebGLContext::ReadPixels(GLint x, GLint y, GLsizei width,
+@@ -5416,6 +5426,7 @@ void ClientWebGLContext::ReadPixels(GLint x, GLint y, GLsizei width,
                                            {format, type},
                                            state.mPixelPackState};
    Run<RPROC(ReadPixelsPbo)>(desc, static_cast<uint64_t>(offset));
-+  // STEALTH-HOOK(fingerprint/webgl/parameters)
-+  StealthWebGLReadback::ProjectReadPixelsPbo(*this, desc, offset);
++  StealthWebGLReadback::ProjectReadPixelsPbo(*this, desc, offset);  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
  }
  
  void ClientWebGLContext::ReadPixels(GLint x, GLint y, GLsizei width,
-@@ -5463,7 +5482,8 @@ void ClientWebGLContext::ReadPixels(GLint x, GLint y, GLsizei width,
+@@ -5463,7 +5474,7 @@ void ClientWebGLContext::ReadPixels(GLint x, GLint y, GLsizei width,
                                              *uvec2::From(width, height),
                                              {format, type},
                                              state.mPixelPackState};
 -    bool succeeded = DoReadPixels(desc, *range);
-+    // STEALTH-HOOK(fingerprint/webgl/parameters)
-+    bool succeeded = StealthWebGLReadback::ReadPixels(*this, desc, *range);
++    bool succeeded = StealthWebGLProjectReadPixels(*this, desc, *range, DoReadPixels(desc, *range));  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
      if (succeeded) {
        CanvasUtils::ImageExtraction extraction =
            ImageExtractionResult(mCanvasElement, mOffscreenCanvas);
-@@ -5499,8 +5519,10 @@ void ClientWebGLContext::ReadPixels(GLint x, GLint y, GLsizei width,
-   });
- }
- 
--bool ClientWebGLContext::DoReadPixels(const webgl::ReadPixelsDesc& desc,
--                                      const Span<uint8_t> dest) const {
-+// STEALTH-HOOK(fingerprint/webgl/parameters)
-+bool ClientWebGLContext::DoReadPixels(
-+    const webgl::ReadPixelsDesc& desc, const Span<uint8_t> dest,
-+    webgl::ReadPixelsResult* const aWritten) const {
-   RefPtr<webgl::NotLostData> notLost(mNotLost);
-   if (!notLost) {
-     return false;
-@@ -5546,6 +5568,8 @@ bool ClientWebGLContext::DoReadPixels(const webgl::ReadPixelsDesc& desc,
+@@ -5546,6 +5557,7 @@ bool ClientWebGLContext::DoReadPixels(const webgl::ReadPixelsDesc& desc,
      Memcpy(&destRow, srcRow);
    }
  
-+  // STEALTH-HOOK(fingerprint/webgl/parameters)
-+  if (aWritten) *aWritten = webgl::ReadPixelsResult{subrect, byteStride};
++  StealthWebGLReadback::NoteReadPixels(*this, subrect, byteStride);  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
    return true;
  }
  
-@@ -5584,6 +5608,8 @@ ClientWebGLContext::DoReadPixelsAsync() {
- 
-   const size_t expectedSize = checkedByteSize.value();
-   const auto desc = webgl::ReadPixelsDesc{{0, 0}, size};
-+  // STEALTH-HOOK(fingerprint/webgl/parameters)
-+  const bool premultiplied = !options.alpha || options.premultipliedAlpha;
- 
-   RefPtr<dom::PWebGLChild::ReadPixelsAsyncPromise> ipcPromise =
-       child->SendReadPixelsAsync(desc, static_cast<uint64_t>(expectedSize));
-@@ -5595,7 +5621,8 @@ ClientWebGLContext::DoReadPixelsAsync() {
-   ipcPromise->Then(
-       GetCurrentSerialEventTarget(), __func__,
-       [self = RefPtr{this}, promise, child, desc, size, surfaceFormat,
--       expectedSize](webgl::ReadPixelsResultIpc&& aReply) mutable {
-+       expectedSize, premultiplied](
-+          webgl::ReadPixelsResultIpc&& aReply) mutable {
-         if (!aReply.byteStride || !aReply.shmem) {
-           promise->Reject(NS_ERROR_FAILURE, __func__);
-           return;
-@@ -5681,7 +5708,10 @@ ClientWebGLContext::DoReadPixelsAsync() {
+@@ -5681,7 +5693,7 @@ ClientWebGLContext::DoReadPixelsAsync() {
                {size.x, size.y}));
          }
  
 -        promise->Resolve(std::move(sourceSurface), __func__);
-+        // STEALTH-HOOK(fingerprint/webgl/parameters)
-+        promise->Resolve(StealthWebGLReadback::ProjectAsyncSnapshot(
-+                             *self, sourceSurface, premultiplied),
-+                         __func__);
++        promise->Resolve(StealthWebGLProjectAsyncSnapshot(*self, std::move(sourceSurface)), __func__);  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
        },
  
        [promise](const mozilla::ipc::ResponseRejectReason aReason) {
 diff --git a/dom/canvas/WebGLContextExtensions.cpp b/dom/canvas/WebGLContextExtensions.cpp
-index d2896172e45e04f85f0588905a0d8f5b475fd717..1282d860df3f8b4ca6f75b6e3c8ea155be0da191 100644
+index d2896172e45e04f85f0588905a0d8f5b475fd717..c2aed2f95f699ab5496de6d4ca1e45e05a60c801 100644
 --- a/dom/canvas/WebGLContextExtensions.cpp
 +++ b/dom/canvas/WebGLContextExtensions.cpp
-@@ -7,6 +7,7 @@
- #include "WebGLContext.h"
- #include "WebGLContextUtils.h"
- #include "WebGLExtensions.h"
+@@ -13,6 +13,8 @@
+ #include "mozilla/dom/ToJSValue.h"
+ #include "nsString.h"
+ 
 +#include "StealthWebGLParams.h"  // STEALTH-HOOK(fingerprint/webgl/parameters)
- #include "mozilla/EnumeratedRange.h"
- #include "mozilla/StaticPrefs_webgl.h"
- #include "mozilla/dom/BindingDeclarations.h"
-@@ -385,6 +386,8 @@ bool WebGLContext::IsExtensionSupported(WebGLExtensionID ext) const {
++
+ namespace mozilla {
+ 
+ const char* GetExtensionName(const WebGLExtensionID ext) {
+@@ -385,6 +387,7 @@ bool WebGLContext::IsExtensionSupported(WebGLExtensionID ext) const {
  
      case WebGLExtensionID::WEBGL_provoking_vertex:
        if (!gl->IsSupported(gl::GLFeature::provoking_vertex)) return false;
-+      // STEALTH-HOOK(fingerprint/webgl/parameters): declared to the page, so served wherever the GL can
-+      if (StealthWebGLExtensionVerdict(IsWebGL2(), ext) == Some(true)) return true;
++      if (StealthWebGLExtensionServed(this, ext)) return true;  // STEALTH-HOOK(fingerprint/webgl/parameters)
  
        // > Implementations SHOULD only expose this extension when
        // > FIRST_VERTEX_CONVENTION is more efficient than the default behavior
-@@ -421,6 +424,8 @@ void WebGLContext::RequestExtension(const WebGLExtensionID ext,
+@@ -421,6 +424,7 @@ void WebGLContext::RequestExtension(const WebGLExtensionID ext,
                                      const bool explicitly) {
    const auto& limits = Limits();
    if (!limits.supportedExtensions[ext]) return;
-+  // STEALTH-HOOK(fingerprint/webgl/parameters): declared but not served: harmless
-+  if (!IsExtensionSupported(ext)) return;
++  if (StealthWebGLExtensionUnserved(this, ext)) return;  // STEALTH-HOOK(fingerprint/webgl/parameters)
  
    auto& slot = mExtensions[ext];
    switch (ext) {
 diff --git a/dom/canvas/WebGLContextFramebufferOperations.cpp b/dom/canvas/WebGLContextFramebufferOperations.cpp
-index 2c4bc437eca9180ef76118c22cddc277c6083e6a..05816e82d3169fff0b69ec9ac22473125a5dc880 100644
+index 2c4bc437eca9180ef76118c22cddc277c6083e6a..d32dde59659cf00c8a0b3b29c1b68cb0e3e82317 100644
 --- a/dom/canvas/WebGLContextFramebufferOperations.cpp
 +++ b/dom/canvas/WebGLContextFramebufferOperations.cpp
-@@ -126,6 +126,8 @@ void WebGLContext::ColorMask(const Maybe<GLuint> i, const uint8_t mask) {
+@@ -10,6 +10,8 @@
+ #include "WebGLRenderbuffer.h"
+ #include "WebGLTexture.h"
+ 
++#include "StealthWebGLParams.h"  // STEALTH-HOOK(fingerprint/webgl/parameters)
++
+ namespace mozilla {
+ 
+ void WebGLContext::Clear(GLbitfield mask) {
+@@ -126,6 +128,7 @@ void WebGLContext::ColorMask(const Maybe<GLuint> i, const uint8_t mask) {
    if (IsContextLost()) return;
  
    if (i) {
-+    // STEALTH-HOOK(fingerprint/webgl/parameters): declared to the page, maybe not enabled here
-+    if (!IsExtensionEnabled(WebGLExtensionID::OES_draw_buffers_indexed)) return;
++    if (StealthWebGLDrawBuffersIndexedMissing(this)) return;  // STEALTH-HOOK(fingerprint/webgl/parameters)
      MOZ_RELEASE_ASSERT(
          IsExtensionEnabled(WebGLExtensionID::OES_draw_buffers_indexed));
      const auto limit = MaxValidDrawBuffers();
 diff --git a/dom/canvas/WebGLContextGL.cpp b/dom/canvas/WebGLContextGL.cpp
-index 2f5cd91a97a863ce6c164906c1316270bfa67a96..0f011639eab624dcb5b8ceb22c653e8f47ba1c2d 100644
+index 2f5cd91a97a863ce6c164906c1316270bfa67a96..e4db4ee4dc06838945035a180ef4eaa39e22f48e 100644
 --- a/dom/canvas/WebGLContextGL.cpp
 +++ b/dom/canvas/WebGLContextGL.cpp
-@@ -125,6 +125,8 @@ void WebGLContext::BlendEquationSeparate(Maybe<GLuint> i, GLenum modeRGB,
+@@ -39,6 +39,8 @@
+ #include "nsReadableUtils.h"
+ #include "nsString.h"
+ 
++#include "StealthWebGLParams.h"  // STEALTH-HOOK(fingerprint/webgl/parameters)
++
+ namespace mozilla {
+ 
+ using namespace gfx;
+@@ -125,6 +127,7 @@ void WebGLContext::BlendEquationSeparate(Maybe<GLuint> i, GLenum modeRGB,
    }
  
    if (i) {
-+    // STEALTH-HOOK(fingerprint/webgl/parameters): declared to the page, maybe not enabled here
-+    if (!IsExtensionEnabled(WebGLExtensionID::OES_draw_buffers_indexed)) return;
++    if (StealthWebGLDrawBuffersIndexedMissing(this)) return;  // STEALTH-HOOK(fingerprint/webgl/parameters)
      MOZ_RELEASE_ASSERT(
          IsExtensionEnabled(WebGLExtensionID::OES_draw_buffers_indexed));
      const auto limit = MaxValidDrawBuffers();
-@@ -206,6 +208,8 @@ void WebGLContext::BlendFuncSeparate(Maybe<GLuint> i, GLenum srcRGB,
+@@ -206,6 +209,7 @@ void WebGLContext::BlendFuncSeparate(Maybe<GLuint> i, GLenum srcRGB,
      return;
  
    if (i) {
-+    // STEALTH-HOOK(fingerprint/webgl/parameters): declared to the page, maybe not enabled here
-+    if (!IsExtensionEnabled(WebGLExtensionID::OES_draw_buffers_indexed)) return;
++    if (StealthWebGLDrawBuffersIndexedMissing(this)) return;  // STEALTH-HOOK(fingerprint/webgl/parameters)
      MOZ_RELEASE_ASSERT(
          IsExtensionEnabled(WebGLExtensionID::OES_draw_buffers_indexed));
      const auto limit = MaxValidDrawBuffers();
-@@ -1571,6 +1575,8 @@ void WebGLContext::PolygonOffsetClampEXT(const GLfloat factor,
+@@ -1571,6 +1575,7 @@ void WebGLContext::PolygonOffsetClampEXT(const GLfloat factor,
                                           const GLfloat clamp) {
    const FuncScope funcScope(*this, "polygonOffsetClampEXT");
    if (IsContextLost()) return;
-+  // STEALTH-HOOK(fingerprint/webgl/parameters): declared to the page, maybe not enabled here
-+  if (!IsExtensionEnabled(WebGLExtensionID::EXT_polygon_offset_clamp)) return;
++  if (StealthWebGLPolygonOffsetClampMissing(this)) return;  // STEALTH-HOOK(fingerprint/webgl/parameters)
    MOZ_RELEASE_ASSERT(
        IsExtensionEnabled(WebGLExtensionID::EXT_polygon_offset_clamp));
  
-@@ -1580,6 +1586,8 @@ void WebGLContext::PolygonOffsetClampEXT(const GLfloat factor,
+@@ -1580,6 +1585,7 @@ void WebGLContext::PolygonOffsetClampEXT(const GLfloat factor,
  void WebGLContext::ProvokingVertex(const webgl::ProvokingVertex mode) const {
    const FuncScope funcScope(*this, "provokingVertex");
    if (IsContextLost()) return;
-+  // STEALTH-HOOK(fingerprint/webgl/parameters): declared to the page, maybe not enabled here
-+  if (!IsExtensionEnabled(WebGLExtensionID::WEBGL_provoking_vertex)) return;
++  if (StealthWebGLProvokingVertexMissing(this)) return;  // STEALTH-HOOK(fingerprint/webgl/parameters)
    MOZ_RELEASE_ASSERT(
        IsExtensionEnabled(WebGLExtensionID::WEBGL_provoking_vertex));
  
-@@ -1596,6 +1604,8 @@ void WebGLContext::SampleCoverage(GLclampf value, WebGLboolean invert) {
+@@ -1596,6 +1602,7 @@ void WebGLContext::SampleCoverage(GLclampf value, WebGLboolean invert) {
  void WebGLContext::ClipControlEXT(const GLenum origin, const GLenum depth) {
    const FuncScope funcScope(*this, "clipControlEXT");
    if (IsContextLost()) return;
-+  // STEALTH-HOOK(fingerprint/webgl/parameters): declared to the page, maybe not enabled here
-+  if (!IsExtensionEnabled(WebGLExtensionID::EXT_clip_control)) return;
++  if (StealthWebGLClipControlMissing(this)) return;  // STEALTH-HOOK(fingerprint/webgl/parameters)
    MOZ_RELEASE_ASSERT(IsExtensionEnabled(WebGLExtensionID::EXT_clip_control));
  
    if (origin != LOCAL_GL_LOWER_LEFT && origin != LOCAL_GL_UPPER_LEFT) {
 diff --git a/dom/canvas/WebGLContextValidate.cpp b/dom/canvas/WebGLContextValidate.cpp
-index 2d8a66a1f8cddcbb238c7ee83da65089f03f625c..ddddd5f2bea7ef32ff33d71a9aceb27418aa6069 100644
+index 2d8a66a1f8cddcbb238c7ee83da65089f03f625c..2c4fdcf80065e634bf6ac28340052bff3d43224d 100644
 --- a/dom/canvas/WebGLContextValidate.cpp
 +++ b/dom/canvas/WebGLContextValidate.cpp
-@@ -10,6 +10,7 @@
- #include "WebGLBuffer.h"
- #include "WebGLContext.h"
- #include "WebGLContextUtils.h"
+@@ -25,6 +25,8 @@
+ #include "mozilla/StaticPrefs_webgl.h"
+ #include "nsPrintfCString.h"
+ 
 +#include "StealthWebGLParams.h"  // STEALTH-HOOK(fingerprint/webgl/parameters)
- #include "WebGLFormats.h"
- #include "WebGLFramebuffer.h"
- #include "WebGLProgram.h"
-@@ -258,6 +259,7 @@ static webgl::Limits MakeLimits(const WebGLContext& webgl) {
++
+ ////////////////////
+ // Minimum value constants defined in GLES 2.0.25 $6.2 "State Tables":
+ const uint32_t kMinMaxVertexAttribs = 8;            // Page 164
+@@ -258,6 +260,7 @@ static webgl::Limits MakeLimits(const WebGLContext& webgl) {
      gl.GetUIntegerv(LOCAL_GL_MAX_VIEWS_OVR, &limits.maxMultiviewLayers);
    }
  
-+  StealthDeclareExtensions(webgl.IsWebGL2(), limits.supportedExtensions);  // STEALTH-HOOK(fingerprint/webgl/parameters)
++  StealthDeclareLimits(webgl, &limits);  // STEALTH-HOOK(fingerprint/webgl/parameters)
    return limits;
  }
  
-@@ -312,6 +314,8 @@ bool WebGLContext::InitAndValidateGL(FailureReason* const out_failReason) {
+@@ -312,6 +315,7 @@ bool WebGLContext::InitAndValidateGL(FailureReason* const out_failReason) {
                           mStencilWriteMaskFront);
    AssertUintParamCorrect(gl, LOCAL_GL_STENCIL_BACK_WRITEMASK,
                           mStencilWriteMaskBack);
-+  // STEALTH-HOOK(fingerprint/webgl/parameters): the masks start at all ones as under ANGLE, not at the driver's stencil bits (Mesa: 255)
-+  mStencilValueMaskFront = mStencilValueMaskBack = mStencilWriteMaskFront = mStencilWriteMaskBack = UINT32_MAX;
++  StealthInitStencilMasks(mStencilValueMaskFront, mStencilValueMaskBack, mStencilWriteMaskFront, mStencilWriteMaskBack);  // STEALTH-HOOK(fingerprint/webgl/parameters)
  
    // Bindings, etc.
+ 
+diff --git a/dom/canvas/gtest/moz.build b/dom/canvas/gtest/moz.build
+index e1fd0c7e9f8d4e9d0f7b8e6c430ce5b8a4679e5a..854117a6517c3eb7d87b17cd62c32b58dcb233dc 100644
+--- a/dom/canvas/gtest/moz.build
++++ b/dom/canvas/gtest/moz.build
+@@ -12,6 +12,7 @@ UNIFIED_SOURCES += [
+     "TestSanitizeRenderer.cpp",
+     "TestWebGLTextureUploadInit.cpp",
+ ]
++UNIFIED_SOURCES += ["TestStealthWebGLParams.cpp"]  # STEALTH-HOOK(fingerprint/webgl/parameters)
+ 
+ include("/ipc/chromium/chromium-config.mozbuild")
  

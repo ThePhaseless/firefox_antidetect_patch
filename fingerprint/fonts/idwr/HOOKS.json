@@ -1,0 +1,10 @@
+[
+ {
+  "file": "gfx/moz.build",
+  "function": "if CONFIG[\"MOZ_FONTATIONS\"]:",
+  "kind": "add",
+  "form": "registration",
+  "line": "DIRS += [\"idwr\"]  # STEALTH-HOOK(fingerprint/fonts/idwr)",
+  "test": "wrapper:tests/test_a_screenshot_draws_the_text_of_the_bundled_fonts_as_the_content_does_e2e.py::test_the_text_of_a_bundled_family_is_drawn_by_the_screenshot_as_the_content_drew_it"
+ }
+]

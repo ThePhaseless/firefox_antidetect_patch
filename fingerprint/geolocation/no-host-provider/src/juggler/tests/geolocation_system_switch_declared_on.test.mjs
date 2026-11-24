@@ -36,17 +36,19 @@ const win = read(WIN);
 const fn = win.slice(win.indexOf('SystemGeolocationPermissionBehavior GetGeolocationPermissionBehavior() {'),
   win.indexOf('already_AddRefed<SystemGeolocationPermissionRequest>\nRequestLocationPermissionFromUser'));
 
-test('the first statement of GetGeolocationPermissionBehavior answers the declared switch, before any OS read', () => {
-  assert.ok(win.includes(
-    `#include "mozilla/StealthGeolocation.h"  // STEALTH-HOOK(${FOLDER})\n`));
-  assert.ok(fn.startsWith(
-    'SystemGeolocationPermissionBehavior GetGeolocationPermissionBehavior() {\n' +
-    `  // STEALTH-HOOK(${FOLDER}): the OS location switch is declared on; the OS is not asked.\n` +
-    '  if (StealthSystemLocationDeclaredOn()) {\n' +
-    '    return SystemGeolocationPermissionBehavior::NoPrompt;\n' +
-    '  }\n'));
-  assert.ok(fn.indexOf('StealthSystemLocationDeclaredOn()') < fn.indexOf('GetLocationAccess()'));
-  assert.equal(win.split('\n').filter(l => l.includes('STEALTH-HOOK')).length, 2);
+test('GetGeolocationPermissionBehavior is the only OS read of the switch on the request path, and our guard precedes it', () => {
+  // The calls of GetLocationAccess() with no argument (it creates the AppCapability): this function and the
+  // prompt path RequestLocationPermissionFromUser, reached only for a behavior other than NoPrompt (below).
+  const calls = win.split('\n').flatMap((l, n) => /GetLocationAccess\(\)/.test(l) && !/^Maybe<|^\s*\/\//.test(l) ? [n] : []);
+  assert.equal(calls.length, 2, 'one use in the behavior, one in the prompt path');
+  const body = fn.slice(0, fn.indexOf('\n}\n'));
+  assert.equal(body.split('GetLocationAccess()').length, 2);
+  const guard = body.indexOf('StealthSystemLocationDeclaredOn()');
+  assert.ok(guard > 0);
+  assert.ok(guard < body.indexOf('GetLocationAccess()'));
+  assert.ok(body.slice(0, guard).split('\n').every(l => !/;\s*$/.test(l)), 'no statement of Mozilla before the guard');
+  const prompt = win.slice(win.indexOf('RequestLocationPermissionFromUser'));
+  assert.equal(prompt.split('GetLocationAccess()').length, 2);
 });
 
 test("Mozilla's body of the function is intact below the hook (no line of Mozilla removed)", () => {
@@ -85,22 +87,17 @@ test('AppCapability is read in three places only: the function above, the monito
   assert.ok(geo.includes('case geolocation::SystemGeolocationPermissionBehavior::NoPrompt:'));
 });
 
-test("the permission monitor of the OS switch is not started: an early return before Mozilla's call", () => {
+test('the OS monitor of a permission is created in one place, reached from one caller, and our guard precedes it', () => {
   const rel = 'dom/permission/PermissionObserver.cpp';
   const obs = read(rel);
-  assert.ok(obs.includes(
-    `#include "mozilla/StealthGeolocation.h"  // STEALTH-HOOK(${FOLDER})\n`));
-  assert.ok(obs.includes(
-    'void PermissionObserver::EnsureMonitoringInParent(PermissionName aName) {\n' +
-    '  MOZ_ASSERT(XRE_IsParentProcess());\n' +
-    '  if (aName == PermissionName::Geolocation &&\n' +
-    `      StealthSystemLocationDeclaredOn()) {  // STEALTH-HOOK(${FOLDER}): declared on, never changes\n` +
-    '    return;\n' +
-    '  }\n' +
-    '  EnsureOSMonitoring(aName);\n' +
-    '}\n'));
-  assert.equal(obs.split('\n').filter(l => l.includes('STEALTH-HOOK')).length, 2);
-  // The one caller, and the one place that creates the monitor.
+  const entry = obs.slice(obs.indexOf('void PermissionObserver::EnsureMonitoringInParent('));
+  const body = entry.slice(0, entry.indexOf('\n}\n'));
+  assert.ok(body.indexOf('StealthSkipsPermissionMonitor(aName)') > 0);
+  assert.ok(body.indexOf('StealthSkipsPermissionMonitor(aName)') < body.indexOf('EnsureOSMonitoring(aName)'));
+  // EnsureOSMonitoring is called only from this entry, and the monitor contract is created only inside it.
+  assert.equal(obs.split('EnsureOSMonitoring(').length, 3, 'its definition and the one call');
+  assert.equal(obs.split('@mozilla.org/permission-monitor;1').length, 2);
+  // The one caller of the entry, and the one place that creates the monitor.
   const out = execFileSync('git', ['grep', '-nE', 'EnsureMonitoringInParent|permission-monitor;1', '--', '*.cpp', '*.h', '*.mm'],
     { cwd: TREE, encoding: 'utf8' });
   assert.deepEqual(out.trim().split('\n').map(l => l.split(':')[0]).sort(), [

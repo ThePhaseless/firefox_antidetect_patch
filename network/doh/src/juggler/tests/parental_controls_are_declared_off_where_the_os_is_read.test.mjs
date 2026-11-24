@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 const TREE = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const read = rel => fs.readFileSync(path.join(TREE, rel), 'utf8');
 const DIR = 'toolkit/components/parentalcontrols';
-const HOOK = 'if (StealthParentalControlsDeclared(&mEnabled)) {';
+const HOOK = 'if (StealthParentalControlsDeclared()) return;';
 
 // The implementations our builds compile: Windows x86_64 and Linux x86_64.
 const implementations = fs.readdirSync(path.join(TREE, DIR))
@@ -53,11 +53,22 @@ test('the implementations our builds compile are known to this test', () => {
       ['nsParentalControlsServiceDefault.cpp', 'nsParentalControlsServiceWin.cpp']);
 });
 
-test('the declared value is set in the constructor of every implementation', () => {
+test('the declared value is set in the constructor of every implementation that reads the OS, and the others read nothing', () => {
   for (const file of implementations) {
-    const body = constructorBody(read(`${DIR}/${file}`));
-    assert.ok(body.includes(HOOK), `${file}: no declaration in the constructor`);
-    assert.match(body, /STEALTH-HOOK\(network\/doh\)/, file);
+    const text = read(`${DIR}/${file}`);
+    const body = constructorBody(text);
+    if (file === 'nsParentalControlsServiceWin.cpp') {
+      assert.ok(body.includes(HOOK), `${file}: no declaration in the constructor`);
+      assert.match(body, /STEALTH-HOOK\(network\/doh\)/, file);
+      // The declared value is the one the initialisation list gives: the guard returns with it.
+      assert.match(text, /nsParentalControlsService::nsParentalControlsService\(\)\n\s+: mEnabled\(false\), mProvider\(0\), mPC\(nullptr\) \{/, file);
+    } else {
+      // The default implementation reads no host: it is Mozilla's as it is, with its own false.
+      assert.doesNotMatch(text, /Stealth/, file);
+      assert.match(text, /nsParentalControlsService::nsParentalControlsService\(\) : mEnabled\(false\) \{/, file);
+      for (const call of OS_CALLS)
+        assert.ok(!body.includes(call), `${file}: ${call} reads the host`);
+    }
   }
 });
 
@@ -65,8 +76,13 @@ test('the declaration comes before the first OS call', () => {
   for (const file of implementations) {
     const body = constructorBody(read(`${DIR}/${file}`));
     const hook = body.indexOf(HOOK);
+    if (!body.includes('GetUserSid(') && !body.includes('windows-registry-key')) {
+      assert.equal(hook, -1, `${file}: a declaration in a constructor that reads nothing`);
+      continue;
+    }
     assert.ok(hook >= 0, file);
-    assert.match(body.slice(hook, hook + 120), /\{\s*return;\s*\}/, `${file}: the hook does not return`);
+    assert.equal(body.slice(0, hook).trim(), '', `${file}: something runs before the declaration`);
+    assert.match(body.slice(hook, hook + 120), /\) return;/, `${file}: the hook does not return`);
     for (const call of OS_CALLS) {
       const at = body.indexOf(call);
       if (at >= 0)
@@ -84,14 +100,15 @@ test('the Windows implementation reads the OS only in its constructor, behind th
 
 test('the declared value is false, in our header', () => {
   const header = read(`${DIR}/StealthParentalControls.h`);
-  assert.match(header, /inline bool StealthParentalControlsDeclared\(bool\* aEnabled\) \{\s*\*aEnabled = false;\s*return true;\s*\}/);
-  for (const file of implementations)
-    assert.match(read(`${DIR}/${file}`), /#include "StealthParentalControls\.h"  \/\/ STEALTH-HOOK\(network\/doh\)/, file);
+  assert.match(header, /inline bool StealthParentalControlsDeclared\(\) \{ return true; \}/);
+  assert.match(read(`${DIR}/nsParentalControlsServiceWin.cpp`), /#include "StealthParentalControls\.h"  \/\/ STEALTH-HOOK\(network\/doh\)/);
+  // The Windows constructor holds the declared value in its initialisation list: the guard returns with it.
+  assert.match(read(`${DIR}/nsParentalControlsServiceWin.cpp`), /: mEnabled\(false\), mProvider\(0\), mPC\(nullptr\) \{\n  if \(StealthParentalControlsDeclared\(\)\) return;  \/\/ STEALTH-HOOK\(network\/doh\)\n/);
 });
 
 test('nsHttpHandler is upstream: it has no parental controls hook of ours', () => {
   const text = read('netwerk/protocol/http/nsHttpHandler.cpp');
-  assert.doesNotMatch(text, /Stealth/);
+  assert.doesNotMatch(text, /Stealth\w*Parental/);
   const start = text.indexOf('void nsHttpHandler::UpdateParentalControlsEnabled(bool waitForCompletion) {');
   const os = text.indexOf('do_CreateInstance("@mozilla.org/parental-controls-service;1")', start);
   const child = text.indexOf('if (!XRE_IsParentProcess()) {', start);

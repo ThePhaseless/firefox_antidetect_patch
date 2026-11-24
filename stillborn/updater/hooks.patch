@@ -1,5 +1,5 @@
 diff --git a/browser/branding/unofficial/pref/firefox-branding.js b/browser/branding/unofficial/pref/firefox-branding.js
-index f22dd0a51ccb367bbbb418d90aba6c8b6dbd7308..93a602ec27a882b2452be870293eb7ecf12f9c1f 100644
+index f22dd0a51ccb367bbbb418d90aba6c8b6dbd7308..ff3cd8db5b61116cb10eaa72f9e14ff3b703dcb0 100644
 --- a/browser/branding/unofficial/pref/firefox-branding.js
 +++ b/browser/branding/unofficial/pref/firefox-branding.js
 @@ -8,24 +8,24 @@ pref("startup.homepage_override_url", "");
@@ -7,7 +7,7 @@ index f22dd0a51ccb367bbbb418d90aba6c8b6dbd7308..93a602ec27a882b2452be870293eb7ec
  pref("startup.homepage_welcome_url.additional", "");
  // The time interval between checks for a new version (in seconds)
 -pref("app.update.interval", 86400); // 24 hours
-+pref("app.update.interval", 21600); // 6 hours, the release value  // STEALTH-HOOK(stillborn/updater)
++pref("app.update.interval", 21600);  // STEALTH-HOOK(stillborn/updater)
  // Give the user x seconds to react before showing the big UI. default=24 hours
 -pref("app.update.promptWaitTime", 86400);
 +pref("app.update.promptWaitTime", 691200);  // STEALTH-HOOK(stillborn/updater)
@@ -34,52 +34,48 @@ index f22dd0a51ccb367bbbb418d90aba6c8b6dbd7308..93a602ec27a882b2452be870293eb7ec
  // Number of usages of the web console.
  // If this is less than 5, then pasting code into the web console is disabled
 diff --git a/toolkit/mozapps/update/BackgroundUpdate.sys.mjs b/toolkit/mozapps/update/BackgroundUpdate.sys.mjs
-index ff6c58cbe0129b75452a8a2a101c54a8264046fe..c70917fe90b9951555b42b5a9a844ea932b0d4a9 100644
+index ff6c58cbe0129b75452a8a2a101c54a8264046fe..af0dc201a7502e80c4ac95eac1c4fe6c7dca2359 100644
 --- a/toolkit/mozapps/update/BackgroundUpdate.sys.mjs
 +++ b/toolkit/mozapps/update/BackgroundUpdate.sys.mjs
-@@ -5,6 +5,7 @@
- import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
+@@ -6,6 +6,8 @@ import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
  import { EXIT_CODE } from "resource://gre/modules/BackgroundTasksManager.sys.mjs";
  import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
-+import * as StealthUpdate from "resource://gre/modules/StealthUpdate.sys.mjs"; // STEALTH-HOOK(stillborn/updater)
  
++import * as StealthUpdate from "resource://gre/modules/StealthUpdate.sys.mjs"; // STEALTH-HOOK(stillborn/updater)
++
  const lazy = {};
  
-@@ -349,6 +350,10 @@ export var BackgroundUpdate = {
+ ChromeUtils.defineESModuleGetters(lazy, {
+@@ -349,6 +351,7 @@ export var BackgroundUpdate = {
     * @return {object} non-null if the background task was registered.
     */
    async _registerBackgroundUpdateTask(taskId = this.taskId) {
-+    // STEALTH-HOOK(stillborn/updater)
-+    if (StealthUpdate.refusesHostTask()) {
-+      return null;
-+    }
++    if (StealthUpdate.refusesHostTask()) return null;  // STEALTH-HOOK(stillborn/updater)
      let binary = Services.dirsvc.get("XREExeF", Ci.nsIFile);
      let args = [
        "--MOZ_LOG",
 diff --git a/toolkit/mozapps/update/UpdateService.sys.mjs b/toolkit/mozapps/update/UpdateService.sys.mjs
-index 164381ebc1073b644ab0a95910e2aab6c397e879..864877cd156e5dd38ba4a2cd7a4181d63aebb917 100644
+index 164381ebc1073b644ab0a95910e2aab6c397e879..db1e28aea40d13a9ac87b2ab581b148d2bacd45d 100644
 --- a/toolkit/mozapps/update/UpdateService.sys.mjs
 +++ b/toolkit/mozapps/update/UpdateService.sys.mjs
-@@ -13,6 +13,7 @@ import {
- } from "moz-src:///toolkit/components/bitsdownload/Bits.sys.mjs";
+@@ -14,6 +14,8 @@ import {
  import { FileUtils } from "resource://gre/modules/FileUtils.sys.mjs";
  import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
-+import * as StealthUpdate from "resource://gre/modules/StealthUpdate.sys.mjs"; // STEALTH-HOOK(stillborn/updater)
  
++import * as StealthUpdate from "resource://gre/modules/StealthUpdate.sys.mjs"; // STEALTH-HOOK(stillborn/updater)
++
  const lazy = {};
  
-@@ -4280,6 +4281,10 @@ export class UpdateService {
+ ChromeUtils.defineESModuleGetters(lazy, {
+@@ -4280,6 +4282,7 @@ export class UpdateService {
      if (!update) {
        throw Components.Exception("", Cr.NS_ERROR_NULL_POINTER);
      }
-+    // STEALTH-HOOK(stillborn/updater)
-+    if (StealthUpdate.refusesDownload()) {
-+      return Ci.nsIApplicationUpdateService.DOWNLOAD_FAILURE_GENERIC;
-+    }
++    if (StealthUpdate.refusesDownload()) return Ci.nsIApplicationUpdateService.DOWNLOAD_FAILURE_GENERIC;  // STEALTH-HOOK(stillborn/updater)
  
      // Don't download the update if the update's version is less than the
      // current application's version or the update's version is the same as the
-@@ -5768,6 +5773,7 @@ export class CheckerService {
+@@ -5768,6 +5771,7 @@ export class CheckerService {
        // "looks" fine but there was probably an XML error or a bogus file.
        return this.#getCheckFailedObject(status, 200, request);
      }

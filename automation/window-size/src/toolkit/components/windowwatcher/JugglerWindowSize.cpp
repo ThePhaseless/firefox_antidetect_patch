@@ -10,16 +10,21 @@
 namespace mozilla {
 
 uint32_t JugglerPopupChromeFlags(const dom::WindowFeatures& aFeatures) {
+  return JugglerPopupChromeFlags(aFeatures,
+                                 nsIWebBrowserChrome::CHROME_MINIMAL_POPUP);
+}
+
+uint32_t JugglerPopupChromeFlags(const dom::WindowFeatures& aFeatures,
+                                 uint32_t aPopupFlags) {
   // Juggler reads this flag to tell a popup that asked for a size from one
   // that did not: without it every popup got the browser context's default
   // viewport, so window.open(url, '', 'width=500,height=400') reported the
   // tab's 1920x947 where Firefox reports 499x400. HaveSpecifiedSize is the
   // test nsWindowWatcher already uses to decide whether the window gets sized.
   if (nsWindowWatcher::HaveSpecifiedSize(aFeatures)) {
-    return nsIWebBrowserChrome::CHROME_MINIMAL_POPUP |
-           kJugglerWindowExplicitSize;
+    return aPopupFlags | kJugglerWindowExplicitSize;
   }
-  return nsIWebBrowserChrome::CHROME_MINIMAL_POPUP;
+  return aPopupFlags;
 }
 
 }  // namespace mozilla

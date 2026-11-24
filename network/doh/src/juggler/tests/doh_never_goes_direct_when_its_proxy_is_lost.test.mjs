@@ -19,20 +19,28 @@ const read = rel => fs.readFileSync(path.join(TREE, rel), 'utf8');
 test('a failed proxy status ends the TRR request, a cancelled one goes on as upstream', () => {
   const text = read('netwerk/protocol/http/TRRServiceChannel.cpp');
   const body = text.slice(text.indexOf('TRRServiceChannel::OnProxyAvailable('));
-  const fail = body.indexOf('if (StealthTRRServiceFailClosed(this, StealthTRRProxyAnswer(status, pi, true), mCanceled)) { return NS_OK; }  // STEALTH-HOOK(network/doh)');
+  const fail = body.indexOf('if (StealthTRRServiceOnProxyAnswer(this, status, pi)) return NS_OK;  // STEALTH-HOOK(network/doh)');
   const used = body.indexOf('if (NS_SUCCEEDED(status)) mProxyInfo = pi;');
   assert.ok(fail > 0, 'no abort on a failed proxy status');
   assert.ok(used > fail, 'the status is used before it is checked');
+  // The cancellation is read in the template, from the channel, and given to the rule.
+  const fn = read('netwerk/ipc/StealthTRRContext.h').match(/bool StealthTRRServiceOnProxyAnswer\([\s\S]*?\n}\n/)[0];
+  assert.match(fn, /GetCanceled\(&canceled\)/);
+  assert.match(fn, /StealthTRRServiceFailClosed\(\s*aChannel, StealthTRRProxyAnswer\(aStatus, aProxyInfo, true\), canceled\)/);
 });
 
 test('a lookup that cannot even be started ends the TRR request', () => {
   const text = read('netwerk/protocol/http/TRRServiceChannel.cpp');
   const body = text.slice(text.indexOf('nsresult TRRServiceChannel::MaybeResolveProxyAndBeginConnect()'));
-  const resolve = body.indexOf('NS_SUCCEEDED(proxyRv = ResolveProxy())');
-  const fail = body.indexOf('if (StealthTRRServiceFailClosed(this, proxyRv, false)) { return NS_OK; }  // STEALTH-HOOK(network/doh)');
-  const connect = body.indexOf('rv = BeginConnect();');
-  assert.ok(resolve > 0 && fail > resolve, 'a failed lookup is not turned into an abort');
-  assert.ok(connect > fail, 'the connection begins before the failure is handled');
+  const fn = body.slice(0, body.indexOf('\n}\n'));
+  const resolve = fn.indexOf('NS_SUCCEEDED(StealthTRRServiceProxyLookup(this, ResolveProxy()))');
+  const connect = fn.indexOf('rv = BeginConnect();');
+  assert.ok(resolve > 0, 'a failed lookup is not turned into an abort');
+  assert.equal(fn.split('ResolveProxy()').length - 1, 1, 'a second, bare call of ResolveProxy');
+  assert.ok(connect > resolve, 'the connection begins before the failure is handled');
+  // A failed lookup ends the request and gives NS_OK, so the caller returns as it does after a lookup that went well.
+  const lookup = read('netwerk/ipc/StealthTRRContext.h').match(/nsresult StealthTRRServiceProxyLookup\([\s\S]*?\n}\n/)[0];
+  assert.match(lookup, /StealthTRRServiceFailClosed\(aChannel, aLookup, false\) \? NS_OK\s+: aLookup;/);
 });
 
 test('the rule is a template in our header: the same test as the nsHttpChannel one, then AsyncAbort with the failure', () => {

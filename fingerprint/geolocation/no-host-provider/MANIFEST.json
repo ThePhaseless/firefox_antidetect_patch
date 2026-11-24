@@ -2,22 +2,6 @@
  "modified": [
   "dom/geolocation/GeolocationSystemWin.cpp",
   "dom/permission/PermissionObserver.cpp",
-  "dom/system/windows/PWindowsUtils.ipdl",
-  "dom/system/windows/WindowsUtilsChild.cpp",
-  "dom/system/windows/WindowsUtilsChild.h",
-  "dom/system/windows/location/PWindowsLocation.ipdl",
-  "dom/system/windows/location/WindowsLegacyLocationChild.cpp",
-  "dom/system/windows/location/WindowsLegacyLocationChild.h",
-  "dom/system/windows/location/WindowsLocationChild.cpp",
-  "dom/system/windows/location/WindowsLocationChild.h",
-  "dom/system/windows/location/WindowsLocationParent.cpp",
-  "dom/system/windows/location/WindowsLocationParent.h",
-  "dom/system/windows/location/WindowsLocationProvider.cpp",
-  "dom/system/windows/location/WindowsLocationProvider.h",
-  "dom/system/windows/location/WindowsRuntimeLocationChild.cpp",
-  "dom/system/windows/location/WindowsRuntimeLocationChild.h",
-  "dom/system/windows/location/moz.build",
-  "dom/system/windows/moz.build",
   "toolkit/components/geolocation/GeolocationService.cpp",
   "toolkit/components/geolocation/moz.build"
  ],
@@ -41,7 +25,7 @@
     "geo.provider.network.url",
     "geo.provider.network.scan"
    ],
-   "added": 5,
+   "added": 3,
    "removed": 0,
    "hunks": 2,
    "inline_logic_lines": 3,
@@ -66,7 +50,7 @@
     "geo.provider.network.url",
     "geo.provider.network.scan"
    ],
-   "added": 5,
+   "added": 3,
    "removed": 0,
    "hunks": 2,
    "inline_logic_lines": 3,
@@ -84,374 +68,6 @@
    }
   },
   {
-   "file": "dom/system/windows/PWindowsUtils.ipdl",
-   "category": "spoof",
-   "feature": "geolocation-no-host-provider",
-   "prefs": [
-    "geo.provider.network.url",
-    "geo.provider.network.scan"
-   ],
-   "added": 0,
-   "removed": 7,
-   "hunks": 1,
-   "inline_logic_lines": 0,
-   "hookable": "already-hook",
-   "anchor": "PWindowsUtils protocol",
-   "evidence": [
-    "(file deleted)"
-   ],
-   "notes": "The Windows location provider is out of the tree: its messages leave the protocol.",
-   "verifier": {
-    "changed": [],
-    "why": "Written from the diff against the tag."
-   }
-  },
-  {
-   "file": "dom/system/windows/WindowsUtilsChild.cpp",
-   "category": "spoof",
-   "feature": "geolocation-no-host-provider",
-   "prefs": [
-    "geo.provider.network.url",
-    "geo.provider.network.scan"
-   ],
-   "added": 1,
-   "removed": 24,
-   "hunks": 1,
-   "inline_logic_lines": 1,
-   "hookable": "already-hook",
-   "anchor": "WindowsUtilsChild",
-   "evidence": [
-    "+namespace mozilla::dom {}  // namespace mozilla::dom"
-   ],
-   "notes": "The Windows location provider is out of the tree: its child actor factory is removed.",
-   "verifier": {
-    "changed": [],
-    "why": "Written from the diff against the tag."
-   }
-  },
-  {
-   "file": "dom/system/windows/WindowsUtilsChild.h",
-   "category": "spoof",
-   "feature": "geolocation-no-host-provider",
-   "prefs": [
-    "geo.provider.network.url",
-    "geo.provider.network.scan"
-   ],
-   "added": 0,
-   "removed": 4,
-   "hunks": 2,
-   "inline_logic_lines": 0,
-   "hookable": "already-hook",
-   "anchor": "WindowsUtilsChild",
-   "evidence": [
-    "(file deleted)"
-   ],
-   "notes": "The Windows location provider is out of the tree: its child actor factory is removed.",
-   "verifier": {
-    "changed": [],
-    "why": "Written from the diff against the tag."
-   }
-  },
-  {
-   "file": "dom/system/windows/location/PWindowsLocation.ipdl",
-   "category": "spoof",
-   "feature": "geolocation-no-host-provider",
-   "prefs": [
-    "geo.provider.network.url",
-    "geo.provider.network.scan"
-   ],
-   "added": 0,
-   "removed": 36,
-   "hunks": 1,
-   "inline_logic_lines": 0,
-   "hookable": "already-hook",
-   "anchor": "(whole file deleted)",
-   "evidence": [
-    "(file deleted)"
-   ],
-   "notes": "The Windows location provider is out of the tree: Mozilla's file is deleted, nothing reads the host location.",
-   "verifier": {
-    "changed": [],
-    "why": "Written from the diff against the tag."
-   }
-  },
-  {
-   "file": "dom/system/windows/location/WindowsLegacyLocationChild.cpp",
-   "category": "spoof",
-   "feature": "geolocation-no-host-provider",
-   "prefs": [
-    "geo.provider.network.url",
-    "geo.provider.network.scan"
-   ],
-   "added": 0,
-   "removed": 289,
-   "hunks": 1,
-   "inline_logic_lines": 0,
-   "hookable": "already-hook",
-   "anchor": "(whole file deleted)",
-   "evidence": [
-    "(file deleted)"
-   ],
-   "notes": "The Windows location provider is out of the tree: Mozilla's file is deleted, nothing reads the host location.",
-   "verifier": {
-    "changed": [],
-    "why": "Written from the diff against the tag."
-   }
-  },
-  {
-   "file": "dom/system/windows/location/WindowsLegacyLocationChild.h",
-   "category": "spoof",
-   "feature": "geolocation-no-host-provider",
-   "prefs": [
-    "geo.provider.network.url",
-    "geo.provider.network.scan"
-   ],
-   "added": 0,
-   "removed": 42,
-   "hunks": 1,
-   "inline_logic_lines": 0,
-   "hookable": "already-hook",
-   "anchor": "(whole file deleted)",
-   "evidence": [
-    "(file deleted)"
-   ],
-   "notes": "The Windows location provider is out of the tree: Mozilla's file is deleted, nothing reads the host location.",
-   "verifier": {
-    "changed": [],
-    "why": "Written from the diff against the tag."
-   }
-  },
-  {
-   "file": "dom/system/windows/location/WindowsLocationChild.cpp",
-   "category": "spoof",
-   "feature": "geolocation-no-host-provider",
-   "prefs": [
-    "geo.provider.network.url",
-    "geo.provider.network.scan"
-   ],
-   "added": 0,
-   "removed": 25,
-   "hunks": 1,
-   "inline_logic_lines": 0,
-   "hookable": "already-hook",
-   "anchor": "(whole file deleted)",
-   "evidence": [
-    "(file deleted)"
-   ],
-   "notes": "The Windows location provider is out of the tree: Mozilla's file is deleted, nothing reads the host location.",
-   "verifier": {
-    "changed": [],
-    "why": "Written from the diff against the tag."
-   }
-  },
-  {
-   "file": "dom/system/windows/location/WindowsLocationChild.h",
-   "category": "spoof",
-   "feature": "geolocation-no-host-provider",
-   "prefs": [
-    "geo.provider.network.url",
-    "geo.provider.network.scan"
-   ],
-   "added": 0,
-   "removed": 33,
-   "hunks": 1,
-   "inline_logic_lines": 0,
-   "hookable": "already-hook",
-   "anchor": "(whole file deleted)",
-   "evidence": [
-    "(file deleted)"
-   ],
-   "notes": "The Windows location provider is out of the tree: Mozilla's file is deleted, nothing reads the host location.",
-   "verifier": {
-    "changed": [],
-    "why": "Written from the diff against the tag."
-   }
-  },
-  {
-   "file": "dom/system/windows/location/WindowsLocationParent.cpp",
-   "category": "spoof",
-   "feature": "geolocation-no-host-provider",
-   "prefs": [
-    "geo.provider.network.url",
-    "geo.provider.network.scan"
-   ],
-   "added": 0,
-   "removed": 35,
-   "hunks": 1,
-   "inline_logic_lines": 0,
-   "hookable": "already-hook",
-   "anchor": "(whole file deleted)",
-   "evidence": [
-    "(file deleted)"
-   ],
-   "notes": "The Windows location provider is out of the tree: Mozilla's file is deleted, nothing reads the host location.",
-   "verifier": {
-    "changed": [],
-    "why": "Written from the diff against the tag."
-   }
-  },
-  {
-   "file": "dom/system/windows/location/WindowsLocationParent.h",
-   "category": "spoof",
-   "feature": "geolocation-no-host-provider",
-   "prefs": [
-    "geo.provider.network.url",
-    "geo.provider.network.scan"
-   ],
-   "added": 0,
-   "removed": 50,
-   "hunks": 1,
-   "inline_logic_lines": 0,
-   "hookable": "already-hook",
-   "anchor": "(whole file deleted)",
-   "evidence": [
-    "(file deleted)"
-   ],
-   "notes": "The Windows location provider is out of the tree: Mozilla's file is deleted, nothing reads the host location.",
-   "verifier": {
-    "changed": [],
-    "why": "Written from the diff against the tag."
-   }
-  },
-  {
-   "file": "dom/system/windows/location/WindowsLocationProvider.cpp",
-   "category": "spoof",
-   "feature": "geolocation-no-host-provider",
-   "prefs": [
-    "geo.provider.network.url",
-    "geo.provider.network.scan"
-   ],
-   "added": 0,
-   "removed": 274,
-   "hunks": 1,
-   "inline_logic_lines": 0,
-   "hookable": "already-hook",
-   "anchor": "(whole file deleted)",
-   "evidence": [
-    "(file deleted)"
-   ],
-   "notes": "The Windows location provider is out of the tree: Mozilla's file is deleted, nothing reads the host location.",
-   "verifier": {
-    "changed": [],
-    "why": "Written from the diff against the tag."
-   }
-  },
-  {
-   "file": "dom/system/windows/location/WindowsLocationProvider.h",
-   "category": "spoof",
-   "feature": "geolocation-no-host-provider",
-   "prefs": [
-    "geo.provider.network.url",
-    "geo.provider.network.scan"
-   ],
-   "added": 0,
-   "removed": 69,
-   "hunks": 1,
-   "inline_logic_lines": 0,
-   "hookable": "already-hook",
-   "anchor": "(whole file deleted)",
-   "evidence": [
-    "(file deleted)"
-   ],
-   "notes": "The Windows location provider is out of the tree: Mozilla's file is deleted, nothing reads the host location.",
-   "verifier": {
-    "changed": [],
-    "why": "Written from the diff against the tag."
-   }
-  },
-  {
-   "file": "dom/system/windows/location/WindowsRuntimeLocationChild.cpp",
-   "category": "spoof",
-   "feature": "geolocation-no-host-provider",
-   "prefs": [
-    "geo.provider.network.url",
-    "geo.provider.network.scan"
-   ],
-   "added": 0,
-   "removed": 336,
-   "hunks": 1,
-   "inline_logic_lines": 0,
-   "hookable": "already-hook",
-   "anchor": "(whole file deleted)",
-   "evidence": [
-    "(file deleted)"
-   ],
-   "notes": "The Windows location provider is out of the tree: Mozilla's file is deleted, nothing reads the host location.",
-   "verifier": {
-    "changed": [],
-    "why": "Written from the diff against the tag."
-   }
-  },
-  {
-   "file": "dom/system/windows/location/WindowsRuntimeLocationChild.h",
-   "category": "spoof",
-   "feature": "geolocation-no-host-provider",
-   "prefs": [
-    "geo.provider.network.url",
-    "geo.provider.network.scan"
-   ],
-   "added": 0,
-   "removed": 54,
-   "hunks": 1,
-   "inline_logic_lines": 0,
-   "hookable": "already-hook",
-   "anchor": "(whole file deleted)",
-   "evidence": [
-    "(file deleted)"
-   ],
-   "notes": "The Windows location provider is out of the tree: Mozilla's file is deleted, nothing reads the host location.",
-   "verifier": {
-    "changed": [],
-    "why": "Written from the diff against the tag."
-   }
-  },
-  {
-   "file": "dom/system/windows/location/moz.build",
-   "category": "spoof",
-   "feature": "geolocation-no-host-provider",
-   "prefs": [
-    "geo.provider.network.url",
-    "geo.provider.network.scan"
-   ],
-   "added": 0,
-   "removed": 33,
-   "hunks": 1,
-   "inline_logic_lines": 0,
-   "hookable": "already-hook",
-   "anchor": "(whole file deleted)",
-   "evidence": [
-    "(file deleted)"
-   ],
-   "notes": "The Windows location provider is out of the tree: Mozilla's file is deleted, nothing reads the host location.",
-   "verifier": {
-    "changed": [],
-    "why": "Written from the diff against the tag."
-   }
-  },
-  {
-   "file": "dom/system/windows/moz.build",
-   "category": "spoof",
-   "feature": "geolocation-no-host-provider",
-   "prefs": [
-    "geo.provider.network.url",
-    "geo.provider.network.scan"
-   ],
-   "added": 0,
-   "removed": 6,
-   "hunks": 1,
-   "inline_logic_lines": 0,
-   "hookable": "already-hook",
-   "anchor": "moz.build",
-   "evidence": [
-    "(file deleted)"
-   ],
-   "notes": "The Windows location provider is out of the tree: the sub-directory and the IPDL file are no longer built.",
-   "verifier": {
-    "changed": [],
-    "why": "Written from the diff against the tag."
-   }
-  },
-  {
    "file": "toolkit/components/geolocation/GeolocationService.cpp",
    "category": "spoof",
    "feature": "geolocation-no-host-provider",
@@ -459,9 +75,9 @@
     "geo.provider.network.url",
     "geo.provider.network.scan"
    ],
-   "added": 6,
-   "removed": 10,
-   "hunks": 4,
+   "added": 3,
+   "removed": 0,
+   "hunks": 2,
    "inline_logic_lines": 3,
    "hookable": "movable",
    "anchor": "GeolocationService::Init",
@@ -485,8 +101,8 @@
     "geo.provider.network.scan"
    ],
    "added": 4,
-   "removed": 4,
-   "hunks": 3,
+   "removed": 0,
+   "hunks": 2,
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "moz.build after the closing bracket",

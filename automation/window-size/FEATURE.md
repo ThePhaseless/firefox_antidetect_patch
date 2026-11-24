@@ -2,15 +2,24 @@
 
 Category: juggler
 Prefs: none read directly
-Test: TODO
+Test: juggler/tests/explicit_size_flag_is_free.test.mjs (node, in the candidate's node step: the C++ and the JS side use the same bit, no CHROME_* flag of nsIWebBrowserChrome uses it); the wrapper's popup tests (tests/test_popup_pages.py)
 
 ## What it does
 
-TODO: one paragraph, from the notes below.
+A popup that a page opens with window.open(url, '', 'width=500,height=400') must
+report the size the page asked for. Juggler can only tell that popup from one that
+gave no size if the chrome flags carry a bit for it. `JugglerPopupChromeFlags`
+(toolkit/components/windowwatcher/JugglerWindowSize.cpp) returns the popup flags
+of Mozilla and adds that bit when the features give a size. It has two forms: one
+that starts from CHROME_MINIMAL_POPUP, and one that takes the popup flags the
+caller already holds (the caller passes Mozilla's own operand, so a change of
+Mozilla's popup flags is followed).
 
 ## Hooks in Mozilla files
 
-- `toolkit/components/windowwatcher/nsWindowWatcher.cpp`: the popup branch of CalculateChromeFlagsForContent calls JugglerPopupChromeFlags (toolkit/components/windowwatcher/JugglerWindowSize.cpp).
+- `toolkit/components/windowwatcher/moz.build` (registration, after the closing `]`): `UNIFIED_SOURCES += ["JugglerWindowSize.cpp"]`. Without it the link fails (`JugglerPopupChromeFlags` undefined), which is the red case.
+- The call in `nsWindowWatcher::CalculateChromeFlagsForContent` (popup branch) and the include of `JugglerWindowSize.h` are in `toolkit/components/windowwatcher/nsWindowWatcher.cpp`, a file that fingerprint/screen-window/popup-position owns (one owner per Mozilla file); the call is `mozilla::JugglerPopupChromeFlags(aFeatures, nsIWebBrowserChrome::CHROME_MINIMAL_POPUP)`.
+- The next line of the same moz.build, `StealthWindowPlacement.cpp`, belongs to fingerprint/screen-window/popup-position.
 
 ## The explicit-size flag
 

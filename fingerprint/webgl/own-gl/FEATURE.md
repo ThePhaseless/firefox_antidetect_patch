@@ -25,8 +25,12 @@ files WebGL has no context. With the engine off, Firefox is unchanged.
 
 ## Hooks in Mozilla files
 
-- `gfx/gl/GLLibraryEGL.cpp` (after #include "GLLibraryEGL.h", after the non-Windows library comment in GLLibraryEGL::Init, and after #ifdef MOZ_WIDGET_GTK in CreateDisplayLocked, already-hook): EGL is the engine's own llvmpipe or nothing, and its display is the surfaceless one.
-- `gfx/gl/GLContextProviderLinux.cpp` (after #include "GLContextProvider.h", and at the top of GLContextProviderLinux::CreateHeadless, already-hook): a headless context is always EGL, never GLX.
+All in `StealthOwnGL.h`'s functions; each Mozilla line is one call with the marker.
+
+- `gfx/gl/GLLibraryEGL.cpp`, `GLLibraryEGL::Init`, anchor right after `mozilla::ScopedGfxFeatureReporter reporter("EGL");` (a guard at the top would run before the reporter and its `return false` would skip the reporter's failure note): `if (StealthOwnGLRefused(&mEGLLibrary, &mGLLibrary, out_failureId)) return false;`. EGL is the engine's own llvmpipe or nothing (ours or none). The fields are passed from inside the member function (no friend). Windows and engine off: the function returns false and does nothing.
+- `gfx/gl/GLLibraryEGL.cpp`, `GLLibraryEGL::CreateDisplayLocked`, guard, first statement: `if (StealthOwnGLRequired()) return StealthOwnGLSurfacelessDisplay(*this, aProofOfLock);`. The display is EGL's surfaceless one only. With the engine on the EGL is our llvmpipe, which never advertises ANGLE_platform_angle_d3d, so the branch the line used to be the first statement of (the else of the ANGLE test) was the only one reached; engine off or not GTK: no-op.
+- `gfx/gl/GLContextProviderLinux.cpp`, `GLContextProviderLinux::CreateHeadless`, guard, first statement: `if (StealthOwnGLRequired()) return StealthOwnGLCreateHeadless(desc, out_failureId);`. A headless context is always EGL, never GLX (our function calls the static `GLContextProviderEGL::CreateHeadless`, the one Mozilla called through its file-scope instance).
+- Both `.cpp` files include `StealthOwnGL.h` in a block of ours after Mozilla's includes.
 
 ## Our own files
 

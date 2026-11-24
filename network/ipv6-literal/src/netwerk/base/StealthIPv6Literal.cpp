@@ -5,6 +5,7 @@
 #include "StealthIPv6Literal.h"
 
 #include "mozilla/StaticPrefs_network.h"
+#include "nsString.h"
 #include "nsXULAppAPI.h"
 #include "prerr.h"
 #ifdef MOZ_WEBRTC
@@ -63,6 +64,16 @@ PRStatus StealthConnect(PRFileDesc* aFd, const NetAddr& aAddr,
     return PR_FAILURE;
   }
   return PR_Connect(aFd, aPrAddr, aTimeout);
+}
+
+PRStatus StealthConnect(const NetAddr& aAddr, bool aProxyTransparent,
+                        const nsACString& aProxyHost, PRFileDesc* aFd,
+                        const PRNetAddr* aPrAddr, PRIntervalTime aTimeout) {
+  // Behind a SOCKS proxy mNetAddr is the destination, which the proxy reaches.
+  StealthConnectTarget target = aProxyTransparent && !aProxyHost.IsEmpty()
+                                    ? StealthConnectTarget::kBehindSocksProxy
+                                    : StealthConnectTarget::kDirect;
+  return StealthConnect(aFd, aAddr, target, aPrAddr, aTimeout);
 }
 
 void StealthApplyDeclaredNetwork() {

@@ -3,6 +3,7 @@
   "js/src/vm/SavedStacks.cpp"
  ],
  "added": {
+  "dom/base/test/gtest/TestStealthStackFrames.cpp": "100644",
   "js/src/vm/StealthStackFrames.h": "100644"
  },
  "inventory": [
@@ -11,7 +12,7 @@
    "category": "spoof",
    "feature": "stack-hide-juggler-frames",
    "prefs": [],
-   "added": 6,
+   "added": 3,
    "removed": 0,
    "hunks": 2,
    "inline_logic_lines": 22,

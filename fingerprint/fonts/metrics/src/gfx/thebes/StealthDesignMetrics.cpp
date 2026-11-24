@@ -2,14 +2,15 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-// STEALTH: design-space glyph metrics for gfxHarfBuzzShaper. The members are
-// declared in gfxHarfBuzzShaper.h; their definitions live here so that the
-// Mozilla file carries only a hook. See fingerprint/fonts/metrics/FEATURE.md.
-// No `using`: these are definitions of members of the global class
-// gfxHarfBuzzShaper, and everything else is spelled out, so the file does not
-// depend on what a unified blob would have opened before it. It also holds the
-// any-thread mirror of the declared rendering mode (StealthTextMeasuring.h).
+// STEALTH: design-space glyph metrics for gfxHarfBuzzShaper. The struct that
+// reads them is declared in StealthDesignFontAccess.h and befriended by
+// gfxHarfBuzzShaper.h, so that the Mozilla file carries only a hook. See
+// fingerprint/fonts/metrics/FEATURE.md. No `using`: everything is spelled out,
+// so the file does not depend on what a unified blob would have opened before
+// it. It also holds the any-thread mirror of the declared rendering mode
+// (StealthTextMeasuring.h).
 
+#include "StealthDesignFontAccess.h"
 #include "gfxHarfBuzzShaper.h"
 
 #include <stdint.h>
@@ -28,10 +29,11 @@
 #include "nsThreadUtils.h"
 
 // STEALTH: the design-space metrics font (member mDesignFont, declared in
-// gfxHarfBuzzShaper.h), built on demand by GetDesignFont and never used for
-// shaping. Mutable because GetDesignGlyphExtents and GetDesignAdvance below are
+// gfxHarfBuzzShaper.h), built on demand by GetFont and never used for
+// shaping. Mutable because GlyphExtents and Advance below take the shaper
 // const and a font that is only read has no business forcing them not to be.
-hb_font_t* gfxHarfBuzzShaper::GetDesignFont() const {
+// The shaper's destructor releases it (its hook line in gfxHarfBuzzShaper.cpp).
+hb_font_t* StealthDesignFontAccess::GetFont(const gfxHarfBuzzShaper& aShaper) {
   // Sotto mMutex, come OGNI altro stato mutabile di questa classe.
   //
   // L'intestazione lo dichiara a chiare lettere due membri piu' sotto: lo
@@ -45,7 +47,7 @@ hb_font_t* gfxHarfBuzzShaper::GetDesignFont() const {
   //
   // E' ricorsivo apposta, quindi prenderlo qui e' sicuro anche quando il
   // chiamante lo tiene gia'.
-  mozilla::RecursiveMutexAutoLock lock(mMutex);
+  mozilla::RecursiveMutexAutoLock lock(aShaper.mMutex);
 
   // A second hb_font on the same face, used for nothing but design-space
   // metrics, and deliberately NOT the shaping font: that one carries our own
@@ -68,10 +70,11 @@ hb_font_t* gfxHarfBuzzShaper::GetDesignFont() const {
   // webfont diverged on 108 of 150 measureText fields between Windows and
   // Linux, because the CFF case fell through to FreeType's grid-fitted bounds
   // and came back as whole integers.
-  if (mDesignFont) {
-    return mDesignFont;
+  if (aShaper.mDesignFont) {
+    return aShaper.mDesignFont;
   }
-  const uint16_t upem = mFont->GetFontEntry()->UnitsPerEm();
+  gfxFont* const shapedFont = aShaper.GetFont();
+  const uint16_t upem = shapedFont->GetFontEntry()->UnitsPerEm();
   if (!upem || upem == gfxFontEntry::kInvalidUPEM) {
     return nullptr;
   }
@@ -94,7 +97,7 @@ hb_font_t* gfxHarfBuzzShaper::GetDesignFont() const {
   // Gli altri TREDICI chiamanti di GetHBFace() nell'albero tengono vivo
   // l'oggetto RAII; questo era l'unico che lo buttava via. Il proprietario
   // dev'essere UNO, e qui e' l'AutoHBFace. Vedi 70-known-bugs.md, 2026-08-10.
-  const auto face(mFont->GetFontEntry()->GetHBFace());
+  const auto face(shapedFont->GetFontEntry()->GetHBFace());
   if (!face) {
     return nullptr;
   }
@@ -109,20 +112,25 @@ hb_font_t* gfxHarfBuzzShaper::GetDesignFont() const {
   // Variations travel too, or a variable font would be measured at its default
   // instance while it renders at another.
   AutoTArray<gfxFontVariation, 8> vars;
-  mFont->GetFontEntry()->GetVariationsForStyle(vars, *mFont->GetStyle());
+  shapedFont->GetFontEntry()->GetVariationsForStyle(vars,
+                                                    *shapedFont->GetStyle());
   if (vars.Length() > 0) {
     static_assert(sizeof(gfxFontVariation) == sizeof(hb_variation_t),
                   "gfxFontVariation and hb_variation_t must be compatible");
     hb_font_set_variations(
         font, reinterpret_cast<hb_variation_t*>(vars.Elements()), vars.Length());
   }
-  mDesignFont = font;
-  return mDesignFont;
+  aShaper.mDesignFont = font;
+  return aShaper.mDesignFont;
+}
+
+void StealthReleaseDesignFont(hb_font_t* aFont) {
+  hb_font_destroy(aFont);  // null is fine, hb_font_destroy takes it
 }
 
 // STEALTH: glyph metrics in DESIGN space, in FONT UNITS, read from the font's
 // own outlines by HarfBuzz and never by a platform rasteriser (this applies to
-// GetDesignGlyphExtents and GetDesignAdvance, declared in gfxHarfBuzzShaper.h).
+// GlyphExtents and Advance, declared in StealthDesignFontAccess.h).
 //
 // They exist so the FreeType backend reports the same ink box and the same
 // advance the DirectWrite one does. gfxDWriteFont::GetGlyphBounds calls
@@ -145,11 +153,11 @@ hb_font_t* gfxHarfBuzzShaper::GetDesignFont() const {
 // whole integers straight out of FreeType's grid fitting. hb-ot-font reads
 // glyf, CFF and CFF2 alike, so there is no case left to fall through with -
 // engine rule 7, make the declared path total rather than add a fallback.
-bool gfxHarfBuzzShaper::GetDesignGlyphExtents(uint16_t aGID, int32_t& aXBearing,
-                                              int32_t& aYBearing,
-                                              int32_t& aWidth,
-                                              int32_t& aHeight) const {
-  hb_font_t* font = GetDesignFont();
+bool StealthDesignFontAccess::GlyphExtents(const gfxHarfBuzzShaper& aShaper,
+                                           uint16_t aGID, int32_t& aXBearing,
+                                           int32_t& aYBearing, int32_t& aWidth,
+                                           int32_t& aHeight) {
+  hb_font_t* font = GetFont(aShaper);
   if (!font) {
     return false;
   }
@@ -167,9 +175,9 @@ bool gfxHarfBuzzShaper::GetDesignGlyphExtents(uint16_t aGID, int32_t& aXBearing,
   return true;
 }
 
-bool gfxHarfBuzzShaper::GetDesignAdvance(uint16_t aGID,
-                                         int32_t& aAdvance) const {
-  hb_font_t* font = GetDesignFont();
+bool StealthDesignFontAccess::Advance(const gfxHarfBuzzShaper& aShaper,
+                                      uint16_t aGID, int32_t& aAdvance) {
+  hb_font_t* font = GetFont(aShaper);
   if (!font) {
     return false;
   }

@@ -10,12 +10,20 @@
 #include <string.h>
 
 #include <algorithm>
+#include <string>
 #include <utility>
 #include <vector>
 
 #include "gtest/gtest.h"
+#include "mozilla/RefPtr.h"
+#include "mozilla/dom/StealthCanvasUtils.h"
 #include "mozilla/gfx/2D.h"
+#include "mozilla/gfx/DrawEventRecorder.h"
+#include "mozilla/gfx/DrawTargetRecording.h"
+#include "mozilla/gfx/RecordedEvent.h"
+#include "mozilla/gfx/RecordingTypes.h"
 #include "mozilla/gfx/StealthCanvasProjection.h"
+#include "mozilla/gfx/StealthRecordedProjection.h"
 
 using namespace mozilla;
 using namespace mozilla::gfx;
@@ -99,7 +107,120 @@ std::vector<uint8_t> FlipY(const std::vector<uint8_t>& aPx) {
   return out;
 }
 
+// A recording stand-in as StealthProjectOriginal reads it: the two public
+// members DrawTargetRecording.cpp's SourceSurfaceRecording has.
+struct FakeStandIn {
+  IntSize mSize = IntSize(kW, kH);
+  StealthStandIn mStealth;
+};
+
+already_AddRefed<DataSourceSurface> DataSurfaceOf(
+    const std::vector<uint8_t>& aPx) {
+  RefPtr<DataSourceSurface> data = Factory::CreateDataSourceSurfaceWithStride(
+      IntSize(kW, kH), SurfaceFormat::R8G8B8A8, kW * 4);
+  if (!data) {
+    return nullptr;
+  }
+  DataSourceSurface::ScopedMap map(data, DataSourceSurface::WRITE);
+  if (!map.IsMapped()) {
+    return nullptr;
+  }
+  for (int32_t y = 0; y < kH; ++y) {
+    memcpy(map.GetData() + y * map.GetStride(), &aPx[y * kW * 4], kW * 4);
+  }
+  return data.forget();
+}
+
+std::vector<uint8_t> BytesOf(DataSourceSurface* aData) {
+  std::vector<uint8_t> out(kW * kH * 4);
+  DataSourceSurface::ScopedMap map(aData, DataSourceSurface::READ);
+  for (int32_t y = 0; y < kH; ++y) {
+    memcpy(&out[y * kW * 4], map.GetData() + y * map.GetStride(), kW * 4);
+  }
+  return out;
+}
+
+// The events of a recording from byte aFrom on, as RecordedEvent reads them
+// back: how many are the projection event (RecordedStealthProjectSurface) and
+// whether the whole tail parsed.
+struct EventCount {
+  int32_t mProjections = 0;
+  int32_t mOthers = 0;
+  bool mParsed = false;
+};
+
+EventCount CountEventsFrom(const MemStream& aStream, size_t aFrom) {
+  EventCount count;
+  MemReader reader(aStream.mData + aFrom, aStream.mLength - aFrom);
+  while (reader.good() && reader.mData < reader.mEnd) {
+    RecordedEvent::EventType type = RecordedEvent::DRAWTARGETCREATION;
+    ReadElementConstrained(reader, type, RecordedEvent::DRAWTARGETCREATION,
+                           RecordedEvent::LAST);
+    if (!reader.good()) {
+      return count;
+    }
+    const bool ok = RecordedEvent::DoWithEventFromReader(
+        reader, type, [&](RecordedEvent*) {
+          if (type == RecordedEvent::STEALTHPROJECTSURFACE) {
+            ++count.mProjections;
+          } else {
+            ++count.mOthers;
+          }
+          return true;
+        });
+    if (!ok) {
+      return count;
+    }
+  }
+  count.mParsed = reader.good();
+  return count;
+}
+
 }  // namespace
+
+// The canvas noise is a WebGL/WebGPU readback only: every other context type
+// reads as drawn, as on retail (test_canvas_reads_as_drawn.py is the page-level
+// proof for 2D and offscreen 2D). A 2D type that answered true would put the
+// noise on every 2D canvas.
+TEST(StealthCanvasUtils, ProjectsOnlyWebGLAndWebGPU)
+{
+  using mozilla::CanvasUtils::StealthProjectsContextType;
+  using mozilla::dom::CanvasContextType;
+  EXPECT_TRUE(StealthProjectsContextType(CanvasContextType::WebGL1));
+  EXPECT_TRUE(StealthProjectsContextType(CanvasContextType::WebGL2));
+  EXPECT_TRUE(StealthProjectsContextType(CanvasContextType::WebGPU));
+  EXPECT_FALSE(StealthProjectsContextType(CanvasContextType::Canvas2D));
+  EXPECT_FALSE(
+      StealthProjectsContextType(CanvasContextType::OffscreenCanvas2D));
+  EXPECT_FALSE(StealthProjectsContextType(CanvasContextType::ImageBitmap));
+  EXPECT_FALSE(StealthProjectsContextType(CanvasContextType::NoContext));
+}
+
+// What a recording stand-in reads back (SourceSurfaceRecording::GetDataSurface
+// through StealthProjectOriginal): the original's pixels projected over the
+// whole stand-in when it carries noise, untouched when it does not.
+TEST(StealthCanvasProjection, StandInReadsProjected)
+{
+  const std::vector<uint8_t> drawn = Drawing(false);
+  std::vector<uint8_t> projected = drawn;
+  ASSERT_TRUE(Project(projected, SurfaceFormat::R8G8B8A8));
+  ASSERT_NE(drawn, projected);
+
+  FakeStandIn noisy;
+  noisy.mStealth.noise = StealthCanvasNoise{kSeed, kTolerance};
+  noisy.mStealth.premultiplied = true;
+  RefPtr<DataSourceSurface> read =
+      StealthProjectOriginal(&noisy, DataSurfaceOf(drawn));
+  ASSERT_TRUE(read);
+  EXPECT_EQ(projected, BytesOf(read));
+
+  // The red case: a stand-in without noise hands back what was drawn.
+  FakeStandIn plain;
+  RefPtr<DataSourceSurface> unread =
+      StealthProjectOriginal(&plain, DataSurfaceOf(drawn));
+  ASSERT_TRUE(unread);
+  EXPECT_EQ(drawn, BytesOf(unread));
+}
 
 TEST(StealthCanvasProjection, IsAProjection)
 {
@@ -451,4 +572,105 @@ TEST(StealthCanvasProjection, RefusesARecordingWithoutNoise)
   RefPtr<SourceSurface> canvasRecording = new FakeRecordingSurface(true);
   EXPECT_FALSE(
       StealthCanProjectRecording(canvasRecording, StealthCanvasNoise::Off()));
+}
+
+// A projection event goes through the stream the way every recorded event
+// does: written with its type, read back through RecordedEvent (the type read
+// constrained to the events up to LAST, as the process that replays a
+// recording reads it) and written again to the same bytes. The seed and the
+// edge tolerance are in the bytes: another noise makes other bytes.
+TEST(StealthCanvasProjection, RecordedEventRoundTrip)
+{
+  const RecordedStealthProjectSurface event(
+      ReferencePtr(reinterpret_cast<void*>(0x1000)),
+      ReferencePtr(reinterpret_cast<void*>(0x2000)), true,
+      StealthCanvasNoise{kSeed, kTolerance});
+  MemStream written;
+  event.RecordToStream(written);
+  ASSERT_TRUE(written.mValid);
+  ASSERT_GT(written.mLength, size_t(0));
+
+  MemReader reader(written.mData, written.mLength);
+  RecordedEvent::EventType type = RecordedEvent::DRAWTARGETCREATION;
+  ReadElementConstrained(reader, type, RecordedEvent::DRAWTARGETCREATION,
+                         RecordedEvent::LAST);
+  ASSERT_TRUE(reader.good());
+  ASSERT_EQ(RecordedEvent::STEALTHPROJECTSURFACE, type);
+
+  MemStream again;
+  std::string name;
+  ASSERT_TRUE(RecordedEvent::DoWithEventFromReader(
+      reader, type, [&](RecordedEvent* aEvent) {
+        name = aEvent->GetName();
+        aEvent->RecordToStream(again);
+        return true;
+      }));
+  EXPECT_EQ("StealthProjectSurface", name);
+  EXPECT_TRUE(reader.good());
+  EXPECT_EQ(reader.mEnd, reader.mData);  // the event took exactly its bytes
+  ASSERT_EQ(written.mLength, again.mLength);
+  EXPECT_EQ(0, memcmp(written.mData, again.mData, written.mLength));
+
+  // The control: the same event with another seed is other bytes.
+  const RecordedStealthProjectSurface other(
+      ReferencePtr(reinterpret_cast<void*>(0x1000)),
+      ReferencePtr(reinterpret_cast<void*>(0x2000)), true,
+      StealthCanvasNoise{kSeed + 1, kTolerance});
+  MemStream otherBytes;
+  other.RecordToStream(otherBytes);
+  ASSERT_EQ(written.mLength, otherBytes.mLength);
+  EXPECT_NE(0, memcmp(written.mData, otherBytes.mData, written.mLength));
+}
+
+// DrawTargetRecording::StealthProjectedSurface on a real recording: a refusal
+// (no noise, or a surface that is no recording) leaves the recorder untouched,
+// an acceptance records exactly one projection event and returns a stand-in
+// that reads back what the projection of the original is.
+TEST(StealthCanvasProjection, ProjectedSurfaceRecordsOneEvent)
+{
+  RefPtr<DrawEventRecorderMemory> recorder =
+      MakeRefPtr<DrawEventRecorderMemory>();
+  RefPtr<DrawTarget> reference = Factory::CreateDrawTarget(
+      BackendType::SKIA, IntSize(1, 1), SurfaceFormat::B8G8R8A8);
+  ASSERT_TRUE(reference);
+  RefPtr<DrawTarget> dt = Factory::CreateRecordingDrawTarget(
+      recorder, reference, IntRect(0, 0, kW, kH));
+  ASSERT_TRUE(dt);
+  ASSERT_TRUE(dt->IsValid());
+  auto* recording = static_cast<DrawTargetRecording*>(dt.get());
+
+  const std::vector<uint8_t> drawn = Drawing(false);
+  RefPtr<DataSourceSurface> data = DataSurfaceOf(drawn);
+  ASSERT_TRUE(data);
+  RefPtr<SourceSurface> source = dt->OptimizeSourceSurface(data);
+  ASSERT_TRUE(source);
+  ASSERT_EQ(SurfaceType::RECORDING, source->GetUnderlyingType());
+
+  const StealthCanvasNoise noise{kSeed, kTolerance};
+  const size_t before = recorder->mOutputStream.mLength;
+
+  // Refusals: nothing is recorded, nothing is returned.
+  RefPtr<SourceSurface> refused =
+      recording->StealthProjectedSurface(source, true, StealthCanvasNoise::Off());
+  EXPECT_FALSE(refused);
+  EXPECT_EQ(before, recorder->mOutputStream.mLength);
+  refused = recording->StealthProjectedSurface(data, true, noise);
+  EXPECT_FALSE(refused);
+  EXPECT_EQ(before, recorder->mOutputStream.mLength);
+
+  // The acceptance: one projection event, held surface still alive (its
+  // release records its destruction, which is another event).
+  RefPtr<SourceSurface> projected =
+      recording->StealthProjectedSurface(source, true, noise);
+  ASSERT_TRUE(projected);
+  ASSERT_GT(recorder->mOutputStream.mLength, before);
+  const EventCount count = CountEventsFrom(recorder->mOutputStream, before);
+  EXPECT_TRUE(count.mParsed);
+  EXPECT_EQ(1, count.mProjections);
+
+  std::vector<uint8_t> expected = drawn;
+  ASSERT_TRUE(Project(expected, SurfaceFormat::R8G8B8A8));
+  RefPtr<DataSourceSurface> read = projected->GetDataSurface();
+  ASSERT_TRUE(read);
+  EXPECT_EQ(expected, BytesOf(read));
 }
