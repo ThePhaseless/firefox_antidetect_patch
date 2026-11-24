@@ -2,7 +2,7 @@
 
 Category: spoof
 Prefs: zoom.stealth.webgl.shader_output_language (declared by the core; read only in `dom/canvas/StealthWebGLShaderLanguage.cpp`)
-Test: `wrapper:tests/test_webgl_shader_language_e2e.py::test_get_translated_shader_source_is_in_the_declared_language_and_the_driver_still_compiles` (to write); `tests/test_webgl_draws_on_the_engine_s_own_gl_e2e.py::test_every_declared_extension_answers_as_on_windows` (existing, reads `WEBGL_debug_shaders`)
+Test: `wrapper:tests/test_webgl_shader_language_e2e.py::test_get_translated_shader_source_is_in_the_declared_language_and_the_driver_still_compiles`; `tests/test_webgl_draws_on_the_engine_s_own_gl_e2e.py::test_every_declared_extension_answers_as_on_windows` (existing, reads `WEBGL_debug_shaders`)
 
 ## What it does
 
