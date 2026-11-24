@@ -225,13 +225,17 @@ def group_no_fallback(doc, jobs, build, steps) -> list:
     command = " ".join(s.get("run", "") for s in node["steps"])
     out.append(("node: one job for the run's one node, which serves every leg that compiles on a node: no matrix, no leg to choose",
                 "strategy" not in node and node["name"] == "node" and "matrix." not in json.dumps(node)
-                and "latitude_node.py provision" in command and "--leg" not in command
+                and "latitude_node.py up" in command and "latitude_node.py prepare" in command and "--leg" not in command
                 and not any("LEG" in s.get("env", {}) for s in node["steps"])))
     out.append(("no fallback: a node job that fails fails the run: nothing swallows it, and the build needs it, so the matrix does not run at all",
                 "continue-on-error" not in node and "node" in build["needs"] and "if" not in build))
     out.append(("node: a rerun of failed jobs turns nothing on: it could not run on it",
                 node["if"] == "needs.plan.outputs.attempt == github.run_attempt && needs.plan.outputs.reuse_run_id == ''"))
-    out.append(("no fallback: the node job's steps always run", not any("if" in s for s in node["steps"])))
+    # The one condition a step of the node job has: the resolver and the cache's save run when the cache has no closure for this image. Nothing
+    # else is skipped, so no step of the node can be left out when something before it failed.
+    out.append(("no fallback: the node job's steps always run, but the two that make and keep the closure on a cache miss",
+                [s["name"] for s in node["steps"] if "if" in s] == ["Resolve the closure against the node's own image", "Keep the closure"]
+                and all(s["if"] == "steps.closure.outputs.cache-hit != 'true'" for s in node["steps"] if "if" in s)))
     source = (HERE / "latitude_node.py").read_text(encoding="utf-8")
     out.append(("no fallback: nor does the re-launch ask for one", "builder" not in source.replace("test_release_builder", "")))
     gate = jobs["gate"]
@@ -344,9 +348,10 @@ def group_secrets_and_labels(doc, jobs, build, steps) -> list:
                 clock and clock[0]["labels"] == ["latitude-5-1-linux-x86_64"]))
     out.append(("runner: a new attempt never matches an old runner, and two legs never share one",
                 latitude_node.leg_label(5, 1, "a") != latitude_node.leg_label(5, 2, "a") != latitude_node.leg_label(5, 2, "b")))
-    provision = jobs["node"]["steps"][-1]
-    out.append(("provision: its failure fails the step, with nothing behind a pipe to hide it", "|" not in provision.get("run", "")))
-    out.append(("provision: its token can read a run's state, which is how it tells a live run's node from a leftover",
+    prepare = jobs["node"]["steps"][-1]
+    out.append(("up and prepare: their failure fails the step, with nothing behind a pipe to hide it",
+                "|" not in prepare.get("run", "") and all("|" not in s.get("run", "") for s in jobs["node"]["steps"])))
+    out.append(("up and prepare: their token can read a run's state, which is how it tells a live run's node from a leftover",
                 jobs["node"]["permissions"].get("actions") == "read"))
     out.append(("no key travels: no job hands a node's access to another, no artifact of it, and the watch has nothing to open",
                 "node-access" not in WORKFLOW.read_text(encoding="utf-8") and not any("artifact" in s.get("uses", "") for n in ("node",) + WATCHES for s in jobs[n]["steps"])))

@@ -19,13 +19,17 @@ Each group runs on its own: an exception is that group's failure, not the file's
     from an empty environment, killing any other run's job at its first step (Linux),
     which the watch turns into a failed run;
   exposure: a node's address in no message, its deployment id in no output, and no
-    configuration on a connection not held to the host key the bootstrap made.
+    configuration on a connection not held to the host key the bootstrap made;
+  the closure of apt packages: resolved against the node's own image (up reads its dpkg database, the node job's resolver makes the files,
+    prepare sends them), the same key for the same image, the old fixed archive failing on the provider's newer image and the resolved one
+    installing on it, under a real apt (Linux).
 
     python3 scripts/ci/test_latitude_node.py
 """
 from __future__ import annotations
 
 import argparse
+import base64
 import contextlib
 import http.client
 import io
@@ -58,6 +62,16 @@ BOOTSTRAPPED = "== the user\nnode_bootstrap: host key: %s\nnode_bootstrap: ready
 START_L = "bash /usr/local/sbin/node_runner.sh 5 l"
 START_W = "bash /usr/local/sbin/node_runner.sh 5 w"
 PUT_RUNNER = "cat > /usr/local/sbin/node_runner.sh"
+# What `up` reads of the node: its dpkg database, through base64 (a real image's has about 600 stanzas; this one has the ones that matter here).
+STATUS_COMMAND = "base64 -w0 /var/lib/dpkg/status"
+NODE_STATUS = (
+    "Package: libsystemd0\nStatus: install ok installed\nPriority: required\nArchitecture: amd64\nVersion: 255.4-1ubuntu8.19\nDescription: systemd library\n\n"
+    "Package: libsystemd-shared\nStatus: install ok installed\nArchitecture: amd64\nVersion: 255.4-1ubuntu8.19\nDescription: systemd shared library\n\n"
+    "Package: systemd\nStatus: install ok installed\nArchitecture: amd64\nVersion: 255.4-1ubuntu8.19\n"
+    "Pre-Depends: libsystemd-shared (= 255.4-1ubuntu8.19)\nDescription: system and service manager\n\n"
+    "Package: systemd-sysv\nStatus: install ok installed\nArchitecture: amd64\nVersion: 255.4-1ubuntu8.19\n"
+    "Depends: systemd (= 255.4-1ubuntu8.19)\nDescription: system and service manager - SysV compatibility symlinks\n")
+STATUS_ANSWER = (0, base64.b64encode(NODE_STATUS.encode()).decode(), "")
 
 
 def listed(marks=t.NODE_MARK, status=t.RUNNING, run=5, attempt=1):
@@ -213,7 +227,7 @@ class FakeGitHub:
 
 class FakeSsh:
     def __init__(self, answers=None):
-        self.calls, self.answers = [], {"bash -s": (0, BOOTSTRAPPED, ""), **(answers or {})}
+        self.calls, self.answers = [], {"bash -s": (0, BOOTSTRAPPED, ""), STATUS_COMMAND: STATUS_ANSWER, **(answers or {})}
 
     def pin(self, host_key):
         self.calls.append(("pin", host_key))
@@ -252,17 +266,28 @@ def quiet(fn, *args, **kwargs):
         return fn(*args, **kwargs), sink.getvalue()
 
 
+def both_phases(latitude, github, make_ssh, clock, tmp, upstream=None):
+    """What release.yml's node job does, in one process: `up`, a closure of one index between (what the cache steps leave), then `prepare`. The
+    wall clock is the simulated one, so that the deadline the state file carries is the same in both."""
+    tmp = Path(tmp)
+    key = tmp / "node_key"
+    key.write_text("private", encoding="utf-8")
+    Path(str(key) + ".pub").write_text("ssh-ed25519 AAAA ci-node\n", encoding="utf-8")
+    closure = tmp / "node-debs"
+    closure.mkdir()
+    (closure / "Packages").write_text("", encoding="utf-8")
+    t.bring_up(latitude, github, 5, 1, make_ssh, lambda: key, tmp / "work", clock, clock.sleep, wall=clock)
+    t.prepare(latitude, github, 5, 1, make_ssh, tmp / "work", closure, clock, clock.sleep, upstream=upstream, wall=clock)
+
+
 def provisioned(api, gh, ssh):
-    """provision() of the run's node: (True or None, error text)."""
+    """up and prepare of the run's node: (True or None, error text)."""
     clock = Clock()
     latitude = t.Latitude(PROJECT, KEY, api, clock.sleep)
     github = t.GitHub("o/r", "TOKEN", "ADMIN", gh, clock.sleep)
     with tempfile.TemporaryDirectory() as tmp:
-        key = Path(tmp) / "node_key"
-        key.write_text("private", encoding="utf-8")
-        Path(str(key) + ".pub").write_text("ssh-ed25519 AAAA ci-node\n", encoding="utf-8")
         try:
-            quiet(t.provision, latitude, github, 5, 1, lambda host, port: ssh, lambda: key, clock, clock.sleep)
+            quiet(both_phases, latitude, github, lambda host, port: ssh, clock, tmp)
             return True, ""
         except t.NodeError as exc:
             return None, str(exc)
@@ -387,10 +412,10 @@ def group_turning_on():
     out.append(("path: refused, the node's connection stops there, and its address stays out of the error", "size the path" in said and "9.9.9.9" not in said))
     seen = []
     made = t.node_ssh(Path("work"), seen.append)("9.9.9.9", 22)
-    out.append(("path: every connection of provision goes through it", seen == ["9.9.9.9"] and isinstance(made, t.Ssh)))
+    out.append(("path: every connection of up and prepare goes through it", seen == ["9.9.9.9"] and isinstance(made, t.Ssh)))
     source = (HERE / "latitude_node.py").read_text(encoding="utf-8")
-    body = source[source.index("def run_provision"):source.index("def run_watch")]
-    out.append(("path: provision takes its connections from there", "node_ssh(work)" in body and "Ssh(" not in body))
+    body = source[source.index("def run_up"):source.index("def run_watch")]
+    out.append(("path: up and prepare take their connections from there", body.count("node_ssh(work)") == 2 and "Ssh(" not in body))
     out.append(("up: a node that never answers says why, with ssh's own words",
                 not got and "Permission denied (publickey)" in error and "ssh exited 255" in error))
     return out
@@ -459,21 +484,23 @@ def group_no_fallback():
     # The command line: exit 1, and nothing a job could read.
     for var in ("LATITUDE_API_KEY", "LATITUDE_PROJECT"):
         os.environ.pop(var, None)
-    sink = io.StringIO()
-    with contextlib.redirect_stdout(sink):
-        code, said = quiet(t.main, ["provision", "--run", "5", "--attempt", "1"])
-    out.append(("fail: the command exits 1 with an error for the run's page, naming the legs left with nowhere to run",
-                code == 1 and sink.getvalue() == "" and "::error::" in said and L in said and W in said))
-    try:
-        quiet(t.main, ["provision", "--run", "5", "--attempt", "1", "--leg", "linux-arm64"])
-        refused = False
-    except SystemExit as exc:
-        refused = exc.code != 0
+    with tempfile.TemporaryDirectory() as tmp:
+        for command in (["up", "--work", tmp + "/w"], ["prepare", "--work", tmp + "/w", "--debs", tmp + "/d"]):
+            sink = io.StringIO()
+            with contextlib.redirect_stdout(sink):
+                code, said = quiet(t.main, [command[0], "--run", "5", "--attempt", "1", *command[1:]])
+            out.append(("fail: `%s` exits 1 with an error for the run's page, naming the legs left with nowhere to run" % command[0],
+                        code == 1 and sink.getvalue() == "" and "::error::" in said and L in said and W in said))
+        try:
+            quiet(t.main, ["up", "--run", "5", "--attempt", "1", "--work", tmp + "/w", "--leg", "linux-arm64"])
+            refused = False
+        except SystemExit as exc:
+            refused = exc.code != 0
     out.append(("no fallback: the command takes no leg, so nothing can ask it for another (no linux-arm64 from firefox-56 on), and the node's legs are the two x86_64 ones",
                 refused and t.node_legs() == [L, W]))
     source = (HERE / "latitude_node.py").read_text(encoding="utf-8")
     out.append(("no fallback: nothing in the script names a builder or sends a leg to GitHub's runners",
-                "builder" not in source.replace("test_release_builder", "") and "provision_outputs" not in source and "GitHub's runners, nothing" not in source))
+                "builder" not in source.replace("test_release_builder", "") and "provision_outputs" not in source and "def provision(" not in source and "GitHub's runners, nothing" not in source))
     return out
 
 
@@ -689,10 +716,7 @@ def group_prefetch():
     latitude = t.Latitude(PROJECT, KEY, api, clock.sleep)
     github = t.GitHub("o/r", "TOKEN", "ADMIN", gh, clock.sleep)
     with tempfile.TemporaryDirectory() as tmp:
-        key = Path(tmp) / "node_key"
-        key.write_text("private", encoding="utf-8")
-        Path(str(key) + ".pub").write_text("ssh-ed25519 AAAA ci-node\n", encoding="utf-8")
-        quiet(t.provision, latitude, github, 5, 1, lambda host, port: ssh, lambda: key, clock, clock.sleep, upstream=upstream)
+        quiet(both_phases, latitude, github, lambda host, port: ssh, clock, tmp, upstream=upstream)
     sent = [(c, s) for c, s in ssh.calls if c == "bash -s" and s and b"mozilla.git" in s]
     order = [c for c, _ in ssh.calls if isinstance(c, str)]
     out.append(("prefetch: the node fetches the series' tag after node_bootstrap.sh and before node_runner.sh, once",
@@ -703,7 +727,7 @@ def group_prefetch():
     out.append(("prefetch: without the series' UPSTREAM.json nothing is fetched, and the node comes up as before",
                 got and not any(s and b"mozilla.git" in s for c, s in ssh.calls if c == "bash -s")))
     workflow_text = (HERE.parent.parent / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
-    out.append(("prefetch: the node job passes the series' UPSTREAM.json", "provision" in workflow_text and "--upstream .series/UPSTREAM.json" in workflow_text))
+    out.append(("prefetch: the node job passes the series' UPSTREAM.json", "latitude_node.py prepare" in workflow_text and "--upstream .series/UPSTREAM.json" in workflow_text))
     if not sys.platform.startswith("linux"):
         print("skip  prefetch: bash and git, Linux only")
         return out
@@ -737,29 +761,20 @@ def group_prefetch():
 def group_bootstrap():
     out = []
     bootstrap = (HERE / "node_bootstrap.sh").read_text(encoding="utf-8")
-    download = bootstrap.index('fetch "$NODE_DEPS_URL"')
-    out.append(("bootstrap: curl and CA certificates from the image's sources only when missing, before the archive's download (a fresh node had none)",
-                0 < bootstrap.index("if ! command -v curl") < bootstrap.index("ca-certificates curl") < download))
-    out.append(("bootstrap: apt's one source is the archive's, on disk; nothing names a mirror (the snapshot was down most of 2026-11-04)",
+    out.append(("bootstrap: apt's one source is the closure's index, on disk; nothing names a mirror (the snapshot was down most of 2026-11-04), and the image's own "
+                "sources are never asked",
                 'echo "deb [trusted=yes] file:$DEPS/debs ./" > /etc/apt/sources.list' in bootstrap
                 and "/etc/apt/sources.list.d/*.sources" in bootstrap and "ubuntu.com" not in bootstrap
-                and download < bootstrap.index("> /etc/apt/sources.list") < bootstrap.index('"${PACKAGES[@]}"')))
-    out.append(("bootstrap: the archive's packages go through apt_install, which keeps apt's whole answer for a failure, not through an "
+                and bootstrap.index("> /etc/apt/sources.list") < bootstrap.index('"${PACKAGES[@]}"')))
+    out.append(("bootstrap: the closure's packages go through apt_install, which keeps apt's whole answer for a failure, not through an "
                 "install whose output goes to /dev/null (runs 44137637832 and 44139666991 said only 'held broken packages')",
                 'apt_install "${PACKAGES[@]}"' in bootstrap and '"${PACKAGES[@]}" >/dev/null' not in bootstrap
                 and bootstrap.index("apt_install() {") < bootstrap.index('apt_install "${PACKAGES[@]}"')))
-    out.append(("bootstrap: glibc is pinned to the archive's versions, from the archive's own index, before the install, and a missing pin "
-                "stops it (run 44157672212: the renewed image had libc6 8.12, the archive's libc6-dev and libc6-i386 ask for 8.9)",
-                "GLIBC_PREFS=/etc/apt/preferences.d/" in bootstrap
-                and 'glibc_pins "$DEPS/debs/Packages" > "$GLIBC_PREFS"' in bootstrap
-                and '[ -s "$GLIBC_PREFS" ] || die' in bootstrap
-                and bootstrap.index("> /etc/apt/sources.list") < bootstrap.index('glibc_pins "$DEPS/debs/Packages"')
-                < bootstrap.index('apt_install "${PACKAGES[@]}"')))
     out.append(("bootstrap: a failed index stops it, by name",
-                bootstrap.count("apt-get update -qq -o APT::Update::Error-Mode=any") == 2 and "apt-get update -qq\n" not in bootstrap))
+                bootstrap.count("apt-get update -qq -o APT::Update::Error-Mode=any") == 1 and "apt-get update -qq\n" not in bootstrap))
     out.append(("bootstrap: every download by version and sha256, nothing else fetched, the runner's version pinned",
-                all(v in bootstrap for v in ("RUNNER_VERSION=", "RUNNER_SHA256=", "NODE_SHA256=", "RUSTUP_SHA256=", "NODE_DEPS_SHA256="))
-                and bootstrap.count("fetch \"https://") == 3 and bootstrap.count('fetch "$NODE_DEPS_URL" "$NODE_DEPS_SHA256"') == 1
+                all(v in bootstrap for v in ("RUNNER_VERSION=", "RUNNER_SHA256=", "NODE_SHA256=", "RUSTUP_SHA256=", "GLSLANG_SHA256="))
+                and bootstrap.count("fetch \"https://") == 3 and bootstrap.count('fetch "$GLSLANG_URL" "$GLSLANG_SHA256"') == 1
                 and "cmake -S" not in bootstrap and "KhronosGroup" not in bootstrap))
     as_runner = next(l for l in bootstrap.splitlines() if l.startswith("as_runner()"))
     out.append(("bootstrap: its checks see the PATH the job will have, where glslang 14 comes before Ubuntu's 11.8",
@@ -1265,37 +1280,54 @@ def runner_case(leaks) -> dict:
 
 
 def group_node_deps():
-    """The node's packages come from one archive of ours, by name and sha256: Ubuntu's
-    snapshot service, where they came from at every start, was down for most of
-    2026-11-04 (503, 502) and three candidates could not prepare their node."""
+    """The node's packages come from a closure resolved against the node's own image, its glslang from one fixed asset, everything else by
+    version and sha256. Ubuntu's snapshot service, where they came from at every start, was down for most of 2026-11-04 (503, 502); a closure
+    fixed once failed on a provider image newer than it."""
     out = []
     bootstrap = (HERE / "node_bootstrap.sh").read_text(encoding="utf-8").replace("\r\n", "\n")
-    build = (HERE / "node_deps_build.sh").read_text(encoding="utf-8").replace("\r\n", "\n")
-    name = re.search(r"^NODE_DEPS=(node-deps-\d{8}-[0-9a-f]{12})$", bootstrap, re.M)
-    sha = re.search(r"^NODE_DEPS_SHA256=([0-9a-f]{64})$", bootstrap, re.M)
-    out.append(("node deps: the archive is named and pinned by sha256, and its URL is this repository's release asset, through the API",
-                bool(name and sha) and re.search(r"^NODE_DEPS_ASSET=[0-9]+$", bootstrap, re.M) is not None
-                and "https://api.github.com/repos/oss-invisible/firefox_antidetect_patch/releases/assets/$NODE_DEPS_ASSET" in bootstrap))
+    resolver = (HERE / t.RESOLVER).read_text(encoding="utf-8").replace("\r\n", "\n")
+    out.append(("node deps: the old archive and its builder are gone, and nothing names them",
+                not (HERE / "node_deps_build.sh").exists() and "NODE_DEPS" not in bootstrap and "node_deps_build" not in bootstrap and "node-deps-2" not in bootstrap))
+    asset = re.search(r"^GLSLANG_ASSET=([0-9]+)$", bootstrap, re.M)
+    sha = re.search(r"^GLSLANG_SHA256=([0-9a-f]{64})$", bootstrap, re.M)
+    name = re.search(r"^GLSLANG=(glslang-14\.0\.0-([0-9a-f]{12}))$", bootstrap, re.M)
+    out.append(("node deps: glslang is one fixed release asset of this repository, named and pinned by sha256, its URL the API's by asset id and the "
+                "direct address second",
+                bool(asset and sha and name) and asset.group(1) == "787817153" and sha.group(1).startswith(name.group(2))
+                and sha.group(1) == "5e10b724aba0426efa763694675e1d4a39bab1fe4a99c9d1f2b17d0571712cbf" and name.group(1) == "glslang-14.0.0-5e10b724aba0"
+                and "https://api.github.com/repos/oss-invisible/firefox_antidetect_patch/releases/assets/$GLSLANG_ASSET" in bootstrap
+                and "https://github.com/oss-invisible/firefox_antidetect_patch/releases/download/$GLSLANG/$GLSLANG.tar" in bootstrap
+                and "GLSLANG_VERSION=14.0.0" in bootstrap))
     fetch = bootstrap.split("fetch() {", 1)[1].split(chr(10) + "}", 1)[0]
     out.append(("node deps: every GitHub release file comes through the API by asset id first, asked for its bytes, and the direct address second, in rounds (2026-11-08: releases/download answered 504 for hours, the API now and then, two candidates lost their node)",
                 re.search(r"^RUNNER_ASSET=[0-9]+$", bootstrap, re.M) is not None
                 and 'fetch "https://api.github.com/repos/actions/runner/releases/assets/$RUNNER_ASSET"' in bootstrap
-                and 'fetch "$NODE_DEPS_URL" "$NODE_DEPS_SHA256" /tmp/node-deps.tar "$NODE_DEPS_WEB_URL"' in bootstrap
+                and 'fetch "$GLSLANG_URL" "$GLSLANG_SHA256" /tmp/glslang.tar "$GLSLANG_WEB_URL"' in bootstrap
                 and bootstrap.count("releases/download") == 2
                 and '-H "Accept: application/octet-stream"' in fetch and 'for url in "$1" ${4:+"$4"}' in fetch
                 and "for round in 1 2 3" in fetch and fetch.index("sha256sum -c") < fetch.index("return 0")))
-    out.append(("node deps: the builder names it as the bootstrap reads it, a plain tar a fresh node can open",
-                'NAME="node-deps-$(date -u +%Y%m%d)-$HASH"' in build and '-cf "$OUT/$NAME.tar"' in build and "zstd" not in build))
-    out.append(("node deps: glslang comes built in the archive, at the version and from the source the bootstrap pins",
-                'cp -a "$DEPS/glslang-root/usr/local/." /usr/local/' in bootstrap
-                and "GLSLANG_VERSION=\"$(value GLSLANG_VERSION)\"" in build and "GLSLANG_SHA256=\"$(value GLSLANG_SHA256)\"" in build
-                and "does not match its sha256" in build))
+    out.append(("node deps: glslang is extracted from the asset into /usr/local, and the bootstrap builds nothing",
+                'cp -a "$DEPS/glslang/glslang-root/usr/local/." /usr/local/' in bootstrap and "cmake -S" not in bootstrap and "KhronosGroup" not in bootstrap))
+    out.append(("node deps: the resolver's sources are Ubuntu's archive for noble, its updates and its security pocket, with every component, the archive "
+                "overridable; and it reads the one list from the bootstrap",
+                "for pocket in noble noble-updates noble-security" in resolver and "main restricted universe multiverse" in resolver
+                and "NODE_DEPS_ARCHIVE:-http://archive.ubuntu.com/ubuntu" in resolver and 'BOOT="${NODE_DEPS_BOOT:-$HERE/node_bootstrap.sh}"' in resolver
+                and "mapfile -t PACKAGES" in resolver))
+    out.append(("node deps: the resolver runs apt on its own directories with the node's status as the installed state, no lock, no root, "
+                "and logs the MB and seconds of the download",
+                all(o in resolver for o in ('-o Debug::NoLocking=1', '-o Dir::State::status="$STATUS"', '-o Dir::State::lists="$WORK/lists"',
+                                            '-o Dir::Cache::archives="$DEBS"', '-o Dir::Etc::sourcelist="$WORK/sources.list"',
+                                            '-o Dir::Etc::sourceparts="$WORK/sources.list.d"', "install -y --download-only --no-install-recommends"))
+                and "sudo" not in resolver and "MB, downloaded in" in resolver and "dpkg-scanpackages" in resolver and "MANIFEST" in resolver))
+    out.append(("node deps: the resolver's index and MANIFEST are written after the download, and the download's refusal is shown whole",
+                resolver.index("--download-only") < resolver.index("dpkg-scanpackages") < resolver.index('> "$DEBS/MANIFEST"')
+                and 'cat "$WORK/install.log" >&2' in resolver))
     if not sys.platform.startswith("linux"):
         print("skip  node deps: bash, Linux only")
         return out
-    # The builder reads the bootstrap's list as bash reads it: the same packages, the
+    # The resolver reads the bootstrap's list as bash reads it: the same packages, the
     # comments out, nothing more and nothing less.
-    read = next(line for line in build.splitlines() if line.startswith("mapfile -t PACKAGES"))
+    read = next(line for line in resolver.splitlines() if line.startswith("mapfile -t PACKAGES"))
     script = "\n".join([
         'BOOT="%s"' % (HERE / "node_bootstrap.sh"),
         'source <(sed -n "/^PACKAGES=(/,/^)/p" "$BOOT")',
@@ -1304,14 +1336,14 @@ def group_node_deps():
         '[ "${WANT[*]}" = "${PACKAGES[*]}" ] && echo "same ${#PACKAGES[@]}"'])
     done = subprocess.run(["bash", "-c", script], capture_output=True, text=True, timeout=30)
     said = done.stdout.split()
-    out.append(("node deps: the builder's list is the bootstrap's (%s)" % (done.stdout.strip() or done.stderr.strip()[-200:]),
-                len(said) == 2 and said[0] == "same" and int(said[1]) > 30))
-    # The bootstrap's own fetch, against an archive that is not the pinned one: it stops, by name.
+    out.append(("node deps: the resolver's list is the bootstrap's (%s)" % (done.stdout.strip() or done.stderr.strip()[-200:]),
+                len(said) == 2 and said[0] == "same" and int(said[1]) > 30 and len(t.bootstrap_packages()) == int(said[1])))
+    # The bootstrap's own fetch, against a file that is not the pinned one: it stops, by name.
     begin = bootstrap.index("fetch() {")
     fetch = bootstrap[begin:bootstrap.index("\n}\n", begin) + 3]
     with tempfile.TemporaryDirectory() as tmp:
-        bad = Path(tmp) / "node-deps.tar"
-        bad.write_bytes(b"not the archive")
+        bad = Path(tmp) / "glslang.tar"
+        bad.write_bytes(b"not the asset")
         script = "\n".join([
             "set -euo pipefail",
             "FETCH_PAUSE=0",
@@ -1319,14 +1351,14 @@ def group_node_deps():
             fetch,
             'fetch "file://%s" "%s" "%s/got.tar"' % (bad, "0" * 64, tmp)])
         done = subprocess.run(["bash", "-c", script], capture_output=True, text=True, timeout=30)
-    out.append(("node deps: an archive that is not the pinned one stops the bootstrap, by name",
+    out.append(("node deps: a file that is not the pinned one stops the bootstrap, by name",
                 done.returncode != 0 and "does not match its sha256" in done.stderr
                 and done.stderr.count("(round ") == 3))
     # The first address down, the second serving the file: it arrives, after one failure.
     with tempfile.TemporaryDirectory() as tmp:
-        good = Path(tmp) / "node-deps.tar"
-        good.write_bytes(b"the archive")
-        digest = hashlib.sha256(b"the archive").hexdigest()
+        good = Path(tmp) / "glslang.tar"
+        good.write_bytes(b"the asset")
+        digest = hashlib.sha256(b"the asset").hexdigest()
         script = "\n".join([
             "set -euo pipefail",
             "FETCH_PAUSE=0",
@@ -1336,7 +1368,27 @@ def group_node_deps():
             'cat "%s/got.tar"' % tmp])
         done = subprocess.run(["bash", "-c", script], capture_output=True, text=True, timeout=30)
     out.append(("node deps: the first address down, the second serving the file: the bootstrap goes on with it",
-                done.returncode == 0 and done.stdout == "the archive" and done.stderr.count("(round 1)") == 1))
+                done.returncode == 0 and done.stdout == "the asset" and done.stderr.count("(round 1)") == 1))
+    # The glslang section as bash runs it, over a tar of the asset's shape: fetched by its pin, extracted, copied into /usr/local (a temporary one).
+    begin = bootstrap.index('echo "== glslang')
+    section = bootstrap[begin:bootstrap.index('echo "== actions-runner')]
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp = Path(tmp)
+        root = tmp / "asset" / "glslang-root" / "usr" / "local" / "bin"
+        root.mkdir(parents=True)
+        (root / "glslangValidator").write_text("#!/bin/sh\necho Glslang Version: 11:14.0.0\n", newline="\n")
+        subprocess.run(["tar", "-cf", str(tmp / "asset.tar"), "-C", str(tmp / "asset"), "glslang-root"], check=True)
+        digest = hashlib.sha256((tmp / "asset.tar").read_bytes()).hexdigest()
+        script = "\n".join([
+            "set -euo pipefail", "FETCH_PAUSE=0", 'die() { echo "node_bootstrap: ERROR: $*" >&2; exit 1; }', fetch,
+            'GLSLANG_VERSION=14.0.0', 'GLSLANG_SHA256=%s' % digest, 'GLSLANG_URL=file://%s' % (tmp / "asset.tar").as_posix(),
+            'GLSLANG_WEB_URL=file://%s/missing' % tmp.as_posix(), "DEPS=%s" % shlex.quote((tmp / "deps").as_posix()),
+            section.replace("/tmp/glslang.tar", (tmp / "got.tar").as_posix()).replace('/usr/local/\n', "%s/\n" % (tmp / "local").as_posix())])
+        (tmp / "local").mkdir()
+        done = subprocess.run(["bash", "-c", script], capture_output=True, text=True, timeout=30)
+        arrived = (tmp / "local" / "bin" / "glslangValidator").is_file()
+    out.append(("node deps: the glslang section fetches the asset by its pin and puts its usr/local into /usr/local (%s)" % (done.stderr.strip()[-200:] or done.returncode),
+                done.returncode == 0 and arrived))
     # The runner's call as bash reads it: four words, the direct address last (a literal
     # backslash-n once made the fourth word "n" and the direct address a fifth, never tried).
     begin = bootstrap.index('  fetch "https://api.github.com/repos/actions/runner/')
@@ -1352,16 +1404,16 @@ def group_node_deps():
     out.append(("node deps: the runner's call gives fetch four words, the direct address the fourth (%s)" % words,
                 words[:1] == ["4"] and done.stdout.endswith("https://github.com/actions/runner/releases/download/v9/actions-runner-linux-x64-9.tar.gz")))
     # apt_install as bash runs it, with apt, dpkg and the rest faked: a refusal of apt says which package, which dependency, which version
-    # is installed against the archive's, and exits with apt's code; an install that works says nothing.
+    # is installed against the closure's, and exits with apt's code; an install that works says nothing.
     begin = bootstrap.index("apt_install() {")
     apt_install = bootstrap[begin:bootstrap.index("\n}\n", begin) + 3]
     refusal = ["Reading package lists...", "Some packages could not be installed.", "The following packages have unmet dependencies:",
-               " libc6-dev : Depends: libc6 (= 2.39-0ubuntu8.3) but 2.39-0ubuntu8.6 is to be installed",
+               " libpam-systemd : Depends: systemd (= 255.4-1ubuntu8.18) but 255.4-1ubuntu8.19 is to be installed",
                "E: Unable to correct problems, you have held broken packages."]
     fakes = [
         "apt-get() {",
         '  echo "$*" >> "$APT_CALLS"',
-        '  case " $* " in *" -s "*) echo "Investigating (0) libc6-dev:amd64 < none -> 2.39-0ubuntu8.3 @un puN Ib >"; return 100;; esac',
+        '  case " $* " in *" -s "*) echo "Investigating (0) libpam-systemd:amd64 < none -> 255.4-1ubuntu8.18 @un puN Ib >"; return 100;; esac',
         '  if [ "$APT_ANSWER" = 0 ]; then return 0; fi',
         "  printf '%s\\n' " + " ".join(shlex.quote(line) for line in refusal) + "; return 100",
         "}",
@@ -1378,43 +1430,351 @@ def group_node_deps():
             said[answer] = subprocess.run(["bash", "-c", script], capture_output=True, text=True, timeout=30)
             calls[answer] = log.read_text().splitlines() if log.exists() else []
     refused, fine = said["100"], said["0"]
-    out.append(("node deps: the install of the archive may go down to the pinned versions (--allow-downgrades): %s" % calls["0"],
-                len(calls["0"]) == 1 and calls["0"][0].startswith("install ") and "--allow-downgrades" in calls["0"][0].split()
-                and calls["0"][0].endswith(" sudo git")))
-    # glibc_pins on an index as dpkg-scanpackages writes it: every package of the archive whose source is glibc, at its version (an
-    # epoch, a Source with its own version, a package that is its own source), and nothing else (systemd, a package with an epoch).
-    begin = bootstrap.index("glibc_pins() {")
-    glibc_pins = bootstrap[begin:bootstrap.index("\n}\n", begin) + 3]
-    index = "\n\n".join([
-        "Package: bison\nVersion: 2:3.8.2+dfsg-1ubuntu0.24.04.1\nArchitecture: amd64\nFilename: ./bison_2%3a3.8.2+dfsg-1ubuntu0.24.04.1_amd64.deb",
-        "Package: libc-dev-bin\nSource: glibc (2.39-0ubuntu8.9)\nVersion: 1:2.39-0ubuntu8.9\nArchitecture: amd64",
-        "Package: libc6\nSource: glibc\nVersion: 2.39-0ubuntu8.9\nArchitecture: amd64\nDepends: libgcc-s1",
-        "Package: libc6-dev\nSource: glibc\nVersion: 2.39-0ubuntu8.9\nArchitecture: amd64\nDepends: libc6 (= 2.39-0ubuntu8.9)",
-        "Package: libsystemd0\nSource: systemd\nVersion: 255.4-1ubuntu8.18\nArchitecture: amd64",
-        "Package: glibc\nVersion: 2.39-0ubuntu8.9\nArchitecture: all",
-        "Package: glibc-tools-not\nSource: glibcx\nVersion: 1.0\nArchitecture: amd64",
-        "Package: systemd\nVersion: 255.4-1ubuntu8.18\nArchitecture: amd64\nDepends: libsystemd0 (= 255.4-1ubuntu8.18)"]) + "\n"
-    want = "".join("Package: %s\nPin: version %s\nPin-Priority: 1001\n\n" % pv for pv in [
-        ("libc-dev-bin", "1:2.39-0ubuntu8.9"), ("libc6", "2.39-0ubuntu8.9"), ("libc6-dev", "2.39-0ubuntu8.9"), ("glibc", "2.39-0ubuntu8.9")])
-    with tempfile.TemporaryDirectory() as tmp:
-        packages = Path(tmp) / "Packages"
-        packages.write_bytes(index.encode())
-        pinned = subprocess.run(["bash", "-c", "set -euo pipefail\n%s\nglibc_pins %s" % (glibc_pins, shlex.quote(packages.as_posix()))],
-                                capture_output=True, text=True, timeout=30)
-    out.append(("node deps: the pins are every package of the archive whose source is glibc, at the archive's version with its epoch, "
-                "and nothing else, not systemd (%r)" % pinned.stdout[:400],
-                pinned.returncode == 0 and pinned.stdout == want))
-    out.append(("node deps: apt refuses the archive: the bootstrap says the unmet dependency, the solver's account, the version of each "
-                "package apt named installed and in the archive, and exits with apt's code, its E: line last (%d: %s)"
+    out.append(("node deps: the install never goes down: the closure holds the versions of this image's day, so no --allow-downgrades and no pin (%s)" % calls["0"],
+                len(calls["0"]) == 1 and calls["0"][0].startswith("install ") and "--allow-downgrades" not in calls["0"][0].split()
+                and calls["0"][0].endswith(" sudo git") and all("--allow-downgrades" not in c for c in calls["100"])))
+    out.append(("node deps: apt refuses the closure: the bootstrap says the unmet dependency, the solver's account, the version of each "
+                "package apt named installed and in the closure, and exits with apt's code, its E: line last (%d: %s)"
                 % (refused.returncode, refused.stderr.strip()[-300:]),
                 refused.returncode == 100 and "went-on" not in refused.stdout
-                and " libc6-dev : Depends: libc6 (= 2.39-0ubuntu8.3) but 2.39-0ubuntu8.6 is to be installed" in refused.stderr
-                and "Investigating (0) libc6-dev" in refused.stderr
-                and re.search(r"^dpkg-query -W .* libc6 libc6-dev$", refused.stderr, re.M) is not None
-                and re.search(r"^apt-cache policy libc6 libc6-dev$", refused.stderr, re.M) is not None
+                and " libpam-systemd : Depends: systemd (= 255.4-1ubuntu8.18) but 255.4-1ubuntu8.19 is to be installed" in refused.stderr
+                and "Investigating (0) libpam-systemd" in refused.stderr
+                and re.search(r"^dpkg-query -W .* libpam-systemd systemd$", refused.stderr, re.M) is not None
+                and re.search(r"^apt-cache policy libpam-systemd systemd$", refused.stderr, re.M) is not None
                 and refused.stderr.rstrip().endswith("E: Unable to correct problems, you have held broken packages.")))
     out.append(("node deps: an install that works says nothing and the bootstrap goes on (%d)" % fine.returncode,
                 fine.returncode == 0 and fine.stdout == "went-on\n" and fine.stderr == ""))
+    return out
+
+
+def group_node_bootstrap_closure():
+    """node_bootstrap.sh takes what the closure holds: the index latitude_node.py prepare sent, and nothing from the network for apt."""
+    out = []
+    bootstrap = (HERE / "node_bootstrap.sh").read_text(encoding="utf-8").replace("\r\n", "\n")
+    install = bootstrap.index('apt_install "${PACKAGES[@]}"')
+    out.append(("closure: the bootstrap stops, by name, when the closure is not on the node, before it touches apt's sources",
+                '[ -f "$DEPS/debs/Packages" ] || die "no closure of packages in $DEPS/debs' in bootstrap
+                and bootstrap.index('[ -f "$DEPS/debs/Packages" ] || die') < bootstrap.index("> /etc/apt/sources.list") < install))
+    out.append(("closure: nothing is pinned and nothing goes down: no preferences file, no glibc pins, no --allow-downgrades (the closure was resolved against "
+                "this image: run 44157672212's libc6 and the systemd of the provider's newer image both meet their exact-version edges by themselves)",
+                "preferences" not in bootstrap and "glibc_pins" not in bootstrap and "GLIBC_PREFS" not in bootstrap and "--allow-downgrades" not in bootstrap))
+    out.append(("closure: the bootstrap removes nothing of the closure, so that a bootstrap asked again on the same node finds it (no rm -rf of /opt/node-deps "
+                "or of its debs)",
+                "rm -rf \"$DEPS\"" not in bootstrap and 'rm -rf "$DEPS/debs"' not in bootstrap and "rm -rf /opt/node-deps" not in bootstrap
+                and t.NODE_DEBS == "/opt/node-deps/debs" and "DEPS=/opt/node-deps\n" in bootstrap))
+    out.append(("closure: the bootstrap asks the network for no apt package: the one source is the closure's index on disk",
+                bootstrap.count("deb [") == 1 and 'echo "deb [trusted=yes] file:$DEPS/debs ./" > /etc/apt/sources.list' in bootstrap and "ubuntu.com" not in bootstrap
+                and "if ! command -v curl" not in bootstrap and bootstrap.count("apt-get update -qq -o APT::Update::Error-Mode=any") == 1))
+    return out
+
+
+def group_closure():
+    """up reads the node's own dpkg database, names the closure to resolve against it and keeps what prepare needs; prepare sends the closure
+    to the node. Any failure in either: the node off."""
+    out = []
+    packages = t.bootstrap_packages()
+    out.append(("closure: the list is the bootstrap's PACKAGES, comments dropped",
+                len(packages) > 30 and "sudo" in packages and "libgtk-3-0t64" in packages and not any(p.startswith("#") or p in "()" for p in packages)))
+    status = NODE_STATUS.encode()
+    key = t.closure_key(status)
+    shuffled = ("\n\n".join(reversed(NODE_STATUS.strip().split("\n\n"))) + "\n").encode()
+    described = NODE_STATUS.replace("systemd library", "another words").replace("Priority: required\n", "Priority: required\nInstalled-Size: 1234\n").encode()
+    newer = NODE_STATUS.replace("255.4-1ubuntu8.19", "255.4-1ubuntu8.20").encode()
+    removed = NODE_STATUS.replace("install ok installed", "deinstall ok config-files", 1).encode()
+    out.append(("closure: its key is the same for the same image state, whatever the order of the stanzas, the descriptions and the sizes",
+                len(key) == 64 and key == t.closure_key(shuffled) == t.closure_key(described)))
+    out.append(("closure: another version installed, or another status of a package, is another key", len({key, t.closure_key(newer), t.closure_key(removed)}) == 3))
+    real_packages, real_bytes = t.bootstrap_packages, t.script_bytes
+    try:
+        t.bootstrap_packages = lambda: list(reversed(packages))
+        reordered = t.closure_key(status)
+        t.bootstrap_packages = lambda: packages + ["one-more"]
+        more = t.closure_key(status)
+        t.bootstrap_packages = real_packages
+        t.script_bytes = lambda name: real_bytes(name) + (b"# changed\n" if name == t.RESOLVER else b"")
+        changed = t.closure_key(status)
+    finally:
+        t.bootstrap_packages, t.script_bytes = real_packages, real_bytes
+    out.append(("closure: the order of the list changes nothing, another list or another resolver is another key", reordered == key and len({key, more, changed}) == 3))
+    import tarfile
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp = Path(tmp)
+        (tmp / "a_1_all.deb").write_bytes(b"deb-a")
+        (tmp / "Packages").write_text("Package: a\n", encoding="utf-8")
+        (tmp / "partial").mkdir()
+        with tarfile.open(fileobj=io.BytesIO(t.closure_tar(tmp))) as tar:
+            members = {m.name: (m.uid, m.gid, m.uname, m.mode) for m in tar.getmembers()}
+            body = tar.extractfile("a_1_all.deb").read()
+        out.append(("closure: its tar holds the files flat and owned by root, and no directory",
+                    sorted(members) == ["Packages", "a_1_all.deb"] and set(members.values()) == {(0, 0, "root", 0o644)} and body == b"deb-a"))
+        send = "rm -rf /opt/node-deps && mkdir -p /opt/node-deps/debs && tar -xf - -C /opt/node-deps/debs"
+        clock = Clock()
+        ssh = FakeSsh()
+        said = quiet(t.send_closure, ssh, tmp, clock, clock() + 600)[1]
+        sent = ssh.calls[-1]
+        out.append(("closure: it goes to the node down ssh's stdin as a tar, into the directory the bootstrap installs from, with its MB and seconds in the log",
+                    sent[0] == send and t.closure_tar(tmp) == sent[1] and "the closure on the node:" in said and " MB in " in said))
+        failed = FakeSsh({send: (2, "", "tar: short read")})
+        try:
+            quiet(t.send_closure, failed, tmp, clock, None)
+            failure = ""
+        except t.NodeError as exc:
+            failure = str(exc)
+        out.append(("closure: a tar the node could not read is an error naming it", "tar: short read" in failure and "closure" in failure))
+        (tmp / "Packages").unlink()
+        try:
+            quiet(t.send_closure, FakeSsh(), tmp, clock, None)
+            missing = ""
+        except t.NodeError as exc:
+            missing = str(exc)
+        out.append(("closure: a directory without its index is not sent: the step before did not leave one", "no closure of packages" in missing))
+    # up and prepare, one after the other, as release.yml's steps run them.
+    api, gh, ssh = FakeLatitude(), FakeGitHub(), FakeSsh()
+    got, error = provisioned(api, gh, ssh)
+    commands = [c for c, _ in ssh.calls if isinstance(c, str)]
+    out.append(("closure: up reads the node's package state, prepare sends the closure, and only then does the bootstrap run, before the runners",
+                got and commands.index(STATUS_COMMAND) < commands.index(send) < commands.index("bash -s") < commands.index(PUT_RUNNER)
+                and commands.count(STATUS_COMMAND) == 1 and commands.count(send) == 1))
+    clock = Clock()
+    api, gh, ssh = FakeLatitude(), FakeGitHub(), FakeSsh()
+    latitude = t.Latitude(PROJECT, KEY, api, clock.sleep)
+    github = t.GitHub("o/r", "TOKEN", "ADMIN", gh, clock.sleep)
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp = Path(tmp)
+        key_file = tmp / "node_key"
+        key_file.write_text("private", encoding="utf-8")
+        Path(str(key_file) + ".pub").write_text("ssh-ed25519 AAAA ci-node\n", encoding="utf-8")
+        work = tmp / "work"
+        found, said = quiet(t.bring_up, latitude, github, 5, 1, lambda host, port: ssh, lambda: key_file, work, clock, clock.sleep, wall=clock)
+        state = json.loads((work / t.STATE_FILE).read_text(encoding="utf-8"))
+        kept = (work / t.STATUS_FILE).read_bytes()
+        out.append(("up: gives the key of the closure for the image it read, and keeps that image's package state, the node's id and the deadline "
+                    "(a time of the wall clock, for the steps after it) for prepare; the node stays on",
+                    found == t.closure_key(status) and kept == status and state == {"node_id": "dpl_x", "deadline_at": t.PROVISION_DEADLINE_S} and api.deleted == []
+                    and found in said and "4 packages" in said))
+        # The steps between spend from the same deadline: a prepare past it fails by itself, deletes the node, and runs nothing on it.
+        closure = tmp / "node-debs"
+        closure.mkdir()
+        (closure / "Packages").write_text("", encoding="utf-8")
+        clock.now += t.PROVISION_DEADLINE_S + 1
+        try:
+            quiet(t.prepare, latitude, github, 5, 1, lambda host, port: ssh, work, closure, clock, clock.sleep, wall=clock)
+            late = ""
+        except t.NodeError as exc:
+            late = str(exc)
+        out.append(("prepare: what the steps between up and prepare spent counts against the one deadline: past it, an error, the node deleted, "
+                    "nothing run on it", "within 2400 s" in late and api.deleted == ["dpl_x"] and "bash -s" not in [c for c, _ in ssh.calls]))
+        api.nodes = listed()
+        try:
+            quiet(t.prepare, latitude, github, 5, 1, lambda host, port: ssh, tmp / "elsewhere", closure, clock, clock.sleep, wall=clock)
+            never = ""
+        except t.NodeError as exc:
+            never = str(exc)
+        out.append(("prepare: with no up before it (no state), an error saying so, and the run's node deleted, whatever is listed under its name",
+                    "no node of this run was brought up" in never and api.deleted == ["dpl_x", "dpl_x"]))
+    for label, answer in (("a package state ssh could not read", (1, "", "base64: /var/lib/dpkg/status: No such file")),
+                          ("a package state that is not base64", (0, "not base64 at all!", "")),
+                          ("a node whose database holds no package", (0, "", ""))):
+        api, gh = FakeLatitude(), FakeGitHub()
+        got, error = provisioned(api, gh, FakeSsh({STATUS_COMMAND: answer}))
+        out.append(("up: %s: an error, the node deleted, no runner registered" % label,
+                    got is None and "package state" in error and api.deleted == ["dpl_x"] and gh.jits == []))
+    api, gh = FakeLatitude(), FakeGitHub()
+    ssh = FakeSsh({"rm -rf /opt/node-deps && mkdir -p /opt/node-deps/debs && tar -xf - -C /opt/node-deps/debs": (2, "", "tar: short read")})
+    got, error = provisioned(api, gh, ssh)
+    out.append(("prepare: a closure the node could not take: an error, the node deleted, the bootstrap never run",
+                got is None and "tar: short read" in error and api.deleted == ["dpl_x"] and "bash -s" not in [c for c, _ in ssh.calls] and gh.jits == []))
+    return out
+
+
+def group_node_job():
+    """release.yml's node job: up, the closure from the cache or resolved on the runner and kept, prepare, in that order."""
+    out = []
+    doc = workflow()
+    node = doc["jobs"]["node"]
+    steps = node["steps"]
+    cache = [s for s in steps if str(s.get("uses", "")).startswith("actions/cache/")]
+    restore = next(s for s in steps if s.get("id") == "closure")
+    save = next(s for s in steps if str(s.get("uses", "")).startswith("actions/cache/save"))
+    resolve = next(s for s in steps if "node_deps_resolve.sh" in s.get("run", ""))
+    up = next(s for s in steps if s.get("id") == "up")
+    elsewhere = {s["uses"] for name, job in doc["jobs"].items() if name != "node" for s in job.get("steps", []) if str(s.get("uses", "")).startswith("actions/cache/")}
+    out.append(("node job: up, then the cache's restore, the resolver, the cache's save, then prepare last",
+                [steps.index(s) for s in (up, restore, resolve, save)] == [1, 2, 3, 4] and "latitude_node.py up" in up["run"]
+                and "latitude_node.py prepare" in steps[-1]["run"] and len(steps) == 6))
+    out.append(("node job: the cache actions are pinned by sha, the same as the other jobs' of this file",
+                restore["uses"].startswith("actions/cache/restore@") and save["uses"].startswith("actions/cache/save@")
+                and all(re.match(r"^actions/cache/(restore|save)@[0-9a-f]{40}$", s["uses"]) for s in cache) and {s["uses"] for s in cache} <= elsewhere))
+    out.append(("node job: restore and save take the same key, which is the one up gives, and the same directory the resolver fills and prepare sends",
+                restore["with"]["key"] == save["with"]["key"] == "node-debs-${{ steps.up.outputs.key }}" and restore["with"]["path"] == save["with"]["path"] == "${{ runner.temp }}/node-debs"
+                and '"$RUNNER_TEMP/node-debs"' in resolve["run"] and '--debs "$RUNNER_TEMP/node-debs"' in steps[-1]["run"]))
+    out.append(("node job: the resolver and the save run on a miss and on nothing else, and no other step of the job has a condition",
+                resolve["if"] == save["if"] == "steps.closure.outputs.cache-hit != 'true'" and [s for s in steps if "if" in s] == [resolve, save]))
+    out.append(("node job: up and prepare name the same work directory, and the resolver reads the status file up leaves there",
+                '--work "$RUNNER_TEMP/build-node"' in up["run"] and '--work "$RUNNER_TEMP/build-node"' in steps[-1]["run"]
+                and '"$RUNNER_TEMP/build-node/%s"' % t.STATUS_FILE in resolve["run"]))
+    out.append(("node job: the resolver has no secret and no token, has its own time limit, and all of it fits in the job's",
+                "env" not in resolve and "secrets" not in json.dumps(resolve)
+                and resolve["timeout-minutes"] * 60 < t.PROVISION_DEADLINE_S <= node["timeout-minutes"] * 60 - 5 * 60))
+    return out
+
+
+def group_node_deps_apt():
+    """The closure against a real apt: the resolver of the node job, run for real over a small archive (served over HTTP on this machine),
+    and apt's own simulation of the install on the image's status. Linux only, and what it needs (apt-get, dpkg-deb, an indexer) must be there:
+    on Linux a missing tool is a failure, not a skip."""
+    out = []
+    if not sys.platform.startswith("linux"):
+        print("skip  node deps, apt: needs Linux and apt")
+        return out
+    missing = [tool for tool in ("apt-get", "dpkg-deb", "bash") if shutil_which(tool) is None]
+    if shutil_which("dpkg-scanpackages") is None and shutil_which("apt-ftparchive") is None:
+        missing.append("dpkg-scanpackages or apt-ftparchive")
+    out.append(("node deps, apt: what the cases need is on this machine (missing: %s)" % (", ".join(missing) or "nothing"), not missing))
+    if missing:
+        return out
+    import functools
+    import gzip
+    import http.server
+    import threading
+    import time
+    from email.utils import formatdate
+    old, new, fixed = "255.4-1ubuntu8.18", "255.4-1ubuntu8.19", "3.24.41-4ubuntu1.3"
+    arch = subprocess.run(["dpkg", "--print-architecture"], capture_output=True, text=True, check=True).stdout.strip()
+    # (package, version, pocket, Depends, Priority): the chain libgtk-3-0t64 -> libgtk-3-common -> dconf-gsettings-backend -> dconf-service ->
+    # dbus-user-session -> libpam-systemd -> systemd, as Ubuntu's; the systemd family at 8.18 in noble and at 8.19 in noble-updates.
+    chain = [("libgtk-3-0t64", fixed, "libgtk-3-common"), ("libgtk-3-common", fixed, "dconf-gsettings-backend"),
+             ("dconf-gsettings-backend", "0.40.0-4build2", "dconf-service"), ("dconf-service", "0.40.0-4build2", "dbus-user-session"),
+             ("dbus-user-session", "1.14.10-4ubuntu4.1", "libpam-systemd")]
+    family = [("libpam-systemd", "systemd (= %s)", "optional"), ("systemd", "libsystemd0 (= %s)", "important"),
+              ("libsystemd-shared", "", "optional"), ("libsystemd0", "", "required")]
+    rows = [(p, v, "noble", "Depends: " + d, "optional") for p, v, d in chain]
+    for version, pocket in ((old, "noble"), (new, "noble-updates")):
+        for package, depends, priority in family:
+            line = ("Depends: " + depends % version) if "%s" in depends else ""
+            if package == "systemd":
+                line = "Pre-Depends: libsystemd-shared (= %s)\n%s" % (version, line)
+            rows.append((package, version, pocket, line, priority))
+    rows.append(("systemd-sysv", new, "noble-updates", "Depends: systemd (= %s)" % new, "important"))
+
+    def stanza(package, version, depends, priority):
+        return ("Package: %s\nVersion: %s\nArchitecture: %s\nPriority: %s\nMaintainer: ci <ci@example.invalid>\n%s%sDescription: fixture\n"
+                % (package, version, arch, priority, depends, "\n" if depends else ""))
+
+    # The image of the provider's newer revision: systemd and its siblings at 8.19 installed, libpam-systemd not there. As dpkg writes it.
+    def image(version):
+        sysv = "Depends: systemd (= %s)\n" % version
+        return "\n".join("Package: %s\nStatus: install ok installed\nPriority: %s\nArchitecture: %s\nVersion: %s\n%sDescription: fixture\n"
+                         % (p, prio, arch, version, extra) for p, prio, extra in (
+                             ("libsystemd0", "required", ""), ("libsystemd-shared", "optional", ""),
+                             ("systemd", "important", "Pre-Depends: libsystemd-shared (= %s)\nDepends: libsystemd0 (= %s)\n" % (version, version)),
+                             ("systemd-sysv", "important", sysv)))
+
+    def simulate(tmp, name, status, source, packages, *flags):
+        """apt-get -s install, on directories of its own, over `source` alone and `status` as the installed state: (update's code, the install's)."""
+        work = Path(tmp) / name
+        for d in ("lists", "cache", "sources.list.d", "preferences.d"):
+            (work / d).mkdir(parents=True)
+        (work / "status").write_text(status, encoding="utf-8")
+        (work / "preferences").write_text("", encoding="utf-8")
+        (work / "sources.list").write_text(source + "\n", encoding="utf-8")
+        options = ["-o", "Debug::NoLocking=1", "-o", "Dir::State::status=%s" % (work / "status"), "-o", "Dir::State::lists=%s" % (work / "lists"),
+                   "-o", "Dir::State::extended_states=%s" % (work / "extended_states"), "-o", "Dir::Cache=%s" % (work / "cache"),
+                   "-o", "Dir::Cache::pkgcache=", "-o", "Dir::Cache::srcpkgcache=", "-o", "Dir::Etc::sourcelist=%s" % (work / "sources.list"),
+                   "-o", "Dir::Etc::sourceparts=%s" % (work / "sources.list.d"), "-o", "Dir::Etc::preferences=%s" % (work / "preferences"),
+                   "-o", "Dir::Etc::preferencesparts=%s" % (work / "preferences.d"), "-o", "APT::Sandbox::User=root", "-o", "Acquire::Languages=none"]
+        env = dict(os.environ, LANG="C", LC_ALL="C")
+        update = subprocess.run(["apt-get", "-q", *options, "-o", "APT::Update::Error-Mode=any", "update"], capture_output=True, text=True, timeout=120, env=env)
+        done = subprocess.run(["apt-get", "-q", *options, "-s", "install", "-y", "--no-install-recommends", "--no-remove", *flags, *packages],
+                              capture_output=True, text=True, timeout=120, env=env)
+        return update, done
+
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp = Path(tmp)
+        site = tmp / "archive"
+        pool = site / "pool"
+        pool.mkdir(parents=True)
+        built = {}
+        for package, version, pocket, depends, priority in rows:
+            staging = tmp / "stage" / ("%s_%s" % (package, version))
+            (staging / "DEBIAN").mkdir(parents=True)
+            (staging / "DEBIAN" / "control").write_text(stanza(package, version, depends, priority), encoding="utf-8", newline="\n")
+            deb = pool / ("%s_%s_%s.deb" % (package, version, arch))
+            subprocess.run(["dpkg-deb", "-Zgzip", "--build", "--root-owner-group", str(staging), str(deb)], check=True, capture_output=True)
+            data = deb.read_bytes()
+            built[(package, version)] = stanza(package, version, depends, priority) + "Filename: %s\nSize: %d\nSHA256: %s\n" % ("%s", len(data), hashlib.sha256(data).hexdigest()), deb.name
+        # Ubuntu's layout, unsigned, one index per pocket and component, for the resolver's own source lines (trusted=yes stands for the keyring).
+        date = formatdate(time.time() - 3600, usegmt=True)
+        for pocket in ("noble", "noble-updates", "noble-security"):
+            hashes = []
+            for component in ("main", "restricted", "universe", "multiverse"):
+                directory = site / "dists" / pocket / component / ("binary-%s" % arch)
+                directory.mkdir(parents=True)
+                text = "".join(built[(p, v)][0] % ("pool/" + built[(p, v)][1]) + "\n" for p, v, where, _, _ in rows if where == pocket and component == "main")
+                (directory / "Packages").write_text(text, encoding="utf-8", newline="\n")
+                (directory / "Packages.gz").write_bytes(gzip.compress(text.encode(), mtime=0))
+                for suffix in ("", ".gz"):
+                    raw = (directory / ("Packages" + suffix)).read_bytes()
+                    hashes.append(" %s %d %s/binary-%s/Packages%s" % (hashlib.sha256(raw).hexdigest(), len(raw), component, arch, suffix))
+            (site / "dists" / pocket / "Release").write_text(
+                "Origin: fixture\nLabel: fixture\nSuite: %s\nCodename: %s\nDate: %s\nArchitectures: %s\nComponents: main restricted universe multiverse\nSHA256:\n%s\n"
+                % (pocket, pocket, date, arch, "\n".join(hashes)), encoding="utf-8", newline="\n")
+        # The fixed archive of before: the closure resolved once, as if nothing were installed, so every package of the chain at 8.18, as a
+        # flat index apt reads from disk (what node_bootstrap.sh used).
+        old_repo = tmp / "old"
+        old_repo.mkdir()
+        old_rows = [(p, v) for p, v, where, _, _ in rows if where == "noble"]
+        (old_repo / "Packages").write_text("".join(built[r][0] % ("./" + built[r][1]) + "\n" for r in old_rows), encoding="utf-8", newline="\n")
+        flat_old = "deb [trusted=yes] file:%s ./" % old_repo
+        root = "libgtk-3-0t64"
+        # --- the old logic: the fixed archive over the newer image ---------------------------------------------------------------------------
+        update, done = simulate(tmp, "old", image(new), flat_old, [root], "--allow-downgrades")
+        out.append(("node deps, apt: the old logic on the newer image (systemd %s installed, the fixed archive's libpam-systemd asking for %s) fails with "
+                    "the production line: libpam-systemd : Depends: systemd (= %s) but %s is to be installed (%s)"
+                    % (new, old, old, new, (done.stdout + done.stderr).strip().splitlines()[-1:] or update.stderr[-200:]),
+                    update.returncode == 0 and done.returncode != 0
+                    and ("libpam-systemd : Depends: systemd (= %s) but %s is to be installed" % (old, new)) in done.stdout + done.stderr))
+        update, done = simulate(tmp, "old-same", image(old), flat_old, [root], "--allow-downgrades")
+        out.append(("node deps, apt: the same fixed archive on the image it was resolved for (systemd %s installed) installs: the one thing that fails the old logic is the image "
+                    "having moved (%s)" % (old, (done.stdout + done.stderr).strip().splitlines()[-1:]), update.returncode == 0 and done.returncode == 0))
+        # --- the new logic: the resolver of the node job, over an archive that has both ----------------------------------------------------
+        class Quiet(http.server.SimpleHTTPRequestHandler):
+            def log_message(self, *args):
+                pass
+        server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(Quiet, directory=str(site)))
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        try:
+            status = tmp / "dpkg-status"
+            status.write_text(image(new), encoding="utf-8")
+            boot = tmp / "boot.sh"
+            boot.write_text("PACKAGES=(\n  # the chain's root\n  %s\n)\n" % root, encoding="utf-8", newline="\n")
+            closure = tmp / "closure"
+            env = dict(os.environ, NODE_DEPS_ARCHIVE="http://127.0.0.1:%d" % server.server_address[1], NODE_DEPS_SOURCE_OPTIONS="trusted=yes",
+                       NODE_DEPS_BOOT=str(boot), NODE_DEPS_TRIES="1", LANG="C")
+            resolved = subprocess.run(["bash", str(HERE / t.RESOLVER), str(status), str(closure)], capture_output=True, text=True, timeout=300, env=env)
+        finally:
+            server.shutdown()
+            server.server_close()
+        index = (closure / "Packages").read_text(encoding="utf-8") if (closure / "Packages").is_file() else ""
+        found = re.findall(r"^Package: (.*)\nVersion: (.*)$", index, re.M)
+        out.append(("node deps, apt: the resolver, run against the newer image and an archive holding both revisions, picks libpam-systemd %s and the rest "
+                    "of the chain, and no %s of anything (%s)" % (new, old, resolved.stderr.strip()[-300:] or found),
+                    resolved.returncode == 0 and ("libpam-systemd", new) in found and not any(v == old for _, v in found)
+                    and {p for p, _ in found} == {p for p, _, _ in chain} | {"libpam-systemd"}))
+        files = sorted(p.name for p in closure.glob("*.deb"))
+        out.append(("node deps, apt: it keeps what the image lacks and nothing it has: the systemd family already installed is not downloaded, and the .debs are the index's",
+                    files == sorted("%s_%s_%s.deb" % (p, v, arch) for p, v in found) and not any(f.startswith(("systemd", "libsystemd")) for f in files)))
+        manifest = (closure / "MANIFEST").read_text(encoding="utf-8") if (closure / "MANIFEST").is_file() else ""
+        out.append(("node deps, apt: its MANIFEST names the archive, the packages asked for and every package with its version, and the time",
+                    manifest.startswith("resolved 20") and "archive http://127.0.0.1:" in manifest and "packages %s" % root in manifest
+                    and "libpam-systemd %s" % new in manifest and "status " in manifest))
+        out.append(("node deps, apt: it says the MB and the seconds of the download", re.search(r"\d+ files, \d+ MB, downloaded in \d+ s", resolved.stdout) is not None))
+        update, done = simulate(tmp, "new", image(new), "deb [trusted=yes] file:%s ./" % closure, [root])
+        planned = done.stdout
+        out.append(("node deps, apt: apt's own simulation of the install from the resolved closure on the newer image succeeds, installs libpam-systemd %s, "
+                    "removes nothing and goes down nowhere, with no --allow-downgrades (%s)" % (new, (planned + done.stderr).strip().splitlines()[-1:]),
+                    update.returncode == 0 and done.returncode == 0 and re.search(r"^Inst libpam-systemd \(%s " % re.escape(new), planned, re.M) is not None
+                    and "Remv" not in planned and all(("Inst %s " % p) in planned for p, _, _ in chain)))
     return out
 
 
@@ -1674,7 +2034,7 @@ def group_same_code():
 
 # What GitHub sets in every job, and what a step sets for each name it declares.
 RUNNER_ENV = {"GITHUB_RUN_ID": "5", "GITHUB_RUN_ATTEMPT": "1", "GITHUB_REF_NAME": "main", "GITHUB_SHA": HEAD,
-              "GITHUB_REPOSITORY": "o/r", "GITHUB_OUTPUT": os.devnull}
+              "GITHUB_REPOSITORY": "o/r", "GITHUB_OUTPUT": os.devnull, "RUNNER_TEMP": "runner-temp"}
 STEP_VALUES = {"LATITUDE_API_KEY": KEY, "LATITUDE_PROJECT": PROJECT, "RUNNER_ADMIN_TOKEN": "ADMIN", "GH_TOKEN": "TOKEN", "KIND": "release",
                "TAG": "firefox-99", "COMPILE_CACHE": "gha", "CORE_REF": "core-x", "WRAPPER_REF": "wrap-y", "GTESTS": "true",
                "GTEST_FILTER_INPUT": "X*", "STOP_AFTER": "", "RELAUNCH_OF": "", "ONLY_IF": "--if-legs-done", "LATITUDE_EXCLUDE_SITES": ""}
@@ -1685,12 +2045,13 @@ def workflow():
     return yaml.safe_load((HERE.parent.parent / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8"))
 
 
-def run_step(step, answers, nodes=t.NODE_MARK, answering=False, wrap_provision=None, **overrides):
+def run_step(step, answers, nodes=t.NODE_MARK, answering=False, wrap=None, **overrides):
     """A step of release.yml, as written: its command line through main(), with nothing in
     the environment but the names the step declares and what GitHub sets, on the real
     from_env and github_from_env. Only HTTP, the clock and sshd's banner are faked.
     (exit code, stdout, stderr, FakeGitHub, FakeLatitude)"""
     env = dict(RUNNER_ENV, PATH=os.environ["PATH"], **{name: overrides.get(name, STEP_VALUES[name]) for name in step["env"]})
+    env.update({name: value for name, value in overrides.items() if name in RUNNER_ENV})
     clock, api, gh = Clock(), FakeLatitude(), FakeGitHub()
     api.nodes = listed(nodes)
     gh.jobs_answers = answers
@@ -1716,15 +2077,16 @@ def run_step(step, answers, nodes=t.NODE_MARK, answering=False, wrap_provision=N
                 client.sleep = clock.sleep
         return service
 
-    saved = t.watch, t.from_env, t.github_from_env, t.urllib.request.urlopen, t.turn_off, t.provision, dict(os.environ)
+    wrap = wrap or {}
+    saved = t.watch, t.from_env, t.github_from_env, t.urllib.request.urlopen, t.turn_off, {name: getattr(t, name) for name in wrap}, dict(os.environ)
     real_watch, real_latitude, real_github, real_turn_off = t.watch, t.from_env, t.github_from_env, t.turn_off
     t.watch = lambda *args, **kwargs: real_watch(*args, probe=lambda h, p: answering, clock=lambda: NOW + clock.now, sleep=clock.sleep, **kwargs)
     t.from_env = lambda: fast(real_latitude())
     t.github_from_env = lambda: fast(real_github())
     t.turn_off = lambda latitude, names, *rest, recheck=0: real_turn_off(latitude, names, clock, clock.sleep, recheck=recheck) if not rest else real_turn_off(latitude, names, *rest, recheck=recheck)
     t.urllib.request.urlopen = urlopen
-    if wrap_provision:
-        t.provision = wrap_provision
+    for name, fake in wrap.items():
+        setattr(t, name, fake)
     os.environ.clear()
     os.environ.update(env)
     printed = io.StringIO()
@@ -1735,7 +2097,9 @@ def run_step(step, answers, nodes=t.NODE_MARK, answering=False, wrap_provision=N
         with contextlib.redirect_stdout(printed):
             code, said = quiet(t.main, argv)
     finally:
-        t.watch, t.from_env, t.github_from_env, t.urllib.request.urlopen, t.turn_off, t.provision = saved[:6]
+        t.watch, t.from_env, t.github_from_env, t.urllib.request.urlopen, t.turn_off = saved[:5]
+        for name, real in saved[5].items():
+            setattr(t, name, real)
         os.environ.clear()
         os.environ.update(saved[6])
     return code, printed.getvalue(), said, gh, api
@@ -1766,25 +2130,39 @@ def group_workflow_steps():
     code, printed, said, gh, api = watch_step("watch-1", [[GREEN_L, GREEN_W]])
     out.append(("watch step: legs that finished: verdict done, exit 0, the node off", code == 0 and "verdict=done" in printed and api.deleted == ["dpl_x"]))
 
-    node_step = doc["jobs"]["node"]["steps"][-1]
-    seen = []
+    node_steps = doc["jobs"]["node"]["steps"]
+    up_step = next(s for s in node_steps if s.get("id") == "up")
+    node_step = node_steps[-1]
+    seen, prepared = [], []
 
-    def fake_provision(latitude, github, run, attempt, make_ssh, make_key, *rest, upstream=None):
-        seen.append((run, attempt, github.repo))
+    def fake_up(latitude, github, run, attempt, make_ssh, make_key, work, *rest):
+        seen.append((run, attempt, github.repo, Path(work).as_posix()))
+        return "feedface"
+
+    def fake_prepare(latitude, github, run, attempt, make_ssh, work, closure, *rest, upstream=None, **kwargs):
+        prepared.append((run, attempt, github.repo, Path(work).as_posix(), Path(closure).as_posix(), bool(upstream)))
     # From an empty directory: where the job runs, .series/UPSTREAM.json exists, and on a
     # developer's machine it may not; the case is the one where it cannot be read.
     here = os.getcwd()
     with tempfile.TemporaryDirectory() as empty:
         os.chdir(empty)
         try:
-            code, printed, said, _, _ = run_step(node_step, [[]], wrap_provision=fake_provision)
+            written = Path(empty) / "output"
+            up_code, up_printed, up_said, _, _ = run_step(up_step, [[]], wrap={"bring_up": fake_up}, GITHUB_OUTPUT=str(written))
+            code, printed, said, _, _ = run_step(node_step, [[]], wrap={"prepare": fake_prepare})
+            key_line = written.read_text(encoding="utf-8")
         finally:
             os.chdir(here)
-    out.append(("node step: reaches provision once, for the run's one node, from its own names, and prints nothing a log would keep",
-                code == 0 and printed == "" and seen == [("5", "1", "o/r")]))
+    out.append(("node steps: `up` reaches bring_up once, for the run's one node, in the job's own work directory, hands the closure's key to the steps "
+                "after it, and prints nothing a log would keep",
+                up_code == 0 and up_printed == "" and seen == [("5", "1", "o/r", "runner-temp/build-node")] and key_line == "key=feedface\n"))
+    out.append(("node steps: `prepare` reaches prepare once, from its own names, with the same work directory and the closure's directory, and prints "
+                "nothing a log would keep",
+                code == 0 and printed == "" and prepared == [("5", "1", "o/r", "runner-temp/build-node", "runner-temp/node-debs", False)]))
     out.append(("node step: an UPSTREAM.json it cannot read costs the head start only, never the run",
                 code == 0 and "no tag fetched ahead" in said))
-    out.append(("node step: no leg in its names: the node is the run's, for every leg", "LEG" not in node_step["env"] and "--leg" not in node_step["run"]))
+    out.append(("node steps: no leg in their names: the node is the run's, for every leg",
+                all("LEG" not in s.get("env", {}) and "--leg" not in s.get("run", "") for s in node_steps)))
     stop_step = next(s for s in doc["jobs"]["stop-node"]["steps"] if " off " in s.get("run", ""))
     code, printed, said, gh, api = run_step(stop_step, [[GREEN_L, RUN_W]])
     out.append(("stop step: with the option from its own names, a leg still running: the node stays for it", code == 0 and api.deleted == [] and W in said))
@@ -2087,22 +2465,20 @@ def with_run(fake, fn):
 
 
 def provisioned_through_ssh(answers):
-    """provision() with the real Ssh class over a scripted ssh: (error text, all it said)."""
+    """up and prepare with the real Ssh class over a scripted ssh: (error text, all it said)."""
     clock = Clock()
     latitude = t.Latitude(PROJECT, KEY, FakeLatitude(), clock.sleep)
     github = t.GitHub("o/r", "TOKEN", "ADMIN", FakeGitHub(), clock.sleep)
     with tempfile.TemporaryDirectory() as tmp:
         key = Path(tmp) / "node_key"
-        key.write_text("private", encoding="utf-8")
-        Path(str(key) + ".pub").write_text("ssh-ed25519 AAAA ci-node\n", encoding="utf-8")
 
         def attempt():
             try:
-                t.provision(latitude, github, 5, 1, lambda host, port: t.Ssh(host, port, key), lambda: key, clock, clock.sleep)
+                both_phases(latitude, github, lambda host, port: t.Ssh(host, port, key), clock, tmp)
                 return ""
             except t.NodeError as exc:
                 return str(exc)
-        return with_run(ScriptedRun(answers), lambda: quiet(attempt))
+        return with_run(ScriptedRun({STATUS_COMMAND: (0, STATUS_ANSWER[1].encode(), b""), **answers}), lambda: quiet(attempt))
 
 
 def group_address():
@@ -2226,34 +2602,28 @@ class BootstrapSsh(FakeSsh):
 
 
 def provisioned_timed(api, gh, ssh):
-    """provision() of the run's node: (error text or '', the simulated seconds it took)."""
+    """up and prepare of the run's node: (error text or '', the simulated seconds it took)."""
     clock = Clock()
     latitude = t.Latitude(PROJECT, KEY, api, clock.sleep)
     github = t.GitHub("o/r", "TOKEN", "ADMIN", gh, clock.sleep)
     with tempfile.TemporaryDirectory() as tmp:
-        key = Path(tmp) / "node_key"
-        key.write_text("private", encoding="utf-8")
-        Path(str(key) + ".pub").write_text("ssh-ed25519 AAAA ci-node\n", encoding="utf-8")
         before = clock.now
         try:
-            quiet(t.provision, latitude, github, 5, 1, lambda host, port: ssh, lambda: key, clock, clock.sleep)
+            quiet(both_phases, latitude, github, lambda host, port: ssh, clock, tmp)
             return "", clock.now - before
         except t.NodeError as exc:
             return str(exc), clock.now - before
 
 
 def provisioned_saying(api, gh, ssh):
-    """provision() of the run's node: (error text or '', what it said to stderr, also when it failed)."""
+    """up and prepare of the run's node: (error text or '', what it said to stderr, also when it failed)."""
     clock = Clock()
     latitude = t.Latitude(PROJECT, KEY, api, clock.sleep)
     github = t.GitHub("o/r", "TOKEN", "ADMIN", gh, clock.sleep)
     sink = io.StringIO()
     with tempfile.TemporaryDirectory() as tmp, contextlib.redirect_stderr(sink):
-        key = Path(tmp) / "node_key"
-        key.write_text("private", encoding="utf-8")
-        Path(str(key) + ".pub").write_text("ssh-ed25519 AAAA ci-node\n", encoding="utf-8")
         try:
-            t.provision(latitude, github, 5, 1, lambda host, port: ssh, lambda: key, clock, clock.sleep)
+            both_phases(latitude, github, lambda host, port: ssh, clock, tmp)
             return "", sink.getvalue()
         except t.NodeError as exc:
             return str(exc), sink.getvalue()
@@ -2319,7 +2689,7 @@ def group_bootstrap_retry():
                 not any(t.TRANSIENT.search(x) for x in texts)))
     bootstrap = (HERE / "node_bootstrap.sh").read_text(encoding="utf-8")
     out.append(("retry: the bootstrap takes a lock on the node, so a second run (after a lost ssh) waits for the first instead of running over it",
-                "exec 9>/run/node_bootstrap.lock" in bootstrap and "flock -w 1500 9" in bootstrap and bootstrap.index("flock") < bootstrap.index("NODE_DEPS=")))
+                "exec 9>/run/node_bootstrap.lock" in bootstrap and "flock -w 1500 9" in bootstrap and bootstrap.index("flock") < bootstrap.index("GLSLANG_VERSION=")))
     texts = ["node_bootstrap: ERROR: missing: git", "node_bootstrap: ERROR: run it as root", "E: Unable to locate package nothere", "syntax error near unexpected token"]
     out.append(("retry: what is not", not any(t.TRANSIENT.search(x) for x in texts)))
     return out
@@ -2327,7 +2697,7 @@ def group_bootstrap_retry():
 
 def group_node_hardening():
     """Three things that keep a node from staying on when a run is cut: a second look in `off` for a node job that did not succeed, a deadline
-    of provision() shorter than the node job's own, and a sweeper that runs when a release run ends."""
+    of up and prepare together shorter than the node job's own, and a sweeper that runs when a release run ends."""
     out = []
 
     class Listing:
@@ -2362,8 +2732,8 @@ def group_node_hardening():
     out.append(("off: run_off asks for the second look exactly when `--if-legs-done` is absent (the node job did not succeed)",
                 "recheck=0 if a.if_legs_done else OFF_RECHECK_S" in inspect.getsource(t.run_off)))
 
-    # --- one deadline for provision() ---------------------------------------------------------------------------------------------------------------
-    out.append(("deadline: provision() has 40 minutes in all, inside the node job's 45 (release.yml), with room for the delete",
+    # --- one deadline for up and prepare ---------------------------------------------------------------------------------------------------------------
+    out.append(("deadline: up and prepare have 40 minutes in all, inside the node job's 45 (release.yml), with room for the delete",
                 t.PROVISION_DEADLINE_S == 2400 and t.PROVISION_DEADLINE_S + 5 * 60 <= 45 * 60))
     clock = Clock()
     try:
@@ -2415,11 +2785,12 @@ def group_node_hardening():
         quiet(t.wait_up, SlowUp(), "dpl_x", lambda *a: None, clock, clock.sleep, min(t.UP_LIMIT_S, 100))
     except t.NodeError:
         pass
-    out.append(("deadline: wait_up takes the limit it is given (provision() hands it what is left)", 100 <= clock.now - before < 110))
-    source = inspect.getsource(t.provision)
-    out.append(("deadline: provision() hands every phase what is left, and cleans up on ANY exit (a cancel is a KeyboardInterrupt)",
-                "limit=min(UP_LIMIT_S, remaining(deadline, clock))" in source and "bootstrap(ssh, clock, sleep, deadline=deadline)" in source
-                and "limit=min(RUNNER_ONLINE_LIMIT_S, remaining(deadline, clock))" in source and "except BaseException:" in source))
+    out.append(("deadline: wait_up takes the limit it is given (up hands it what is left)", 100 <= clock.now - before < 110))
+    up_source, prepare_source = inspect.getsource(t.bring_up), inspect.getsource(t.prepare)
+    out.append(("deadline: up and prepare hand every phase what is left, and clean up on ANY exit (a cancel is a KeyboardInterrupt)",
+                "limit=min(UP_LIMIT_S, remaining(deadline, clock))" in up_source and "bootstrap(ssh, clock, sleep, deadline=deadline)" in prepare_source
+                and "limit=min(RUNNER_ONLINE_LIMIT_S, remaining(deadline, clock))" in prepare_source and "send_closure(ssh, closure, clock, deadline)" in prepare_source
+                and "except BaseException:" in up_source and "except BaseException:" in prepare_source))
 
     # --- the sweeper runs when a release run ends ---------------------------------------------------------------------------------------------------
     import yaml
@@ -2431,7 +2802,7 @@ def group_node_hardening():
     return out
 
 
-GROUPS = [group_prefetch, group_node_deps, group_runner_isolated, group_turning_on, group_no_fallback, group_two_runs, group_off, group_stop_node, group_bootstrap, group_github_blip, group_false_lost,
+GROUPS = [group_prefetch, group_node_deps, group_node_bootstrap_closure, group_closure, group_node_job, group_node_deps_apt, group_runner_isolated, group_turning_on, group_no_fallback, group_two_runs, group_off, group_stop_node, group_bootstrap, group_github_blip, group_false_lost,
           group_lost_either_order, group_two_legs, group_relaunch, group_stuck, group_watch_stages, group_sweep, group_secrets,
           group_probe, group_runner, group_cancelled_by_hand, group_runner_clock, group_same_code,
           group_workflow_steps, group_any_shape, group_clear_verdicts, group_dispatch_once, group_lingering_and_silence,

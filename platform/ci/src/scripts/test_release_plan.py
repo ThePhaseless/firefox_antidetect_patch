@@ -33,11 +33,16 @@ refuse, each one a real way to get it wrong, and the runs it must accept:
    15. accepted: a candidate by hand on a latitude/* branch, with the gtests turned off
        whatever the input said (nothing links, so none can run); the other plans carry
        stop_after empty.
+  the core of a push candidate (event push, core_ref empty: `v<the version the wrapper at wrapper_ref pins>`)
+   16. accepted: the pin read from the wrapper's pyproject.toml (either spelling), an explicit core_ref that wins, and the
+       other events and kinds that keep core_ref or main; refused: no pin, two pins, a pin that is not X.Y.Z, a tag the
+       core does not have, no way to read the pin.
 
 Run it directly, like test_make_seal.py: `python3 scripts/test_release_plan.py`.
 """
 from __future__ import annotations
 
+import io
 import os
 import sys
 from pathlib import Path
@@ -71,6 +76,15 @@ REFUSED = [
 
 #: The last published release the workflow reads from the tags: a candidate is the engine after it.
 LAST_RELEASE = "48"
+
+#: The wrapper's dependencies as pyproject.toml has them, with the one core pin; a push candidate tests that core.
+PYPROJECT = 'dependencies = [\n    "playwright==1.49.0",\n    "invisible_core==68.80.0",\n]\n'
+CORE_TAGS = {"v68.80.0", "v69.82.0"}
+
+
+def fake_pin(wrapper_ref):
+    """What release.yml's plan step does with the API and the tags, on text: the plan's own reading, offline."""
+    return p.pinned_core_ref(wrapper_ref, lambda ref: PYPROJECT, lambda tag: tag in CORE_TAGS)
 
 #: What every plan carries besides its kind: the gtests and the refs.
 DEFAULTS = {"gtests": "false", "gtest_filter": p.DEFAULT_GTEST_FILTER,
@@ -121,8 +135,8 @@ ACCEPTED = [
     ("a push to main: a candidate with the gtests and the cache",
      ("push", "", "", "main", "", "branch"),
      {"kind": "candidate", "tag": "", "num": "", "prevtag": "", "seal_tag": "firefox-49-candidate",
-      "compile_cache": "gha", "gtests": "true"}),
-    ("the weekly timer on main: the same candidate",
+      "compile_cache": "gha", "gtests": "true", "core_ref": "v68.80.0"}),
+    ("the weekly timer on main: the same candidate, on the core of main (only a push reads the pin)",
      ("schedule", "", "", "main", "", "branch"),
      {"kind": "candidate", "tag": "", "num": "", "prevtag": "", "seal_tag": "firefox-49-candidate",
       "compile_cache": "gha", "gtests": "true"}),
@@ -164,7 +178,7 @@ def main() -> int:
     for name, args, want in ACCEPTED:
         want = {**DEFAULTS, **want}
         try:
-            got = p.plan(*args, last_release=LAST_RELEASE)
+            got = p.plan(*args, last_release=LAST_RELEASE, core_ref_of_wrapper=fake_pin)
         except p.PlanError as exc:
             print(f"FAIL  refused: {name}: {exc}")
             failures += 1
@@ -240,6 +254,79 @@ def main() -> int:
     else:
         print("ok    a release is sealed under its own tag")
 
+    # The core of a push candidate: the one its wrapper pins, never `main` (run 45348928499: wrapper 0.58.1 pinned invisible_core==68.80.0, the core's main was
+    # 69.82.0, and every wrapper e2e died at import). Offline: the pyproject text and the tags are handed in.
+    push = ("push", "", "", "main", "", "branch")
+
+    def push_plan(pyproject, tags, core="", wrapper="", args=push):
+        seen = []
+
+        def read(ref):
+            seen.append(ref)
+            return pyproject
+
+        got = p.plan(*args, core_ref=core, wrapper_ref=wrapper, last_release=LAST_RELEASE,
+                     core_ref_of_wrapper=lambda ref: p.pinned_core_ref(ref, read, lambda tag: tag in tags))
+        return got, seen
+
+    got, seen = push_plan(PYPROJECT, CORE_TAGS)
+    pin_ok = (got["core_ref"], got["wrapper_ref"], seen) == ("v68.80.0", "main", ["main"])
+    got, seen = push_plan(PYPROJECT.replace("invisible_core", "invisible-core"), CORE_TAGS, wrapper="some-branch")
+    pin_ok = pin_ok and (got["core_ref"], got["wrapper_ref"], seen) == ("v68.80.0", "some-branch", ["some-branch"])
+    got, seen = push_plan(PYPROJECT, CORE_TAGS, core="my-branch")
+    explicit_ok = (got["core_ref"], seen) == ("my-branch", [])
+    other_ok = True
+    for args in (("schedule", "", "", "main", "", "branch"), ("workflow_dispatch", "candidate", "", "main", "", "branch"),
+                 ("workflow_dispatch", "release", "firefox-50", "main", "", "branch")):
+        got, seen = push_plan(PYPROJECT, CORE_TAGS, args=args)
+        other_ok = other_ok and (got["core_ref"], seen) == ("main", [])
+    for name, ok in (("a push candidate with no core_ref tests v<the core its wrapper pins>, either spelling, read at wrapper_ref", pin_ok),
+                     ("an explicit core_ref wins over the pin, and the pin is not even read", explicit_ok),
+                     ("the weekly timer and a run by hand keep core_ref or main, and read no pin", other_ok)):
+        print(("ok    " if ok else "FAIL  ") + name)
+        failures += not ok
+    for name, pyproject, tags in (("a pyproject with no core pin", 'dependencies = ["playwright==1.49.0"]', CORE_TAGS),
+                                  ("a pyproject with two core pins", PYPROJECT + '"invisible-core==68.80.0"', CORE_TAGS),
+                                  ("a core requirement that is no exact pin", 'dependencies = ["invisible_core>=68.80.0"]', CORE_TAGS),
+                                  ("a core pin that is not X.Y.Z", 'dependencies = ["invisible_core==68.80"]', CORE_TAGS),
+                                  ("a pin whose tag the core does not have (no fall back to main)", PYPROJECT, {"v69.82.0"})):
+        try:
+            got, _ = push_plan(pyproject, tags)
+        except p.PlanError as exc:
+            print(f"ok    refused: {name}: {exc}")
+        else:
+            print(f"FAIL  accepted: {name}: {got}")
+            failures += 1
+
+    def unreadable(ref):
+        raise p.PlanError("pyproject.toml cannot be read: no API")
+
+    for name, resolver in (("a push candidate with no way to read the pin", None),
+                           ("a pyproject that cannot be read", lambda ref: p.pinned_core_ref(ref, unreadable, lambda t: True))):
+        try:
+            got = p.plan(*push, last_release=LAST_RELEASE, core_ref_of_wrapper=resolver)
+        except p.PlanError as exc:
+            print(f"ok    refused: {name}: {exc}")
+        else:
+            print(f"FAIL  accepted: {name}: {got}")
+            failures += 1
+    # The command line reads the pin through github_pyproject / github_tag_exists (replaced here by text): a push says v<pin>, and a missing tag is exit 1.
+    real = (p.github_pyproject, p.github_tag_exists)
+    out, stderr, sys.stdout, sys.stderr = sys.stdout, sys.stderr, io.StringIO(), open(os.devnull, "w")
+    try:
+        p.github_pyproject, p.github_tag_exists = (lambda ref: PYPROJECT), (lambda tag: True)
+        cli_ok = p.main(["--event", "push", "--ref-name", "main", "--ref-type", "branch", "--last-release", LAST_RELEASE])
+        said = sys.stdout.getvalue()
+        p.github_tag_exists = lambda tag: False
+        cli_missing = p.main(["--event", "push", "--ref-name", "main", "--ref-type", "branch", "--last-release", LAST_RELEASE])
+    finally:
+        p.github_pyproject, p.github_tag_exists = real
+        sys.stderr.close()
+        sys.stdout, sys.stderr = out, stderr
+    cli_good = (cli_ok, cli_missing) == (0, 1) and "core_ref=v68.80.0\n" in said
+    print(("ok    " if cli_good else "FAIL  ") + "the command line of a push plans on the pinned core, and refuses a pin with no tag")
+    failures += not cli_good
+
     # No fallback: the choice of who compiles does not exist, so it cannot be made.
     stderr, sys.stderr = sys.stderr, open(os.devnull, "w")
     try:
@@ -253,7 +340,7 @@ def main() -> int:
     if took:
         print("FAIL  the command line took a builder")
         failures += 1
-    total = len(REFUSED) + len(ACCEPTED) + len(STOP_REFUSED) + len(STOP_ACCEPTED) + 2 + 6 + 1
+    total = len(REFUSED) + len(ACCEPTED) + len(STOP_REFUSED) + len(STOP_ACCEPTED) + 2 + 6 + 1 + 3 + 5 + 2 + 1
     print(f"{total - failures}/{total} cases as expected")
     return 1 if failures else 0
 

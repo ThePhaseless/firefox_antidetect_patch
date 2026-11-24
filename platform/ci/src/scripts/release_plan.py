@@ -57,13 +57,23 @@ that is always there stops being read. The tag rule itself stays make_seal.py's
 
 prints the outputs as `key=value` lines for $GITHUB_OUTPUT, or exits 1 naming
 what is wrong. Its known-bad inputs: scripts/test_release_plan.py.
+
+The core a push candidate tests. A push to main runs with no inputs, so core_ref and wrapper_ref were each `main`, independently; the wrapper's main
+pinned `invisible_core==68.80.0` while the core's main was 69.82.0, and every wrapper e2e leg died at import ("invisible-core version mismatch", run
+45348928499). So for a candidate started by a PUSH with an empty core_ref, core_ref is `v<the version wrapper_ref pins>`: the release tag of that core.
+An explicit core_ref always wins, and every other event and kind (the weekly timer, a candidate or a release by hand) keeps its own rule: the input,
+else `main`. The pin is read from the wrapper's pyproject.toml at wrapper_ref, and the tag must exist in the core: a pin that cannot be read, that is
+not exactly one `invisible_core==X.Y.Z`, or whose tag is missing is a refused plan, never a fall back to `main`. The reading is the caller's
+(`pinned_core_ref`, injected into plan()): the decision stays pure and is tested offline.
 """
 from __future__ import annotations
 
 import argparse
 import re
+import subprocess
 import sys
 from pathlib import Path
+from typing import Callable
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -102,6 +112,12 @@ DEFAULT_GTEST_FILTER = ("StealthGfxFeatureStatus.*:StealthWebGPUAdapter.*:"
                         "StealthBranding.*:StealthCanvasUtils.*:StealthDragGesture.*:StealthHttp3Socks.*:StealthJugglerCoalesce.*:"
                         "StealthJugglerMouseAck.*:StealthMouseEventCopy.*:StealthMouseEventIPC.*:StealthNsProxyInfoKinds.*:StealthSocksUdpLayer.*:StealthStackFrames.*:StealthStartupCache.*:StealthTimezone.*:StealthExclusivePort.*")
 DEFAULT_REF = "main"
+# Where the wrapper's pin is read and the core's tags are looked up (the same repositories gate.yml checks out and installs).
+WRAPPER_REPOSITORY = "oss-invisible/playwright"
+CORE_REPOSITORY = "oss-invisible/core"
+# The one quoted requirement string that names the core in the wrapper's pyproject.toml, either spelling.
+CORE_REQUIREMENT = re.compile(r"""["']\s*(invisible[-_.]core(?![\w-])[^"']*)["']""", re.IGNORECASE)
+CORE_PIN = re.compile(r"""invisible[-_.]core\s*==\s*([0-9]+\.[0-9]+\.[0-9]+)\s*(?:;[^"']*)?""", re.IGNORECASE)
 # What `stop_after` can say: nothing (the whole run), or the objects of the touched directories.
 STOP_AFTERS = ("", "objects")
 # The only branches a compile-only run starts from: the ones the proofs run on.
@@ -112,10 +128,50 @@ class PlanError(ValueError):
     pass
 
 
+def core_pin(pyproject: str) -> str:
+    """The version X.Y.Z the wrapper's pyproject.toml pins, from its one `invisible_core==X.Y.Z` (or `invisible-core==X.Y.Z`) requirement."""
+    found = [m.group(1).strip() for m in CORE_REQUIREMENT.finditer(pyproject)]
+    if len(found) != 1:
+        raise PlanError(f"the wrapper's pyproject.toml must name the core in exactly one requirement (invisible_core==X.Y.Z), found {len(found)}"
+                        + (": " + ", ".join(repr(f) for f in found) if found else ""))
+    match = CORE_PIN.fullmatch(found[0])
+    if not match:
+        raise PlanError(f"the wrapper's requirement on the core is not an exact X.Y.Z pin (invisible_core==X.Y.Z): {found[0]!r}")
+    return match.group(1)
+
+
+def pinned_core_ref(wrapper_ref: str, read_pyproject: Callable[[str], str], tag_exists: Callable[[str], bool]) -> str:
+    """`v<version>`, the core release the wrapper at wrapper_ref pins; PlanError when it cannot be read, is not one pin, or the tag is not in the core."""
+    tag = "v" + core_pin(read_pyproject(wrapper_ref))
+    if not tag_exists(tag):
+        raise PlanError(f"the wrapper at {wrapper_ref!r} pins the core {tag[1:]}, and {CORE_REPOSITORY} has no tag {tag}: "
+                        f"no core to test it with (the plan does not fall back to {DEFAULT_REF})")
+    return tag
+
+
+def github_pyproject(ref: str) -> str:
+    """pyproject.toml of the wrapper at `ref` (a branch, a tag or a commit), from the contents API; GH_TOKEN is the runner's."""
+    done = subprocess.run(["gh", "api", "-X", "GET", "-H", "Accept: application/vnd.github.raw+json", f"repos/{WRAPPER_REPOSITORY}/contents/pyproject.toml",
+                           "-f", f"ref={ref}"], capture_output=True, text=True, timeout=120)
+    if done.returncode != 0:
+        raise PlanError(f"pyproject.toml of {WRAPPER_REPOSITORY} at {ref!r} cannot be read: {done.stderr.strip() or done.returncode}")
+    return done.stdout
+
+
+def github_tag_exists(tag: str) -> bool:
+    """Is `tag` a tag of the (public) core repository? A lookup that fails is a PlanError, not an absent tag."""
+    done = subprocess.run(["git", "ls-remote", "--tags", "--refs", f"https://github.com/{CORE_REPOSITORY}", f"refs/tags/{tag}"],
+                          capture_output=True, text=True, timeout=120)
+    if done.returncode != 0:
+        raise PlanError(f"the tags of {CORE_REPOSITORY} cannot be read: {done.stderr.strip() or done.returncode}")
+    return any(line.split("	")[-1:] == [f"refs/tags/{tag}"] for line in done.stdout.splitlines())
+
+
 def plan(event: str, kind: str, release_tag: str, ref_name: str,
          compile_cache: str = "", ref_type: str = "", gtests: str = "",
          gtest_filter: str = "", core_ref: str = "", wrapper_ref: str = "",
-         last_release: str = "", stop_after: str = "") -> dict[str, str]:
+         last_release: str = "", stop_after: str = "",
+         core_ref_of_wrapper: Callable[[str], str] | None = None) -> dict[str, str]:
     """The outputs of a run, or PlanError.
 
     compile_cache is the run's request: "" takes the default. ref_type is what the
@@ -124,7 +180,9 @@ def plan(event: str, kind: str, release_tag: str, ref_name: str,
     automatic run: it is a candidate from main with the gtests and the defaults.
     last_release is the number N of the last published `firefox-N` (the workflow reads
     it from the tags): a candidate is the engine after it. stop_after is "" or "objects":
-    only a candidate by hand on a `latitude/*` branch may stop after the objects."""
+    only a candidate by hand on a `latitude/*` branch may stop after the objects.
+    core_ref_of_wrapper(wrapper_ref) is the core release the wrapper pins, `v<version>` (`pinned_core_ref`): the core_ref of a candidate started by a
+    PUSH with no core_ref (see the top of this file); a push without it is refused, never planned on `main`."""
     if event in AUTOMATIC_EVENTS:
         if ref_type != "branch" or ref_name != RELEASE_BRANCH:
             raise PlanError(f"a run by itself is a candidate from the branch {RELEASE_BRANCH}, "
@@ -135,9 +193,15 @@ def plan(event: str, kind: str, release_tag: str, ref_name: str,
     elif event != "workflow_dispatch":
         raise PlanError(f"release runs by hand, from main for a release, or by itself on "
                         f"{' and '.join(AUTOMATIC_EVENTS)} from {RELEASE_BRANCH}, not on {event!r}")
+    wrapper_ref = wrapper_ref or DEFAULT_REF
+    if not core_ref and event == "push":
+        # A push has no inputs: the core is the one the wrapper pins (the other events and kinds keep core_ref or main).
+        if core_ref_of_wrapper is None:
+            raise PlanError("a push candidate tests the core its wrapper pins, and no way to read the pin was given")
+        core_ref = core_ref_of_wrapper(wrapper_ref)
     common = {"gtests": "true" if gtests == "true" else "false",
               "gtest_filter": gtest_filter or DEFAULT_GTEST_FILTER,
-              "core_ref": core_ref or DEFAULT_REF, "wrapper_ref": wrapper_ref or DEFAULT_REF}
+              "core_ref": core_ref or DEFAULT_REF, "wrapper_ref": wrapper_ref}
     if kind not in KINDS:
         raise PlanError(f"kind must be one of {', '.join(KINDS)}, got {kind!r}")
     if stop_after not in STOP_AFTERS:
@@ -200,7 +264,8 @@ def main(argv=None) -> int:
         outputs = plan(a.event, a.kind, a.release_tag.strip(), a.ref_name,
                        a.compile_cache.strip(), a.ref_type.strip(), a.gtests.strip(),
                        a.gtest_filter.strip(), a.core_ref.strip(), a.wrapper_ref.strip(),
-                       a.last_release.strip(), a.stop_after.strip())
+                       a.last_release.strip(), a.stop_after.strip(),
+                       core_ref_of_wrapper=lambda ref: pinned_core_ref(ref, github_pyproject, github_tag_exists))
     except PlanError as exc:
         print(f"PLAN REFUSED: {exc}", file=sys.stderr)
         return 1

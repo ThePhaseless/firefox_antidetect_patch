@@ -182,6 +182,8 @@ jobs:
       - name: Plan
         id: plan
         env:
+          # A push candidate with no core_ref tests the core its wrapper_ref pins: the plan reads the wrapper's pyproject.toml through the API (scripts/release_plan.py).
+          GH_TOKEN: ${{ github.token }}
           LAST_RELEASE: ${{ steps.last_release.outputs.last_release }}
           EVENT: ${{ github.event_name }}
           KIND: ${{ inputs.kind }}
@@ -444,7 +446,12 @@ jobs:
       - name: The series (this repository, this commit)
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with: { path: .series, fetch-depth: 1 }
-      - name: Turn the run's node on, prepare it, start one runner per leg
+      # The node's apt packages are resolved against the node's OWN image, at its start, and kept per image state and list: a closure fixed once
+      # (as if nothing were installed) failed on a provider image newer than it, where libpam-systemd asked for systemd (= 8.18) and 8.19 was
+      # installed. `up` reads the node's dpkg database and names the closure; a miss is resolved here, on this runner, and kept; `prepare` sends it.
+      # A failure in any step fails the job, and stop-node turns the node off.
+      - name: Turn the run's node on and read its package state
+        id: up
         env:
           LATITUDE_API_KEY: ${{ secrets.LATITUDE_API_KEY }}
           LATITUDE_PROJECT: ${{ secrets.LATITUDE_PROJECT }}
@@ -453,8 +460,34 @@ jobs:
           RUNNER_ADMIN_TOKEN: ${{ secrets.RUNNER_ADMIN_TOKEN }}
           GH_TOKEN: ${{ github.token }}
         run: |
-          python3 .series/platform/ci/src/scripts/ci/latitude_node.py provision \
-            --run "$GITHUB_RUN_ID" --attempt "$GITHUB_RUN_ATTEMPT" --upstream .series/UPSTREAM.json
+          python3 .series/platform/ci/src/scripts/ci/latitude_node.py up \
+            --run "$GITHUB_RUN_ID" --attempt "$GITHUB_RUN_ATTEMPT" --work "$RUNNER_TEMP/build-node"
+      - name: The node's closure of packages, from the cache
+        id: closure
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/node-debs
+          key: node-debs-${{ steps.up.outputs.key }}
+      - name: Resolve the closure against the node's own image
+        if: steps.closure.outputs.cache-hit != 'true'
+        timeout-minutes: 15
+        run: bash .series/platform/ci/src/scripts/ci/node_deps_resolve.sh "$RUNNER_TEMP/build-node/dpkg-status" "$RUNNER_TEMP/node-debs"
+      - name: Keep the closure
+        if: steps.closure.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/node-debs
+          key: node-debs-${{ steps.up.outputs.key }}
+      - name: Prepare the node, start one runner per leg
+        env:
+          LATITUDE_API_KEY: ${{ secrets.LATITUDE_API_KEY }}
+          LATITUDE_PROJECT: ${{ secrets.LATITUDE_PROJECT }}
+          RUNNER_ADMIN_TOKEN: ${{ secrets.RUNNER_ADMIN_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 .series/platform/ci/src/scripts/ci/latitude_node.py prepare \
+            --run "$GITHUB_RUN_ID" --attempt "$GITHUB_RUN_ATTEMPT" --work "$RUNNER_TEMP/build-node" \
+            --debs "$RUNNER_TEMP/node-debs" --upstream .series/UPSTREAM.json
 
   build:
     name: build-${{ matrix.leg }}
