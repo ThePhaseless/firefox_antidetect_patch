@@ -182,8 +182,11 @@ def test_the_hook_locals_command_is_red_on_a_hit_and_reads_the_tag(monkeypatch, 
     monkeypatch.setattr(hc, "git_base_reader", lambda source, tag: seen.append((source, tag)) or "reader")
     hit = hc.Violation("C16", FOLDER, "js/x/WrapperFactory.cpp", "f", "txt", "k", "line 5: xrayType")
     monkeypatch.setattr(hc, "locals_violations", lambda root, base=None: [hit] if base == "reader" else [])
+    seen_unq = []
+    monkeypatch.setattr(hc, "namespace_violations", lambda root, unqualified=False: seen_unq.append(unqualified) or [])
     assert engine.hook_locals(Path("src"), "TAG") == 1
     out = capsys.readouterr().out
+    assert seen_unq == [True]                        # C17 with the unqualified names looked up in our sources
     assert seen == [(Path("src"), "TAG")] and "FAIL" in out and "xrayType" in out and "WrapperFactory.cpp" in out
     monkeypatch.setattr(hc, "locals_violations", lambda root, base=None: [])
     assert engine.hook_locals(Path("src"), "TAG") == 0
