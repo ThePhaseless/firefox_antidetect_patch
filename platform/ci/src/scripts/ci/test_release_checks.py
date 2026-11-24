@@ -223,6 +223,13 @@ def _cases() -> list:
                 "apt-cache depends --recurse --no-recommends" in deps_run and "apt-get download" in deps_run and "apt-ftparchive packages . > Packages" in deps_run
                 and "roots.txt" in deps_run and "is not in the repository" in deps_run and 'for group in ("tools", "firefox")' in deps_run
                 and "--download-only" not in deps_run))
+    # wrapper PR #585: libgtk-3-0 is a name libgtk-3-0t64 provides (a root check on Package: alone refused it), a key per image build missed the entry
+    # run after run (the builds of one release are mixed in a run), and a closure read one package at a time took 13 minutes from a slow mirror.
+    out.append(("linux-deps.yml: a root may be a name a package of the repository provides, the entry is per release of the image (not per build), "
+                "the closure is downloaded 8 at a time and every package of it is checked",
+                "Provides: (.*, )?$e" in deps_run and 'RELEASE="${ImageVersion%%.*}"' in deps_run and "$ImageVersion-$SHA" not in deps_run
+                and "xargs -n 20 -P 8 apt-get download -qq -o Acquire::Retries=5" in deps_run and "of the closure was not downloaded" in deps_run and "MB in $((T1 - T0)) s" in deps_run
+                and load("linux-deps.yml")["jobs"]["debs"]["timeout-minutes"] == 20))
     out.append(("linux-deps.yml: the archive is read only when the entry of this image and list is missing",
                 all(st.get("if") == "steps.restore.outputs.cache-hit != 'true'" for st in deps_steps
                     if "apt-get" in str(st.get("run", "")) or str(st.get("uses", "")).startswith("actions/cache/save"))))

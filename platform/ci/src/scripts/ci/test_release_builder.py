@@ -264,10 +264,10 @@ def group_cache_sharing(doc, jobs, build, steps) -> list:
     deps_jobs = deps_doc["jobs"]
     deps_caches = [st for j in deps_jobs.values() for st in j.get("steps", []) if str(st.get("uses", "")).startswith("actions/cache")]
     deps_spec = " ".join(str(st.get("run", "")) for j in deps_jobs.values() for st in j.get("steps", []))
-    out.append(("cache: linux-deps.yml's entries are .deb files, on GitHub's ubuntu-24.04 only, under linux-deps-<ImageOS>-<ImageVersion>-<sha of the list>",
+    out.append(("cache: linux-deps.yml's entries are .deb files, on GitHub's ubuntu-24.04 only, under linux-deps-<ImageOS>-<release of the image>-<sha of the list>",
                 list(deps_jobs) == ["debs"] and deps_jobs["debs"]["runs-on"] == "ubuntu-24.04" and len(deps_caches) == 2
                 and all(st["with"]["key"] == "${{ steps.spec.outputs.key }}" and st["with"]["path"] == "/tmp/linux-deps" for st in deps_caches)
-                and 'echo "key=linux-deps-$ImageOS-$ImageVersion-$SHA"' in deps_spec))
+                and 'RELEASE="${ImageVersion%%.*}"' in deps_spec and 'echo "key=linux-deps-$ImageOS-$RELEASE-$SHA"' in deps_spec))
     lavapipe = steps.get("WebGPU's Vulkan driver (linux-x86_64) - built before", {})
     tool = steps.get("Toolchains - restore", {})
     out.append(("cache: the executables' entries are the node legs' only", "matrix.leg == 'linux-x86_64'" in lavapipe.get("if", "") and tool.get("if") == "matrix.node"))
