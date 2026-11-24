@@ -341,34 +341,8 @@ def test_the_gate_calls_package_ab_yml_with_the_published_tag_as_an_input():
 # ---------------------------------------------------------------- the engine published before is resolved, never written in a workflow
 
 WORKFLOWS = ROOT / ".github" / "workflows"
-# A release tag as a whole token: `firefox-<N>` and nothing after the digits. `firefox-69-candidate`, `firefox-NN-candidate`, `firefox-*-stealth-...` and an asset
-# name such as `firefox-159.0-stealth-...` are not release tags.
-RELEASE_TAG = re.compile(r"(?<![\w.-])firefox-\d+(?![\w.-])")
-
-
 def _release(tag, draft=False, prerelease=False):
     return {"tag_name": tag, "draft": draft, "prerelease": prerelease}
-
-
-def hardcoded_release_tags(doc) -> list:
-    """Every `firefox-<N>` in a value of a parsed workflow: a string anywhere in it, the lines of a script that are shell comments left out, and the
-    `description` of an input (prose, with examples) left out. A comment of the YAML is not a value and the parser drops it."""
-    found = []
-
-    def walk(node, where):
-        if isinstance(node, dict):
-            for key, value in node.items():
-                if key != "description":
-                    walk(value, where + "/" + str(key))
-        elif isinstance(node, list):
-            for i, value in enumerate(node):
-                walk(value, "%s[%d]" % (where, i))
-        elif isinstance(node, str):
-            text = "\n".join(line for line in node.splitlines() if not line.lstrip().startswith("#"))
-            found.extend((where, m.group(0)) for m in RELEASE_TAG.finditer(text))
-
-    walk(doc, "")
-    return found
 
 
 def test_the_resolver_returns_the_latest_published_firefox_release():
@@ -433,14 +407,14 @@ def test_an_explicit_published_tag_wins_and_the_resolver_runs_only_when_it_is_em
     assert pab["env"]["TAG"] == "${{ inputs.published_tag }}"
     assert pab["env"]["CAND_TAG"].index("inputs.candidate_tag") < pab["env"]["CAND_TAG"].index("inputs.published_tag")
     steps = [s for s in pab["steps"] if "published_release.py" in str(s.get("run", ""))]
-    assert len(steps) == 1 and steps[0]["if"] == "inputs.published_tag == ''" and "--name TAG" in steps[0]["run"]
-    # xpcshell.yml: the input is what PUBLISHED_TAG is, the resolver runs only with an empty input on this workflow's own push, and the prefs baseline is always resolved
+    assert len(steps) == 1 and steps[0]["if"] == "inputs.published_tag == ''" and 'echo "TAG=$BASE" >> "$GITHUB_ENV"' in steps[0]["run"]
+    # xpcshell.yml: the input is what PUBLISHED_TAG is, the resolver runs only with an empty input on this workflow's own event, and the prefs baseline is always resolved
     xp = _workflow("xpcshell.yml")["jobs"]
     assert xp["xpcshell"]["env"]["PUBLISHED_TAG"] == "${{ inputs.published_tag }}"
     steps = [s for s in xp["xpcshell"]["steps"] if "published_release.py" in str(s.get("run", ""))]
     assert len(steps) == 1 and steps[0]["if"].startswith("inputs.published_tag == '' &&") and "--name PUBLISHED_TAG" in steps[0]["run"]
     steps = [s for s in xp["prefs"]["steps"] if "published_release.py" in str(s.get("run", ""))]
-    assert len(steps) == 1 and "if" not in steps[0] and "--name PREFS_BASE_TAG" in steps[0]["run"] and xp["prefs"]["env"]["PREFS_BASE_TAG"] == ""
+    assert len(steps) == 1 and "if" not in steps[0] and 'echo "PREFS_BASE_TAG=$LATEST" >> "$GITHUB_ENV"' in steps[0]["run"] and xp["prefs"]["env"]["PREFS_BASE_TAG"] == ""
     # gate.yml: the input goes to the called workflow as it came, and its default is empty
     gate = _workflow("gate.yml")
     assert gate["jobs"]["package-ab"]["with"]["published_tag"] == "${{ inputs.published_tag }}"
@@ -452,25 +426,337 @@ def test_an_explicit_published_tag_wins_and_the_resolver_runs_only_when_it_is_em
     assert (WORKFLOWS / "xpcshell.yml").read_text(encoding="utf-8").count("/platform/ci/src/scripts/ci/published_release.py\n") == 2
 
 
-def test_the_rule_finds_a_hardcoded_release_tag_and_lets_placeholders_through():
-    import yaml
-    bad = yaml.safe_load("a:\n  default: firefox-68\n  env: { TAG: \"${{ inputs.published_tag || 'firefox-68' }}\" }\n  run: |\n    gh release download firefox-9 --repo x\n")
-    assert [tag for _, tag in hardcoded_release_tags(bad)] == ["firefox-68", "firefox-68", "firefox-9"]
-    fine = yaml.safe_load("a:\n  description: 'a tag (e.g. firefox-11)'\n  gate: 'a candidate: firefox-NN-candidate or firefox-69-candidate'\n"
-                          "  run: |\n    # firefox-47 moved the juggler\n    set -- art/firefox-*-stealth-linux.*\n    ls firefox-159.0-stealth-win.zip\n")
-    assert hardcoded_release_tags(fine) == []
+# ---------------------------------------------------------------- RULE (decision ci-02, "derived, never written"), over every workflow and every CI script
+#
+# A reference to something that changes (a release of the engine, a build run, a release asset, a version of the core or the wrapper) is resolved at run time from its
+# source of truth: the latest published release (scripts/ci/published_release.py), its seal, the version the wrapper pins, a branch head. A workflow input may name one
+# explicitly, and then it wins. Three detectors, one rule test (test_no_workflow_or_script_writes_a_reference_that_changes):
+#   a) a release tag `firefox-<N>`, as a whole token, in a value (a path component such as `ff-build/firefox-150` is not a tag);
+#   b) a run id or an asset id: eight digits or more as a whole token, where a reference is written (see names_a_reference and scan_workflow);
+#   c) a version `X.Y.Z` of the core or the wrapper, on a line (or under a key) that names `core`, `wrapper` or `invisible`.
+# Prose is not checked: the `description` of a workflow input, a shell comment, a Python comment, a docstring and the `help=`/`description=` of argparse.
+SCRIPTS = ROOT / "scripts"
+RELEASE_TAG = re.compile(r"(?<![\w.-])firefox-\d+(?![\w.-])")
+BIG_NUMBER = re.compile(r"(?<![\w.-])\d{8,}(?![\w.-])")
+VERSION = re.compile(r"(?<![\w.])\d+\.\d+\.\d+(?!\w|\.\d)")
+CORE_NAMES = re.compile(r"(?i)(?<![a-z])(?:invisible|core|wrapper)(?![a-z])")
+# The words that say a number is a reference, split at _ - . (so RUN_ID, build-run-id and NODE_DEPS_ASSET count; SOURCE_DATE_EPOCH, GIT_AUTHOR_EMAIL, PREFS and runner do not).
+ID_WORDS = {"run", "runs", "ref", "refs", "asset", "assets", "id", "runid"}
 
 
-def test_no_workflow_hardcodes_a_firefox_release_tag_as_a_value():
-    """RULE: the engine a job compares with, tests or publishes under is resolved from the release list (scripts/ci/published_release.py) or given as an input,
-    never written in a workflow: a tag written there is stale the day the next release is published (firefox-68 stayed in the gate after firefox-69)."""
+def release_tags(text) -> list:
+    """The `firefox-<N>` of `text` that are tags: `.../firefox-150` is a path component, unless it follows `/tags/` or `/download/`."""
+    found = []
+    for m in RELEASE_TAG.finditer(text):
+        before = text[:m.start()]
+        if before.endswith("/") and not before.endswith(("/tags/", "/download/")):
+            continue
+        found.append(m.group(0))
+    return found
+
+
+def names_a_reference(prefix) -> bool:
+    """True when one of the two words just before a number (the name it is assigned to, or the word before it) says run, ref, asset or id."""
+    words = re.findall(r"[A-Za-z0-9_.-]+", prefix[-80:])[-2:]
+    return any(part in ID_WORDS for word in words for part in re.split(r"[_.-]+", word.lower()))
+
+
+def strip_shell_comment(line) -> str:
+    """`line` without its comment: a `#` at the start or after a blank, outside quotes. A `$#` or a `${#a[@]}` is not a comment."""
+    quote = ""
+    for i, char in enumerate(line):
+        if quote:
+            quote = "" if char == quote else quote
+        elif char in "'\"":
+            quote = char
+        elif char == "#" and (i == 0 or line[i - 1] in " \t"):
+            return line[:i]
+    return line
+
+
+def segment_hits(segment, physical, column, kinds, where) -> list:
+    """The hits of one piece of text `segment` that starts at `column` of the physical line `physical` (its comment already out): (place, kind, token)."""
+    found = []
+    if "tag" in kinds:
+        found += [(where, "release tag", tag) for tag in release_tags(segment)]
+    if "id" in kinds:
+        found += [(where, "run or asset id", m.group(0)) for m in BIG_NUMBER.finditer(segment) if names_a_reference(physical[:column + m.start()])]
+    if "version" in kinds and CORE_NAMES.search(physical):
+        found += [(where, "core or wrapper version", m.group(0)) for m in VERSION.finditer(segment)]
+    return found
+
+
+def scan_shell(text, kinds=("tag", "id", "version")) -> list:
+    found = []
+    for number, raw in enumerate(text.splitlines(), 1):
+        line = strip_shell_comment(raw)
+        found += segment_hits(line, line, 0, kinds, "line %d" % number)
+    return found
+
+
+def scan_python(text) -> list:
+    """The string literals (the docstrings and the help=/description=/epilog= of a call left out) and the numbers of a Python source, by tokenize. A comment is not checked."""
+    import ast
+    import tokenize
+    lines = text.splitlines()
+    skip = []  # (start, end) of the text that is prose, as (row, column in characters)
+
+    def chars(row, byte_column):
+        return len(lines[row - 1].encode("utf-8")[:byte_column].decode("utf-8", "ignore"))
+
+    def prose(node):
+        skip.append(((node.lineno, chars(node.lineno, node.col_offset)), (node.end_lineno, chars(node.end_lineno, node.end_col_offset))))
+
+    for node in ast.walk(ast.parse(text)):
+        if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)) and node.body:
+            first = node.body[0]
+            if isinstance(first, ast.Expr) and isinstance(first.value, ast.Constant) and isinstance(first.value.value, str):
+                prose(first.value)
+        elif isinstance(node, ast.Call):
+            for keyword in node.keywords:
+                if keyword.arg in ("help", "description", "epilog"):
+                    prose(keyword.value)
+    strings = {tokenize.STRING, getattr(tokenize, "FSTRING_MIDDLE", tokenize.STRING)}
+    found = []
+    for tok in tokenize.generate_tokens(io.StringIO(text).readline):
+        if tok.type in strings and not any(start <= tok.start < end for start, end in skip):
+            for i, segment in enumerate(tok.string.split("\n")):
+                row = tok.start[0] + i
+                found += segment_hits(segment, strip_shell_comment(lines[row - 1]), tok.start[1] if i == 0 else 0, ("tag", "id", "version"), "line %d" % row)
+        elif tok.type == tokenize.NUMBER and "." not in tok.string and "x" not in tok.string.lower():
+            found += segment_hits(tok.string.replace("_", ""), lines[tok.start[0] - 1], tok.start[1], ("id",), "line %d" % tok.start[0])
+    return found
+
+
+def scan_workflow(text) -> list:
+    """Every string of a parsed workflow (the keys too, for a tag) without the `description` of an input and without shell comments. A run or asset id is looked
+    for where a reference is written: under `with:` or `env:`, a `ref`, a `run-id`, the `default` of an input, inside an expression `${{ }}`, and in a `run:` script by
+    the shell rule. A version of the core or the wrapper: on a line that names them, or under a key that does."""
     import yaml
+    found = []
+
+    def visit(value, where, key, written):
+        if isinstance(value, dict):
+            inputs = "inputs" in where.split("/")
+            for k, v in value.items():
+                if k == "description":
+                    continue
+                found.extend((where + "/" + str(k), "release tag", tag) for tag in release_tags(str(k)))
+                visit(v, where + "/" + str(k), str(k), written or k in ("with", "env", "ref", "run-id") or (k == "default" and inputs))
+        elif isinstance(value, list):
+            for i, v in enumerate(value):
+                visit(v, "%s[%d]" % (where, i), key, written)
+        elif isinstance(value, bool) or value is None:
+            return
+        elif isinstance(value, int):
+            if written and len(str(abs(value))) >= 8:
+                found.append((where, "run or asset id", str(value)))
+        elif isinstance(value, str):
+            lines = [strip_shell_comment(line) for line in value.splitlines()]
+            body = "\n".join(lines)
+            found.extend((where, "release tag", tag) for tag in release_tags(body))
+            if written:
+                found.extend((where, "run or asset id", m.group(0)) for m in BIG_NUMBER.finditer(body))
+            else:
+                for expression in re.findall(r"\$\{\{(.*?)\}\}", body, re.S):
+                    found.extend((where, "run or asset id (in an expression)", m.group(0)) for m in BIG_NUMBER.finditer(expression))
+            if key == "run":
+                found.extend((where + "/" + place, kind, token) for place, kind, token in scan_shell(body, ("id",)))
+            for line in lines:
+                if CORE_NAMES.search(line) or CORE_NAMES.search(key):
+                    found.extend((where, "core or wrapper version", m.group(0)) for m in VERSION.finditer(line))
+
+    visit(yaml.safe_load(text), "", "", False)
+    return found
+
+
+def rule_files() -> list:
+    """Every workflow, and every script of scripts/ (Python and shell) except a test file and the folder of the browser smoke tests: (path, scanner)."""
+    files = [(path, scan_workflow) for path in sorted(WORKFLOWS.glob("*.y*ml"))]
+    for pattern, scanner in (("*.py", scan_python), ("*.sh", scan_shell)):
+        for path in sorted(SCRIPTS.rglob(pattern)):
+            parts = path.relative_to(SCRIPTS).parts
+            if path.name.startswith("test_") or "tests" in parts or "__pycache__" in parts:
+                continue
+            files.append((path, scanner))
+    return files
+
+
+def written_references(read=lambda path: path.read_text(encoding="utf-8")) -> dict:
+    """{file: hits} for every file of rule_files(), read through `read` (the tree of an older commit is read through git by whoever asks for it)."""
     bad = {}
-    for path in sorted(WORKFLOWS.glob("*.yml")):
-        found = hardcoded_release_tags(yaml.safe_load(path.read_text(encoding="utf-8")))
-        if found:
-            bad[path.name] = found
+    for path, scanner in rule_files():
+        try:
+            text = read(path)
+        except FileNotFoundError:
+            continue
+        hits = scanner(text)
+        if hits:
+            bad[path.relative_to(ROOT).as_posix()] = hits
+    return bad
+
+
+def test_the_rule_detector_on_a_workflow_finds_what_is_written_and_lets_prose_and_other_numbers_through():
+    bad = scan_workflow("a:\n  default: firefox-68\n  env: { TAG: \"${{ inputs.published_tag || 'firefox-68' }}\", RUN: '44921963200', N: 12345678 }\n"
+                        "  inputs: { build_run_id: { default: '44921963200' } }\n  ref: 44921963200\n  x: \"${{ inputs.run || '44921963200' }}\"\n"
+                        "  run: |\n    gh release download firefox-9 --repo x\n    gh run download 44921963200 --name x\n    RUN_ID=44921963200\n"
+                        "    pip install invisible-core==69.82.0 invisible_playwright==0.57.0\n  CORE_VERSION: 69.82.0\n  with: { run-id: 44921963200 }\n")
+    kinds = sorted({(kind, token) for _, kind, token in bad})
+    assert kinds == [("core or wrapper version", "0.57.0"), ("core or wrapper version", "69.82.0"), ("release tag", "firefox-68"), ("release tag", "firefox-9"),
+                     ("run or asset id", "12345678"), ("run or asset id", "44921963200"), ("run or asset id (in an expression)", "44921963200")], kinds
+    assert sum(1 for _, kind, token in bad if token == "firefox-68") == 2 and any(where.endswith("/CORE_VERSION") for where, _, _ in bad), bad
+    assert [where for where, kind, token in bad if kind == "run or asset id" and "/run/" in where] == ["/a/run/line 2", "/a/run/line 3"], bad
+    fine = scan_workflow("a:\n  description: 'a tag (e.g. firefox-11) of a run 27346856197, core 69.82.0'\n  gate: 'a candidate: firefox-NN-candidate or firefox-69-candidate'\n"
+                         "  path: ff-build/firefox-150/x\n  inputs: { published_tag: { default: '' } }\n  timeout-minutes: 15\n  small: 12345678\n  flag: true\n"
+                         "  uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3.2.0\n  pin: 34e114876b0b11c390a56381ad16ebd13914f8d5\n"
+                         "  env: { RUN: \"${{ github.run_id }}\", SOURCE_DATE_EPOCH: 'x', V: '${{ inputs.v }}' }\n  tool: pip install pytest==8.3.4 fonttools==4.55.3 cryptography==44.0.0\n"
+                         "  run: |\n    # firefox-47 moved the juggler, run 44921963200, core 69.82.0\n    set -- art/firefox-*-stealth-linux.*\n    ls firefox-159.0-stealth-win.zip\n"
+                         "    SOURCE_DATE_EPOCH=1700000000 sccache 0.8.1 node 22.23.4 # firefox-68\n    echo \"$GITHUB_RUN_ID\" \"${#a[@]}\" $#\n")
+    assert [(kind, token) for _, kind, token in fine] == [], fine
+
+
+def test_the_rule_detector_on_a_python_script_checks_strings_and_numbers_but_not_prose():
+    bad = scan_python('TAG = "firefox-68"\nSEAL = {"run": 44921963200, "asset": "709796661"}\nASSET_ID = 678460500\nCORE = "invisible_core==69.82.0"\n'
+                      'def f(): return "release firefox-9 of run 44921963200"\nCMD = f"gh run view 44921963200 {SEAL}"\nREF = "firefox-9"\n')
+    assert sorted((kind, token) for _, kind, token in bad) == sorted([
+        ("release tag", "firefox-68"), ("run or asset id", "44921963200"), ("run or asset id", "709796661"), ("run or asset id", "678460500"),
+        ("core or wrapper version", "69.82.0"), ("release tag", "firefox-9"), ("run or asset id", "44921963200"), ("run or asset id", "44921963200"),
+        ("release tag", "firefox-9")]), bad
+    fine = scan_python('"""Module prose: firefox-68, run 44921963200, core 69.82.0."""\nimport argparse\nSOURCE_DATE_EPOCH = 1700000000\nEMAIL = "GIT_AUTHOR_EMAIL=12345678"\n'
+                       'P = "ff-build/firefox-150"\nOLD = "firefox-69-candidate"\nVER = "sccache 0.8.1 fonttools==4.55.3"\n'
+                       'def f():\n    """Prose: firefox-68 and run 44921963200."""\n    # firefox-68 in a comment, run 44921963200, core 69.82.0\n    return 12345678 + 1.5\n'
+                       'p = argparse.ArgumentParser(description="e.g. firefox-4 of core 69.82.0")\np.add_argument("--tag", help="a tag such as firefox-68, run 44921963200")\n')
+    assert fine == [], fine
+
+
+def test_the_rule_detector_on_a_shell_script_checks_what_runs_and_not_the_comments():
+    bad = scan_shell('NODE_DEPS_ASSET=709796661\nRUNNER_ASSET="678460500"\ngh release download firefox-68 --repo x\ncurl https://x/releases/assets/709796661\n'
+                     'gh run download 44921963200 --name x\npip install invisible_core==69.82.0\nCORE_VERSION=69.82.0\n')
+    assert sorted(bad) == sorted([
+        ("line 1", "run or asset id", "709796661"), ("line 2", "run or asset id", "678460500"), ("line 3", "release tag", "firefox-68"),
+        ("line 4", "run or asset id", "709796661"), ("line 5", "run or asset id", "44921963200"), ("line 6", "core or wrapper version", "69.82.0"),
+        ("line 7", "core or wrapper version", "69.82.0")]), bad
+    fine = scan_shell('# firefox-68, run 44921963200, core 69.82.0\nSOURCE_DATE_EPOCH=1700000000\nexport GIT_AUTHOR_EMAIL=12345678@x\nNODE_VERSION=22.23.4 # core 1.2.3\n'
+                      'echo "${#a[@]} $# firefox-*-stealth-linux.tar" "ff-build/firefox-150"\nRUNNER_VERSION=2.338.2\n'
+                      'curl -o x "https://github.com/actions/runner/releases/download/v$RUNNER_VERSION/x.tar.gz"\nsccache_version=0.8.1\n')
+    assert fine == [], fine
+
+
+def test_the_rule_reads_every_workflow_and_every_script_but_the_tests():
+    names = [path.relative_to(ROOT).as_posix() for path, _ in rule_files()]
+    assert len([n for n in names if n.startswith(".github/workflows/")]) >= 12 and len(names) >= 50, names
+    assert ".github/workflows/package-ab.yml" in names and "scripts/ci/node_bootstrap.sh" in names and "scripts/stock_parity.py" in names
+    assert "scripts/ci/published_release.py" in names and "scripts/make_release.sh" in names
+    assert not any("/test_" in n or "/tests/" in n or "__pycache__" in n for n in names), names
+
+
+def test_no_workflow_or_script_writes_a_reference_that_changes():
+    """RULE (ci-02, derived and never written): a release of the engine, a build run, a release asset, a version of the core or the wrapper is resolved at run time
+    from its source of truth (the latest published release, scripts/ci/published_release.py; its seal; the version the wrapper pins; a branch head) or given as an
+    input, which wins. A value written in a workflow or a script is stale the day the next release is published (firefox-68 stayed in the gate after firefox-69)
+    and a run's archives expire. Prose (a comment, an input's description, a docstring, an argparse help) is free to name them."""
+    bad = written_references()
     assert not bad, bad
+
+
+def test_the_resolver_rank_picks_the_release_before_the_latest():
+    releases = [_release("firefox-67"), _release("firefox-69"), _release("firefox-68"), _release("firefox-70", draft=True), _release("firefox-71", prerelease=True),
+                _release("firefox-69-candidate"), _release("firefox-100", prerelease=True), _release("firefox-69")]
+    assert published_release.latest_published(releases) == published_release.latest_published(releases, 1) == "firefox-69"
+    assert published_release.latest_published(releases, 2) == "firefox-68" and published_release.latest_published(releases, 3) == "firefox-67"
+    # the same tag twice is one release; a rank beyond the releases there are is an error that says how many there are, and 0 is not a rank
+    for given, rank, message in ((releases, 4, "only 3 published release(s)"), ([], 1, "no published release")):
+        try:
+            published_release.latest_published(given, rank)
+            raise AssertionError("rank %d was accepted" % rank)
+        except published_release.NoPublishedRelease as error:
+            assert message in str(error), str(error)
+    try:
+        published_release.latest_published(releases, 0)
+        raise AssertionError("rank 0 was accepted")
+    except ValueError:
+        pass
+    pages = json.dumps([_release("firefox-67"), _release("firefox-68"), _release("firefox-69")])
+    real_run = subprocess.run
+    published_release.subprocess.run = lambda cmd, **kwargs: subprocess.CompletedProcess(cmd, 0, pages, "")
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            env = os.path.join(tmp, "env")
+            with contextlib.redirect_stdout(io.StringIO()) as said:
+                assert published_release.main(["--repo", "o/r", "--rank", "2", "--github-env", env, "--name", "TAG"]) == 0
+            assert said.getvalue().strip() == "firefox-68" and Path(env).read_text() == "TAG=firefox-68\n"
+            with contextlib.redirect_stderr(io.StringIO()) as err:
+                assert published_release.main(["--repo", "o/r", "--rank", "4"]) == 1
+            assert "only 3 published release(s)" in err.getvalue()
+    finally:
+        published_release.subprocess.run = real_run
+
+
+def _steps_with(steps, needle):
+    return [s for s in steps if needle in str(s.get("run", "")) or needle in str(s.get("uses", "")) or needle in str(s.get("name", ""))]
+
+
+def test_an_explicit_build_run_id_wins_and_a_call_without_one_reads_its_own_run():
+    """A call (the gate's) names its run and that run's artifacts are read as before; a call that names none reads this run's own (github.run_id), never a literal."""
+    pab = _workflow("package-ab.yml")["jobs"]["package-ab"]
+    assert pab["env"]["BUILD_RUN_ID"] == "${{ inputs.build_run_id || github.run_id }}"
+    down = [s for s in pab["steps"] if str(s.get("uses", "")).startswith("actions/download-artifact")]
+    assert len(down) == 3 and all(s["with"]["run-id"] == "${{ env.BUILD_RUN_ID }}" and "github.run_id" in s["with"]["github-token"] for s in down)
+    xp = _workflow("xpcshell.yml")
+    on = xp.get(True) or xp["on"]
+    assert on["workflow_dispatch"]["inputs"]["build_run_id"]["default"] == ""
+    main_dl = [s for s in xp["jobs"]["xpcshell"]["steps"] if str(s.get("name", "")).startswith("Download asset (the run's)")]
+    cand_dl = [s for s in xp["jobs"]["prefs"]["steps"] if str(s.get("name", "")).startswith("Download the candidate (the run's asset)")]
+    assert len(main_dl) == 1 and len(cand_dl) == 1
+    for step in main_dl + cand_dl:
+        assert step["with"]["run-id"] == "${{ inputs.build_run_id || github.run_id }}", step["with"]
+        assert step["with"]["github-token"] == "${{ (inputs.build_run_id || github.run_id) != github.run_id && github.token || '' }}", step["with"]
+    # the main job: a given published tag or a given run is never replaced by the latest release (the resolver needs both empty), and the run's artifacts are
+    # downloaded only when no release is the engine
+    resolver = _steps_with(xp["jobs"]["xpcshell"]["steps"], "published_release.py")
+    assert len(resolver) == 1 and "inputs.published_tag == ''" in resolver[0]["if"] and "inputs.build_run_id == ''" in resolver[0]["if"]
+    assert main_dl[0]["if"] == "env.PUBLISHED_TAG == ''"
+    # the prefs job: the candidate is the run's asset unless the step that resolves the release found no run named (a call names its run, whatever its event)
+    pref = _steps_with(xp["jobs"]["prefs"]["steps"], "published_release.py")
+    assert len(pref) == 1 and "inputs.build_run_id == ''" in pref[0]["env"]["OWN_RUN"] and "github.workflow == 'xpcshell'" in pref[0]["env"]["OWN_RUN"]
+    assert cand_dl[0]["if"] == "env.PREFS_CAND_TAG == ''"
+
+
+def test_a_push_or_a_dispatch_with_no_run_takes_the_archives_of_the_latest_published_release():
+    pab = _workflow("package-ab.yml")["jobs"]["package-ab"]
+    steps = pab["steps"]
+    resolver = _steps_with(steps, "published_release.py")
+    assert len(resolver) == 1 and resolver[0]["if"] == "inputs.published_tag == ''"
+    run = resolver[0]["run"]
+    own = resolver[0]["env"]["OWN_PUSH"]
+    # the own push of package-ab only (the caller's name is github.workflow in a call): the A/B leg is the latest against the one before it
+    assert "github.event_name == 'push'" in own and "github.workflow == 'package-ab'" in own and "inputs.build_run_id == ''" in own
+    assert '[ "$MODE" = ab ] && [ -n "$OWN_PUSH" ]' in run and "--rank 2" in run and 'echo "CAND_TAG=$LATEST" >> "$GITHUB_ENV"' in run and 'echo "TAG=$BASE" >> "$GITHUB_ENV"' in run
+    # ... which is the path of a release as the candidate, checked against its seal and checksums.txt, the run's artifacts skipped
+    rel = [s for s in steps if s.get("id") == "candidate_release"]
+    assert len(rel) == 1 and rel[0]["if"] == "env.CAND_TAG != ''" and "sha256sum -c checksums.txt" in rel[0]["run"] and "seal-check candidate-release" in rel[0]["run"]
+    assert all(s["if"] == "env.CAND_TAG == ''" for s in steps if str(s.get("uses", "")).startswith("actions/download-artifact"))
+    assert steps.index(resolver[0]) < steps.index(rel[0])
+    # the A/A of a push's tag leg is the latest with itself, and only a push or the gate's call without candidate_tag gets it
+    assert '[ "$MODE" = tag ] && [ -z "$CANDIDATE_TAG" ]' in run
+    # xpcshell.yml, the main job: the same release, and its archives verified against the seal before they are extracted
+    xp = _workflow("xpcshell.yml")["jobs"]
+    legs = xp["xpcshell"]["steps"]
+    latest = _steps_with(legs, "published_release.py")
+    assert len(latest) == 1 and latest[0]["if"] == "inputs.published_tag == '' && inputs.build_run_id == '' && github.workflow == 'xpcshell'"
+    pub = [s for s in legs if str(s.get("name", "")).startswith("Download asset (the published")]
+    assert len(pub) == 1 and pub[0]["if"] == "env.PUBLISHED_TAG != ''" and "verify-asset" in pub[0]["run"] and legs.index(latest[0]) < legs.index(pub[0])
+    # xpcshell.yml, the prefs job: the candidate release and the base are both released archives checked against their seals, the candidate's download first
+    ps = xp["prefs"]["steps"]
+    assert xp["prefs"]["env"]["PREFS_CAND_TAG"] == "" and xp["prefs"]["env"]["PREFS_BASE_TAG"] == ""
+    resolver = _steps_with(ps, "published_release.py")
+    cand_rel = [s for s in ps if str(s.get("name", "")).startswith("Download the candidate (the latest published")]
+    base_rel = [s for s in ps if str(s.get("name", "")).startswith("Download the published engine")]
+    assert len(resolver) == 1 and len(cand_rel) == 1 and len(base_rel) == 1
+    assert 'echo "PREFS_CAND_TAG=$LATEST" >> "$GITHUB_ENV"' in resolver[0]["run"] and 'echo "PREFS_BASE_TAG=$LATEST" >> "$GITHUB_ENV"' in resolver[0]["run"]
+    assert cand_rel[0]["if"] == "env.PREFS_CAND_TAG != ''" and "art-cand" in cand_rel[0]["run"] and "verify-asset --dir art-cand" in cand_rel[0]["run"]
+    assert "verify-asset --dir art-pub" in base_rel[0]["run"] and "if" not in base_rel[0]
+    assert ps.index(resolver[0]) < ps.index(cand_rel[0]) and ps.index(resolver[0]) < ps.index(base_rel[0])
 
 
 # ---------------------------------------------------------------- the linkage: tiny PE and ELF files made here

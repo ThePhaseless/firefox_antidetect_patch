@@ -834,7 +834,7 @@ def main() -> int:
     ap.add_argument("--selftest", action="store_true",
                     help="run the known-bad inputs for the updater and the "
                          "page-surface checks and exit")
-    ap.add_argument("tag", nargs="?", help="release tag, e.g. firefox-4 (resolves to release/binary/<tag>/)")
+    ap.add_argument("tag", nargs="?", help="release tag, firefox-<N> (resolves to release/binary/<tag>/)")
     ap.add_argument("--linux", type=Path, help="explicit path to the Linux tar.gz (overrides tag)")
     ap.add_argument("--win", type=Path, help="explicit path to the Windows zip (overrides tag)")
     ap.add_argument("--linux-only", action="store_true")
