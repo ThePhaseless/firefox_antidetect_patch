@@ -3,7 +3,7 @@
 Category: build, other
 Prefs: none (network.trr.* are Firefox's own; the build keeps network.trr.async_connInfo off and network.trr.exclude-etc-hosts false)
 Test: TestStealthTRRContext.*, TestStealthSessionResolver.* and StealthIceResolverContext.* (netwerk/test/gtest and dom/media/webrtc/transport/test/gtest, in the default gtest filter of the candidate): they run the functions the hooks call, with fake channels
-for the templates of the two channel classes (a failed lookup, a refused answer, a cancellation, a context with a proxy), a real channel for the context of a DoH request, and a real socket transport for the TLS over a tunnel; the node
+for the templates of the two channel classes (a failed lookup, a refused answer, a cancellation, a context with a proxy), a real channel for the context of a DoH request, a real socket transport for the TLS over a tunnel, and the socket process and the parent replayed in the order of sending for the message of the context (with the control: a constructor without its message has no context); the node
 tests of juggler/tests (the text pins of the hooks are gone: HOOKS.json declares the hooks, and these tests assert the only entry and the order against Mozilla's statements): dns_has_no_gate_of_ours, doh_never_goes_direct_when_its_proxy_is_lost,
 doh_request_carries_the_context_of_its_lookup, proxy_info_leaves_name_resolution_to_the_browser,
 trr_connection_info_is_not_cached_in_this_build, etc_hosts_exclusion_is_off, http_proxy_credentials_are_sent_preemptively_for_doh,
@@ -23,7 +23,16 @@ tells the proxy to resolve the host (the browser resolves the name and connects 
 - The context. `StealthTRRContext` (netwerk/ipc) takes the user context id from the lookup's origin suffix and gives it to the load
   info of the TRR channel (`TRRLoadInfo` keeps the origin attributes, also in its clone) and to the stand-in channel of the proxy
   lookup, so the proxy filters (the Juggler's) answer for that context. The default context carries nothing: the browser's proxy
-  answers it, as upstream. The cached connection info of the default server is not used for another context.
+  answers it, as upstream. The cached connection info of the default server is not used for another context. The context reaches the
+  proxy lookup without a parameter in any Mozilla signature: it is state of ours (`StealthTRRContext`), set by `TRRServiceChannel::ResolveProxy` on the
+  statement before `ProxyConfigLookup::Create` (`StealthSetTRRLookupContext`, "pending") and taken by the first statement of `Create`
+  (`StealthEnterTRRLookupContext`: pending becomes "active"), so a lookup never carries the context of another and a lookup nobody set a context for has none.
+  Where `Create` builds the stand-in channel the active context is given to it (`StealthApplyTRRLookupContext`). In the socket process
+  `ProxyConfigLookupChild::Create` sends the active context in a message of PSocketProcess, `StealthProxyLookupOrigin`, always (empty when empty),
+  right before the constructor of PProxyConfigLookup; the parent parks it in the slot of the socket process actor
+  (`SocketProcessParent::RecvStealthProxyLookupOrigin`) and the first statement of `RecvPProxyConfigLookupConstructor` takes it
+  (`StealthTakeParkedTRRLookupContext`). The messages of one protocol arrive in the order they were sent, the take empties the slot and the next
+  message overwrites it, so a lookup made in the parent process in between never reads it.
 - Fail closed. A DoH request whose proxy lookup fails or cannot start ends with an error (`StealthTRRProxyFailure`) instead of
   failing over to DIRECT, which would send the name from the machine's own address. A cancellation keeps its own code.
 - Fail closed on the main thread too. With no socket process, or after a proxy 401/407, the DoH request is sent from the main thread by a
@@ -107,7 +116,8 @@ Every hook is one line with the marker, in a form of the contract; HOOKS.json li
 - `netwerk/protocol/http/TRRServiceChannel.cpp`: an include; the lookup is `NS_SUCCEEDED(StealthTRRServiceProxyLookup(this, ResolveProxy()))` (one line rewritten),
   the answer an anchor after `nsresult rv;` in `OnProxyAvailable`, the connection info and the alternative service mapping take
   `StealthTRRConnectionAttributes(this, OriginAttributes())` in place of the default attributes (two lines rewritten); the proxy lookup of
-  `ResolveProxy` passes `Nothing(), StealthTRRContextOf(this)` as two arguments added to `ProxyConfigLookup::Create` (one line rewritten, a pm-approved exception: no form adds arguments to a call; the context is that of its load info).
+  `ResolveProxy` is Mozilla's call of `ProxyConfigLookup::Create`, preceded by an anchor, `StealthSetTRRLookupContext(this);`, on the statement before (the context is that of the channel's load info; no
+  argument is added to Mozilla's call).
 - `netwerk/protocol/http/nsHttpChannel.cpp`: an include; `NS_SUCCEEDED(StealthChannelProxyLookup(this, ResolveProxy()))` (one line rewritten) and an
   anchor `if (StealthChannelOnProxyAnswer(this, status, pi)) return NS_OK;` after `nsresult rv;` in `OnProxyAvailable`.
 - `dom/media/webrtc/transport/nriceresolver.{h,cpp}`, `dom/media/webrtc/jsapi/MediaTransportHandler.cpp`: the resolver's origin attributes (the member after `vtbl_`, the two
@@ -136,8 +146,11 @@ Every hook is one line with the marker, in a form of the contract; HOOKS.json li
 - `modules/libpref/init/StaticPrefList.yaml` (the file is owned by fingerprint/webgpu/adapter-declaration), `network.trr.request_timeout_ms`: the value line carries the TRR-only timeout (30000); a proxied lookup is TRR_ONLY per request in global mode 0.
 - `modules/libpref/init/StaticPrefList.yaml` (same file), `network.trr.exclude-etc-hosts`: the value line is false; the host's hosts file is never read, not even at start-up.
 - Hooks of this feature in files another folder owns (a file has one owner): `netwerk/base/TRRLoadInfo.cpp`
-  (automation/navigation), `netwerk/ipc/ProxyConfigLookup*.{h,cpp}`, `PSocketProcess.ipdl`, `SocketProcessParent.{h,cpp}`,
-  `netwerk/ipc/moz.build` (network/proxy-udp: the lookup carries the origin attributes next to the load info),
+  (automation/navigation), `netwerk/ipc/ProxyConfigLookup.cpp`, `ProxyConfigLookupChild.cpp`, `PSocketProcess.ipdl`, `SocketProcessParent.{h,cpp}`,
+  `netwerk/ipc/moz.build` (network/proxy-udp: the message `StealthProxyLookupOrigin` of the context sits next to the message of the load info, one line each:
+  `StealthEnterTRRLookupContext();` first in `Create`, `StealthApplyTRRLookupContext(channel, &rv)` after Mozilla's channel creation in `DoProxyResolve`,
+  `StealthSendTRRLookupContext(socketChild);` right before the constructor in `ProxyConfigLookupChild::Create`, the declaration of `RecvStealthProxyLookupOrigin`
+  (defined in `StealthTRRContext.cpp`) and `StealthTakeParkedTRRLookupContext(this);` first in `RecvPProxyConfigLookupConstructor`),
   `netwerk/test/gtest/moz.build` (network/socks). Their lines are tagged `STEALTH-HOOK(network/doh)`. The Juggler files of the pending
   filter (NetworkObserver.js, TargetRegistry.js, Protocol.js, BrowserHandler.js, Juggler.js, SessionRoute.js) belong to automation/juggler.
 

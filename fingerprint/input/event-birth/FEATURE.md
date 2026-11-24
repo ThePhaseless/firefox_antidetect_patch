@@ -43,7 +43,7 @@ web-exposed KeyboardEventInit. The logic lives in `dom/base/StealthInputEventBir
   the anchor `StealthSetMouseEventBirth(mouseOrPointerEvent, aMouseEventData, aPresShell);` after the `mMovementX.WasPassed()` block of
   `SynthesizeMouseEvent`. The two other hooks of this function (`StealthSetJugglerId`, `StealthJugglerNotAsyncSynthesized`) belong to automation/input.
 - `dom/base/moz.build` (`UNIFIED_SOURCES += ["StealthInputEventBirth.cpp"]`) and `dom/base/test/gtest/moz.build` (`UNIFIED_SOURCES +=
-  ["TestStealthInputEventBirth.cpp"]`), after the closing brackets, one line per owner folder.
+  ["TestStealthInputEventBirth.cpp"]`), after the closing brackets, one line per owner folder (the gtest `moz.build` also holds the lines of the other folders, such as `TestStealthCallerObject.cpp` of automation/hybrid-xrays, which keep their own markers).
 - No Mozilla line is removed or changed in this folder.
 
 ## Our own files
