@@ -14,7 +14,7 @@
   "form": "wrap-call",
   "line": "  status = StealthConnect(this, fd, &prAddr, NS_SOCKET_CONNECT_TIMEOUT);  // STEALTH-HOOK(network/ipv6-literal)",
   "removed": "  status = PR_Connect(fd, &prAddr, NS_SOCKET_CONNECT_TIMEOUT);",
-  "test": ""
+  "test": "wrapper:tests/test_ipv6_literal_connect_e2e.py::test_a_direct_ipv6_literal_is_refused_and_one_behind_socks_is_left_to_the_proxy"
  },
  {
   "file": "netwerk/base/nsSocketTransport2.h",
@@ -22,6 +22,6 @@
   "kind": "add",
   "form": "member",
   "line": "  friend struct StealthSocketTransportAccess;  // STEALTH-HOOK(network/ipv6-literal)",
-  "test": ""
+  "test": "wrapper:tests/test_ipv6_literal_connect_e2e.py::test_a_direct_ipv6_literal_is_refused_and_one_behind_socks_is_left_to_the_proxy"
  }
 ]

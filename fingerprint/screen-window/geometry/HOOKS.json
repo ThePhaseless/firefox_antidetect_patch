@@ -23,7 +23,8 @@
   "line": "      GetDeclaredRealmLanguage(aDocument), GetDeclaredRealmTimezone(aDocument));  // STEALTH-HOOK(fingerprint/locale-time/session-declaration)",
   "removed": "      aDocument->GetBrowsingContext()->Top()->GetLanguageOverride(),\n      aDocument->GetBrowsingContext()->Top()->GetTimezoneOverride());",
   "test": "wrapper:tests/test_context_locale_e2e.py::test_intl_in_the_page_realm_follows_the_language_and_zone_of_its_context",
-  "exception": "G35, approved by the pm (PM-DECISIONS.md, 22/11): the two Mozilla arguments GetLanguageOverride()/GetTimezoneOverride() are replaced by the declared language and zone, as on the base; keeping Mozilla's tokens inside a wrap would change the call and its order of evaluation with no gain in portability (the same two Mozilla lines stay touched). To review at the port to 160.",
+  "exception": "the two arguments of xpc::InitGlobalObjectOptions in CreateNativeGlobalForInner are the document's context language and zone, or the session's when the context carries none, including a document with no BrowsingContext. Mozilla's expressions dereference the context, no add-only form can substitute a value for them or stop their evaluation (arguments are evaluated before any callee of ours), and a hook before the statement cannot skip it.",
+  "reason_kind": "expression",
   "pm": "approvato"
  },
  {
@@ -137,7 +138,7 @@
   "kind": "add",
   "form": "registration",
   "line": "EXPORTS.ipc += [\"StealthMouseEventIPC.h\"]  # STEALTH-HOOK(automation/input)",
-  "test": ""
+  "test": "gtest:StealthMouseEventIPC.TheIdSurvivesTheMessage"
  },
  {
   "file": "widget/nsIWidget.cpp",

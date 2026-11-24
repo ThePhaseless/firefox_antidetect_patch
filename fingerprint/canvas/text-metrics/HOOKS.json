@@ -14,7 +14,7 @@
   "form": "wrap-call",
   "line": "      RefPtr<SourceSurface> srcSurf = srcCanvas->StealthGetSurfaceSnapshot();  // STEALTH-HOOK(fingerprint/canvas/text-metrics)",
   "removed": "      RefPtr<SourceSurface> srcSurf = srcCanvas->GetSurfaceSnapshot();",
-  "test": ""
+  "test": "gtest:StealthCanvasPageSnapshot.TheSnapshotOfTheContextIsNotTakenWhenItHasAnElement"
  },
  {
   "file": "dom/canvas/CanvasRenderingContext2D.cpp",
@@ -23,7 +23,7 @@
   "form": "wrap-call",
   "line": "      RefPtr<SourceSurface> srcSurf = srcCanvas->StealthGetSurfaceSnapshot();  // STEALTH-HOOK(fingerprint/canvas/text-metrics)",
   "removed": "      RefPtr<SourceSurface> srcSurf = srcCanvas->GetSurfaceSnapshot();",
-  "test": ""
+  "test": "gtest:StealthCanvasPageSnapshot.TheSnapshotOfTheContextIsNotTakenWhenItHasAnElement"
  },
  {
   "file": "dom/canvas/CanvasRenderingContext2D.cpp",
@@ -41,6 +41,6 @@
   "kind": "add",
   "form": "member",
   "line": "  already_AddRefed<mozilla::gfx::SourceSurface> StealthGetSurfaceSnapshot();  // STEALTH-HOOK(fingerprint/canvas/text-metrics)",
-  "test": ""
+  "test": "gtest:StealthCanvasPageSnapshot.TheSnapshotOfTheContextIsNotTakenWhenItHasAnElement"
  }
 ]

@@ -29,9 +29,9 @@
   "kind": "add",
   "form": "anchor",
   "line": "  mozilla::StealthDebuggerReadMode(cx, object, &invisibleDebuggee_);  // STEALTH-HOOK(fingerprint/js-surface/debugger)",
-  "test": "",
-  "anchor": "",
-  "why": ""
+  "test": "gtest:StealthDebugger.ARealmShowsNoDebuggerOnlyWhenTheDebuggerIsInStealthMode",
+  "anchor": "if (!cx->compartment()->wrap(cx, &debuggeeLink)) { return false; }  (the block that wraps debuggeeLink, just before the no-GC region)",
+  "why": "the mode is read in the debuggee's realm (after AutoRealm ar(cx, global) and the wrap of debuggeeLink) and before the no-GC region; a guard at the top of addDebuggeeGlobal would run in the debugger's realm and also on the already-debuggee early return"
  },
  {
   "file": "js/src/debugger/Debugger.cpp",
@@ -39,9 +39,9 @@
   "kind": "add",
   "form": "anchor",
   "line": "  if (!invisibleDebuggee_)  // STEALTH-HOOK(fingerprint/js-surface/debugger)",
-  "test": "",
-  "anchor": "",
-  "why": ""
+  "test": "gtest:StealthDebugger.ARealmShowsNoDebuggerOnlyWhenTheDebuggerIsInStealthMode",
+  "anchor": "auto& globalDebuggers = global->getDebuggers(nogc);",
+  "why": "the line conditions Mozilla's untouched append to the global's debugger vector (step 1), which an invisible debuggee must not make; globalDebuggers is a local reference born on the line above and the member it reads is set in the middle of the function, so a guard at the head of addDebuggeeGlobal has neither"
  },
  {
   "file": "js/src/debugger/Debugger.cpp",
@@ -49,9 +49,9 @@
   "kind": "add",
   "form": "anchor",
   "line": "  mozilla::StealthDebuggerReleaseIfInvisible(invisibleDebuggee_, globalDebuggersGuard);  // STEALTH-HOOK(fingerprint/js-surface/debugger)",
-  "test": "",
-  "anchor": "",
-  "why": ""
+  "test": "gtest:StealthDebugger.ARealmShowsNoDebuggerOnlyWhenTheDebuggerIsInStealthMode",
+  "anchor": "auto globalDebuggersGuard = MakeScopeExit([&] { globalDebuggers.popBack(); });",
+  "why": "the rollback guard of step (1) is a local of Mozilla's function that exists only after this statement; for an invisible debuggee nothing was pushed, so the guard is released here, by reference, and nothing earlier can name it"
  },
  {
   "file": "js/src/debugger/Debugger.cpp",
@@ -59,9 +59,9 @@
   "kind": "add",
   "form": "anchor",
   "line": "  if (invisibleDebuggee_) return mozilla::StealthDebuggerReleaseGuards(globalDebuggersGuard, debuggeesGuard, debuggeeZonesGuard);  // STEALTH-HOOK(fingerprint/js-surface/debugger)",
-  "test": "",
-  "anchor": "",
-  "why": ""
+  "test": "gtest:StealthDebugger.ARealmShowsNoDebuggerOnlyWhenTheDebuggerIsInStealthMode",
+  "anchor": "the end of the scope-exit guard debuggeeZonesGuard (the last statement of step (3))",
+  "why": "the successful early return between steps (3) and (4) passes the three rollback guards, locals of Mozilla's function, to be released, and skips steps (4) and (5), which an invisible attach never had; it cannot sit at the head of the function, which has none of them"
  },
  {
   "file": "js/src/debugger/Debugger.cpp",

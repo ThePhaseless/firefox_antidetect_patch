@@ -61,7 +61,7 @@
   "form": "wrap-call",
   "line": "  SurfaceFromElementResult result = nsLayoutUtils::StealthSurfaceFromElementAsDrawn(aCanvas);  // STEALTH-HOOK(fingerprint/canvas/as-drawn)",
   "removed": "  SurfaceFromElementResult result = nsLayoutUtils::SurfaceFromElement(aCanvas);",
-  "test": ""
+  "test": "wrapper:tests/test_canvas_reads_as_drawn.py::test_random_pixels_read_back_as_drawn"
  },
  {
   "file": "dom/events/EventStateManager.cpp",
@@ -200,7 +200,7 @@
   "kind": "add",
   "form": "registration",
   "line": "UNIFIED_SOURCES += [\"TestStealthSurfaceFlags.cpp\"]  # STEALTH-HOOK(fingerprint/canvas/as-drawn)",
-  "test": ""
+  "test": "gtest:StealthSurfaceFlags.OnlyOurFlagAsksForTheCanvasAsDrawn"
  },
  {
   "file": "widget/MouseEvents.h",
@@ -224,7 +224,7 @@
   "kind": "add",
   "form": "registration",
   "line": "#include \"ipc/StealthMouseEventIPC.h\"  // STEALTH-HOOK(automation/input)",
-  "test": ""
+  "test": "gtest:StealthMouseEventIPC.TheIdSurvivesTheMessage"
  },
  {
   "file": "widget/nsGUIEventIPC.h",
@@ -243,7 +243,7 @@
   "form": "wrap-expression",
   "line": "           StealthReadJugglerEventId(aReader, aResult, ReadParam(aReader, &aResult->mInputSource));  // STEALTH-HOOK(automation/input)",
   "removed": "           ReadParam(aReader, &aResult->mInputSource);",
-  "test": ""
+  "test": "gtest:StealthMouseEventIPC.TheIdIsReadOnlyWhenTheFieldBeforeItWasRead"
  },
  {
   "file": "xpcom/reflect/xptinfo/xptinfo.h",

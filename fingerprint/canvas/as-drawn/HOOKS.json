@@ -14,7 +14,7 @@
   "form": "wrap-call",
   "line": "  result.mSourceSurface = aElement->StealthGetSurfaceSnapshot(aSurfaceFlags, pAlphaType, aTarget);  // STEALTH-HOOK(fingerprint/canvas/as-drawn)",
   "removed": "  result.mSourceSurface = aElement->GetSurfaceSnapshot(pAlphaType, aTarget);",
-  "test": ""
+  "test": "wrapper:tests/test_moz_element_paints_a_webgl_canvas_as_drawn_e2e.py::test_moz_element_paints_a_webgl_canvas_as_drawn"
  },
  {
   "file": "layout/base/nsLayoutUtils.h",
@@ -22,7 +22,7 @@
   "kind": "add",
   "form": "member",
   "line": "  template <class ElementT> static mozilla::SurfaceFromElementResult StealthSurfaceFromElementAsDrawn(ElementT* aElement);  // STEALTH-HOOK(fingerprint/canvas/as-drawn)",
-  "test": ""
+  "test": "wrapper:tests/test_moz_element_paints_a_webgl_canvas_as_drawn_e2e.py::test_moz_element_paints_a_webgl_canvas_as_drawn"
  },
  {
   "file": "layout/painting/nsImageRenderer.cpp",
@@ -39,7 +39,7 @@
   "form": "wrap-call",
   "line": "    mImageElementSurface = nsLayoutUtils::StealthSurfaceFromElementAsDrawn(paintElement);  // STEALTH-HOOK(fingerprint/canvas/as-drawn)",
   "removed": "    mImageElementSurface = nsLayoutUtils::SurfaceFromElement(paintElement);",
-  "test": ""
+  "test": "wrapper:tests/test_moz_element_paints_a_webgl_canvas_as_drawn_e2e.py::test_moz_element_paints_a_webgl_canvas_as_drawn"
  },
  {
   "file": "widget/nsBaseDragService.cpp",

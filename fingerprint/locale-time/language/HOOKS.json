@@ -13,9 +13,9 @@
   "kind": "add",
   "form": "anchor",
   "line": "    if (StealthDeclaredRegionalPrefsLocales(aRetVal)) return NS_OK;  // STEALTH-HOOK(fingerprint/locale-time/language)",
-  "test": "",
-  "anchor": "",
-  "why": ""
+  "test": "gtest:Intl_Locale_StealthSystemLocales.WithTheOSLocalesPreferenceTheDeclaredLanguageIsTheOnlyOne",
+  "anchor": "`if (useOSLocales) {` of Mozilla, as its first statement",
+  "why": "the answer is given in the block that runs only when the OS regional preferences are used, before Mozilla's call of OSPreferences::GetRegionalPrefsLocales; OSPreferences has two other callers (Troubleshoot.sys.mjs, TelemetryEnvironment.sys.mjs) that keep the host's value today, so the declaration is not applied at the source, and a guard at the head of GetRegionalPrefsLocales would also answer when the pref is off"
  },
  {
   "file": "intl/locale/LocaleService.cpp",
@@ -23,9 +23,9 @@
   "kind": "add",
   "form": "anchor",
   "line": "  if (!StealthDeclaredRegionalPrefsLocales(regionalPrefsLocales))  // STEALTH-HOOK(fingerprint/locale-time/language)",
-  "test": "",
-  "anchor": "",
-  "why": ""
+  "test": "gtest:Intl_Locale_StealthSystemLocales.TheDeclaredLanguageIsTheRegionalLanguage",
+  "anchor": "`LocaleService::GetInstance()->GetAppLocaleAsBCP47(appLocale);` of Mozilla",
+  "why": "regionalPrefsLocales is Mozilla's local, declared a few lines above and filled in place by the declaration; the line conditions Mozilla's untouched host query that follows it, so the host is not asked when a language is declared, and a guard at the head of the function would run before the local exists"
  },
  {
   "file": "intl/locale/moz.build",
