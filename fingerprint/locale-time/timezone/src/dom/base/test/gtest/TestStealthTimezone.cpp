@@ -96,6 +96,60 @@ TEST(StealthTimezone, LocalTimeIsTheDeclaredZonesWallClock)
   EXPECT_EQ(kolkata.tm_params.tp_dst_offset, 0);
 }
 
+// The form the hooks of Document.cpp use: an anchor notes the document, the call
+// that replaces Mozilla's PR_ExplodeTime has Mozilla's arguments and takes it.
+
+TEST(StealthTimezone, TheNotedDocumentIsForTheNextCallOnly)
+{
+  RefPtr<Document> doc = CreateDoc();
+  DeclaredZone zone("Pacific/Chatham");
+  PRExplodedTime first, second, host;
+  StealthNoteTimeDocument(doc);
+  StealthExplodeTime(kInstant, PR_LocalTimeParameters, &first);
+  // The second call has noted nothing: it is Mozilla's, not the first's.
+  StealthExplodeTime(kInstant, PR_LocalTimeParameters, &second);
+  PR_ExplodeTime(kInstant, PR_LocalTimeParameters, &host);
+  EXPECT_EQ(first.tm_hour, 21);
+  EXPECT_EQ(first.tm_min, 13);
+  EXPECT_EQ(second.tm_hour, host.tm_hour);
+  EXPECT_EQ(second.tm_min, host.tm_min);
+  EXPECT_EQ(second.tm_params.tp_gmt_offset, host.tm_params.tp_gmt_offset);
+}
+
+TEST(StealthTimezone, NothingNotedIsMozillasPRExplodeTime)
+{
+  // Control: a zone is declared and no document is noted.
+  DeclaredZone zone("Asia/Kolkata");
+  PRExplodedTime ours, host;
+  StealthExplodeTime(kInstant, PR_LocalTimeParameters, &ours);
+  PR_ExplodeTime(kInstant, PR_LocalTimeParameters, &host);
+  EXPECT_EQ(ours.tm_hour, host.tm_hour);
+  EXPECT_EQ(ours.tm_min, host.tm_min);
+  PRExplodedTime gmtOurs, gmtHost;
+  StealthExplodeTime(kInstant, PR_GMTParameters, &gmtOurs);
+  PR_ExplodeTime(kInstant, PR_GMTParameters, &gmtHost);
+  EXPECT_EQ(gmtOurs.tm_hour, gmtHost.tm_hour);
+}
+
+TEST(StealthTimezone, TwoNotedDocumentsWithOppositeZonesDoNotLeak)
+{
+  RefPtr<Document> doc = CreateDoc();
+  PRExplodedTime chatham, kolkata;
+  {
+    DeclaredZone zone("Pacific/Chatham");
+    StealthNoteTimeDocument(doc);
+    StealthExplodeTime(kInstant, PR_LocalTimeParameters, &chatham);
+  }
+  {
+    DeclaredZone zone("Asia/Kolkata");
+    StealthNoteTimeDocument(doc);
+    StealthExplodeTime(kInstant, PR_LocalTimeParameters, &kolkata);
+  }
+  EXPECT_EQ(chatham.tm_hour, 21);
+  EXPECT_EQ(kolkata.tm_hour, 12);
+  EXPECT_EQ(kolkata.tm_min, 58);
+}
+
 // resistFingerprinting asks for UTC by passing PR_GMTParameters: the declared
 // zone is not consulted.
 

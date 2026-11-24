@@ -182,6 +182,20 @@ void StealthExplodeTime(const Document* aDocument, PRTime aTime,
                         PRTimeParamFn aParams, PRExplodedTime* aExploded);
 
 /**
+ * Document::GetFormattedTimeString (document.lastModified) is a static function
+ * of Mozilla's that has no document: StealthNoteTimeDocument, an anchor at each
+ * of its two callers, says whose time it is about to format (the caller's
+ * `this`), and the call of Mozilla's PR_ExplodeTime in it is
+ * StealthExplodeTime(aTime, aParams, aExploded), the same arguments, which takes
+ * that document and CLEARS it: the document it was given is the document of the
+ * one call that follows. Called with none noted (a caller no hook announced),
+ * it is PR_ExplodeTime itself, as Mozilla has it. Main thread only.
+ */
+void StealthNoteTimeDocument(const Document* aDocument);
+void StealthExplodeTime(PRTime aTime, PRTimeParamFn aParams,
+                        PRExplodedTime* aExploded);
+
+/**
  * STEALTHFOX: the language of a document's text that declares none is the
  * language of ITS CONTEXT, not of the process.
  *
