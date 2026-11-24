@@ -132,6 +132,14 @@
   "test": "gtest:StealthFullscreen.TheRectOrTakesTheDeclaredScreenAndElseMozillas"
  },
  {
+  "file": "widget/moz.build",
+  "function": "SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "EXPORTS.ipc += [\"StealthMouseEventIPC.h\"]  # STEALTH-HOOK(automation/input)",
+  "test": ""
+ },
+ {
   "file": "widget/nsIWidget.cpp",
   "function": "",
   "kind": "add",

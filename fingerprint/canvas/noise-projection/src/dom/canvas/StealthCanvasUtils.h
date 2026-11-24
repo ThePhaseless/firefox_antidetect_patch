@@ -54,6 +54,23 @@ already_AddRefed<gfx::SourceSurface> StealthProjectWebGPUSnapshot(
     nsICanvasRenderingContextInternal* aContext,
     already_AddRefed<gfx::SourceSurface> aSnapshot);
 
+// The snapshot a page reads of a canvas context (nsICanvasRenderingContextInternal::StealthGetSurfaceSnapshot, what
+// createPattern() takes from a canvas or an OffscreenCanvas): the element's own GetSurfaceSnapshot, where the noise of a
+// WebGL or WebGPU canvas is applied, never the context's raw one, which would read a WebGL canvas back for nothing. The
+// element of the context is aCanvas (a canvas element's context) or aOffscreen (an OffscreenCanvas's); only a context that
+// has neither (never one of those two paths) answers with its own snapshot, aContextOwn.
+template <typename CanvasT, typename OffscreenT, typename ContextOwnT>
+already_AddRefed<gfx::SourceSurface> StealthPageSnapshotOf(
+    CanvasT* aCanvas, OffscreenT* aOffscreen, ContextOwnT&& aContextOwn) {
+  if (aCanvas) {
+    return aCanvas->GetSurfaceSnapshot();
+  }
+  if (aOffscreen) {
+    return aOffscreen->GetSurfaceSnapshot();
+  }
+  return aContextOwn();
+}
+
 }  // namespace CanvasUtils
 }  // namespace mozilla
 

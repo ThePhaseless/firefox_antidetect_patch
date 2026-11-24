@@ -40,10 +40,8 @@
   "function": "nsresult nsDocShell::InternalLoad(nsDocShellLoadState* aLoadState,",
   "kind": "add",
   "form": "unknown",
-  "line": "  StealthNavigationLoad stealthLoad(this, aLoadState, !isJavaScript && !sameDocument);  // STEALTH-HOOK(automation/navigation)",
-  "test": "wrapper:tests/test_a_goto_to_a_refused_port_ends_with_its_reason_e2e.py::test_a_goto_to_a_refused_port_ends_with_its_reason",
-  "anchor": "nsCOMPtr<nsIRequest> req; (in InternalLoad, before rv = DoURILoad(...))",
-  "why": "needs isJavaScript and sameDocument, two locals Mozilla computes in InternalLoad: a wrap of DoURILoad would recompute them and follow Mozilla's rule silently only until it changes"
+  "line": "  StealthNavigationLoad stealthLoad(this, aLoadState);  // STEALTH-HOOK(automation/navigation)",
+  "test": ""
  },
  {
   "file": "docshell/base/nsDocShell.cpp",

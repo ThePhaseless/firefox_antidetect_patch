@@ -82,24 +82,24 @@ TEST(StealthWindowInputDesktop, OnlyAWindowOfThisProcessOnAnotherDesktopIsOff)
   {
     WindowOnItsOwnThread onInput(nullptr);
     ASSERT_TRUE(onInput.Window());
-    EXPECT_TRUE(webrtc::StealthIsWindowOnInputDesktop(onInput.Window()));
-    EXPECT_FALSE(webrtc::StealthIsOffInputDesktop(onInput.Window()));
+    EXPECT_TRUE(mozilla::StealthIsWindowOnInputDesktop(onInput.Window()));
+    EXPECT_FALSE(mozilla::StealthIsOffInputDesktop(onInput.Window()));
   }
 
   // A window created on a second desktop object.
   {
     WindowOnItsOwnThread hidden(L"StealthHiddenDesktopTest");
     ASSERT_TRUE(hidden.Window());
-    EXPECT_FALSE(webrtc::StealthIsWindowOnInputDesktop(hidden.Window()));
-    EXPECT_TRUE(webrtc::StealthIsOffInputDesktop(hidden.Window()));
+    EXPECT_FALSE(mozilla::StealthIsWindowOnInputDesktop(hidden.Window()));
+    EXPECT_TRUE(mozilla::StealthIsOffInputDesktop(hidden.Window()));
   }
 
   // A window of another process cannot be asked: reported as on.
   HWND other = ::GetDesktopWindow();
   ASSERT_TRUE(other);
-  EXPECT_TRUE(webrtc::StealthIsWindowOnInputDesktop(other));
+  EXPECT_TRUE(mozilla::StealthIsWindowOnInputDesktop(other));
 
   // No window, so no thread: reported as on.
-  EXPECT_TRUE(webrtc::StealthIsWindowOnInputDesktop(nullptr));
-  EXPECT_FALSE(webrtc::StealthIsOffInputDesktop(nullptr));
+  EXPECT_TRUE(mozilla::StealthIsWindowOnInputDesktop(nullptr));
+  EXPECT_FALSE(mozilla::StealthIsOffInputDesktop(nullptr));
 }

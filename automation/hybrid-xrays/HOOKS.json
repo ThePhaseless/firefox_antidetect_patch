@@ -20,60 +20,28 @@
   "function": "bool SandboxProxyHandler::getPropertyDescriptorImpl(",
   "kind": "rewrite",
   "form": "wrap-call",
-  "line": "    if (!xpc::StealthGetPropertyDescriptor(cx, obj, id, desc_, &holder)) {  // STEALTH-HOOK(automation/hybrid-xrays)",
+  "line": "    if (!mozilla::StealthGetPropertyDescriptor(cx, obj, id, desc_, &holder)) {  // STEALTH-HOOK(automation/hybrid-xrays)",
   "removed": "    if (!JS_GetPropertyDescriptorById(cx, obj, id, desc_, &holder)) {",
-  "test": "wrapper:tests/test_the_callers_code_is_not_counted_e2e.py::test_what_the_page_added_is_the_pages"
+  "test": ""
  },
  {
   "file": "js/xpconnect/src/Sandbox.cpp",
   "function": "nsresult xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp,",
   "kind": "add",
   "form": "anchor",
-  "line": "  if (!xpc::StealthCheckHybridXrays(cx, principal, options)) return NS_ERROR_INVALID_ARG;  // STEALTH-HOOK(automation/hybrid-xrays)",
-  "test": "xpcshell:js/xpconnect/tests/unit/test_stealth_hybrid_xrays_options.js#run_test",
-  "anchor": "bool isSystemPrincipal = principal->IsSystemPrincipal();",
-  "why": "principal is derived inside CreateSandboxObject (QI of prinOrSop, GetPrincipal, NullPrincipal fallback) and cannot be recomputed without copying Mozilla logic; a guard at the top would also move the check before the associatedWindow error"
+  "line": "  if (!mozilla::StealthCheckHybridXrays(cx, principal, options)) return NS_ERROR_INVALID_ARG;  // STEALTH-HOOK(automation/hybrid-xrays)",
+  "test": "",
+  "anchor": "",
+  "why": ""
  },
  {
   "file": "js/xpconnect/src/Sandbox.cpp",
   "function": "nsresult xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp,",
   "kind": "rewrite",
-  "form": "unknown",
-  "line": "        // STEALTH-HOOK(fingerprint/locale-time/timezone)",
-  "removed": "        realmOptions.behaviors().setLocaleOverride(\n            PromiseFlatCString(localeOverride).get());",
-  "test": "wrapper:tests/test_context_locale_e2e.py::test_a_context_locale_reaches_navigator_intl_and_the_header",
-  "exception": "as on the baseline; a one-line form needs a new function and touches the same two Mozilla lines, no portability gain; to review at the port to 160",
-  "pm": "approvato"
- },
- {
-  "file": "js/xpconnect/src/Sandbox.cpp",
-  "function": "nsresult xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp,",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "        nsAutoCString primaryLocale;",
-  "test": "wrapper:tests/test_context_locale_e2e.py::test_a_context_locale_reaches_navigator_intl_and_the_header",
-  "exception": "as on the baseline; a one-line form needs a new function and touches the same two Mozilla lines, no portability gain; to review at the port to 160",
-  "pm": "approvato"
- },
- {
-  "file": "js/xpconnect/src/Sandbox.cpp",
-  "function": "nsresult xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp,",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "        mozilla::intl::PrimaryLanguageTag(localeOverride, primaryLocale);",
-  "test": "wrapper:tests/test_context_locale_e2e.py::test_a_context_locale_reaches_navigator_intl_and_the_header",
-  "exception": "as on the baseline; a one-line form needs a new function and touches the same two Mozilla lines, no portability gain; to review at the port to 160",
-  "pm": "approvato"
- },
- {
-  "file": "js/xpconnect/src/Sandbox.cpp",
-  "function": "nsresult xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp,",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "        realmOptions.behaviors().setLocaleOverride(primaryLocale.get());",
-  "test": "wrapper:tests/test_context_locale_e2e.py::test_a_context_locale_reaches_navigator_intl_and_the_header",
-  "exception": "as on the baseline; a one-line form needs a new function and touches the same two Mozilla lines, no portability gain; to review at the port to 160",
-  "pm": "approvato"
+  "form": "wrap-expression",
+  "line": "            mozilla::intl::StealthPrimaryLanguageTag(PromiseFlatCString(localeOverride)).get());  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "removed": "            PromiseFlatCString(localeOverride).get());",
+  "test": ""
  },
  {
   "file": "js/xpconnect/src/Sandbox.cpp",
@@ -178,78 +146,56 @@
  {
   "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
   "function": "JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  mozilla::StealthNoteCallerObject(origin, target, targetIsChrome, targetSubsumesOrigin);  // STEALTH-HOOK(automation/hybrid-xrays)",
+  "test": "",
+  "anchor": "",
+  "why": ""
+ },
+ {
+  "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
+  "function": "JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,",
   "kind": "rewrite",
   "form": "wrap-expression",
-  "line": "                                      !StealthTargetWantsXrays(cx, targetCompartmentPrivate->wantXrays)))) {  // STEALTH-HOOK(automation/hybrid-xrays)",
+  "line": "                                      !mozilla::StealthTargetWantsXrays(cx, targetCompartmentPrivate->wantXrays)))) {  // STEALTH-HOOK(automation/hybrid-xrays)",
   "removed": "                                      !targetCompartmentPrivate->wantXrays))) {",
-  "test": "wrapper:tests/test_the_callers_code_is_not_counted_e2e.py::test_what_the_caller_hands_the_page_from_a_cross_origin_frame_stays_cross_origin"
+  "test": ""
  },
  {
   "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
   "function": "JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,",
   "kind": "add",
   "form": "unknown",
-  "line": "  else if (StealthCallerObjectApplies(origin, target, targetIsChrome, targetSubsumesOrigin)) wrapper = StealthCallerObjectWrapper();  // STEALTH-HOOK(automation/hybrid-xrays)",
-  "test": "wrapper:tests/test_the_callers_code_is_not_counted_e2e.py::test_what_the_caller_hands_the_page_has_the_pages_own_prototypes"
+  "line": "  else if (mozilla::StealthCallerObjectApplies()) wrapper = mozilla::StealthCallerObjectWrapper();  // STEALTH-HOOK(automation/hybrid-xrays)",
+  "test": ""
  },
  {
   "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
   "function": "JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,",
   "kind": "rewrite",
   "form": "wrap-expression",
-  "line": "           !StealthTargetWantsXrays(cx, targetCompartmentPrivate->wantXrays) &&  // STEALTH-HOOK(automation/hybrid-xrays)",
+  "line": "           !mozilla::StealthTargetWantsXrays(cx, targetCompartmentPrivate->wantXrays) &&  // STEALTH-HOOK(automation/hybrid-xrays)",
   "removed": "           !targetCompartmentPrivate->wantXrays &&",
-  "test": "wrapper:tests/test_the_callers_code_is_not_counted_e2e.py::test_what_the_page_added_is_the_pages"
+  "test": ""
  },
  {
   "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
   "function": "JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,",
   "kind": "rewrite",
   "form": "wrap-expression",
-  "line": "                           StealthTargetWantsXrays(cx, targetCompartmentPrivate->wantXrays);  // STEALTH-HOOK(automation/hybrid-xrays)",
+  "line": "                           mozilla::StealthTargetWantsXrays(cx, targetCompartmentPrivate->wantXrays);  // STEALTH-HOOK(automation/hybrid-xrays)",
   "removed": "                           targetCompartmentPrivate->wantXrays;",
-  "test": "wrapper:tests/test_the_callers_code_is_not_counted_e2e.py::test_what_the_page_added_is_the_pages"
+  "test": ""
  },
  {
   "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
   "function": "JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,",
   "kind": "rewrite",
-  "form": "unknown",
-  "line": "    // STEALTH-HOOK(automation/hybrid-xrays)",
+  "form": "wrap-expression",
+  "line": "    wrapper = mozilla::StealthSelectedWrapper(cx, SelectWrapper(securityWrapper, xrayType, waiveXrays, obj));  // STEALTH-HOOK(automation/hybrid-xrays)",
   "removed": "    wrapper = SelectWrapper(securityWrapper, xrayType, waiveXrays, obj);",
-  "test": "wrapper:tests/test_the_callers_code_is_not_counted_e2e.py::test_what_the_page_added_is_the_pages",
-  "exception": "G35, declared by the pm's verdict (point 2): the selection answers inside the generic branch, before Mozilla's SelectWrapper, as it does today; moved after the chain the whole classification would run for our case and be replaced afterwards; no fixed form expresses a ternary that chooses between our wrapper and Mozilla's call",
-  "pm": "approvato"
- },
- {
-  "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
-  "function": "JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    wrapper = StealthTargetIsHybrid(cx) && !securityWrapper && !waiveXrays",
-  "test": "wrapper:tests/test_the_callers_code_is_not_counted_e2e.py::test_what_the_page_added_is_the_pages",
-  "exception": "G35, declared by the pm's verdict (point 2): the selection answers inside the generic branch, before Mozilla's SelectWrapper, as it does today; moved after the chain the whole classification would run for our case and be replaced afterwards; no fixed form expresses a ternary that chooses between our wrapper and Mozilla's call",
-  "pm": "approvato"
- },
- {
-  "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
-  "function": "JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "                  ? StealthHybridWrapper(xrayType)",
-  "test": "wrapper:tests/test_the_callers_code_is_not_counted_e2e.py::test_what_the_page_added_is_the_pages",
-  "exception": "G35, declared by the pm's verdict (point 2): the selection answers inside the generic branch, before Mozilla's SelectWrapper, as it does today; moved after the chain the whole classification would run for our case and be replaced afterwards; no fixed form expresses a ternary that chooses between our wrapper and Mozilla's call",
-  "pm": "approvato"
- },
- {
-  "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
-  "function": "JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "                  : SelectWrapper(securityWrapper, xrayType, waiveXrays, obj);",
-  "test": "wrapper:tests/test_the_callers_code_is_not_counted_e2e.py::test_what_the_page_added_is_the_pages",
-  "exception": "G35, declared by the pm's verdict (point 2): the selection answers inside the generic branch, before Mozilla's SelectWrapper, as it does today; moved after the chain the whole classification would run for our case and be replaced afterwards; no fixed form expresses a ternary that chooses between our wrapper and Mozilla's call",
-  "pm": "approvato"
+  "test": ""
  },
  {
   "file": "js/xpconnect/wrappers/XrayWrapper.h",

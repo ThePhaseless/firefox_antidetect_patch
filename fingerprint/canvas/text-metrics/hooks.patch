@@ -1,5 +1,5 @@
 diff --git a/dom/canvas/CanvasRenderingContext2D.cpp b/dom/canvas/CanvasRenderingContext2D.cpp
-index 2f28cb5686188778c4f836a2a4ac942d7494b1d2..065e05d8345630e1413fb46b278e30f583133cb6 100644
+index 2f28cb5686188778c4f836a2a4ac942d7494b1d2..db87eba36c2a601dd8f8bdb642ff8213455722b9 100644
 --- a/dom/canvas/CanvasRenderingContext2D.cpp
 +++ b/dom/canvas/CanvasRenderingContext2D.cpp
 @@ -126,6 +126,8 @@
@@ -16,7 +16,7 @@ index 2f28cb5686188778c4f836a2a4ac942d7494b1d2..065e05d8345630e1413fb46b278e30f5
      if (srcCanvas) {
        // This might not be an Azure canvas!
 -      RefPtr<SourceSurface> srcSurf = srcCanvas->GetSurfaceSnapshot();
-+      RefPtr<SourceSurface> srcSurf = canvas->GetSurfaceSnapshot();  // STEALTH-HOOK(fingerprint/canvas/text-metrics)
++      RefPtr<SourceSurface> srcSurf = srcCanvas->StealthGetSurfaceSnapshot();  // STEALTH-HOOK(fingerprint/canvas/text-metrics)
        if (!srcSurf) {
          aError.ThrowInvalidStateError(
              "CanvasRenderingContext2D.createPattern() failed to snapshot source"
@@ -25,7 +25,7 @@ index 2f28cb5686188778c4f836a2a4ac942d7494b1d2..065e05d8345630e1413fb46b278e30f5
          offscreenCanvas->GetContext();
      if (srcCanvas) {
 -      RefPtr<SourceSurface> srcSurf = srcCanvas->GetSurfaceSnapshot();
-+      RefPtr<SourceSurface> srcSurf = offscreenCanvas->GetSurfaceSnapshot();  // STEALTH-HOOK(fingerprint/canvas/text-metrics)
++      RefPtr<SourceSurface> srcSurf = srcCanvas->StealthGetSurfaceSnapshot();  // STEALTH-HOOK(fingerprint/canvas/text-metrics)
        if (!srcSurf) {
          aError.ThrowInvalidStateError(
              "Passed-in canvas failed to create snapshot");
@@ -37,3 +37,15 @@ index 2f28cb5686188778c4f836a2a4ac942d7494b1d2..065e05d8345630e1413fb46b278e30f5
      return MakeUnique<TextMetrics>(
          totalWidth, actualBoundingBoxLeft, actualBoundingBoxRight,
          fontMetrics.maxAscent - baselineAnchor,   // fontBBAscent
+diff --git a/dom/canvas/nsICanvasRenderingContextInternal.h b/dom/canvas/nsICanvasRenderingContextInternal.h
+index 6e066b1c21593c03a95ed0997f6298d55d674708..4502a59db586c3abab3f61f1cca4e58fd407f7f6 100644
+--- a/dom/canvas/nsICanvasRenderingContextInternal.h
++++ b/dom/canvas/nsICanvasRenderingContextInternal.h
+@@ -132,6 +132,7 @@ class nsICanvasRenderingContextInternal : public nsISupports,
+   // if one is returned.
+   virtual already_AddRefed<mozilla::gfx::SourceSurface> GetSurfaceSnapshot(
+       gfxAlphaType* out_alphaType = nullptr) = 0;
++  already_AddRefed<mozilla::gfx::SourceSurface> StealthGetSurfaceSnapshot();  // STEALTH-HOOK(fingerprint/canvas/text-metrics)
+ 
+   // Like GetSurfaceSnapshot, but will attempt to optimize the snapshot for the
+   // provided DrawTarget, which may be nullptr. By default, this will defer to

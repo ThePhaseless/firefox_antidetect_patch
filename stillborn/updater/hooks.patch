@@ -55,19 +55,20 @@ index ff6c58cbe0129b75452a8a2a101c54a8264046fe..af0dc201a7502e80c4ac95eac1c4fe6c
      let args = [
        "--MOZ_LOG",
 diff --git a/toolkit/mozapps/update/UpdateService.sys.mjs b/toolkit/mozapps/update/UpdateService.sys.mjs
-index 164381ebc1073b644ab0a95910e2aab6c397e879..db1e28aea40d13a9ac87b2ab581b148d2bacd45d 100644
+index 164381ebc1073b644ab0a95910e2aab6c397e879..02b4df900eae52dc625ef8fcee50e5d2ee1c8700 100644
 --- a/toolkit/mozapps/update/UpdateService.sys.mjs
 +++ b/toolkit/mozapps/update/UpdateService.sys.mjs
-@@ -14,6 +14,8 @@ import {
+@@ -14,6 +14,9 @@ import {
  import { FileUtils } from "resource://gre/modules/FileUtils.sys.mjs";
  import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
  
 +import * as StealthUpdate from "resource://gre/modules/StealthUpdate.sys.mjs"; // STEALTH-HOOK(stillborn/updater)
++import { StealthNoneOffered } from "resource://gre/modules/StealthUpdate.sys.mjs"; // STEALTH-HOOK(stillborn/updater)
 +
  const lazy = {};
  
  ChromeUtils.defineESModuleGetters(lazy, {
-@@ -4280,6 +4282,7 @@ export class UpdateService {
+@@ -4280,6 +4283,7 @@ export class UpdateService {
      if (!update) {
        throw Components.Exception("", Cr.NS_ERROR_NULL_POINTER);
      }
@@ -75,14 +76,15 @@ index 164381ebc1073b644ab0a95910e2aab6c397e879..db1e28aea40d13a9ac87b2ab581b148d
  
      // Don't download the update if the update's version is less than the
      // current application's version or the update's version is the same as the
-@@ -5768,6 +5771,7 @@ export class CheckerService {
-       // "looks" fine but there was probably an XML error or a bogus file.
-       return this.#getCheckFailedObject(status, 200, request);
-     }
-+    updates = StealthUpdate.noneOffered(updates); // STEALTH-HOOK(stillborn/updater)
- 
-     LOG(
-       "CheckerService:#updateCheck - number of updates available: " +
+@@ -5755,7 +5759,7 @@ export class CheckerService {
+     let updates;
+     try {
+       // Analyze the resulting DOM and determine the set of updates.
+-      updates = this.#parseUpdates(request);
++      updates = StealthNoneOffered(this.#parseUpdates(request)); // STEALTH-HOOK(stillborn/updater)
+     } catch (e) {
+       LOG(
+         "CheckerService:#updateCheck - there was a problem checking for " +
 diff --git a/toolkit/mozapps/update/moz.build b/toolkit/mozapps/update/moz.build
 index a264cbb26b6878c89cf5bbbe161cdff6b7bdd13e..8154a5c15ec85cf07014f565f369c580136662a4 100644
 --- a/toolkit/mozapps/update/moz.build

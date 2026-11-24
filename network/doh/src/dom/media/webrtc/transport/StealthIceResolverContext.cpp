@@ -134,8 +134,8 @@ std::unique_ptr<NrSocketProxyConfig> StealthProxyConfigOfPrincipal(
 }
 
 std::unique_ptr<NrSocketProxyConfig> StealthProxyConfigOf(
-    std::unique_ptr<NrSocketProxyConfig> aUpstream, nsPIDOMWindowInner* aWindow,
-    bool aForceProxy) {
+    nsPIDOMWindowInner* aWindow, bool aForceProxy,
+    std::unique_ptr<NrSocketProxyConfig> aUpstream) {
   if (aUpstream) {
     return aUpstream;
   }

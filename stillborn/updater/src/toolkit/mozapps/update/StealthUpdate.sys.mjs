@@ -26,7 +26,7 @@
  * @param {nsIUpdate[]} aUpdates the updates Mozilla parsed from the answer
  * @returns {nsIUpdate[]} always a new empty array
  */
-export function noneOffered(aUpdates) {
+export function StealthNoneOffered(aUpdates) {
   if (aUpdates.length) {
     console.info(
       `StealthUpdate: the update check offered ${aUpdates.length} update(s); none is taken`
@@ -38,7 +38,7 @@ export function noneOffered(aUpdates) {
 /**
  * Called at the start of UpdateService's #downloadUpdate, the one door every
  * download goes through (a fresh offer, a download resumed from an earlier
- * session, the fallback to a complete update). After noneOffered nothing should
+ * session, the fallback to a complete update). After StealthNoneOffered nothing should
  * reach it; this is the backstop for a download left half done in the update
  * directory by another build installed at the same path. It covers downloads
  * only: an update another build already staged there is applied at startup by

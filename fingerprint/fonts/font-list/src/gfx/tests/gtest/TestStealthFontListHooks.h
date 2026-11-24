@@ -52,6 +52,18 @@ TEST(StealthFontListHooks, NoFontsFound)
   EXPECT_FALSE(StealthNoFontsFoundCore(true, false));
 }
 
+TEST(StealthFontListHooks, BundledFontsApply)
+{
+  // Bundle-only: the manifest is the list, the bundled collection is not
+  // appended and its timing is not recorded.
+  EXPECT_FALSE(StealthBundledFontsApplyCore(true, true));
+  EXPECT_FALSE(StealthBundledFontsApplyCore(true, false));
+  // Negative control: stock Firefox appends the bundled collection when it
+  // exists, and only then.
+  EXPECT_TRUE(StealthBundledFontsApplyCore(false, true));
+  EXPECT_FALSE(StealthBundledFontsApplyCore(false, false));
+}
+
 TEST(StealthFontListHooks, SkipsHostCollection)
 {
   int system = 0;

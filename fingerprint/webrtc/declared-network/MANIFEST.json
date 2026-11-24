@@ -13,6 +13,7 @@
   "netwerk/base/nsIOService.cpp"
  ],
  "added": {
+  "dom/media/webrtc/transport/mdns_service/src/stealth_interface.rs": "100644",
   "dom/media/webrtc/transport/mdns_service/src/stealth_tests.rs": "100644",
   "dom/media/webrtc/transport/nr_stealth_network.cpp": "100644",
   "dom/media/webrtc/transport/nr_stealth_network.h": "100644",

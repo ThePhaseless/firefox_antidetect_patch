@@ -21,7 +21,8 @@
   "dom/ipc/gtest/TestStealthJugglerCoalesce.cpp": "100644",
   "dom/ipc/gtest/TestStealthMouseEventIPC.cpp": "100644",
   "layout/base/StealthJugglerAck.h": "100644",
-  "layout/base/gtest/TestStealthJugglerMouseAck.cpp": "100644"
+  "layout/base/gtest/TestStealthJugglerMouseAck.cpp": "100644",
+  "widget/StealthMouseEventIPC.h": "100644"
  },
  "inventory": [
   {

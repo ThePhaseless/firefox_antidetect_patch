@@ -6,15 +6,8 @@
 #ifndef StealthCanvasAsDrawn_h
 #define StealthCanvasAsDrawn_h
 
+// Chrome-only test hook (compareCanvases): the canvases as drawn, through
+// nsLayoutUtils::StealthSurfaceFromElementAsDrawn (StealthSurfaceFlags.h).
 #include "StealthSurfaceFlags.h"
-#include "mozilla/SurfaceFromElementResult.h"
-#include "mozilla/dom/HTMLCanvasElement.h"
-#include "nsLayoutUtils.h"
-
-// Chrome-only test hook (compareCanvases): the canvases as drawn.
-inline mozilla::SurfaceFromElementResult StealthSurfaceFromCanvasAsDrawn(
-    mozilla::dom::HTMLCanvasElement* aCanvas) {
-  return nsLayoutUtils::SurfaceFromElement(aCanvas, kStealthSfeAsDrawn);
-}
 
 #endif  // StealthCanvasAsDrawn_h

@@ -10,12 +10,11 @@
  {
   "file": "dom/media/webrtc/jsapi/PeerConnectionImpl.cpp",
   "function": "nsresult PeerConnectionImpl::SetConfiguration(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  proxyConfig = StealthProxyConfigOf(std::move(proxyConfig), mWindow.get(), mForceProxy);  // STEALTH-HOOK(network/proxy-udp)",
-  "test": "gtest:StealthPcProxyConfig.AWindowWithoutAConfigGetsTheConfigOfItsPrincipalAndItsContext",
-  "anchor": "auto proxyConfig = GetProxyConfig();",
-  "why": "the config GetProxyConfig made is the value the next Mozilla lines test and use; it is handed on in place"
+  "kind": "rewrite",
+  "form": "wrap-expression",
+  "line": "  auto proxyConfig = StealthProxyConfigOf(mWindow.get(), mForceProxy, GetProxyConfig());  // STEALTH-HOOK(network/proxy-udp)",
+  "removed": "  auto proxyConfig = GetProxyConfig();",
+  "test": ""
  },
  {
   "file": "dom/media/webrtc/transport/ipc/WebrtcTCPSocket.cpp",
@@ -29,63 +28,11 @@
   "file": "dom/media/webrtc/transport/ipc/WebrtcTCPSocket.cpp",
   "function": "nsresult WebrtcTCPSocket::DoProxyConfigLookup() {",
   "kind": "add",
-  "form": "unknown",
-  "line": "  const uint32_t flags = nsIProtocolProxyService::RESOLVE_PREFER_HTTPS_PROXY |",
-  "test": "wrapper:tests/test_nothing_of_a_context_leaves_but_through_its_proxy_e2e.py::test_two_contexts_each_resolve_their_turn_name_through_their_own_proxy",
-  "exception": "G35 (PM-DECISIONS 22/11 morning, F9): as on the baseline, verified three times; a one-line form would repeat Mozilla's flag value (G16) or change a call the proxy depends on; to review at the port to 160",
-  "pm": "approvato"
- },
- {
-  "file": "dom/media/webrtc/transport/ipc/WebrtcTCPSocket.cpp",
-  "function": "nsresult WebrtcTCPSocket::DoProxyConfigLookup() {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "                         nsIProtocolProxyService::RESOLVE_ALWAYS_TUNNEL;",
-  "test": "wrapper:tests/test_nothing_of_a_context_leaves_but_through_its_proxy_e2e.py::test_two_contexts_each_resolve_their_turn_name_through_their_own_proxy",
-  "exception": "G35 (PM-DECISIONS 22/11 morning, F9): as on the baseline, verified three times; a one-line form would repeat Mozilla's flag value (G16) or change a call the proxy depends on; to review at the port to 160",
-  "pm": "approvato"
- },
- {
-  "file": "dom/media/webrtc/transport/ipc/WebrtcTCPSocket.cpp",
-  "function": "nsresult WebrtcTCPSocket::DoProxyConfigLookup() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  rv = StealthNewChannelOfLoadInfo(mURI, flags, mProxyConfig->loadInfoArgs(),  // STEALTH-HOOK(network/proxy-udp)",
-  "removed": "  rv = NS_NewChannel(getter_AddRefs(channel), mURI,\n                     nsContentUtils::GetSystemPrincipal(),\n                     nsILoadInfo::SEC_ALLOW_CROSS_ORIGIN_SEC_CONTEXT_IS_NULL,\n                     nsIContentPolicy::TYPE_OTHER);",
-  "test": "wrapper:tests/test_nothing_of_a_context_leaves_but_through_its_proxy_e2e.py::test_two_contexts_each_resolve_their_turn_name_through_their_own_proxy",
-  "exception": "G35 (PM-DECISIONS 22/11 morning, F9): as on the baseline, verified three times; a one-line form would repeat Mozilla's flag value (G16) or change a call the proxy depends on; to review at the port to 160",
-  "pm": "approvato"
- },
- {
-  "file": "dom/media/webrtc/transport/ipc/WebrtcTCPSocket.cpp",
-  "function": "nsresult WebrtcTCPSocket::DoProxyConfigLookup() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "                                   getter_AddRefs(channel));",
-  "test": "wrapper:tests/test_nothing_of_a_context_leaves_but_through_its_proxy_e2e.py::test_two_contexts_each_resolve_their_turn_name_through_their_own_proxy",
-  "exception": "G35 (PM-DECISIONS 22/11 morning, F9): as on the baseline, verified three times; a one-line form would repeat Mozilla's flag value (G16) or change a call the proxy depends on; to review at the port to 160",
-  "pm": "approvato"
- },
- {
-  "file": "dom/media/webrtc/transport/ipc/WebrtcTCPSocket.cpp",
-  "function": "nsresult WebrtcTCPSocket::DoProxyConfigLookup() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  rv = pps->AsyncResolve(channel, flags, this, nullptr,",
-  "removed": "  rv = pps->AsyncResolve(channel,\n                         nsIProtocolProxyService::RESOLVE_PREFER_HTTPS_PROXY |\n                             nsIProtocolProxyService::RESOLVE_ALWAYS_TUNNEL,\n                         this, nullptr, getter_AddRefs(mProxyRequest));",
-  "test": "wrapper:tests/test_nothing_of_a_context_leaves_but_through_its_proxy_e2e.py::test_two_contexts_each_resolve_their_turn_name_through_their_own_proxy",
-  "exception": "G35 (PM-DECISIONS 22/11 morning, F9): as on the baseline, verified three times; a one-line form would repeat Mozilla's flag value (G16) or change a call the proxy depends on; to review at the port to 160",
-  "pm": "approvato"
- },
- {
-  "file": "dom/media/webrtc/transport/ipc/WebrtcTCPSocket.cpp",
-  "function": "nsresult WebrtcTCPSocket::DoProxyConfigLookup() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "                         getter_AddRefs(mProxyRequest));",
-  "test": "wrapper:tests/test_nothing_of_a_context_leaves_but_through_its_proxy_e2e.py::test_two_contexts_each_resolve_their_turn_name_through_their_own_proxy",
-  "exception": "G35 (PM-DECISIONS 22/11 morning, F9): as on the baseline, verified three times; a one-line form would repeat Mozilla's flag value (G16) or change a call the proxy depends on; to review at the port to 160",
-  "pm": "approvato"
+  "form": "anchor",
+  "line": "  if (StealthSwapTcpLookupChannel(this, channel, &rv)) return rv;  // STEALTH-HOOK(network/proxy-udp)",
+  "test": "",
+  "anchor": "",
+  "why": ""
  },
  {
   "file": "dom/media/webrtc/transport/ipc/WebrtcTCPSocket.cpp",
@@ -137,32 +84,10 @@
   "file": "dom/media/webrtc/transport/nr_socket_proxy_config.cpp",
   "function": "",
   "kind": "rewrite",
-  "form": "unknown",
-  "line": "    : mPrivate(new Private({aProxyConfig})) {",
+  "form": "wrap-expression",
+  "line": "    : mPrivate(net::StealthPcUdpProxyOf(aProxyConfig, new Private({aProxyConfig}))) {}  // STEALTH-HOOK(network/proxy-udp)",
   "removed": "    : mPrivate(new Private({aProxyConfig})) {}",
-  "test": "gtest:StealthPcUdpProxyKinds.ASocks5ProxyMeasuredCoherentIsTheRoadOfTheUdpWithItsCredentials",
-  "exception": "the hook stays in the body of the constructor (G23) and Mozilla empty body is opened for our line: one rewritten line as on the baseline",
-  "pm": "approvato"
- },
- {
-  "file": "dom/media/webrtc/transport/nr_socket_proxy_config.cpp",
-  "function": "",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  net::StealthPcUdpProxyLookup(mPrivate->mUdpProxy, aProxyConfig);  // STEALTH-HOOK(network/proxy-udp)",
-  "test": "gtest:StealthPcUdpProxyKinds.ASocks5ProxyMeasuredCoherentIsTheRoadOfTheUdpWithItsCredentials",
-  "exception": "the hook stays in the body of the constructor (G23) and Mozilla empty body is opened for our line: one rewritten line as on the baseline",
-  "pm": "approvato"
- },
- {
-  "file": "dom/media/webrtc/transport/nr_socket_proxy_config.cpp",
-  "function": "",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "}",
-  "test": "gtest:StealthPcUdpProxyKinds.ASocks5ProxyMeasuredCoherentIsTheRoadOfTheUdpWithItsCredentials",
-  "exception": "the hook stays in the body of the constructor (G23) and Mozilla empty body is opened for our line: one rewritten line as on the baseline",
-  "pm": "approvato"
+  "test": ""
  },
  {
   "file": "dom/media/webrtc/transport/nr_socket_proxy_config.cpp",
@@ -451,33 +376,18 @@
  {
   "file": "netwerk/ipc/PSocketProcess.ipdl",
   "function": "parent:",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "                           bool aIsTRRServiceChannel,",
-  "removed": "                           bool aIsTRRServiceChannel);",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
+  "kind": "add",
+  "form": "registration",
+  "line": "  async StealthProxyLookupLoadInfo(LoadInfoArgs? aLoadInfo);  // STEALTH-HOOK(network/proxy-udp)",
+  "test": ""
  },
  {
   "file": "netwerk/ipc/PSocketProcess.ipdl",
   "function": "parent:",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "                           LoadInfoArgs? aLoadInfo,  // STEALTH-HOOK(network/proxy-udp)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/PSocketProcess.ipdl",
-  "function": "parent:",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "                           OriginAttributes? aOriginAttributes);  // STEALTH-HOOK(network/doh)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
+  "kind": "add",
+  "form": "registration",
+  "line": "  async StealthProxyLookupOrigin(OriginAttributes? aOriginAttributes);  // STEALTH-HOOK(network/doh)",
+  "test": ""
  },
  {
   "file": "netwerk/ipc/PSocketProcess.ipdl",
@@ -505,568 +415,75 @@
  },
  {
   "file": "netwerk/ipc/ProxyConfigLookup.cpp",
-  "function": "namespace net {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    nsICancelable** aLookupCancellable,",
-  "removed": "    nsICancelable** aLookupCancellable) {",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookup.cpp",
-  "function": "namespace net {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    const Maybe<LoadInfoArgs>& aLoadInfo,  // STEALTH-HOOK(network/proxy-udp)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookup.cpp",
-  "function": "namespace net {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    const Maybe<OriginAttributes>& aOriginAttributes) {  // STEALTH-HOOK(network/doh)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookup.cpp",
-  "function": "namespace net {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "      std::move(aCallback), aURI, aProxyResolveFlags, aIsTRRServiceChannel,",
-  "removed": "      std::move(aCallback), aURI, aProxyResolveFlags, aIsTRRServiceChannel);",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookup.cpp",
-  "function": "namespace net {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "      aLoadInfo,  // STEALTH-HOOK(network/proxy-udp)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookup.cpp",
-  "function": "namespace net {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "      aOriginAttributes);  // STEALTH-HOOK(network/doh)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookup.cpp",
-  "function": "namespace net {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    uint32_t aProxyResolveFlags, bool aIsTRRServiceChannel,",
-  "removed": "    uint32_t aProxyResolveFlags, bool aIsTRRServiceChannel)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookup.cpp",
-  "function": "namespace net {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    const Maybe<LoadInfoArgs>& aLoadInfo,  // STEALTH-HOOK(network/proxy-udp)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookup.cpp",
-  "function": "namespace net {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    const Maybe<OriginAttributes>& aOriginAttributes)  // STEALTH-HOOK(network/doh)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookup.cpp",
-  "function": "namespace net {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "      mIsTRRServiceChannel(aIsTRRServiceChannel),",
-  "removed": "      mIsTRRServiceChannel(aIsTRRServiceChannel) {}",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookup.cpp",
-  "function": "namespace net {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "      mLoadInfo(aLoadInfo),  // STEALTH-HOOK(network/proxy-udp)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookup.cpp",
-  "function": "namespace net {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "      mOriginAttributes(aOriginAttributes) {}  // STEALTH-HOOK(network/doh)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookup.cpp",
-  "function": "nsresult ProxyConfigLookup::DoProxyResolve(nsICancelable** aLookupCancellable) {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "        },",
-  "removed": "        });",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookup.cpp",
-  "function": "nsresult ProxyConfigLookup::DoProxyResolve(nsICancelable** aLookupCancellable) {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "        mLoadInfo,  // STEALTH-HOOK(network/proxy-udp)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookup.cpp",
-  "function": "nsresult ProxyConfigLookup::DoProxyResolve(nsICancelable** aLookupCancellable) {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "        mOriginAttributes);  // STEALTH-HOOK(network/doh)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookup.cpp",
-  "function": "nsresult ProxyConfigLookup::DoProxyResolve(nsICancelable** aLookupCancellable) {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  rv = mLoadInfo ? StealthNewChannelOfLoadInfo(mURI, mProxyResolveFlags, mLoadInfo.ref(), getter_AddRefs(channel))  // STEALTH-HOOK(network/proxy-udp)",
-  "removed": "  rv = NS_NewChannel(getter_AddRefs(channel), mURI,",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookup.cpp",
-  "function": "nsresult ProxyConfigLookup::DoProxyResolve(nsICancelable** aLookupCancellable) {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "                 : NS_NewChannel(getter_AddRefs(channel), mURI,",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookup.cpp",
-  "function": "nsresult ProxyConfigLookup::DoProxyResolve(nsICancelable** aLookupCancellable) {",
+  "function": "nsresult ProxyConfigLookup::Create(",
   "kind": "add",
-  "form": "unknown",
-  "line": "  rv = StealthApplyTRRContextToChannel(channel, mOriginAttributes);  // STEALTH-HOOK(network/doh)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
+  "form": "notice",
+  "line": "  StealthEnterLookupLoadInfo();  // STEALTH-HOOK(network/proxy-udp)",
+  "test": ""
+ },
+ {
+  "file": "netwerk/ipc/ProxyConfigLookup.cpp",
+  "function": "nsresult ProxyConfigLookup::Create(",
+  "kind": "add",
+  "form": "notice",
+  "line": "  StealthEnterTRRLookupContext();  // STEALTH-HOOK(network/doh)",
+  "test": ""
  },
  {
   "file": "netwerk/ipc/ProxyConfigLookup.cpp",
   "function": "nsresult ProxyConfigLookup::DoProxyResolve(nsICancelable** aLookupCancellable) {",
   "kind": "add",
   "form": "anchor",
-  "line": "  NS_ENSURE_SUCCESS(rv, rv);  // STEALTH-HOOK(network/doh)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_a_gateway_with_coherent_udp_gives_the_page_a_srflx_born_through_its_relay",
-  "anchor": "if (NS_FAILED(rv)) { return rv; } (the check of the channel creation)",
-  "why": "it checks the status of StealthApplyTRRContextToChannel on the line before it, which can only be placed after Mozilla's own check of the channel creation"
+  "line": "  if (StealthSwapLookupChannel(mURI, mProxyResolveFlags, channel, &rv)) return rv;  // STEALTH-HOOK(network/proxy-udp)",
+  "test": "",
+  "anchor": "",
+  "why": ""
  },
  {
-  "file": "netwerk/ipc/ProxyConfigLookup.h",
-  "function": "",
+  "file": "netwerk/ipc/ProxyConfigLookup.cpp",
+  "function": "nsresult ProxyConfigLookup::DoProxyResolve(nsICancelable** aLookupCancellable) {",
   "kind": "add",
-  "form": "registration",
-  "line": "#include \"mozilla/Maybe.h\"  // STEALTH-HOOK(network/proxy-udp)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_a_gateway_with_coherent_udp_gives_the_page_a_srflx_born_through_its_relay"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookup.h",
-  "function": "",
-  "kind": "add",
-  "form": "registration",
-  "line": "#include \"mozilla/OriginAttributes.h\"  // STEALTH-HOOK(network/doh)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookup.h",
-  "function": "",
-  "kind": "add",
-  "form": "registration",
-  "line": "#include \"mozilla/net/NeckoChannelParams.h\"  // STEALTH-HOOK(network/proxy-udp)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_a_gateway_with_coherent_udp_gives_the_page_a_srflx_born_through_its_relay"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookup.h",
-  "function": "class ProxyConfigLookup final : public nsIProtocolProxyCallback {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "      nsICancelable** aLookupCancellable = nullptr,",
-  "removed": "      nsICancelable** aLookupCancellable = nullptr);",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookup.h",
-  "function": "class ProxyConfigLookup final : public nsIProtocolProxyCallback {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "      const Maybe<LoadInfoArgs>& aLoadInfo = Nothing(),  // STEALTH-HOOK(network/proxy-udp)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookup.h",
-  "function": "class ProxyConfigLookup final : public nsIProtocolProxyCallback {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "      const Maybe<OriginAttributes>& aOriginAttributes = Nothing());  // STEALTH-HOOK(network/doh)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookup.h",
-  "function": "class ProxyConfigLookup final : public nsIProtocolProxyCallback {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "      uint32_t aProxyResolveFlags, bool aIsTRRServiceChannel,",
-  "removed": "      uint32_t aProxyResolveFlags, bool aIsTRRServiceChannel);",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookup.h",
-  "function": "class ProxyConfigLookup final : public nsIProtocolProxyCallback {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "      const Maybe<LoadInfoArgs>& aLoadInfo,  // STEALTH-HOOK(network/proxy-udp)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookup.h",
-  "function": "class ProxyConfigLookup final : public nsIProtocolProxyCallback {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "      const Maybe<OriginAttributes>& aOriginAttributes);  // STEALTH-HOOK(network/doh)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookup.h",
-  "function": "class ProxyConfigLookup final : public nsIProtocolProxyCallback {",
-  "kind": "add",
-  "form": "member",
-  "line": "  Maybe<LoadInfoArgs> mLoadInfo;  // STEALTH-HOOK(network/proxy-udp)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookup.h",
-  "function": "class ProxyConfigLookup final : public nsIProtocolProxyCallback {",
-  "kind": "add",
-  "form": "member",
-  "line": "  Maybe<OriginAttributes> mOriginAttributes;  // STEALTH-HOOK(network/doh)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
+  "form": "anchor",
+  "line": "  if (StealthApplyTRRLookupContext(channel, &rv)) return rv;  // STEALTH-HOOK(network/doh)",
+  "test": "",
+  "anchor": "",
+  "why": ""
  },
  {
   "file": "netwerk/ipc/ProxyConfigLookupChild.cpp",
-  "function": "namespace net {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    std::function<void(nsIProxyInfo*, nsresult)>&& aCallback,",
-  "removed": "    std::function<void(nsIProxyInfo*, nsresult)>&& aCallback) {",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/net/StealthDocumentChannel.h\"  // STEALTH-HOOK(network/proxy-udp)",
+  "test": ""
  },
  {
   "file": "netwerk/ipc/ProxyConfigLookupChild.cpp",
-  "function": "namespace net {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    const Maybe<LoadInfoArgs>& aLoadInfo,  // STEALTH-HOOK(network/proxy-udp)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookupChild.cpp",
-  "function": "namespace net {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    const Maybe<OriginAttributes>& aOriginAttributes) {  // STEALTH-HOOK(network/doh)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/net/StealthTRRContext.h\"  // STEALTH-HOOK(network/doh)",
+  "test": ""
  },
  {
   "file": "netwerk/ipc/ProxyConfigLookupChild.cpp",
   "function": "bool ProxyConfigLookupChild::Create(",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "      child, aURI, aProxyResolveFlags, aIsTRRServiceChannel,",
-  "removed": "      child, aURI, aProxyResolveFlags, aIsTRRServiceChannel);",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
+  "kind": "add",
+  "form": "anchor",
+  "line": "  StealthSendLookupLoadInfo(socketChild);  // STEALTH-HOOK(network/proxy-udp)",
+  "test": "",
+  "anchor": "",
+  "why": ""
  },
  {
   "file": "netwerk/ipc/ProxyConfigLookupChild.cpp",
   "function": "bool ProxyConfigLookupChild::Create(",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "      aLoadInfo,  // STEALTH-HOOK(network/proxy-udp)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookupChild.cpp",
-  "function": "bool ProxyConfigLookupChild::Create(",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "      aOriginAttributes);  // STEALTH-HOOK(network/doh)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookupChild.h",
-  "function": "",
   "kind": "add",
-  "form": "registration",
-  "line": "#include \"mozilla/OriginAttributes.h\"  // STEALTH-HOOK(network/doh)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookupChild.h",
-  "function": "class ProxyConfigLookupChild final : public PProxyConfigLookupChild {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "                     std::function<void(nsIProxyInfo*, nsresult)>&& aCallback,",
-  "removed": "                     std::function<void(nsIProxyInfo*, nsresult)>&& aCallback);",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookupChild.h",
-  "function": "class ProxyConfigLookupChild final : public PProxyConfigLookupChild {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "                     const Maybe<LoadInfoArgs>& aLoadInfo = Nothing(),  // STEALTH-HOOK(network/proxy-udp)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookupChild.h",
-  "function": "class ProxyConfigLookupChild final : public PProxyConfigLookupChild {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "                     const Maybe<OriginAttributes>& aOriginAttributes = Nothing());  // STEALTH-HOOK(network/doh)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookupParent.cpp",
-  "function": "",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "ProxyConfigLookupParent::ProxyConfigLookupParent(",
-  "removed": "ProxyConfigLookupParent::ProxyConfigLookupParent(nsIURI* aURI,\n                                                 uint32_t aProxyResolveFlags,\n                                                 bool aIsTRRServiceChannel)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookupParent.cpp",
-  "function": "",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    nsIURI* aURI, uint32_t aProxyResolveFlags, bool aIsTRRServiceChannel,",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookupParent.cpp",
-  "function": "",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    const Maybe<LoadInfoArgs>& aLoadInfo,  // STEALTH-HOOK(network/proxy-udp)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookupParent.cpp",
-  "function": "",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    const Maybe<OriginAttributes>& aOriginAttributes)  // STEALTH-HOOK(network/doh)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookupParent.cpp",
-  "function": "",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "      mIsTRRServiceChannel(aIsTRRServiceChannel),",
-  "removed": "      mIsTRRServiceChannel(aIsTRRServiceChannel) {}",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookupParent.cpp",
-  "function": "",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "      mLoadInfo(aLoadInfo),  // STEALTH-HOOK(network/proxy-udp)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookupParent.cpp",
-  "function": "",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "      mOriginAttributes(aOriginAttributes) {}  // STEALTH-HOOK(network/doh)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookupParent.cpp",
-  "function": "void ProxyConfigLookupParent::DoProxyLookup() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "      mURI, mProxyResolveFlags, mIsTRRServiceChannel, nullptr,",
-  "removed": "      mURI, mProxyResolveFlags, mIsTRRServiceChannel);",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookupParent.cpp",
-  "function": "void ProxyConfigLookupParent::DoProxyLookup() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "      mLoadInfo,  // STEALTH-HOOK(network/proxy-udp)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookupParent.cpp",
-  "function": "void ProxyConfigLookupParent::DoProxyLookup() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "      mOriginAttributes);  // STEALTH-HOOK(network/doh)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookupParent.h",
-  "function": "",
-  "kind": "add",
-  "form": "registration",
-  "line": "#include \"mozilla/OriginAttributes.h\"  // STEALTH-HOOK(network/doh)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookupParent.h",
-  "function": "class ProxyConfigLookupParent final : public PProxyConfigLookupParent {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "                          bool aIsTRRServiceChannel,",
-  "removed": "                          bool aIsTRRServiceChannel);",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookupParent.h",
-  "function": "class ProxyConfigLookupParent final : public PProxyConfigLookupParent {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "                          const Maybe<LoadInfoArgs>& aLoadInfo,  // STEALTH-HOOK(network/proxy-udp)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookupParent.h",
-  "function": "class ProxyConfigLookupParent final : public PProxyConfigLookupParent {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "                          const Maybe<OriginAttributes>& aOriginAttributes);  // STEALTH-HOOK(network/doh)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookupParent.h",
-  "function": "class ProxyConfigLookupParent final : public PProxyConfigLookupParent {",
-  "kind": "add",
-  "form": "member",
-  "line": "  Maybe<LoadInfoArgs> mLoadInfo;  // STEALTH-HOOK(network/proxy-udp)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookupParent.h",
-  "function": "class ProxyConfigLookupParent final : public PProxyConfigLookupParent {",
-  "kind": "add",
-  "form": "member",
-  "line": "  Maybe<OriginAttributes> mOriginAttributes;  // STEALTH-HOOK(network/doh)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
+  "form": "anchor",
+  "line": "  StealthSendTRRLookupContext(socketChild);  // STEALTH-HOOK(network/doh)",
+  "test": "",
+  "anchor": "",
+  "why": ""
  },
  {
   "file": "netwerk/ipc/SocketProcessChild.h",
@@ -1078,158 +495,51 @@
  },
  {
   "file": "netwerk/ipc/SocketProcessParent.cpp",
-  "function": "SocketProcessParent::AllocPAltServiceParent() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    const bool& aIsTRRServiceChannel,",
-  "removed": "    const bool& aIsTRRServiceChannel) {",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/net/StealthDocumentChannel.h\"  // STEALTH-HOOK(network/proxy-udp)",
+  "test": ""
  },
  {
   "file": "netwerk/ipc/SocketProcessParent.cpp",
-  "function": "SocketProcessParent::AllocPAltServiceParent() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    const Maybe<LoadInfoArgs>& aLoadInfo,  // STEALTH-HOOK(network/proxy-udp)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/net/StealthTRRContext.h\"  // STEALTH-HOOK(network/doh)",
+  "test": ""
  },
  {
   "file": "netwerk/ipc/SocketProcessParent.cpp",
-  "function": "SocketProcessParent::AllocPAltServiceParent() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    const Maybe<OriginAttributes>& aOriginAttributes) {  // STEALTH-HOOK(network/doh)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
+  "function": "SocketProcessParent::AllocPProxyConfigLookupParent(",
+  "kind": "add",
+  "form": "notice",
+  "line": "  StealthTakeParkedLookupLoadInfo(this);  // STEALTH-HOOK(network/proxy-udp)",
+  "test": ""
  },
  {
   "file": "netwerk/ipc/SocketProcessParent.cpp",
-  "function": "SocketProcessParent::AllocPAltServiceParent() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "      aURI, aProxyResolveFlags, aIsTRRServiceChannel,",
-  "removed": "      aURI, aProxyResolveFlags, aIsTRRServiceChannel);",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/SocketProcessParent.cpp",
-  "function": "SocketProcessParent::AllocPAltServiceParent() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "      aLoadInfo,  // STEALTH-HOOK(network/proxy-udp)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/SocketProcessParent.cpp",
-  "function": "SocketProcessParent::AllocPAltServiceParent() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "      aOriginAttributes);  // STEALTH-HOOK(network/doh)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/SocketProcessParent.cpp",
-  "function": "SocketProcessParent::AllocPAltServiceParent() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    const uint32_t& aProxyResolveFlags, const bool& aIsTRRServiceChannel,",
-  "removed": "    const uint32_t& aProxyResolveFlags, const bool& aIsTRRServiceChannel) {",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/SocketProcessParent.cpp",
-  "function": "SocketProcessParent::AllocPAltServiceParent() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    const Maybe<LoadInfoArgs>& aLoadInfo,  // STEALTH-HOOK(network/proxy-udp)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/SocketProcessParent.cpp",
-  "function": "SocketProcessParent::AllocPAltServiceParent() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    const Maybe<OriginAttributes>& aOriginAttributes) {  // STEALTH-HOOK(network/doh)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
+  "function": "SocketProcessParent::AllocPProxyConfigLookupParent(",
+  "kind": "add",
+  "form": "notice",
+  "line": "  StealthTakeParkedTRRLookupContext(this);  // STEALTH-HOOK(network/doh)",
+  "test": ""
  },
  {
   "file": "netwerk/ipc/SocketProcessParent.h",
   "function": "class SocketProcessParent final",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "      const bool& aIsTRRServiceChannel,",
-  "removed": "      const bool& aIsTRRServiceChannel);",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
+  "kind": "add",
+  "form": "member",
+  "line": "  mozilla::ipc::IPCResult RecvStealthProxyLookupLoadInfo(const Maybe<LoadInfoArgs>& aLoadInfo);  // STEALTH-HOOK(network/proxy-udp)",
+  "test": ""
  },
  {
   "file": "netwerk/ipc/SocketProcessParent.h",
   "function": "class SocketProcessParent final",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "      const Maybe<LoadInfoArgs>& aLoadInfo,  // STEALTH-HOOK(network/proxy-udp)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/SocketProcessParent.h",
-  "function": "class SocketProcessParent final",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "      const Maybe<OriginAttributes>& aOriginAttributes);  // STEALTH-HOOK(network/doh)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/SocketProcessParent.h",
-  "function": "class SocketProcessParent final",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "      const uint32_t& aProxyResolveFlags, const bool& aIsTRRServiceChannel,",
-  "removed": "      const uint32_t& aProxyResolveFlags,\n      const bool& aIsTRRServiceChannel) override;",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/SocketProcessParent.h",
-  "function": "class SocketProcessParent final",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "      const Maybe<LoadInfoArgs>& aLoadInfo,  // STEALTH-HOOK(network/proxy-udp)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
- },
- {
-  "file": "netwerk/ipc/SocketProcessParent.h",
-  "function": "class SocketProcessParent final",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "      const Maybe<OriginAttributes>& aOriginAttributes) override;  // STEALTH-HOOK(network/doh)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_two_contexts_with_two_proxies_each_gets_the_srflx_of_its_own",
-  "exception": "the two parameters (load info and DoH origin attributes) through the 12 Mozilla signatures of the ProxyConfigLookup / SocketProcess family: no form carries a parameter of ours; the redesign changes the IPC path and is not done in this round",
-  "pm": "approvato"
+  "kind": "add",
+  "form": "member",
+  "line": "  mozilla::ipc::IPCResult RecvStealthProxyLookupOrigin(const Maybe<OriginAttributes>& aOriginAttributes);  // STEALTH-HOOK(network/doh)",
+  "test": ""
  },
  {
   "file": "netwerk/ipc/moz.build",
@@ -1410,12 +720,10 @@
   "file": "netwerk/socket/nsSOCKSIOLayer.cpp",
   "function": "PRStatus nsSOCKSSocketInfo::ConnectToProxy(PRFileDesc* fd) {",
   "kind": "rewrite",
-  "form": "unknown",
-  "line": "    status = StealthConnect(fd->lower, proxy, StealthConnectTarget::kSocksProxyHop, &prProxy, mTimeout);  // STEALTH-HOOK(network/ipv6-literal)",
+  "form": "wrap-expression",
+  "line": "    status = StealthHopConnect(this, fd->lower->methods->connect)(fd->lower, &prProxy, mTimeout);  // STEALTH-HOOK(network/ipv6-literal)",
   "removed": "    status = fd->lower->methods->connect(fd->lower, &prProxy, mTimeout);",
-  "test": "gtest:StealthDeclaredNetwork.AnIPv4MappedAddressIsLeftAloneBehindAProxyAndOnTheProxyHop",
-  "exception": "the gate of an IPv6 literal must run before the connect and feed the failure branch of Mozilla and its loop to the next address: neither a wrap after the call nor a guard at the top gives that",
-  "pm": "approvato"
+  "test": ""
  },
  {
   "file": "netwerk/socket/nsSOCKSIOLayer.cpp",

@@ -16,6 +16,7 @@
 #include "nsDocShellLoadState.h"
 #include "nsIContent.h"
 #include "nsIObserverService.h"
+#include "nsIURI.h"
 #include "nsPrintfCString.h"
 #include "nsString.h"
 
@@ -35,9 +36,10 @@ static void NotifyNavigationStarted(nsISupports* aSubject, const char* aTopic,
 }
 
 StealthNavigationLoad::StealthNavigationLoad(nsDocShell* aDocShell,
-                                             nsDocShellLoadState* aLoadState,
-                                             bool aNotify)
-    : mDocShell(aDocShell), mLoadState(aLoadState), mNotify(aNotify) {
+                                             nsDocShellLoadState* aLoadState)
+    : mDocShell(aDocShell),
+      mLoadState(aLoadState),
+      mNotify(!aLoadState->URI()->SchemeIs("javascript")) {
   if (!mNotify) {
     return;
   }

@@ -1,5 +1,5 @@
 diff --git a/intl/locale/LocaleService.cpp b/intl/locale/LocaleService.cpp
-index 49a16861cc18b88fdcd67260c62d0e4bed2be43b..bedddc52646ec78ba49356ef0fa3493ee1bfa5b4 100644
+index 49a16861cc18b88fdcd67260c62d0e4bed2be43b..501de6487882a6f7d199fe46dbbd914124afe93f 100644
 --- a/intl/locale/LocaleService.cpp
 +++ b/intl/locale/LocaleService.cpp
 @@ -32,6 +32,8 @@
@@ -11,26 +11,22 @@ index 49a16861cc18b88fdcd67260c62d0e4bed2be43b..bedddc52646ec78ba49356ef0fa3493e
  #define INTL_SYSTEM_LOCALES_CHANGED "intl:system-locales-changed"
  
  #define ACCEPT_LANGUAGES_PREF "intl.accept_languages"
-@@ -499,8 +501,7 @@ LocaleService::GetRegionalPrefsLocales(nsTArray<nsCString>& aRetVal) {
+@@ -499,6 +501,7 @@ LocaleService::GetRegionalPrefsLocales(nsTArray<nsCString>& aRetVal) {
    // If the user specified that they want to use OS Regional Preferences
    // locales, try to retrieve them and use.
    if (useOSLocales) {
--    if (NS_SUCCEEDED(
--            OSPreferences::GetInstance()->GetRegionalPrefsLocales(aRetVal))) {
-+    if (NS_SUCCEEDED(MachineRegionalPrefsLocales(aRetVal))) {  // STEALTH-HOOK(fingerprint/locale-time/language)
++    if (StealthDeclaredRegionalPrefsLocales(aRetVal)) return NS_OK;  // STEALTH-HOOK(fingerprint/locale-time/language)
+     if (NS_SUCCEEDED(
+             OSPreferences::GetInstance()->GetRegionalPrefsLocales(aRetVal))) {
        return NS_OK;
-     }
- 
-@@ -519,8 +520,7 @@ LocaleService::GetRegionalPrefsLocales(nsTArray<nsCString>& aRetVal) {
+@@ -519,6 +522,7 @@ LocaleService::GetRegionalPrefsLocales(nsTArray<nsCString>& aRetVal) {
    AutoTArray<nsCString, 10> regionalPrefsLocales;
    LocaleService::GetInstance()->GetAppLocaleAsBCP47(appLocale);
  
--  if (NS_FAILED(OSPreferences::GetInstance()->GetRegionalPrefsLocales(
--          regionalPrefsLocales))) {
-+  if (NS_FAILED(MachineRegionalPrefsLocales(regionalPrefsLocales))) {  // STEALTH-HOOK(fingerprint/locale-time/language)
++  if (!StealthDeclaredRegionalPrefsLocales(regionalPrefsLocales))  // STEALTH-HOOK(fingerprint/locale-time/language)
+   if (NS_FAILED(OSPreferences::GetInstance()->GetRegionalPrefsLocales(
+           regionalPrefsLocales))) {
      GetAppLocalesAsBCP47(aRetVal);
-     return NS_OK;
-   }
 diff --git a/intl/locale/moz.build b/intl/locale/moz.build
 index 4d6ff0428de7faaa6f6c6570708f7f5690e0e4df..d26b374eba597ef4982743711ae4bc1ae7fdbcb8 100644
 --- a/intl/locale/moz.build

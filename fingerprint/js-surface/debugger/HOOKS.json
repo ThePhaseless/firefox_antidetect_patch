@@ -28,44 +28,40 @@
   "function": "bool Debugger::addDebuggeeGlobal(JSContext* cx, Handle<GlobalObject*> global) {",
   "kind": "add",
   "form": "anchor",
-  "line": "  StealthDebuggerReadMode(cx, object, &invisibleDebuggee_);  // STEALTH-HOOK(fingerprint/js-surface/debugger)",
-  "test": "gtest:StealthDebugger.ARealmShowsNoDebuggerOnlyWhenTheDebuggerIsInStealthMode",
-  "anchor": "if (!cx->compartment()->wrap(cx, &debuggeeLink)) { return false; }  (the block that wraps debuggeeLink, just before the no-GC region)",
-  "why": "stealthMode is read in the debuggee's realm (after AutoRealm ar(cx, global) and the wrap of debuggeeLink) and before the no-GC region; a guard at the top of addDebuggeeGlobal would run in the debugger's realm and also on the already-debuggee early return"
- },
- {
-  "file": "js/src/debugger/Debugger.cpp",
-  "function": "bool Debugger::addDebuggeeGlobal(JSContext* cx, Handle<GlobalObject*> global) {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  if (!invisibleDebuggee_ && !globalDebuggers.append(Realm::DebuggerVectorEntry(this, debuggeeLink))) {  // STEALTH-HOOK(fingerprint/js-surface/debugger)",
-  "removed": "  if (!globalDebuggers.append(Realm::DebuggerVectorEntry(this, debuggeeLink))) {",
-  "test": "gtest:StealthDebugger.ARealmShowsNoDebuggerOnlyWhenTheDebuggerIsInStealthMode",
-  "exception": "step (1) of addDebuggeeGlobal: the Mozilla statement is skipped for a stealth debuggee: no form (guard, wrap, notice) can skip a statement of Mozilla without an allocation failure at the append that a stealth attach never had (G28 a). Port to 160: take 160's line (emplaceBack(this, debuggeeLink)) and keep the prefix: if (!invisibleDebuggee_ && !globalDebuggers.emplaceBack(this, debuggeeLink)) {",
-  "pm": "approvato"
- },
- {
-  "file": "js/src/debugger/Debugger.cpp",
-  "function": "bool Debugger::addDebuggeeGlobal(JSContext* cx, Handle<GlobalObject*> global) {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  auto globalDebuggersGuard = MakeScopeExit([&] { if (!invisibleDebuggee_) { globalDebuggers.popBack(); } });  // STEALTH-HOOK(fingerprint/js-surface/debugger)",
-  "removed": "  auto globalDebuggersGuard = MakeScopeExit([&] { globalDebuggers.popBack(); });",
-  "test": "gtest:StealthDebugger.ARealmShowsNoDebuggerOnlyWhenTheDebuggerIsInStealthMode",
-  "exception": "rollback guard of step (1): it must not pop an entry that was never pushed; companion of the line above",
-  "pm": "approvato"
+  "line": "  mozilla::StealthDebuggerReadMode(cx, object, &invisibleDebuggee_);  // STEALTH-HOOK(fingerprint/js-surface/debugger)",
+  "test": "",
+  "anchor": "",
+  "why": ""
  },
  {
   "file": "js/src/debugger/Debugger.cpp",
   "function": "bool Debugger::addDebuggeeGlobal(JSContext* cx, Handle<GlobalObject*> global) {",
   "kind": "add",
   "form": "anchor",
-  "line": "  if (invisibleDebuggee_) return StealthDebuggerReleaseGuards(globalDebuggersGuard, debuggeesGuard, debuggeeZonesGuard);  // STEALTH-HOOK(fingerprint/js-surface/debugger)",
-  "test": "gtest:StealthDebugger.ARealmShowsNoDebuggerOnlyWhenTheDebuggerIsInStealthMode",
+  "line": "  if (!invisibleDebuggee_)  // STEALTH-HOOK(fingerprint/js-surface/debugger)",
+  "test": "",
   "anchor": "",
-  "why": "",
-  "exception": "early successful return between steps (3) and (4) with the rollback guards (Mozilla locals) as arguments: it skips steps (4) and (5); no form of the contract fits a mid-function return",
-  "pm": "approvato"
+  "why": ""
+ },
+ {
+  "file": "js/src/debugger/Debugger.cpp",
+  "function": "bool Debugger::addDebuggeeGlobal(JSContext* cx, Handle<GlobalObject*> global) {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  mozilla::StealthDebuggerReleaseIfInvisible(invisibleDebuggee_, globalDebuggersGuard);  // STEALTH-HOOK(fingerprint/js-surface/debugger)",
+  "test": "",
+  "anchor": "",
+  "why": ""
+ },
+ {
+  "file": "js/src/debugger/Debugger.cpp",
+  "function": "bool Debugger::addDebuggeeGlobal(JSContext* cx, Handle<GlobalObject*> global) {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  if (invisibleDebuggee_) return mozilla::StealthDebuggerReleaseGuards(globalDebuggersGuard, debuggeesGuard, debuggeeZonesGuard);  // STEALTH-HOOK(fingerprint/js-surface/debugger)",
+  "test": "",
+  "anchor": "",
+  "why": ""
  },
  {
   "file": "js/src/debugger/Debugger.cpp",

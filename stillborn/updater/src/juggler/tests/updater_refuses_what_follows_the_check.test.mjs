@@ -85,14 +85,14 @@ function checkPart({ cutHook = false } = {}) {
     .replace(/this\.#getChannelStatus\(/g, 'this.status(')
     .replace(/this\.#getCheckFailedObject\(/g, 'this.failed(');
   if (cutHook) {
-    const cut = src.replace(/StealthUpdate\.noneOffered\((.*)\);/, '$1;');
+    const cut = src.replace(/StealthNoneOffered\((.*)\);/, '$1;');
     assert.notEqual(cut, src, 'no hook to cut');
     src = cut;
   }
   const { m } = load();
   return vm.runInNewContext(
     `(function (request) {\n${src}\nreturn updates;\n})`,
-    { StealthUpdate: m, LOG() {} });
+    { StealthUpdate: m, StealthNoneOffered: m.StealthNoneOffered, LOG() {} });
 }
 
 const answerOf = parse => ({
@@ -120,7 +120,7 @@ test("negative control: without the hook the offered updates reach Mozilla's cod
 test("the only parse of the server's answer is the one the check uses", () => {
   const text = read('toolkit/mozapps/update/UpdateService.sys.mjs');
   // A second parse that Mozilla adds to a new version would hand updates to
-  // code that noneOffered never sees.
+  // code that StealthNoneOffered never sees.
   const calls = text.split('\n').filter(l => /this\.#parseUpdates\(/.test(l));
   assert.equal(calls.length, 1, 'a second parse of the answer');
 });
@@ -183,7 +183,7 @@ test('the update cadence is the release one', () => {
 function load() {
   let src = fs.readFileSync(path.join(UPDATE, 'StealthUpdate.sys.mjs'), 'utf8');
   src = src.replace(/^export /gm, '');
-  src += '\nmodule.exports = { noneOffered, refusesDownload, refusesHostTask };\n';
+  src += '\nmodule.exports = { StealthNoneOffered, refusesDownload, refusesHostTask };\n';
   const logged = [];
   const sandbox = { module: { exports: {} }, console: { info: m => logged.push(m) } };
   vm.runInNewContext(src, sandbox);
@@ -193,12 +193,12 @@ function load() {
 test('our functions: none offered, every download and task refused', () => {
   const { m, logged } = load();
   const offered = [{}, {}];
-  const out = m.noneOffered(offered);
+  const out = m.StealthNoneOffered(offered);
   assert.equal(out.length, 0);
   assert.notEqual(out, offered, 'a new array, the parsed one untouched');
   assert.equal(offered.length, 2);
   assert.equal(logged.length, 1);
-  assert.equal(m.noneOffered([]).length, 0);
+  assert.equal(m.StealthNoneOffered([]).length, 0);
   assert.equal(logged.length, 1, 'nothing to say when nothing was offered');
   assert.equal(m.refusesDownload(), true);
   assert.equal(m.refusesHostTask(), true);

@@ -24,7 +24,7 @@ index 215d61190dbe192fba09e129e869093ced0eacca..571252e084d04932e704bf769bf6acc6
  transport_cppsrcs = [
      "/dom/media/webrtc/transport/%s" % s for s in sorted(transport_lcppsrcs)
 diff --git a/dom/media/webrtc/transport/ipc/StunAddrsRequestParent.cpp b/dom/media/webrtc/transport/ipc/StunAddrsRequestParent.cpp
-index db8a3c004486d5b27e012b0b318b4d8ac477569a..8b823026558d286828a9ba71c494beb6983cc9ae 100644
+index db8a3c004486d5b27e012b0b318b4d8ac477569a..c2f7ce4e4495c34005fe571dcef765a835c5f25e 100644
 --- a/dom/media/webrtc/transport/ipc/StunAddrsRequestParent.cpp
 +++ b/dom/media/webrtc/transport/ipc/StunAddrsRequestParent.cpp
 @@ -14,6 +14,8 @@
@@ -36,60 +36,50 @@ index db8a3c004486d5b27e012b0b318b4d8ac477569a..8b823026558d286828a9ba71c494beb6
  using namespace mozilla::ipc;
  
  namespace mozilla::net {
-@@ -145,21 +147,7 @@ void StunAddrsRequestParent::SendStunAddrs(const NrIceStunAddrArray& addrs) {
-   }
- 
-   if (!MDNSServiceWrapper::Instance()) {
--    std::ostringstream o;
--    char buffer[16];
--    for (auto& addr : addrs) {
--      nr_local_addr localAddr;
--      addr.toNrLocalAddr(localAddr);
--      if (localAddr.addr.ip_version == NR_IPV4 &&
--          !nr_transport_addr_is_loopback(&localAddr.addr)) {
--        nr_transport_addr_get_addrstring(&localAddr.addr, buffer, 16);
--        o << buffer << ";";
--      }
--    }
--    std::string addrstring = o.str();
+@@ -157,7 +159,7 @@ void StunAddrsRequestParent::SendStunAddrs(const NrIceStunAddrArray& addrs) {
+       }
+     }
+     std::string addrstring = o.str();
 -    if (!addrstring.empty()) {
--      (void)MDNSServiceWrapper::EnsureInstance(addrstring);
--    }
-+    (void)MDNSServiceWrapper::EnsureInstance(nr_stealth_mdns_interfaces());  // STEALTH-HOOK(fingerprint/webrtc/declared-network)
++    if (StealthMdnsResponderWanted(!addrstring.empty())) {  // STEALTH-HOOK(fingerprint/webrtc/declared-network)
+       (void)MDNSServiceWrapper::EnsureInstance(addrstring);
+     }
    }
+@@ -185,7 +187,7 @@ StaticRefPtr<StunAddrsRequestParent::MDNSServiceWrapper>
  
-   // send the new addresses back to the child
+ StunAddrsRequestParent::MDNSServiceWrapper::MDNSServiceWrapper(
+     const std::string& aAddrsString)
+-    : mAddrsString(aAddrsString) {}
++    : mAddrsString(StealthMdnsInterfaces(aAddrsString)) {}  // STEALTH-HOOK(fingerprint/webrtc/declared-network)
+ 
+ void StunAddrsRequestParent::MDNSServiceWrapper::RegisterHostname(
+     const char* hostname, const char* address) {
 diff --git a/dom/media/webrtc/transport/mdns_service/src/lib.rs b/dom/media/webrtc/transport/mdns_service/src/lib.rs
-index 82d3609ed94472e02ab3a7b9b291824160e8a79b..85cf4d3a9733bcc42041bb8c62e041f2c2ea2ff7 100644
+index 82d3609ed94472e02ab3a7b9b291824160e8a79b..3b08d4adb8bfbf548b210ee03165fc04501d0f98 100644
 --- a/dom/media/webrtc/transport/mdns_service/src/lib.rs
 +++ b/dom/media/webrtc/transport/mdns_service/src/lib.rs
-@@ -27,6 +27,7 @@ const MAX_NAME_LENGTH: usize = 255;
+@@ -27,6 +27,8 @@ const MAX_NAME_LENGTH: usize = 255;
  
  #[macro_use]
  extern crate log;
 +#[cfg(test)] mod stealth_tests;  // STEALTH-HOOK(fingerprint/webrtc/declared-network)
++mod stealth_interface;  // STEALTH-HOOK(fingerprint/webrtc/declared-network)
  
  struct Callback {
      data: *const c_void,
-@@ -459,14 +460,19 @@ impl MDNSService {
+@@ -459,6 +461,7 @@ impl MDNSService {
          socket.set_multicast_loop_v4(true)?;
          socket.set_read_timeout(Some(time::Duration::from_millis(1)))?;
          socket.set_write_timeout(Some(time::Duration::from_millis(1)))?;
--        for addr in addrs {
--            if let Err(err) = socket.join_multicast_v4(&mdns_addr, &addr) {
-+        for addr in &addrs {  // STEALTH-HOOK(fingerprint/webrtc/declared-network)
-+            if let Err(err) = socket.join_multicast_v4(&mdns_addr, addr) {
++        let stealth_if = addrs.first().copied();  // STEALTH-HOOK(fingerprint/webrtc/declared-network)
+         for addr in addrs {
+             if let Err(err) = socket.join_multicast_v4(&mdns_addr, &addr) {
                  warn!(
-                     "Could not join multicast group on interface: {:?}: {}",
-                     addr, err
+@@ -467,6 +470,7 @@ impl MDNSService {
                  );
              }
          }
-+        if let Some(addr) = addrs.first() {  // STEALTH-HOOK(fingerprint/webrtc/declared-network)
-+            if let Err(err) = socket2::SockRef::from(&socket).set_multicast_if_v4(addr) {
-+                warn!("Could not send multicast through interface: {:?}: {}", addr, err);
-+            }
-+        }
++        stealth_interface::set_multicast_if(&socket, stealth_if);  // STEALTH-HOOK(fingerprint/webrtc/declared-network)
  
          let thread_name = "mdns_service";
          let builder = thread::Builder::new().name(thread_name.into());

@@ -92,8 +92,8 @@ std::unique_ptr<NrSocketProxyConfig> StealthProxyConfigOfPrincipal(
  * aForceProxy: null, no proxy config at all, as upstream (a page cannot set a pref).
  */
 std::unique_ptr<NrSocketProxyConfig> StealthProxyConfigOf(
-    std::unique_ptr<NrSocketProxyConfig> aUpstream, nsPIDOMWindowInner* aWindow,
-    bool aForceProxy);
+    nsPIDOMWindowInner* aWindow, bool aForceProxy,
+    std::unique_ptr<NrSocketProxyConfig> aUpstream);
 
 }  // namespace mozilla
 

@@ -1,5 +1,5 @@
 diff --git a/dom/canvas/ClientWebGLContext.cpp b/dom/canvas/ClientWebGLContext.cpp
-index 097d20229785c61c89dc5c7e4c22799c48fb7c12..f682300f3d311d59c8aa34c1b5342c29e3985738 100644
+index 097d20229785c61c89dc5c7e4c22799c48fb7c12..7b080959204afd7be594d6ea1bc7e64da550aae5 100644
 --- a/dom/canvas/ClientWebGLContext.cpp
 +++ b/dom/canvas/ClientWebGLContext.cpp
 @@ -46,6 +46,9 @@
@@ -16,7 +16,7 @@ index 097d20229785c61c89dc5c7e4c22799c48fb7c12..f682300f3d311d59c8aa34c1b5342c29
    gfxAlphaType any;
    RefPtr<gfx::SourceSurface> snapshot = GetSurfaceSnapshot(&any);
    if (!snapshot) return nullptr;
-+  snapshot = StealthWebGLProjectReaderSnapshot(*this, snapshot, any);  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
++  StealthWebGLProjectReaderSnapshot(*this, snapshot, any);  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
  
    RefPtr<gfx::DataSourceSurface> dataSurface = snapshot->GetDataSurface();
  
@@ -24,11 +24,19 @@ index 097d20229785c61c89dc5c7e4c22799c48fb7c12..f682300f3d311d59c8aa34c1b5342c29
    gfxAlphaType any;
    RefPtr<gfx::SourceSurface> snapshot = GetSurfaceSnapshot(&any);
    if (!snapshot) return NS_ERROR_FAILURE;
-+  snapshot = StealthWebGLProjectReaderSnapshot(*this, snapshot, any);  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
++  StealthWebGLProjectReaderSnapshot(*this, snapshot, any);  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
  
    RefPtr<gfx::DataSourceSurface> dataSurface = snapshot->GetDataSurface();
    const auto& premultAlpha = notLost->info.options.premultipliedAlpha;
-@@ -2177,6 +2182,7 @@ void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,
+@@ -2169,6 +2174,7 @@ Maybe<std::string> ClientWebGLContext::GetString(const GLenum pname) {
+ void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,
+                                       JS::MutableHandle<JS::Value> retval,
+                                       ErrorResult& rv, const bool debug) {
++  if (StealthWebGLParameter(*this, cx, pname, retval, rv, debug)) return;  // STEALTH-HOOK(fingerprint/webgl/parameters)
+   const FuncScope funcScope(*this, "getParameter");
+   retval.setNull();
+   RefPtr<webgl::NotLostData> notLost(mNotLost);
+@@ -2177,6 +2183,7 @@ void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,
    }
    const auto& limits = Limits();
    const auto& state = State();
@@ -36,31 +44,7 @@ index 097d20229785c61c89dc5c7e4c22799c48fb7c12..f682300f3d311d59c8aa34c1b5342c29
  
    // -
  
-@@ -2464,6 +2470,7 @@ void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,
-         break;
- 
-       case LOCAL_GL_RENDERER: {
-+        if (StealthWebGLRendererOverride(ret)) break;  // STEALTH-HOOK(fingerprint/webgl/parameters)
-         bool allowRenderer = StaticPrefs::webgl_enable_renderer_query();
-         if (ShouldResistFingerprinting(RFPTarget::WebGLRenderInfo) ||
-             ShouldResistFingerprinting(RFPTarget::WebGLRendererConstant)) {
-@@ -2506,6 +2513,7 @@ void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,
- 
-         switch (pname) {
-           case dom::WEBGL_debug_renderer_info_Binding::UNMASKED_RENDERER_WEBGL:
-+            if (StealthWebGLUnmaskedRendererOverride(ret)) break;  // STEALTH-HOOK(fingerprint/webgl/parameters)
-             if (ShouldResistFingerprinting(RFPTarget::WebGLRenderInfo) ||
-                 ShouldResistFingerprinting(RFPTarget::WebGLRendererConstant)) {
-               ret = Some("Mozilla"_ns);
-@@ -2518,6 +2526,7 @@ void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,
-             break;
- 
-           case dom::WEBGL_debug_renderer_info_Binding::UNMASKED_VENDOR_WEBGL:
-+            if (StealthWebGLUnmaskedVendorOverride(ret)) break;  // STEALTH-HOOK(fingerprint/webgl/parameters)
-             if (ShouldResistFingerprinting(RFPTarget::WebGLRenderInfo)) {
-               ret = Some("Mozilla"_ns);
-             } else if (ShouldResistFingerprinting(
-@@ -3019,6 +3028,7 @@ ClientWebGLContext::GetShaderPrecisionFormat(const GLenum shadertype,
+@@ -3019,6 +3026,7 @@ ClientWebGLContext::GetShaderPrecisionFormat(const GLenum shadertype,
    if (!notLost) {
      return nullptr;
    }
@@ -68,7 +52,7 @@ index 097d20229785c61c89dc5c7e4c22799c48fb7c12..f682300f3d311d59c8aa34c1b5342c29
  
    const auto& shaderPrecisions = *notLost->info.shaderPrecisions;
    const auto args =
-@@ -5416,6 +5426,7 @@ void ClientWebGLContext::ReadPixels(GLint x, GLint y, GLsizei width,
+@@ -5416,6 +5424,7 @@ void ClientWebGLContext::ReadPixels(GLint x, GLint y, GLsizei width,
                                            {format, type},
                                            state.mPixelPackState};
    Run<RPROC(ReadPixelsPbo)>(desc, static_cast<uint64_t>(offset));
@@ -76,16 +60,16 @@ index 097d20229785c61c89dc5c7e4c22799c48fb7c12..f682300f3d311d59c8aa34c1b5342c29
  }
  
  void ClientWebGLContext::ReadPixels(GLint x, GLint y, GLsizei width,
-@@ -5463,7 +5474,7 @@ void ClientWebGLContext::ReadPixels(GLint x, GLint y, GLsizei width,
+@@ -5463,7 +5472,7 @@ void ClientWebGLContext::ReadPixels(GLint x, GLint y, GLsizei width,
                                              *uvec2::From(width, height),
                                              {format, type},
                                              state.mPixelPackState};
 -    bool succeeded = DoReadPixels(desc, *range);
-+    bool succeeded = StealthWebGLProjectReadPixels(*this, desc, *range, DoReadPixels(desc, *range));  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
++    bool succeeded = StealthDoReadPixels(this, desc, *range);  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
      if (succeeded) {
        CanvasUtils::ImageExtraction extraction =
            ImageExtractionResult(mCanvasElement, mOffscreenCanvas);
-@@ -5546,6 +5557,7 @@ bool ClientWebGLContext::DoReadPixels(const webgl::ReadPixelsDesc& desc,
+@@ -5546,6 +5555,7 @@ bool ClientWebGLContext::DoReadPixels(const webgl::ReadPixelsDesc& desc,
      Memcpy(&destRow, srcRow);
    }
  
@@ -93,7 +77,7 @@ index 097d20229785c61c89dc5c7e4c22799c48fb7c12..f682300f3d311d59c8aa34c1b5342c29
    return true;
  }
  
-@@ -5681,7 +5693,7 @@ ClientWebGLContext::DoReadPixelsAsync() {
+@@ -5681,7 +5691,7 @@ ClientWebGLContext::DoReadPixelsAsync() {
                {size.x, size.y}));
          }
  
@@ -235,14 +219,15 @@ index 2d8a66a1f8cddcbb238c7ee83da65089f03f625c..2c4fdcf80065e634bf6ac28340052bff
    // Bindings, etc.
  
 diff --git a/dom/canvas/gtest/moz.build b/dom/canvas/gtest/moz.build
-index e1fd0c7e9f8d4e9d0f7b8e6c430ce5b8a4679e5a..854117a6517c3eb7d87b17cd62c32b58dcb233dc 100644
+index e1fd0c7e9f8d4e9d0f7b8e6c430ce5b8a4679e5a..0deb32986fd66632ef1eb8ed51171ed0a4481a69 100644
 --- a/dom/canvas/gtest/moz.build
 +++ b/dom/canvas/gtest/moz.build
-@@ -12,6 +12,7 @@ UNIFIED_SOURCES += [
+@@ -12,6 +12,8 @@ UNIFIED_SOURCES += [
      "TestSanitizeRenderer.cpp",
      "TestWebGLTextureUploadInit.cpp",
  ]
 +UNIFIED_SOURCES += ["TestStealthWebGLParams.cpp"]  # STEALTH-HOOK(fingerprint/webgl/parameters)
++UNIFIED_SOURCES += ["TestStealthCanvasPageSnapshot.cpp"]  # STEALTH-HOOK(fingerprint/canvas/text-metrics)
  
  include("/ipc/chromium/chromium-config.mozbuild")
  

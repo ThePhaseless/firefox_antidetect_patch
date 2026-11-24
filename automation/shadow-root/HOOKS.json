@@ -22,12 +22,10 @@
   "file": "dom/base/Element.cpp",
   "function": "void Element::SetSlot(const nsAString& aName, ErrorResult& aError) {",
   "kind": "rewrite",
-  "form": "unknown",
-  "line": "    return StealthClosedShadowRootForBindings(shadowRoot, aSubject);  // STEALTH-HOOK(automation/shadow-root)",
+  "form": "wrap-expression",
+  "line": "    return StealthClosedShadowRootForBindings(this, aSubject, nullptr);  // STEALTH-HOOK(automation/shadow-root)",
   "removed": "    return nullptr;",
-  "test": "wrapper:tests/test_ua_widget_not_selectable.py::test_the_page_itself_still_sees_null_on_both_kinds_of_closed_root",
-  "exception": "the value born in this block (null or closed root) is replaced by the answer of our function; same decision as the PM-DECISIONS ruling for automation/shadow-root",
-  "pm": "approvato"
+  "test": ""
  },
  {
   "file": "dom/base/Element.h",

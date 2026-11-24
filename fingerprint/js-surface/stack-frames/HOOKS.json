@@ -10,11 +10,28 @@
  {
   "file": "js/src/vm/SavedStacks.cpp",
   "function": "JS_PUBLIC_API bool BuildStackString(JSContext* cx, JSPrincipals* principals,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "      if (StealthSkipJugglerFrame(&frame, nextFrame, &skippedAsync, skippedNextAsync)) continue;  // STEALTH-HOOK(fingerprint/js-surface/stack-frames)",
-  "test": "gtest:StealthStackFrames.JugglersFrameIsNotInTheStackAPageReads",
-  "anchor": "nextFrame = js::GetFirstSubsumedFrame(cx, principals, parent, SavedFrameSelfHosted::Exclude, skippedNextAsync);",
-  "why": "The hook needs the walk's own locals (frame, nextFrame, skippedAsync, skippedNextAsync) and a `continue` of Mozilla's loop: no guard or notice at the head of the function can see them, and a wrap-expression on GetFirstSubsumedFrame/UnwrapSavedFrame would be two rewritten lines with a rooting wrapper and would change the `!nextFrame` last-frame test of the V8 format, so not the same result."
+  "kind": "rewrite",
+  "form": "wrap-call",
+  "line": "        roots, StealthUnwrapVisibleFrame(cx, principals, stack,  // STEALTH-HOOK(fingerprint/js-surface/stack-frames)",
+  "removed": "        roots, UnwrapSavedFrame(cx, principals, stack,",
+  "test": ""
+ },
+ {
+  "file": "js/src/vm/SavedStacks.cpp",
+  "function": "JS_PUBLIC_API bool BuildStackString(JSContext* cx, JSPrincipals* principals,",
+  "kind": "rewrite",
+  "form": "wrap-call",
+  "line": "      nextFrame = StealthFirstVisibleFrame(cx, principals, parent,  // STEALTH-HOOK(fingerprint/js-surface/stack-frames)",
+  "removed": "      nextFrame = js::GetFirstSubsumedFrame(cx, principals, parent,",
+  "test": ""
+ },
+ {
+  "file": "js/src/vm/SavedStacks.cpp",
+  "function": "JS_PUBLIC_API bool BuildStackString(JSContext* cx, JSPrincipals* principals,",
+  "kind": "rewrite",
+  "form": "wrap-expression",
+  "line": "          if (!FormatV8StackFrame(cx, sb, frame, indent, StealthIsLastFrame(!nextFrame))) {  // STEALTH-HOOK(fingerprint/js-surface/stack-frames)",
+  "removed": "          if (!FormatV8StackFrame(cx, sb, frame, indent, !nextFrame)) {",
+  "test": ""
  }
 ]
