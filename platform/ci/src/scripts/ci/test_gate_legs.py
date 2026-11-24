@@ -166,7 +166,7 @@ def cases() -> list:
         and 'echo "INVPW_CORE_DIR=$RUNNER_TEMP/cores" >> "$GITHUB_ENV"' in cores[0]["run"] and "matrix.os" not in cond and names.index(cores[0]["name"]) < suite)
     deps = " ".join(str(s.get("run", "")) for s in steps if s.get("name") == "Linux system deps (Firefox runtime libs, a virtual display)")
     add("gate legs: the host oracle's leg and the recorder's leg have strace, as the fontconfig ones (the linux-deps-e2e list, installed by the system deps step of every Linux leg)",
-        "strace" in e2e_list and "apt-get install -y -qq --no-download --no-install-recommends" in deps and gate["jobs"]["wrapper-e2e"].get("needs") == "linux-deps-e2e")
+        "strace" in e2e_list and "sudo apt-get $APT install -y --no-download --no-install-recommends $(cat /tmp/linux-deps/roots.txt)" in deps and gate["jobs"]["wrapper-e2e"].get("needs") == "linux-deps-e2e")
 
     # a leg first, its row second: a suite the wrapper's list does not have yet is said, not failed, and nothing else is skipped
     listed = [i for i, s in enumerate(steps) if "LISTED=1" in str(s.get("run", ""))]

@@ -190,31 +190,42 @@ def _cases() -> list:
     out.append(("publish: each archive is downloaded by its name, asset-<leg>, for every leg of the tree (scripts/ci matrix), and a missing one is red",
                 len(by_name) == 1 and "_src/scripts/ci matrix" in legs_run and "for leg in $LEGS" in legs_run and "exit 1" in legs_run))
     # --- the Linux legs of the gate and of its xpcshell read no mirror (republish 45297517213: `playwright install-deps firefox` at 102 kB/s, a green
-    # leg cancelled at its 25 minutes): every package is a file of the run's linux-deps job (linux-deps.yml), installed with --no-download.
-    import re as _re
+    # leg cancelled at its 25 minutes). Their apt reads only the run's linux-deps repository (linux-deps.yml): its own sources list, sources folder and
+    # lists folder, and installs the roots by name with --no-download (wrapper PR #584: .deb files installed against another image build wanted a fetch).
+    APT_LOCAL = "-o Dir::Etc::SourceList=/tmp/linux-deps-apt/sources.list -o Dir::Etc::SourceParts=/tmp/linux-deps-apt/parts -o Dir::State::Lists=/tmp/linux-deps-apt/lists -o Acquire::Languages=none"
+    allowed = ("sudo apt-get $APT update", "sudo apt-get $APT install -y --no-download --no-install-recommends $(cat /tmp/linux-deps/roots.txt)")
     legs_of = {"gate.yml": ("gate", "wrapper-e2e"), "xpcshell.yml": ("xpcshell", "prefs")}
     for wf_name, job_names in legs_of.items():
         wf_jobs = load(wf_name)["jobs"]
         for job_name in job_names:
             job = wf_jobs.get(job_name) or {}
             text = "\n".join(str(st.get("run", "")) for st in job.get("steps", []))
-            installs = _re.findall(r"apt-get\s+(?:-\S+\s+)*install\b[^\n]*", text)
-            mirror = [l for l in installs if "--no-download" not in l]
-            out.append(("%s %s: no `playwright install-deps`, no `apt-get update`, every `apt-get install` with --no-download (%s)" % (wf_name, job_name, "; ".join(mirror) or "none from the mirror"),
-                        bool(job) and "install-deps" not in text and "apt-get update" not in text and not mirror))
+            apt_lines = [l.strip() for l in text.splitlines() if "apt-get" in l or "apt install" in l or "apt update" in l]
+            other = [l for l in apt_lines if l not in allowed]
+            out.append(("%s %s: no `playwright install-deps`, and apt only on the run's linux-deps repository, the roots by name with --no-download (%s)"
+                        % (wf_name, job_name, "; ".join(other) or "nothing else"),
+                        bool(job) and "install-deps" not in text and not other and all(a in apt_lines for a in allowed)
+                        and ('APT="%s"' % APT_LOCAL) in text and 'echo "deb [trusted=yes] file:/tmp/linux-deps ./" | sudo tee /tmp/linux-deps-apt/sources.list' in text
+                        and "sudo cp /tmp/linux-deps/*.deb /var/cache/apt/archives/" in text))
             need = job.get("needs")
             need = [need] if isinstance(need, str) else list(need or [])
             deps_jobs = [n for n in need if str((wf_jobs.get(n) or {}).get("uses", "")) == "./.github/workflows/linux-deps.yml"]
             fetched = [st for st in job.get("steps", []) if "download-artifact" in str(st.get("uses", ""))
-                       and str((st.get("with") or {}).get("name", "")) in ["${{ needs.%s.outputs.artifact }}" % n for n in deps_jobs]]
-            out.append(("%s %s: its packages are the files of a linux-deps.yml job it needs, downloaded before they are installed" % (wf_name, job_name),
-                        len(deps_jobs) == 1 and len(fetched) == 1 and installs != []
-                        and job["steps"].index(fetched[0]) < min(i for i, st in enumerate(job["steps"]) if "--no-download" in str(st.get("run", "")))))
-    deps_run = "\n".join(str(st.get("run", "")) for st in load("linux-deps.yml")["jobs"]["debs"]["steps"])
-    out.append(("linux-deps.yml: the archive is read only when the entry of this image and list is missing, and the list names Playwright's install-deps for Firefox",
-                "install-deps --dry-run firefox" in deps_run and "--download-only" in deps_run
-                and all(st.get("if") == "steps.restore.outputs.cache-hit != 'true'" for st in load("linux-deps.yml")["jobs"]["debs"]["steps"]
-                        if "apt-get" in str(st.get("run", "")) or str(st.get("uses", "")).startswith("actions/cache/save"))))
+                       and str((st.get("with") or {}).get("name", "")) in ["${{ needs.%s.outputs.artifact }}" % n for n in deps_jobs]
+                       and str((st.get("with") or {}).get("path", "")) == "/tmp/linux-deps"]
+            installing = [i for i, st in enumerate(job.get("steps", [])) if allowed[1] in str(st.get("run", ""))]
+            out.append(("%s %s: its repository is the artifact of a linux-deps.yml job it needs, downloaded to /tmp/linux-deps before the install" % (wf_name, job_name),
+                        len(deps_jobs) == 1 and len(fetched) == 1 and len(installing) == 1 and job["steps"].index(fetched[0]) < installing[0]))
+    deps_steps = load("linux-deps.yml")["jobs"]["debs"]["steps"]
+    deps_run = "\n".join(str(st.get("run", "")) for st in deps_steps)
+    out.append(("linux-deps.yml: a repository of the closure (Depends and Pre-Depends, recursively, what the image has included), its Packages index and its roots, "
+                "every root checked in it, Playwright's roots read from its table",
+                "apt-cache depends --recurse --no-recommends" in deps_run and "apt-get download" in deps_run and "apt-ftparchive packages . > Packages" in deps_run
+                and "roots.txt" in deps_run and "is not in the repository" in deps_run and 'for group in ("tools", "firefox")' in deps_run
+                and "--download-only" not in deps_run))
+    out.append(("linux-deps.yml: the archive is read only when the entry of this image and list is missing",
+                all(st.get("if") == "steps.restore.outputs.cache-hit != 'true'" for st in deps_steps
+                    if "apt-get" in str(st.get("run", "")) or str(st.get("uses", "")).startswith("actions/cache/save"))))
     return out
 
 
