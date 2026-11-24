@@ -244,3 +244,54 @@ def test_the_register_as_committed_is_well_formed_and_only_grows_against_main():
     rows = json.loads(engine.RAISES.read_text(encoding="utf-8"))
     engine.load_main_budgets()
     assert isinstance(rows, list) and engine.raises_list_problems(rows, engine.load_main_raises()) == []
+
+
+# The removed budget goes above main's the same way: a row of the register with `budget: "removed"`.
+RAISE_REMOVED = dict(RAISE, **{"from": 2, "to": 3, "budget": "removed", "reason": "a one-line rewrite in an allowed form replaces a longer hook"})
+
+
+def _removed_raised(removed, branch_rows, main_rows):
+    return (engine.raises_list_problems(branch_rows, main_rows)
+            + engine.budget_raise_problems({"a/A.cpp": 4}, removed, MAIN_HOOK, MAIN_REMOVED, None,
+                                           engine.new_raise_rows(branch_rows, main_rows)))
+
+
+def test_a_removed_raise_with_its_row_is_fine_and_without_it_fails():
+    # fails on the old code: the row had a field it did not know, and the value was above main's
+    assert _removed_raised({"a/A.cpp": 3}, [RAISE_REMOVED], []) == []
+    found = _removed_raised({"a/A.cpp": 3}, [], [])
+    assert len(found) == 1 and "removed budget 3 is above main's 2" in found[0], found
+
+
+def test_a_removed_row_whose_from_or_to_do_not_match_fails():
+    for row, value in ((dict(RAISE_REMOVED, **{"from": 1}), 3), (dict(RAISE_REMOVED, to=4), 3), (RAISE_REMOVED, 4), (RAISE_REMOVED, 2)):
+        found = _removed_raised({"a/A.cpp": value}, [row], [])
+        assert any("raises the removed budget" in p and "main's is 2" in p for p in found), (row, value, found)
+
+
+def test_a_file_without_a_removed_budget_on_main_raises_from_zero():
+    row = dict(RAISE_REMOVED, file="b/B.cpp", **{"from": 0, "to": 3})
+    main_hook = {"a/A.cpp": 4, "b/B.cpp": 2}
+    found = engine.budget_raise_problems({"b/B.cpp": 2}, {"b/B.cpp": 3}, main_hook, MAIN_REMOVED, None, [row])
+    assert found == [], found
+    found = engine.budget_raise_problems({"b/B.cpp": 2}, {"b/B.cpp": 3}, main_hook, MAIN_REMOVED, None, [])
+    assert len(found) == 1 and "above main's 0" in found[0], found
+
+
+def test_a_hook_row_and_a_removed_row_of_one_file_are_two_raises_and_two_removed_rows_are_not():
+    assert engine.budget_raise_problems({"a/A.cpp": 6}, {"a/A.cpp": 3}, MAIN_HOOK, MAIN_REMOVED, None, [RAISE, RAISE_REMOVED]) == []
+    again = dict(RAISE_REMOVED, reason="again")
+    assert any("two rows" in p for p in engine.budget_raise_problems({"a/A.cpp": 4}, {"a/A.cpp": 3}, MAIN_HOOK, MAIN_REMOVED, None, [RAISE_REMOVED, again]))
+
+
+def test_a_removed_row_does_not_lift_the_hook_budget_nor_the_other_way_round():
+    found = engine.budget_raise_problems({"a/A.cpp": 6}, {"a/A.cpp": 3}, MAIN_HOOK, MAIN_REMOVED, None, [RAISE_REMOVED])
+    assert any("hook budget 6 is above main's 4" in p for p in found), found
+    found = engine.budget_raise_problems({"a/A.cpp": 6}, {"a/A.cpp": 3}, MAIN_HOOK, MAIN_REMOVED, None, [RAISE])
+    assert any("removed budget 3 is above main's 2" in p for p in found), found
+
+
+def test_a_row_with_another_budget_than_hook_or_removed_fails():
+    found = engine.raises_list_problems([dict(RAISE, budget="lines")], [])
+    assert any("the budget 'lines'" in p for p in found), found
+    assert engine.raises_list_problems([dict(RAISE, budget="hook")], []) == []
