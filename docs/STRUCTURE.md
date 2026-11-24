@@ -65,7 +65,7 @@ One per folder without `BACKPORT.json`, beside `hooks.patch`, one entry per hook
 
 | Fields | Written by | Meaning |
 |---|---|---|
-| `file`, `function`, `kind`, `form`, `line`, `removed` | `export` or `hooks-list` | The Mozilla file, the host function, `add` / `rewrite` / `delete` / `file`, the form, the added line, the Mozilla line it replaces |
+| `file`, `function`, `kind`, `form`, `line`, `removed` | `export` or `hooks-list` | The Mozilla file, the host function (the function whose signature is nearest above the block: git's section header of the hunk, or in a C or C++ file a nearer signature inside the hunk), `add` / `rewrite` / `delete` / `file`, the form, the added line, the Mozilla line it replaces |
 | `test` | Hand | The test that proves the hook (grammar below); a hook with none is debt T1 |
 | `anchor`, `why` | Hand | Form `anchor` only: the Mozilla statement it follows, and why a guard or a wrap is not enough (debt T2) |
 | `own_function`, `renamed`, `calls_mozilla` | Hand | Read by `prebuild`: our functions to link-check besides `Stealth*`, a renamed Mozilla body besides `*_Mozilla`, a direct call of a renamed body that is allowed |

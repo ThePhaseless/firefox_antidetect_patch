@@ -961,6 +961,27 @@ def _renames(files: list) -> set:
     return names
 
 
+_SECTION_START = re.compile(r"^[A-Za-z_$]")
+
+
+_SECTION_TYPES = ("c", "cc", "cpp", "cxx", "h", "hh", "hpp", "m", "mm")
+
+
+def enclosing_section(ft: str, lines, upto: int, header: str) -> str:
+    """The host function of the block that starts at `lines[upto]`: git prints, as the section header of a hunk, the
+    nearest line above its first line that starts at column 0 with a letter, `_` or `$`; a hunk that holds a whole
+    function signature above the block (the hunk starts in the function before it) has a nearer one in its own lines
+    (context and removed lines, the old side), and that is the function the block is in. A line without a `(` is a
+    namespace, a class or a `using`, not a function, and the header stays. Only for C and C++ files: in the other
+    languages a line at column 0 with a `(` is a call (`include(...)` in a moz.build), not a definition."""
+    if ft not in _SECTION_TYPES:
+        return header
+    for t, x in reversed(lines[:upto]):
+        if t != "+" and _SECTION_START.match(x) and "(" in x:
+            return x.strip()
+    return header
+
+
 def analyse_patch(folder: str, text: str):
     """-> (hooks, violations) of one hooks.patch (folder: its series folder). Does not look at
     BACKPORT.json: series_hooks skips those folders."""
@@ -992,9 +1013,11 @@ def _analyse_patch(folder: str, text: str):
             lines, section = h["lines"], h["section"]
             new_side = [(t, x) for t, x in lines if t != "-"]
             blocks = file_blocks[hno - 1]
+            hunk_section = section
             for bi, b in enumerate(blocks):
                 role = file_roles.get((hno - 1, bi))
                 rem, add = b["rem"], b["add"]
+                section = enclosing_section(ft, lines, b["lo"], hunk_section)
                 kind = "rewrite" if add and rem else ("add" if add else "delete")
                 # the block with its context: the changes of other blocks as the new side has them
                 sub = []
@@ -1477,9 +1500,10 @@ def analyse_locals(folder: str, text: str, base=None) -> list:
         if ft not in LOCALS_FILES or _whole_file(f):
             continue
         base_lines = base(path) if base else None
-        by_fn = {}
+        by_fn = {}           # host function -> its lines in the hunks (the function of a line is the one enclosing_section names)
         for h in f["hunks"]:
-            by_fn.setdefault(h["section"], []).append(h)
+            for i, (_, x) in enumerate(h["lines"]):
+                by_fn.setdefault(enclosing_section(ft, h["lines"], i + 1, h["section"]), []).append(x)
         # new-file line number of each added line: (hunk number, text) -> [numbers]
         at = {}
         for hno, h in enumerate(f["hunks"], 1):
@@ -1490,8 +1514,8 @@ def analyse_locals(folder: str, text: str, base=None) -> list:
                         at.setdefault((hno, norm(x)), []).append(n)
                     n += 1
         locals_of = {}
-        for section, hs in by_fn.items():
-            names = declared_locals(ft, [x for h in hs for _, x in h["lines"]])
+        for section, xs in by_fn.items():
+            names = declared_locals(ft, xs)
             names -= set(re.findall(r"[A-Za-z_]\w*", section))          # a parameter named in the host function
             locals_of[section] = names
         units = [(r.hunk, r.function, r.rem, r.add, r.hooks) for r in rewrites if r.file == path and r.add]
