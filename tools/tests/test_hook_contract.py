@@ -678,3 +678,58 @@ def test_g53_a_changed_mozilla_line_between_the_ends_fails():
     text = g53_two_hunks(between="            Changed();")
     assert text.count("\n@@ ") == 3
     assert "C6" in rules(text)
+
+
+# --------------------------------------------------------------------------- G29, the qualifier of the called name may change to ours; C17
+def test_g29_the_qualifier_may_change_when_the_new_last_component_is_ours():
+    for added in ("  mozilla::StealthFoo(a, b);", "  StealthFoo(a, b);", "  mozilla::stealth::StealthFoo(a, b);",
+                  "  JS::StealthFoo(a, b);"):          # a form here; C17 refuses the last one
+        text = rewrite("  JS::Foo(a, b);", added)
+        assert rules(text) == [] and forms_of(text) == ["wrap-call"], (added, rules(text), forms_of(text))
+    # red: the new name is not ours; the arguments change; a receiver is dropped; two names change
+    for added in ("  mozilla::Foo2(a, b);", "  mozilla::StealthFoo(a, c);", "  mozilla::StealthFoo(a);", "  mozilla::StealthFoo(b, a);"):
+        assert "C6" in rules(rewrite("  JS::Foo(a, b);", added)), added
+    assert "C6" in rules(rewrite("  x->Foo(a);", "  StealthFoo(a);"))
+    assert "C6" in rules(rewrite("  x.Foo(a);", "  mozilla::StealthFoo(a);"))
+    # the rest of the line stays Mozilla's
+    assert rules(rewrite("  rv = JS::Foo(a, b);", "  rv = mozilla::StealthFoo(a, b);")) == []
+    assert "C6" in rules(rewrite("  rv = JS::Foo(a, b);", "  rv = mozilla::StealthFoo(a, b) + 1;"))
+
+
+def test_g29_the_one_plain_argument_rules_still_apply_when_the_qualifier_changes():
+    text = rewrite("  JS::Foo(a, b);", "  mozilla::StealthFoo(this, a, b);")
+    assert rules(text) == [] and forms_of(text) == ["wrap-call"]
+    assert "C6" in rules(rewrite("  JS::Foo(a, b);", "  mozilla::StealthFoo(this, extra, a, b);"))      # two arguments of ours
+    assert "C6" in rules(rewrite("  JS::Foo(a, b);", "  mozilla::StealthFoo(this, a, c);"))              # one of Mozilla's changed
+    # a name of ours that exists already keeps Mozilla's qualifier (G41): the qualifier may not change for it
+    assert "C6" in rules(rewrite("  JS::Foo(a, b);", "  mozilla::SessionSystemLocales(this, a, b);"))
+
+
+def _c17(text):
+    return [v.detail for v in hc.analyse_namespaces(FOLDER, text)]
+
+
+def test_c17_a_stealth_function_never_goes_into_a_mozilla_namespace():
+    for added, ns in (("  JS::StealthFoo(a, b);", "JS"), ("  js::StealthFoo(a, b);", "js"), ("  xpc::StealthFoo(a);", "xpc"),
+                      ("  mozilla::net::StealthFoo(a);", "net"), ("  gfx::StealthFoo(a);", "gfx"),
+                      ("  rv = mozilla::widget::StealthFoo();", "widget")):
+        got = _c17(top(added + MARK))
+        assert len(got) == 1 and ns in got[0], (added, got)
+    for added in ("  StealthFoo(a, b);", "  mozilla::StealthFoo(a, b);", "  mozilla::stealth::StealthFoo(a);",
+                  "  if (gfxPlatformFontList::StealthBundleOnly()) return;", "  nr_stealth_foo(a);"):
+        assert _c17(top(added + MARK)) == [], added
+    assert _c17(top('  #include "js::StealthFoo.h"' + MARK)) == []
+    assert _c17(rewrite("  JS::Foo(a, b);", "  JS::StealthFoo(a, b);")) != []          # the rewrite G29 accepts is refused by C17
+    assert _c17(rewrite("  JS::Foo(a, b);", "  mozilla::StealthFoo(a, b);")) == []
+
+
+def test_c17_is_in_the_contract_never_debt_and_a_backport_is_exempt(tmp_path):
+    d = tmp_path / FOLDER
+    d.mkdir(parents=True)
+    (d / "hooks.patch").write_text(top("  JS::StealthFoo(a);" + MARK), encoding="utf-8", newline="")
+    (tmp_path / "SERIES").write_text(FOLDER + "\n", encoding="utf-8")
+    v = hc.namespace_violations(tmp_path)
+    assert [x.rule for x in v] == ["C17"] and "C17" in hc.PORT06_RULES and "C17" in hc.RULES
+    assert hc.update_debt([], v, init=True) == []
+    (d / "BACKPORT.json").write_text("{}", encoding="utf-8")
+    assert hc.namespace_violations(tmp_path) == []
