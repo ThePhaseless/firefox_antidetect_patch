@@ -207,7 +207,7 @@ def test_check_against_a_tag_that_holds_the_commit_is_red(tmp_path, monkeypatch,
     newer = _tree(tmp_path, "newer", AFTER)
     monkeypatch.setattr(engine, "problems", lambda: [])
     monkeypatch.setattr(engine, "series_folders", lambda: [])
-    monkeypatch.setattr(engine, "contract_problems", lambda against_main=False: ([], 0, 0))     # this test's root is no series
+    monkeypatch.setattr(engine, "contract_problems", lambda against_main=False, base=None: ([], 0, 0))     # this test's root is no series
     assert engine.check(newer, "T") == 1
     assert "already contains the backport" in capsys.readouterr().out
     assert engine.check(tmp_path / "base", "T") == 0

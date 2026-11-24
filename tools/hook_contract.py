@@ -95,6 +95,7 @@ RULES = {
     "C13": "a `skip` rewrite whose removed Mozilla lines are not all kept verbatim among the added lines (port-06)",
     "C14": "a rewrite that fits wrap-expression: Mozilla's expression survives intact in our line, or the change adds ||, && or ?: around it (port-06)",
     "C15": "a parameter threaded through a C++ signature or call: carry it by side state, or declare it with reason_kind declaration and say why no side state can (port-06)",
+    "C16": "a hook passes a local of Mozilla's function as an argument outside an anchor (hook-02 point 3; read from the lines the hunks show)",
     "T1": "a hook with no test (the `test` of its HOOKS.json entry is empty)",
     "T2": "an anchor hook without its `anchor` and `why` in HOOKS.json",
     "T3": "a hook whose test no round runs (gtest filter of the candidate, node job, python step)",
@@ -103,7 +104,7 @@ RULES = {
 # they add to the list are not "entries main does not have" (tools/hooks_list.py; remove this once main has them).
 INTRODUCED_RULES = {"T1", "T2", "T3"}
 # port-06: these rules are fixed by the engine change and the HOOKS.json fields, never by the debt list (debt_problems refuses them)
-PORT06_RULES = ("C12", "C13", "C14", "C15")
+PORT06_RULES = ("C12", "C13", "C14", "C15", "C16")      # C16 is hook-02 point 3: it is fixed by the hook, never by the debt
 
 HASH_COMMENT = {"py", "yaml", "yml", "toml", "build", "configure", "sh", "txt", "in", "ini",
                 "cfg", "cmake", "gitignore", "mk", "conf", "lock"}
@@ -1309,6 +1310,194 @@ def rewrite_violations(root) -> list:
     return found
 
 
+# --------------------------------------------------------------------------- hook-02 point 3: no local of Mozilla's function as an argument
+# A hook passes `this`, the function's parameters or the wrapped expression, never a local of Mozilla's function (a local
+# names a statement Mozilla may move or rename at the next tag); only an anchor may. C16 reads the declaration of a local
+# from the lines the hunks show of the function (context, removed and added lines of every hunk with the same host function);
+# what it cannot see is a local declared in lines the diff does not show (a hunk's 3 lines of context are all it has), a
+# parameter hidden behind a macro, and a local declared by a statement the declaration patterns do not read.
+NOT_A_DECLARATION = {"return", "else", "delete", "throw", "goto", "case", "new", "co_return", "using", "typedef", "namespace",
+                     "class", "struct", "enum", "union", "public", "private", "protected", "template", "default", "do"}
+NOT_AN_ARGUMENT = KEYWORDS | NOT_A_DECLARATION | {"this", "true", "false", "nullptr", "null", "NULL", "None", "True", "False",
+                                                  "const", "auto", "bool", "int", "void", "char", "unsigned", "static"}
+_TYPE = r"(?:[A-Za-z_][\w:]*(?:<[^;=()]*>)?(?:\s*[*&]+\s*|\s+))+"
+LOCAL_DECL_C = (
+    re.compile(r"^(?:(?:const|static|constexpr|volatile|mutable|thread_local)\s+)*" + _TYPE + r"([A-Za-z_]\w*)\s*(?:=|\(|\{|;|\[)"),
+    re.compile(r"\bfor\s*\(\s*(?:const\s+)?" + _TYPE + r"([A-Za-z_]\w*)\s*[:=]"),
+    re.compile(r"\b(?:if|while|switch)\s*\(\s*(?:const\s+)?" + _TYPE + r"([A-Za-z_]\w*)\s*="),
+)
+LOCAL_DECL_JS = re.compile(r"\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)")
+LOCALS_FILES = {"cpp", "cc", "c", "mm", "m", "js", "mjs", "jsm", "jsx", "ts"}        # not headers (members and parameters), not rust
+TYPE_WORDS = {"bool", "int", "auto", "void", "char", "unsigned", "const"}
+EXEMPT_FOR_LOCALS = ("anchor", "registration", "member", "shadow")
+
+
+def declared_locals(ft: str, lines) -> set:
+    """The names a function's visible lines declare as locals (C++: `Type name = ..;`, `Type name(..);`, a range-for, an
+    `if (Type name = ..)`; js: const/let/var; rust: let). Signature lines and lines at column 0 are not declarations."""
+    names = set()
+    for raw in lines:
+        if not raw.strip() or is_comment_line(raw, ft) or indent_of(raw) == 0 or raw.lstrip().startswith("#"):
+            continue
+        s = _strip_literals(marker_split(raw)[0]).strip()
+        if ft in ("js", "mjs", "jsm", "jsx", "ts"):
+            m = LOCAL_DECL_JS.search(s)
+            if m:
+                names.add(m.group(1))
+            continue
+        if ft not in C_FAMILY:
+            continue
+        first = re.match(r"[A-Za-z_]\w*", s)
+        for k, rx in enumerate(LOCAL_DECL_C):
+            m = rx.search(s) if k else rx.match(s)
+            if not m or (k == 0 and (first is None or first.group(0) in NOT_A_DECLARATION)):
+                continue
+            if k == 0 and s.endswith("{") and "=" not in s:        # a signature or a block opener, not a declaration
+                continue
+            names.add(m.group(1))
+    return names
+
+
+def _ours(rem_t: list, add_t: list) -> list:
+    """The indexes of `add_t` that are ours: every token of an added line, and for a rewrite the tokens Mozilla's removed
+    text does not have (the inserted and the replaced ones)."""
+    if not rem_t:
+        return list(range(len(add_t)))
+    import difflib
+    out = []
+    for tag, _, _, j1, j2 in difflib.SequenceMatcher(None, rem_t, add_t, autojunk=False).get_opcodes():
+        if tag in ("insert", "replace"):
+            out += list(range(j1, j2))
+    return out
+
+
+def _passed_identifiers(add_t: list, ours: list) -> list:
+    """The names among our tokens that read as a value passed or used by the hook: not a called name, a member, a qualified
+    name, a keyword, a literal, nor the name a declaration of the hook itself introduces."""
+    found = []
+    for k in ours:
+        t = add_t[k]
+        if not IDENT.match(t) or t in NOT_AN_ARGUMENT:
+            continue
+        prev, prev2 = (add_t[k - 1] if k >= 1 else ""), (add_t[k - 2] if k >= 2 else "")
+        if prev == "." or (prev == ">" and prev2 == "-") or (prev == ":" and prev2 == ":"):
+            continue
+        nxt, nxt2 = (add_t[k + 1] if k + 1 < len(add_t) else ""), (add_t[k + 2] if k + 2 < len(add_t) else "")
+        if nxt == "(" or nxt == "." or (nxt == "-" and nxt2 == ">") or (nxt == "=" and nxt2 != "="):
+            continue                                # a called name, a receiver, the target of an assignment: not passed
+        declares = (IDENT.match(prev) and (prev not in NOT_AN_ARGUMENT or prev in TYPE_WORDS)) or (
+            prev in ("*", "&") and IDENT.match(prev2) and k + 1 < len(add_t) and add_t[k + 1] in ("=", ";"))
+        if declares:
+            continue                                # `bool stealthPlaced = ..`: the hook declares it
+        if t not in found:
+            found.append(t)
+    return found
+
+
+MOZILLA_NOT_LOCAL = re.compile(r"^(?:m|s|g|k|a)[A-Z]")        # member, static, global, constant, parameter: Mozilla's naming
+
+
+def _function_lines(base: list, old_start: int):
+    """(signature names, body lines) of the function of the base file that holds old line `old_start`, or None: the nearest
+    column-0 line above is the header (a column-0 `}` first means the line is not inside a function), the body runs to the
+    next column-0 `}`."""
+    i = min(old_start, len(base)) - 1
+    while i >= 0:
+        ln = base[i]
+        if ln.strip() and indent_of(ln) == 0 and not ln.lstrip().startswith(("#", "//", "/*", "*")):
+            if ln.startswith("}"):
+                return None
+            break
+        i -= 1
+    else:
+        return None
+    head, j = [], i
+    while j < len(base) and not base[j].rstrip().endswith("{") and j < i + 12:
+        head.append(base[j])
+        j += 1
+    head.append(base[j] if j < len(base) else "")
+    end = j + 1
+    while end < len(base) and not base[end].startswith("}"):
+        end += 1
+    return set(re.findall(r"[A-Za-z_]\w*", " ".join(head))), base[j + 1:end]
+
+
+def git_base_reader(source, tag: str):
+    """A `base` for analyse_locals: the lines of a Mozilla file at `tag` in the repository `source` (None when it has none)."""
+    import subprocess
+    cache = {}
+
+    def read(path: str):
+        if path not in cache:
+            got = subprocess.run(["git", "-C", str(source), "show", "%s:%s" % (tag, path)], capture_output=True)
+            cache[path] = got.stdout.decode("utf-8", errors="replace").split(chr(10)) if got.returncode == 0 else None
+        return cache[path]
+    return read
+
+
+def analyse_locals(folder: str, text: str, base=None) -> list:
+    """C16 of one hooks.patch: every hook that is not an anchor (nor a registration, member or shadow) and passes a local of
+    Mozilla's function. The locals are read from the lines the hunks show of the function; with `base` (a function from a
+    Mozilla path to the lines of the file at the tag, see git_base_reader) from the whole function in the base file too.
+    Header files and rust are not read (their indented lines are members and parameters; rust declares with `let`)."""
+    hooks, _, rewrites = _analyse_patch(folder, text)
+    out = []
+    for f in parse_patch(text):
+        path, ft = f["file"], file_type_of(f["file"])
+        if ft not in LOCALS_FILES or _whole_file(f):
+            continue
+        base_lines = base(path) if base else None
+        by_fn = {}
+        for h in f["hunks"]:
+            by_fn.setdefault(h["section"], []).append(h)
+        # new-file line number of each added line: (hunk number, text) -> [numbers]
+        at = {}
+        for hno, h in enumerate(f["hunks"], 1):
+            n = h["new_start"]
+            for tag, x in h["lines"]:
+                if tag != "-":
+                    if tag == "+":
+                        at.setdefault((hno, norm(x)), []).append(n)
+                    n += 1
+        locals_of = {}
+        for section, hs in by_fn.items():
+            names = declared_locals(ft, [x for h in hs for _, x in h["lines"]])
+            names -= set(re.findall(r"[A-Za-z_]\w*", section))          # a parameter named in the host function
+            locals_of[section] = names
+        units = [(r.hunk, r.function, r.rem, r.add, r.hooks) for r in rewrites if r.file == path and r.add]
+        units += [(h.hunk, h.function, (), (h.line,), (h,)) for h in hooks if h.file == path and h.kind == "add" and h.line]
+        for hno, section, rem, add, hks in units:
+            live = [h for h in hks if h.form not in EXEMPT_FOR_LOCALS]
+            if not live:
+                continue
+            visible, params = set(locals_of.get(section, ())), set()
+            fn = _function_lines(base_lines, f["hunks"][hno - 1]["old_start"]) if base_lines else None
+            if fn:
+                params, body = fn
+                visible |= declared_locals(ft, body)
+            visible = {n for n in visible if n not in params and not MOZILLA_NOT_LOCAL.match(n)}
+            visible -= declared_locals(ft, list(add))            # a name the hook itself declares is its own
+            add_t = _toks(" ".join(_code_of(x).strip() for x in add))
+            rem_t = _toks(" ".join(x.strip() for x in rem)) if rem else []
+            names = [n for n in _passed_identifiers(add_t, _ours(rem_t, add_t)) if n in visible]
+            if not names:
+                continue
+            head = live[0]
+            line = (at.get((hno, norm(head.line))) or [0])[0]
+            txt = "\n".join(x for x in add) if rem else head.line
+            out.append(Violation("C16", folder, path, section, txt, _key("C16", folder, path, section, txt),
+                                 "line %d: %s" % (line, ", ".join(names)), tuple(hook_identity(h) for h in hks)))
+    return _unique(out)
+
+
+def locals_violations(root, base=None) -> list:
+    """C16 of every non-backport folder (`base`: see analyse_locals)."""
+    root, found = Path(root), []
+    for folder in _folders(root):
+        found += analyse_locals(folder, (root / folder / "hooks.patch").read_text(encoding="utf-8", errors="replace"), base)
+    return found
+
+
 def _folders(root: Path) -> list:
     names = (root / "SERIES").read_text(encoding="utf-8").split()
     return [f for f in names if (root / f / "hooks.patch").is_file() and not (root / f / "BACKPORT.json").exists()]
@@ -1346,7 +1535,8 @@ def contract_violations(root) -> list:
     kept = [v for v in _analyse(root)[1]
             if not (v.ids and all((v.folder, i) in excepted for i in v.ids)) and not end_anchor(v)]
     # port-06: a declared exception does not leave these out; they judge the exception itself
-    return sorted(kept + hooks_list.missing_test_violations(root) + rewrite_violations(root), key=lambda v: v.key)
+    return sorted(kept + hooks_list.missing_test_violations(root) + rewrite_violations(root)
+                  + locals_violations(root), key=lambda v: v.key)
 
 
 # --------------------------------------------------------------------------- the debt list

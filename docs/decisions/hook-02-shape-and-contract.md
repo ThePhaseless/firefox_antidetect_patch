@@ -1,9 +1,9 @@
 # hook-02: shape and contract
 
-**Rule.** Every hook outside the backport folders follows ten points; `tools/hook_contract.py` enforces them as rules C1-C11.
+**Rule.** Every hook outside the backport folders follows ten points; `tools/hook_contract.py` enforces them as rules C1-C11 and C16 (point 3).
 1. One line with no logic: the call and, in a guard, the `return`. No `&&`, `||`, ternary or arithmetic (C1, C5).
 2. The marker `STEALTH-HOOK(<folder of the function>)` on the same line, in the file's comment syntax, and nothing else in the comment (C2, C3).
-3. Arguments: `this`, the function's parameters, or the wrapped expression. A private field with no public accessor is passed by reference or pointer and named in `HOOKS.json`, so a rename by Mozilla fails at compile time. No locals, except in an anchor.
+3. Arguments: `this`, the function's parameters, or the wrapped expression. A private field with no public accessor is passed by reference or pointer and named in `HOOKS.json`, so a rename by Mozilla fails at compile time. No locals, except in an anchor (C16: a name that the lines the hunks show of the function declare as a local, passed or used by a hook that is not an anchor; with `check --against <tag> --source <path>` the whole function is read from the base file, otherwise a local declared out of view is not seen).
 4. No Mozilla line removed or changed, except the single line of the rewriting forms (C6).
 5. A guard or notice is the first statement of the body. Never inside a Mozilla list, never the last line of a block: one untouched Mozilla line must stay between our line and what Mozilla appends at each release (C9).
 6. No comment in a Mozilla file besides the marker (C4).
