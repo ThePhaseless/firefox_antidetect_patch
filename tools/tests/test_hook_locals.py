@@ -174,3 +174,26 @@ def test_c16_the_added_else_if_of_the_s2_shape_passes_locals_the_base_declares()
             "  }", "", "  // Special handling", "  return wrapper;", "}"]
     assert names(text) == []                                  # the hunk shows none of the declarations
     assert names(text, lambda path: base) == ["origin", "target", "targetIsChrome"]     # `wrapper` is an assignment target
+
+
+def test_the_hook_locals_command_is_red_on_a_hit_and_reads_the_tag(monkeypatch, capsys):
+    import engine
+    seen = []
+    monkeypatch.setattr(hc, "git_base_reader", lambda source, tag: seen.append((source, tag)) or "reader")
+    hit = hc.Violation("C16", FOLDER, "js/x/WrapperFactory.cpp", "f", "txt", "k", "line 5: xrayType")
+    monkeypatch.setattr(hc, "locals_violations", lambda root, base=None: [hit] if base == "reader" else [])
+    assert engine.hook_locals(Path("src"), "TAG") == 1
+    out = capsys.readouterr().out
+    assert seen == [(Path("src"), "TAG")] and "FAIL" in out and "xrayType" in out and "WrapperFactory.cpp" in out
+    monkeypatch.setattr(hc, "locals_violations", lambda root, base=None: [])
+    assert engine.hook_locals(Path("src"), "TAG") == 0
+    assert "ok" in capsys.readouterr().out
+
+
+def test_the_rebuilds_job_runs_the_hook_locals_command_against_the_materialized_tag():
+    wf = Path(__file__).resolve().parents[2] / ".github" / "workflows"
+    checks = (wf / "checks.yml").read_text(encoding="utf-8")
+    rebuilds = checks.split("\n  rebuilds:")[1].split("\n  noreply-identity:")[0]
+    assert "engine.py hook-locals --source source" in rebuilds
+    assert "engine.py hook-locals" not in checks.split("\n  rebuilds:")[0]               # the rules job stays patch-only
+    assert "hook-locals" not in (wf / "series.yml").read_text(encoding="utf-8")         # checks.yml is the one place a check is added

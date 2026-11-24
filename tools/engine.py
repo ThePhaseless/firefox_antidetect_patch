@@ -1416,6 +1416,18 @@ def hook_debt(init: bool = False, summary: bool = False) -> int:
     return 0
 
 
+def hook_locals(source: Path, tag: str) -> int:
+    """C16 (hook-02 point 3) with the whole function read from the Mozilla tag in `source`, not only the lines a hunk shows:
+    a hook that is not an anchor and passes a local of Mozilla's function is red. Reads the tag's objects only."""
+    found = hook_contract.locals_violations(ROOT, hook_contract.git_base_reader(source, tag))
+    for v in found:
+        print("FAIL %s/hooks.patch, %s: C16 %s (a local of Mozilla's function passed outside an anchor, hook-02 point 3)"
+              % (v.folder, v.file, v.detail))
+    if not found:
+        print("ok: no hook passes a local of Mozilla's function (read from %s)" % tag)
+    return 1 if found else 0
+
+
 def status(source: Path, head: str) -> int:
     up = upstream()
     now = git(source, "rev-parse", head).decode().strip()
@@ -1428,7 +1440,7 @@ def status(source: Path, head: str) -> int:
     return 1
 
 
-SOURCE_COMMANDS = ("status", "apply", "export", "verify", "drift", "port")     # check needs it only with --against
+SOURCE_COMMANDS = ("status", "apply", "export", "verify", "drift", "port", "hook-locals")     # check needs it only with --against
 
 
 def main() -> int:
@@ -1439,7 +1451,7 @@ def main() -> int:
         return prebuild.main(sys.argv[2:])    # its own options: --head, --base, --folder, --checks, --json (tools/prebuild.py)
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("command", choices=["status", "apply", "materialize", "export", "verify", "check",
-                                        "shrink-budget", "hook-debt", "hooks-list", "drift", "port", "births"])
+                                        "shrink-budget", "hook-debt", "hooks-list", "drift", "port", "births", "hook-locals"])
     ap.add_argument("--to", help="drift/port: the Mozilla tag to move to (a stable release, never a beta)")
     ap.add_argument("--into", type=Path, default=Path("."), help="materialize: the directory to make the tree")
     ap.add_argument("--shared", type=Path, default=None,
@@ -1476,6 +1488,8 @@ def main() -> int:
         return check(a.source, a.against or None, against_main=True)
     if a.command == "hook-debt":
         return hook_debt(a.init, a.summary)
+    if a.command == "hook-locals":
+        return hook_locals(a.source, a.against or base)
     if a.command == "hooks-list":
         print(write_hooks_list())
         return 0
