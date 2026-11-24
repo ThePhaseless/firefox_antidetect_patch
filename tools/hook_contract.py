@@ -870,17 +870,21 @@ def _closes_wrap(removed: str, code: str) -> bool:
     return len(c) == len(r) + 1 and any(t == ")" and c[:k] + c[k + 1:] == r for k, t in enumerate(c))
 
 
-def _wrap_roles(ft: str, blocks: list) -> dict:
+def _wrap_roles(ft: str, hunks_blocks: list) -> dict:
     """G53: a multi-line expression wrap. One line of ours is ADDED to open our call (`StealthX(a,  // STEALTH-HOOK(f)`,
     marker on it), Mozilla's expression lines in between stay as they are (context), and only the closing line is
-    rewritten: Mozilla's closing text plus our `)` and the marker. -> {block index: "open" | "close"}. A wrap where a
-    middle line changes (another block between the two) or where a line lacks the marker is not recognised."""
+    rewritten: Mozilla's closing text plus our `)` and the marker. `hunks_blocks` is the list of blocks of every hunk of
+    one file: the two ends may fall in two hunks (git cuts a hunk when the lines between are far apart), and they are
+    paired only when they are consecutive changes of the file, so every line between them is Mozilla's, unchanged.
+    -> {(hunk index, block index): "open" | "close"}. A wrap where a middle line changes (another block between the
+    two, in this hunk or in one between) or where a line lacks the marker is not recognised."""
     roles = {}
     if ft not in CLIKE:
         return roles
-    for i in range(len(blocks) - 1):
-        a, z = blocks[i], blocks[i + 1]
-        if a["rem"] or len(a["add"]) != 1 or len(z["rem"]) != 1 or len(z["add"]) != 1 or i in roles:
+    flat = [(hi, bi, b) for hi, blocks in enumerate(hunks_blocks) for bi, b in enumerate(blocks)]
+    for i in range(len(flat) - 1):
+        (ha, ba, a), (hz, bz, z) = flat[i], flat[i + 1]
+        if a["rem"] or len(a["add"]) != 1 or len(z["rem"]) != 1 or len(z["add"]) != 1 or (ha, ba) in roles:
             continue
         o_code, o_mk, o_extra = marker_split(a["add"][0].rstrip())
         c_code, c_mk, c_extra = marker_split(z["add"][0].rstrip())
@@ -890,7 +894,7 @@ def _wrap_roles(ft: str, blocks: list) -> dict:
         if not m or _close_paren(o_code, m.end() - 1) >= 0 or not _balanced_open_one(o_code):
             continue
         if _closes_wrap(z["rem"][0], c_code):
-            roles[i], roles[i + 1] = "open", "close"
+            roles[(ha, ba)], roles[(hz, bz)] = "open", "close"
     return roles
 
 
@@ -951,13 +955,14 @@ def _analyse_patch(folder: str, text: str):
             hooks.append(Hook(folder, path, "", "unknown", "", "<%s file>" % whole, "file", "unknown"))
             violate("C7", path, "", "<%s>" % whole, whole, hooks[-1:])
             continue
+        file_blocks = [_blocks(h["lines"]) for h in f["hunks"]]
+        file_roles = _wrap_roles(ft, file_blocks)
         for hno, h in enumerate(f["hunks"], 1):
             lines, section = h["lines"], h["section"]
             new_side = [(t, x) for t, x in lines if t != "-"]
-            blocks = _blocks(lines)
-            roles = _wrap_roles(ft, blocks)
+            blocks = file_blocks[hno - 1]
             for bi, b in enumerate(blocks):
-                role = roles.get(bi)
+                role = file_roles.get((hno - 1, bi))
                 rem, add = b["rem"], b["add"]
                 kind = "rewrite" if add and rem else ("add" if add else "delete")
                 # the block with its context: the changes of other blocks as the new side has them
