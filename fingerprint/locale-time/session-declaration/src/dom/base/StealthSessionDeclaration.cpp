@@ -274,6 +274,27 @@ void StealthExplodeTime(const Document* aDocument, PRTime aTime,
   aExploded->tm_params.tp_dst_offset = dstMs / 1000;
 }
 
+// The document StealthNoteTimeDocument noted for the next StealthExplodeTime
+// without one; null when none is noted.
+static const Document* sNotedTimeDocument = nullptr;
+
+void StealthNoteTimeDocument(const Document* aDocument) {
+  MOZ_ASSERT(NS_IsMainThread());
+  sNotedTimeDocument = aDocument;
+}
+
+void StealthExplodeTime(PRTime aTime, PRTimeParamFn aParams,
+                        PRExplodedTime* aExploded) {
+  MOZ_ASSERT(NS_IsMainThread());
+  const Document* document = sNotedTimeDocument;
+  sNotedTimeDocument = nullptr;
+  if (!document) {
+    PR_ExplodeTime(aTime, aParams, aExploded);
+    return;
+  }
+  StealthExplodeTime(document, aTime, aParams, aExploded);
+}
+
 nsAtom* ChooseCharsetLanguage(nsAtom* aFromCharset, nsAtom* aProcessLanguage,
                               nsAtom* aDeclared) {
   return aDeclared && aFromCharset == aProcessLanguage ? aDeclared

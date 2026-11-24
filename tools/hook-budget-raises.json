@@ -160,17 +160,6 @@
   "test": "gtest:StealthMouseEventIPC.TheIdIsReadOnlyWhenTheFieldBeforeItWasRead"
  },
  {
-  "file": "dom/base/Document.cpp",
-  "from": 4,
-  "to": 5,
-  "folder": "fingerprint/locale-time/timezone",
-  "reason": "port-06: a one-line rewrite in an allowed form (wrap) replaces a longer hook",
-  "decided_by": "pm",
-  "date": "2026-11-25",
-  "test": "wrapper:tests/test_a_launch_and_a_context_timezone_reach_the_page_e2e.py::test_a_launch_and_a_context_timezone_reach_the_page",
-  "budget": "removed"
- },
- {
   "file": "dom/media/webrtc/jsapi/PeerConnectionImpl.cpp",
   "from": 0,
   "to": 1,
