@@ -327,6 +327,17 @@ OWN_FILES = [
     (r"^gfx/wr/webrender/src/render_backend/stealth_shared_fonts\.rs$", "platform/webrender-memory"),
     (r"^(toolkit/components/urlformatter/tests/unit/test_stealth_apikeys_observer\.js|"
      r"toolkit/components/urlformatter/tests/unit/xpcshell-stealth\.toml)$", "stillborn/api-keys"),
+    (r"^(dom/base/test/gtest/TestStealthCallerObject\.cpp|"
+     r"juggler/tests/caller_object_decision_is_written_before_its_branch_reads_it\.test\.mjs)$", "automation/hybrid-xrays"),
+    (r"^(dom/canvas/gtest/TestStealthCanvasPageSnapshot\.cpp)$", "fingerprint/canvas/text-metrics"),
+    (r"^(dom/media/gtest/TestStealthMediaEnumeration\.cpp)$", "fingerprint/media/enumeration"),
+    (r"^(dom/media/webrtc/transport/mdns_service/src/stealth_interface\.rs)$", "fingerprint/webrtc/declared-network"),
+    (r"^(dom/xslt/xslt/StealthExsltTime\.h|"
+     r"juggler/tests/exslt_time_finds_the_source_document_as_the_file_does\.test\.mjs)$", "fingerprint/locale-time/timezone"),
+    (r"^(layout/base/gtest/TestStealthSurfaceFlags\.cpp)$", "fingerprint/canvas/as-drawn"),
+    (r"^(netwerk/test/gtest/TestStealthLookupLoadInfo\.cpp)$", "network/proxy-udp"),
+    (r"^(widget/StealthMouseEventIPC\.h)$", "automation/input"),
+    (r"^(juggler/tests/navigation_hook_runs_only_for_a_load_that_leaves_the_document\.test\.mjs)$", "automation/navigation"),
     (r"^juggler/tests/pingsender_route_reaches_the_channel\.test\.mjs$", "stillborn/telemetry"),
     (r"^juggler/", "automation/juggler"),
     (r"^browser/fonts/", "fingerprint/fonts/bundle"),
