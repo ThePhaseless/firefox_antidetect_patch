@@ -767,3 +767,43 @@ def test_c17_is_in_the_contract_never_debt_and_a_backport_is_exempt(tmp_path):
     assert hc.update_debt([], v, init=True) == []
     (d / "BACKPORT.json").write_text("{}", encoding="utf-8")
     assert hc.namespace_violations(tmp_path) == []
+
+
+# `function` of a hook is the function the block is in: the section header git prints for the hunk is the one above the
+# hunk's first line, and a hunk that starts in the previous function holds the signature of the real one in its own lines.
+def _function_of(path, header, signature, hook_lines):
+    body = [signature] + hook_lines
+    lines = [l if l.startswith(("+", "-")) else " " + l for l in body]
+    old_len = sum(1 for l in lines if not l.startswith("+"))
+    new_len = sum(1 for l in lines if not l.startswith("-"))
+    text = ("diff --git a/%s b/%s\nindex 1111111..2222222 100644\n--- a/%s\n+++ b/%s\n@@ -100,%d +100,%d @@ %s\n%s\n"
+            % (path, path, path, path, old_len, new_len, header, "\n".join(lines)))
+    hooks, _ = hc.analyse_patch("f/x", text)
+    return [h.function for h in hooks]
+
+
+def test_the_function_of_a_hook_is_the_one_whose_signature_the_hunk_shows_above_it():
+    # GetString ends just above GetParameter: git names the first, the hook is in the second
+    got = _function_of("dom/canvas/ClientWebGLContext.cpp", "Maybe<std::string> ClientWebGLContext::GetString(const GLenum pname) {",
+                       "void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,",
+                       ["                                      JS::MutableHandle<JS::Value> retval,",
+                        "                                      ErrorResult& rv, const bool debug) {",
+                        "+  if (StealthWebGLParameter(*this, cx, pname, retval, rv, debug)) return;  // STEALTH-HOOK(f/x)",
+                        "   const auto& state = State();"])
+    assert got == ["void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,"], got
+    # LookupLanguage ends just above GetLocaleLanguage
+    got = _function_of("intl/locale/nsLanguageAtomService.cpp", "nsStaticAtom* nsLanguageAtomService::LookupLanguage(",
+                       "nsAtom* nsLanguageAtomService::GetLocaleLanguage() {",
+                       ["+  if (nsAtom* worker = intl::WorkerLocaleLanguage()) return worker;  // STEALTH-HOOK(f/x)",
+                        "   {"])
+    assert got == ["nsAtom* nsLanguageAtomService::GetLocaleLanguage() {"], got
+
+
+def test_the_header_stays_when_no_signature_is_above_the_block_or_the_file_is_not_c():
+    got = _function_of("dom/base/Foo.cpp", "void Foo::Bar() {", "  int a = 1;",
+                       ["+  Stealth();  // STEALTH-HOOK(f/x)", "   int b = 2;"])
+    assert got == ["void Foo::Bar() {"], got
+    # a call at column 0 of a moz.build is not a definition
+    got = _function_of("gfx/thebes/moz.build", "USE_LIBS += [", 'include("/ipc/chromium/chromium-config.mozbuild")',
+                       ['+UNIFIED_SOURCES += ["StealthX.cpp"]  # STEALTH-HOOK(f/x)', "   FINAL = 1"])
+    assert got == ["USE_LIBS += ["], got
