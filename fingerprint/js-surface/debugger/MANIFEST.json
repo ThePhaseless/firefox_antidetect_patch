@@ -62,7 +62,7 @@
    "feature": "debugger-invisible-attach",
    "prefs": [],
    "added": 7,
-   "removed": 2,
+   "removed": 0,
    "hunks": 4,
    "inline_logic_lines": 35,
    "hookable": "hard",

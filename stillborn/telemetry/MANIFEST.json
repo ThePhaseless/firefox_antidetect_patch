@@ -18,7 +18,7 @@
    "prefs": [],
    "added": 5,
    "removed": 1,
-   "hunks": 4,
+   "hunks": 3,
    "inline_logic_lines": 27,
    "hookable": "movable",
    "anchor": "sendStandalonePing (module-level, hunk 2); TelemetrySendImpl.runPingSender (hunks 3 and 4); new module-level function sessionRoute() at end of file",
