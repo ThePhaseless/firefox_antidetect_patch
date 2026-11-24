@@ -44,7 +44,7 @@ inline bool StealthEngineActive() {
 }
 
 /**
- * The canvas noise as invisible_core declared it: the seed, or 0 when the
+ * The canvas noise as the core declared it: the seed, or 0 when the
  * canvas is to be left exactly as drawn (the engine is off, or the canvas noise
  * is declared off, zoom.stealth.canvas.substitute_pixels), and the tolerance
  * that tells a blend of two colours from a neighbourhood with a third
@@ -65,7 +65,7 @@ inline gfx::StealthCanvasNoise StealthCanvasNoiseDeclared() {
  *
  * Engine rule 7, in the form the owner dictated on 2026-08-09: a value whose
  * domain is finite - or infinite but with the set of values the whole web
- * actually uses finite - lives ONLY in invisible_core. One source. No compiled
+ * actually uses finite - lives ONLY in the core. One source. No compiled
  * copy in the engine, not even as a floor. And if the declaration is missing,
  * the engine REFUSES: it does not invent a default and it does not ask the
  * machine.
@@ -116,7 +116,7 @@ bool StealthScaleMatchesDeclaration(float aDevPixelsPerPx,
  * widget, it held on NONE of 45 events on Windows and none of 20 on Linux,
  * against 0 failures out of 6 on stock.
  *
- * DEVICE pixels since firefox-38 (70-known-bugs.md B258, B261). The previous
+ * DEVICE pixels since firefox-38 (known bugs B258, B261). The previous
  * declaration was four CSS integers - a window at (0, 0), no side border, the
  * content 85 below - read the same for every window. Retail Firefox 151 on
  * Windows 11, measured at the four persona scales, says otherwise: a maximized
@@ -168,28 +168,27 @@ Maybe<LayoutDeviceIntRect> StealthDeclaredMaximizedWindow();
 bool StealthOuterSizeIsDeclared(const LayoutDeviceIntSize& aRealOuter);
 
 /**
- * Lo SCARTO fra l'origine reale del contenuto e quella dichiarata, in app
- * units. Nothing() quando il motore e' spento.
+ * The SHIFT between the real content origin and the declared one, in app
+ * units. Nothing() when the engine is off.
  *
- * Esiste perche' la sostituzione secca non basta, e la prima versione di questa
- * patch lo ha dimostrato sul campo. `mozInnerScreenX` restituiva l'origine
- * dichiarata a OGNI finestra, iframe compresi: misurato il 2026-08-10, un
- * iframe posizionato a (220, 150) nella pagina rispondeva (0, 85) esattamente
- * come il documento di primo livello, e dentro quell'iframe l'invariante sopra
- * dava 220 contro 0. Non si SOSTITUISCE il valore, si sposta l'ANCORA: il
- * chiamante passa la propria origine reale e somma lo scarto, cosi' l'offset fra
- * i frame resta quello vero a qualsiasi profondita'.
+ * It exists because a plain substitution is not enough, and the first version
+ * of this patch proved it in the field. `mozInnerScreenX` returned the declared
+ * origin to EVERY window, iframes included: measured on 2026-08-10, an iframe
+ * placed at (220, 150) in the page answered (0, 85) exactly like the top-level
+ * document, and inside that iframe the invariant above gave 220 against 0. The
+ * value is not SUBSTITUTED, the ANCHOR is moved: the caller passes its own real
+ * origin and adds the shift, so the offset between frames stays the true one at
+ * any depth.
  *
- * `aPopupWindowOrigin` decide QUALE finestra si dichiara. Nothing() e' la
- * finestra principale massimizzata, il cui contenuto parte da (0, interfaccia)
- * sullo schermo dichiarato. Some(p) e' un popup, la cui posizione e' quella
- * REALE (la sceglie la pagina, o nsWindowWatcher dalla dichiarazione quando la
- * pagina non la chiede) e il cui contenuto parte da p + (bordo, interfaccia del
- * popup). In pixel di dispositivo; `aAppUnitsPerDevPixel` e' quello del
- * pres context del chiamante.
+ * `aPopupWindowOrigin` decides WHICH window is declared. Nothing() is the
+ * maximized main window, whose content starts at (0, UI) on the declared
+ * screen. Some(p) is a popup, whose position is the REAL one (chosen by the
+ * page, or by nsWindowWatcher from the declaration when the page does not ask
+ * for one) and whose content starts at p + (border, popup UI). In device
+ * pixels; `aAppUnitsPerDevPixel` is the one of the caller's pres context.
  *
- * Una funzione sola, perche' lo scarto e' un fatto e i fatti stanno in un posto:
- * quando era calcolato in tre punti, il quarto consumatore fu dimenticato.
+ * One function only, because the shift is a fact and facts live in one place:
+ * when it was computed in three places, the fourth consumer was forgotten.
  */
 //
 // `aFullscreen` comes first: a window in fullscreen, main or popup, is the
@@ -214,7 +213,7 @@ Maybe<nsPoint> StealthDeclaredOriginShift(
  * keeping: both development machines are 24-bit, so the field AGREED across
  * platforms and looked declared. Agreement is not declaration - an absence of
  * difference is not evidence of a shared source, and this is the field that
- * proved it. Found by the field-by-field audit (19-field-declaration-audit.md),
+ * proved it. Found by the field-by-field declaration audit,
  * which asks for the source in the code rather than for equality in the
  * measurement.
  */
@@ -222,7 +221,7 @@ int32_t StealthDeclaredPixelDepth();
 
 /**
  * The screen the persona declares, in CSS pixels: {0, 0, width, height} from
- * zoom.stealth.screen.width/height (set by invisible_core at launch), or
+ * zoom.stealth.screen.width/height (set by the core at launch), or
  * Nothing() when either is not above zero and the caller carries on as stock
  * Firefox.
  *
@@ -240,7 +239,7 @@ Maybe<CSSIntRect> StealthDeclaredScreenRect();
  * as stock Firefox.
  *
  * The strip by which availHeight is short of height is the Windows taskbar, and
- * its height is DECLARED - by invisible_core, once, and by nothing else. It used
+ * its height is DECLARED - by the core, once, and by nothing else. It used
  * to be the literal 48 in the engine and a second literal 48 in the generator's
  * Python, in two languages with nothing tying them together: a persona needing
  * a different one (auto-hide, a second monitor, a scaled display) had to be

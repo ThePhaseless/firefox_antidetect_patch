@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate the release seal from the archives a release is about to publish.
 
-The seal is the ONE machine-generated file that pairs an invisible_core with one
+The seal is the ONE machine-generated file that pairs a core with one
 engine build. Everything downstream is derived from it: the archive names, the
 cache directory name, the spoofed User-Agent, the pip-visible core version, and
 the launch-time engine check.
@@ -45,7 +45,7 @@ from pathlib import Path
 
 # 1 -> 2 (2026-07-25): BuildID moved into the per-asset record. Bumped because
 # a schema-1 reader would take the top-level BuildID as the authority, which is
-# the bug; invisible_core refuses a schema it does not know rather than guess.
+# the bug; the core refuses a schema it does not know rather than guess.
 SCHEMA = 2
 JUGGLER_ENTRIES = (
     "modules/juggler/protocol/PageHandler.js",
@@ -63,15 +63,15 @@ ENTRY_REL = {
     "darwin": "Firefox.app/Contents/MacOS/firefox",
 }
 # (platform, arch) -> the archive-name infix release.yml produces.
-# macOS uscito il 2026-08-26: da firefox-21 la pipeline produce TRE gambe, non
-# cinque, e una release senza mac non e' piu' "incompleta". darwin resta pero'
-# in ENTRY_REL e in NAME_RE qui sotto, di proposito: republish.yml ri-sigilla i
-# tag STORICI (firefox-20 e giu') che il mac ce l'avevano, e senza saperlo
-# leggere quel workflow si romperebbe. Si smette di PRETENDERE il mac, non di
-# saperlo leggere.
-# linux-arm64 uscito il 2026-11-04 (Federico): da firefox-56 DUE gambe, Linux e
-# Windows x86_64. Come per il mac, arm64 resta in NAME_RE: i tag vecchi che lo hanno
-# si leggono ancora. Si smette di pretenderlo, non di saperlo leggere.
+# macOS dropped on 2026-08-26: from firefox-21 the pipeline produces THREE legs,
+# not five, and a release without mac is no longer "incomplete". darwin stays
+# however in ENTRY_REL and in NAME_RE below, on purpose: republish.yml re-seals
+# the HISTORICAL tags (firefox-20 and below) that had the mac, and without
+# knowing how to read it that workflow would break. We stop REQUIRING the mac,
+# not knowing how to read it.
+# linux-arm64 dropped on 2026-11-04 (the owner): from firefox-56 TWO legs, Linux
+# and Windows x86_64. As for the mac, arm64 stays in NAME_RE: the old tags that
+# have it can still be read. We stop requiring it, not knowing how to read it.
 EXPECTED = {
     ("linux", "x86_64"): "-linux-x86_64.tar.gz",
     ("win32", "x86_64"): "-win-x86_64.zip",
@@ -195,37 +195,39 @@ def read_archive(archive: Path) -> dict:
                  else "in the archive, and no omni.ja either")
         raise SealBuildError(
             f"{archive.name}: no {JUGGLER_DIR_REL}/ {where}. Playwright cannot drive this "
-            f"build, and invisible_core would refuse every launch of it.")
-    # ⛔ La sbarra e' 4/4, la stessa di validate_release.py, e fino al 2026-08-17
-    # qui era 0/4. Non erano "tre soglie per lo stesso segnale": le tre
-    # rispondono a domande diverse e due sono legittime - questa chiede "e' una
-    # delle NOSTRE build?", validate_release chiede "e' INTEGRA?", seal.py a
-    # runtime chiede "posso LANCIARLA?" e tollera 2/4 apposta, perche' li' una
-    # rinomina upstream non deve diventare un rifiuto di avvio su ogni macchina.
+            f"build, and the core would refuse every launch of it.")
+    # WARNING: the bar is 4/4, the same as validate_release.py, and until
+    # 2026-08-17 here it was 0/4. They were not "three thresholds for the same
+    # signal": the three answer different questions and two are legitimate -
+    # this one asks "is it one of OUR builds?", validate_release asks "is it
+    # INTACT?", seal.py at runtime asks "can I LAUNCH it?" and tolerates 2/4 on
+    # purpose, because there an upstream rename must not become a refusal to
+    # start on every machine.
     #
-    # L'incoerenza era una sola e bastava: a 1/4 il produttore coniava il
-    # sigillo per un binario che l'esecuzione (soglia 2) avrebbe rifiutato
-    # OVUNQUE. Il produttore non deve poter sigillare cio' che nessuno lancia.
+    # The inconsistency was a single one and it was enough: at 1/4 the producer
+    # minted the seal for a binary that execution (threshold 2) would have
+    # refused EVERYWHERE. The producer must not be able to seal what nobody
+    # launches.
     #
-    # E per macOS questo e' l'UNICO cancello che esiste: nessun percorso di
-    # validate_release.py copre quelle gambe, quindi la sbarra lasca non
-    # arrivava mai a un secondo controllo. Prima di alzarla la premessa e' stata
-    # verificata invece che assunta - scaricate e aperte le due gambe mac di
-    # firefox-19: layout omni.ja sotto Firefox.app/Contents/Resources/, 21 file
-    # juggler, 4/4 marcate su ENTRAMBE. Alzarla non rompe mac.
+    # And for macOS this is the ONLY gate that exists: no path of
+    # validate_release.py covers those legs, so the loose bar never reached a
+    # second check. Before raising it the premise was verified instead of
+    # assumed - the two mac legs of firefox-19 were downloaded and opened:
+    # omni.ja layout under Firefox.app/Contents/Resources/, 21 juggler files,
+    # 4/4 marked on BOTH. Raising it does not break mac.
     #
-    # La sbarra si scrive `len(JUGGLER_ENTRIES)` e non un numero, come fa
-    # validate_release.py: quella tupla e' gia' confrontata fra le tre copie da
-    # invisible_core/tests/test_juggler_contract.py, quindi non nasce un secondo
-    # posto che sappia quanto vale.
+    # The bar is written `len(JUGGLER_ENTRIES)` and not a number, as
+    # validate_release.py does: that tuple is already compared across the three
+    # copies by the core's juggler-contract test, so no second place is born
+    # that knows what it is worth.
     if marked < len(JUGGLER_ENTRIES):
-        perche = (
+        reason = (
             "A stock build scores 0: this leg is not one of our patched builds"
             if not marked else
             "This leg IS one of ours but has lost markers - an eroding build")
         raise SealBuildError(
             f"{archive.name}: {marked}/{len(JUGGLER_ENTRIES)} juggler entries carry a stealth "
-            f"marker ({b'/'.join(JUGGLER_MARKERS).decode()}) in the {layout} layout. {perche}, "
+            f"marker ({b'/'.join(JUGGLER_MARKERS).decode()}) in the {layout} layout. {reason}, "
             f"and sealing it would hand the launch-time provenance guard a build it refuses "
             f"on every machine.")
 

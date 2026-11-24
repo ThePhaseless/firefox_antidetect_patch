@@ -28,7 +28,7 @@
 #
 # WHO COMPILES: the two x86_64 legs ONLY on Latitude.sh servers, at the same time, each on its
 # own, on a single-job runner with a label of its own. No linux-arm64 from firefox-56 on
-# (Federico, 2026-11-04): always both legs, no choice. Gates and tests stay on GitHub's runners, with the
+# (owner's decision, 2026-11-04): always both legs, no choice. Gates and tests stay on GitHub's runners, with the
 # binaries from the artifacts. `node` turns the nodes on: if either cannot, the run fails.
 # `watch-*` turn each node off as its leg ends, and re-launch the run once if a machine is
 # lost; `stop-node` makes sure both are off. All on GitHub's runners with the API key, which
@@ -117,7 +117,7 @@ on:
 # Each job asks for what it needs.
 permissions: { contents: read }
 
-# «Un nuovo push annulla la prova vecchia»: a CANDIDATE (a push, the weekly run, a dispatch of a candidate) shares one group with the other
+# "A new push cancels the old run": a CANDIDATE (a push, the weekly run, a dispatch of a candidate) shares one group with the other
 # candidates of its branch, and a newer one cancels the older that is still running, node and all (`stop-node` turns it off). A RELEASE and a
 # RE-LAUNCH have a group of their own, per run: no push cancels a release, and a re-launch does not cancel the run it replaces, which is still
 # reporting. republish.yml is another workflow and has no group.
@@ -323,7 +323,7 @@ jobs:
       # channel end's kept answers is never dispatched and nothing says so (a
       # page's "main world created" was lost that way, B286). And where it loads
       # from: never a chrome package, which a page probes by name, and every
-      # resource URL a file the build installs (invisible_playwright #336).
+      # resource URL a file the build installs (wrapper issue #336).
       - name: Juggler's tests without a browser
         shell: bash
         # The files, expanded by the shell: from Node 21 the arguments of
@@ -375,7 +375,7 @@ jobs:
           path: junit-node
           if-no-files-found: ignore
           retention-days: 14
-      # A newer push to the branch has replaced this candidate (the rule is «un nuovo push annulla la prova vecchia»; the `concurrency` above
+      # A newer push to the branch has replaced this candidate (the rule is "a new push cancels the old run"; the `concurrency` above
       # cancels a run that a newer one finds in progress, this catches the one that was queued behind it). Cancelled HERE, before `node` starts:
       # the sleep keeps this job running until the cancel has landed, because a job that ended would let the node start. Exit 2 (the head could
       # not be read) goes on.
@@ -660,7 +660,7 @@ jobs:
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with: { python-version: '3.11' }
 
-      # The page-surface gate at the packaging step asks invisible_core which
+      # The page-surface gate at the packaging step asks the core which
       # branding archive it declares (validate_release.declared_branding): an
       # engine with the branding redirect (P60) serves that archive, not the
       # brand in its omni.ja, so that archive is what a page reads and what is
@@ -732,47 +732,47 @@ jobs:
           rustup default "$RUST"
           rustc --version
 
-      # LA CACHE DI COMPILAZIONE (compile_cache=gha, deciso da
-      # scripts/release_plan.py). La corsa dopo una correzione deve ricompilare
-      # solo cio' che la correzione tocca: un port a una nuova versione di
-      # Firefox richiede molte corse, e ognuna a freddo costa 1-2 ore a gamba.
+      # THE COMPILE CACHE (compile_cache=gha, decided by
+      # scripts/release_plan.py). The run after a fix must recompile
+      # only what the fix touches: a port to a new version of
+      # Firefox takes many runs, and each one cold costs 1-2 hours per leg.
       #
-      # COME: sccache con la cache su DISCO del runner (SCCACHE_DIR), e quella
-      # cartella salvata e ripristinata da actions/cache come UNA voce per gamba.
+      # HOW: sccache with the cache on the runner's DISK (SCCACHE_DIR), and that
+      # folder saved and restored by actions/cache as ONE entry per leg.
       #
-      # ⛔ NON il backend `gha` di sccache (SCCACHE_GHA_ENABLED), che e' come
-      # questa cache e' nata il 2026-10-26 ed e' stato misurato sbagliato: crea
-      # una voce di cache PER OGNI OGGETTO compilato, circa 5.500 a gamba, e
-      # GitHub accetta 200 nuove voci al minuto per repository (1.500 letture);
-      # oltre, l'upload fallisce e sccache prosegue in silenzio. Risultato: il
-      # 33-48% delle scritture perso nella corsa fredda e il 100% in una corsa
-      # calda su Windows (corse 40302089863, 40318828530), e quello che non si
-      # scrive torna miss alla corsa dopo. Una voce per gamba per corsa sta
-      # lontanissima da quel tetto.
+      # NOT sccache's `gha` backend (SCCACHE_GHA_ENABLED), which is how
+      # this cache was born on 2026-10-26 and was measured wrong: it creates
+      # a cache entry FOR EVERY compiled object, about 5,500 per leg, and
+      # GitHub accepts 200 new entries per minute per repository (1,500 reads);
+      # beyond that, the upload fails and sccache goes on silently. Result:
+      # 33-48% of the writes lost in the cold run and 100% in a warm run
+      # on Windows (runs 40302089863, 40318828530), and what is not
+      # written is a miss again in the next run. One entry per leg per run is
+      # very far from that ceiling.
       #
-      # ⛔ E UN SOLO sccache, quello fissato qui, passato a configure col
-      # percorso ASSOLUTO. Con `--with-ccache=sccache` (il nome nudo del
-      # .mozconfig) e --enable-bootstrap, mach scarica un sccache SUO in
-      # ~/.mozbuild/sccache e configure prende quello: nelle stesse corse le
-      # gambe x86_64 e Windows compilavano con lo 0.17.0 di Mozilla, la arm64
-      # (dove il bootstrap non ne fornisce uno) con lo 0.18.0 fissato qui. Il
-      # passo dopo la build fallisce se il compilatore non e' passato da questo.
+      # AND A SINGLE sccache, the one pinned here, passed to configure with the
+      # ABSOLUTE path. With `--with-ccache=sccache` (the bare name in the
+      # .mozconfig) and --enable-bootstrap, mach downloads an sccache of ITS OWN in
+      # ~/.mozbuild/sccache and configure takes that one: in the same runs the
+      # x86_64 and Windows legs compiled with Mozilla's 0.17.0, the arm64 one
+      # (where bootstrap provides none) with the 0.18.0 pinned here. The
+      # step after the build fails if the compiler did not go through this one.
       #
-      # La chiave e' per gamba e unica per corsa (le voci della cache sono
-      # immutabili); si riparte dall'ultima della stessa gamba. Le chiavi di
-      # sccache dentro la cartella sono l'hash di sorgente preprocessato,
-      # argomenti e compilatore, quindi un oggetto riusato e' identico a quello
-      # che la compilazione produrrebbe. Il tetto del repository e' 150 GB dal
-      # 2026-10-28 (10 fino al 27, poi 60). Con PGO + LTO + simboli una build
-      # scrive PIU' di 15 GB di oggetti: sccache sfratta i piu' vecchi per
-      # restare nel tetto, la build dopo compila nello stesso ordine, trova
-      # sfrattati i primi e scrivendoli sfratta quelli che le servirebbero
-      # dopo - la corsa 40557157874 riuso' lo 0.2% (prima di PGO il 98.5%).
-      # 30 GB a gamba, 90 in tutto: ci stanno, con la generazione precedente
-      # di ogni gamba, che e' la meno usata di recente e va via per prima.
+      # The key is per leg and unique per run (cache entries are
+      # immutable); it restarts from the last one of the same leg. The sccache keys
+      # inside the folder are the hash of the preprocessed source,
+      # arguments and compiler, so a reused object is identical to the one
+      # that compiling would produce. The repository's ceiling is 150 GB since
+      # 2026-10-28 (10 until the 27th, then 60). With PGO + LTO + symbols a build
+      # writes MORE than 15 GB of objects: sccache evicts the oldest to
+      # stay within the ceiling, the next build compiles in the same order, finds
+      # the first ones evicted and by writing them evicts the ones it would need
+      # later - run 40557157874 reused 0.2% (before PGO 98.5%).
+      # 30 GB per leg, 90 in all: they fit, with the previous generation
+      # of each leg, which is the least recently used and goes first.
       #
-      # Versioni fissate, non "latest": una build che cambia strumento da sola
-      # tra una corsa e l'altra non e' riproducibile.
+      # Pinned versions, not "latest": a build that changes tool by itself
+      # between one run and the next is not reproducible.
       #
       # Built from its tag and our patches (scripts/ci/sccache_build.py), never
       # downloaded: 0.18.0 counts the file of a Rust -C profile-use among the
@@ -892,24 +892,24 @@ jobs:
           # compile and sccache-misses.txt came out empty on every run. The one module that
           # says hit or miss, into this step's log; nothing else of sccache's debug.
           SCCACHE_LOG: ${{ matrix.node && 'sccache::compiler::compiler=debug' || '' }}
-        # ⛔ Un tetto sul PASSO, non solo sul job. Il 2026-08-26 la gamba
-        # win-x86_64 si e' piantata sul download del toolchain Microsoft che
-        # `--enable-bootstrap` fa a inizio build: nessuna riga emessa per oltre
-        # tre ore, con il contatore di mach fermo a 0:29. Senza questo tetto la
-        # corsa avrebbe consumato le 6 ore del job prima di arrendersi, e il
-        # guasto si riconosce solo aprendo il log e notando che il contatore non
-        # si muove - cioe' a mano.
-        # 180 minuti sono il 48% sopra la piu' lenta build riuscita mai
-        # osservata su questa gamba (121 min il 2026-08-26; 105 e 106 il
-        # 2026-08-17), quindi non uccide una build lenta ma vera. Quando scatta,
-        # il job risulta FALLITO invece che appeso. Si rilancia la corsa intera, che
-        # accende un nodo nuovo: `rerun-failed-jobs` non puo' (vedi `rerun-refused`).
+        # A ceiling on the STEP, not only on the job. On 2026-08-26 the
+        # win-x86_64 leg hung on the download of the Microsoft toolchain that
+        # `--enable-bootstrap` does at the start of the build: no line emitted for over
+        # three hours, with mach's counter stuck at 0:29. Without this ceiling the
+        # run would have used up the job's 6 hours before giving up, and the
+        # fault is recognised only by opening the log and noticing that the counter
+        # does not move - that is, by hand.
+        # 180 minutes are 48% above the slowest successful build ever
+        # observed on this leg (121 min on 2026-08-26; 105 and 106 on
+        # 2026-08-17), so it does not kill a slow but real build. When it fires,
+        # the job is FAILED instead of hung. The whole run is relaunched, which
+        # turns on a new node: `rerun-failed-jobs` cannot (see `rerun-refused`).
         #
-        # --keep-going: una corsa che fallisce riporta TUTTI gli errori di
-        # compilazione della gamba, non solo i primi. Senza, make si ferma al
-        # primo e ogni corsa da 1-2 ore ne mostra uno o due, che e' il modo piu'
-        # lento di portare la pila su una versione nuova. Su una build che
-        # riesce non cambia niente.
+        # --keep-going: a run that fails reports ALL the compilation errors of
+        # the leg, not only the first ones. Without it, make stops at the
+        # first and every 1-2 hour run shows one or two, which is the slowest
+        # way to bring the stack to a new version. On a build that
+        # succeeds nothing changes.
         # The disk too: the Windows leg of run 40466778026 stopped logging after
         # 86 of its 175 minutes with memory at 3 of 16 GB, and the runner never
         # answered again - the pattern of a full disk, which the next run will
@@ -1047,7 +1047,7 @@ jobs:
           if [ "${{ needs.plan.outputs.gtests }}" = "true" ]; then python3 scripts/ci/background.py wait gtest; fi
       # Nothing of a leg outlives its job: the node is deleted as soon as the job ends. The
       # runner's signals reach a step's shell and no further, so this is what stops a build
-      # on a cancel, about 41 s after it and well inside the 5:00 cut (PROBES.md).
+      # on a cancel, about 41 s after it and well inside the 5:00 cut.
       - name: The node - a cancel or a failure ends what runs beside the steps
         if: (cancelled() || failure()) && matrix.node
         timeout-minutes: 2

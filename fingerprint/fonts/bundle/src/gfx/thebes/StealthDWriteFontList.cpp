@@ -11,22 +11,23 @@
 // ---------------------------------------------------------------------------
 // CreateFontInstance: the bundle path travels with the unscaled font.
 // ---------------------------------------------------------------------------
-// STEALTH: il percorso di bundle viaggia con l'unscaled font. Senza,
-// `GetFontDescriptor` fallisce e Gecko manda a WebRender i BYTE del font;
-// e non puo' ricavarselo da solo perche' il nostro caricatore non e' un
-// `IDWriteLocalFontFileLoader`. Per ogni altro font resta vuoto e il
-// comportamento upstream non si muove.
+// STEALTH: the bundle path travels with the unscaled font. Without it,
+// `GetFontDescriptor` fails and Gecko sends the font BYTES to WebRender;
+// and it cannot work the path out by itself because our loader is not an
+// `IDWriteLocalFontFileLoader`. For every other font it stays empty and the
+// upstream behavior does not move.
 //
 // The member it comes from (gfxDWriteFontEntry::mBundleFilePath) was declared
 // in gfxDWriteFontList.h with this comment:
 //
-// STEALTH: il percorso del file di bundle, vuoto per ogni altro font.
+// STEALTH: the path of the bundle file, empty for every other font.
 //
-// Il byte-serving verso WebRender passa da `UnscaledFontDWrite`, che il
-// percorso non riesce a ricavarlo da solo: lo prende da un
-// `IDWriteLocalFontFileLoader`, e il nostro caricatore presta byte in memoria.
-// Dichiararlo qui e' l'unico modo di farlo arrivare la', ed evita che Gecko
-// mandi i BYTE del font - 65,9 MB nel padre, misurati su Linux ([B154]).
+// The byte-serving to WebRender goes through `UnscaledFontDWrite`, which
+// cannot work the path out by itself: it takes it from an
+// `IDWriteLocalFontFileLoader`, and our loader lends bytes in memory.
+// Declaring it here is the only way to make it get there, and it keeps Gecko
+// from sending the font BYTES - 65.9 MB in the parent, measured on Linux
+// (known bug B154).
 //
 // ---------------------------------------------------------------------------
 // ReadCMAP and CreateFontFace.
@@ -156,13 +157,13 @@ already_AddRefed<gfxFontEntry> gfxDWriteFontList::CreateStealthBundleFontEntry(
       uniqueName, fontFile, stream, aFace->mWeight, aFace->mWidth,
       aFace->mStyle);
   entry->mBundleFaceIndex = aFace->mIndex;
-  // Il percorso va dichiarato insieme ai byte: e' la stessa funzione che
-  // risolve il blob qui sopra, quindi non e' una seconda fonte. Se manca si
-  // prosegue: il font disegna, si paga solo la copia verso WebRender.
+  // The path must be declared together with the bytes: it is the same function
+  // that resolves the blob above, so it is not a second source. If it is
+  // missing we carry on: the font draws, only the copy to WebRender is paid.
   nsAutoCString path;
   if (StealthBundleFontList::GetFacePath(file, path)) {
-    // `get()` torna un `char16ptr_t`, che su Windows converte da solo a
-    // `const wchar_t*` (`mfbt/Char16.h:49`): niente reinterpret_cast.
+    // `get()` returns a `char16ptr_t`, which on Windows converts by itself to
+    // `const wchar_t*` (`mfbt/Char16.h:49`): no reinterpret_cast.
     entry->mBundleFilePath = std::wstring(NS_ConvertUTF8toUTF16(path).get());
   }
   BOOL supported;
@@ -195,9 +196,8 @@ already_AddRefed<gfxFontEntry> gfxDWriteFontList::CreateStealthBundleFontEntry(
 }
 
 // ---------------------------------------------------------------------------
-// The bundle path travels with the unscaled font (series folder
-// fingerprint/fonts/bundle; the hook that gives it the path is
-// StealthWithBundlePath, fingerprint/fonts/font-list).
+// The bundle path travels with the unscaled font (the hook that gives it the
+// path is StealthWithBundlePath).
 // ---------------------------------------------------------------------------
 // STEALTH: Mozilla's GetFontDescriptor answers from mFontFileName, the file
 // name of the font with its terminator, which it reads from the IDWriteFont:
@@ -205,7 +205,7 @@ already_AddRefed<gfxFontEntry> gfxDWriteFontList::CreateStealthBundleFontEntry(
 // have no IDWriteFont (the loader of our fonts is not an
 // IDWriteLocalFontFileLoader, so Mozilla cannot get the name back), and
 // Gecko then sends the BYTES of the font to WebRender: 65.9 MB in the parent
-// process against 1.9 on an empty page ([B154]). The path of the bundle file is
+// process against 1.9 on an empty page (known bug B154). The path of the bundle file is
 // put where Mozilla keeps the file name (path plus terminator), so the callback
 // gets the bytes Mozilla would give it for a font installed at that path, with
 // the same face index.

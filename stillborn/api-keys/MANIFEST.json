@@ -53,7 +53,7 @@
     "-    MOZILLA_API_KEY: () => AppConstants.MOZ_MOZILLA_API_KEY,",
     "+    MOZILLA_API_KEY: () => stealthDeclaredApiKey(PREF_APIKEY_MOZILLA),"
    ],
-   "notes": "Keys move from build-time AppConstants to prefs declared by invisible_core, read through one reader. An undeclared key gives an empty string plus a console error, so the request is not sent. The three pref names are literal constants on purpose (a grep gate). trimSensitiveURLs now reads the same prefs for log redaction. The helper functions (hunk 1) belong in our own file. Pref names contain a vendor name (google_*): check against the no-vendor-names rule.",
+   "notes": "Keys move from build-time AppConstants to prefs declared by the core, read through one reader. An undeclared key gives an empty string plus a console error, so the request is not sent. The three pref names are literal constants on purpose (a grep gate). trimSensitiveURLs now reads the same prefs for log redaction. The helper functions (hunk 1) belong in our own file. Pref names contain a vendor name (google_*): check against the no-vendor-names rule.",
    "verifier": {
     "changed": [],
     "why": "Checked against the diff and tree; no correction needed."

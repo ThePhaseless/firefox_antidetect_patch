@@ -27,9 +27,9 @@ const Cu = Components.utils;
 const Cr = Components.results;
 const Cm = Components.manager;
 const CC = Components.Constructor;
-// Stealthfox 2026-08-30: rimessi con la copia dei corpi. Servono a leggere i
-// byte che arrivano e a rimetterne una copia identica nel flusso, cosi' il
-// consumatore vero non si accorge di niente.
+// Stealthfox 2026-08-30: put back with the copy of the bodies. They are used to read the
+// bytes as they arrive and to put an identical copy of them back into the stream, so that the
+// real consumer does not notice anything.
 const BinaryInputStream = CC('@mozilla.org/binaryinputstream;1', 'nsIBinaryInputStream', 'setInputStream');
 const BinaryOutputStream = CC('@mozilla.org/binaryoutputstream;1', 'nsIBinaryOutputStream', 'setOutputStream');
 const StorageStream = CC('@mozilla.org/storagestream;1', 'nsIStorageStream', 'init');
@@ -60,11 +60,11 @@ export class PageNetwork {
     helper.decorateAsEventEmitter(this);
     this._target = target;
     this._extraHTTPHeaders = null;
-    // Stealthfox 2026-08-30: rimesso. Costa memoria - fino a 100 MB per tab,
-    // 10 MB per singola risposta, con sfratto - e sono i limiti di upstream,
-    // non inventati qui. Il prezzo si paga perche' senza questo
-    // response.text() rifiuta, e i trace e gli HAR escono con i corpi vuoti
-    // senza dirlo a nessuno.
+    // Stealthfox 2026-08-30: put back. It costs memory - up to 100 MB per tab,
+    // 10 MB per single response, with eviction - and these are the limits of upstream,
+    // not invented here. The price is paid because without this
+    // response.text() is refused, and the traces and the HARs come out with empty bodies
+    // without telling anyone.
     this._responseStorage = new ResponseStorage(MAX_RESPONSE_STORAGE_SIZE, MAX_RESPONSE_STORAGE_SIZE / 10);
     this._requestInterceptionEnabled = false;
     // This is requestId => NetworkRequest map, only contains requests that are
@@ -154,7 +154,7 @@ class NetworkRequest {
     this.requestId = httpChannel.channelId + '';
     this.navigationId = httpChannel.isMainDocumentChannel && loadInfo ? helper.toProtocolNavigationId(loadInfo.jugglerLoadIdentifier) : undefined;
 
-    // Stealthfox 2026-08-30: rimesso con la lettura dei corpi.
+    // Stealthfox 2026-08-30: put back with the reading of the bodies.
     this._responseBodyChunks = [];
     // Set by NetworkObserver._onServiceWorkerResponse when a service worker
     // answered this request; read once, when the response is reported.
@@ -487,10 +487,10 @@ class NetworkRequest {
     // we do not get onResponse normally, but we do get nsIStreamListener notifications.
     this._sendOnResponse(false);
 
-    // Stealthfox 2026-08-30: la copia e' TORNATA. Dal 2026-08-24 al 2026-08-30
-    // qui c'era un pass-through diretto, perche' con Network.getResponseBody
-    // tolto il corpo non lo leggeva piu' nessuno. Lo leggeva: response.text(),
-    // e anche i trace e gli HAR, che pero' non protestavano.
+    // Stealthfox 2026-08-30: the copy is BACK. From 2026-08-24 to 2026-08-30
+    // there was a direct pass-through here, because with Network.getResponseBody
+    // removed nobody read the body any more. Somebody did: response.text(),
+    // and also the traces and the HARs, which however did not complain.
     const iStream = new BinaryInputStream(aInputStream);
     const sStream = new StorageStream(8192, aCount, null);
     const oStream = new BinaryOutputStream(sStream.getOutputStream(0));
@@ -555,7 +555,7 @@ class NetworkRequest {
       // For requests with internal redirect (e.g. intercepted by Service Worker),
       // we do not get onResponse normally, but we do get nsIRequestObserver notifications.
       this._sendOnResponse(false);
-      // Stealthfox 2026-08-30: rimesso.
+      // Stealthfox 2026-08-30: put back.
       const body = this._responseBodyChunks.join('');
       const pageNetwork = this._pageNetwork;
       if (pageNetwork)
@@ -1264,15 +1264,15 @@ PageNetwork.Events = {
   RequestFailed: Symbol('PageNetwork.Events.RequestFailed'),
 };
 
-// Stealthfox 2026-08-30: RIMESSE, identiche a com'erano prima del 2026-08-24.
-// Erano uscite portando NetworkObserver all'osso, insieme a
-// Network.getResponseBody. La conseguenza l'ha segnalata un utente: senza il
-// corpo delle risposte si perde una delle tre fonti - URL, header, corpo - con
-// cui si riconosce chi protegge un sito. E i trace e gli HAR uscivano con i
-// corpi vuoti senza sollevare niente, che era il difetto peggiore dei due.
+// Stealthfox 2026-08-30: PUT BACK, identical to what they were before 2026-08-24.
+// They had gone out when NetworkObserver was stripped to the bone, together with
+// Network.getResponseBody. A user reported the consequence: without the
+// body of the responses one of the three sources - URL, headers, body - is lost,
+// by which the protector of a site is recognized. And the traces and the HARs came out with
+// empty bodies without raising anything, which was the worse defect of the two.
 //
-// Il costo e' dichiarato: i limiti sono quelli di upstream, 100 MB per tab e
-// un decimo per singola risposta, con sfratto quando si supera.
+// The cost is declared: the limits are those of upstream, 100 MB per tab and
+// a tenth of that per single response, with eviction when it is exceeded.
 
 class ResponseStorage {
   constructor(maxTotalSize, maxResponseSize, maxEntries = MAX_RESPONSE_STORAGE_ENTRIES) {

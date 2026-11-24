@@ -4,11 +4,10 @@
 
 // STEALTH: design-space glyph metrics for gfxHarfBuzzShaper. The struct that
 // reads them is declared in StealthDesignFontAccess.h and befriended by
-// gfxHarfBuzzShaper.h, so that the Mozilla file carries only a hook. See
-// fingerprint/fonts/metrics/FEATURE.md. No `using`: everything is spelled out,
-// so the file does not depend on what a unified blob would have opened before
-// it. It also holds the any-thread mirror of the declared rendering mode
-// (StealthTextMeasuring.h).
+// gfxHarfBuzzShaper.h, so that the Mozilla file carries only a hook. No
+// `using`: everything is spelled out, so the file does not depend on what a
+// unified blob would have opened before it. It also holds the any-thread
+// mirror of the declared rendering mode (StealthTextMeasuring.h).
 
 #include "StealthDesignFontAccess.h"
 #include "gfxHarfBuzzShaper.h"
@@ -34,19 +33,18 @@
 // const and a font that is only read has no business forcing them not to be.
 // The shaper's destructor releases it (its hook line in gfxHarfBuzzShaper.cpp).
 hb_font_t* StealthDesignFontAccess::GetFont(const gfxHarfBuzzShaper& aShaper) {
-  // Sotto mMutex, come OGNI altro stato mutabile di questa classe.
+  // Under mMutex, like EVERY other mutable state of this class.
   //
-  // L'intestazione lo dichiara a chiare lettere due membri piu' sotto: lo
-  // shaper "is shared across threads via the global gfxFontCache", e per questo
-  // esiste il mutex. mDesignFont era l'unico membro mutabile che quel contratto
-  // non rispettava - un controlla-e-assegna nudo. Due thread potevano vederlo
-  // nullo insieme, costruire entrambi un font e prendere entrambi un
-  // riferimento alla faccia: uno vince l'assegnazione, l'altro resta con un
-  // puntatore che nessuno distruggera' e che sta gia' usando. Il distruttore
-  // ne libera uno solo.
+  // The header says it plainly two members further down: the shaper "is shared
+  // across threads via the global gfxFontCache", and that is why the mutex
+  // exists. mDesignFont was the only mutable member that did not respect that
+  // contract - a bare check-then-assign. Two threads could see it null
+  // together, both build a font and both take a reference to the face: one
+  // wins the assignment, the other is left with a pointer that nobody will
+  // destroy and that it is already using. The destructor frees only one.
   //
-  // E' ricorsivo apposta, quindi prenderlo qui e' sicuro anche quando il
-  // chiamante lo tiene gia'.
+  // It is recursive on purpose, so taking it here is safe even when the caller
+  // already holds it.
   mozilla::RecursiveMutexAutoLock lock(aShaper.mMutex);
 
   // A second hb_font on the same face, used for nothing but design-space
@@ -78,25 +76,25 @@ hb_font_t* StealthDesignFontAccess::GetFont(const gfxHarfBuzzShaper& aShaper) {
   if (!upem || upem == gfxFontEntry::kInvalidUPEM) {
     return nullptr;
   }
-  // `auto`, non `hb_face_t*`, e NIENTE hb_face_destroy a mano.
+  // `auto`, not `hb_face_t*`, and NO hb_face_destroy by hand.
   //
-  // GetHBFace() torna un AutoHBFace PER VALORE, che e' un oggetto RAII: se lo
-  // si assegna a un puntatore grezzo, il temporaneo viene convertito e poi
-  // DISTRUTTO alla fine di quella stessa istruzione, quindi il puntatore e'
-  // gia' penzolante alla riga dopo. hb_font_create prende il proprio
-  // riferimento scrivendo dentro memoria liberata, e il rilascio esplicito
-  // qui sotto era il terzo decremento sullo stesso oggetto morto: da li' in
-  // avanti l'allocatore e' corrotto e il segmentation fault arriva altrove,
-  // di solito molto dopo, dentro HarfBuzz che compone il testo.
+  // GetHBFace() returns an AutoHBFace BY VALUE, which is an RAII object: if it
+  // is assigned to a raw pointer, the temporary is converted and then
+  // DESTROYED at the end of that same statement, so the pointer is already
+  // dangling on the next line. hb_font_create takes its own reference by
+  // writing into freed memory, and the explicit release below was the third
+  // decrement on the same dead object: from there on the allocator is
+  // corrupted and the segmentation fault shows up elsewhere, usually much
+  // later, inside HarfBuzz composing the text.
   //
-  // Misurato PRIMA di questa correzione: il processo di CONTENUTO moriva in 6
-  // sessioni di navigazione su 10 su Linux e 4 su 10 su Windows, contro 0 su
-  // 10 del firefox di Playwright sulla stessa macchina, e i core cadevano su
-  // hb_face_t::get_num_glyphs con la faccia gia' liberata.
+  // Measured BEFORE this fix: the CONTENT process died in 6 browsing sessions
+  // out of 10 on Linux and 4 out of 10 on Windows, against 0 out of 10 for
+  // Playwright's Firefox on the same machine, and the cores landed on
+  // hb_face_t::get_num_glyphs with the face already freed.
   //
-  // Gli altri TREDICI chiamanti di GetHBFace() nell'albero tengono vivo
-  // l'oggetto RAII; questo era l'unico che lo buttava via. Il proprietario
-  // dev'essere UNO, e qui e' l'AutoHBFace. Vedi 70-known-bugs.md, 2026-08-10.
+  // The other THIRTEEN callers of GetHBFace() in the tree keep the RAII object
+  // alive; this was the only one that threw it away. The owner must be ONE,
+  // and here it is the AutoHBFace. Known bug entry of 2026-08-10.
   const auto face(shapedFont->GetFontEntry()->GetHBFace());
   if (!face) {
     return nullptr;

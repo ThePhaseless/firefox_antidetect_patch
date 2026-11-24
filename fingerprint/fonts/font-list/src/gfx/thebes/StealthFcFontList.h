@@ -99,11 +99,11 @@
 // StealthCreateBundleFontEntry right after it builds the entry with the
 // data-font constructor of gfxFontconfigFontEntry, which stays Mozilla's.
 //
-// STEALTH: `aFile`/`aIndex` sono il file da cui quella faccia viene, quando
-// ce n'e' uno. Per un font scaricato da una pagina non c'e' e restano vuoti,
-// che e' il comportamento upstream; per le facce del nostro bundle c'e', e
-// dichiararlo evita che WebRender riceva i BYTE al posto del percorso. Vedi
-// `70-known-bugs.md` [B154]: erano 65,9 MB nel processo padre.
+// STEALTH: `aFile`/`aIndex` are the file that face comes from, when there is
+// one. For a font downloaded by a page there is none and they stay empty,
+// which is the upstream behavior; for the faces of our bundle there is one, and
+// declaring it keeps WebRender from receiving the BYTES instead of the path.
+// See known bug B154: it was 65.9 MB in the parent process.
 void StealthDeclareFontFile(FcPattern* aPattern, const char* aFile,
                             int aIndex);
 

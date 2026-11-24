@@ -5,7 +5,7 @@ Validates BOTH the Linux tar.gz AND the Windows zip in a single run.
 Each archive is extracted to a clean temp dir and:
 
   1. Symlink check - must have ZERO symlinks
-  2. Path-leak check - must have ZERO `/home/feder` or `Users\\Feder` bytes
+  2. Path-leak check - must have ZERO bytes of the build user's Linux home path or of a Windows user-profile path
   3. Critical-files check - firefox + application.ini + dependentlibs.list
      must exist as real files
   4. Smoke-test - `firefox --version` (Linux: run under WSL if invoked from
@@ -264,7 +264,7 @@ def _juggler_root(tree: Path) -> Path:
 
 
 def assert_juggler_provenance(tree: Path) -> None:
-    """The launch-time guard in invisible_core keys on these markers. If a
+    """The launch-time guard in the core keys on these markers. If a
     rebase drops them, every user's launch breaks at once, so a build without
     them must never be published. Measured 2026-07-25: firefox-14 and
     firefox-18 mark 4/4; stock builds mark 0/4.
@@ -312,7 +312,7 @@ def assert_juggler_provenance(tree: Path) -> None:
     else:
         raise SystemExit(
             f"validate_release: no omni.ja and no {JUGGLER_DIR_REL}/ in {root} - "
-            f"Playwright cannot drive this build, and invisible_core refuses to launch it")
+            f"Playwright cannot drive this build, and the core refuses to launch it")
 
     if marked < len(JUGGLER_ENTRIES):
         raise SystemExit(
@@ -325,7 +325,7 @@ def assert_juggler_provenance(tree: Path) -> None:
 
 
 def declared_branding() -> Path:
-    """The branding archive invisible_core declares by default, asked of the
+    """The branding archive the core declares by default, asked of the
     installed core the way a launch asks it - a profile translated to prefs -
     so that this gate holds no default and no second copy of where it lives.
     The release workflow installs the core it pairs with the build first."""
@@ -335,9 +335,9 @@ def declared_branding() -> Path:
         from invisible_core import generate_profile, translate_profile_to_prefs
     except ImportError as exc:
         raise ValidationError(
-            "this engine serves the branding invisible_core declares, and no invisible_core "
+            "this engine serves the branding the core declares, and no core "
             f"is installed to say which: {exc}") from exc
-    # A launch declares the session's zone, and since invisible_core 49.46.0 a
+    # A launch declares the session's zone, and since core 49.46.0 a
     # profile translated without one is refused, because an undeclared zone is
     # the host's. The branding does not depend on the zone: any IANA name the
     # core accepts asks the question a launch asks. Without it, every release
@@ -345,7 +345,7 @@ def declared_branding() -> Path:
     prefs = translate_profile_to_prefs(generate_profile(seed=1), timezone="UTC")
     spec = prefs.get("zoom.stealth.branding.archive")
     if not spec:
-        raise ValidationError("the installed invisible_core declares no zoom.stealth.branding.archive: "
+        raise ValidationError("the installed core declares no zoom.stealth.branding.archive: "
                               "it is older than the engine, and the engine refuses to launch with it")
     return Path(urllib.request.url2pathname(urllib.parse.urlparse(spec).path))
 
@@ -366,7 +366,7 @@ def assert_page_surface_is_stock(tree: Path) -> None:
     it. Run on firefox-47 on 2026-10-15 this gate found 44 differences on
     Windows and 87 on each Linux architecture, the names gate none.
 
-    On an engine that serves the branding invisible_core declares (P60) the
+    On an engine that serves the branding the core declares (P60) the
     page reads that directory, not the build's own brand, so it is judged in
     its place: declared_branding() asks the installed core for it.
     """
@@ -501,7 +501,7 @@ def assert_build_ids_agree(tree: Path) -> None:
     The first 157 candidates did not: from 157 the build graph generates
     buildid.h twice in one `mach build` (export, and again near the end), and
     without MOZ_BUILD_DATE each generation takes the clock, so application.ini
-    said 13:25 and platform.ini 15:11 (run 40329304164), invisible_core's seal
+    said 13:25 and platform.ini 15:11 (run 40329304164), the core's seal
     check refused the launch (platform.ini's BuildID is not the sealed one), and
     the package was not the retail's in a file every crash report and update
     check carries. MOZ_BUILD_DATE is now fixed once per run (.mozconfig,

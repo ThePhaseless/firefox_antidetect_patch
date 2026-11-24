@@ -136,13 +136,13 @@ uint32_t StealthFaceIndex(uint16_t aBundleFaceIndex, uint32_t aMozillaIndex) {
 }
 
 #ifdef XP_WIN
-// STEALTH: il percorso di bundle viaggia con l'unscaled font. Senza,
-// `GetFontDescriptor` fallisce e Gecko manda a WebRender i BYTE del font; e non
-// puo' ricavarselo da solo perche' il nostro caricatore non e' un
-// `IDWriteLocalFontFileLoader`. Per ogni altro font il percorso e' vuoto e il
-// comportamento upstream non si muove. Il percorso sta dove Mozilla tiene il
-// nome del file (UnscaledFontDWrite::StealthSeedFilePath, in
-// StealthDWriteFontList.cpp). [B154]
+// STEALTH: the bundle path travels with the unscaled font. Without it,
+// `GetFontDescriptor` fails and Gecko sends the font BYTES to WebRender; and it
+// cannot work the path out by itself because our loader is not an
+// `IDWriteLocalFontFileLoader`. For every other font the path is empty and the
+// upstream behavior does not move. The path sits where Mozilla keeps the file
+// name (UnscaledFontDWrite::StealthSeedFilePath, in
+// StealthDWriteFontList.cpp). Known bug B154.
 mozilla::gfx::UnscaledFontDWrite* StealthWithBundlePath(
     const std::wstring& aPath, mozilla::gfx::UnscaledFontDWrite* aFont) {
   if (!aPath.empty()) {

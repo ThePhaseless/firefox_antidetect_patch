@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Is this run still the head of its branch? The guard that stands in front of the node (release.yml, job `checks`, last step).
 
-The rule is written in docs/decisions/ci-release-17: «un nuovo push annulla la prova vecchia». release.yml has a `concurrency` group per branch for it,
+The rule (a project decision) is: a new push cancels the old run. release.yml has a `concurrency` group per branch for it,
 which cancels a run that a newer one replaces. This is the other half: a run that was queued behind the new one, or started in the seconds
 between, is not cancelled by the group, and would turn a server on (an hour paid) for a commit nobody is waiting for. So before the node is
 turned on the run asks the repository what the head of its branch is NOW, and if it is not the commit the run builds, the run is cancelled.

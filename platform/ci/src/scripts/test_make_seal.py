@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """make_seal.py, driven against the inputs it exists to refuse.
 
-WHY THIS FILE WAS WRITTEN ON 2026-07-28. `18-gate-inventory.md` D1 quoted
-`C:\\ff\\source\\tests\\test_make_seal.py` as this gate's known-bad input and
-described the three cases it runs. **That file did not exist, and neither did
+WHY THIS FILE WAS WRITTEN ON 2026-07-28. The gate inventory (item D1) quoted
+`<source>/tests/test_make_seal.py` (in the source repository) as this gate's
+known-bad input and described the three cases it runs. **That file did not exist, and neither did
 the directory.** By the inventory's own rule - "where that column says NONE, the
 gate is unproven and should be treated as documentation, not as protection" - a
 named-but-ABSENT known-bad input is worse than an empty column, because it reads
 as proven.
 
-`make_seal.py` writes the one file that pairs an invisible_core with one engine
+`make_seal.py` writes the one file that pairs a core with one engine
 build. Everything downstream is derived from it: the archive names, the cache
 directory, the spoofed User-Agent, the pip-visible core version, the launch-time
 engine check. It also refuses the issue-#14 failure mode - an asset whose
@@ -75,17 +75,17 @@ def _juggler_files(marked) -> dict:
     refusals, and a fixture that conflated them would prove neither.
 
     `marked` also takes an INT since 2026-08-17: how many of the four carry the
-    marker. Serve a un caso che prima non era esprimibile - una build NOSTRA che
-    ha perso dei marcatori - perche' la sbarra qui era 0/4 e un tutto-o-niente
-    non puo' distinguere "non e' nostra" da "e' nostra e si sgretola".
+    marker. It serves a case that could not be expressed before - a build of
+    OURS that lost some markers - because the bar here was 0/4 and an
+    all-or-nothing check cannot tell "not ours" from "ours and crumbling".
     """
-    vero = b"// juggler\nprefs.getBoolPref('zoom.stealth.humanize');\n"
-    falso = b"// juggler\nconst zoom = 1;\n"
+    marked_src = b"// juggler\nprefs.getBoolPref('zoom.stealth.humanize');\n"
+    unmarked_src = b"// juggler\nconst zoom = 1;\n"
     if isinstance(marked, bool):
-        quante = len(m.JUGGLER_ENTRIES) if marked else 0
+        how_many = len(m.JUGGLER_ENTRIES) if marked else 0
     else:
-        quante = int(marked)
-    return {e: (vero if i < quante else falso)
+        how_many = int(marked)
+    return {e: (marked_src if i < how_many else unmarked_src)
             for i, e in enumerate(m.JUGGLER_ENTRIES)}
 
 
@@ -150,9 +150,9 @@ _LEGS = {
 def _release(d: Path, version: str = "151.0", **overrides) -> Path:
     """A clean set (Win + Linux, x86_64), unless an override breaks one leg.
 
-    Era a cinque fino a firefox-20: le due gambe macOS sono uscite il 2026-08-26
-    quando si e' smesso di rilasciare per Mac; linux-arm64 e' uscita il 2026-11-04,
-    da firefox-56."""
+    It was five up to firefox-20: the two macOS legs were dropped on 2026-08-26
+    when releasing for Mac stopped; linux-arm64 was dropped on 2026-11-04,
+    from firefox-56."""
     for i, (leg, ext) in enumerate(_LEGS.items()):
         v = overrides.get(f"{leg}_version", version)
         name = overrides.get(f"{leg}_name", f"firefox-{v}-stealth-{leg}{ext}")
@@ -235,7 +235,7 @@ def test_a_basename_that_lies_about_its_own_version_is_refused(d: Path):
 
 @case
 def test_an_archive_with_no_juggler_is_refused(d: Path):
-    """Playwright cannot drive it and invisible_core refuses every launch of it,
+    """Playwright cannot drive it and the core refuses every launch of it,
     so a seal naming it would pair the core to an engine nobody can use."""
     _release(d, **{"linux-x86_64_juggler": False})
     _expect(d, "no modules/juggler")
@@ -252,13 +252,13 @@ def test_a_stock_build_with_no_stealth_marker_is_refused(d: Path):
 
 @case
 def test_a_build_of_ours_that_lost_markers_is_refused(d: Path):
-    """L'input noto-cattivo della sbarra alzata il 2026-08-17: 1/4.
+    """The known-bad input of the bar raised on 2026-08-17: 1/4.
 
-    Prima passava. `make_seal` rifiutava solo a 0/4 - "e' una delle nostre?" -
-    mentre `seal.py` a runtime rifiuta sotto 2/4, quindi il produttore coniava
-    il sigillo per un binario che l'esecuzione avrebbe rifiutato su OGNI
-    macchina. Ed e' il caso che scotta su macOS, dove nessun percorso di
-    `validate_release.py` arriva e questo e' l'unico cancello.
+    It used to pass. `make_seal` refused only at 0/4 - "is it one of ours?" -
+    while `seal.py` at runtime refuses below 2/4, so the producer minted the
+    seal for a binary that execution would have refused on EVERY machine. And
+    it is the case that burns on macOS, where no path of `validate_release.py`
+    reaches and this is the only gate.
     """
     _release(d, **{"win-x86_64_marked": 1})
     _expect(d, "marker")
@@ -266,11 +266,11 @@ def test_a_build_of_ours_that_lost_markers_is_refused(d: Path):
 
 @case
 def test_three_of_four_is_still_refused(d: Path):
-    """La sbarra e' 4/4, non "quasi": 3/4 e' una build che si sgretola.
+    """The bar is 4/4, not "almost": 3/4 is a build that is crumbling.
 
-    Senza questo caso, un rifiuto scritto `marked < 2` passerebbe il test qui
-    sopra e lascerebbe passare 3/4, che e' esattamente la classe che
-    `validate_release.py` rifiuta gia' sulle altre gambe.
+    Without this case, a refusal written `marked < 2` would pass the test
+    above and would let 3/4 through, which is exactly the class that
+    `validate_release.py` already refuses on the other legs.
     """
     _release(d, **{"linux-x86_64_marked": 3})
     _expect(d, "marker")
@@ -278,11 +278,12 @@ def test_three_of_four_is_still_refused(d: Path):
 
 @case
 def test_a_full_house_is_NOT_refused(d: Path):
-    """Il caso che deve NON scattare: un gate che rifiuta tutto e' inutile.
+    """The case that must NOT fire: a gate that refuses everything is useless.
 
-    Le due gambe (Win + Linux, x86_64) segnano 4/4 e non vanno rifiutate. Fino a
-    firefox-20 erano cinque, con le due mac scaricate e aperte prima di alzare
-    la sbarra; da firefox-21 il mac non si rilascia piu', da firefox-56 arm64.
+    The two legs (Win + Linux, x86_64) score 4/4 and must not be refused. Up to
+    firefox-20 there were five, with the two mac ones downloaded and opened
+    before raising the bar; from firefox-21 mac is no longer released, from
+    firefox-56 arm64.
     """
     seal, _ = _build(_release(d))
     assert len(seal["assets"]) == 2, sorted(seal["assets"])

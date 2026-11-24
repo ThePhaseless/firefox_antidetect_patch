@@ -27,23 +27,23 @@ export class BrowserHandler {
     this._startCompletePromise = startCompletePromise;
   }
 
-  // STEALTHFOX: questo comando non scrive piu' prefs, e le rifiuta.
+  // STEALTHFOX: this command no longer writes prefs, and refuses them.
   //
-  // Qui c'era un ciclo che applicava una lista di prefs ricevuta dal
-  // protocollo con i setter di ramo UTENTE. Era l'unico posto in cui un
-  // processo esterno poteva cambiare qualunque pref del browser, ed era anche
-  // l'UNICA strada con cui le 204 prefs dello stealth arrivavano: per questo
-  // non si poteva togliere.
+  // There used to be a loop here that applied a list of prefs received from the
+  // protocol with the USER-branch setters. It was the only place where an
+  // external process could change any pref of the browser, and it was also the
+  // ONLY road by which the 204 stealth prefs arrived: that is why it could
+  // not be removed.
   //
-  // Adesso il client le scrive nel PROFILO prima dell'avvio, quindi qui non
-  // arriva piu' niente. Il parametro pero' si rifiuta invece di essere
-  // ignorato: un client che continuasse a mandarlo otterrebbe altrimenti un
-  // browser senza le prefs che crede di aver impostato, e senza nessun errore.
+  // Now the client writes them into the PROFILE before the launch, so nothing
+  // arrives here any more. The parameter is refused rather than ignored,
+  // though: a client that kept sending it would otherwise get a browser
+  // without the prefs it believes it has set, and no error at all.
   //
-  // E il nuovo ordine vale di suo. Prima le prefs arrivavano DOPO l'avvio, e
-  // il commento in launcher.py ne misurava la conseguenza: il primo lancio
-  // inizializzava gfx e font con i default e il secondo con le prefs attive,
-  // due percorsi diversi, causa di [B150]. Quella asimmetria non esiste piu'.
+  // The new order holds on its own too. Before, the prefs arrived AFTER the start, and
+  // the comment in the launcher measured the consequence: the first launch
+  // initialized gfx and fonts with the defaults and the second with the prefs on,
+  // two different paths, the cause of known bug B150. That asymmetry no longer exists.
   async ['Browser.enable']({attachToDefaultContext, userPrefs}) {
     if (userPrefs !== undefined && userPrefs !== null &&
         !(Array.isArray(userPrefs) && userPrefs.length === 0)) {
@@ -236,20 +236,20 @@ export class BrowserHandler {
     await this._targetRegistry.browserContextForId(browserContextId).setColorScheme(nullToUndefined(colorScheme));
   }
 
-  // Le tre media feature qui sotto NON hanno piu' un apparato dietro: la
-  // potatura di TargetRegistry.js si e' portata via i metodi di PageTarget, e
-  // non tornano. Ma il comando deve restare DICHIARATO, perche' Playwright
-  // upstream lo manda a ogni creazione di contesto e senza dichiarazione il
-  // binario non si pilota affatto (drive gate rosso su tutte e tre le gambe,
-  // firefox-21, primo giro).
+  // The three media features below NO longer have any machinery behind them: the
+  // pruning of TargetRegistry.js took away the PageTarget methods, and
+  // they do not come back. But the command must stay DECLARED, because upstream
+  // Playwright sends it at every context creation and without the declaration the
+  // binary cannot be driven at all (drive gate red on all three legs,
+  // firefox-21, first run).
   //
-  // Il valore NEUTRO si accetta e non fa niente, e non e' una bugia: e'
-  // esattamente cio' che il browser riporta - la dichiarazione in
-  // invisible_core non chiede ne' reduce, ne' forced-colors, ne' contrasto. Un
-  // valore diverso si RIFIUTA nominando la manopola vera, che e' la stessa
-  // scelta gia' fatta in 28.4 per i parametri di Page.setEmulatedMedia: un
-  // override ignorato in silenzio farebbe credere al chiamante di aver
-  // cambiato una media feature mentre la pagina ne risponde un'altra.
+  // The NEUTRAL value is accepted and does nothing, and it is not a lie: it is
+  // exactly what the browser reports - the declaration in the
+  // core asks for neither reduce, nor forced-colors, nor contrast. Any other
+  // value is REFUSED naming the real knob, which is the same
+  // choice already made earlier for the params of Page.setEmulatedMedia: an
+  // override ignored in silence would make the caller believe it has
+  // changed a media feature while the page answers another.
   _refuseUnlessNeutral(name, value, neutral) {
     if (value === null || value === undefined || value === neutral)
       return;

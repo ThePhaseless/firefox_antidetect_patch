@@ -33,7 +33,7 @@ that is skipped by the shell is red), the profiler (MOZ_PROFILER_STARTUP: no tes
 
     python3 scripts/ci/xpcshell_run.py fetch --series engine-series --lock scripts/ci/xpcshell_support.json --into xpc-support
     python3 scripts/ci/xpcshell_run.py run --binary ff/firefox --series engine-series --support xpc-support --out xpcshell-result
-    python3 scripts/ci/xpcshell_run.py lock --git C:/ff/source --series C:/ff/wt/series-69 --out scripts/ci/xpcshell_support.json
+    python3 scripts/ci/xpcshell_run.py lock --git <source> --series <series> --out scripts/ci/xpcshell_support.json
 """
 from __future__ import annotations
 

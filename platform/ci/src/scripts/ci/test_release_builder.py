@@ -3,7 +3,7 @@
 
 The x86_64 legs compile on a build node and nowhere else: no input chooses, no
 expression falls back, no leg names a hosted runner. No linux-arm64 from firefox-56 on
-(Federico, 2026-11-04): two legs, always both. Gates and tests stay on GitHub's runners. And the
+(the owner, 2026-11-04): two legs, always both. Gates and tests stay on GitHub's runners. And the
 guards around that: secrets behind an environment, labels of one run and one leg, no
 workflow on our branches that a pull request starts reaching them, no cache entry the
 node writes and GitHub's runners read.
@@ -98,7 +98,7 @@ def cache_keys(doc: dict, leg, runner_arch: str, on_node: bool) -> set:
 
 def series_root():
     """The series repository, whose root holds the workflows GitHub runs: the plan job's
-    checkout, this file's own repository, SERIES_REPO, or C:/ff/engine beside a worktree."""
+    checkout, this file's own repository, SERIES_REPO, or the `engine` directory beside the tree."""
     tree = HERE.parent.parent
     places = [Path(os.environ["SERIES_REPO"])] if os.environ.get("SERIES_REPO") else []
     places += [tree / ".series"] + list(HERE.parents[4:5]) + [tree.parent / "engine"]
@@ -481,7 +481,7 @@ def group_watch_and_stop(doc, jobs, build, steps) -> list:
     if guide.exists():
         guide_text = guide.read_text(encoding="utf-8")
         out.append(("guide: says what the plan and publish.yml do: releases use the cache, core_ref has no branch of its own",
-                    "sempre a freddo" not in guide_text and "la rifiuta" not in guide_text and "engine/firefox-157" not in guide_text))
+                    "always cold" not in guide_text and "refuses it" not in guide_text and "engine/firefox-157" not in guide_text))
     trim = jobs.get("cache-trim", {})
     out.append(("cache-trim: on GitHub's runners with actions: write; the build job never has it",
                 trim.get("runs-on") == "ubuntu-24.04" and trim.get("permissions", {}).get("actions") == "write"

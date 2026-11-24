@@ -439,10 +439,11 @@ size_t StealthBundleFontList::MappedBytes() const {
   return n;
 }
 
-// La sola funzione che sa dove stanno i file imbarcati. Prima la directory era
-// ricostruita a mano in ogni chiamante che ne aveva bisogno; adesso chi vuole i
-// byte e chi vuole il percorso passano di qui, quindi non possono divergere.
-static already_AddRefed<nsIFile> PercorsoDelFile(const nsACString& aFile) {
+// The only function that knows where the bundled files are. Before, the
+// directory was rebuilt by hand in every caller that needed it; now whoever
+// wants the bytes and whoever wants the path come through here, so they cannot
+// diverge.
+static already_AddRefed<nsIFile> ResolveBundleFilePath(const nsACString& aFile) {
   nsCOMPtr<nsIFile> path;
   if (NS_FAILED(NS_GetSpecialDirectory(NS_GRE_DIR, getter_AddRefs(path))) ||
       NS_FAILED(path->Append(u"fonts"_ns)) ||
@@ -454,7 +455,7 @@ static already_AddRefed<nsIFile> PercorsoDelFile(const nsACString& aFile) {
 
 bool StealthBundleFontList::GetFacePath(const nsACString& aFile,
                                         nsACString& aOut) {
-  nsCOMPtr<nsIFile> path = PercorsoDelFile(aFile);
+  nsCOMPtr<nsIFile> path = ResolveBundleFilePath(aFile);
   if (!path) {
     return false;
   }
@@ -464,11 +465,11 @@ bool StealthBundleFontList::GetFacePath(const nsACString& aFile,
   // the function still has to COMPILE there, and a caller that appears later
   // must get a real answer rather than a stub.
 #ifdef XP_WIN
-  nsAutoString largo;
-  if (NS_FAILED(path->GetPath(largo))) {
+  nsAutoString widePath;
+  if (NS_FAILED(path->GetPath(widePath))) {
     return false;
   }
-  CopyUTF16toUTF8(largo, aOut);
+  CopyUTF16toUTF8(widePath, aOut);
 #else
   if (NS_FAILED(path->GetNativePath(aOut))) {
     return false;
@@ -483,7 +484,7 @@ StealthBundleFontList::GetFaceBlob(const nsACString& aFile) {
   if (auto cached = mFileCache.Lookup(file)) {
     return do_AddRef(cached.Data());
   }
-  nsCOMPtr<nsIFile> path = PercorsoDelFile(aFile);
+  nsCOMPtr<nsIFile> path = ResolveBundleFilePath(aFile);
   if (!path) {
     return nullptr;
   }
@@ -542,19 +543,21 @@ StealthBundleFontList::MapFile(nsIFile* aPath) {
   return MakeAndAddRef<FileBlob>(map, addr, len);
 }
 
-// ⛔ `ReadFaceData` STAVA QUI e non c'e' piu', dal 2026-08-17. Copiava i byte del
-// blob nell'array del chiamante, "on purpose: the caller hands ownership of the
-// bytes to a platform object that frees them". Quella frase e' morta due volte:
-// il ramo FreeType passo' a `GetFaceBlob` prestando, e il 2026-08-17 anche
-// CoreText - dove peraltro non era mai stata vera, perche' `CFDataCreate` COPIA e
-// l'array moriva a fine scope senza che nessuno ne prendesse possesso.
+// NOTE: `ReadFaceData` WAS HERE and is gone, since 2026-08-17. It copied the
+// bytes of the blob into the caller's array, "on purpose: the caller hands
+// ownership of the bytes to a platform object that frees them". That sentence
+// died twice: the FreeType branch moved to `GetFaceBlob`, lending, and on
+// 2026-08-17 so did CoreText - where it had never been true anyway, because
+// `CFDataCreate` COPIES and the array died at the end of the scope with nobody
+// taking ownership of it.
 //
-// Rimossa invece di lasciata senza chiamanti: era la seconda via per gli stessi
-// byte, quella che copia, tenuta viva da una giustificazione scaduta. Lasciarla
-// li' significa che il prossimo la ritrova e reintroduce la copia senza
-// accorgersene, che e' esattamente cio' che la regola 16 vieta. Chi ha bisogno
-// dei byte chiama `GetFaceBlob` e li presta; chi ha bisogno di POSSEDERLI ne
-// faccia una copia sul posto e scriva perche'.
+// It was removed instead of being left without callers: it was the second way
+// to the same bytes, the one that copies, kept alive by an expired
+// justification. Leaving it there means the next person finds it and
+// reintroduces the copy without noticing, which is exactly what the
+// one-source rule forbids. Whoever needs the bytes calls `GetFaceBlob` and
+// lends them; whoever needs to OWN them makes a copy on the spot and writes
+// why.
 
 hb_blob_t* StealthBundleFontList::GetFaceNameTable(const nsACString& aFile,
                                                    uint16_t aIndex) {
@@ -588,7 +591,7 @@ bool StealthBundleFontList::GetVMetrics(const nsACString& aFile,
   return false;
 }
 
-// ---- Vertical metrics hooked from gfxFont (fingerprint/fonts/metrics) ----
+// ---- Vertical metrics hooked from gfxFont ----
 
 // STEALTH: host-independent vertical metrics straight from the font's own OS/2
 // sfnt table (FUnits->px), bypassing the platform backend (DWrite/FreeType/CoreText)
@@ -895,8 +898,8 @@ bool gfxFontEntry::ShouldPublishCharacterMap() const {
 }
 
 // ---------------------------------------------------------------------------
-// Hooks called from gfxPlatformFontList.cpp (series folder
-// fingerprint/fonts/font-list). Declared in StealthBundleFontList.h.
+// Hooks called from gfxPlatformFontList.cpp. Declared in
+// StealthBundleFontList.h.
 // ---------------------------------------------------------------------------
 
 // Reports one number to about:memory. A free function cannot use
@@ -1220,7 +1223,7 @@ void StealthApplyAlias(bool aBundleOnly, nsACString& aKey) {
 // overhead, which is crippling for DirectWrite on Windows).
 //
 // The SetupFamilyCharMap call that follows in InitializeFamily used to carry
-// `&& !mStealthBundleOnly`, and that deroga was CORRECT for as long as no bundled
+// `&& !mStealthBundleOnly`, and that exemption was CORRECT for as long as no bundled
 // face had a character map: with every face map null, SetupFamilyCharMap takes
 // its "unusable family" branch and stores the EMPTY map deliberately so it will
 // not retry, and from there SearchAllFontsForChar returns on its second line for
@@ -1232,10 +1235,10 @@ void StealthApplyAlias(bool aBundleOnly, nsACString& aKey) {
 // retail Firefox gives 69.97 (Segoe UI Symbol, a family we bundle and could not
 // reach).
 //
-// The deroga is gone because its PREMISE is gone:
+// The exemption is gone because its PREMISE is gone:
 // gfxFontEntry::ShouldPublishCharacterMap now lets a bundled face publish into
 // the shared list, so the union computed there is a real union and not an empty
-// map. What the deroga cost while it stood is the whole reason this changed:
+// map. What the exemption cost while it stood is the whole reason this changed:
 // with no family map, IsFullyInitialized() is false for all 68 families forever,
 // so SearchAllFontsForChar could never reject a family cheaply AND every search
 // re-ran InitializeFamily through IPC because nothing was ever cached. Measured

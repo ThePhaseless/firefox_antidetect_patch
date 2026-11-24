@@ -3,15 +3,15 @@
 #
 # When a release run's builds all SUCCEEDED but the publish was blocked by a
 # GATE/TEST bug (not a binary defect), rebuilding every target (hours) just to
-# re-run a few-minute test is wasteful. Erano cinque fino a firefox-20, sono tre
-# dal 21: il numero non e' scritto qui apposta, la matrice sotto e' l'autorita'.
+# re-run a few-minute test is wasteful. There were five up to firefox-20, three
+# from 21: the number is deliberately not written here, the matrix below is the authority.
 #
-# ⛔ E il caso vero e' successo il 2026-08-26: le tre build di firefox-21 erano
-# verdi e i tre job `gate` sono usciti rossi per un comando di protocollo tolto
-# per sbaglio. Questo workflow sarebbe stato la via d'uscita - e non avrebbe
-# funzionato, perche' il suo assert pretendeva ancora i due archivi macOS che una
-# release a tre gambe non produce. La via d'uscita era rotta nel momento in cui
-# serviva, e nessuno poteva saperlo: questo workflow si lancia a mano. This workflow downloads the binary artifacts
+# The real case happened on 2026-08-26: the three firefox-21 builds were
+# green and the three `gate` jobs came out red because of a protocol command removed
+# by mistake. This workflow would have been the way out - and would not have
+# worked, because its assert still demanded the two macOS archives that a
+# three-leg release does not produce. The way out was broken at the moment it
+# was needed, and nobody could know: this workflow is launched by hand. This workflow downloads the binary artifacts
 # from a prior `release` run, re-runs the (now-fixed) drive gate + hidden-desktop/WebGL guards
 # against those exact byte-identical binaries on their native runners, and — only if
 # green — publishes the DRAFT release. Same publish logic as release.yml (draft, notes,

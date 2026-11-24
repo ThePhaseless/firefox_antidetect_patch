@@ -60,15 +60,15 @@ export function initialize(browsingContext, docShell) {
     // the parent (PageTarget.updateJavaScriptDisabled), the one process that can write it for every document.
   };
 
-  // STEALTHFOX: qui c'erano docShell.overrideHasFocus e forceActiveState,
-  // messi su OGNI documento di primo livello. Sono codice morto: verificato in
-  // tutto l'albero che l'unico lettore e' la coppia getter/setter in
-  // nsDocShell.cpp:2891-2917, e che ne' Document::HasFocus() ne'
-  // ComputeVisibilityState() li guardano. Il commento in Document.cpp:17188 e'
-  // nostro e lo dice: "GetForceActiveState removed in 150".
+  // STEALTHFOX: docShell.overrideHasFocus and forceActiveState used to be
+  // set here, on EVERY top-level document. They are dead code: checked across
+  // the whole tree, the only reader is the getter/setter pair in
+  // nsDocShell.cpp:2891-2917, and neither Document::HasFocus() nor
+  // ComputeVisibilityState() looks at them. The comment in Document.cpp:17188
+  // is ours and says so: "GetForceActiveState removed in 150".
   //
-  // Misurato prima di toglierli, per non fidarsi del solo sorgente: su tre
-  // schede il fuoco resta UNO, come in un browser vero, sia con sia senza.
+  // Measured before removing them, so as not to trust the source alone: on three
+  // tabs the focus stays ONE, as in a real browser, with and without them.
   // STEALTHFOX: BFCache stays enabled, as for a real user, so
   // pageshow's event.persisted behaves like one. Upstream Juggler disables it
   // per docshell; the knob that was here to restore that

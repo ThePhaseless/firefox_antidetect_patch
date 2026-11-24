@@ -22,14 +22,14 @@
 // ScriptPreloader.h between mCacheData and mMonitor, a position that fixes the
 // destruction order and must not change):
 //
-//   La mappatura del file che abbiamo SCRITTO in questa sessione, dopo che
-//   StealthAdoptWrittenCache l'ha adottata. Vive quanto l'istanza, perche' i
-//   mXDRRange delle voci puntano dentro di lei: distruggerla prima li
-//   renderebbe pendenti.
+//   The mapping of the file we WROTE in this session, after
+//   StealthAdoptWrittenCache adopted it. It lives as long as the instance,
+//   because the mXDRRange of the entries point inside it: destroying it earlier
+//   would leave them dangling.
 //
-//   E' un membro per valore e non un puntatore a una statica come mCacheData
-//   perche' non deve sopravvivere all'istanza - mCacheData lo fa solo per come
-//   e' costruito il singleton, non per un requisito di durata.
+//   It is a member by value and not a pointer to a static like mCacheData
+//   because it must not outlive the instance - mCacheData does so only because
+//   of how the singleton is built, not because of a lifetime requirement.
 
 #ifndef StealthScriptCache_inl_h
 #define StealthScriptCache_inl_h
@@ -43,10 +43,10 @@ namespace mozilla {
 
 void ScriptPreloader::StealthReportWrittenCache(
     nsIHandleReportCallback* aHandleReport, nsISupports* aData) {
-  // La mappatura del file scritto in QUESTA sessione, adottata al posto delle
-  // copie sull'heap (StealthAdoptWrittenCache). Va riportata, altrimenti i megabyte
-  // spariscono dall'heap e non ricompaiono da nessuna parte, e un totale che non
-  // torna e' indistinguibile da un risparmio vero.
+  // The mapping of the file written in THIS session, adopted in place of the
+  // heap copies (StealthAdoptWrittenCache). It must be reported, otherwise the
+  // megabytes vanish from the heap and show up nowhere else, and a total that
+  // does not add up is indistinguishable from a real saving.
   MOZ_COLLECT_REPORT(
       "explicit/script-preloader/non-heap/memmapped-written-cache",
       KIND_NONHEAP, UNITS_BYTES,
@@ -55,39 +55,39 @@ void ScriptPreloader::StealthReportWrittenCache(
       "place of the heap copies of the same bytes.");
 }
 
-// Dopo aver scritto il file di cache, adotta i byte del FILE al posto delle
-// copie sull'heap: mappa il file appena scritto e ripunta ogni voce dentro la
-// mappatura, liberando buffer e stencil che diventano ridondanti.
+// After writing the cache file, adopt the bytes of the FILE in place of the
+// heap copies: map the file just written and repoint every entry inside the
+// mapping, freeing the buffers and stencils that become redundant.
 //
-// Perche' esiste. Con un profilo CALDO questa cache e' una mappatura di file e
-// non costa heap: mXDRRange punta dentro mCacheData, IsMemMapped() e' vero e
-// FreeData() non ha niente da liberare. Con un profilo FRESCO gli stessi byte
-// sono heap anonimo, perche' sono stati costruiti in memoria per la scrittura,
-// e li' restano per tutta la sessione: misurato 16,52 MB nel processo padre,
-// invariati fra 40 s e 180 s, con il file da 13.343.940 byte gia' su disco.
-// Questo porta la prima sessione nello stesso stato della seconda.
+// Why it exists. With a WARM profile this cache is a file mapping and costs no
+// heap: mXDRRange points inside mCacheData, IsMemMapped() is true and
+// FreeData() has nothing to free. With a FRESH profile the same bytes are
+// anonymous heap, because they were built in memory for the write, and they
+// stay there for the whole session: measured 16.52 MB in the parent process,
+// unchanged between 40 s and 180 s, with the 13,343,940-byte file already on
+// disk. This brings the first session to the same state as the second.
 //
-// I byte sono su disco: da qui in avanti tenerne una copia sull'heap vuol dire
-// avere due volte la stessa cosa. MoveTo aggiorna `cacheFile` sulla nuova
-// posizione, quindi e' lui il file da mappare (lo passa il chiamante, WriteCache,
-// subito dopo MoveTo).
+// The bytes are on disk: from here on keeping a copy on the heap means having
+// the same thing twice. MoveTo updates `cacheFile` to the new location, so it
+// is the file to map (the caller, WriteCache, passes it right after MoveTo).
 //
-// Non restituisce nulla: l'unico chiamante (WriteCache) registrava l'errore e
-// andava avanti, quindi la registrazione sta qui e il gancio e' una riga sola.
-// Il testo dei due messaggi di log e' quello di prima.
+// It returns nothing: the only caller (WriteCache) used to log the error and
+// carry on, so the logging lives here and the hook is a single line. The text
+// of the two log messages is the same as before.
 void ScriptPreloader::StealthAdoptWrittenCache(nsIFile* aCacheFile) {
   auto adopt = [&]() -> Result<Ok, nsresult> {
-    // ⛔ Si adotta UNA volta sola, e non e' una precauzione teorica.
-    // AutoMemMap::init apre con MOZ_ASSERT(!fd): in debug scatta, in RELEASE
-    // l'assert non c'e' e la seconda init sovrascriverebbe fd e addr, lasciando
-    // PENDENTI i mXDRRange delle voci gia' adottate - cioe' puntatori dentro una
-    // regione smappata, che e' un crash e non un degrado.
+    // Adopt ONLY ONCE, and this is not a theoretical precaution.
+    // AutoMemMap::init opens with MOZ_ASSERT(!fd): in debug it fires, in
+    // RELEASE the assert is not there and the second init would overwrite fd
+    // and addr, leaving the mXDRRange of the entries already adopted DANGLING -
+    // that is, pointers inside an unmapped region, which is a crash and not a
+    // degradation.
     //
-    // Una seconda scrittura puo' succedere: il commento in Run() dice che
-    // l'invalidazione della cache "can trigger a new write during shutdown". In
-    // quel caso le voci di allora tengono le loro copie sull'heap, che e' il
-    // comportamento di prima, e la mappatura vecchia resta viva finche' vive
-    // l'istanza.
+    // A second write can happen: the comment in Run() says that the cache
+    // invalidation "can trigger a new write during shutdown". In that case the
+    // entries of that moment keep their heap copies, which is the previous
+    // behaviour, and the old mapping stays alive as long as the instance
+    // lives.
     if (mStealthWrittenCacheData.initialized()) {
       return Ok();
     }
@@ -97,16 +97,16 @@ void ScriptPreloader::StealthAdoptWrittenCache(nsIFile* aCacheFile) {
     mMonitor.AssertNotCurrentThreadOwns();
     MonitorAutoLock mal(mMonitor);
 
-    size_t adottate = 0;
-    size_t inPrestito = 0;
+    size_t adopted = 0;
+    size_t borrowed = 0;
 
-    // Lettura dell'intestazione del file mappato: la stessa aritmetica e gli
-    // stessi controlli di InitCacheInternal, lato LETTORE. Chi SCRIVE calcola
-    // l'inizio della sezione dati come MAGIC + headerSize + header, senza i 4
-    // byte del crc che pure scrive, mentre chi LEGGE li conta. Le due formule
-    // danno lo stesso risultato solo perche' l'allineamento e' un divisore di 4.
-    // Questa e' una copia di InitCacheInternal (che resta com'e' in Mozilla): se
-    // quella cambia, va cambiata anche questa.
+    // Reading the header of the mapped file: the same arithmetic and the same
+    // checks as InitCacheInternal, READER side. The WRITER computes the start
+    // of the data section as MAGIC + headerSize + header, without the 4 bytes
+    // of the crc that it does write, while the READER counts them. The two
+    // formulas give the same result only because the alignment is a divisor of
+    // 4. This is a copy of InitCacheInternal (which stays as it is in Mozilla):
+    // if that one changes, this one must change too.
     auto size = mStealthWrittenCacheData.size();
 
     uint32_t headerSize;
@@ -171,45 +171,45 @@ void ScriptPreloader::StealthAdoptWrittenCache(nsIFile* aCacheFile) {
 
       script->mXDRRange.emplace(scriptData, scriptData + script->mSize);
 
-      auto* vivo = mScripts.Get(script->mCachePath);
-      if (!vivo) {
+      auto* live = mScripts.Get(script->mCachePath);
+      if (!live) {
         continue;
       }
 
-      // Uno stencil che PRENDE IN PRESTITO il buffer non si puo' lasciare
-      // indietro: distruggere il buffer sotto di lui darebbe puntatori
-      // pendenti, e rilasciare la nostra referenza non basta, perche' qualcun
-      // altro puo' tenerne una. Questa voce resta com'e'.
-      if (vivo->mStencil && JS::StencilIsBorrowed(vivo->mStencil)) {
-        inPrestito++;
+      // A stencil that BORROWS the buffer cannot be left behind: destroying
+      // the buffer under it would give dangling pointers, and releasing our
+      // reference is not enough, because someone else may hold one. This entry
+      // stays as it is.
+      if (live->mStencil && JS::StencilIsBorrowed(live->mStencil)) {
+        borrowed++;
         continue;
       }
 
-      // I byte devono essere gli stessi, non solo la chiave.
-      if (vivo->mSize != script->mSize) {
+      // The bytes must be the same, not only the key.
+      if (live->mSize != script->mSize) {
         continue;
       }
 
-      // Sostituisce la copia sull'heap con gli stessi byte presi dal file di
-      // cache mappato. Dopo questo passo IsMemMapped() e' vero, quindi
-      // FreeData() torna a essere il no-op corretto e non c'e' piu' niente da
-      // liberare: la sola copia dei byte e' il file.
+      // Replace the heap copy with the same bytes taken from the mapped cache
+      // file. After this step IsMemMapped() is true, so FreeData() is again
+      // the correct no-op and there is nothing left to free: the only copy of
+      // the bytes is the file.
       //
-      // Qui si e' gia' verificato (sopra) che nessuno stencil stia PRENDENDO
-      // IN PRESTITO il buffer (JS::StencilIsBorrowed), altrimenti distruggerlo
-      // qui lascerebbe lo stencil con puntatori pendenti.
-      vivo->mXDRRange.reset();
-      if (!vivo->mXDRData.empty()) {
-        vivo->mXDRData.destroy();
+      // It has already been verified (above) that no stencil is BORROWING the
+      // buffer (JS::StencilIsBorrowed), otherwise destroying it here would
+      // leave the stencil with dangling pointers.
+      live->mXDRRange.reset();
+      if (!live->mXDRData.empty()) {
+        live->mXDRData.destroy();
       }
-      vivo->mXDRRange.emplace(script->Range());
+      live->mXDRRange.emplace(script->Range());
 
-      // E lo stencil va via con loro. Non e' una perdita di cache: e'
-      // esattamente lo stato in cui questa voce si trova all'avvio SUCCESSIVO,
-      // dove mStencil e' nullo e GetStencil decodifica dal range mappato. La
-      // prima sessione smette di essere il caso speciale che paga due volte.
-      vivo->mStencil = nullptr;
-      adottate++;
+      // And the stencil goes away with them. It is not a cache loss: it is
+      // exactly the state this entry is in at the NEXT startup, where mStencil
+      // is null and GetStencil decodes from the mapped range. The first session
+      // stops being the special case that pays twice.
+      live->mStencil = nullptr;
+      adopted++;
     }
 
     if (buf.error()) {
@@ -218,19 +218,19 @@ void ScriptPreloader::StealthAdoptWrittenCache(nsIFile* aCacheFile) {
 
     MOZ_LOG(gLog, LogLevel::Info,
             ("Adopted the written cache: %zu scripts, %zu left borrowed\n",
-             adottate, inPrestito));
+             adopted, borrowed));
     return Ok();
   };
 
-  // Se l'adozione non riesce non e' un errore della SCRITTURA: il file e' valido
-  // e la sessione continua col comportamento di prima, cioe' le copie
-  // sull'heap. Si registra e si va avanti, perche' far fallire la scrittura per
-  // un'ottimizzazione mancata sarebbe peggio del problema che risolve.
-  if (auto risultato = adopt(); risultato.isErr()) {
+  // If the adoption fails it is not an error of the WRITE: the file is valid
+  // and the session carries on with the previous behaviour, that is, the heap
+  // copies. It is logged and we go on, because failing the write for a missed
+  // optimization would be worse than the problem it solves.
+  if (auto result = adopt(); result.isErr()) {
     MOZ_LOG(gLog, LogLevel::Info,
             ("Could not adopt the written cache (0x%" PRIx32 "), keeping the "
              "heap copies\n",
-             static_cast<uint32_t>(risultato.unwrapErr())));
+             static_cast<uint32_t>(result.unwrapErr())));
   }
 }
 

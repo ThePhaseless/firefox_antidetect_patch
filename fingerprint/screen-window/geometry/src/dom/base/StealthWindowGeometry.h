@@ -44,8 +44,8 @@ namespace mozilla::dom {
 
 namespace {
 
-// La finestra di primo livello di questo documento e' un popup (aperto con
-// delle feature)? La dichiarazione della finestra dipende da questo.
+// Is the top-level window of this document a popup (opened with features)?
+// The declaration of the window depends on it.
 inline bool StealthIsInPopup(const nsGlobalWindowOuter& aWindow) {
   BrowsingContext* bc = aWindow.GetBrowsingContext();
   return bc && bc->Top()->GetIsPopupRequested();
@@ -185,13 +185,13 @@ inline bool StealthScreenXY(nsGlobalWindowOuter& aWindow,
 //
 // GetInnerScreenRect keeps serving its other callers - popup placement,
 // coordinate conversion - the real rect. Those are not content-visible.
-// Lo SCARTO, non la sostituzione. Sostituire risponde l'origine del PRIMO
-// LIVELLO a ogni finestra: misurato il 2026-08-10, un iframe a (220, 150)
-// nella pagina rispondeva (0, 85) come il top, e dentro quell'iframe
-// screenX - clientX dava 220 contro un mozInnerScreenX di 0 - la stessa
-// contraddizione che questa patch esiste per togliere, spostata di un
-// livello. Sommando lo scarto al rettangolo REALE della finestra, l'offset
-// fra i frame resta vero e la relazione vale a ogni profondita'.
+// The SHIFT, not the substitution. Substituting answers the TOP-LEVEL origin
+// to every window: measured on 2026-08-10, an iframe at (220, 150) in the
+// page answered (0, 85) like the top, and inside that iframe
+// screenX - clientX gave 220 against a mozInnerScreenX of 0 - the same
+// contradiction this patch exists to remove, moved one level down. By adding
+// the shift to the REAL rect of the window, the offset between frames stays
+// true and the relation holds at any depth.
 inline Maybe<float> StealthMozInnerScreenX(nsGlobalWindowOuter& aWindow,
                                            const nsRect& aRect) {
   if (const auto shift = StealthShiftOf(aWindow)) {

@@ -42,7 +42,7 @@ find "$STAGING" -type f \
   \( -name '*.so' -o -name firefox -o -name firefox-bin -o -name plugin-container \
      -o -name pingsender -o -name glxtest -o -name vaapitest -o -name updater \) \
   -exec strip --strip-debug {} + 2>/dev/null || true
-STAGING="$STAGING" python3 scripts/linux_sanitize.py || true   # no-op in CI (no /home/feder), defensive
+STAGING="$STAGING" python3 scripts/linux_sanitize.py || true   # no-op in CI (no path under the build user's home directory), defensive
 tar --owner=0 --group=0 --numeric-owner --mtime="2026-01-01 00:00:00 UTC" \
     -czf "out/$ASSET" -C "$STAGING" .              # firefox at ROOT
 echo "=== HARD GATE: scripts/validate_release.py (the issue-#14 protector) ==="

@@ -1,75 +1,72 @@
-# Questo albero non e' mozilla-central: e' il nostro Firefox patchato
+# This tree is not mozilla-central: it is our patched Firefox
 
-Ramo `stealth/157`. Le istruzioni di Mozilla qui sopra valgono; queste vengono
-prima quando si contraddicono.
+Mozilla's instructions above apply; these come first when they contradict.
 
-## Sei nell'unico posto dove il sorgente si modifica
+## You are in the only place where the source is changed
 
-`C:/ff/source` (da WSL `/mnt/c/ff/source`). Non cercarne un altro e non
-crearne: **`~/ff-build/firefox-150` e' uno specchio di build**, esiste solo
-perche' Firefox si compila nativamente su ciascun sistema, e un hook di
-pre-commit li' rifiuta i commit. Si allinea con `git fetch win stealth/157`.
-macOS non ha checkout locale, lo costruisce la CI dalla stessa storia.
+This is the source repository. Do not look for another and do not create
+one: a build mirror only exists because Firefox compiles natively on each
+system, and a pre-commit hook there refuses commits. The series repository
+(`oss-invisible/firefox_antidetect_patch`) holds the same work as patches on
+the Mozilla tag, produced from this tree with `tools/engine.py`
+(`export`, `verify`, `check`).
 
-Un solo `.mozconfig`, alla radice, identico per le due macchine - e decide
-anche cosa costruisce la CI, che non ne ha uno suo e ci appende solo le opzioni
-per target.
+There is a single `.mozconfig`, at the root, identical for both machines - and
+it also decides what the CI builds, which has none of its own and only appends
+the per-target options.
 
-Verifica: `python scripts/check_tree_parity.py` dal workbench.
+## Building
 
-## Compilare
+`./mach build`. It is incremental. **Never `mach clobber`**, never delete the
+objdir: 15-60 minutes against 3-4 hours, and a clobber almost never solves
+anything that a `mach build` does not.
 
-`./mach build`. E' incrementale. **Mai `mach clobber`**, mai cancellare
-l'objdir: 15-60 minuti contro 3-4 ore, e il clobber quasi mai risolve qualcosa
-che non risolva un `mach build`.
+**The cost depends on WHAT you touch, not on how much you write**, and they are
+different orders of magnitude: a lone `.cpp` takes about 2 minutes;
+`dom/base/Element.h`, which is included almost everywhere, 38 minutes for three
+lines. When the same change can be made without touching a widely included
+header, that choice is worth half an hour and must be made when writing the
+patch, not afterwards. Touching `.mozconfig` forces a reconfigure.
 
-**Il costo dipende da COSA tocchi, non da quanto scrivi**, e sono ordini di
-grandezza diversi: un `.cpp` da solo circa 2 minuti; `dom/base/Element.h`, che
-e' incluso quasi ovunque, 38 minuti per tre righe. Quando la stessa modifica si
-puo' fare senza toccare un header molto incluso, quella scelta vale mezz'ora e
-va fatta scrivendo la patch, non dopo. Toccare `.mozconfig` forza un
-reconfigure.
+The compile cache is already declared in the `.mozconfig` (`sccache`, for Rust
+too) and works by itself: there is nothing to launch first. Check it with
+`sccache --show-stats`. The first run after a reconfigure is SLOWER with the
+cache than without, because it has to populate.
 
-La cache di compilazione e' gia' dichiarata nel `.mozconfig` (`sccache`, anche
-per Rust) e si usa da sola: non c'e' niente da lanciare prima. Si controlla con
-`sccache --show-stats`. Il primo giro dopo un reconfigure e' piu' LENTO con la
-cache che senza, perche' deve popolarsi.
+## Building in CI (`release.yml`)
 
-## Compilare in CI (`release.yml`)
+- **Candidate** (`kind=candidate`): builds with sccache backed by the GitHub
+  Actions cache (`compile_cache=gha`, the default), so the run after a fix
+  recompiles only what changed. Build errors are fixed by iterating this way,
+  not with cold runs.
+- **Release**: with the cache too (decision of 03/11). `compile_cache=off`
+  asks for a cold build, and `publish.yml` refuses nothing because of the
+  cache. It is launched by hand from `main`, a candidate from a branch; no
+  build starts from a tag. A candidate is published without recompiling by
+  `republish.yml`.
+- Every build runs with `--keep-going`: a failed run lists all the errors of
+  the leg, not only the first.
+- The decision lives in one place, `scripts/release_plan.py` (with its cases in
+  `scripts/test_release_plan.py`); the workflows only read the plan.
+- An empty `core_ref` means `main`. A new version of the engine passes the
+  branch of the core that follows it: the surface check judges the branding
+  that core declares.
 
-- **Candidata** (`kind=candidate`): compila con sccache appoggiato alla cache
-  di GitHub Actions (`compile_cache=gha`, il default), quindi la corsa dopo una
-  correzione ricompila solo cio' che e' cambiato. Per correggere errori di
-  build si itera cosi', non con corse a freddo.
-- **Release**: con la cache anche lei (decisione del 03/11). `compile_cache=off`
-  chiede una build a freddo, e `publish.yml` non rifiuta niente per la cache.
-  Si lancia a mano da `main`, una candidata da un ramo; da un tag non parte
-  nessuna build. Una candidata si pubblica senza ricompilare da `republish.yml`.
-- Ogni build gira con `--keep-going`: una corsa fallita elenca tutti gli
-  errori della gamba, non solo il primo.
-- La decisione sta in un posto solo, `scripts/release_plan.py` (con i suoi casi
-  in `scripts/test_release_plan.py`); i workflow leggono il piano e basta.
-- `core_ref` vuoto vuol dire `main`. Una versione nuova del motore passa il ramo
-  del core che la segue: il controllo della superficie giudica il branding che
-  quel core dichiara.
+## The two rules that break the product if ignored
 
-## Le due regole che rompono il prodotto se ignorate
+1. **Every spoof goes through a pref** `zoom.stealth.*` or `stealthfox.*` (or
+   `STEALTHFOX_*` for the binary/Juggler contract). Never values hardwired in
+   C++ or in Python, and **never rename those prefs**: they are the contract
+   between the binary and the wrapper.
+2. **Look real, not "lose nothing".** A suppressed, blocked or empty signal is
+   itself a clue and counts as a failure. Before writing "real browsers do
+   this", test it on a retail Firefox of the same major version we declare.
 
-1. **Ogni spoof passa da una pref** `zoom.stealth.*` o `stealthfox.*` (o
-   `STEALTHFOX_*` per il contratto binario/Juggler). Mai valori cablati in C++
-   o in Python, e **mai rinominare quelle pref**: sono il contratto fra il
-   binario e il wrapper.
-2. **Sembrare reale, non "non perdere niente".** Un segnale soppresso, bloccato
-   o vuoto e' esso stesso un indizio e vale come fallimento. Prima di scrivere
-   "i browser veri fanno cosi'", provalo su un Firefox retail della stessa
-   major che dichiariamo.
+## Where the rest is written
 
-## Dove sta scritto il resto
+The design documents are NOT in this tree: they are kept outside it, in
+the project's private documentation. They hold the list of our patches and
+why, and the open bugs.
 
-I documenti NON sono in questo albero: stanno nel workbench, in
-`c:/src/firefox-stealth/docs/firefox-stealth-architecture/`. Si entra da
-`INDEX.md`, che dice quale file risponde a quale domanda. Le patch e il loro
-perche' stanno in `20-our-patches.md`, i bug aperti in `70-known-bugs.md`.
-
-**Ogni modifica al sorgente aggiorna quei documenti nello stesso lavoro.** Le
-regole di comportamento complete stanno in `c:/src/firefox-stealth/CLAUDE.md`.
+**Every change to the source updates those documents in the same piece of
+work.**

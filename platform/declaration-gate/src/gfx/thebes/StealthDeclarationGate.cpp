@@ -34,7 +34,7 @@ namespace {
 }
 
 // One row per declaration whose domain is finite, i.e. per value that
-// invisible_core is the single source of. Adding a declared surface means
+// the core is the single source of. Adding a declared surface means
 // adding a row here, and forgetting to is caught the first time a profile is
 // generated without it rather than by a page noticing months later.
 //
@@ -185,20 +185,20 @@ void StealthAssertDeclarationsComplete() {
        []() { return StaticPrefs::zoom_stealth_screen_color_depth(); }, 1},
       {"zoom.stealth.max_touch_points",
        []() { return StaticPrefs::zoom_stealth_max_touch_points(); }, 0},
-      // Lo stile di hinting e l'antialias di FreeType, aggiunti il 2026-08-16.
-      // Senza di loro `PrepareFontOptions` torna a chiedere al pattern
-      // fontconfig, cioe' alla macchina: stesso binario, stessa pagina, hash
-      // dei pixel diversi al variare di `/etc/fonts` - 3842037683 con l'host
-      // (che qui vale `hintslight`), 1512591551 con una configurazione vuota,
-      // 2489286717 con `hintnone`, misurati attraverso il prodotto.
+      // The FreeType hinting style and antialias, added 2026-08-16. Without
+      // them `PrepareFontOptions` goes back to asking the fontconfig pattern,
+      // that is, the machine: same binary, same page, different pixel hash as
+      // `/etc/fonts` varies - 3842037683 with the host (which here is
+      // `hintslight`), 1512591551 with an empty configuration, 2489286717 with
+      // `hintnone`, measured through the product.
       //
-      // Il pavimento e' 0 e il sentinella e' -1, perche' 0 e' un valore legale
-      // per entrambi: `FC_HINT_NONE` vale 0 e l'antialias spento pure.
+      // The floor is 0 and the sentinel is -1, because 0 is a legal value for
+      // both: `FC_HINT_NONE` is 0 and so is antialias off.
       //
-      // Sono letti solo dal ramo GTK, e il gate li pretende su ogni
-      // piattaforma di proposito: una dichiarazione che vale per una sola
-      // build e' una dichiarazione che qualcuno dimentichera' di spedire, e la
-      // build che la dimentica non e' quella che se ne accorge.
+      // They are read only by the GTK branch, and the gate requires them on
+      // every platform on purpose: a declaration that holds for one build only
+      // is a declaration somebody will forget to ship, and the build that
+      // forgets it is not the one that notices.
       // The tolerance of the canvas noise's two-colour test, added 2026-10-19
       // with the single canvas function: a pixel whose neighbourhood is a
       // blend of two colours within it (text, two-colour antialiasing) is left
@@ -246,7 +246,7 @@ void StealthAssertDeclarationsComplete() {
       {"zoom.stealth.pointer.all",
        []() { return StaticPrefs::zoom_stealth_pointer_all(); }, 1},
       // Six that this gate did NOT cover until 2026-08-09, and every one of
-      // them is declared unconditionally by invisible_core. That is exactly
+      // them is declared unconditionally by the core. That is exactly
       // what made the hole invisible: nothing is broken in normal operation,
       // so no measurement could see it. What it costs is the refusal - if any
       // of these six ever went missing (a refactor dropping a line from

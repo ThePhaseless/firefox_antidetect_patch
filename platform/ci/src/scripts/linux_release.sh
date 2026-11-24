@@ -2,8 +2,8 @@
 # Build the Linux release tarball from a patched Firefox build.
 #
 # Run this from inside WSL / Linux. It produces a tarball with NO
-# symlinks (all dereferenced into real files) and NO `/home/feder/`
-# personal-path leaks. Output is suitable for direct upload to a GitHub
+# symlinks (all dereferenced into real files) and NO paths under the build
+# user's home directory leaked. Output is suitable for direct upload to a GitHub
 # release.
 #
 # Usage:

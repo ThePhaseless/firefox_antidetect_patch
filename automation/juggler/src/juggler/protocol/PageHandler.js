@@ -1099,7 +1099,7 @@ export class PageHandler {
     this._pageNetwork.fulfillInterceptedRequest(requestId, status, statusText, headers, base64body);
   }
 
-  // Stealthfox 2026-08-30: rimesso insieme al comando nel protocollo.
+  // Stealthfox 2026-08-30: put back together with the command in the protocol.
   async ['Network.getResponseBody']({requestId}) {
     return this._pageNetwork.getResponseBody(requestId);
   }

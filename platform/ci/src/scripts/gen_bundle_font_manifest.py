@@ -82,16 +82,16 @@ WEIGHT_WORD_TO_CLASS = {
 # The test that found it needs TWO different fallbacks (`"X", monospace` and
 # `"X", cursive`): a single monospace fallback calls Consolas unresolved,
 # because Consolas IS the monospace fallback.
-# [PROVATO E RITIRATO IL 2026-08-09.] Per qualche ora questo insieme ha
-# contenuto "Arial Black", per emettere quella famiglia separatamente invece di
-# ripiegarla. La misura che lo giustificava era presa contro
-# C:/tmp/ff151-win2, che riporta 151.0 ma NON e' un retail: non firmato,
-# ProductName "Nightly", IsPrivateBuild true. Contro un 151.0 scaricato da
-# archive.mozilla.org e verificato Authenticode come firmato Mozilla, la
-# risposta e' l'opposto: `font-weight:900` su Arial misura 277.5833, cioe' il
-# retail USA Arial Black come faccia a peso 900 - che e' esattamente cio' che il
-# ripiegamento riproduce, e che questa build faceva gia'. La riga sopra aveva
-# ragione; il "difetto" era la build di confronto.
+# [PROVEN AND WITHDRAWN ON 2026-08-09.] For a few hours this set held
+# "Arial Black", to emit that family separately instead of folding it. The
+# measurement that justified it was taken against a local build that reports
+# 151.0 but is NOT a retail: unsigned, ProductName "Nightly", IsPrivateBuild
+# true. Against a 151.0 downloaded from archive.mozilla.org and verified by
+# Authenticode as signed by Mozilla, the answer is the opposite: `font-weight:900`
+# on Arial measures 277.5833, that is, the retail USES Arial Black as the
+# weight-900 face - which is exactly what the folding reproduces, and what this
+# build already did. The line above was right; the "defect" was the comparison
+# build.
 KEEP_GDI_NAME = set()
 
 # nameIDs that carry copyright / trademark / manufacturer / license text -
@@ -135,7 +135,7 @@ def _name(name_table, name_id):
     and the table is sorted by platform, so Macintosh when a font has both -
     else any record that decodes, else None.
 
-    ⛔ OUR RULE, NOT THE LIBRARY'S. This was `name_table.getDebugName`, whose
+    WARNING: OUR RULE, NOT THE LIBRARY'S. This was `name_table.getDebugName`, whose
     preference is fontTools' to change, and fontTools 4.67 changed it to the
     Windows record first. Microsoft Himalaya carries 'MicrosoftHimalaya'
     (Macintosh) and 'Microsoft Himalaya' (Windows) as its PostScript name, so
@@ -366,7 +366,7 @@ def _parse_substitute_table(path: str, table_name: str) -> list[tuple[str, str]]
     body = src[start:end]
     pairs = re.findall(r'\{\s*"((?:[^"\\]|\\.)*)"\s*,\s*"((?:[^"\\]|\\.)*)"\s*\}', body)
     if not pairs:
-        raise SystemExit(f"nessuna coppia estratta da {table_name} in {path}")
+        raise SystemExit(f"no pair extracted from {table_name} in {path}")
     return [(a, b) for a, b in pairs]
 
 
@@ -511,7 +511,7 @@ def build_script_fallback(gfx_dir: str, intl_dir: str) -> dict:
             // We always append Arial below, so no need to add it here.
             // aFontList.AppendElement("Arial");
 
-        inside those cases. It is the defect CLAUDE.md names as the most
+        inside those cases. It is the defect the project rules name as the most
         repeated one in this project - a check written against the comment
         instead of the code - and it produced a table that looked plausible.
         """
@@ -554,7 +554,7 @@ def build_script_fallback(gfx_dir: str, intl_dir: str) -> dict:
 
     if len(per_script) < 30:
         raise SystemExit(
-            f"solo {len(per_script)} script estratti: il parser non regge piu")
+            f"only {len(per_script)} scripts extracted: the parser no longer holds")
 
     # --- tail: Arial, then the symbol/punctuation block, then the rest -----
     # Order in the function is: Arial | if(symbolish){...} | Arial Unicode MS |
@@ -563,7 +563,7 @@ def build_script_fallback(gfx_dir: str, intl_dir: str) -> dict:
     sym = re.search(r"if \(aRunScript == Script::COMMON.*?\{(.*?)\n  \}",
                     tail, re.S)
     if not sym:
-        raise SystemExit("blocco simboli/punteggiatura non trovato nella coda")
+        raise SystemExit("symbol/punctuation block not found in the tail")
     before = tail[:sym.start()]
     after = tail[sym.end():]
     return {
@@ -576,31 +576,32 @@ def build_script_fallback(gfx_dir: str, intl_dir: str) -> dict:
     }
 
 
-#: I nomi che un Windows standard espone e le cui FACCE non sono nel bundle.
+#: The names a standard Windows exposes whose FACES are not in the bundle.
 #:
-#: Non e' una lista derivata: e' una MISURA, e derivarla sarebbe sbagliato. La
-#: regola ovvia - "nome della lista standard meno la parola di stile, se la base
-#: e' dichiarata" - scatta anche su `Bahnschrift Light` e `Bahnschrift SemiBold`,
-#: e quei due sul retail NON risolvono (208,85 su entrambi, cioe' il ripiego
-#: generico): aliasarli creerebbe la divergenza che il rimedio vuole chiudere.
+#: This is not a derived list: it is a MEASUREMENT, and deriving it would be
+#: wrong. The obvious rule - "name from the standard list minus the style word,
+#: if the base is declared" - also fires on `Bahnschrift Light` and
+#: `Bahnschrift SemiBold`, and those two do NOT resolve on the retail (208.85
+#: on both, that is, the generic fallback): aliasing them would create the
+#: divergence the remedy is meant to close.
 #:
-#: Misurati il 2026-08-16 contro `judge151-frozen` (151.0, firma Valid,
-#: CN=Mozilla Corporation), UN BROWSER PER NOME, 32px su "Handgloves 123". La
-#: verifica di ogni riga e' che il nome legacy misuri sul giudice esattamente
-#: quanto la sua base, e vale per tutte:
+#: Measured on 2026-08-16 against `judge151-frozen` (151.0, signature Valid,
+#: CN=Mozilla Corporation), ONE BROWSER PER NAME, 32px on "Handgloves 123". The
+#: check for every row is that the legacy name measures on the judge exactly as
+#: much as its base, and it holds for all of them:
 #:
-#:   Calibri = 206,5000 | Segoe UI = 227,4833 | Nirmala UI = 227,2833
-#:   Leelawadee UI = 227,2833 | Yu Gothic UI = 227,4833 | Yu Gothic = 234,9667
-#:   Malgun Gothic = 234,4333 | Microsoft JhengHei (UI) = 242,9167
-#:   Microsoft YaHei (UI) = 247,2833 | MingLiU-ExtB = SimSun = 224,0000
-#:   Sitka Small = 190,1500 sul giudice
+#:   Calibri = 206.5000 | Segoe UI = 227.4833 | Nirmala UI = 227.2833
+#:   Leelawadee UI = 227.2833 | Yu Gothic UI = 227.4833 | Yu Gothic = 234.9667
+#:   Malgun Gothic = 234.4333 | Microsoft JhengHei (UI) = 242.9167
+#:   Microsoft YaHei (UI) = 247.2833 | MingLiU-ExtB = SimSun = 224.0000
+#:   Sitka Small = 190.1500 on the judge
 #:
-#: ⛔ E la lista da cui si pesca e' `StandardFonts-win10.inc`, MAI quello che il
-#: giudice risolve. Sui 743 nomi che i rilevatori sondano il giudice ne risolve
-#: 102 che noi no, ma 99 sono FUORI dalla lista standard: sono font di Office
-#: che quella macchina ha. Inseguirli vorrebbe dire dichiarare una macchina con
-#: Office installato.
-_ALIAS_WINDOWS_MISURATI = (
+#: WARNING: the list to draw from is `StandardFonts-win10.inc`, NEVER what the
+#: judge resolves. Of the 743 names the detectors probe, the judge resolves
+#: 102 that we do not, but 99 are OUTSIDE the standard list: they are Office
+#: fonts that machine has. Chasing them would mean declaring a machine with
+#: Office installed.
+_MEASURED_WINDOWS_ALIASES = (
     ("Calibri Light", "Calibri"),
     ("Leelawadee UI Semilight", "Leelawadee UI"),
     ("Malgun Gothic Semilight", "Malgun Gothic"),
@@ -625,15 +626,15 @@ _ALIAS_WINDOWS_MISURATI = (
     ("Yu Gothic UI Semilight", "Yu Gothic UI"),
 )
 
-#: Nomi della lista standard che sul RETAIL non risolvono, misurati.
-#: Stanno qui e non nel silenzio, cosi' il segnalatore non li ripropone ogni
-#: volta e chi legge sa che sono stati guardati.
-_NON_RISOLVONO_SUL_RETAIL = frozenset((
-    # Tutte e tre le istanze nominate di Bahnschrift: sul giudice misurano
-    # 208,85, che e' il ripiego generico. Bahnschrift stessa risolve (219,3333),
-    # quindi non e' la famiglia a mancare: sono i suoi nomi di istanza che un
-    # Firefox non espone. E' un font variabile, e le istanze nominate di un
-    # variabile non diventano famiglie.
+#: Names from the standard list that do not resolve on the RETAIL, measured.
+#: They are listed here and not left silent, so the reporter does not raise
+#: them every time and the reader knows they have been looked at.
+_UNRESOLVED_ON_RETAIL = frozenset((
+    # All three named instances of Bahnschrift: on the judge they measure
+    # 208.85, which is the generic fallback. Bahnschrift itself resolves
+    # (219.3333), so the family is not what is missing: it is its instance names
+    # that a Firefox does not expose. It is a variable font, and the named
+    # instances of a variable font do not become families.
     "Bahnschrift Light",
     "Bahnschrift SemiBold",
     "Bahnschrift SemiLight",
@@ -641,28 +642,28 @@ _NON_RISOLVONO_SUL_RETAIL = frozenset((
 
 
 def _standard_windows_families(gfx_dir: str) -> list[str]:
-    """I nomi di famiglia che Microsoft dichiara standard su Windows 10.
+    """The family names Microsoft declares standard on Windows 10.
 
-    Letti da `StandardFonts-win10.inc`, che sta nell'albero Firefox: e' la
-    stessa fonte da cui vengono gli altri alias, quindi non c'e' una seconda
-    copia da tenere allineata a mano.
+    Read from `StandardFonts-win10.inc`, which lives in the Firefox tree: it is
+    the same source the other aliases come from, so there is no second copy to
+    keep aligned by hand.
     """
     path = os.path.join(gfx_dir, "StandardFonts-win10.inc")
     try:
         with open(path, encoding="utf-8") as fh:
-            testo = fh.read()
+            text = fh.read()
     except OSError as exc:
         raise SystemExit(
-            "gen_bundle_font_manifest: non riesco a leggere %s (%s). E' la "
-            "lista dei nomi che un Windows standard espone, e senza di lei gli "
-            "alias verso le famiglie base non si possono derivare. Rifiuto di "
-            "generare un manifest incompleto in silenzio." % (path, exc))
-    nomi, visti = [], set()
-    for n in re.findall(r'^\s*"([^"]+)",\s*$', testo, re.M):
-        if n not in visti:
-            visti.add(n)
-            nomi.append(n)
-    return nomi
+            "gen_bundle_font_manifest: cannot read %s (%s). It is the "
+            "list of names a standard Windows exposes, and without it the "
+            "aliases to the base families cannot be derived. Refusing to "
+            "generate an incomplete manifest silently." % (path, exc))
+    names, seen = [], set()
+    for n in re.findall(r'^\s*"([^"]+)",\s*$', text, re.M):
+        if n not in seen:
+            seen.add(n)
+            names.append(n)
+    return names
 
 
 def build_manifest(fonts_dir: str, gfx_dir: str | None = None) -> dict:
@@ -693,7 +694,7 @@ def build_manifest(fonts_dir: str, gfx_dir: str | None = None) -> dict:
     # earlier removal was missing: dropping the compound from the family list
     # was right (the family count is a tell), dropping it from resolution was
     # not.
-    aliases_da_facce: dict[str, str] = {}
+    aliases_from_faces: dict[str, str] = {}
 
     def add_face(name, face):
         families.setdefault(name, []).append(face)
@@ -721,20 +722,20 @@ def build_manifest(fonts_dir: str, gfx_dir: str | None = None) -> dict:
         # static faces) - not itself a selectable Windows font family.
         if gdi_name.endswith(" Variable"):
             continue
-        # I due font di ICONE restano dichiarati, e l'esclusione che c'era qui
-        # e' stata tolta il 2026-08-16.
+        # The two ICON fonts stay declared, and the exclusion that used to be
+        # here was removed on 2026-08-16.
         #
-        # Diceva: "Measured 2026-08-07 against retail Firefox 152.0.6 on
-        # Windows: neither resolves as a family name for a page". Quel giudice
-        # e' un 152, e noi dichiariamo 151: e' la quinta volta che il progetto
-        # trova una major sbagliata dentro una decisione presa. Rimisurato
-        # contro un 151.0 firmato, un browser per nome, 32px:
-        # `Segoe MDL2 Assets` RISOLVE (209,6167 contro il ripiego generico
-        # 208,85) e `Segoe Fluent Icons` pure (210,2333).
+        # It said: "Measured 2026-08-07 against retail Firefox 152.0.6 on
+        # Windows: neither resolves as a family name for a page". That judge is
+        # a 152, and we declare 151: it is the fifth time the project has found
+        # a wrong major inside a decision already taken. Re-measured against a
+        # signed 151.0, one browser per name, 32px:
+        # `Segoe MDL2 Assets` RESOLVES (209.6167 against the generic fallback
+        # 208.85) and so does `Segoe Fluent Icons` (210.2333).
         #
-        # I due file erano gia' nella cartella dei font imbarcati e non
-        # dichiarati in nessuna famiglia: 743.840 byte spediti che nessuna
-        # pagina poteva raggiungere.
+        # The two files were already in the bundled-font folder and not
+        # declared in any family: 743,840 bytes shipped that no page could
+        # reach.
 
         typo_name = _name(name_table, 16)
         wws_name = _name(name_table, 21)
@@ -760,7 +761,7 @@ def build_manifest(fonts_dir: str, gfx_dir: str | None = None) -> dict:
 
         add_face(family, face)
         if family != gdi_name:
-            aliases_da_facce[gdi_name] = family
+            aliases_from_faces[gdi_name] = family
 
         # WWS-base derivation: a compound name with no typographic-family record
         # of its own (Franklin Gothic Medium has neither nameID 16 nor 21) is
@@ -784,7 +785,7 @@ def build_manifest(fonts_dir: str, gfx_dir: str | None = None) -> dict:
                 if base:
                     families.pop(family, None)
                     add_face(base, dict(face))
-                    aliases_da_facce[gdi_name] = base
+                    aliases_from_faces[gdi_name] = base
 
     result_families = []
     for name in sorted(families):
@@ -793,86 +794,87 @@ def build_manifest(fonts_dir: str, gfx_dir: str | None = None) -> dict:
 
     intl_dir = os.path.normpath(
         os.path.join(gfx_dir, "..", "..", "intl", "components", "src"))
-    # I nomi di famiglia che Windows ha e che noi NON dichiariamo, portati
-    # sulla famiglia base che dichiariamo.
+    # The family names Windows has and we do NOT declare, mapped onto the base
+    # family we declare.
     #
-    # Gli alias derivati dalle facce (sopra) coprono solo i nomi le cui facce
-    # imbarchiamo. Ne restano altri che un Windows standard espone e le cui
-    # facce non sono nel bundle: un retail li risolve, noi cadevamo sul ripiego
-    # generico, e una pagina lo legge con un measureText.
+    # The aliases derived from the faces (above) cover only the names whose
+    # faces we ship. There are others that a standard Windows exposes and whose
+    # faces are not in the bundle: a retail resolves them, we fell to the
+    # generic fallback, and a page reads that with a measureText.
     #
-    # ⛔ LA LISTA E' `StandardFonts-win10.inc`, NON quello che il giudice
-    # risolve. Misurato il 2026-08-16 sui 743 nomi che
-    # `FingerprintedFonts.inc` dichiara sondati dai rilevatori: il giudice ne
-    # risolve 102 che noi no, ma **99 di quei 102 sono fuori dalla lista
-    # standard** - Century Gothic, Haettenschweiler, Monotype Corsiva, Papyrus,
-    # Rockwell e compagnia, cioe' font di Office che QUELLA macchina ha.
-    # Inseguirli vorrebbe dire dichiarare di essere una macchina con Office
-    # installato, che e' un'altra identita', non piu' realness.
+    # WARNING: THE LIST IS `StandardFonts-win10.inc`, NOT what the judge
+    # resolves. Measured on 2026-08-16 over the 743 names that
+    # `FingerprintedFonts.inc` declares as probed by detectors: the judge
+    # resolves 102 that we do not, but **99 of those 102 are outside the
+    # standard list** - Century Gothic, Haettenschweiler, Monotype Corsiva,
+    # Papyrus, Rockwell and the like, that is, Office fonts THAT machine has.
+    # Chasing them would mean declaring a machine with Office installed, which
+    # is another identity, not more realness.
     #
-    # ⛔ E la misura va fatta UN BROWSER PER NOME. Dentro una pagina sola, in una
-    # famiglia risolve solo il nome chiesto per primo (la popolazione degli
-    # alias in Gecko e' pigra), e su 743 nomi nemmeno confrontare i due ordini
-    # basta: `Arial Black` risultava "di troppo" mentre per browser risolve.
+    # WARNING: and the measurement must be done ONE BROWSER PER NAME. Within a
+    # single page, in a family only the name asked first resolves (alias
+    # population in Gecko is lazy), and over 743 names even comparing the two
+    # orders is not enough: `Arial Black` looked "extra" while per browser it
+    # resolves.
     #
-    # Il bersaglio si ricava togliendo la parola di stile finale, e la
-    # VERIFICA e' che sul giudice il nome legacy misuri esattamente quanto la
-    # base. Misurato a 32px su "Handgloves 123", un browser per nome:
-    # Calibri Light = Calibri = 206,5000; Segoe UI Black = Segoe UI Semibold =
-    # Segoe UI = 227,4833; Nirmala UI Semilight = Nirmala UI = 227,2833;
-    # Leelawadee UI Semilight = Leelawadee UI = 227,2833; le tre Yu Gothic UI =
-    # Yu Gothic UI = 227,4833; Malgun Gothic Semilight = Malgun Gothic =
-    # 234,4333; Microsoft JhengHei (UI) Light = 242,9167; Microsoft YaHei (UI)
-    # Light = 247,2833; Yu Gothic Light = Yu Gothic = 234,9667.
-    dichiarate = {f["name"] for f in result_families}
-    aliases_da_windows: dict[str, str] = {}
-    for nome, base in _ALIAS_WINDOWS_MISURATI:
-        if nome in dichiarate:
+    # The target is derived by removing the trailing style word, and the
+    # CHECK is that on the judge the legacy name measures exactly as much as
+    # the base. Measured at 32px on "Handgloves 123", one browser per name:
+    # Calibri Light = Calibri = 206.5000; Segoe UI Black = Segoe UI Semibold =
+    # Segoe UI = 227.4833; Nirmala UI Semilight = Nirmala UI = 227.2833;
+    # Leelawadee UI Semilight = Leelawadee UI = 227.2833; the three Yu Gothic UI
+    # = Yu Gothic UI = 227.4833; Malgun Gothic Semilight = Malgun Gothic =
+    # 234.4333; Microsoft JhengHei (UI) Light = 242.9167; Microsoft YaHei (UI)
+    # Light = 247.2833; Yu Gothic Light = Yu Gothic = 234.9667.
+    declared = {f["name"] for f in result_families}
+    aliases_from_windows: dict[str, str] = {}
+    for alias_name, base in _MEASURED_WINDOWS_ALIASES:
+        if alias_name in declared:
             continue
-        if base not in dichiarate:
+        if base not in declared:
             raise SystemExit(
-                "gen_bundle_font_manifest: l'alias misurato %r punta a %r, che "
-                "questo bundle non dichiara. Un alias verso una famiglia "
-                "assente non risolve, quindi la riga prometterebbe e non "
-                "manterrebbe." % (nome, base))
-        aliases_da_windows[nome] = base
+                "gen_bundle_font_manifest: the measured alias %r points at %r, "
+                "which this bundle does not declare. An alias to a missing "
+                "family does not resolve, so the row would promise and not "
+                "deliver." % (alias_name, base))
+        aliases_from_windows[alias_name] = base
 
-    # Il segnalatore: un nome standard che SEMBRA un candidato e che non e'
-    # nella tabella misurata non viene aliasato - viene detto. Cosi' un nome
-    # aggiunto da Microsoft domani si nota, invece di restare fuori in silenzio.
-    # `aliases_da_facce` conta come "gia' coperto": quei nomi risolvono perche'
-    # la faccia e' imbarcata, e senza questo il segnalatore gridava su tre nomi
-    # che erano gia' a posto - un allarme che grida sul verde smette di essere
-    # letto.
-    noti = ({n for n, _ in _ALIAS_WINDOWS_MISURATI}
-            | set(_NON_RISOLVONO_SUL_RETAIL)
-            | set(aliases_da_facce))
-    for nome in _standard_windows_families(gfx_dir):
-        if nome in dichiarate or nome in noti:
+    # The reporter: a standard name that LOOKS like a candidate and is not
+    # in the measured table is not aliased - it is reported. So a name
+    # added by Microsoft tomorrow is noticed, instead of staying out silently.
+    # `aliases_from_faces` counts as "already covered": those names resolve
+    # because the face is shipped, and without this the reporter shouted about
+    # three names that were already fine - an alarm that shouts on green stops
+    # being read.
+    known = ({n for n, _ in _MEASURED_WINDOWS_ALIASES}
+            | set(_UNRESOLVED_ON_RETAIL)
+            | set(aliases_from_faces))
+    for alias_name in _standard_windows_families(gfx_dir):
+        if alias_name in declared or alias_name in known:
             continue
-        parole = nome.split(" ")
-        if len(parole) > 1 and " ".join(parole[:-1]) in dichiarate:
+        name_words = alias_name.split(" ")
+        if len(name_words) > 1 and " ".join(name_words[:-1]) in declared:
             sys.stderr.write(
-                "gen_bundle_font_manifest: %r somiglia a un nome di faccia "
-                "legacy e non e' nella tabella misurata. Misuralo un browser "
-                "per nome contro un retail certificato e mettilo nella tabella "
-                "giusta." % nome + chr(10))
+                "gen_bundle_font_manifest: %r looks like a legacy face name "
+                "and is not in the measured table. Measure it one browser "
+                "per name against a certified retail and put it in the "
+                "right table." % alias_name + chr(10))
 
-    # Le tre sorgenti si fondono qui, e l'ordine dice chi vince. La tabella di
-    # Mozilla batte tutto: se `kFontSubstitutes` dice gia' dove va un nome,
-    # quella e' la risposta di Windows e le nostre sono inferenze.
-    aliases = dict(aliases_da_windows)
-    aliases.update(aliases_da_facce)
+    # The three sources merge here, and the order says who wins. Mozilla's
+    # table beats everything: if `kFontSubstitutes` already says where a name
+    # goes, that is Windows' answer and ours are inferences.
+    aliases = dict(aliases_from_windows)
+    aliases.update(aliases_from_faces)
     for alias, target in build_aliases(gfx_dir):
         aliases[alias] = target
-    # ⛔ NON si filtrano gli alias il cui bersaglio non e' una famiglia che
-    # dichiariamo. Nove ce ne sono (David, FangSong, Miriam, Fixedsys, KaiTi,
-    # Rod, Mistral, System e Miriam Fixed) e sono INERTI: `GetAlias` restituisce
-    # il nome bersaglio, il chiamante lo cerca fra le famiglie, non lo trova, e
-    # cade sul ripiego - esattamente come se l'alias non ci fosse. Toglierli
-    # sarebbe un cambiamento che non sposta nessuna misura, ed e' la categoria
-    # che questo progetto rifiuta per regola. Restano, e il fatto che siano
-    # inerti sta scritto in [B159].
+    # WARNING: aliases whose target is not a family we declare are NOT
+    # filtered. There are nine (David, FangSong, Miriam, Fixedsys, KaiTi,
+    # Rod, Mistral, System and Miriam Fixed) and they are INERT: `GetAlias`
+    # returns the target name, the caller looks it up among the families, does
+    # not find it, and falls to the fallback - exactly as if the alias were not
+    # there. Removing them would be a change that moves no measurement, and
+    # that is the category this project refuses by rule. They stay, and the
+    # fact that they are inert is recorded as known bug B159.
     return {"families": result_families,
             "aliases": [(a, t) for a, t in sorted(aliases.items())],
             "script_fallback": build_script_fallback(gfx_dir, intl_dir)}

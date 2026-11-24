@@ -43,12 +43,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Le due gambe macOS sono uscite il 2026-08-26 (fine supporto totale,
-          # decisione del proprietario). Nominavano anche macos-15 /
-          # macos-15-intel, immagini gia' abbandonate a firefox-19: stale due
-          # volte. Il mac resta LEGGIBILE dove serve alla storia - make_seal.py
-          # tiene darwin in ENTRY_REL e in NAME_RE apposta, perche' i tag fino a
-          # firefox-20 il mac ce l'avevano - ma qui si smette di pretenderlo.
+          # The two macOS legs were removed on 2026-08-26 (end of all support,
+          # owner's decision). They also named macos-15 /
+          # macos-15-intel, images already dropped at firefox-19: stale twice
+          # over. The mac stays READABLE where history needs it - make_seal.py
+          # keeps darwin in ENTRY_REL and NAME_RE on purpose, because tags up to
+          # firefox-20 had the mac - but here it is no longer required.
           # --full (interaction) only on the reliable linux-x86_64 leg; others run
           # the robust SMOKE drive. Same rationale as release.yml's gate.
           - leg: linux-x86_64
