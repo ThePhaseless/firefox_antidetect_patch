@@ -64,7 +64,7 @@
  },
  {
   "file": "dom/base/Document.cpp",
-  "function": "void Document::SetDocumentURI(nsIURI* aURI) {",
+  "function": "static void GetFormattedTimeString(PRTime aTime, bool aUniversal,",
   "kind": "add",
   "form": "unknown",
   "line": "                                   const Document* aDocument,  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
@@ -74,7 +74,7 @@
  },
  {
   "file": "dom/base/Document.cpp",
-  "function": "void Document::SetDocumentURI(nsIURI* aURI) {",
+  "function": "static void GetFormattedTimeString(PRTime aTime, bool aUniversal,",
   "kind": "rewrite",
   "form": "unknown",
   "line": "  StealthExplodeTime(aDocument, aTime, aUniversal ? PR_GMTParameters : PR_LocalTimeParameters, &prtime);  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
@@ -115,7 +115,7 @@
  },
  {
   "file": "dom/base/Document.cpp",
-  "function": "const LangGroupFontPrefs* Document::GetFontPrefsForLang(",
+  "function": "void Document::RecomputeLanguageFromCharset() {",
   "kind": "rewrite",
   "form": "wrap-expression",
   "line": "  nsAtom* language = StealthDocumentCharsetLanguage(this, mozilla::intl::EncodingToLang::Lookup(mCharacterSet));  // STEALTH-HOOK(fingerprint/locale-time/timezone)",

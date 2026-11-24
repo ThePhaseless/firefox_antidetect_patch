@@ -33,7 +33,7 @@
  },
  {
   "file": "netwerk/base/nsProtocolProxyService.cpp",
-  "function": "nsProtocolProxyService::GetName(nsACString& aName) {",
+  "function": "void nsProtocolProxyService::PrefsChanged(nsIPrefBranch* prefBranch,",
   "kind": "add",
   "form": "notice",
   "line": "  StealthSocksPrefsChanged(prefBranch, pref, mSOCKSProxyUsername, mSOCKSProxyPassword);  // STEALTH-HOOK(network/socks)",
@@ -49,6 +49,7 @@
   "test": "gtest:TestStealthSocksCredentials.ReachResolvedProxyInfo",
   "why": "G9/G14: Mozilla's call with the two members as its 5th and 6th arguments; only the first line of the call is rewritten (the tool does not yet read a replaced argument as a wrap)",
   "exception": "G35, approved by the pm (PM-DECISIONS 22/11 morning, value declared = a literal in place of a literal): the two \"\"_ns` credentials become mSOCKSProxyUsername / mSOCKSProxyPassword, the session's SOCKS credentials, as on the base; to be reviewed at the port to 160",
+  "reason_kind": "expression",
   "pm": "approvato"
  },
  {

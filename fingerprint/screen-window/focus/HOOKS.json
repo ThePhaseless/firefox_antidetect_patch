@@ -19,7 +19,7 @@
  },
  {
   "file": "xpfe/appshell/AppWindow.cpp",
-  "function": "void AppWindow::WindowActivated() {",
+  "function": "void AppWindow::WindowDeactivated() {",
   "kind": "add",
   "form": "guard",
   "line": "  if (StealthKeepsActivation()) return;  // STEALTH-HOOK(fingerprint/screen-window/focus)",

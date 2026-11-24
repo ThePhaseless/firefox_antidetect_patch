@@ -25,6 +25,7 @@
   "removed": "            if len(unified_prefix) > 20:",
   "test": "py:scripts/ci/test_stealth_build_tools.py::test_two_directories_that_collided_at_20_characters_get_two_names",
   "exception": "a declared value (20 -> 30) that Mozilla writes on two adjacent lines: no wrap or guard expresses it; it concerns only the build (G35, PM-DECISIONS platform/build-tools)",
+  "reason_kind": "expression",
   "pm": "approvato"
  },
  {
@@ -36,6 +37,7 @@
   "removed": "                unified_prefix = unified_prefix[-20:].split(\"/\", 1)[-1]",
   "test": "py:scripts/ci/test_stealth_build_tools.py::test_two_directories_that_collided_at_20_characters_get_two_names",
   "exception": "a declared value (20 -> 30) that Mozilla writes on two adjacent lines: no wrap or guard expresses it; it concerns only the build (G35, PM-DECISIONS platform/build-tools)",
+  "reason_kind": "expression",
   "pm": "approvato"
  },
  {

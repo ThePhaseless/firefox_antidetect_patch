@@ -9,7 +9,7 @@
  },
  {
   "file": "security/manager/ssl/nsCertOverrideService.cpp",
-  "function": "void nsCertOverrideService::CountPermanentOverrideTelemetry(",
+  "function": "static bool IsDebugger() {",
   "kind": "add",
   "form": "anchor",
   "line": "  if (StealthJugglerPipeConnected()) return true;  // STEALTH-HOOK(automation/ignore-https-errors)",

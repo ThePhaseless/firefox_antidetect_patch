@@ -9,7 +9,7 @@
  },
  {
   "file": "dom/webgpu/Adapter.cpp",
-  "function": "uint32_t AdapterInfo::SubgroupMaxSize() const {",
+  "function": "bool AdapterInfo::IsFallbackAdapter() const {",
   "kind": "add",
   "form": "guard",
   "line": "  if (StealthWebGPUDeclared()) return StealthWebGPUIsFallback(mParent.get());  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
@@ -81,7 +81,7 @@
  },
  {
   "file": "dom/webgpu/ipc/WebGPUParent.cpp",
-  "function": "extern void wgpu_parent_swap_chain_drop(",
+  "function": "extern void wgpu_parent_get_compositor_device_luid(",
   "kind": "add",
   "form": "anchor",
   "line": "  StealthWebGPUZeroLuid(aOutLuid);  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
@@ -124,6 +124,7 @@
   "anchor": "if (!IsGfxInfoStatusOkay(nsIGfxInfo::FEATURE_WEBGPU_EXTERNAL_TEXTURE, ...)) { ... }",
   "why": "the preload fails if a host Vulkan loader is already mapped, and gfxInfo of the external texture may open one: moving it higher (wrapping SetAllowWebGPU) could change the outcome (G18); it must stay before the force-disable #if",
   "exception": "same hunk as the approved `#if ... && 0` line (PM-DECISIONS fingerprint/webgpu/adapter-declaration, 2b, G35): the pair is one rewrite of Mozilla's `#if` line, which stays as it is today",
+  "reason_kind": "macro",
   "pm": "approvato"
  },
  {
@@ -134,6 +135,7 @@
   "line": "#if !defined(XP_WIN) && !defined(XP_MACOSX) && 0  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
   "test": "wrapper:tests/test_webgpu_external_texture_e2e.py::test_importexternaltexture_exists_on_every_os_e2e",
   "exception": "the #if of Mozilla's ForceDisable of WebGPU external textures off Windows and macOS is rewritten with && 0: restoring it and wrapping SetAllowWebGPUExternalTexture is not provably identical (user pref false, gfxInfo blocklist)",
+  "reason_kind": "macro",
   "pm": "approvato"
  },
  {

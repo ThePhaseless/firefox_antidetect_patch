@@ -82,7 +82,7 @@
  },
  {
   "file": "dom/media/webrtc/transport/nr_socket_proxy_config.cpp",
-  "function": "",
+  "function": "NrSocketProxyConfig::NrSocketProxyConfig(",
   "kind": "rewrite",
   "form": "wrap-expression",
   "line": "    : mPrivate(net::StealthPcUdpProxyOf(aProxyConfig, new Private({aProxyConfig}))) {}  // STEALTH-HOOK(network/proxy-udp)",
@@ -227,7 +227,7 @@
  },
  {
   "file": "dom/media/webrtc/transport/nr_socket_prsock.cpp",
-  "function": "int NrSocket::getaddr(nr_transport_addr* addrp) {",
+  "function": "void NrSocket::close() {",
   "kind": "add",
   "form": "notice",
   "line": "  StealthOwnPortReleased(&my_addr_, &stealth_own_port_);  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
@@ -357,7 +357,7 @@
  },
  {
   "file": "netwerk/base/nsUDPSocket.cpp",
-  "function": "nsUDPSocket::SendWithAddress(const NetAddr* aAddr, const uint8_t* aData,",
+  "function": "int64_t nsUDPSocket::GetFileDescriptor() {",
   "kind": "add",
   "form": "anchor",
   "line": "  if (StealthSocksUdpHasNoHandle(mFD)) return -1;  // STEALTH-HOOK(network/proxy-udp)",
@@ -511,7 +511,7 @@
  },
  {
   "file": "netwerk/ipc/SocketProcessParent.cpp",
-  "function": "SocketProcessParent::AllocPProxyConfigLookupParent(",
+  "function": "mozilla::ipc::IPCResult SocketProcessParent::RecvPProxyConfigLookupConstructor(",
   "kind": "add",
   "form": "notice",
   "line": "  StealthTakeParkedLookupLoadInfo(this);  // STEALTH-HOOK(network/proxy-udp)",
@@ -519,7 +519,7 @@
  },
  {
   "file": "netwerk/ipc/SocketProcessParent.cpp",
-  "function": "SocketProcessParent::AllocPProxyConfigLookupParent(",
+  "function": "mozilla::ipc::IPCResult SocketProcessParent::RecvPProxyConfigLookupConstructor(",
   "kind": "add",
   "form": "notice",
   "line": "  StealthTakeParkedTRRLookupContext(this);  // STEALTH-HOOK(network/doh)",
@@ -643,7 +643,7 @@
  },
  {
   "file": "netwerk/protocol/http/HttpBaseChannel.cpp",
-  "function": "void HttpBaseChannel::DoDiagnosticAssertWhenOnStopNotCalledOnDestroy() {}",
+  "function": "bool HttpBaseChannel::Http3Allowed() const {",
   "kind": "rewrite",
   "form": "wrap-expression",
   "line": "                    StealthSocksProxyIsHttp3Capable(mProxyInfo.get(), static_cast<nsProxyInfo*>(mProxyInfo.get())->IsHttp3Proxy()))  // STEALTH-HOOK(network/proxy-udp)",

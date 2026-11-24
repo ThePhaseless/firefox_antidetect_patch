@@ -9,7 +9,7 @@
  },
  {
   "file": "dom/media/mediacapabilities/MediaCapabilities.cpp",
-  "function": "static uint32_t Vp8EncoderThreads(const uint32_t aPixels,",
+  "function": "static bool IsSWEncodeSmooth(const CodecType aCodec,",
   "kind": "add",
   "form": "shadow",
   "line": "  const auto GetNumberOfProcessors = StealthDeclaredNumberOfProcessors;  // STEALTH-HOOK(fingerprint/media/decode-declaration)",
@@ -51,7 +51,7 @@
  },
  {
   "file": "dom/media/platforms/PDMFactory.cpp",
-  "function": "DecodeSupportSet PDMFactory::SupportsMimeType(",
+  "function": "DecodeSupportSet PDMFactory::Supports(",
   "kind": "add",
   "form": "guard",
   "line": "  if (DecodeSupportSet declared; StealthDeclaredDecodeSupportFor(aParams, &declared)) return declared;  // STEALTH-HOOK(fingerprint/media/decode-declaration)",
@@ -59,7 +59,7 @@
  },
  {
   "file": "dom/media/platforms/PDMFactory.cpp",
-  "function": "DecodeSupportSet PDMFactory::Supports(",
+  "function": "RefPtr<PDMSupportsDecoderPromise> PDMFactory::SupportsAsync(",
   "kind": "add",
   "form": "guard",
   "line": "  if (auto declared = StealthDeclaredDecodeSupportAsyncFor(aParams)) return declared;  // STEALTH-HOOK(fingerprint/media/decode-declaration)",
@@ -75,7 +75,7 @@
  },
  {
   "file": "dom/media/webrtc/jsapi/DefaultCodecPreferences.cpp",
-  "function": "bool DefaultCodecPreferences::H264EnabledStatic() {",
+  "function": "bool DefaultCodecPreferences::SoftwareH264EnabledStatic() {",
   "kind": "add",
   "form": "guard",
   "line": "  if (bool declared; StealthDeclaredSoftwareH264(&declared)) return declared;  // STEALTH-HOOK(fingerprint/media/decode-declaration)",
@@ -99,7 +99,7 @@
  },
  {
   "file": "dom/media/webrtc/libwebrtcglue/WebrtcVideoCodecFactory.cpp",
-  "function": "PlatformEncodeSupportOrNone(const EncoderConfig& aConfig) {",
+  "function": "WebrtcVideoEncoderFactory::SupportsCodec(const EncoderConfig& aConfig) {",
   "kind": "add",
   "form": "guard",
   "line": "  if (auto declared = StealthDeclaredWebrtcEncodeSupport(aConfig)) return declared;  // STEALTH-HOOK(fingerprint/media/decode-declaration)",

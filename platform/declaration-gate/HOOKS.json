@@ -19,7 +19,7 @@
  },
  {
   "file": "widget/GfxInfoBase.cpp",
-  "function": "nsresult GfxInfoBase::GetFeatureStatusImpl(",
+  "function": "GfxInfoBase::GetFeatureSuggestedDriverVersion(int32_t aFeature,",
   "kind": "add",
   "form": "guard",
   "line": "  if (mozilla::gfx::StealthGfxSuggestedDriverVersion(aVersion)) return NS_OK;  // STEALTH-HOOK(platform/declaration-gate)",
@@ -27,7 +27,7 @@
  },
  {
   "file": "widget/GfxInfoBase.cpp",
-  "function": "GfxInfoBase::GetFeatureSuggestedDriverVersionStr(const nsAString& aFeature,",
+  "function": "void GfxInfoBase::EvaluateDownloadedBlocklist(",
   "kind": "add",
   "form": "guard",
   "line": "  if (mozilla::gfx::StealthGfxDeclarationActive()) return;  // STEALTH-HOOK(platform/declaration-gate)",
@@ -53,7 +53,7 @@
  },
  {
   "file": "widget/gtk/GfxInfo.cpp",
-  "function": "int GfxInfo::FireTestProcess(const nsAString& aBinaryFile, int* aOutPipe,",
+  "function": "bool GfxInfo::FireGLXTestProcess() {",
   "kind": "add",
   "form": "guard",
   "line": "  if (gfx::StealthNoHostGLProbe()) return false;  // STEALTH-HOOK(platform/declaration-gate)",

@@ -9,7 +9,7 @@
  },
  {
   "file": "dom/geolocation/GeolocationSystemWin.cpp",
-  "function": "NS_IMPL_ISUPPORTS(LocationPermissionWifiScanListener, nsIWifiListener)",
+  "function": "SystemGeolocationPermissionBehavior GetGeolocationPermissionBehavior() {",
   "kind": "add",
   "form": "guard",
   "line": "  if (StealthSystemLocationDeclaredOn()) return SystemGeolocationPermissionBehavior::NoPrompt;  // STEALTH-HOOK(fingerprint/geolocation/no-host-provider)",
@@ -25,7 +25,7 @@
  },
  {
   "file": "dom/permission/PermissionObserver.cpp",
-  "function": "void PermissionObserver::RemoveSink(PermissionStatusSink* aSink) {",
+  "function": "void PermissionObserver::EnsureMonitoringInParent(PermissionName aName) {",
   "kind": "add",
   "form": "guard",
   "line": "  if (StealthSkipsPermissionMonitor(aName)) return;  // STEALTH-HOOK(fingerprint/geolocation/no-host-provider)",

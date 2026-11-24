@@ -33,7 +33,7 @@
  },
  {
   "file": "intl/locale/OSPreferences.cpp",
-  "function": "bool OSPreferences::GetDateTimeConnectorPattern(const nsACString& aLocale,",
+  "function": "OSPreferences::GetSystemLocales(nsTArray<nsCString>& aRetVal) {",
   "kind": "add",
   "form": "guard",
   "line": "  if (SessionSystemLocales(aRetVal)) return NS_OK;  // STEALTH-HOOK(fingerprint/locale-time/session-declaration)",
@@ -41,7 +41,7 @@
  },
  {
   "file": "intl/locale/OSPreferences.cpp",
-  "function": "OSPreferences::GetSystemLocales(nsTArray<nsCString>& aRetVal) {",
+  "function": "OSPreferences::GetSystemLocale(nsACString& aRetVal) {",
   "kind": "add",
   "form": "guard",
   "line": "  if (SessionSystemLocale(aRetVal)) return NS_OK;  // STEALTH-HOOK(fingerprint/locale-time/session-declaration)",

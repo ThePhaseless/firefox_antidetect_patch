@@ -64,7 +64,7 @@
  },
  {
   "file": "dom/workers/WorkerPrivate.cpp",
-  "function": "void WorkerPrivate::UpdateTimezoneOverrideInternal(JSContext* aCx,",
+  "function": "void WorkerPrivate::UpdateLanguagesInternal(",
   "kind": "add",
   "form": "guard",
   "line": "  if (StealthWorkerFollowsOwnerLanguage(this)) return;  // STEALTH-HOOK(fingerprint/locale-time/workers)",

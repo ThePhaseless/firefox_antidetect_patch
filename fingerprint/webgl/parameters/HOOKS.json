@@ -37,7 +37,7 @@
  },
  {
   "file": "dom/canvas/ClientWebGLContext.cpp",
-  "function": "Maybe<std::string> ClientWebGLContext::GetString(const GLenum pname) {",
+  "function": "void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,",
   "kind": "add",
   "form": "guard",
   "line": "  if (StealthWebGLParameter(*this, cx, pname, retval, rv, debug)) return;  // STEALTH-HOOK(fingerprint/webgl/parameters)",
@@ -187,7 +187,7 @@
  },
  {
   "file": "dom/canvas/WebGLContextGL.cpp",
-  "function": "void WebGLContext::PolygonOffsetClampEXT(const GLfloat factor,",
+  "function": "void WebGLContext::ProvokingVertex(const webgl::ProvokingVertex mode) const {",
   "kind": "add",
   "form": "anchor",
   "line": "  if (StealthWebGLProvokingVertexMissing(this)) return;  // STEALTH-HOOK(fingerprint/webgl/parameters)",
@@ -197,7 +197,7 @@
  },
  {
   "file": "dom/canvas/WebGLContextGL.cpp",
-  "function": "void WebGLContext::SampleCoverage(GLclampf value, WebGLboolean invert) {",
+  "function": "void WebGLContext::ClipControlEXT(const GLenum origin, const GLenum depth) {",
   "kind": "add",
   "form": "anchor",
   "line": "  if (StealthWebGLClipControlMissing(this)) return;  // STEALTH-HOOK(fingerprint/webgl/parameters)",

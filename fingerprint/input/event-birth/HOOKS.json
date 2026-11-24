@@ -17,7 +17,7 @@
  },
  {
   "file": "dom/base/TextInputProcessor.cpp",
-  "function": "nsresult TextInputProcessor::InitEditCommands(",
+  "function": "TextInputProcessor::Keydown(Event* aDOMKeyEvent, uint32_t aKeyFlags,",
   "kind": "add",
   "form": "unknown",
   "line": "  StealthKeyBirthScope stealthBirth(mStealthKeyBirth);  // STEALTH-HOOK(fingerprint/input/event-birth)",
@@ -35,7 +35,7 @@
  },
  {
   "file": "dom/base/TextInputProcessor.cpp",
-  "function": "nsresult TextInputProcessor::KeydownInternal(",
+  "function": "TextInputProcessor::Keyup(Event* aDOMKeyEvent, uint32_t aKeyFlags,",
   "kind": "add",
   "form": "unknown",
   "line": "  StealthKeyBirthScope stealthBirth(mStealthKeyBirth);  // STEALTH-HOOK(fingerprint/input/event-birth)",

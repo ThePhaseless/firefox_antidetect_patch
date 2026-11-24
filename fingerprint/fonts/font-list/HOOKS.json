@@ -36,7 +36,7 @@
  },
  {
   "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "static void GetPostScriptNameFromNameTable(IDWriteFontFace* aFace,",
+  "function": "already_AddRefed<gfxFontEntry> gfxDWriteFontList::CreateFontEntry(",
   "kind": "add",
   "form": "guard",
   "line": "  if (gfxPlatformFontList::StealthBundleOnly()) return CreateStealthBundleFontEntry(aFace, aFamily);  // STEALTH-HOOK(fingerprint/fonts/font-list)",
@@ -44,7 +44,7 @@
  },
  {
   "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "void gfxDWriteFontList::AppendFamiliesFromCollection(",
+  "function": "void gfxDWriteFontList::GetFacesInitDataForFamily(",
   "kind": "add",
   "form": "guard",
   "line": "  if (StealthFacesForFamily(this, aFamily, aFaces)) return;  // STEALTH-HOOK(fingerprint/fonts/font-list)",
@@ -60,7 +60,7 @@
  },
  {
   "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "bool gfxDWriteFontList::ReadFaceNames(const fontlist::Family* aFamily,",
+  "function": "void gfxDWriteFontList::ReadFaceNamesForFamily(",
   "kind": "add",
   "form": "guard",
   "line": "  if (gfxPlatformFontList::StealthBundleOnly()) return gfxPlatformFontList::ReadFaceNamesForFamily(aFamily, aNeedFullnamePostscriptNames);  // STEALTH-HOOK(fingerprint/fonts/font-list)",
@@ -95,7 +95,7 @@
  },
  {
   "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "nsresult gfxDWriteFontList::InitFontListForPlatform() {",
+  "function": "void gfxDWriteFontList::GetFontsFromCollection(",
   "kind": "add",
   "form": "guard",
   "line": "  if (StealthSkipsHostCollection(this, aCollection, mSystemFonts)) return;  // STEALTH-HOOK(fingerprint/fonts/font-list)",
@@ -103,7 +103,7 @@
  },
  {
   "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "static void RemoveCharsetFromFontSubstitute(nsACString& aName) {",
+  "function": "nsresult gfxDWriteFontList::GetFontSubstitutes() {",
   "kind": "add",
   "form": "guard",
   "line": "  if (StealthSkipsHostSubstitutes(this)) return NS_OK;  // STEALTH-HOOK(fingerprint/fonts/font-list)",
@@ -111,7 +111,7 @@
  },
  {
   "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "static const FontSubstitution sDirectWriteSubs[] = {",
+  "function": "void gfxDWriteFontList::GetDirectWriteSubstitutes() {",
   "kind": "add",
   "form": "guard",
   "line": "  if (StealthSkipsHostSubstitutes(this)) return;  // STEALTH-HOOK(fingerprint/fonts/font-list)",
@@ -119,7 +119,7 @@
  },
  {
   "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "BundledFontLoader::CreateEnumeratorFromKey(",
+  "function": "gfxDWriteFontList::CreateBundledFontsCollection(IDWriteFactory* aFactory) {",
   "kind": "add",
   "form": "guard",
   "line": "  if (StealthSkipsBundledCollection(this)) return nullptr;  // STEALTH-HOOK(fingerprint/fonts/font-list)",
@@ -142,6 +142,7 @@
   "removed": "      face = hb_face_reference(gfxFontEntry::GetHBFace());",
   "test": "wrapper:tests/test_the_parent_reads_the_bundle_from_fontconfig_s_cache_linux_e2e.py::test_the_warm_parent_reads_the_bundle_from_fontconfig_cache_and_does_not_scan_it",
   "exception": "the network on AutoHBFace in gfxFontEntry.h (operator hb_face_t*() const&& = delete, fingerprint/fonts/bundle) makes Mozilla's line `face = hb_face_reference(gfxFontEntry::GetHBFace());` a compile error, because it binds the returned temporary; the line stays as it is today, with a named object (G35, G24)",
+  "reason_kind": "expression",
   "pm": "approvato"
  },
  {
@@ -155,7 +156,7 @@
  },
  {
   "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
-  "function": "nsresult gfxFontconfigFontEntry::ReadCMAP(FontInfoData* aFontInfoData) {",
+  "function": "bool gfxFontconfigFontEntry::HasFontTableInternal(uint32_t aTableTag) {",
   "kind": "add",
   "form": "guard",
   "line": "  if (bool rv; StealthFaceDataHasTable(this, aTableTag, &rv)) return rv;  // STEALTH-HOOK(fingerprint/fonts/font-list)",
@@ -163,7 +164,7 @@
  },
  {
   "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
-  "function": "bool gfxFontconfigFontEntry::HasFontTableInternal(uint32_t aTableTag) {",
+  "function": "hb_blob_t* gfxFontconfigFontEntry::GetFontTableInternal(uint32_t aTableTag) {",
   "kind": "add",
   "form": "guard",
   "line": "  if (hb_blob_t* rv; StealthFaceDataTable(this, aTableTag, &rv)) return rv;  // STEALTH-HOOK(fingerprint/fonts/font-list)",
@@ -178,11 +179,12 @@
   "removed": "  auto* table = hb_face_reference_table(GetHBFace(), aTableTag);",
   "test": "wrapper:tests/test_the_parent_reads_the_bundle_from_fontconfig_s_cache_linux_e2e.py::test_the_warm_parent_reads_the_bundle_from_fontconfig_cache_and_does_not_scan_it",
   "exception": "the network on AutoHBFace in gfxFontEntry.h (fingerprint/fonts/bundle) makes Mozilla's line `auto* table = hb_face_reference_table(GetHBFace(), aTableTag);` a compile error, because it binds the returned temporary; the line stays as it is today (G35, G24)",
+  "reason_kind": "expression",
   "pm": "approvato"
  },
  {
   "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
-  "function": "double gfxFontconfigFontEntry::GetAspect(uint8_t aSizeAdjustBasis) {",
+  "function": "static void PrepareFontOptions(FcPattern* aPattern, int* aOutLoadFlags,",
   "kind": "add",
   "form": "notice",
   "line": "  StealthDeclareTextOptions(aPattern);  // STEALTH-HOOK(fingerprint/fonts/font-list)",
@@ -240,7 +242,7 @@
  },
  {
   "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
-  "function": "gfxFcPlatformFontList::GetFilteredPlatformFontLists() {",
+  "function": "already_AddRefed<gfxFontEntry> gfxFcPlatformFontList::CreateFontEntry(",
   "kind": "add",
   "form": "guard",
   "line": "  if (gfxPlatformFontList::StealthBundleOnly()) return StealthCreateBundleFontEntry(this, aFace, aFamily);  // STEALTH-HOOK(fingerprint/fonts/font-list)",
@@ -331,7 +333,7 @@
  },
  {
   "file": "gfx/thebes/gfxPlatformFontList.cpp",
-  "function": "void gfxPlatformFontList::MaybeRemoveCmap(gfxCharacterMap* aCharMap,",
+  "function": "static void GetSystemUIFontFamilies(",
   "kind": "add",
   "form": "guard",
   "line": "  if (StealthSystemUIFamilies(aFamilies)) return;  // STEALTH-HOOK(fingerprint/fonts/font-list)",

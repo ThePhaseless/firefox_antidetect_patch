@@ -19,7 +19,7 @@
  },
  {
   "file": "dom/media/webaudio/AudioContext.cpp",
-  "function": "void AudioContext::UnregisterActiveNode(AudioNode* aNode) {",
+  "function": "uint32_t AudioContext::MaxChannelCount() const {",
   "kind": "add",
   "form": "guard",
   "line": "  if (uint32_t stealth; StealthAudioMaxChannelCount(&stealth)) return stealth;  // STEALTH-HOOK(fingerprint/audio/context-values)",

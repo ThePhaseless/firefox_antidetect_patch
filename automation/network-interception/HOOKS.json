@@ -17,7 +17,7 @@
  },
  {
   "file": "netwerk/protocol/http/InterceptedHttpChannel.cpp",
-  "function": "NS_IMETHODIMP",
+  "function": "InterceptedHttpChannel::ResetInterception(bool aBypass) {",
   "kind": "add",
   "form": "anchor",
   "line": "  if (StealthOwnsInterception()) return StealthInterceptAgain(aBypass);  // STEALTH-HOOK(automation/network-interception)",
