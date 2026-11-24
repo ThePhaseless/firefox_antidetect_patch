@@ -27,7 +27,7 @@
  },
  {
   "file": "toolkit/xre/nsWindowsWMain.cpp",
-  "function": "static void FreeAllocStrings(int argc, char** argv) {",
+  "function": "int wmain(int argc, WCHAR** argv) {",
   "kind": "add",
   "form": "anchor",
   "line": "  StealthJugglerPipeStdio(argc, argv);  // STEALTH-HOOK(automation/pipe)",

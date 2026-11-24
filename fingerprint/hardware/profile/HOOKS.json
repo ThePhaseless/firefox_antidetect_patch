@@ -9,7 +9,7 @@
  },
  {
   "file": "dom/base/Navigator.cpp",
-  "function": "bool Navigator::GlobalPrivacyControl() {",
+  "function": "uint64_t Navigator::HardwareConcurrency() {",
   "kind": "add",
   "form": "guard",
   "line": "  if (uint64_t stealthCores; StealthHardwareConcurrency(&stealthCores)) return stealthCores;  // STEALTH-HOOK(fingerprint/hardware/profile)",

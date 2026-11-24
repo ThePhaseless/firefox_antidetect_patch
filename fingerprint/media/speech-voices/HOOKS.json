@@ -27,7 +27,7 @@
  },
  {
   "file": "dom/media/webspeech/synth/SpeechSynthesisVoice.cpp",
-  "function": "JSObject* SpeechSynthesisVoice::WrapObject(JSContext* aCx,",
+  "function": "void SpeechSynthesisVoice::GetVoiceURI(nsString& aRetval) const {",
   "kind": "add",
   "form": "guard",
   "line": "  if (StealthVoiceRetailURI(mUri, aRetval)) return;  // STEALTH-HOOK(fingerprint/media/speech-voices)",
@@ -35,7 +35,7 @@
  },
  {
   "file": "dom/media/webspeech/synth/SpeechSynthesisVoice.cpp",
-  "function": "JSObject* SpeechSynthesisVoice::WrapObject(JSContext* aCx,",
+  "function": "void SpeechSynthesisVoice::GetName(nsString& aRetval) const {",
   "kind": "add",
   "form": "guard",
   "line": "  if (StealthVoiceName(mUri, aRetval)) return;  // STEALTH-HOOK(fingerprint/media/speech-voices)",
@@ -43,7 +43,7 @@
  },
  {
   "file": "dom/media/webspeech/synth/SpeechSynthesisVoice.cpp",
-  "function": "void SpeechSynthesisVoice::GetName(nsString& aRetval) const {",
+  "function": "void SpeechSynthesisVoice::GetLang(nsString& aRetval) const {",
   "kind": "add",
   "form": "guard",
   "line": "  if (StealthVoiceLang(mUri, aRetval)) return;  // STEALTH-HOOK(fingerprint/media/speech-voices)",
@@ -51,7 +51,7 @@
  },
  {
   "file": "dom/media/webspeech/synth/SpeechSynthesisVoice.cpp",
-  "function": "void SpeechSynthesisVoice::GetLang(nsString& aRetval) const {",
+  "function": "bool SpeechSynthesisVoice::LocalService() const {",
   "kind": "add",
   "form": "guard",
   "line": "  if (bool stealth = false; StealthVoiceLocal(mUri, &stealth)) return stealth;  // STEALTH-HOOK(fingerprint/media/speech-voices)",
@@ -59,7 +59,7 @@
  },
  {
   "file": "dom/media/webspeech/synth/SpeechSynthesisVoice.cpp",
-  "function": "bool SpeechSynthesisVoice::LocalService() const {",
+  "function": "bool SpeechSynthesisVoice::Default() const {",
   "kind": "add",
   "form": "guard",
   "line": "  if (bool stealth = false; StealthVoiceDefault(mUri, &stealth)) return stealth;  // STEALTH-HOOK(fingerprint/media/speech-voices)",

@@ -42,7 +42,7 @@
  },
  {
   "file": "dom/media/webrtc/transport/ipc/StunAddrsRequestParent.cpp",
-  "function": "StaticRefPtr<StunAddrsRequestParent::MDNSServiceWrapper>",
+  "function": "StunAddrsRequestParent::MDNSServiceWrapper::MDNSServiceWrapper(",
   "kind": "rewrite",
   "form": "wrap-expression",
   "line": "    : mAddrsString(StealthMdnsInterfaces(aAddrsString)) {}  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
@@ -187,7 +187,7 @@
  },
  {
   "file": "netwerk/base/nsIOService.cpp",
-  "function": "static const char* gCallbackSecurityPrefs[] = {",
+  "function": "nsresult nsIOService::Init() {",
   "kind": "add",
   "form": "notice",
   "line": "  StealthApplyDeclaredNetwork();  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",

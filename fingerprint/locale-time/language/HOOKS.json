@@ -53,7 +53,7 @@
  },
  {
   "file": "intl/locale/nsLanguageAtomService.cpp",
-  "function": "nsStaticAtom* nsLanguageAtomService::LookupLanguage(",
+  "function": "nsAtom* nsLanguageAtomService::GetLocaleLanguage() {",
   "kind": "add",
   "form": "guard",
   "line": "  if (nsAtom* worker = intl::WorkerLocaleLanguage()) return worker;  // STEALTH-HOOK(fingerprint/locale-time/language)",

@@ -245,7 +245,7 @@
  },
  {
   "file": "toolkit/components/parentalcontrols/nsParentalControlsServiceWin.cpp",
-  "function": "static nsAutoString GetUserSid() {",
+  "function": "nsParentalControlsService::nsParentalControlsService()",
   "kind": "add",
   "form": "guard",
   "line": "  if (StealthParentalControlsDeclared()) return;  // STEALTH-HOOK(network/doh)",
@@ -311,7 +311,7 @@
  },
  {
   "file": "toolkit/components/url-classifier/nsUrlClassifierDBService.cpp",
-  "function": "class nsUrlClassifierHashCompleterBase",
+  "function": "NS_IMPL_ISUPPORTS(nsUrlClassifierHashCompleterBase,",
   "kind": "add",
   "form": "unknown",
   "line": "NS_IMETHODIMP nsUrlClassifierHashCompleterBase::GetUserContextId(uint32_t* aId) { return mozilla::net::StealthLookupContextOut(mStealthUserContextId, aId); }  // STEALTH-HOOK(network/doh)",

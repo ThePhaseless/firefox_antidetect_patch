@@ -43,7 +43,7 @@
  },
  {
   "file": "dom/canvas/OffscreenCanvasDisplayHelper.cpp",
-  "function": "OffscreenCanvasDisplayHelper::GetSurfaceSnapshot() {",
+  "function": "already_AddRefed<layers::Image> OffscreenCanvasDisplayHelper::GetAsImage() {",
   "kind": "rewrite",
   "form": "wrap-function",
   "line": "  RefPtr<gfx::SourceSurface> surface = GetSurfaceSnapshotAsDrawn();  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
@@ -109,7 +109,7 @@
  },
  {
   "file": "dom/html/HTMLCanvasElement.cpp",
-  "function": "void HTMLCanvasElement::SetFrameCapture(",
+  "function": "already_AddRefed<SourceSurface> HTMLCanvasElement::GetSurfaceSnapshot(",
   "kind": "rewrite",
   "form": "wrap-function",
   "line": "    return mOffscreenDisplay->GetSurfaceSnapshotAsDrawn();  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",

@@ -9,7 +9,7 @@
  },
  {
   "file": "dom/base/nsScreen.cpp",
-  "function": "NS_IMPL_CYCLE_COLLECTION_INHERITED(nsScreen, DOMEventTargetHelper,",
+  "function": "int32_t nsScreen::PixelDepth() {",
   "kind": "add",
   "form": "guard",
   "line": "  if (int32_t declared = gfx::StealthDeclaredPixelDepth()) return declared;  // STEALTH-HOOK(fingerprint/screen-window/screen)",
@@ -17,7 +17,7 @@
  },
  {
   "file": "dom/base/nsScreen.cpp",
-  "function": "nsDeviceContext* nsScreen::GetDeviceContext() const {",
+  "function": "CSSIntRect nsScreen::GetRect() {",
   "kind": "add",
   "form": "guard",
   "line": "  if (auto declared = gfx::StealthDeclaredScreenRect()) return *declared;  // STEALTH-HOOK(fingerprint/screen-window/screen)",
@@ -25,7 +25,7 @@
  },
  {
   "file": "dom/base/nsScreen.cpp",
-  "function": "CSSIntRect nsScreen::GetRect() {",
+  "function": "CSSIntRect nsScreen::GetAvailRect() {",
   "kind": "add",
   "form": "guard",
   "line": "  if (auto declared = gfx::StealthDeclaredAvailRect()) return *declared;  // STEALTH-HOOK(fingerprint/screen-window/screen)",
@@ -41,7 +41,7 @@
  },
  {
   "file": "layout/base/nsPresContext.cpp",
-  "function": "void nsPresContext::SetOverrideDPPX(float aDPPX) {",
+  "function": "void nsPresContext::UpdateInnerSizeSpoofedForRFP() {",
   "kind": "rewrite",
   "form": "wrap-expression",
   "line": "  if (!StealthRfpOrEngineActive(mDocument->ShouldResistFingerprinting(RFPTarget::WindowOuterSize)) ||  // STEALTH-HOOK(fingerprint/screen-window/screen)",

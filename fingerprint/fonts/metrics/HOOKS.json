@@ -27,7 +27,7 @@
  },
  {
   "file": "gfx/thebes/gfxDWriteFonts.cpp",
-  "function": "using namespace mozilla::gfx;",
+  "function": "static BYTE GetSystemTextQuality() {",
   "kind": "add",
   "form": "guard",
   "line": "  if (StealthTextQualityDeclared()) return StealthDeclaredTextQuality();  // STEALTH-HOOK(fingerprint/fonts/metrics)",
@@ -81,7 +81,7 @@
  },
  {
   "file": "gfx/thebes/gfxFT2FontBase.cpp",
-  "function": "gfxFT2FontBase::GlyphMetrics gfxFT2FontBase::GetCachedGlyphMetrics(",
+  "function": "bool gfxFT2FontBase::GetGlyphBounds(uint16_t aGID, gfxRect* aBounds,",
   "kind": "add",
   "form": "guard",
   "line": "  if (StealthDesignGlyphBounds(*this, aGID, aBounds)) return true;  // STEALTH-HOOK(fingerprint/fonts/metrics)",
@@ -97,7 +97,7 @@
  },
  {
   "file": "gfx/thebes/gfxFont.cpp",
-  "function": "gfxFontCache::Observer::Observe(nsISupports* aSubject, const char* aTopic,",
+  "function": "nsresult gfxFontCache::Init() {",
   "kind": "add",
   "form": "notice",
   "line": "  StealthTextMeasuringInit();  // STEALTH-HOOK(fingerprint/fonts/metrics)",

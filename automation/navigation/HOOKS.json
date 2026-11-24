@@ -157,7 +157,7 @@
  },
  {
   "file": "netwerk/base/TRRLoadInfo.cpp",
-  "function": "TRRLoadInfo::TRRLoadInfo(nsIURI* aResultPrincipalURI,",
+  "function": "already_AddRefed<nsILoadInfo> TRRLoadInfo::Clone() const {",
   "kind": "add",
   "form": "unknown",
   "line": "  static_cast<TRRLoadInfo*>(loadInfo.get())->mOriginAttributes = mOriginAttributes;  // STEALTH-HOOK(network/doh)",
@@ -167,7 +167,7 @@
  },
  {
   "file": "netwerk/base/TRRLoadInfo.cpp",
-  "function": "nsresult TRRLoadInfo::GetOriginAttributes(",
+  "function": "nsresult TRRLoadInfo::SetOriginAttributes(",
   "kind": "add",
   "form": "guard",
   "line": "  if (nsresult rv; StealthTRRSetOriginAttributes(mOriginAttributes, aOriginAttributes, &rv)) return rv;  // STEALTH-HOOK(network/doh)",
@@ -201,7 +201,7 @@
  },
  {
   "file": "netwerk/ipc/DocumentLoadListener.cpp",
-  "function": "bool DocumentLoadListener::MaybeTriggerProcessSwitch(",
+  "function": "void DocumentLoadListener::TriggerProcessSwitch(",
   "kind": "add",
   "form": "notice",
   "line": "  StealthNotifyNavigationMoved(aContext, mContentParent, mLoadIdentifier, mIsDocumentLoad, aIsNewTab);  // STEALTH-HOOK(automation/navigation)",

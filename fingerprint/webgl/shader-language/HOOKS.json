@@ -61,7 +61,7 @@
  },
  {
   "file": "dom/canvas/WebGLShaderValidator.cpp",
-  "function": "static ShShaderOutput ShaderOutput(gl::GLContext* gl) {",
+  "function": "std::unique_ptr<webgl::ShaderValidator> WebGLContext::CreateShaderValidator(",
   "kind": "rewrite",
   "form": "wrap-call",
   "line": "  const auto outputLanguage = StealthShaderOutputLanguage(gl, mStealthPerPage);  // STEALTH-HOOK(fingerprint/webgl/shader-language)",
