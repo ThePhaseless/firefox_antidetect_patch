@@ -7,6 +7,7 @@
 #define DOM_MEDIA_STEALTHMEDIAENUMERATION_H_
 
 #include <cstdint>
+#include <type_traits>
 #include <utility>
 
 #include "mozilla/Logging.h"
@@ -52,24 +53,57 @@ inline bool StealthHostSpeakersForCorrelation(bool aSameBackend) {
   return aSameBackend && StealthHostSpeakersMayBeAsked();
 }
 
-// Stealthfox [B300]: a declared enumeration takes the declared time, on every
-// host, instead of the host's speakers' time. The list is then kept as Firefox
-// keeps it, so only the first one of the session waits, as on a real machine.
-// With the pref at 0 aResolve runs now, on the same stack. aResolve is the
-// resolve step of MediaManager::GetPhysicalDevices, passed as an rvalue; it is
-// moved into the delayed runnable. Called on the main thread.
-template <typename Resolve>
-void StealthDeclaredEnumeration(Resolve&& aResolve) {
-  if (uint32_t ms = StaticPrefs::zoom_stealth_media_enumeration_ms()) {
-    MOZ_LOG(gStealthMediaEnumerationLog, LogLevel::Info,
-            ("declared wait: %u ms", ms));
-    NS_DelayedDispatchToCurrentThread(
-        NS_NewRunnableFunction("MediaManager::DeclaredEnumeration",
-                               std::forward<Resolve>(aResolve)),
-        ms);
-    return;
+// Stealthfox [B300]: the resolve callback of MediaManager::GetPhysicalDevices,
+// as a declared enumeration runs it. It is the callback Mozilla passes to
+// Then, unchanged, held inside this one, which has the same operator() (the
+// parameter type is spelled out because MozPromise::Then takes the address of
+// the callback's operator(), so it cannot be a generic lambda). It runs on the
+// same event-loop hop as Mozilla's callback would, and reads the pref there.
+//
+// A declared enumeration takes the declared time, on every host, instead of the
+// host's speakers' time. The list is then kept as Firefox keeps it, so only
+// the first one of the session waits, as on a real machine. With the pref at 0
+// the callback runs now, on the same stack, with the same value. Otherwise the
+// callback and the value are moved into a runnable that runs after the declared
+// time. Called on the main thread.
+template <typename Resolve, typename Method>
+class StealthDeferredResolve;
+
+template <typename Resolve, typename Class, typename Value>
+class StealthDeferredResolve<Resolve, void (Class::*)(Value)> {
+ public:
+  explicit StealthDeferredResolve(Resolve aResolve)
+      : mResolve(std::move(aResolve)) {}
+
+  void operator()(Value aValue) {
+    if (uint32_t ms = StaticPrefs::zoom_stealth_media_enumeration_ms()) {
+      MOZ_LOG(gStealthMediaEnumerationLog, LogLevel::Info,
+              ("declared wait: %u ms", ms));
+      NS_DelayedDispatchToCurrentThread(
+          NS_NewRunnableFunction(
+              "MediaManager::DeclaredEnumeration",
+              [resolve = std::move(mResolve),
+               value = std::move(aValue)]() mutable {
+                resolve(std::move(value));
+              }),
+          ms);
+      return;
+    }
+    mResolve(std::move(aValue));
   }
-  aResolve();
+
+ private:
+  Resolve mResolve;
+};
+
+// aResolve is Mozilla's resolve callback, a mutable lambda with one parameter
+// and no result, passed as an rvalue; the result is the callback to hand to
+// Then in its place.
+template <typename Resolve>
+auto StealthDeclaredEnumeration(Resolve&& aResolve) {
+  using Callback = std::decay_t<Resolve>;
+  return StealthDeferredResolve<Callback, decltype(&Callback::operator())>(
+      std::forward<Resolve>(aResolve));
 }
 
 }  // namespace mozilla

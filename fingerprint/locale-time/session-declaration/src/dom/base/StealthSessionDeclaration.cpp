@@ -159,26 +159,8 @@ void SetRealmDeclaredLocale(JS::Realm* aRealm, const nsACString& aLanguage) {
   }
 }
 
-StealthRealmLocale::StealthRealmLocale(JS::Realm* aRealm,
-                                       const nsACString& aLanguage)
-    : mRealm(aRealm) {
-  MOZ_ASSERT(NS_IsMainThread());
-  MOZ_ASSERT(!aLanguage.IsEmpty());
-  intl::PrimaryLanguageTag(aLanguage, mTag);
-}
-
-StealthRealmLocale::~StealthRealmLocale() {
-  // The document of this window caches the language of its text with no
-  // `lang`: it follows its context when the context's language changes. Mozilla's
-  // JS::SetRealmLocaleOverride, in the statement that holds this object, has run.
-  if (!mRealm) {
-    return;
-  }
-  if (nsGlobalWindowInner* window = xpc::WindowOrNull(JS::GetRealmGlobalOrNull(mRealm))) {
-    if (Document* document = window->GetExtantDoc()) {
-      RefreshDocumentLanguage(document);
-    }
-  }
+void StealthSetRealmLocaleOverride(JS::Realm* aRealm, const char* aLanguage) {
+  SetRealmDeclaredLocale(aRealm, nsDependentCString(aLanguage));
 }
 
 void StealthDocumentContainerSet(Document* aDocument, nsDocShell* aContainer) {
@@ -326,7 +308,7 @@ nsAtom* InternedLanguage(const nsACString& aDeclared) {
   return atom;
 }
 
-nsAtom* DocumentCharsetLanguage(const Document* aDocument,
+nsAtom* StealthDocumentCharsetLanguage(const Document* aDocument,
                                 nsAtom* aFromCharset) {
   nsAtom* process = nsLanguageAtomService::GetService()->GetLocaleLanguage();
   if (aFromCharset != process) {

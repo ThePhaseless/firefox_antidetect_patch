@@ -79,6 +79,7 @@ int nr_stealth_addr_is_wildcard_ip(const struct nr_transport_addr_* addr);
 }  // extern "C"
 
 #  include <set>
+#  include <string>
 
 #  include "nscore.h"
 
@@ -99,6 +100,14 @@ bool StealthApplyDeclaredIPFamily(const char* aDecl);
 
 /* The same, for the declaration of this process's environment (STEALTHFOX_WEBRTC_NETWORK). */
 bool StealthApplyDeclaredIPFamilyFromEnvironment();
+
+/* The parent's mDNS responder (StunAddrsRequestParent::SendStunAddrs). Mozilla builds a list of the IPv4 addresses of the
+ * adapters it was given, and starts the responder when the list is not empty. The responder here is started on the
+ * loopback whatever the list holds, as the interfaces are the loopback (nr_stealth_mdns_interfaces), not the declared
+ * adapter: StealthMdnsResponderWanted(aMozilla) is true (aMozilla is Mozilla's own condition, that the list is not
+ * empty), and StealthMdnsInterfaces(aMozilla) is nr_stealth_mdns_interfaces() in place of Mozilla's list. */
+bool StealthMdnsResponderWanted(bool aMozilla);
+std::string StealthMdnsInterfaces(const std::string& aMozilla);
 
 /* R3: the host UDP ports of ONE connection (one ICE context), as Windows hands them out: consecutive in the order the
  * sockets are made (the IPv4 host N, the IPv6 host N+1), from a base drawn at random in the dynamic range 49152-65535,

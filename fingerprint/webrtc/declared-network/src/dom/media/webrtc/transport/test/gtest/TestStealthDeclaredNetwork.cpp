@@ -222,6 +222,18 @@ TEST(StealthDeclaredNetwork, TheResponderJoinsAndSpeaksOnTheLoopback)
   EXPECT_STREQ("127.0.0.1;", nr_stealth_mdns_interfaces());
 }
 
+TEST(StealthDeclaredNetwork, TheResponderStartsOnTheLoopbackWhateverListMozillaBuilt)
+{
+  // Mozilla's list of the adapters' IPv4 addresses is neither the interfaces nor the condition: the responder starts
+  // on the loopback, with a list or without one.
+  EXPECT_TRUE(mozilla::StealthMdnsResponderWanted(true));
+  EXPECT_TRUE(mozilla::StealthMdnsResponderWanted(false));
+  EXPECT_EQ(std::string("127.0.0.1;"), mozilla::StealthMdnsInterfaces("192.168.0.87;"));
+  EXPECT_EQ(std::string("127.0.0.1;"), mozilla::StealthMdnsInterfaces(""));
+  // Negative control: the declared adapter is not one of the interfaces.
+  EXPECT_NE(std::string("192.168.0.87;"), mozilla::StealthMdnsInterfaces("192.168.0.87;"));
+}
+
 TEST(StealthDeclaredNetwork, AConnectionsHostPortsAreConsecutiveFromABaseInTheDynamicRange)
 {
   for (uint64_t r : {0ull, 1ull, 16382ull, 16383ull, 0x123456789abcdefull, ~0ull}) {

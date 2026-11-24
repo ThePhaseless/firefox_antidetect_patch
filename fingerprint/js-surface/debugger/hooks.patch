@@ -21,7 +21,7 @@ index c02913fac9def98eb43df329bd7d5d62c2597ea8..2a8b7f7d0f5e22186e323f8ce0dd19c0
 +
 +UNIFIED_SOURCES += ["TestStealthDebugger.cpp"]  # STEALTH-HOOK(fingerprint/js-surface/debugger)
 diff --git a/js/src/debugger/Debugger.cpp b/js/src/debugger/Debugger.cpp
-index 734904920529c1a426772aae5513b37c7d5b76e7..e5a207edf847d98e52c690213d87b7e67166c09a 100644
+index 734904920529c1a426772aae5513b37c7d5b76e7..64dab1e4bfab0d8cc04e3eb29d3e702de690bbfb 100644
 --- a/js/src/debugger/Debugger.cpp
 +++ b/js/src/debugger/Debugger.cpp
 @@ -134,6 +134,8 @@
@@ -33,35 +33,35 @@ index 734904920529c1a426772aae5513b37c7d5b76e7..e5a207edf847d98e52c690213d87b7e6
  namespace js {
  
  namespace frontend {
-@@ -5093,16 +5095,17 @@ bool Debugger::addDebuggeeGlobal(JSContext* cx, Handle<GlobalObject*> global) {
+@@ -5093,16 +5095,19 @@ bool Debugger::addDebuggeeGlobal(JSContext* cx, Handle<GlobalObject*> global) {
      return false;
    }
  
-+  StealthDebuggerReadMode(cx, object, &invisibleDebuggee_);  // STEALTH-HOOK(fingerprint/js-surface/debugger)
++  mozilla::StealthDebuggerReadMode(cx, object, &invisibleDebuggee_);  // STEALTH-HOOK(fingerprint/js-surface/debugger)
    // There can be no GC past this point.
    JS::AutoAssertNoGC nogc;
  
    // (1)
    auto& globalDebuggers = global->getDebuggers(nogc);
--  if (!globalDebuggers.append(Realm::DebuggerVectorEntry(this, debuggeeLink))) {
-+  if (!invisibleDebuggee_ && !globalDebuggers.append(Realm::DebuggerVectorEntry(this, debuggeeLink))) {  // STEALTH-HOOK(fingerprint/js-surface/debugger)
++  if (!invisibleDebuggee_)  // STEALTH-HOOK(fingerprint/js-surface/debugger)
+   if (!globalDebuggers.append(Realm::DebuggerVectorEntry(this, debuggeeLink))) {
      ReportOutOfMemory(cx);
      return false;
    }
--  auto globalDebuggersGuard = MakeScopeExit([&] { globalDebuggers.popBack(); });
-+  auto globalDebuggersGuard = MakeScopeExit([&] { if (!invisibleDebuggee_) { globalDebuggers.popBack(); } });  // STEALTH-HOOK(fingerprint/js-surface/debugger)
+   auto globalDebuggersGuard = MakeScopeExit([&] { globalDebuggers.popBack(); });
++  mozilla::StealthDebuggerReleaseIfInvisible(invisibleDebuggee_, globalDebuggersGuard);  // STEALTH-HOOK(fingerprint/js-surface/debugger)
  
    // (2)
    if (!debuggees.put(global)) {
-@@ -5124,6 +5127,7 @@ bool Debugger::addDebuggeeGlobal(JSContext* cx, Handle<GlobalObject*> global) {
+@@ -5124,6 +5129,7 @@ bool Debugger::addDebuggeeGlobal(JSContext* cx, Handle<GlobalObject*> global) {
      }
    });
  
-+  if (invisibleDebuggee_) return StealthDebuggerReleaseGuards(globalDebuggersGuard, debuggeesGuard, debuggeeZonesGuard);  // STEALTH-HOOK(fingerprint/js-surface/debugger)
++  if (invisibleDebuggee_) return mozilla::StealthDebuggerReleaseGuards(globalDebuggersGuard, debuggeesGuard, debuggeeZonesGuard);  // STEALTH-HOOK(fingerprint/js-surface/debugger)
    // (4)
    if (trackingAllocationSites) {
      Debugger::addAllocationsTracking(cx, global);
-@@ -5226,6 +5230,7 @@ void Debugger::removeDebuggeeGlobal(JS::GCContext* gcx, GlobalObject* global,
+@@ -5226,6 +5232,7 @@ void Debugger::removeDebuggeeGlobal(JS::GCContext* gcx, GlobalObject* global,
    // the same zone. If after recomputing the debuggee zone set, this global's
    // zone is not in the set, then we must remove ourselves from the zone's
    // vector of observing debuggers.

@@ -155,13 +155,12 @@
  {
   "file": "netwerk/protocol/http/TRRServiceChannel.cpp",
   "function": "nsresult TRRServiceChannel::ResolveProxy() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "      getter_AddRefs(proxyRequest), Nothing(), StealthTRRContextOf(this));  // STEALTH-HOOK(network/doh)",
-  "removed": "      getter_AddRefs(proxyRequest));",
-  "test": "gtest:TestStealthTRRContext.TheContextOfAChannelIsTheContextOfItsLoadInfo",
-  "exception": "adds two arguments to ProxyConfigLookup::Create: no form of the contract adds arguments to a call (PM-DECISIONS network/doh 1, G9)",
-  "pm": "approvato"
+  "kind": "add",
+  "form": "anchor",
+  "line": "  StealthSetTRRLookupContext(this);  // STEALTH-HOOK(network/doh)",
+  "test": "",
+  "anchor": "",
+  "why": ""
  },
  {
   "file": "netwerk/protocol/http/TRRServiceChannel.cpp",

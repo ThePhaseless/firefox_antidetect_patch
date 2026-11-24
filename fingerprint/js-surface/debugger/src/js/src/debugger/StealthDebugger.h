@@ -36,7 +36,7 @@
 #include "js/TypeDecls.h"           // for JSContext, JSObject
 #include "js/Value.h"               // for JS::Value
 
-namespace js {
+namespace mozilla {
 
 // Reads the stealthMode property of the Debugger object. Call it BEFORE the
 // no-GC region of addDebuggeeGlobal: JS_GetProperty can run JS and so can GC.
@@ -69,23 +69,36 @@ inline void StealthDebuggerReadMode(JSContext* cx, JSObject* debuggerObject,
 // Realm does NOT enter debug mode) are skipped.
 //
 // The lines of Mozilla's addDebuggeeGlobal/removeDebuggeeGlobal that read
-// invisibleDebuggee_ are declared exceptions (G35, approved by the pm): no form
-// can skip a Mozilla statement without a possible allocation failure that a
-// stealth attach never had.
-//   step (1): `if (!invisibleDebuggee_ && !globalDebuggers.append(...))`: no
-//             entry is pushed in Realm::debuggers_ for a stealth debuggee.
-//   rollback guard of step (1): pops the entry only if one was pushed.
+// invisibleDebuggee_ skip a Mozilla statement for a stealth debuggee; Mozilla's
+// own lines stay as Mozilla wrote them.
+//   step (1): an unbraced `if (!invisibleDebuggee_)` in front of Mozilla's
+//             `if (!globalDebuggers.append(...)) {...}`: no entry is pushed in
+//             Realm::debuggers_ for a stealth debuggee.
+//   rollback guard of step (1): released as soon as it is made when the
+//             debuggee is stealth (StealthDebuggerReleaseIfInvisible), so it
+//             never pops an entry that was not pushed.
 //   between (3) and (4): `if (invisibleDebuggee_) return
 //             StealthDebuggerReleaseGuards(...)`: steps (4) and (5) are skipped.
 //   removeDebuggeeGlobal: `if (!invisibleDebuggee_)` before the erase: a
 //             stealth debuggee never kept an entry (findDebuggerInVector asserts
 //             the entry exists; erase on end() is undefined).
+// The rollback guard of step (1), for a stealth debuggee, which pushed nothing
+// to roll back: released at once (release() is idempotent, the early return of
+// StealthDebuggerReleaseGuards releases it again).
+template <typename Guard>
+inline void StealthDebuggerReleaseIfInvisible(bool aInvisibleDebuggee,
+                                              Guard& aGuard) {
+  if (aInvisibleDebuggee) {
+    aGuard.release();
+  }
+}
+
 template <typename... Guards>
 inline bool StealthDebuggerReleaseGuards(Guards&... guards) {
   (guards.release(), ...);
   return true;
 }
 
-}  // namespace js
+}  // namespace mozilla
 
 #endif  // debugger_StealthDebugger_h

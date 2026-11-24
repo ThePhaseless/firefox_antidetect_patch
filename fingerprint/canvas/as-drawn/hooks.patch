@@ -1,5 +1,5 @@
 diff --git a/layout/base/nsLayoutUtils.cpp b/layout/base/nsLayoutUtils.cpp
-index ef125f0123d9949a8f65a5b3de7ad65b62ddd18b..e2f93d05f716a4f507cc5a735f2366cd76f93fa7 100644
+index ef125f0123d9949a8f65a5b3de7ad65b62ddd18b..955d882a7018b302a87c480f0c763caa274b62af 100644
 --- a/layout/base/nsLayoutUtils.cpp
 +++ b/layout/base/nsLayoutUtils.cpp
 @@ -173,6 +173,8 @@
@@ -16,12 +16,24 @@ index ef125f0123d9949a8f65a5b3de7ad65b62ddd18b..e2f93d05f716a4f507cc5a735f2366cd
          nullptr;  // Coersce GetSurfaceSnapshot to give us Opaque/Premult only.
    }
 -  result.mSourceSurface = aElement->GetSurfaceSnapshot(pAlphaType, aTarget);
-+  result.mSourceSurface = StealthCanvasSnapshot(aElement, aSurfaceFlags, pAlphaType, aTarget);  // STEALTH-HOOK(fingerprint/canvas/as-drawn)
++  result.mSourceSurface = aElement->StealthGetSurfaceSnapshot(aSurfaceFlags, pAlphaType, aTarget);  // STEALTH-HOOK(fingerprint/canvas/as-drawn)
    if (!result.mSourceSurface) {
      // If the element doesn't have a context then we won't get a snapshot. The
      // canvas spec wants us to not error and just draw nothing, so return an
+diff --git a/layout/base/nsLayoutUtils.h b/layout/base/nsLayoutUtils.h
+index 69277159d9d35c1fda50b649fb5344a885d158a1..a97ee281ef2b30a892ee3250bcd22a59cc7b5be6 100644
+--- a/layout/base/nsLayoutUtils.h
++++ b/layout/base/nsLayoutUtils.h
+@@ -2475,6 +2475,7 @@ class nsLayoutUtils {
+   static mozilla::SurfaceFromElementResult SurfaceFromElement(
+       mozilla::dom::HTMLVideoElement* aElement, uint32_t aSurfaceFlags,
+       RefPtr<DrawTarget>& aTarget, bool aOptimizeSourceSurface = true);
++  template <class ElementT> static mozilla::SurfaceFromElementResult StealthSurfaceFromElementAsDrawn(ElementT* aElement);  // STEALTH-HOOK(fingerprint/canvas/as-drawn)
+ 
+   /**
+    * When the document is editable by contenteditable attribute of its root
 diff --git a/layout/painting/nsImageRenderer.cpp b/layout/painting/nsImageRenderer.cpp
-index 0da623ed046aa6e14823666bf4b02408010d466c..73fc5ccc116754c1088486024e30b1f4e839f35f 100644
+index 0da623ed046aa6e14823666bf4b02408010d466c..69eadb695d3be978534b22ec9dcb266d8cb6cd2a 100644
 --- a/layout/painting/nsImageRenderer.cpp
 +++ b/layout/painting/nsImageRenderer.cpp
 @@ -32,6 +32,8 @@
@@ -38,7 +50,7 @@ index 0da623ed046aa6e14823666bf4b02408010d466c..73fc5ccc116754c1088486024e30b1f4
      // If the referenced element is an <img>, <canvas>, or <video> element,
      // prefer SurfaceFromElement as it's more reliable.
 -    mImageElementSurface = nsLayoutUtils::SurfaceFromElement(paintElement);
-+    mImageElementSurface = nsLayoutUtils::SurfaceFromElement(paintElement, kStealthSfeAsDrawn);  // STEALTH-HOOK(fingerprint/canvas/as-drawn)
++    mImageElementSurface = nsLayoutUtils::StealthSurfaceFromElementAsDrawn(paintElement);  // STEALTH-HOOK(fingerprint/canvas/as-drawn)
  
      if (!mImageElementSurface.GetSourceSurface()) {
        nsIFrame* paintServerFrame =

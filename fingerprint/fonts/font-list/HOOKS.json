@@ -70,63 +70,19 @@
   "file": "gfx/thebes/gfxDWriteFontList.cpp",
   "function": "void gfxDWriteFontList::InitSharedFontListForPlatform() {",
   "kind": "rewrite",
-  "form": "unknown",
-  "line": "    if (mStealthBundleOnly) {  // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "form": "wrap-call",
+  "line": "    StealthAppendFamiliesFromCollection(mSystemFonts, families, &forceClassicFams);  // STEALTH-HOOK(fingerprint/fonts/font-list)",
   "removed": "    AppendFamiliesFromCollection(mSystemFonts, families, &forceClassicFams);",
-  "test": "wrapper:tests/test_the_font_list_is_the_bundle_e2e.py::test_the_font_list_is_the_bundle_and_nothing_else",
-  "exception": "DW9: the two rewritten lines of Mozilla (families = the bundle's list instead of the system collection; the bundled collection only when not bundle-only) stay where they are: moving them into the callee would add one cache Add and one glean sample (G18, PM-DECISIONS fonts/font-list Q4)",
-  "pm": "approvato"
+  "test": ""
  },
  {
   "file": "gfx/thebes/gfxDWriteFontList.cpp",
   "function": "void gfxDWriteFontList::InitSharedFontListForPlatform() {",
   "kind": "rewrite",
-  "form": "unknown",
-  "line": "      families = StealthBundleFontList::Get()->Families().Clone();",
-  "test": "wrapper:tests/test_the_font_list_is_the_bundle_e2e.py::test_the_font_list_is_the_bundle_and_nothing_else",
-  "exception": "DW9: the two rewritten lines of Mozilla (families = the bundle's list instead of the system collection; the bundled collection only when not bundle-only) stay where they are: moving them into the callee would add one cache Add and one glean sample (G18, PM-DECISIONS fonts/font-list Q4)",
-  "pm": "approvato"
- },
- {
-  "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "void gfxDWriteFontList::InitSharedFontListForPlatform() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    } else {",
-  "test": "wrapper:tests/test_the_font_list_is_the_bundle_e2e.py::test_the_font_list_is_the_bundle_and_nothing_else",
-  "exception": "DW9: the two rewritten lines of Mozilla (families = the bundle's list instead of the system collection; the bundled collection only when not bundle-only) stay where they are: moving them into the callee would add one cache Add and one glean sample (G18, PM-DECISIONS fonts/font-list Q4)",
-  "pm": "approvato"
- },
- {
-  "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "void gfxDWriteFontList::InitSharedFontListForPlatform() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "      AppendFamiliesFromCollection(mSystemFonts, families, &forceClassicFams);",
-  "test": "wrapper:tests/test_the_font_list_is_the_bundle_e2e.py::test_the_font_list_is_the_bundle_and_nothing_else",
-  "exception": "DW9: the two rewritten lines of Mozilla (families = the bundle's list instead of the system collection; the bundled collection only when not bundle-only) stay where they are: moving them into the callee would add one cache Add and one glean sample (G18, PM-DECISIONS fonts/font-list Q4)",
-  "pm": "approvato"
- },
- {
-  "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "void gfxDWriteFontList::InitSharedFontListForPlatform() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    }",
-  "test": "wrapper:tests/test_the_font_list_is_the_bundle_e2e.py::test_the_font_list_is_the_bundle_and_nothing_else",
-  "exception": "DW9: the two rewritten lines of Mozilla (families = the bundle's list instead of the system collection; the bundled collection only when not bundle-only) stay where they are: moving them into the callee would add one cache Add and one glean sample (G18, PM-DECISIONS fonts/font-list Q4)",
-  "pm": "approvato"
- },
- {
-  "file": "gfx/thebes/gfxDWriteFontList.cpp",
-  "function": "void gfxDWriteFontList::InitSharedFontListForPlatform() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    if (mBundledFonts && !mStealthBundleOnly) {",
+  "form": "wrap-expression",
+  "line": "    if (StealthBundledFontsApply(this, mBundledFonts)) {  // STEALTH-HOOK(fingerprint/fonts/font-list)",
   "removed": "    if (mBundledFonts) {",
-  "test": "wrapper:tests/test_the_font_list_is_the_bundle_e2e.py::test_the_font_list_is_the_bundle_and_nothing_else",
-  "exception": "DW9: the two rewritten lines of Mozilla (families = the bundle's list instead of the system collection; the bundled collection only when not bundle-only) stay where they are: moving them into the callee would add one cache Add and one glean sample (G18, PM-DECISIONS fonts/font-list Q4)",
-  "pm": "approvato"
+  "test": ""
  },
  {
   "file": "gfx/thebes/gfxDWriteFontList.cpp",

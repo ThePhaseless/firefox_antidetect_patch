@@ -11,10 +11,11 @@
 
 namespace mozilla {
 
-bool StealthPlacePopupAtDefault(bool aIsCallerChrome,
+void StealthPlacePopupAtDefault(bool aIsCallerChrome,
                                 nsIBaseWindow* aTreeOwnerAsWin, bool aHasLeft,
                                 bool aHasTop, DesktopIntCoord& aLeft,
-                                DesktopIntCoord& aTop) {
+                                DesktopIntCoord& aTop,
+                                bool& aPositionSpecified) {
   // Stealth: a window a PAGE opens without left/top is born at the declared
   // default position, not wherever the host puts it (70-known-bugs.md B258).
   // Retail Firefox 151 on Windows 11 opens it at 4,4 device pixels (3,3 CSS at
@@ -31,12 +32,12 @@ bool StealthPlacePopupAtDefault(bool aIsCallerChrome,
   // display's together. Measured on the Linux build at 1.25, 1.5 and 2: a
   // second conversion here put left=100 at screenX 125, 150 and 200.
   if (aIsCallerChrome) {
-    return false;
+    return;
   }
   const Maybe<gfx::StealthWindowFrame> stealthFrame =
       gfx::StealthDeclaredWindowFrame();
   if (!stealthFrame) {
-    return false;
+    return;
   }
   MOZ_ASSERT(aTreeOwnerAsWin);
   const DesktopToLayoutDeviceScale devToDesktop =
@@ -50,7 +51,7 @@ bool StealthPlacePopupAtDefault(bool aIsCallerChrome,
   if (!aHasTop) {
     aTop = byDefault;
   }
-  return true;
+  aPositionSpecified = true;
 }
 
 }  // namespace mozilla

@@ -10,24 +10,22 @@
  {
   "file": "intl/locale/LocaleService.cpp",
   "function": "LocaleService::GetRegionalPrefsLocales(nsTArray<nsCString>& aRetVal) {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    if (NS_SUCCEEDED(MachineRegionalPrefsLocales(aRetVal))) {  // STEALTH-HOOK(fingerprint/locale-time/language)",
-  "removed": "    if (NS_SUCCEEDED(\n            OSPreferences::GetInstance()->GetRegionalPrefsLocales(aRetVal))) {",
-  "test": "gtest:Intl_Locale_StealthSystemLocales.WithTheOSLocalesPreferenceTheDeclaredLanguageIsTheOnlyOne",
-  "exception": "OSPreferences::GetRegionalPrefsLocales has two other callers (Troubleshoot.sys.mjs, TelemetryEnvironment.sys.mjs) that receive the host's value today and a guard at the source would change what they see, and would run GetInstance() before the guard in the declared case; no form expresses the call without it (G31 analysed, G35 approved by the pm in PM-VERDICT)",
-  "pm": "approvato"
+  "kind": "add",
+  "form": "anchor",
+  "line": "    if (StealthDeclaredRegionalPrefsLocales(aRetVal)) return NS_OK;  // STEALTH-HOOK(fingerprint/locale-time/language)",
+  "test": "",
+  "anchor": "",
+  "why": ""
  },
  {
   "file": "intl/locale/LocaleService.cpp",
   "function": "LocaleService::GetRegionalPrefsLocales(nsTArray<nsCString>& aRetVal) {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  if (NS_FAILED(MachineRegionalPrefsLocales(regionalPrefsLocales))) {  // STEALTH-HOOK(fingerprint/locale-time/language)",
-  "removed": "  if (NS_FAILED(OSPreferences::GetInstance()->GetRegionalPrefsLocales(\n          regionalPrefsLocales))) {",
-  "test": "gtest:Intl_Locale_StealthSystemLocales.TheDeclaredLanguageIsTheRegionalLanguage",
-  "exception": "OSPreferences::GetRegionalPrefsLocales has two other callers (Troubleshoot.sys.mjs, TelemetryEnvironment.sys.mjs) that receive the host's value today and a guard at the source would change what they see, and would run GetInstance() before the guard in the declared case; no form expresses the call without it (G31 analysed, G35 approved by the pm in PM-VERDICT)",
-  "pm": "approvato"
+  "kind": "add",
+  "form": "anchor",
+  "line": "  if (!StealthDeclaredRegionalPrefsLocales(regionalPrefsLocales))  // STEALTH-HOOK(fingerprint/locale-time/language)",
+  "test": "",
+  "anchor": "",
+  "why": ""
  },
  {
   "file": "intl/locale/moz.build",

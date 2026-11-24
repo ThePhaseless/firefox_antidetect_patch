@@ -10,7 +10,11 @@
 #include "nsStringFwd.h"
 #include "prio.h"
 
+class nsSOCKSSocketInfo;
+
 namespace mozilla::net {
+
+class nsSocketTransport;
 
 /**
  * With IPv6 declared off (the disableIPv6 DNS pref, derived from the declared
@@ -86,6 +90,26 @@ PRStatus StealthConnect(PRFileDesc* aFd, const NetAddr& aAddr,
 PRStatus StealthConnect(const NetAddr& aAddr, bool aProxyTransparent,
                         const nsACString& aProxyHost, PRFileDesc* aFd,
                         const PRNetAddr* aPrAddr, PRIntervalTime aTimeout);
+
+/**
+ * The same connect as the transport calls it, in place of PR_Connect(aFd, aPrAddr, aTimeout): the transport's own
+ * mNetAddr, mProxyTransparent and mProxyHost are the three arguments above (nsSocketTransport has one friend of ours,
+ * StealthSocketTransportAccess).
+ */
+PRStatus StealthConnect(nsSocketTransport* aTransport, PRFileDesc* aFd,
+                        const PRNetAddr* aPrAddr, PRIntervalTime aTimeout);
+
+/**
+ * The connect of nsSOCKSSocketInfo::ConnectToProxy to its proxy: the function that is called in the place of
+ * fd->lower->methods->connect, which is aConnect, the layer's own. The target is the SOCKS hop, which is what aSocksSocketInfo
+ * being the layer's own socket info says. The function returned is the connect above with that target: it takes the address
+ * of the proxy from the call's own argument, as the layer built it (an IPv4-mapped one when the layer needs it, which is not a
+ * page's literal), and sends nothing when the hop is refused (the route rule): PR_FAILURE and the error, as a failed connect()
+ * leaves it; the caller reads PR_GetError() right after. When it is not refused it is PR_Connect(aFd, ...), which is
+ * aFd->methods->connect(aFd, ...), aConnect itself (aFd is the layer below, fd->lower).
+ */
+PRConnectFN StealthHopConnect(nsSOCKSSocketInfo* aSocksSocketInfo,
+                              PRConnectFN aConnect);
 
 /**
  * Parent process, once, at the top of nsIOService::Init and before any lookup:

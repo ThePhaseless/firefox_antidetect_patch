@@ -35,11 +35,12 @@
 using namespace mozilla::dom;
 using namespace JS;
 using namespace mozilla;
+using namespace xpc;
 
 using js::BaseProxyHandler;
 using js::Wrapper;
 
-namespace xpc {
+namespace mozilla {
 
 /*
  * STEALTHFOX [B322]: HYBRID XRAYS. The rule, and why it lives in the wrapper,
@@ -536,8 +537,8 @@ bool HybridXrayWrapper<Traits>::isExtensible(JSContext* cx,
 }
 
 template <typename Traits>
-MOZ_GLOBINIT const xpc::HybridXrayWrapper<Traits>
-    xpc::HybridXrayWrapper<Traits>::singleton(0);
+MOZ_GLOBINIT const HybridXrayWrapper<Traits>
+    HybridXrayWrapper<Traits>::singleton(0);
 
 template class HybridXrayDOM;
 template class HybridXrayJS;
@@ -648,6 +649,24 @@ const js::Wrapper* StealthHybridWrapper(XrayType xrayType) {
   return &js::CrossCompartmentWrapper::singleton;
 }
 
+const js::Wrapper* StealthSelectedWrapper(JSContext* aCx,
+                                          const js::Wrapper* aMozillaWrapper) {
+  if (!StealthTargetIsHybrid(aCx)) {
+    return aMozillaWrapper;
+  }
+  if (aMozillaWrapper == &PermissiveXrayDOM::singleton) {
+    return StealthHybridWrapper(XrayForDOMObject);
+  }
+  if (aMozillaWrapper == &PermissiveXrayJS::singleton) {
+    return StealthHybridWrapper(XrayForJSObject);
+  }
+  if (aMozillaWrapper == &PermissiveXrayOpaque::singleton ||
+      aMozillaWrapper == &js::CrossCompartmentWrapper::singleton) {
+    return StealthHybridWrapper(NotXray);
+  }
+  return aMozillaWrapper;
+}
+
 bool StealthTargetWantsXrays(JSContext* aCx, bool aWantXrays) {
   return aWantXrays || StealthTargetIsHybrid(aCx);
 }
@@ -656,14 +675,35 @@ bool StealthTargetIsHybrid(JSContext* aCx) {
   return CompartmentPrivate::Get(js::GetContextRealm(aCx))->hybridXrays;
 }
 
-bool StealthCallerObjectApplies(JS::Realm* origin, JS::Realm* target,
-                                bool targetIsChrome,
-                                bool targetSubsumesOrigin) {
-  CompartmentPrivate* originPrivate = CompartmentPrivate::Get(origin);
-  CompartmentPrivate* targetPrivate = CompartmentPrivate::Get(target);
+// The decision of StealthNoteCallerObject for the Rewrap that is running on this
+// thread, read by the condition of its branch.
+static thread_local bool sCallerObjectApplies = false;
+
+bool StealthCallerObjectDecision(bool aOriginHybrid, bool aTargetHybrid,
+                                 bool aTargetWantsXrays, bool aTargetIsChrome,
+                                 bool aTargetSubsumesOrigin) {
   // "The target forces Xrays" is wantXrays || hybridXrays.
-  return originPrivate->hybridXrays && !targetPrivate->hybridXrays &&
-         !targetIsChrome && targetSubsumesOrigin && !targetPrivate->wantXrays;
+  return aOriginHybrid && !aTargetHybrid && !aTargetIsChrome &&
+         aTargetSubsumesOrigin && !aTargetWantsXrays;
 }
 
-}  // namespace xpc
+void StealthRecordCallerObject(bool aApplies) {
+  sCallerObjectApplies = aApplies;
+}
+
+void StealthNoteCallerObject(JS::Realm* origin, JS::Realm* target,
+                             bool targetIsChrome, bool targetSubsumesOrigin) {
+  CompartmentPrivate* originPrivate = CompartmentPrivate::Get(origin);
+  CompartmentPrivate* targetPrivate = CompartmentPrivate::Get(target);
+  StealthRecordCallerObject(StealthCallerObjectDecision(
+      originPrivate->hybridXrays, targetPrivate->hybridXrays,
+      targetPrivate->wantXrays, targetIsChrome, targetSubsumesOrigin));
+}
+
+bool StealthCallerObjectApplies() {
+  const bool applies = sCallerObjectApplies;
+  sCallerObjectApplies = false;
+  return applies;
+}
+
+}  // namespace mozilla

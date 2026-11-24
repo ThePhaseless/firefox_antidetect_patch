@@ -8,10 +8,12 @@
   "js/xpconnect/wrappers/moz.build"
  ],
  "added": {
+  "dom/base/test/gtest/TestStealthCallerObject.cpp": "100644",
   "js/xpconnect/src/StealthSandbox.h": "100644",
   "js/xpconnect/tests/unit/test_stealth_hybrid_xrays_options.js": "100644",
   "js/xpconnect/wrappers/StealthHybridXray.cpp": "100644",
-  "js/xpconnect/wrappers/StealthHybridXray.h": "100644"
+  "js/xpconnect/wrappers/StealthHybridXray.h": "100644",
+  "juggler/tests/caller_object_decision_is_written_before_its_branch_reads_it.test.mjs": "100644"
  },
  "inventory": [
   {

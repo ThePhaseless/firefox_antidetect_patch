@@ -75,6 +75,14 @@ bool StealthSkipsHostSubstitutes(const gfxPlatformFontList* aList);
 bool StealthNoFontsFoundCore(bool aBundleOnly, bool aMozilla);
 bool StealthNoFontsFound(const gfxPlatformFontList* aList, bool aMozilla);
 
+// InitSharedFontListForPlatform: the bundled DirectWrite collection is
+// appended to the family list, and its timing recorded, only when the list is
+// not bundle-only (the manifest is the list then). aBundled is Mozilla's own
+// condition (`mBundledFonts`).
+bool StealthBundledFontsApplyCore(bool aBundleOnly, bool aBundled);
+bool StealthBundledFontsApply(const gfxPlatformFontList* aList,
+                              const IDWriteFontCollection* aBundled);
+
 // GetFontsFromCollection: the system collection is not enumerated under
 // bundle-only; the bundled collection still is (its other caller).
 bool StealthSkipsHostCollectionCore(bool aBundleOnly, const void* aCollection,

@@ -1,5 +1,5 @@
 diff --git a/dom/media/webrtc/jsapi/PeerConnectionImpl.cpp b/dom/media/webrtc/jsapi/PeerConnectionImpl.cpp
-index 74ec5d79595fa08a4e1db2e841ff9f5a204999cf..eefbe3c727ea5619ba373f09bf03de7a48bacc0e 100644
+index 74ec5d79595fa08a4e1db2e841ff9f5a204999cf..c7a5ebd2692440b2f3d124466d82487ad6ddbc14 100644
 --- a/dom/media/webrtc/jsapi/PeerConnectionImpl.cpp
 +++ b/dom/media/webrtc/jsapi/PeerConnectionImpl.cpp
 @@ -114,6 +114,8 @@
@@ -11,16 +11,17 @@ index 74ec5d79595fa08a4e1db2e841ff9f5a204999cf..eefbe3c727ea5619ba373f09bf03de7a
  #ifdef XP_WIN
  // We need to undef the MS macro again in case the windows include file
  // got imported after we included mozilla/dom/Document.h
-@@ -2641,6 +2643,7 @@ nsresult PeerConnectionImpl::SetConfiguration(
+@@ -2640,7 +2642,7 @@ nsresult PeerConnectionImpl::SetConfiguration(
+     mRequestedPrivacy = Some(PrincipalPrivacy::Private);
    }
  
-   auto proxyConfig = GetProxyConfig();
-+  proxyConfig = StealthProxyConfigOf(std::move(proxyConfig), mWindow.get(), mForceProxy);  // STEALTH-HOOK(network/proxy-udp)
+-  auto proxyConfig = GetProxyConfig();
++  auto proxyConfig = StealthProxyConfigOf(mWindow.get(), mForceProxy, GetProxyConfig());  // STEALTH-HOOK(network/proxy-udp)
    if (proxyConfig) {
      // Note that this could check if PrivacyRequested() is set on the PC and
      // remove "webrtc" from the ALPN list.  But that would only work if the PC
 diff --git a/dom/media/webrtc/transport/ipc/WebrtcTCPSocket.cpp b/dom/media/webrtc/transport/ipc/WebrtcTCPSocket.cpp
-index 28458bedcd1b97143c73e3cf0526439adbfa529e..606e9c3616f80b6a9747e6cb419f36939a669df1 100644
+index 28458bedcd1b97143c73e3cf0526439adbfa529e..b69c9071f938743ef3a2ecdbf9ad675d3f40b4cd 100644
 --- a/dom/media/webrtc/transport/ipc/WebrtcTCPSocket.cpp
 +++ b/dom/media/webrtc/transport/ipc/WebrtcTCPSocket.cpp
 @@ -25,6 +25,8 @@
@@ -32,33 +33,15 @@ index 28458bedcd1b97143c73e3cf0526439adbfa529e..606e9c3616f80b6a9747e6cb419f3693
  namespace mozilla::net {
  
  class WebrtcTCPData {
-@@ -216,19 +218,17 @@ nsresult WebrtcTCPSocket::DoProxyConfigLookup() {
-     return rv;
-   }
- 
-+  const uint32_t flags = nsIProtocolProxyService::RESOLVE_PREFER_HTTPS_PROXY |
-+                         nsIProtocolProxyService::RESOLVE_ALWAYS_TUNNEL;
-   nsCOMPtr<nsIChannel> channel;
--  rv = NS_NewChannel(getter_AddRefs(channel), mURI,
--                     nsContentUtils::GetSystemPrincipal(),
--                     nsILoadInfo::SEC_ALLOW_CROSS_ORIGIN_SEC_CONTEXT_IS_NULL,
--                     nsIContentPolicy::TYPE_OTHER);
-+  rv = StealthNewChannelOfLoadInfo(mURI, flags, mProxyConfig->loadInfoArgs(),  // STEALTH-HOOK(network/proxy-udp)
-+                                   getter_AddRefs(channel));
+@@ -224,6 +226,7 @@ nsresult WebrtcTCPSocket::DoProxyConfigLookup() {
    if (NS_WARN_IF(NS_FAILED(rv))) {
      return rv;
    }
++  if (StealthSwapTcpLookupChannel(this, channel, &rv)) return rv;  // STEALTH-HOOK(network/proxy-udp)
  
--  rv = pps->AsyncResolve(channel,
--                         nsIProtocolProxyService::RESOLVE_PREFER_HTTPS_PROXY |
--                             nsIProtocolProxyService::RESOLVE_ALWAYS_TUNNEL,
--                         this, nullptr, getter_AddRefs(mProxyRequest));
-+  rv = pps->AsyncResolve(channel, flags, this, nullptr,
-+                         getter_AddRefs(mProxyRequest));
-   if (NS_WARN_IF(NS_FAILED(rv))) {
-     return rv;
-   }
-@@ -268,6 +268,7 @@ NS_IMETHODIMP WebrtcTCPSocket::OnProxyAvailable(nsICancelable* aRequest,
+   rv = pps->AsyncResolve(channel,
+                          nsIProtocolProxyService::RESOLVE_PREFER_HTTPS_PROXY |
+@@ -268,6 +271,7 @@ NS_IMETHODIMP WebrtcTCPSocket::OnProxyAvailable(nsICancelable* aRequest,
      }
    }
  
@@ -66,7 +49,7 @@ index 28458bedcd1b97143c73e3cf0526439adbfa529e..606e9c3616f80b6a9747e6cb419f3693
    OpenWithoutHttpProxy(nullptr);
  
    return NS_OK;
-@@ -339,6 +340,8 @@ void WebrtcTCPSocket::OpenWithoutHttpProxy(nsIProxyInfo* aSocksProxyInfo) {
+@@ -339,6 +343,8 @@ void WebrtcTCPSocket::OpenWithoutHttpProxy(nsIProxyInfo* aSocksProxyInfo) {
      return;
    }
  
@@ -88,10 +71,10 @@ index c6324a4745b2c7c8ce188d2566054963802ef081..bcb2fa8c872795bf9d9c806cd1ae377c
    void SetTabId(dom::TabId aTabId);
    nsresult Open(const nsACString& aHost, const int& aPort,
 diff --git a/dom/media/webrtc/transport/nr_socket_proxy_config.cpp b/dom/media/webrtc/transport/nr_socket_proxy_config.cpp
-index e9a7db5899e4bbc299ea3015d48faeb731bd4b15..7d647efef27b1679439dea472423b81291ece4e3 100644
+index e9a7db5899e4bbc299ea3015d48faeb731bd4b15..3d10807d73605528c6c1830d67b53821faa70044 100644
 --- a/dom/media/webrtc/transport/nr_socket_proxy_config.cpp
 +++ b/dom/media/webrtc/transport/nr_socket_proxy_config.cpp
-@@ -6,16 +6,21 @@
+@@ -6,16 +6,19 @@
  
  #include "mozilla/net/WebrtcProxyConfig.h"
  
@@ -108,13 +91,11 @@ index e9a7db5899e4bbc299ea3015d48faeb731bd4b15..7d647efef27b1679439dea472423b812
  NrSocketProxyConfig::NrSocketProxyConfig(
      const net::WebrtcProxyConfig& aProxyConfig)
 -    : mPrivate(new Private({aProxyConfig})) {}
-+    : mPrivate(new Private({aProxyConfig})) {
-+  net::StealthPcUdpProxyLookup(mPrivate->mUdpProxy, aProxyConfig);  // STEALTH-HOOK(network/proxy-udp)
-+}
++    : mPrivate(net::StealthPcUdpProxyOf(aProxyConfig, new Private({aProxyConfig}))) {}  // STEALTH-HOOK(network/proxy-udp)
  
  NrSocketProxyConfig::NrSocketProxyConfig(NrSocketProxyConfig&& aOrig)
      : mPrivate(std::move(aOrig.mPrivate)) {}
-@@ -26,6 +31,8 @@ const net::WebrtcProxyConfig& NrSocketProxyConfig::GetConfig() const {
+@@ -26,6 +29,8 @@ const net::WebrtcProxyConfig& NrSocketProxyConfig::GetConfig() const {
    return mPrivate->mProxyConfig;
  }
  
@@ -381,17 +362,15 @@ index 33deecc4b4c4d8e46c2bedf1261aeafd6541b47b..e9b0f9aafa86c911aeec05189bf0a583
    nsCOMPtr<nsIUDPSocketListener> mListener MOZ_GUARDED_BY(mLock);
    nsCOMPtr<nsIUDPSocketSyncListener> mSyncListener;
 diff --git a/netwerk/ipc/PSocketProcess.ipdl b/netwerk/ipc/PSocketProcess.ipdl
-index 8168d164d782847642aabcda232c3081389290bf..4533447d23026e0069fee9d438bfd4f797970219 100644
+index 8168d164d782847642aabcda232c3081389290bf..0fdf75f95cc03cc9e4b8c397a4ab3fc71671e9fd 100644
 --- a/netwerk/ipc/PSocketProcess.ipdl
 +++ b/netwerk/ipc/PSocketProcess.ipdl
-@@ -128,7 +128,9 @@ parent:
-   async InitSocketBackground(Endpoint<PSocketProcessBackgroundParent> aEndpoint);
+@@ -129,6 +129,8 @@ parent:
    async PAltService();
    async PProxyConfigLookup(nullable nsIURI aUri, uint32_t aFlags,
--                           bool aIsTRRServiceChannel);
-+                           bool aIsTRRServiceChannel,
-+                           LoadInfoArgs? aLoadInfo,  // STEALTH-HOOK(network/proxy-udp)
-+                           OriginAttributes? aOriginAttributes);  // STEALTH-HOOK(network/doh)
+                            bool aIsTRRServiceChannel);
++  async StealthProxyLookupLoadInfo(LoadInfoArgs? aLoadInfo);  // STEALTH-HOOK(network/proxy-udp)
++  async StealthProxyLookupOrigin(OriginAttributes? aOriginAttributes);  // STEALTH-HOOK(network/doh)
  
    async ExcludeHttp2OrHttp3(HttpConnectionInfoCloneArgs aArgs);
  
@@ -405,7 +384,7 @@ index 8168d164d782847642aabcda232c3081389290bf..4533447d23026e0069fee9d438bfd4f7
      returns (SocketDataArgs data);
    async GetDNSCacheEntries()
 diff --git a/netwerk/ipc/ProxyConfigLookup.cpp b/netwerk/ipc/ProxyConfigLookup.cpp
-index b09731c707ff8a47235fb6cbaeaaf3b5d25237b2..f67b9a6b3e215bffa29a32e4086ea5f9f54d69c3 100644
+index b09731c707ff8a47235fb6cbaeaaf3b5d25237b2..72e371c550c8e04c784ed73553379b3ddeba438c 100644
 --- a/netwerk/ipc/ProxyConfigLookup.cpp
 +++ b/netwerk/ipc/ProxyConfigLookup.cpp
 @@ -15,6 +15,9 @@
@@ -418,228 +397,47 @@ index b09731c707ff8a47235fb6cbaeaaf3b5d25237b2..f67b9a6b3e215bffa29a32e4086ea5f9
  namespace mozilla {
  namespace net {
  
-@@ -22,21 +25,29 @@ namespace net {
- nsresult ProxyConfigLookup::Create(
+@@ -23,6 +26,8 @@ nsresult ProxyConfigLookup::Create(
      std::function<void(nsIProxyInfo*, nsresult)>&& aCallback, nsIURI* aURI,
      uint32_t aProxyResolveFlags, bool aIsTRRServiceChannel,
--    nsICancelable** aLookupCancellable) {
-+    nsICancelable** aLookupCancellable,
-+    const Maybe<LoadInfoArgs>& aLoadInfo,  // STEALTH-HOOK(network/proxy-udp)
-+    const Maybe<OriginAttributes>& aOriginAttributes) {  // STEALTH-HOOK(network/doh)
+     nsICancelable** aLookupCancellable) {
++  StealthEnterLookupLoadInfo();  // STEALTH-HOOK(network/proxy-udp)
++  StealthEnterTRRLookupContext();  // STEALTH-HOOK(network/doh)
    MOZ_ASSERT(NS_IsMainThread());
  
    RefPtr<ProxyConfigLookup> lookUp = new ProxyConfigLookup(
--      std::move(aCallback), aURI, aProxyResolveFlags, aIsTRRServiceChannel);
-+      std::move(aCallback), aURI, aProxyResolveFlags, aIsTRRServiceChannel,
-+      aLoadInfo,  // STEALTH-HOOK(network/proxy-udp)
-+      aOriginAttributes);  // STEALTH-HOOK(network/doh)
-   return lookUp->DoProxyResolve(aLookupCancellable);
- }
- 
- ProxyConfigLookup::ProxyConfigLookup(
-     std::function<void(nsIProxyInfo*, nsresult)>&& aCallback, nsIURI* aURI,
--    uint32_t aProxyResolveFlags, bool aIsTRRServiceChannel)
-+    uint32_t aProxyResolveFlags, bool aIsTRRServiceChannel,
-+    const Maybe<LoadInfoArgs>& aLoadInfo,  // STEALTH-HOOK(network/proxy-udp)
-+    const Maybe<OriginAttributes>& aOriginAttributes)  // STEALTH-HOOK(network/doh)
-     : mCallback(std::move(aCallback)),
-       mURI(aURI),
-       mProxyResolveFlags(aProxyResolveFlags),
--      mIsTRRServiceChannel(aIsTRRServiceChannel) {}
-+      mIsTRRServiceChannel(aIsTRRServiceChannel),
-+      mLoadInfo(aLoadInfo),  // STEALTH-HOOK(network/proxy-udp)
-+      mOriginAttributes(aOriginAttributes) {}  // STEALTH-HOOK(network/doh)
- 
- ProxyConfigLookup::~ProxyConfigLookup() = default;
- 
-@@ -47,19 +58,24 @@ nsresult ProxyConfigLookup::DoProxyResolve(nsICancelable** aLookupCancellable) {
-         mURI, mProxyResolveFlags, mIsTRRServiceChannel,
-         [self](nsIProxyInfo* aProxyinfo, nsresult aResult) {
-           self->OnProxyAvailable(nullptr, nullptr, aProxyinfo, aResult);
--        });
-+        },
-+        mLoadInfo,  // STEALTH-HOOK(network/proxy-udp)
-+        mOriginAttributes);  // STEALTH-HOOK(network/doh)
-     return result ? NS_OK : NS_ERROR_FAILURE;
-   }
- 
-   nsresult rv;
-   nsCOMPtr<nsIChannel> channel;
--  rv = NS_NewChannel(getter_AddRefs(channel), mURI,
-+  rv = mLoadInfo ? StealthNewChannelOfLoadInfo(mURI, mProxyResolveFlags, mLoadInfo.ref(), getter_AddRefs(channel))  // STEALTH-HOOK(network/proxy-udp)
-+                 : NS_NewChannel(getter_AddRefs(channel), mURI,
-                      nsContentUtils::GetSystemPrincipal(),
-                      nsILoadInfo::SEC_ALLOW_CROSS_ORIGIN_SEC_CONTEXT_IS_NULL,
-                      nsIContentPolicy::TYPE_OTHER);
+@@ -60,6 +65,8 @@ nsresult ProxyConfigLookup::DoProxyResolve(nsICancelable** aLookupCancellable) {
    if (NS_FAILED(rv)) {
      return rv;
    }
-+  rv = StealthApplyTRRContextToChannel(channel, mOriginAttributes);  // STEALTH-HOOK(network/doh)
-+  NS_ENSURE_SUCCESS(rv, rv);  // STEALTH-HOOK(network/doh)
++  if (StealthSwapLookupChannel(mURI, mProxyResolveFlags, channel, &rv)) return rv;  // STEALTH-HOOK(network/proxy-udp)
++  if (StealthApplyTRRLookupContext(channel, &rv)) return rv;  // STEALTH-HOOK(network/doh)
  
    // The real requester is a TRRServiceChannel, which can't be handed to the
    // proxy service because it doesn't live on the main thread. Propagate the
-diff --git a/netwerk/ipc/ProxyConfigLookup.h b/netwerk/ipc/ProxyConfigLookup.h
-index 5dff98ad643118e6f962c89e3656eb056aa9e321..96f801e68fe0ec03849c9d2e09337232d5300831 100644
---- a/netwerk/ipc/ProxyConfigLookup.h
-+++ b/netwerk/ipc/ProxyConfigLookup.h
-@@ -10,6 +10,10 @@
- #include "nsCOMPtr.h"
- #include "nsIProtocolProxyCallback.h"
- 
-+#include "mozilla/Maybe.h"  // STEALTH-HOOK(network/proxy-udp)
-+#include "mozilla/OriginAttributes.h"  // STEALTH-HOOK(network/doh)
-+#include "mozilla/net/NeckoChannelParams.h"  // STEALTH-HOOK(network/proxy-udp)
-+
- class nsIURI;
- 
- namespace mozilla {
-@@ -25,12 +29,16 @@ class ProxyConfigLookup final : public nsIProtocolProxyCallback {
-   static nsresult Create(
-       std::function<void(nsIProxyInfo*, nsresult)>&& aCallback, nsIURI* aURI,
-       uint32_t aProxyResolveFlags, bool aIsTRRServiceChannel = false,
--      nsICancelable** aLookupCancellable = nullptr);
-+      nsICancelable** aLookupCancellable = nullptr,
-+      const Maybe<LoadInfoArgs>& aLoadInfo = Nothing(),  // STEALTH-HOOK(network/proxy-udp)
-+      const Maybe<OriginAttributes>& aOriginAttributes = Nothing());  // STEALTH-HOOK(network/doh)
- 
-  private:
-   explicit ProxyConfigLookup(
-       std::function<void(nsIProxyInfo*, nsresult)>&& aCallback, nsIURI* aURI,
--      uint32_t aProxyResolveFlags, bool aIsTRRServiceChannel);
-+      uint32_t aProxyResolveFlags, bool aIsTRRServiceChannel,
-+      const Maybe<LoadInfoArgs>& aLoadInfo,  // STEALTH-HOOK(network/proxy-udp)
-+      const Maybe<OriginAttributes>& aOriginAttributes);  // STEALTH-HOOK(network/doh)
-   virtual ~ProxyConfigLookup();
-   nsresult DoProxyResolve(nsICancelable** aLookupCancellable);
- 
-@@ -38,6 +46,8 @@ class ProxyConfigLookup final : public nsIProtocolProxyCallback {
-   nsCOMPtr<nsIURI> mURI;
-   uint32_t mProxyResolveFlags;
-   bool mIsTRRServiceChannel;
-+  Maybe<LoadInfoArgs> mLoadInfo;  // STEALTH-HOOK(network/proxy-udp)
-+  Maybe<OriginAttributes> mOriginAttributes;  // STEALTH-HOOK(network/doh)
- };
- 
- }  // namespace net
 diff --git a/netwerk/ipc/ProxyConfigLookupChild.cpp b/netwerk/ipc/ProxyConfigLookupChild.cpp
-index d64fa1391fa50832b101caea14eb9f942663cadc..2d9d35724fce23b86302e38042a5156b220dfbe3 100644
+index d64fa1391fa50832b101caea14eb9f942663cadc..d13c075443faeca4c8f868b1af658c9047d67738 100644
 --- a/netwerk/ipc/ProxyConfigLookupChild.cpp
 +++ b/netwerk/ipc/ProxyConfigLookupChild.cpp
-@@ -13,7 +13,9 @@ namespace net {
- // static
- bool ProxyConfigLookupChild::Create(
-     nsIURI* aURI, uint32_t aProxyResolveFlags, bool aIsTRRServiceChannel,
--    std::function<void(nsIProxyInfo*, nsresult)>&& aCallback) {
-+    std::function<void(nsIProxyInfo*, nsresult)>&& aCallback,
-+    const Maybe<LoadInfoArgs>& aLoadInfo,  // STEALTH-HOOK(network/proxy-udp)
-+    const Maybe<OriginAttributes>& aOriginAttributes) {  // STEALTH-HOOK(network/doh)
-   SocketProcessChild* socketChild = SocketProcessChild::GetSingleton();
-   if (!socketChild) {
-     return false;
-@@ -22,7 +24,9 @@ bool ProxyConfigLookupChild::Create(
-   RefPtr<ProxyConfigLookupChild> child =
-       new ProxyConfigLookupChild(std::move(aCallback));
-   return socketChild->SendPProxyConfigLookupConstructor(
--      child, aURI, aProxyResolveFlags, aIsTRRServiceChannel);
-+      child, aURI, aProxyResolveFlags, aIsTRRServiceChannel,
-+      aLoadInfo,  // STEALTH-HOOK(network/proxy-udp)
-+      aOriginAttributes);  // STEALTH-HOOK(network/doh)
- }
+@@ -7,6 +7,9 @@
+ #include "mozilla/net/SocketProcessChild.h"
+ #include "nsProxyInfo.h"
  
- ProxyConfigLookupChild::ProxyConfigLookupChild(
-diff --git a/netwerk/ipc/ProxyConfigLookupChild.h b/netwerk/ipc/ProxyConfigLookupChild.h
-index de76941b17fe3806202cd5d2acfa0be5322ce118..a19164d1ead821e3aec3ecaa4f1f79cad198a28b 100644
---- a/netwerk/ipc/ProxyConfigLookupChild.h
-+++ b/netwerk/ipc/ProxyConfigLookupChild.h
-@@ -9,6 +9,8 @@
- 
- #include "mozilla/net/PProxyConfigLookupChild.h"
- 
-+#include "mozilla/OriginAttributes.h"  // STEALTH-HOOK(network/doh)
++#include "mozilla/net/StealthDocumentChannel.h"  // STEALTH-HOOK(network/proxy-udp)
++#include "mozilla/net/StealthTRRContext.h"  // STEALTH-HOOK(network/doh)
 +
- class nsIProxyInfo;
- 
- namespace mozilla {
-@@ -20,7 +22,9 @@ class ProxyConfigLookupChild final : public PProxyConfigLookupChild {
- 
-   static bool Create(nsIURI* aURI, uint32_t aProxyResolveFlags,
-                      bool aIsTRRServiceChannel,
--                     std::function<void(nsIProxyInfo*, nsresult)>&& aCallback);
-+                     std::function<void(nsIProxyInfo*, nsresult)>&& aCallback,
-+                     const Maybe<LoadInfoArgs>& aLoadInfo = Nothing(),  // STEALTH-HOOK(network/proxy-udp)
-+                     const Maybe<OriginAttributes>& aOriginAttributes = Nothing());  // STEALTH-HOOK(network/doh)
- 
-   mozilla::ipc::IPCResult Recv__delete__(
-       nsTArray<ProxyInfoCloneArgs>&& aProxyInfo, const nsresult& aResult);
-diff --git a/netwerk/ipc/ProxyConfigLookupParent.cpp b/netwerk/ipc/ProxyConfigLookupParent.cpp
-index ee23a20be8d0562f36268f2eb231c2ed5bd3a72d..7f7fa751ab7788c72ecd4a6dcc7d11f07dc67192 100644
---- a/netwerk/ipc/ProxyConfigLookupParent.cpp
-+++ b/netwerk/ipc/ProxyConfigLookupParent.cpp
-@@ -10,12 +10,15 @@
  namespace mozilla {
  namespace net {
  
--ProxyConfigLookupParent::ProxyConfigLookupParent(nsIURI* aURI,
--                                                 uint32_t aProxyResolveFlags,
--                                                 bool aIsTRRServiceChannel)
-+ProxyConfigLookupParent::ProxyConfigLookupParent(
-+    nsIURI* aURI, uint32_t aProxyResolveFlags, bool aIsTRRServiceChannel,
-+    const Maybe<LoadInfoArgs>& aLoadInfo,  // STEALTH-HOOK(network/proxy-udp)
-+    const Maybe<OriginAttributes>& aOriginAttributes)  // STEALTH-HOOK(network/doh)
-     : mURI(aURI),
-       mProxyResolveFlags(aProxyResolveFlags),
--      mIsTRRServiceChannel(aIsTRRServiceChannel) {}
-+      mIsTRRServiceChannel(aIsTRRServiceChannel),
-+      mLoadInfo(aLoadInfo),  // STEALTH-HOOK(network/proxy-udp)
-+      mOriginAttributes(aOriginAttributes) {}  // STEALTH-HOOK(network/doh)
+@@ -21,6 +24,8 @@ bool ProxyConfigLookupChild::Create(
  
- ProxyConfigLookupParent::~ProxyConfigLookupParent() = default;
- 
-@@ -32,7 +35,9 @@ void ProxyConfigLookupParent::DoProxyLookup() {
-           (void)Send__delete__(self, proxyInfoArray, aStatus);
-         }
-       },
--      mURI, mProxyResolveFlags, mIsTRRServiceChannel);
-+      mURI, mProxyResolveFlags, mIsTRRServiceChannel, nullptr,
-+      mLoadInfo,  // STEALTH-HOOK(network/proxy-udp)
-+      mOriginAttributes);  // STEALTH-HOOK(network/doh)
- 
-   if (NS_WARN_IF(NS_FAILED(rv))) {
-     nsTArray<ProxyInfoCloneArgs> emptyArray;
-diff --git a/netwerk/ipc/ProxyConfigLookupParent.h b/netwerk/ipc/ProxyConfigLookupParent.h
-index ef0e206b40bcc0b4179eecc24dae937a5f26fe6f..25b857746b4f2b6cfbbeb30aed657f569cc7cb31 100644
---- a/netwerk/ipc/ProxyConfigLookupParent.h
-+++ b/netwerk/ipc/ProxyConfigLookupParent.h
-@@ -7,6 +7,8 @@
- 
- #include "mozilla/net/PProxyConfigLookupParent.h"
- 
-+#include "mozilla/OriginAttributes.h"  // STEALTH-HOOK(network/doh)
-+
- class nsIURI;
- 
- namespace mozilla {
-@@ -17,7 +19,9 @@ class ProxyConfigLookupParent final : public PProxyConfigLookupParent {
-   NS_INLINE_DECL_REFCOUNTING(ProxyConfigLookupParent, override)
- 
-   ProxyConfigLookupParent(nsIURI* aURI, uint32_t aProxyResolveFlags,
--                          bool aIsTRRServiceChannel);
-+                          bool aIsTRRServiceChannel,
-+                          const Maybe<LoadInfoArgs>& aLoadInfo,  // STEALTH-HOOK(network/proxy-udp)
-+                          const Maybe<OriginAttributes>& aOriginAttributes);  // STEALTH-HOOK(network/doh)
- 
-   void DoProxyLookup();
- 
-@@ -27,6 +31,8 @@ class ProxyConfigLookupParent final : public PProxyConfigLookupParent {
-   nsCOMPtr<nsIURI> mURI;
-   uint32_t mProxyResolveFlags;
-   bool mIsTRRServiceChannel;
-+  Maybe<LoadInfoArgs> mLoadInfo;  // STEALTH-HOOK(network/proxy-udp)
-+  Maybe<OriginAttributes> mOriginAttributes;  // STEALTH-HOOK(network/doh)
- };
- 
- }  // namespace net
+   RefPtr<ProxyConfigLookupChild> child =
+       new ProxyConfigLookupChild(std::move(aCallback));
++  StealthSendLookupLoadInfo(socketChild);  // STEALTH-HOOK(network/proxy-udp)
++  StealthSendTRRLookupContext(socketChild);  // STEALTH-HOOK(network/doh)
+   return socketChild->SendPProxyConfigLookupConstructor(
+       child, aURI, aProxyResolveFlags, aIsTRRServiceChannel);
+ }
 diff --git a/netwerk/ipc/SocketProcessChild.h b/netwerk/ipc/SocketProcessChild.h
 index 026db9b3016a0eb0f8fbbd6298ad6dc88156eaa5..fc5ab441c152899918326a4f0f651b28044edbc8 100644
 --- a/netwerk/ipc/SocketProcessChild.h
@@ -654,53 +452,38 @@ index 026db9b3016a0eb0f8fbbd6298ad6dc88156eaa5..fc5ab441c152899918326a4f0f651b28
    mozilla::ipc::IPCResult RecvGetDNSCacheEntries(
        GetDNSCacheEntriesResolver&& aResolve);
 diff --git a/netwerk/ipc/SocketProcessParent.cpp b/netwerk/ipc/SocketProcessParent.cpp
-index bf7e2b896b8fb3ad04a674a88456853d7ba4cb81..93dd6ebbce271d24e61a92fbb6711f6f13422627 100644
+index bf7e2b896b8fb3ad04a674a88456853d7ba4cb81..79e3ef9f25a490975261f3fb517d56788cf3e642 100644
 --- a/netwerk/ipc/SocketProcessParent.cpp
 +++ b/netwerk/ipc/SocketProcessParent.cpp
-@@ -265,15 +265,21 @@ SocketProcessParent::AllocPAltServiceParent() {
- already_AddRefed<PProxyConfigLookupParent>
- SocketProcessParent::AllocPProxyConfigLookupParent(
-     nsIURI* aURI, const uint32_t& aProxyResolveFlags,
--    const bool& aIsTRRServiceChannel) {
-+    const bool& aIsTRRServiceChannel,
-+    const Maybe<LoadInfoArgs>& aLoadInfo,  // STEALTH-HOOK(network/proxy-udp)
-+    const Maybe<OriginAttributes>& aOriginAttributes) {  // STEALTH-HOOK(network/doh)
-   RefPtr<ProxyConfigLookupParent> actor = new ProxyConfigLookupParent(
--      aURI, aProxyResolveFlags, aIsTRRServiceChannel);
-+      aURI, aProxyResolveFlags, aIsTRRServiceChannel,
-+      aLoadInfo,  // STEALTH-HOOK(network/proxy-udp)
-+      aOriginAttributes);  // STEALTH-HOOK(network/doh)
-   return actor.forget();
- }
+@@ -46,6 +46,9 @@
+ #  include "mozilla/WinDllServices.h"
+ #endif
  
++#include "mozilla/net/StealthDocumentChannel.h"  // STEALTH-HOOK(network/proxy-udp)
++#include "mozilla/net/StealthTRRContext.h"  // STEALTH-HOOK(network/doh)
++
+ namespace mozilla {
+ namespace net {
+ 
+@@ -274,6 +277,8 @@ SocketProcessParent::AllocPProxyConfigLookupParent(
  mozilla::ipc::IPCResult SocketProcessParent::RecvPProxyConfigLookupConstructor(
      PProxyConfigLookupParent* aActor, nsIURI* aURI,
--    const uint32_t& aProxyResolveFlags, const bool& aIsTRRServiceChannel) {
-+    const uint32_t& aProxyResolveFlags, const bool& aIsTRRServiceChannel,
-+    const Maybe<LoadInfoArgs>& aLoadInfo,  // STEALTH-HOOK(network/proxy-udp)
-+    const Maybe<OriginAttributes>& aOriginAttributes) {  // STEALTH-HOOK(network/doh)
+     const uint32_t& aProxyResolveFlags, const bool& aIsTRRServiceChannel) {
++  StealthTakeParkedLookupLoadInfo(this);  // STEALTH-HOOK(network/proxy-udp)
++  StealthTakeParkedTRRLookupContext(this);  // STEALTH-HOOK(network/doh)
    mozilla::ipc::ActorCast<ProxyConfigLookupParent>(aActor)->DoProxyLookup();
    return IPC_OK();
  }
 diff --git a/netwerk/ipc/SocketProcessParent.h b/netwerk/ipc/SocketProcessParent.h
-index 78f3ec67f6e12111836bebdd0a5558ca3eb42b49..2c034d7c7517a77c8c94926638a717f6cdc21e25 100644
+index 78f3ec67f6e12111836bebdd0a5558ca3eb42b49..132deec75777c5912ce0c74922d50820d1f93cce 100644
 --- a/netwerk/ipc/SocketProcessParent.h
 +++ b/netwerk/ipc/SocketProcessParent.h
-@@ -82,11 +82,14 @@ class SocketProcessParent final
- 
-   already_AddRefed<PProxyConfigLookupParent> AllocPProxyConfigLookupParent(
-       nsIURI* aURI, const uint32_t& aProxyResolveFlags,
--      const bool& aIsTRRServiceChannel);
-+      const bool& aIsTRRServiceChannel,
-+      const Maybe<LoadInfoArgs>& aLoadInfo,  // STEALTH-HOOK(network/proxy-udp)
-+      const Maybe<OriginAttributes>& aOriginAttributes);  // STEALTH-HOOK(network/doh)
-   mozilla::ipc::IPCResult RecvPProxyConfigLookupConstructor(
+@@ -87,6 +87,8 @@ class SocketProcessParent final
        PProxyConfigLookupParent* aActor, nsIURI* aURI,
--      const uint32_t& aProxyResolveFlags,
--      const bool& aIsTRRServiceChannel) override;
-+      const uint32_t& aProxyResolveFlags, const bool& aIsTRRServiceChannel,
-+      const Maybe<LoadInfoArgs>& aLoadInfo,  // STEALTH-HOOK(network/proxy-udp)
-+      const Maybe<OriginAttributes>& aOriginAttributes) override;  // STEALTH-HOOK(network/doh)
+       const uint32_t& aProxyResolveFlags,
+       const bool& aIsTRRServiceChannel) override;
++  mozilla::ipc::IPCResult RecvStealthProxyLookupLoadInfo(const Maybe<LoadInfoArgs>& aLoadInfo);  // STEALTH-HOOK(network/proxy-udp)
++  mozilla::ipc::IPCResult RecvStealthProxyLookupOrigin(const Maybe<OriginAttributes>& aOriginAttributes);  // STEALTH-HOOK(network/doh)
  
    mozilla::ipc::IPCResult RecvExcludeHttp2OrHttp3(
        const HttpConnectionInfoCloneArgs& aArgs);
@@ -879,7 +662,7 @@ index 97b6d04e2c3d3e689b32daa848b9a7774106f885..e3ac0a2e87ad6dc3b859e02bf6c37b5b
  if CONFIG["MOZ_WIDGET_TOOLKIT"] == "windows":
      XPIDL_SOURCES += [
 diff --git a/netwerk/socket/nsSOCKSIOLayer.cpp b/netwerk/socket/nsSOCKSIOLayer.cpp
-index de33c4c1c0344437db3e6041bbb5c461a7cc0be9..19d3021073fec9ad05000fd74f0f92f9eaf6e539 100644
+index de33c4c1c0344437db3e6041bbb5c461a7cc0be9..23dab41313f85b7e28cab682e692b97c4ef8d14c 100644
 --- a/netwerk/socket/nsSOCKSIOLayer.cpp
 +++ b/netwerk/socket/nsSOCKSIOLayer.cpp
 @@ -22,6 +22,9 @@
@@ -897,7 +680,7 @@ index de33c4c1c0344437db3e6041bbb5c461a7cc0be9..19d3021073fec9ad05000fd74f0f92f9
      PRNetAddr prProxy;
      NetAddrToPRNetAddr(&proxy, &prProxy);
 -    status = fd->lower->methods->connect(fd->lower, &prProxy, mTimeout);
-+    status = StealthConnect(fd->lower, proxy, StealthConnectTarget::kSocksProxyHop, &prProxy, mTimeout);  // STEALTH-HOOK(network/ipv6-literal)
++    status = StealthHopConnect(this, fd->lower->methods->connect)(fd->lower, &prProxy, mTimeout);  // STEALTH-HOOK(network/ipv6-literal)
      if (status != PR_SUCCESS) {
        PRErrorCode c = PR_GetError();
  

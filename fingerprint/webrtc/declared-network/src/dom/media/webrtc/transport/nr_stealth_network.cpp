@@ -478,4 +478,14 @@ bool StealthApplyDeclaredIPFamilyFromEnvironment() {
   return StealthApplyDeclaredIPFamily(getenv("STEALTHFOX_WEBRTC_NETWORK"));
 }
 
+bool StealthMdnsResponderWanted(bool aMozilla) {
+  (void)aMozilla;
+  return true;
+}
+
+std::string StealthMdnsInterfaces(const std::string& aMozilla) {
+  (void)aMozilla;
+  return nr_stealth_mdns_interfaces();
+}
+
 }  // namespace mozilla

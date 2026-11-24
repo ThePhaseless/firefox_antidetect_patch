@@ -25,35 +25,50 @@ test('the filter answers per userContextId of the load info of the channel', () 
   assert.match(text, /originAttributes \? originAttributes\.userContextId : undefined/);
 });
 
-test('the lookup message carries the origin attributes', () => {
-  assert.match(read('netwerk/ipc/PSocketProcess.ipdl'),
-      /LoadInfoArgs\? aLoadInfo,[^\n]*\n\s+OriginAttributes\? aOriginAttributes\);  \/\/ STEALTH-HOOK\(network\/doh\)/);
+test('the context of the lookup travels in a message of ours; the message of Mozilla keeps its parameters', () => {
+  const ipdl = read('netwerk/ipc/PSocketProcess.ipdl');
+  assert.match(ipdl, /async PProxyConfigLookup\(nullable nsIURI aUri, uint32_t aFlags,\n\s+bool aIsTRRServiceChannel\);\n/);
+  assert.match(ipdl,
+      /\n  async StealthProxyLookupOrigin\(OriginAttributes\? aOriginAttributes\);  \/\/ STEALTH-HOOK\(network\/doh\)\n/);
 });
 
-test('every layer of the lookup passes them on', () => {
-  // [file, minimum, pattern]: SocketProcessParent.cpp has older lines about
-  // aOriginAttributes (the DNS resolve calls), so its own lines are told apart
-  // by the optional type our change adds.
-  for (const [file, minimum, pattern] of [
-    ['netwerk/ipc/ProxyConfigLookup.h', 3],
-    ['netwerk/ipc/ProxyConfigLookup.cpp', 6],
-    ['netwerk/ipc/ProxyConfigLookupChild.h', 1],
-    ['netwerk/ipc/ProxyConfigLookupChild.cpp', 2],
-    ['netwerk/ipc/ProxyConfigLookupParent.h', 2],
-    ['netwerk/ipc/ProxyConfigLookupParent.cpp', 3],
-    ['netwerk/ipc/SocketProcessParent.h', 2],
-    ['netwerk/ipc/SocketProcessParent.cpp', 2, /Maybe<OriginAttributes>/],
-  ]) {
-    const lines = read(file).split(/\r?\n/).filter(l => (pattern || /aOriginAttributes|mOriginAttributes/).test(l));
-    assert.ok(lines.length >= minimum, `${file}: ${lines.length} lines carry the attributes`);
-  }
+test('no signature of Mozilla carries the context: it is set, taken, sent, parked and taken again, one line of ours each', () => {
+  // The signatures of the lookup are Mozilla's text: no parameter of ours in them.
+  for (const file of ['netwerk/ipc/ProxyConfigLookup.h', 'netwerk/ipc/ProxyConfigLookup.cpp',
+    'netwerk/ipc/ProxyConfigLookupChild.h', 'netwerk/ipc/ProxyConfigLookupChild.cpp',
+    'netwerk/ipc/ProxyConfigLookupParent.h', 'netwerk/ipc/ProxyConfigLookupParent.cpp'])
+    assert.doesNotMatch(read(file), /OriginAttributes/, file);
+  // The caller sets it on the statement before Create; nothing is passed to Create.
+  // The first statement of Create takes it.
+  const create = read('netwerk/ipc/ProxyConfigLookup.cpp');
+  assert.match(create, /\nnsresult ProxyConfigLookup::Create\(\n[^{]*\) \{\n  StealthEnterLookupLoadInfo\(\);  \/\/ STEALTH-HOOK\(network\/proxy-udp\)\n  StealthEnterTRRLookupContext\(\);  \/\/ STEALTH-HOOK\(network\/doh\)\n  MOZ_ASSERT\(NS_IsMainThread\(\)\);\n/);
+  // The socket process sends it on the one path that sends the constructor, the line right before it.
+  assert.match(read('netwerk/ipc/ProxyConfigLookupChild.cpp'),
+      /\n  StealthSendLookupLoadInfo\(socketChild\);  \/\/ STEALTH-HOOK\(network\/proxy-udp\)\n  StealthSendTRRLookupContext\(socketChild\);  \/\/ STEALTH-HOOK\(network\/doh\)\n  return socketChild->SendPProxyConfigLookupConstructor\(\n      child, aURI, aProxyResolveFlags, aIsTRRServiceChannel\);\n/);
+  const senders = [];
+  const walk = dir => {
+    for (const entry of fs.readdirSync(path.join(TREE, dir), { withFileTypes: true })) {
+      const rel = dir + '/' + entry.name;
+      if (entry.isDirectory()) { if (entry.name !== 'gtest') walk(rel); }  // a gtest names the function in its own stand-in actor
+      else if (/\.(cpp|h)$/.test(entry.name) && read(rel).includes('SendPProxyConfigLookupConstructor(')) senders.push(rel);
+    }
+  };
+  for (const dir of ['netwerk', 'dom/media/webrtc']) walk(dir);
+  assert.deepEqual(senders, ['netwerk/ipc/ProxyConfigLookupChild.cpp'], 'every constructor has its message: one sender');
+  // The parent keeps what arrives (our file) and the constructor takes it, as its first statement.
+  assert.match(read('netwerk/ipc/SocketProcessParent.h'),
+      /\n  mozilla::ipc::IPCResult RecvStealthProxyLookupOrigin\(const Maybe<OriginAttributes>& aOriginAttributes\);  \/\/ STEALTH-HOOK\(network\/doh\)\n/);
+  assert.match(read('netwerk/ipc/SocketProcessParent.cpp'),
+      /RecvPProxyConfigLookupConstructor\(\n    PProxyConfigLookupParent\* aActor, nsIURI\* aURI,\n    const uint32_t& aProxyResolveFlags, const bool& aIsTRRServiceChannel\) \{\n  StealthTakeParkedLookupLoadInfo\(this\);  \/\/ STEALTH-HOOK\(network\/proxy-udp\)\n  StealthTakeParkedTRRLookupContext\(this\);  \/\/ STEALTH-HOOK\(network\/doh\)\n  mozilla::ipc::ActorCast<ProxyConfigLookupParent>\(aActor\)->DoProxyLookup\(\);\n/);
+  const own = read('netwerk/ipc/StealthTRRContext.cpp');
+  assert.match(own, /IPCResult SocketProcessParent::RecvStealthProxyLookupOrigin\(\n    const Maybe<OriginAttributes>& aOriginAttributes\) \{\n  StealthParkTRRLookupContext\(this, aOriginAttributes\);\n  return IPC_OK\(\);/);
 });
 
 test('the stand-in channel of the lookup is given the context before the proxy is asked', () => {
   const text = read('netwerk/ipc/ProxyConfigLookup.cpp');
-  // The hook sits between the statement that makes the stand-in and upstream's
-  // check of its status, which stays as Mozilla wrote it.
-  const apply = text.indexOf('rv = StealthApplyTRRContextToChannel(channel, mOriginAttributes);  // STEALTH-HOOK(network/doh)\n  NS_ENSURE_SUCCESS(rv, rv);  // STEALTH-HOOK(network/doh)');
+  // The hook sits after upstream's check of the status of the statement that makes the stand-in, which stays as Mozilla
+  // wrote it.
+  const apply = text.indexOf('if (StealthApplyTRRLookupContext(channel, &rv)) return rv;  // STEALTH-HOOK(network/doh)');
   const ask = text.indexOf('pps2->AsyncResolve2(channel');
   assert.ok(apply > 0, 'the stand-in does not get the context');
   assert.ok(ask > apply, 'the proxy is asked before the stand-in has its context');
@@ -85,11 +100,11 @@ test('the file of the two TRR.cpp functions is registered next to the resolver\'
   assert.match(code, /return aPrefValue && StealthTRRContextOfSuffix\(aOriginSuffix\)\.isNothing\(\);/);
 });
 
-test('the TRR channel asks the proxy lookup with the context of its load info', () => {
+test('the TRR channel sets the context of its load info on the statement before the lookup, and passes nothing to it', () => {
   const text = read('netwerk/protocol/http/TRRServiceChannel.cpp');
   const resolve = text.slice(text.indexOf('nsresult TRRServiceChannel::ResolveProxy()'));
   assert.match(resolve.slice(0, 1200),
-      /getter_AddRefs\(proxyRequest\), Nothing\(\), StealthTRRContextOf\(this\)\);  \/\/ STEALTH-HOOK\(network\/doh\)/);
+      /  nsCOMPtr<nsICancelable> proxyRequest;\n  StealthSetTRRLookupContext\(this\);  \/\/ STEALTH-HOOK\(network\/doh\)\n  nsresult rv = ProxyConfigLookup::Create\(\n      \[self\]\(nsIProxyInfo\* aProxyInfo, nsresult aStatus\) \{\n        self->OnProxyAvailable\(nullptr, nullptr, aProxyInfo, aStatus\);\n      \},\n      mURI, mProxyResolveFlags, LoadIsTRRServiceChannel\(\),\n      getter_AddRefs\(proxyRequest\)\);\n/);
 });
 
 test('a TRR load info keeps the context, and its clone (a redirect) too', () => {

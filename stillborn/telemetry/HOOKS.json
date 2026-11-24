@@ -9,6 +9,14 @@
  },
  {
   "file": "toolkit/components/telemetry/app/TelemetrySend.sys.mjs",
+  "function": "import { ServiceRequest } from \"resource://gre/modules/ServiceRequest.sys.mjs\";",
+  "kind": "add",
+  "form": "registration",
+  "line": "import { StealthRoutedProcess } from \"resource://gre/modules/StealthPingsender.sys.mjs\"; // STEALTH-HOOK(stillborn/telemetry)",
+  "test": ""
+ },
+ {
+  "file": "toolkit/components/telemetry/app/TelemetrySend.sys.mjs",
   "function": "export function sendStandalonePing(endpoint, payload, extraHeaders = {}) {",
   "kind": "add",
   "form": "anchor",
@@ -20,25 +28,11 @@
  {
   "file": "toolkit/components/telemetry/app/TelemetrySend.sys.mjs",
   "function": "export var TelemetrySendImpl = {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    ({ exeName, params } = StealthPingsender.invocation()); // STEALTH-HOOK(stillborn/telemetry)",
-  "test": "node:juggler/tests/pingsender_route_lives_in_our_file.test.mjs#the program and its arguments",
-  "anchor": "the closing brace of Mozilla's `if (lazy.NimbusFeatures.pingsender.getVariable(\"backgroundTaskEnabled\")) {` block",
-  "why": "it assigns Mozilla's locals exeName and params after Mozilla's choice and before their use; no guard or wrap can reach a value of Mozilla's locals",
-  "exception": "stays as today: declaring toolkit.telemetry.shutdownPingSender.backgroundtask.enabled in firefox.js would make the program depend on a pref that can change (PM-DECISIONS, stillborn/telemetry)",
-  "pm": "approvato"
- },
- {
-  "file": "toolkit/components/telemetry/app/TelemetrySend.sys.mjs",
-  "function": "export var TelemetrySendImpl = {",
   "kind": "rewrite",
-  "form": "unknown",
-  "line": "    StealthPingsender.runAsync(process, params, observer); // STEALTH-HOOK(stillborn/telemetry)",
+  "form": "wrap-expression",
+  "line": "    StealthRoutedProcess(process).runAsync(params, params.length, observer); // STEALTH-HOOK(stillborn/telemetry)",
   "removed": "    process.runAsync(params, params.length, observer);",
-  "test": "node:juggler/tests/no_ping_leaves_before_the_session_proxy_is_decided.test.mjs#undecided: the pingsender is not started and the road is never put in the environment",
-  "exception": "G35 (PM-VERDICT stillborn/telemetry, 22/11): the line stays as on the base, in place of Mozilla's call of process.runAsync",
-  "pm": "approvato"
+  "test": ""
  },
  {
   "file": "toolkit/components/telemetry/moz.build",

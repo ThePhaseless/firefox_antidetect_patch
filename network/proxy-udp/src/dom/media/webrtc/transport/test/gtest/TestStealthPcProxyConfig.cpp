@@ -67,7 +67,7 @@ TEST(StealthPcProxyConfig, AConfigUpstreamMadeIsReturnedAsItIs)
       StealthProxyConfigOfPrincipal(nsContentUtils::GetSystemPrincipal(), 5, false);
   ASSERT_NE(nullptr, upstream.get());
   NrSocketProxyConfig* raw = upstream.get();
-  std::unique_ptr<NrSocketProxyConfig> given = StealthProxyConfigOf(std::move(upstream), nullptr, false);
+  std::unique_ptr<NrSocketProxyConfig> given = StealthProxyConfigOf(nullptr, false, std::move(upstream));
   EXPECT_EQ(raw, given.get()) << "a live window got another config than upstream's";
   EXPECT_EQ(5u, static_cast<uint64_t>(Of(given).tabId()));
 }
@@ -111,7 +111,7 @@ TEST(StealthPcProxyConfig, NoPrincipalAtAllForcesTheProxy)
 TEST(StealthPcProxyConfig, NoWindowAndNoUpstreamConfigIsAForcedOne)
 {
   Scope scope;
-  std::unique_ptr<NrSocketProxyConfig> config = StealthProxyConfigOf(nullptr, nullptr, false);
+  std::unique_ptr<NrSocketProxyConfig> config = StealthProxyConfigOf(nullptr, false, nullptr);
   ASSERT_NE(nullptr, config.get());
   EXPECT_TRUE(config->GetForceProxy());
 }
@@ -122,8 +122,8 @@ TEST(StealthPcProxyConfig, UpstreamsOptOutStaysWhereItAppliesAndOnlyThere)
   const bool hadValue = Preferences::HasUserValue("media.peerconnection.disable_http_proxy");
   const bool old = Preferences::GetBool("media.peerconnection.disable_http_proxy", false);
   ASSERT_EQ(NS_OK, Preferences::SetBool("media.peerconnection.disable_http_proxy", true));
-  EXPECT_EQ(nullptr, StealthProxyConfigOf(nullptr, nullptr, false).get()) << "the pref of upstream no longer disables the proxy config";
-  EXPECT_NE(nullptr, StealthProxyConfigOf(nullptr, nullptr, true).get()) << "a forced proxy ignores the opt-out, as upstream";
+  EXPECT_EQ(nullptr, StealthProxyConfigOf(nullptr, false, nullptr).get()) << "the pref of upstream no longer disables the proxy config";
+  EXPECT_NE(nullptr, StealthProxyConfigOf(nullptr, true, nullptr).get()) << "a forced proxy ignores the opt-out, as upstream";
   if (hadValue) {
     Preferences::SetBool("media.peerconnection.disable_http_proxy", old);
   } else {

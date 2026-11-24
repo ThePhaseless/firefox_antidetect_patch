@@ -59,17 +59,25 @@ void SessionLanguageTag(nsACString& aTag);
 // declared. The caller holds nsLanguageAtomService::mLock for writing.
 already_AddRefed<nsAtom> SessionLocaleLanguage();
 
-// The regional-settings locales of the machine the session declares: the
-// declared language as the only entry when one is declared, else the
-// operating system's (OSPreferences::GetRegionalPrefsLocales). Same contract
-// as that method: on success aRetVal holds at least the entries it returns.
-nsresult MachineRegionalPrefsLocales(nsTArray<nsCString>& aRetVal);
+// The regional-settings locales of the machine the session declares, in
+// LocaleService::GetRegionalPrefsLocales, before upstream asks the operating
+// system (OSPreferences::GetRegionalPrefsLocales): when a language is declared,
+// aRetVal is that language as the only entry and the answer is true, and the
+// operating system is not asked; when nothing is declared the answer is false,
+// aRetVal is left as it was and upstream's call, which stays as upstream wrote
+// it, runs. Same contract as that method on the declared path: success, with
+// the entry.
+bool StealthDeclaredRegionalPrefsLocales(nsTArray<nsCString>& aRetVal);
 
 // The primary tag of an Accept-Language list: "fr-FR, fr, en-US, en" gives
 // "fr-FR"; a single tag passes through. The one place the list becomes a tag,
 // for every realm and every process-wide question that needs a BCP-47 tag.
 // A realm takes only this tag; navigator.languages keeps the full list.
 void PrimaryLanguageTag(const nsACString& aList, nsACString& aTag);
+// PrimaryLanguageTag as a value, for a hook that wraps an expression (a realm's
+// locale override in CreateSandboxObject): the tag of the list, a string that
+// lives to the end of the full expression it is called in.
+nsCString StealthPrimaryLanguageTag(const nsACString& aList);
 
 // STEALTHFOX: the languages "the machine" has, as the session declares them,
 // in place of this machine's. `OSPreferences::GetSystemLocales` asked the

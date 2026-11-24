@@ -3,7 +3,8 @@
   "dom/media/MediaManager.cpp"
  ],
  "added": {
-  "dom/media/StealthMediaEnumeration.h": "100644"
+  "dom/media/StealthMediaEnumeration.h": "100644",
+  "dom/media/gtest/TestStealthMediaEnumeration.cpp": "100644"
  },
  "inventory": [
   {

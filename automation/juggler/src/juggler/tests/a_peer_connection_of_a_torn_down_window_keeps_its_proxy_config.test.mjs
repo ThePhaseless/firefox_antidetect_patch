@@ -30,8 +30,7 @@ test('the only config the PeerConnection gives its ICE context is what GetProxyC
   // of ours). A second place that asks GetProxyConfig() for a config, or a second call of ours, fails here.
   assert.equal(text.match(/StealthProxyConfigOf\(/g).length, 1);
   assert.equal(text.match(/[^:\w]GetProxyConfig\(\)/g).length, 1, 'a second use of GetProxyConfig()');
-  const call = '  auto proxyConfig = GetProxyConfig();\n' +
-      '  proxyConfig = StealthProxyConfigOf(std::move(proxyConfig), mWindow.get(), mForceProxy);  // STEALTH-HOOK(network/proxy-udp)\n';
+  const call = '  auto proxyConfig = StealthProxyConfigOf(mWindow.get(), mForceProxy, GetProxyConfig());  // STEALTH-HOOK(network/proxy-udp)\n';
   assert.ok(text.includes(call), 'SetConfiguration does not give the config of Mozilla to our function');
   // The null config is still tested, after the hook: nothing is sent to the transport without one.
   assert.ok(text.slice(text.indexOf(call) + call.length).startsWith('  if (proxyConfig) {'));
@@ -49,7 +48,7 @@ test('GetProxyConfig is as Mozilla wrote it: the fix is at the call, not in the 
 
 test('our function: upstream\'s config first, its opt-out next, then the principal of the window, a tab id of 0 and no node', () => {
   const header = read(T + 'StealthIceResolverContext.h');
-  assert.match(header, /std::unique_ptr<NrSocketProxyConfig> StealthProxyConfigOf\(\n\s+std::unique_ptr<NrSocketProxyConfig> aUpstream, nsPIDOMWindowInner\* aWindow,\n\s+bool aForceProxy\);/);
+  assert.match(header, /std::unique_ptr<NrSocketProxyConfig> StealthProxyConfigOf\(\n\s+nsPIDOMWindowInner\* aWindow, bool aForceProxy,\n\s+std::unique_ptr<NrSocketProxyConfig> aUpstream\);/);
   assert.match(header, /std::unique_ptr<NrSocketProxyConfig> StealthProxyConfigOfPrincipal\(\n\s+nsIPrincipal\* aPrincipal, uint64_t aTabId, bool aForceProxy\);/);
   const code = read(T + 'StealthIceResolverContext.cpp');
   const of = code.match(/std::unique_ptr<NrSocketProxyConfig> StealthProxyConfigOf\(\n[\s\S]*?\n}\n/)[0];

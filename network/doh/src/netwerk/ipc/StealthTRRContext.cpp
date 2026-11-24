@@ -4,6 +4,7 @@
 
 #include "StealthTRRContext.h"
 
+#include "mozilla/net/SocketProcessParent.h"
 #include "nsCOMPtr.h"
 #include "nsDebug.h"
 #include "nsIChannel.h"
@@ -11,6 +12,7 @@
 #include "nsIPrincipal.h"
 #include "nsISocketTransport.h"
 #include "nsString.h"
+#include "nsThreadUtils.h"
 
 namespace mozilla::net {
 
@@ -68,6 +70,83 @@ nsresult StealthApplyTRRContextToChannel(
   NS_ENSURE_TRUE(aChannel, NS_ERROR_UNEXPECTED);
   nsCOMPtr<nsILoadInfo> loadInfo = aChannel->LoadInfo();
   return StealthApplyTRRContext(loadInfo, aContext);
+}
+
+namespace {
+
+// Main thread only (the header says why). Never freed: it holds nothing between two lookups.
+struct TRRLookupContextState {
+  Maybe<OriginAttributes> mPending;
+  Maybe<OriginAttributes> mActive;
+  const void* mParkedOwner = nullptr;
+  Maybe<OriginAttributes> mParked;
+};
+
+TRRLookupContextState* TRRLookupState() {
+  if (!NS_IsMainThread()) {
+    return nullptr;
+  }
+  static TRRLookupContextState* sState = new TRRLookupContextState();
+  return sState;
+}
+
+}  // namespace
+
+void StealthSetTRRLookupContext(const Maybe<OriginAttributes>& aContext) {
+  if (TRRLookupContextState* state = TRRLookupState()) {
+    state->mPending = aContext;
+  }
+}
+
+void StealthSetTRRLookupContext(nsIChannel* aChannel) {
+  StealthSetTRRLookupContext(StealthTRRContextOf(aChannel));
+}
+
+void StealthEnterTRRLookupContext() {
+  if (TRRLookupContextState* state = TRRLookupState()) {
+    state->mActive = std::move(state->mPending);
+    state->mPending.reset();
+  }
+}
+
+Maybe<OriginAttributes> StealthActiveTRRLookupContext() {
+  TRRLookupContextState* state = TRRLookupState();
+  return state ? state->mActive : Maybe<OriginAttributes>();
+}
+
+bool StealthApplyTRRLookupContext(nsIChannel* aChannel, nsresult* aRv) {
+  nsresult rv = StealthApplyTRRContextToChannel(aChannel,
+                                                StealthActiveTRRLookupContext());
+  if (NS_FAILED(rv)) {
+    *aRv = rv;
+    return true;
+  }
+  return false;
+}
+
+void StealthParkTRRLookupContext(const void* aOwner,
+                                 const Maybe<OriginAttributes>& aContext) {
+  if (TRRLookupContextState* state = TRRLookupState()) {
+    state->mParkedOwner = aOwner;
+    state->mParked = aContext;
+  }
+}
+
+void StealthTakeParkedTRRLookupContext(const void* aOwner) {
+  if (TRRLookupContextState* state = TRRLookupState()) {
+    state->mPending.reset();
+    if (state->mParkedOwner == aOwner) {
+      state->mPending = std::move(state->mParked);
+    }
+    state->mParked.reset();
+    state->mParkedOwner = nullptr;
+  }
+}
+
+mozilla::ipc::IPCResult SocketProcessParent::RecvStealthProxyLookupOrigin(
+    const Maybe<OriginAttributes>& aOriginAttributes) {
+  StealthParkTRRLookupContext(this, aOriginAttributes);
+  return IPC_OK();
 }
 
 void StealthKeepRequestContext(const OriginAttributes& aPage,

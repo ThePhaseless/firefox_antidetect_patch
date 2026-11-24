@@ -13,3 +13,4 @@ SOURCES += [
     "TestStealthTRRContext.cpp",
 ]
 SOURCES += ["TestStealthHttp3Socks.cpp"]  # STEALTH-HOOK(network/proxy-udp)
+SOURCES += ["TestStealthLookupLoadInfo.cpp"]  # STEALTH-HOOK(network/proxy-udp)

@@ -15,6 +15,7 @@
   "docshell/base/StealthNavigationEvents.h": "100644",
   "docshell/base/test/gtest/TestStealthNavigation.cpp": "100644",
   "docshell/base/test/gtest/stealth.build": "100644",
+  "juggler/tests/navigation_hook_runs_only_for_a_load_that_leaves_the_document.test.mjs": "100644",
   "netwerk/base/StealthLoadInfo.cpp": "100644",
   "netwerk/base/StealthLoadInfo.h": "100644"
  },

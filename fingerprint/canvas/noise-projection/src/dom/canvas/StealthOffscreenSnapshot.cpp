@@ -67,6 +67,13 @@
 #include "nsIGlobalObject.h"
 #include "nsIPrincipal.h"
 
+already_AddRefed<mozilla::gfx::SourceSurface>
+nsICanvasRenderingContextInternal::StealthGetSurfaceSnapshot() {
+  return mozilla::CanvasUtils::StealthPageSnapshotOf(
+      mCanvasElement.get(), mOffscreenCanvas.get(),
+      [&] { return GetSurfaceSnapshot(); });
+}
+
 namespace mozilla::dom {
 
 already_AddRefed<gfx::SourceSurface> OffscreenCanvas::GetSurfaceSnapshot(

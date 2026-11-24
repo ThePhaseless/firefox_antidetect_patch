@@ -57,6 +57,24 @@ TEST(StealthMouseEventIPC, AMessageWithoutTheEventIsRefused)
   EXPECT_FALSE(IPC::ParamTraits<WidgetMouseEvent>::Read(&reader, &out));
 }
 
+TEST(StealthMouseEventIPC, TheIdIsReadOnlyWhenTheFieldBeforeItWasRead)
+{
+  // The read is the last link of the && chain: after a failed read of the
+  // field before it, nothing is consumed (negative control), and after a
+  // successful one it is the next value of the stream that becomes the id.
+  UniquePtr<IPC::Message> msg(new IPC::Message(MSG_ROUTING_NONE, 0));
+  {
+    IPC::MessageWriter writer(*msg);
+    IPC::WriteParam(&writer, uint32_t(5));
+  }
+  WidgetMouseEvent out(true, eMouseMove, nullptr);
+  IPC::MessageReader reader(*msg);
+  EXPECT_FALSE(IPC::StealthReadJugglerEventId(&reader, &out, false));
+  EXPECT_EQ(out.mJugglerEventId, 0u);
+  EXPECT_TRUE(IPC::StealthReadJugglerEventId(&reader, &out, true));
+  EXPECT_EQ(out.mJugglerEventId, 5u);
+}
+
 TEST(StealthMouseEventCopy, DuplicateKeepsTheId)
 {
   WidgetMouseEvent origin(true, eMouseUp, nullptr);

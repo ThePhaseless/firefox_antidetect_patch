@@ -11,12 +11,18 @@
   "file": "layout/base/nsLayoutUtils.cpp",
   "function": "SurfaceFromElementResult nsLayoutUtils::SurfaceFromElement(",
   "kind": "rewrite",
-  "form": "unknown",
-  "line": "  result.mSourceSurface = StealthCanvasSnapshot(aElement, aSurfaceFlags, pAlphaType, aTarget);  // STEALTH-HOOK(fingerprint/canvas/as-drawn)",
+  "form": "wrap-call",
+  "line": "  result.mSourceSurface = aElement->StealthGetSurfaceSnapshot(aSurfaceFlags, pAlphaType, aTarget);  // STEALTH-HOOK(fingerprint/canvas/as-drawn)",
   "removed": "  result.mSourceSurface = aElement->GetSurfaceSnapshot(pAlphaType, aTarget);",
-  "test": "wrapper:tests/test_moz_element_paints_a_webgl_canvas_as_drawn_e2e.py::test_moz_element_paints_a_webgl_canvas_as_drawn",
-  "exception": "G29 (PM-DECISIONS 22/11 morning, read by the pm against the tag): one Mozilla line, only the called function changes",
-  "pm": "approvato"
+  "test": ""
+ },
+ {
+  "file": "layout/base/nsLayoutUtils.h",
+  "function": "class nsLayoutUtils {",
+  "kind": "add",
+  "form": "member",
+  "line": "  template <class ElementT> static mozilla::SurfaceFromElementResult StealthSurfaceFromElementAsDrawn(ElementT* aElement);  // STEALTH-HOOK(fingerprint/canvas/as-drawn)",
+  "test": ""
  },
  {
   "file": "layout/painting/nsImageRenderer.cpp",
@@ -30,12 +36,10 @@
   "file": "layout/painting/nsImageRenderer.cpp",
   "function": "bool nsImageRenderer::PrepareImage() {",
   "kind": "rewrite",
-  "form": "unknown",
-  "line": "    mImageElementSurface = nsLayoutUtils::SurfaceFromElement(paintElement, kStealthSfeAsDrawn);  // STEALTH-HOOK(fingerprint/canvas/as-drawn)",
+  "form": "wrap-call",
+  "line": "    mImageElementSurface = nsLayoutUtils::StealthSurfaceFromElementAsDrawn(paintElement);  // STEALTH-HOOK(fingerprint/canvas/as-drawn)",
   "removed": "    mImageElementSurface = nsLayoutUtils::SurfaceFromElement(paintElement);",
-  "test": "wrapper:tests/test_moz_element_paints_a_webgl_canvas_as_drawn_e2e.py::test_moz_element_paints_a_webgl_canvas_as_drawn",
-  "exception": "G29 (PM-DECISIONS 22/11 morning, read by the pm against the tag): one Mozilla line, one argument of ours is added to the call",
-  "pm": "approvato"
+  "test": ""
  },
  {
   "file": "widget/nsBaseDragService.cpp",
