@@ -5,6 +5,7 @@
 #include "StealthPcUdpProxy.h"
 
 #include "mozilla/net/ProxyConfigLookup.h"
+#include "mozilla/net/StealthDocumentChannel.h"
 #include "mozilla/net/WebrtcProxyConfig.h"
 #include "mozilla/Maybe.h"
 #include "mozilla/net/NeckoChannelParams.h"
@@ -54,13 +55,15 @@ void PcUdpProxy::DoLookup(const LoadInfoArgs& aLoadInfo) {
     return;
   }
   RefPtr<PcUdpProxy> self = this;
+  // The load info of the document is the one of this lookup alone: Create takes it (StealthDocumentChannel.h).
+  StealthSetLookupLoadInfo(Some(aLoadInfo));
   rv = ProxyConfigLookup::Create(
       [self](nsIProxyInfo* aProxyInfo, nsresult aStatus) {
         Socks5Info info;
         const Kind kind = KindFor(aStatus, aProxyInfo, &info);
         self->Resolved(kind, info);
       },
-      uri, nsIProtocolProxyService::RESOLVE_PREFER_SOCKS_PROXY, false, nullptr, Some(aLoadInfo));
+      uri, nsIProtocolProxyService::RESOLVE_PREFER_SOCKS_PROXY, false, nullptr);
   if (NS_FAILED(rv)) {
     // The lookup could not be made: the proxy is not known, so nothing goes out (see above).
     Resolved(Kind::Blocked, Socks5Info());

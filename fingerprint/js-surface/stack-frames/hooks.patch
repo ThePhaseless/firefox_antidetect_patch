@@ -1,5 +1,5 @@
 diff --git a/js/src/vm/SavedStacks.cpp b/js/src/vm/SavedStacks.cpp
-index db96f4fbbbf05aea39e37d465537b53720cdfa0c..45a773e63fc1df933f0e5b5ef091b2525df02520 100644
+index db96f4fbbbf05aea39e37d465537b53720cdfa0c..786066a4c5e5e53c59b67dad817efd239412df59 100644
 --- a/js/src/vm/SavedStacks.cpp
 +++ b/js/src/vm/SavedStacks.cpp
 @@ -40,6 +40,8 @@
@@ -11,11 +11,30 @@ index db96f4fbbbf05aea39e37d465537b53720cdfa0c..45a773e63fc1df933f0e5b5ef091b252
  using mozilla::AddToHash;
  using mozilla::DebugOnly;
  using mozilla::Maybe;
-@@ -1081,6 +1083,7 @@ JS_PUBLIC_API bool BuildStackString(JSContext* cx, JSPrincipals* principals,
-       nextFrame = js::GetFirstSubsumedFrame(cx, principals, parent,
+@@ -1063,7 +1065,7 @@ JS_PUBLIC_API bool BuildStackString(JSContext* cx, JSPrincipals* principals,
+     bool skippedAsync;
+     RootedTuple<js::SavedFrame*, js::SavedFrame*, js::SavedFrame*> roots(cx);
+     RootedField<js::SavedFrame*, 0> frame(
+-        roots, UnwrapSavedFrame(cx, principals, stack,
++        roots, StealthUnwrapVisibleFrame(cx, principals, stack,  // STEALTH-HOOK(fingerprint/js-surface/stack-frames)
+                                 SavedFrameSelfHosted::Exclude, skippedAsync));
+     if (!frame) {
+       stringp.set(cx->runtime()->emptyString);
+@@ -1078,7 +1080,7 @@ JS_PUBLIC_API bool BuildStackString(JSContext* cx, JSPrincipals* principals,
+ 
+       parent = frame->getParent();
+       bool skippedNextAsync;
+-      nextFrame = js::GetFirstSubsumedFrame(cx, principals, parent,
++      nextFrame = StealthFirstVisibleFrame(cx, principals, parent,  // STEALTH-HOOK(fingerprint/js-surface/stack-frames)
                                              SavedFrameSelfHosted::Exclude,
                                              skippedNextAsync);
-+      if (StealthSkipJugglerFrame(&frame, nextFrame, &skippedAsync, skippedNextAsync)) continue;  // STEALTH-HOOK(fingerprint/js-surface/stack-frames)
  
-       switch (format) {
-         case js::StackFormat::SpiderMonkey:
+@@ -1090,7 +1092,7 @@ JS_PUBLIC_API bool BuildStackString(JSContext* cx, JSPrincipals* principals,
+           }
+           break;
+         case js::StackFormat::V8:
+-          if (!FormatV8StackFrame(cx, sb, frame, indent, !nextFrame)) {
++          if (!FormatV8StackFrame(cx, sb, frame, indent, StealthIsLastFrame(!nextFrame))) {  // STEALTH-HOOK(fingerprint/js-surface/stack-frames)
+             return false;
+           }
+           break;

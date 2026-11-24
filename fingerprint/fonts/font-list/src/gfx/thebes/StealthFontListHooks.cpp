@@ -14,6 +14,7 @@
 #include "nsXULAppAPI.h"
 
 #ifdef XP_WIN
+#  include "gfxDWriteFontList.h"
 #  include "mozilla/gfx/UnscaledFontDWrite.h"
 #endif
 
@@ -105,6 +106,36 @@ bool StealthNoFontsFoundCore(bool aBundleOnly, bool aMozilla) {
 
 bool StealthNoFontsFound(const gfxPlatformFontList* aList, bool aMozilla) {
   return StealthNoFontsFoundCore(aList->StealthBundleOnly(), aMozilla);
+}
+
+// InitSharedFontListForPlatform (gfxDWriteFontList.cpp): the family list of the
+// shared font list. Under bundle-only it is the manifest's, assigned in place
+// of the host's system collection, which is never enumerated (no read of the
+// host's fonts or of its locale: AppendFamiliesFromCollection asks both). The
+// bundled collection, which Mozilla appends next, is not appended either
+// (StealthBundledFontsApply), so its timing is not recorded in the parent. In
+// any other list the call is Mozilla's, with the same arguments.
+#ifdef XP_WIN
+void gfxDWriteFontList::StealthAppendFamiliesFromCollection(
+    IDWriteFontCollection* aCollection,
+    nsTArray<fontlist::Family::InitData>& aFamilies,
+    const nsTArray<nsCString>* aForceClassicFams) {
+  if (StealthBundleOnly()) {
+    aFamilies = StealthBundleFontList::Get()->Families().Clone();
+    return;
+  }
+  AppendFamiliesFromCollection(aCollection, aFamilies, aForceClassicFams);
+}
+#endif
+
+bool StealthBundledFontsApplyCore(bool aBundleOnly, bool aBundled) {
+  return aBundled && !aBundleOnly;
+}
+
+bool StealthBundledFontsApply(const gfxPlatformFontList* aList,
+                              const IDWriteFontCollection* aBundled) {
+  return StealthBundledFontsApplyCore(aList->StealthBundleOnly(),
+                                      aBundled != nullptr);
 }
 
 bool StealthSkipsHostCollectionCore(bool aBundleOnly, const void* aCollection,

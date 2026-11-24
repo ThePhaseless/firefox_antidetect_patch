@@ -7,7 +7,9 @@
   "js/xpconnect/src/nsXPConnect.cpp"
  ],
  "added": {
-  "dom/base/test/gtest/TestStealthTimezone.cpp": "100644"
+  "dom/base/test/gtest/TestStealthTimezone.cpp": "100644",
+  "dom/xslt/xslt/StealthExsltTime.h": "100644",
+  "juggler/tests/exslt_time_finds_the_source_document_as_the_file_does.test.mjs": "100644"
  },
  "inventory": [
   {

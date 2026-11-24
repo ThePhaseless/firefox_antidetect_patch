@@ -1,5 +1,5 @@
 diff --git a/docshell/base/BrowsingContext.cpp b/docshell/base/BrowsingContext.cpp
-index 0986f712c9246d9dee01a95237eb1b69e4b8349e..bbd2288d75846485855f70bc6958244798b7b309 100644
+index 0986f712c9246d9dee01a95237eb1b69e4b8349e..0bfaae6747286abc77f5e4c17c75ffd8ee25e669 100644
 --- a/docshell/base/BrowsingContext.cpp
 +++ b/docshell/base/BrowsingContext.cpp
 @@ -102,6 +102,8 @@
@@ -28,15 +28,15 @@ index 0986f712c9246d9dee01a95237eb1b69e4b8349e..bbd2288d75846485855f70bc69582447
  
    workerinternals::RuntimeService* rts =
        workerinternals::RuntimeService::GetService();
-@@ -3597,7 +3600,7 @@ void BrowsingContext::DidSet(FieldIndex<IDX_LanguageOverride>,
+@@ -3596,7 +3599,7 @@ void BrowsingContext::DidSet(FieldIndex<IDX_LanguageOverride>,
+         if (languageOverride.IsEmpty()) {
            JS::SetRealmLocaleOverride(realm, nullptr);
          } else {
-           JS::SetRealmLocaleOverride(
--              realm, PromiseFlatCString(languageOverride).get());
-+              realm, StealthRealmLocale(realm, PromiseFlatCString(languageOverride)).get());  // STEALTH-HOOK(fingerprint/locale-time/timezone)
+-          JS::SetRealmLocaleOverride(
++          StealthSetRealmLocaleOverride(  // STEALTH-HOOK(fingerprint/locale-time/timezone)
+               realm, PromiseFlatCString(languageOverride).get());
          }
  
-         if (Navigator* navigator = window->Navigator()) {
 @@ -3889,7 +3892,7 @@ void BrowsingContext::DidSet(FieldIndex<IDX_TimezoneOverride>,
                               nsString&& aOldValue) {
    MOZ_ASSERT(IsTop());
@@ -47,7 +47,7 @@ index 0986f712c9246d9dee01a95237eb1b69e4b8349e..bbd2288d75846485855f70bc69582447
    PreOrderWalk([&](BrowsingContext* aBrowsingContext) {
      if (RefPtr<WindowContext> windowContext =
 diff --git a/dom/base/Document.cpp b/dom/base/Document.cpp
-index 24fc4978206ae6eba18971f243d680a8b8802e65..bb9291a164ab90ea3c6a2f443e3897e2f82c6533 100644
+index 24fc4978206ae6eba18971f243d680a8b8802e65..3ceeeee4522aace7e7762a6e8c14d2fb1bed446c 100644
 --- a/dom/base/Document.cpp
 +++ b/dom/base/Document.cpp
 @@ -486,6 +486,8 @@
@@ -106,11 +106,12 @@ index 24fc4978206ae6eba18971f243d680a8b8802e65..bb9291a164ab90ea3c6a2f443e3897e2
    }
  }
  
-@@ -20984,6 +20988,7 @@ const LangGroupFontPrefs* Document::GetFontPrefsForLang(
+@@ -20983,7 +20987,7 @@ const LangGroupFontPrefs* Document::GetFontPrefsForLang(
+ }
  
  void Document::RecomputeLanguageFromCharset() {
-   nsAtom* language = mozilla::intl::EncodingToLang::Lookup(mCharacterSet);
-+  language = DocumentCharsetLanguage(this, language);  // STEALTH-HOOK(fingerprint/locale-time/timezone)
+-  nsAtom* language = mozilla::intl::EncodingToLang::Lookup(mCharacterSet);
++  nsAtom* language = StealthDocumentCharsetLanguage(this, mozilla::intl::EncodingToLang::Lookup(mCharacterSet));  // STEALTH-HOOK(fingerprint/locale-time/timezone)
  
    if (language == mLanguageFromCharset) {
      return;
@@ -127,24 +128,25 @@ index 8d5870ae7c2d09a637e5230780a8cd62fece1e2e..eb001affdb0c0f210ad2387505a3ee0a
  
    void AppendAutoFocusCandidateToTopDocument(Element* aAutoFocusCandidate);
 diff --git a/dom/xslt/xslt/txEXSLTFunctions.cpp b/dom/xslt/xslt/txEXSLTFunctions.cpp
-index ba2f3c2e6022c7dc4c15b331a3f0ee5eadc6b550..fb851b8446dc9a1d208276f0e038fde97dd337fc 100644
+index ba2f3c2e6022c7dc4c15b331a3f0ee5eadc6b550..a684a25d885c9fd652f99db7cbd3de41260a7d53 100644
 --- a/dom/xslt/xslt/txEXSLTFunctions.cpp
 +++ b/dom/xslt/xslt/txEXSLTFunctions.cpp
-@@ -28,6 +28,8 @@
+@@ -28,6 +28,9 @@
  #include "txXPathTreeWalker.h"
  #include "xpcprivate.h"
  
 +#include "mozilla/dom/StealthSessionDeclaration.h"  // STEALTH-HOOK(fingerprint/locale-time/timezone)
++#include "StealthExsltTime.h"  // STEALTH-HOOK(fingerprint/locale-time/timezone)
 +
  using namespace mozilla;
  using namespace mozilla::dom;
  
-@@ -596,7 +598,7 @@ nsresult txEXSLTFunctionCall::evaluate(txIEvalContext* aContext,
+@@ -596,7 +599,7 @@ nsresult txEXSLTFunctionCall::evaluate(txIEvalContext* aContext,
                      RTPCallerType::ResistFingerprinting) *
                      PR_USEC_PER_SEC
                : PR_Now();
 -      PR_ExplodeTime(time, timezone, &prtime);
-+      StealthExplodeTime(sourceDoc, time, timezone, &prtime);  // STEALTH-HOOK(fingerprint/locale-time/timezone)
++      StealthExplodeTime(aContext, time, timezone, &prtime);  // STEALTH-HOOK(fingerprint/locale-time/timezone)
  
        int32_t offset =
            (prtime.tm_params.tp_gmt_offset + prtime.tm_params.tp_dst_offset) /

@@ -8,6 +8,9 @@
 // hashed every unsigned DLL of the install for a catalog signature that
 // cannot exist, 1.26 s of CPU per launch.
 
+#include <iterator>
+#include <windows.h>
+
 #include "gtest/gtest.h"
 
 #include "mozilla/UntrustedModulesData.h"
@@ -50,4 +53,31 @@ TEST(StealthOwnBinaries, StealthSkipsSignatureLookup)
   // No version resource: the lookup is kept.
   EXPECT_FALSE(StealthSkipsSignatureLookup(u"C:\\Windows\\System32\\ntdll.dll"_ns,
                                            mozilla::ModuleVersionInfo(), false));
+}
+
+// GetVersionAndVendorInfo hands the signature lookup of Mozilla to our function as a thunk: it is made for a module that
+// is not one of this build's own, and never made for one that is (the running exe's own file is one: its directory and its
+// version). The count of the thunk is the observable; the control is the module of the system, for which it is made once.
+TEST(StealthOwnBinaries, TheSignatureLookupIsMadeOnlyForAModuleThatIsNotOurOwn)
+{
+  int lookups = 0;
+  auto lookup = [&]() {
+    ++lookups;
+    return mozilla::UniquePtr<wchar_t[]>();
+  };
+
+  // The control: a module of the system, the lookup is made, once, and its answer is the one returned.
+  mozilla::StealthSignatureLookupUnlessOwn(u"C:\\Windows\\System32\\ntdll.dll"_ns, lookup);
+  EXPECT_EQ(lookups, 1);
+
+  wchar_t exePath[MAX_PATH * 4];
+  const DWORD exeLen = ::GetModuleFileNameW(nullptr, exePath, std::size(exePath));
+  ASSERT_TRUE(exeLen > 0 && exeLen < std::size(exePath));
+  const nsDependentString exe(exePath, exeLen);
+  if (!mozilla::StealthSkipsSignatureLookupOf(exe)) {
+    GTEST_SKIP() << "the test process has no version resource of its own";
+  }
+  lookups = 0;
+  mozilla::StealthSignatureLookupUnlessOwn(exe, lookup);
+  EXPECT_EQ(lookups, 0);
 }

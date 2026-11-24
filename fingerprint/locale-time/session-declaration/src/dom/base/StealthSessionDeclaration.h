@@ -143,33 +143,15 @@ void SeedDeclaredTimezoneAndLanguage(BrowsingContext* aContext);
 void SetRealmDeclaredLocale(JS::Realm* aRealm, const nsACString& aLanguage);
 
 /**
- * The default Intl locale of a window realm, from the declared language, as the
- * argument of JS::SetRealmLocaleOverride:
- *   JS::SetRealmLocaleOverride(realm, StealthRealmLocale(realm, list).get());
- * The override may be an Accept-Language list ("fr-FR, fr") so that
- * navigator.languages reports the full desktop-default list; the realm's Intl
- * default locale is a single BCP-47 tag, so `get()` is the list's primary tag.
- * `aLanguage` must not be empty: the caller clears the override with nullptr
- * itself.
- *
- * The document of this window caches the language of its text with no `lang`
- * and follows its context when the context's language changes: the temporary
- * refreshes it when it is destroyed, at the end of the statement, that is after
- * the realm took the tag (the same three steps, in the same order, as the
- * function this replaces). Main thread only.
+ * JS::SetRealmLocaleOverride for the realm of a window, with the declared
+ * language in the form the realm takes: Mozilla's caller (BrowsingContext::
+ * DidSet(LanguageOverride)) passes `PromiseFlatCString(languageOverride).get()`
+ * as it always did, which may be an Accept-Language list ("fr-FR, fr"); the
+ * realm's Intl default locale is a single BCP-47 tag, so it takes the list's
+ * primary tag, and the document of the window follows (SetRealmDeclaredLocale).
+ * `aLanguage` must not be empty. Main thread only.
  */
-class StealthRealmLocale {
- public:
-  StealthRealmLocale(JS::Realm* aRealm, const nsACString& aLanguage);
-  ~StealthRealmLocale();
-  StealthRealmLocale(const StealthRealmLocale&) = delete;
-  StealthRealmLocale& operator=(const StealthRealmLocale&) = delete;
-  const char* get() const { return mTag.get(); }
-
- private:
-  JS::Realm* mRealm;
-  nsAutoCString mTag;
-};
+void StealthSetRealmLocaleOverride(JS::Realm* aRealm, const char* aLanguage);
 
 /**
  * `aTime` exploded as the local time of a page in `aDocument`, with
@@ -217,7 +199,7 @@ void StealthExplodeTime(const Document* aDocument, PRTime aTime,
  * the context's language changes while the document lives
  * (SetRealmDeclaredLocale, from BrowsingContext::DidSet(LanguageOverride)).
  *
- * DocumentCharsetLanguage gives, for the atom EncodingToLang answered, the
+ * StealthDocumentCharsetLanguage gives, for the atom EncodingToLang answered, the
  * context's language (the top BrowsingContext's LanguageOverride, or the
  * session's) as an atom interned for the life of the process (a Document
  * holds the pointer without owning it) when the encoding has no language of
@@ -230,7 +212,7 @@ void StealthExplodeTime(const Document* aDocument, PRTime aTime,
 nsAtom* ChooseCharsetLanguage(nsAtom* aFromCharset, nsAtom* aProcessLanguage,
                               nsAtom* aDeclared);
 nsAtom* InternedLanguage(const nsACString& aDeclared);
-nsAtom* DocumentCharsetLanguage(const Document* aDocument,
+nsAtom* StealthDocumentCharsetLanguage(const Document* aDocument,
                                 nsAtom* aFromCharset);
 
 // Document::SetContainer, right after it stored the container: the context is

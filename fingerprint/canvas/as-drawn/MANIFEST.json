@@ -1,13 +1,15 @@
 {
  "modified": [
   "layout/base/nsLayoutUtils.cpp",
+  "layout/base/nsLayoutUtils.h",
   "layout/painting/nsImageRenderer.cpp",
   "widget/nsBaseDragService.cpp",
   "widget/windows/TaskbarPreview.cpp"
  ],
  "added": {
   "dom/base/StealthCanvasAsDrawn.h": "100644",
-  "layout/base/StealthSurfaceFlags.h": "100644"
+  "layout/base/StealthSurfaceFlags.h": "100644",
+  "layout/base/gtest/TestStealthSurfaceFlags.cpp": "100644"
  },
  "inventory": [
   {
@@ -32,6 +34,26 @@
      "notes"
     ],
     "why": "Anchor made precise (the HTMLCanvasElement overload); dependency question resolved."
+   }
+  },
+  {
+   "file": "layout/base/nsLayoutUtils.h",
+   "category": "spoof",
+   "feature": "canvas-as-drawn-readers",
+   "prefs": [],
+   "added": 1,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "class nsLayoutUtils, after the SurfaceFromElement(HTMLCanvasElement*, ...) declaration",
+   "evidence": [
+    "+  template <class ElementT> static mozilla::SurfaceFromElementResult StealthSurfaceFromElementAsDrawn(ElementT* aElement);  // STEALTH-HOOK(fingerprint/canvas/as-drawn)"
+   ],
+   "notes": "Declares the template through which the two readers that show a canvas ask for its snapshot as drawn; the definition is in our own file.",
+   "verifier": {
+    "changed": [],
+    "why": "Written from the diff against the tag."
    }
   },
   {

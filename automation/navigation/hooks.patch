@@ -28,7 +28,7 @@ index 86b2939a83873627e79ec19b87d13008e2e2109d..6ef207fb4a9a5ec3a85e5068c925f747
  }
  
 diff --git a/docshell/base/nsDocShell.cpp b/docshell/base/nsDocShell.cpp
-index 9890b717e687329386006642e8c536f4dd094bd9..9a33c70a5197c164ce4cf7ac27f00955df0774f0 100644
+index 9890b717e687329386006642e8c536f4dd094bd9..0e42c150bf10b9b03f5430dded6a46571d1fd112 100644
 --- a/docshell/base/nsDocShell.cpp
 +++ b/docshell/base/nsDocShell.cpp
 @@ -262,6 +262,8 @@
@@ -44,7 +44,7 @@ index 9890b717e687329386006642e8c536f4dd094bd9..9a33c70a5197c164ce4cf7ac27f00955
    attrs.SetFirstPartyDomain(isTopLevelDoc, aLoadState->URI());
  
    nsCOMPtr<nsIRequest> req;
-+  StealthNavigationLoad stealthLoad(this, aLoadState, !isJavaScript && !sameDocument);  // STEALTH-HOOK(automation/navigation)
++  StealthNavigationLoad stealthLoad(this, aLoadState);  // STEALTH-HOOK(automation/navigation)
    rv = DoURILoad(aLoadState, aCacheKey, getter_AddRefs(req));
  
    if (NS_SUCCEEDED(rv)) {

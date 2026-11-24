@@ -58,4 +58,10 @@ bool StealthSkipsSignatureLookup(const nsAString& aPath,
   return aHasVersion && IsOwnUnsignedBinary(aPath, aVerInfo);
 }
 
+bool StealthSkipsSignatureLookupOf(const nsAString& aPath) {
+  ModuleVersionInfo verInfo;
+  const bool hasVersion = verInfo.GetFromImage(aPath);
+  return StealthSkipsSignatureLookup(aPath, verInfo, hasVersion);
+}
+
 }  // namespace mozilla

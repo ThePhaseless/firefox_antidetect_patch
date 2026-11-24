@@ -79,6 +79,26 @@ TEST(Intl_Locale_StealthSystemLocales, TheDeclaredLanguageIsTheRegionalLanguage)
   EXPECT_FALSE(IsOnly(RegionalLocales(), "en-TT"));
 }
 
+// The declaration is read before upstream asks the operating system, and the answer says whether upstream's call runs: a
+// declared language is the only entry and the system is not asked; with nothing declared the list is left as it was and
+// upstream's call fills it.
+TEST(Intl_Locale_StealthSystemLocales,
+     ADeclaredLanguageIsAnsweredBeforeTheOperatingSystemIsAsked)
+{
+  nsTArray<nsCString> locales;
+  locales.AppendElement("sentinel"_ns);
+  {
+    DeclaredRegionalLanguage session("en-TT, en, en-US");
+    EXPECT_TRUE(StealthDeclaredRegionalPrefsLocales(locales));
+    EXPECT_TRUE(IsOnly(locales, "en-TT"));
+  }
+  // The control: nothing declared.
+  locales.Clear();
+  locales.AppendElement("sentinel"_ns);
+  EXPECT_FALSE(StealthDeclaredRegionalPrefsLocales(locales));
+  EXPECT_TRUE(IsOnly(locales, "sentinel"));
+}
+
 TEST(Intl_Locale_StealthSystemLocales,
      ADeclaredLanguageOfAnotherLanguageKeepsTheAppLocales)
 {

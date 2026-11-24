@@ -93,6 +93,25 @@ test('the name context and the bind address of the transport come from one call,
   }
 });
 
+test('the channel of the proxy lookup that the swap drops is never opened, and both lookups swap through one function', () => {
+  // The behaviour is in netwerk/test/gtest/TestStealthLookupLoadInfo.cpp (TheChannelTheSwapDropsIsNeverOpened, with its control).
+  // Here: the lookup of this socket, between the channel Mozilla makes and the proxy service, opens nothing.
+  const text = read(TCP);
+  const start = text.indexOf('nsresult WebrtcTCPSocket::DoProxyConfigLookup() {');
+  assert.ok(start > 0);
+  const body = text.slice(start, text.indexOf('\n}\n', start) + 3);
+  assert.doesNotMatch(body, /AsyncOpen|\bOpen\(|Open2|OpenWith/);
+  assert.match(body, /\n  if \(StealthSwapTcpLookupChannel\(this, channel, &rv\)\) return rv;  \/\/ STEALTH-HOOK\(network\/proxy-udp\)\n/);
+  assert.ok(body.indexOf('NS_NewChannel(') < body.indexOf('StealthSwapTcpLookupChannel(') && body.indexOf('StealthSwapTcpLookupChannel(') < body.indexOf('pps->AsyncResolve(channel'));
+  // The swap of the socket and the one of ProxyConfigLookup are the same function, which only makes the new channel.
+  assert.match(read(OWN), /return StealthSwapChannelOfLoadInfo\(aSocket->mURI, flags, aSocket->mProxyConfig->loadInfoArgs\(\), aChannel, aRv\);/);
+  const doc = read('netwerk/ipc/StealthDocumentChannel.cpp');
+  assert.match(doc, /  return StealthSwapChannelOfLoadInfo\(aURI, aProxyResolveFlags, loadInfo\.ref\(\),\s+aChannel, aRv\);/);
+  const core = doc.slice(doc.indexOf('bool StealthSwapChannelOfLoadInfo('));
+  const fn = core.slice(0, core.indexOf('\n}\n') + 3);
+  assert.doesNotMatch(fn, /AsyncOpen|\bOpen\(|Open2/);
+});
+
 test('the gtest of the rule is built', () => {
   assert.match(read(T + 'test/gtest/moz.build'), /\nSOURCES \+= \["TestStealthTcpProxyRoad\.cpp"\]\n/);
   const test = read(T + 'test/gtest/TestStealthTcpProxyRoad.cpp');

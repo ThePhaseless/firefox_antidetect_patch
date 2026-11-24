@@ -57,15 +57,15 @@ already_AddRefed<nsAtom> SessionLocaleLanguage() {
 // en-GB machine and en-US on any other, in the main runtime's default locale
 // (XPCLocale), the locales date and time inputs render with
 // (GetWebExposedLocales, datetimebox.js) and AppDateTimeFormat.
-nsresult MachineRegionalPrefsLocales(nsTArray<nsCString>& aRetVal) {
+bool StealthDeclaredRegionalPrefsLocales(nsTArray<nsCString>& aRetVal) {
   nsAutoCString declared;
   SessionLanguageTag(declared);
-  if (!declared.IsEmpty()) {
-    aRetVal.Clear();
-    aRetVal.AppendElement(declared);
-    return NS_OK;
+  if (declared.IsEmpty()) {
+    return false;
   }
-  return OSPreferences::GetInstance()->GetRegionalPrefsLocales(aRetVal);
+  aRetVal.Clear();
+  aRetVal.AppendElement(declared);
+  return true;
 }
 
 bool SystemLocalesFromDeclared(const nsACString& aDeclared,
@@ -159,6 +159,12 @@ void PrimaryLanguageTag(const nsACString& aList, nsACString& aTag) {
     aTag.Truncate(comma);
   }
   aTag.Trim(" \t");
+}
+
+nsCString StealthPrimaryLanguageTag(const nsACString& aList) {
+  nsCString tag;
+  PrimaryLanguageTag(aList, tag);
+  return tag;
 }
 
 }  // namespace mozilla::intl

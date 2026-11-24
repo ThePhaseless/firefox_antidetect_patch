@@ -14,7 +14,7 @@
 
 #include "modules/desktop_capture/win/desktop.h"
 
-namespace webrtc {
+namespace mozilla {
 
 // STEALTHFOX_HIDDEN_DESKTOP: whether the window lives on the desktop the
 // screen shows (the input desktop). A window of this process created on
@@ -48,7 +48,8 @@ inline bool StealthIsWindowOnInputDesktop(HWND hwnd) {
                                    sizeof(window_desktop_name), &length)) {
     return true;
   }
-  std::unique_ptr<Desktop> input_desktop(Desktop::GetInputDesktop());
+  std::unique_ptr<webrtc::Desktop> input_desktop(
+      webrtc::Desktop::GetInputDesktop());
   std::wstring input_desktop_name;
   if (!input_desktop || !input_desktop->GetName(&input_desktop_name)) {
     return true;
@@ -76,6 +77,6 @@ inline bool StealthIsOffInputDesktop(HWND hwnd) {
   return !StealthIsWindowOnInputDesktop(hwnd);
 }
 
-}  // namespace webrtc
+}  // namespace mozilla
 
 #endif  // MODULES_DESKTOP_CAPTURE_WIN_STEALTH_WINDOW_INPUT_DESKTOP_H_

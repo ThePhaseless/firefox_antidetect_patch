@@ -75,12 +75,11 @@ export function attachRoute(request, endpoint) {
  * engine, with necko, and leaves by the road `sessionRoute()` hands it
  * below.
  *
- * Called in runPingSender right AFTER Mozilla's own choice (pingsender[.exe],
- * or the background task when a Nimbus variable says so), which stays as
- * Mozilla wrote it: this overrides its result.
+ * Called by StealthRoutedProcess when it starts the child: Mozilla's own choice
+ * in runPingSender (pingsender[.exe], or the background task when a Nimbus
+ * variable says so) stays as Mozilla wrote it and is never started.
  *
- * `params` is a fresh array on every call: the caller appends the ping urls
- * and paths to it.
+ * `params` is a fresh array on every call: the ping urls and paths follow it.
  *
  * @returns {{exeName: string, params: string[]}}
  */
@@ -92,33 +91,53 @@ export function invocation() {
 }
 
 /**
- * Start the background task with the session's road in its environment.
+ * The process of runPingSender, as its `runAsync` call meets it: the call is
+ * Mozilla's, `StealthRoutedProcess(process).runAsync(params, params.length,
+ * observer)`. The process Mozilla built (its own program, never started) is
+ * left as it is: the child is `invocation()`, `firefox[.exe] --backgroundtask
+ * pingsender` followed by Mozilla's parameters (the ping urls and paths), built
+ * here, and it starts with the session's road in its environment. nsIProcess
+ * can be initialised once, so the child is a process of its own.
  *
  * The road goes through the environment: not the command line, which any
  * process on the machine can list, and not a file that could outlive the
  * session with a proxy password in it. Only this child inherits it,
  * because `runAsync` starts the process on this thread before returning.
  *
- * @param {nsIProcess} process an initialised process (init, startHidden, noShell done)
- * @param {string[]} params the complete argument list
- * @param {nsIObserver} observer
+ * @param {nsIProcess} process the process Mozilla built (init, startHidden, noShell done)
+ * @returns {{runAsync: function(string[], number, nsIObserver): void}} the
+ *   same call as nsIProcess.runAsync(args, count, observer)
  */
-export function runAsync(process, params, observer) {
-  const route = sessionRoute();
-  if (!route) {
-    // The session's proxy is undecided: the ping would leave DIRECT. The ping
-    // stays on disk for a later session; nothing is started.
-    if (observer) {
-      observer.observe(process, "process-failed", null);
-    }
-    return;
-  }
-  Services.env.set(PINGSENDER_ROUTE_ENV, JSON.stringify(route));
-  try {
-    process.runAsync(params, params.length, observer);
-  } finally {
-    Services.env.set(PINGSENDER_ROUTE_ENV, "");
-  }
+export function StealthRoutedProcess(process) {
+  return {
+    runAsync(params, count, observer) {
+      const route = sessionRoute();
+      if (!route) {
+        // The session's proxy is undecided: the ping would leave DIRECT. The
+        // ping stays on disk for a later session; nothing is started.
+        if (observer) {
+          observer.observe(process, "process-failed", null);
+        }
+        return;
+      }
+      const { exeName, params: own } = invocation();
+      const exe = Services.dirsvc.get("GreBinD", Ci.nsIFile);
+      exe.append(exeName);
+      const child = Cc["@mozilla.org/process/util;1"].createInstance(
+        Ci.nsIProcess
+      );
+      child.init(exe);
+      child.startHidden = true;
+      child.noShell = true;
+      const args = [...own, ...params];
+      Services.env.set(PINGSENDER_ROUTE_ENV, JSON.stringify(route));
+      try {
+        child.runAsync(args, args.length, observer);
+      } finally {
+        Services.env.set(PINGSENDER_ROUTE_ENV, "");
+      }
+    },
+  };
 }
 
 /**

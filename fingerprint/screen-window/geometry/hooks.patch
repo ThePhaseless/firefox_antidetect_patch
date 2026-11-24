@@ -119,10 +119,10 @@ index 8613fdfd1976a3df90d995ce59753c2ef1919f7f..b9d832e43134dd4a374b507a96ca4574
  
    /**
 diff --git a/widget/moz.build b/widget/moz.build
-index 67a8082de98eb985cfa40c9af158b0518ec577de..b15202b39ae70edadb66b0ecaa1939ba8fa9f4e7 100644
+index 67a8082de98eb985cfa40c9af158b0518ec577de..780754a1f76d48bc7dca3ccbb5f3105b4cf15652 100644
 --- a/widget/moz.build
 +++ b/widget/moz.build
-@@ -320,6 +320,7 @@ SOURCES += [
+@@ -320,10 +320,12 @@ SOURCES += [
      "nsIWidget.cpp",
      "ScreenManager.cpp",
  ]
@@ -130,6 +130,11 @@ index 67a8082de98eb985cfa40c9af158b0518ec577de..b15202b39ae70edadb66b0ecaa1939ba
  
  EXPORTS.ipc = [
      "nsGUIEventIPC.h",
+ ]
++EXPORTS.ipc += ["StealthMouseEventIPC.h"]  # STEALTH-HOOK(automation/input)
+ 
+ if CONFIG["MOZ_X11"] or CONFIG["MOZ_WAYLAND"]:
+     DIRS += ["x11"]
 diff --git a/widget/nsIWidget.cpp b/widget/nsIWidget.cpp
 index 39411305c2b853b90a386d88b0c1fbae9449796e..032d61027ddf62e951b9383fde58a73f6c915ee3 100644
 --- a/widget/nsIWidget.cpp

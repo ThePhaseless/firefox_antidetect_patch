@@ -355,10 +355,10 @@ TEST(TestStealthTRRContext, TheFilterSeesTheContextOfTheLookup)
   auto Lookup = [&](const Maybe<OriginAttributes>& aContext) {
     bool done = false;
     filter->mAsked = false;
+    StealthSetTRRLookupContext(aContext);
     EXPECT_EQ(ProxyConfigLookup::Create(
                   [&done](nsIProxyInfo*, nsresult) { done = true; }, uri, 0,
-                  /* aIsTRRServiceChannel */ true, nullptr, Nothing(),
-                  aContext),
+                  /* aIsTRRServiceChannel */ true, nullptr),
               NS_OK);
     EXPECT_TRUE(SpinEventLoopUntil("TestStealthTRRContext"_ns,
                                    [&] { return done; }));
@@ -373,6 +373,225 @@ TEST(TestStealthTRRContext, TheFilterSeesTheContextOfTheLookup)
   EXPECT_EQ(filter->mUserContextId, 0u);
 
   EXPECT_EQ(pps->UnregisterChannelFilter(filter), NS_OK);
+}
+
+namespace {
+
+// One lookup of the parent process, as the callers of ProxyConfigLookup::Create make it: aSet is whether the statement
+// before Create sets a context (TRRServiceChannel::ResolveProxy does; TRRServiceBase and the lookup of a PeerConnection
+// UDP do not). Returns the userContextId the proxy filter saw on the stand-in channel.
+uint32_t LookupAndAskTheFilter(RecordingFilter* aFilter, nsIURI* aURI,
+                               bool aSet,
+                               const Maybe<OriginAttributes>& aContext) {
+  bool done = false;
+  aFilter->mAsked = false;
+  if (aSet) {
+    StealthSetTRRLookupContext(aContext);
+  }
+  EXPECT_EQ(ProxyConfigLookup::Create(
+                [&done](nsIProxyInfo*, nsresult) { done = true; }, aURI, 0,
+                /* aIsTRRServiceChannel */ true, nullptr),
+            NS_OK);
+  EXPECT_TRUE(
+      SpinEventLoopUntil("TestStealthTRRContext"_ns, [&] { return done; }));
+  EXPECT_TRUE(aFilter->mAsked);
+  return aFilter->mUserContextId;
+}
+
+// What the parent does for one constructor of PProxyConfigLookup, on the messages it has received: a message parks the
+// context in the slot of the socket process actor (SocketProcessParent::RecvStealthProxyLookupOrigin), the constructor
+// takes it (the first statement of RecvPProxyConfigLookupConstructor) and the lookup is made (ProxyConfigLookup::Create,
+// whose first statement makes the taken context the one of the lookup).
+struct ParentSideOfTheLookup {
+  int mActor = 0;  // only its address is used: the SocketProcessParent
+  void OnMessage(const Maybe<OriginAttributes>& aContext) {
+    StealthParkTRRLookupContext(&mActor, aContext);
+  }
+  // The context the lookup of the constructor is made with, as a userContextId (0: none).
+  uint32_t OnConstructor() {
+    StealthTakeParkedTRRLookupContext(&mActor);
+    StealthEnterTRRLookupContext();
+    Maybe<OriginAttributes> context = StealthActiveTRRLookupContext();
+    return context.isSome() ? context->mUserContextId : 0;
+  }
+};
+
+// The socket process side, as ProxyConfigLookupChild::Create makes it: the guard of Create, then the message, then the
+// constructor. The wire is what the two sides share, in the order of sending.
+struct WireEvent {
+  bool mIsConstructor;
+  Maybe<OriginAttributes> mContext;
+};
+
+struct FakeSocketProcessChild {
+  nsTArray<WireEvent>* mWire;
+  bool SendStealthProxyLookupOrigin(const Maybe<OriginAttributes>& aContext) {
+    mWire->AppendElement(WireEvent{false, aContext});
+    return true;
+  }
+  void SendPProxyConfigLookupConstructor() {
+    mWire->AppendElement(WireEvent{true, Nothing()});
+  }
+};
+
+// One lookup made in the socket process; aMessage false is a lookup whose message never reaches the parent (the control).
+void LookupInTheSocketProcess(FakeSocketProcessChild* aChild,
+                              const Maybe<OriginAttributes>& aContext,
+                              bool aMessage) {
+  StealthSetTRRLookupContext(aContext);  // TRRServiceChannel::ResolveProxy
+  StealthEnterTRRLookupContext();        // the first statement of Create
+  if (aMessage) {
+    StealthSendTRRLookupContext(aChild);  // right before the constructor
+  }
+  aChild->SendPProxyConfigLookupConstructor();
+}
+
+// The parent, the events in the order they arrive: the wire of the channel is a queue (ipc/glue/MessageChannel.cpp:
+// OnMessageReceivedFromLink inserts each message at the back of mPending and posts a task for it; the tasks run in the
+// order they were posted). The result is the context each constructor made its lookup with.
+nsTArray<uint32_t> ContextsOfTheLookupsOfTheParent(
+    ParentSideOfTheLookup& aParent, const nsTArray<WireEvent>& aWire) {
+  nsTArray<uint32_t> made;
+  for (const WireEvent& event : aWire) {
+    if (event.mIsConstructor) {
+      made.AppendElement(aParent.OnConstructor());
+    } else {
+      aParent.OnMessage(event.mContext);
+    }
+  }
+  return made;
+}
+
+}  // namespace
+
+// A context is the one of the lookup it was set for: the next lookup, which nobody sets a context for, is the default
+// context's, not the one before it. (A pending context that stayed would make a lookup of another context leave by this
+// one's proxy.)
+TEST(TestStealthTRRContext, TheContextOfALookupIsNotTheNextOnes)
+{
+  nsCOMPtr<nsIProtocolProxyService> pps =
+      do_GetService(NS_PROTOCOLPROXYSERVICE_CONTRACTID);
+  ASSERT_TRUE(pps);
+  RefPtr<RecordingFilter> filter = new RecordingFilter();
+  ASSERT_EQ(pps->RegisterChannelFilter(filter, 0), NS_OK);
+  nsCOMPtr<nsIURI> uri;
+  ASSERT_EQ(NS_NewURI(getter_AddRefs(uri),
+                      "https://mozilla.cloudflare-dns.com/dns-query"_ns),
+            NS_OK);
+
+  EXPECT_EQ(LookupAndAskTheFilter(filter, uri, true, ContextOf(7)), 7u);
+  EXPECT_EQ(LookupAndAskTheFilter(filter, uri, false, Nothing()), 0u);
+  EXPECT_EQ(LookupAndAskTheFilter(filter, uri, true, ContextOf(12)), 12u);
+  EXPECT_EQ(LookupAndAskTheFilter(filter, uri, false, Nothing()), 0u);
+
+  EXPECT_EQ(pps->UnregisterChannelFilter(filter), NS_OK);
+}
+
+// Between the message of the socket process and its constructor the parent may make a lookup of its own (TRRServiceBase
+// has no context to set): it never reads the one parked for the constructor. The constructor takes it, once; a
+// constructor of a socket process that was started again (another actor) gets none.
+TEST(TestStealthTRRContext, ALookupBetweenTheMessageAndTheConstructorNeverReadsItsContext)
+{
+  nsCOMPtr<nsIProtocolProxyService> pps =
+      do_GetService(NS_PROTOCOLPROXYSERVICE_CONTRACTID);
+  ASSERT_TRUE(pps);
+  RefPtr<RecordingFilter> filter = new RecordingFilter();
+  ASSERT_EQ(pps->RegisterChannelFilter(filter, 0), NS_OK);
+  nsCOMPtr<nsIURI> uri;
+  ASSERT_EQ(NS_NewURI(getter_AddRefs(uri),
+                      "https://mozilla.cloudflare-dns.com/dns-query"_ns),
+            NS_OK);
+
+  ParentSideOfTheLookup actor;
+  ParentSideOfTheLookup restarted;
+
+  actor.OnMessage(ContextOf(7));
+  // The lookup of the parent in between: no context.
+  EXPECT_EQ(LookupAndAskTheFilter(filter, uri, false, Nothing()), 0u);
+  // The constructor: the context of its message.
+  StealthTakeParkedTRRLookupContext(&actor.mActor);
+  EXPECT_EQ(LookupAndAskTheFilter(filter, uri, false, Nothing()), 7u);
+  // Taken: a constructor with no message in front of it has none (the control: the same take, nothing parked).
+  StealthTakeParkedTRRLookupContext(&actor.mActor);
+  EXPECT_EQ(LookupAndAskTheFilter(filter, uri, false, Nothing()), 0u);
+  // Another actor takes nothing of this one's.
+  actor.OnMessage(ContextOf(12));
+  StealthTakeParkedTRRLookupContext(&restarted.mActor);
+  EXPECT_EQ(LookupAndAskTheFilter(filter, uri, false, Nothing()), 0u);
+
+  EXPECT_EQ(pps->UnregisterChannelFilter(filter), NS_OK);
+}
+
+// The messages and the constructors of one channel arrive in the order they were sent, and each constructor has its
+// message right in front of it: so each lookup of the parent has the context its caller in the socket process set, the
+// default context's included (a message is sent for it too), and never the one of the lookup before.
+TEST(TestStealthTRRContext, EachConstructorTakesTheMessageSentRightBeforeIt)
+{
+  nsTArray<WireEvent> wire;
+  FakeSocketProcessChild child{&wire};
+  LookupInTheSocketProcess(&child, ContextOf(7), true);
+  LookupInTheSocketProcess(&child, Nothing(), true);
+  LookupInTheSocketProcess(&child, ContextOf(12), true);
+  // A message and a constructor each, and nothing between a message and its constructor.
+  ASSERT_EQ(wire.Length(), 6u);
+  for (size_t i = 0; i < wire.Length(); ++i) {
+    EXPECT_EQ(wire[i].mIsConstructor, i % 2 == 1);
+  }
+
+  ParentSideOfTheLookup actor;
+  nsTArray<uint32_t> made = ContextsOfTheLookupsOfTheParent(actor, wire);
+  ASSERT_EQ(made.Length(), 3u);
+  EXPECT_EQ(made[0], 7u);
+  EXPECT_EQ(made[1], 0u);
+  EXPECT_EQ(made[2], 12u);
+}
+
+// The control: the same lookups with no message in front of the second constructor. Without our message the context is
+// absent: the lookup has none, not the one of the lookup before.
+TEST(TestStealthTRRContext, WithoutItsMessageAConstructorHasNoContext)
+{
+  nsTArray<WireEvent> wire;
+  FakeSocketProcessChild child{&wire};
+  LookupInTheSocketProcess(&child, ContextOf(7), true);
+  LookupInTheSocketProcess(&child, ContextOf(12), false);
+  LookupInTheSocketProcess(&child, ContextOf(9), true);
+  ASSERT_EQ(wire.Length(), 5u);
+
+  ParentSideOfTheLookup actor;
+  nsTArray<uint32_t> made = ContextsOfTheLookupsOfTheParent(actor, wire);
+  ASSERT_EQ(made.Length(), 3u);
+  EXPECT_EQ(made[0], 7u);
+  EXPECT_EQ(made[1], 0u);
+  EXPECT_EQ(made[2], 9u);
+}
+
+// Where Create builds the stand-in channel the active context is given to it; a lookup with none leaves it as it is.
+TEST(TestStealthTRRContext, TheStandInChannelTakesTheActiveContextOfTheLookup)
+{
+  nsCOMPtr<nsIURI> uri;
+  ASSERT_EQ(NS_NewURI(getter_AddRefs(uri), "https://example.com/dns-query"_ns),
+            NS_OK);
+  nsCOMPtr<nsIChannel> channel;
+  ASSERT_EQ(
+      NS_NewChannel(getter_AddRefs(channel), uri,
+                    nsContentUtils::GetSystemPrincipal(),
+                    nsILoadInfo::SEC_ALLOW_CROSS_ORIGIN_SEC_CONTEXT_IS_NULL,
+                    nsIContentPolicy::TYPE_OTHER),
+      NS_OK);
+  nsCOMPtr<nsILoadInfo> loadInfo = channel->LoadInfo();
+
+  nsresult rv = NS_OK;
+  StealthSetTRRLookupContext(Nothing());
+  StealthEnterTRRLookupContext();
+  ASSERT_FALSE(StealthApplyTRRLookupContext(channel, &rv));
+  EXPECT_EQ(rv, NS_OK);
+  EXPECT_EQ(loadInfo->GetOriginAttributes().mUserContextId, 0u);
+
+  StealthSetTRRLookupContext(ContextOf(7));
+  StealthEnterTRRLookupContext();
+  ASSERT_FALSE(StealthApplyTRRLookupContext(channel, &rv));
+  EXPECT_EQ(rv, NS_OK);
+  EXPECT_EQ(loadInfo->GetOriginAttributes().mUserContextId, 7u);
 }
 
 // Parental controls are declared off by the service itself, so every reader

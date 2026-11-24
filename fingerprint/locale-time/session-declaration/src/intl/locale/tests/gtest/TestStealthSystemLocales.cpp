@@ -219,3 +219,18 @@ TEST(Intl_Locale_StealthSystemLocales, TheFirstOfTheDeclaredListAsOneTag)
   EXPECT_TRUE(SessionSystemLocale(tag));
   EXPECT_TRUE(tag.EqualsLiteral("fr-CA"));
 }
+
+// The value a realm's locale override takes in CreateSandboxObject: the tag
+// of the list, as a string that PrimaryLanguageTag would have filled.
+TEST(Intl_Locale_StealthSystemLocales, TheRealmOverrideIsThePrimaryTagOfTheList)
+{
+  for (const char* list : {"fr-CA, fr, en-US, en", "  de-DE ,de", "ja-JP", "", "it-IT;q=0.9, it"}) {
+    nsAutoCString want;
+    PrimaryLanguageTag(nsDependentCString(list), want);
+    nsCString got = StealthPrimaryLanguageTag(nsDependentCString(list));
+    EXPECT_TRUE(got.Equals(want)) << list;
+  }
+  EXPECT_TRUE(StealthPrimaryLanguageTag("fr-CA, fr, en"_ns).EqualsLiteral("fr-CA"));
+  // The list itself is not the tag.
+  EXPECT_FALSE(StealthPrimaryLanguageTag("fr-CA, fr, en"_ns).EqualsLiteral("fr-CA, fr, en"));
+}

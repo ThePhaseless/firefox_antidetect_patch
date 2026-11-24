@@ -22,13 +22,17 @@
 
 class JSObject;
 
-namespace xpc {
-
-// For HybridXrayWrapper, which walks its prototypes itself [B322].
+// For HybridXrayWrapper, which walks its prototypes itself [B322]. A member of
+// Mozilla's xpc::XrayWrapper, defined here by its qualified name (a definition
+// of a member of xpc may stand in a namespace that encloses xpc).
 template <typename Base, typename Traits>
-constexpr XrayWrapper<Base, Traits>::XrayWrapper(unsigned flags,
-                                                 bool aHasPrototype)
-    : Base(flags | WrapperFactory::IS_XRAY_WRAPPER_FLAG, aHasPrototype) {}
+constexpr xpc::XrayWrapper<Base, Traits>::XrayWrapper(unsigned flags,
+                                                      bool aHasPrototype)
+    : Base(flags | xpc::WrapperFactory::IS_XRAY_WRAPPER_FLAG, aHasPrototype) {}
+
+// Every function and class of ours is in mozilla, never in xpc or another
+// namespace of Mozilla's.
+namespace mozilla {
 
 // STEALTHFOX [B322]: HYBRID XRAYS, the view the CALLER'S world has of the page.
 //
@@ -78,8 +82,8 @@ constexpr XrayWrapper<Base, Traits>::XrayWrapper(unsigned flags,
 // such a compartment (Juggler is the one that does).
 template <typename Traits>
 class HybridXrayWrapper
-    : public XrayWrapper<js::CrossCompartmentWrapper, Traits> {
-  using Base = XrayWrapper<js::CrossCompartmentWrapper, Traits>;
+    : public xpc::XrayWrapper<js::CrossCompartmentWrapper, Traits> {
+  using Base = xpc::XrayWrapper<js::CrossCompartmentWrapper, Traits>;
 
  public:
   constexpr explicit HybridXrayWrapper(unsigned flags)
@@ -135,8 +139,8 @@ class HybridXrayWrapper
   static const HybridXrayWrapper singleton;
 };
 
-#define HybridXrayDOM xpc::HybridXrayWrapper<xpc::DOMXrayTraits>
-#define HybridXrayJS xpc::HybridXrayWrapper<xpc::JSXrayTraits>
+#define HybridXrayDOM mozilla::HybridXrayWrapper<xpc::DOMXrayTraits>
+#define HybridXrayJS mozilla::HybridXrayWrapper<xpc::JSXrayTraits>
 
 extern template class HybridXrayDOM;
 extern template class HybridXrayJS;
@@ -173,8 +177,26 @@ bool StealthTargetIsHybrid(JSContext* aCx);
 // transparent wrapper, an object of another realm. A page that does not
 // subsume the caller, or that wants Xrays (another sandbox), still gets
 // what Gecko's rules give it.
-bool StealthCallerObjectApplies(JS::Realm* origin, JS::Realm* target,
-                                bool targetIsChrome, bool targetSubsumesOrigin);
+//
+// The four values it is decided from are Rewrap's own locals, which a hook
+// cannot pass to a branch of the chain: StealthNoteCallerObject takes them
+// where Rewrap has computed them (an anchor, after `sameOrigin`, on the one
+// straight path every call takes before the chain) and decides then, and
+// StealthCallerObjectApplies, the condition of the branch, answers with that
+// decision and clears it: a read with no decision since the last read is false.
+// The decision is kept per thread: Rewrap runs on the thread of the context, and
+// nothing between the anchor and the branch (the conditions of the cases before
+// it read the class of `obj` and two flags) reaches another Rewrap.
+void StealthNoteCallerObject(JS::Realm* origin, JS::Realm* target,
+                             bool targetIsChrome, bool targetSubsumesOrigin);
+bool StealthCallerObjectApplies();
+
+// The parts of the pair, for a test with no Realm: the decision as a function
+// of its five values, and the per-thread state it is kept in.
+bool StealthCallerObjectDecision(bool aOriginHybrid, bool aTargetHybrid,
+                                 bool aTargetWantsXrays, bool aTargetIsChrome,
+                                 bool aTargetSubsumesOrigin);
+void StealthRecordCallerObject(bool aApplies);
 
 // The wrapper the page reads the caller's objects through (see the class
 // comment in StealthHybridXray.cpp).
@@ -185,8 +207,22 @@ const js::Wrapper* StealthCallerObjectWrapper();
 // where it has none (a scripted Proxy, a generator): there the standard view
 // would be empty, so the page's answer is the only one. The rule is written
 // above HybridXrayWrapper in this file.
-const js::Wrapper* StealthHybridWrapper(XrayType xrayType);
+const js::Wrapper* StealthHybridWrapper(xpc::XrayType xrayType);
 
-}  // namespace xpc
+// STEALTHFOX [B322]: the wrapper Rewrap selects for a generic cross-compartment
+// reference. aMozillaWrapper is what Gecko's SelectWrapper chose (a pure choice
+// among static wrappers, it reads nothing and has no effect). When the context
+// realm is a caller's world the answer is the hybrid Xray, for the references
+// that are neither a security wrapper nor a waived Xray; Gecko's choice names
+// them: the permissive Xray of a DOM object, of a JS object (each has its hybrid
+// twin), and the permissive opaque Xray and the transparent wrapper of a
+// reference with no Xray (both the transparent wrapper, as StealthHybridWrapper
+// gives for them). Every other choice (the waived Xray, the opaque filters of
+// the security wrappers) is Gecko's own answer, and so is every choice when the
+// realm is not a caller's world.
+const js::Wrapper* StealthSelectedWrapper(JSContext* aCx,
+                                          const js::Wrapper* aMozillaWrapper);
+
+}  // namespace mozilla
 
 #endif  // StealthHybridXray_h

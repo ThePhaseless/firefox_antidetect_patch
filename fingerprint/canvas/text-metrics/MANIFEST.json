@@ -1,9 +1,11 @@
 {
  "modified": [
-  "dom/canvas/CanvasRenderingContext2D.cpp"
+  "dom/canvas/CanvasRenderingContext2D.cpp",
+  "dom/canvas/nsICanvasRenderingContextInternal.h"
  ],
  "added": {
-  "dom/canvas/StealthCanvasTextMetrics.h": "100644"
+  "dom/canvas/StealthCanvasTextMetrics.h": "100644",
+  "dom/canvas/gtest/TestStealthCanvasPageSnapshot.cpp": "100644"
  },
  "inventory": [
   {
@@ -29,6 +31,26 @@
      "notes"
     ],
     "why": "Two evidence quotes had the wrong indentation (8 spaces, not 6); notes now say which pref StealthEngineActive() reads."
+   }
+  },
+  {
+   "file": "dom/canvas/nsICanvasRenderingContextInternal.h",
+   "category": "spoof",
+   "feature": "canvas-2d-text-metrics",
+   "prefs": [],
+   "added": 1,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "class nsICanvasRenderingContextInternal, after GetSurfaceSnapshot",
+   "evidence": [
+    "+  already_AddRefed<mozilla::gfx::SourceSurface> StealthGetSurfaceSnapshot();  // STEALTH-HOOK(fingerprint/canvas/text-metrics)"
+   ],
+   "notes": "Declares the member of the context through which createPattern takes the snapshot of the page's canvas (StealthCanvasTextMetrics); the definition is in our own file.",
+   "verifier": {
+    "changed": [],
+    "why": "Written from the diff against the tag."
    }
   }
  ]

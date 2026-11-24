@@ -110,6 +110,14 @@
   "function": "UNIFIED_SOURCES += [",
   "kind": "add",
   "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"TestStealthCallerObject.cpp\"]  # STEALTH-HOOK(automation/hybrid-xrays)",
+  "test": ""
+ },
+ {
+  "file": "dom/base/test/gtest/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
   "line": "UNIFIED_SOURCES += [\"TestStealthDocumentLanguage.cpp\"]  # STEALTH-HOOK(fingerprint/locale-time/session-declaration)",
   "test": "gtest:Intl_Locale_StealthSystemLocales.TheDeclaredListIsWhatEveryCallerOfTheSystemSees"
  },

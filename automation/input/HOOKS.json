@@ -59,11 +59,9 @@
   "function": "nsDOMWindowUtils::NodesFromRect(float aX, float aY, float aTopSize,",
   "kind": "rewrite",
   "form": "wrap-call",
-  "line": "  SurfaceFromElementResult result = StealthSurfaceFromCanvasAsDrawn(aCanvas);  // STEALTH-HOOK(fingerprint/canvas/as-drawn)",
+  "line": "  SurfaceFromElementResult result = nsLayoutUtils::StealthSurfaceFromElementAsDrawn(aCanvas);  // STEALTH-HOOK(fingerprint/canvas/as-drawn)",
   "removed": "  SurfaceFromElementResult result = nsLayoutUtils::SurfaceFromElement(aCanvas);",
-  "test": "wrapper:tests/test_canvas_reads_as_drawn.py::test_random_pixels_read_back_as_drawn",
-  "exception": "G29 (PM-DECISIONS 22/11 morning, read by the pm against the tag): one Mozilla line, only the called function changes",
-  "pm": "approvato"
+  "test": ""
  },
  {
   "file": "dom/events/EventStateManager.cpp",
@@ -197,6 +195,14 @@
   "test": "gtest:StealthJugglerMouseAck.AnEventWithAnIdIsAckedOnceWhenTheScopeEnds"
  },
  {
+  "file": "layout/base/gtest/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"TestStealthSurfaceFlags.cpp\"]  # STEALTH-HOOK(fingerprint/canvas/as-drawn)",
+  "test": ""
+ },
+ {
   "file": "widget/MouseEvents.h",
   "function": "class WidgetMouseEventBase : public WidgetInputEvent {",
   "kind": "add",
@@ -214,6 +220,14 @@
  },
  {
   "file": "widget/nsGUIEventIPC.h",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"ipc/StealthMouseEventIPC.h\"  // STEALTH-HOOK(automation/input)",
+  "test": ""
+ },
+ {
+  "file": "widget/nsGUIEventIPC.h",
   "function": "struct ParamTraits<mozilla::WidgetMouseEventBase> {",
   "kind": "add",
   "form": "anchor",
@@ -226,22 +240,10 @@
   "file": "widget/nsGUIEventIPC.h",
   "function": "struct ParamTraits<mozilla::WidgetMouseEventBase> {",
   "kind": "rewrite",
-  "form": "unknown",
-  "line": "           ReadParam(aReader, &aResult->mInputSource) &&",
+  "form": "wrap-expression",
+  "line": "           StealthReadJugglerEventId(aReader, aResult, ReadParam(aReader, &aResult->mInputSource));  // STEALTH-HOOK(automation/input)",
   "removed": "           ReadParam(aReader, &aResult->mInputSource);",
-  "test": "gtest:StealthMouseEventIPC.TheIdSurvivesTheMessage",
-  "exception": "G44 (approved in PM-DECISIONS): the read of the id must be the last link of the && chain of ReadForDerivedClass, a single return expression; a read at the head would not match the write and would move the id in the stream",
-  "pm": "approvato"
- },
- {
-  "file": "widget/nsGUIEventIPC.h",
-  "function": "struct ParamTraits<mozilla::WidgetMouseEventBase> {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "           ReadParam(aReader, &aResult->mJugglerEventId);  // STEALTH-HOOK(automation/input)",
-  "test": "gtest:StealthMouseEventIPC.TheIdSurvivesTheMessage",
-  "exception": "G44 (approved in PM-DECISIONS): the read of the id must be the last link of the && chain of ReadForDerivedClass, a single return expression; a read at the head would not match the write and would move the id in the stream",
-  "pm": "approvato"
+  "test": ""
  },
  {
   "file": "xpcom/reflect/xptinfo/xptinfo.h",

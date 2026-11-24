@@ -28,21 +28,10 @@
   "file": "toolkit/components/windowwatcher/nsWindowWatcher.cpp",
   "function": "static void SizeOpenedWindow(nsIDocShellTreeOwner* aTreeOwner,",
   "kind": "add",
-  "form": "unknown",
-  "line": "  const bool stealthPlaced = mozilla::StealthPlacePopupAtDefault(aIsCallerChrome, treeOwnerAsWin, aSizeSpec.mLeft.isSome(), aSizeSpec.mTop.isSome(), left, top);  // STEALTH-HOOK(fingerprint/screen-window/popup-position)",
-  "test": "wrapper:tests/test_popup_geometry_is_the_declared_frame_e2e.py::test_a_popup_is_its_inner_size_plus_the_declared_frame",
-  "anchor": "if (aSizeSpec.mTop) {\n    top = *aSizeSpec.mTop;\n  }",
-  "why": "the call writes left and top (locals of Mozilla's function: the products of the statements above) and needs treeOwnerAsWin and the left/top presence of aSizeSpec; a guard at the top finds them unborn. Kept in the position of today (moved row, G28: a merge with the positionSpecified line needs the test green on firefox-68 first)"
- },
- {
-  "file": "toolkit/components/windowwatcher/nsWindowWatcher.cpp",
-  "function": "static void SizeOpenedWindow(nsIDocShellTreeOwner* aTreeOwner,",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  bool positionSpecified = aSizeSpec.PositionSpecified() || stealthPlaced;  // STEALTH-HOOK(fingerprint/screen-window/popup-position)",
-  "removed": "  bool positionSpecified = aSizeSpec.PositionSpecified();",
-  "test": "wrapper:tests/test_popup_geometry_is_the_declared_frame_e2e.py::test_a_popup_is_its_inner_size_plus_the_declared_frame",
-  "exception": "the OR of the placed result into Mozilla's positionSpecified (a value derived from the local of the anchor above); it goes into StealthPlacePopupAtDefault only together with the move of that anchor (moved row, G28)",
-  "pm": "approvato"
+  "form": "anchor",
+  "line": "  mozilla::StealthPlacePopupAtDefault(aIsCallerChrome, treeOwnerAsWin, aSizeSpec.mLeft.isSome(), aSizeSpec.mTop.isSome(), left, top, positionSpecified);  // STEALTH-HOOK(fingerprint/screen-window/popup-position)",
+  "test": "",
+  "anchor": "",
+  "why": ""
  }
 ]

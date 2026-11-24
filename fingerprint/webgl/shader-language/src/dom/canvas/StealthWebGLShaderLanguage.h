@@ -45,7 +45,7 @@ Maybe<ShShaderOutput> StealthDeclaredShaderOutput();
 // the pref, even on the driver path, so that the warning for an unknown name
 // fires at every construction of the validator. `aForPage` is the field
 // `WebGLContext::mStealthPerPage`, true only while
-// `WebGLShader::StealthPerPageObjectCode` builds the validator of the second
+// `WebGLShader::StealthSetObjectCodeForPage` builds the validator of the second
 // translation.
 ShShaderOutput StealthShaderOutputLanguage(gl::GLContext* gl,
                                            bool aForPage);

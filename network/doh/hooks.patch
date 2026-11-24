@@ -157,7 +157,7 @@ index 67a27ab0551a2999fad921c321844884e4fdc143..8fa5282159394b16a2e52d01200f211f
  }
  
 diff --git a/netwerk/protocol/http/TRRServiceChannel.cpp b/netwerk/protocol/http/TRRServiceChannel.cpp
-index 376ae9120226120b8a0f7c2335b9207e2b985a97..3e4345cb9c318ee41023f9f4d8a74d092772faec 100644
+index 376ae9120226120b8a0f7c2335b9207e2b985a97..b0cd1c3c0ee3f5c62637acb462f5438cb2f39015 100644
 --- a/netwerk/protocol/http/TRRServiceChannel.cpp
 +++ b/netwerk/protocol/http/TRRServiceChannel.cpp
 @@ -29,6 +29,8 @@
@@ -178,16 +178,15 @@ index 376ae9120226120b8a0f7c2335b9207e2b985a97..3e4345cb9c318ee41023f9f4d8a74d09
      return NS_OK;
    }
  
-@@ -280,7 +282,7 @@ nsresult TRRServiceChannel::ResolveProxy() {
+@@ -275,6 +277,7 @@ nsresult TRRServiceChannel::ResolveProxy() {
+   // TODO: bug 1625171. Consider moving proxy resolution to socket process.
+   RefPtr<TRRServiceChannel> self = this;
+   nsCOMPtr<nsICancelable> proxyRequest;
++  StealthSetTRRLookupContext(this);  // STEALTH-HOOK(network/doh)
+   nsresult rv = ProxyConfigLookup::Create(
+       [self](nsIProxyInfo* aProxyInfo, nsresult aStatus) {
          self->OnProxyAvailable(nullptr, nullptr, aProxyInfo, aStatus);
-       },
-       mURI, mProxyResolveFlags, LoadIsTRRServiceChannel(),
--      getter_AddRefs(proxyRequest));
-+      getter_AddRefs(proxyRequest), Nothing(), StealthTRRContextOf(this));  // STEALTH-HOOK(network/doh)
- 
-   if (NS_FAILED(rv)) {
-     if (!mCurrentEventTarget->IsOnCurrentThread()) {
-@@ -339,6 +341,7 @@ TRRServiceChannel::OnProxyAvailable(nsICancelable* request, nsIChannel* channel,
+@@ -339,6 +342,7 @@ TRRServiceChannel::OnProxyAvailable(nsICancelable* request, nsIChannel* channel,
    }
  
    nsresult rv;
@@ -195,7 +194,7 @@ index 376ae9120226120b8a0f7c2335b9207e2b985a97..3e4345cb9c318ee41023f9f4d8a74d09
  
    // If status is a failure code, then it means that we failed to resolve
    // proxy info.  That is a non-fatal error assuming it wasn't because the
-@@ -406,7 +409,7 @@ nsresult TRRServiceChannel::BeginConnect() {
+@@ -406,7 +410,7 @@ nsresult TRRServiceChannel::BeginConnect() {
                                           mCallbacks, OriginAttributes());
  
    RefPtr<nsHttpConnectionInfo> connInfo = new nsHttpConnectionInfo(
@@ -204,7 +203,7 @@ index 376ae9120226120b8a0f7c2335b9207e2b985a97..3e4345cb9c318ee41023f9f4d8a74d09
    // TODO: Bug 1622778 for using AltService in socket process.
    StoreAllowAltSvc(XRE_IsParentProcess() && LoadAllowAltSvc());
    bool http2Allowed = !gHttpHandler->IsHttp2Excluded(connInfo);
-@@ -446,7 +449,7 @@ nsresult TRRServiceChannel::BeginConnect() {
+@@ -446,7 +450,7 @@ nsresult TRRServiceChannel::BeginConnect() {
      LOG(("TRRServiceChannel %p Using connection info from altsvc mapping",
           this));
      mapping->GetConnectionInfo(getter_AddRefs(mConnectionInfo), proxyInfo,

@@ -30,10 +30,10 @@
   "file": "docshell/base/BrowsingContext.cpp",
   "function": "void BrowsingContext::DidSet(FieldIndex<IDX_LanguageOverride>,",
   "kind": "rewrite",
-  "form": "wrap-expression",
-  "line": "              realm, StealthRealmLocale(realm, PromiseFlatCString(languageOverride)).get());  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
-  "removed": "              realm, PromiseFlatCString(languageOverride).get());",
-  "test": "wrapper:tests/test_context_locale_e2e.py::test_a_context_locale_reaches_navigator_intl_and_the_header"
+  "form": "wrap-call",
+  "line": "          StealthSetRealmLocaleOverride(  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "removed": "          JS::SetRealmLocaleOverride(",
+  "test": ""
  },
  {
   "file": "docshell/base/BrowsingContext.cpp",
@@ -116,10 +116,11 @@
  {
   "file": "dom/base/Document.cpp",
   "function": "const LangGroupFontPrefs* Document::GetFontPrefsForLang(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  language = DocumentCharsetLanguage(this, language);  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
-  "test": "gtest:StealthDocumentLanguage.WithNoContextTheSessionsLanguageIsTheDocumentsOne"
+  "kind": "rewrite",
+  "form": "wrap-expression",
+  "line": "  nsAtom* language = StealthDocumentCharsetLanguage(this, mozilla::intl::EncodingToLang::Lookup(mCharacterSet));  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "removed": "  nsAtom* language = mozilla::intl::EncodingToLang::Lookup(mCharacterSet);",
+  "test": ""
  },
  {
   "file": "dom/base/Document.h",
@@ -139,14 +140,20 @@
  },
  {
   "file": "dom/xslt/xslt/txEXSLTFunctions.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthExsltTime.h\"  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "test": ""
+ },
+ {
+  "file": "dom/xslt/xslt/txEXSLTFunctions.cpp",
   "function": "nsresult txEXSLTFunctionCall::evaluate(txIEvalContext* aContext,",
   "kind": "rewrite",
   "form": "wrap-call",
-  "line": "      StealthExplodeTime(sourceDoc, time, timezone, &prtime);  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "line": "      StealthExplodeTime(aContext, time, timezone, &prtime);  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
   "removed": "      PR_ExplodeTime(time, timezone, &prtime);",
-  "test": "wrapper:tests/test_a_launch_and_a_context_timezone_reach_the_page_e2e.py::test_a_launch_and_a_context_timezone_reach_the_page",
-  "exception": "the call of EXSLT's date:date-time() gains sourceDoc, a local born by getSourceDocument (a static of the file), so it is neither `this` nor a parameter (G9 does not cover it): G35, approved by the pm in PM-DECISIONS.md",
-  "pm": "approvato"
+  "test": ""
  },
  {
   "file": "js/xpconnect/src/nsXPConnect.cpp",
