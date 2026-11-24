@@ -9,6 +9,7 @@ import hashlib
 import io
 import json
 import os
+import re
 import struct
 import subprocess
 import sys
@@ -20,6 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import ab_package  # noqa: E402
+import published_release  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 ELF = b"\x7fELF" + b"\x02\x01\x01" + b"\0" * 40
@@ -326,11 +328,149 @@ def test_the_seal_check_refuses_a_sha_that_the_seal_or_checksums_do_not_say():
 def test_the_gate_calls_package_ab_yml_with_the_published_tag_as_an_input():
     gate = (ROOT / ".github" / "workflows" / "gate.yml").read_text(encoding="utf-8")
     assert gate.count("\n  package-ab:\n") == 1 and gate.count("uses: ./.github/workflows/package-ab.yml") == 1
-    assert "      published_tag:\n        description:" in gate and "        default: firefox-68\n" in gate
+    import yaml
+    doc = yaml.safe_load(gate)
+    default = (doc.get(True) or doc["on"])["workflow_call"]["inputs"]["published_tag"]
+    assert default["default"] == "" and "latest published firefox-<N>" in default["description"], default
     job = (ROOT / ".github" / "workflows" / "package-ab.yml").read_text(encoding="utf-8")
     assert "    runs-on: ubuntu-24.04\n" in job and "    timeout-minutes: 15\n" in job
     for needle in ("gh release download", "sha256sum -c checksums.txt", "ab_package.py", "seal-check", "name: package-ab", "GITHUB_STEP_SUMMARY", "asset-linux-x86_64", "asset-win-x86_64"):
         assert needle in job, needle
+
+
+# ---------------------------------------------------------------- the engine published before is resolved, never written in a workflow
+
+WORKFLOWS = ROOT / ".github" / "workflows"
+# A release tag as a whole token: `firefox-<N>` and nothing after the digits. `firefox-69-candidate`, `firefox-NN-candidate`, `firefox-*-stealth-...` and an asset
+# name such as `firefox-159.0-stealth-...` are not release tags.
+RELEASE_TAG = re.compile(r"(?<![\w.-])firefox-\d+(?![\w.-])")
+
+
+def _release(tag, draft=False, prerelease=False):
+    return {"tag_name": tag, "draft": draft, "prerelease": prerelease}
+
+
+def hardcoded_release_tags(doc) -> list:
+    """Every `firefox-<N>` in a value of a parsed workflow: a string anywhere in it, the lines of a script that are shell comments left out, and the
+    `description` of an input (prose, with examples) left out. A comment of the YAML is not a value and the parser drops it."""
+    found = []
+
+    def walk(node, where):
+        if isinstance(node, dict):
+            for key, value in node.items():
+                if key != "description":
+                    walk(value, where + "/" + str(key))
+        elif isinstance(node, list):
+            for i, value in enumerate(node):
+                walk(value, "%s[%d]" % (where, i))
+        elif isinstance(node, str):
+            text = "\n".join(line for line in node.splitlines() if not line.lstrip().startswith("#"))
+            found.extend((where, m.group(0)) for m in RELEASE_TAG.finditer(text))
+
+    walk(doc, "")
+    return found
+
+
+def test_the_resolver_returns_the_latest_published_firefox_release():
+    releases = [_release("firefox-68"), _release("firefox-70", draft=True), _release("firefox-71", prerelease=True), _release("firefox-69"),
+                _release("firefox-69-candidate"), _release("firefox-100-candidate"), _release("v2.0"), _release("firefox-9"), {"name": "no tag"}]
+    assert published_release.latest_published(releases) == "firefox-69"
+    assert published_release.latest_published(list(reversed(releases))) == "firefox-69"
+    # the highest NUMBER, not the highest string: firefox-9 is lower than firefox-68, and firefox-100 is higher than both
+    assert published_release.latest_published([_release("firefox-9"), _release("firefox-100"), _release("firefox-68")]) == "firefox-100"
+
+
+def test_the_resolver_fails_clearly_when_no_release_qualifies():
+    nothing = [[], None, [_release("firefox-70", draft=True)], [_release("firefox-71", prerelease=True)], [_release("firefox-69-candidate"), _release("v1"), _release("firefox-")]]
+    for releases in nothing:
+        try:
+            published_release.latest_published(releases)
+            raise AssertionError("a list with no published firefox-<N> was accepted: %r" % (releases,))
+        except published_release.NoPublishedRelease as error:
+            assert "no published release named firefox-<N>" in str(error)
+
+
+def test_the_resolver_cli_reads_paginated_output_and_writes_the_tag():
+    pages = json.dumps([_release("firefox-68")]) + "\n" + json.dumps([_release("firefox-69"), _release("firefox-70", draft=True)])
+    assert [r["tag_name"] for r in published_release.parse_pages(pages)] == ["firefox-68", "firefox-69", "firefox-70"]
+    real_run = subprocess.run
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append(cmd)
+        return subprocess.CompletedProcess(cmd, FAKE["code"], FAKE["out"], FAKE["err"])
+
+    FAKE = {"code": 0, "out": pages, "err": ""}
+    published_release.subprocess.run = fake_run
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            out, env = os.path.join(tmp, "out"), os.path.join(tmp, "env")
+            with contextlib.redirect_stdout(io.StringIO()) as said:
+                code = published_release.main(["--repo", "o/r", "--github-output", out, "--github-env", env, "--name", "TAG"])
+            assert code == 0 and said.getvalue().strip() == "firefox-69", said.getvalue()
+            assert calls == [["gh", "api", "repos/o/r/releases", "--paginate"]]
+            assert Path(out).read_text() == "TAG=firefox-69\n" and Path(env).read_text() == "TAG=firefox-69\n"
+            FAKE.update(out=json.dumps([_release("firefox-70", draft=True)]))
+            with contextlib.redirect_stderr(io.StringIO()) as err:
+                assert published_release.main(["--repo", "o/r", "--github-env", env, "--name", "TAG"]) == 1
+            assert "no published release named firefox-<N>" in err.getvalue() and Path(env).read_text() == "TAG=firefox-69\n"
+            FAKE.update(code=1, out="", err="HTTP 401")
+            with contextlib.redirect_stderr(io.StringIO()) as err:
+                assert published_release.main(["--repo", "o/r"]) == 1
+            assert "HTTP 401" in err.getvalue()
+    finally:
+        published_release.subprocess.run = real_run
+
+
+def _workflow(name):
+    import yaml
+    return yaml.safe_load((WORKFLOWS / name).read_text(encoding="utf-8"))
+
+
+def test_an_explicit_published_tag_wins_and_the_resolver_runs_only_when_it_is_empty():
+    # package-ab.yml: the input is what TAG is (the resolver writes it only when the input is empty), and the candidate of the A/A takes its own input first
+    pab = _workflow("package-ab.yml")["jobs"]["package-ab"]
+    assert pab["env"]["TAG"] == "${{ inputs.published_tag }}"
+    assert pab["env"]["CAND_TAG"].index("inputs.candidate_tag") < pab["env"]["CAND_TAG"].index("inputs.published_tag")
+    steps = [s for s in pab["steps"] if "published_release.py" in str(s.get("run", ""))]
+    assert len(steps) == 1 and steps[0]["if"] == "inputs.published_tag == ''" and "--name TAG" in steps[0]["run"]
+    # xpcshell.yml: the input is what PUBLISHED_TAG is, the resolver runs only with an empty input on this workflow's own push, and the prefs baseline is always resolved
+    xp = _workflow("xpcshell.yml")["jobs"]
+    assert xp["xpcshell"]["env"]["PUBLISHED_TAG"] == "${{ inputs.published_tag }}"
+    steps = [s for s in xp["xpcshell"]["steps"] if "published_release.py" in str(s.get("run", ""))]
+    assert len(steps) == 1 and steps[0]["if"].startswith("inputs.published_tag == '' &&") and "--name PUBLISHED_TAG" in steps[0]["run"]
+    steps = [s for s in xp["prefs"]["steps"] if "published_release.py" in str(s.get("run", ""))]
+    assert len(steps) == 1 and "if" not in steps[0] and "--name PREFS_BASE_TAG" in steps[0]["run"] and xp["prefs"]["env"]["PREFS_BASE_TAG"] == ""
+    # gate.yml: the input goes to the called workflow as it came, and its default is empty
+    gate = _workflow("gate.yml")
+    assert gate["jobs"]["package-ab"]["with"]["published_tag"] == "${{ inputs.published_tag }}"
+    assert (gate.get(True) or gate["on"])["workflow_call"]["inputs"]["published_tag"]["default"] == ""
+    # every call of the resolver has the token and the checkout that holds the script
+    for name in ("package-ab.yml", "xpcshell.yml"):
+        text = (WORKFLOWS / name).read_text(encoding="utf-8")
+        assert text.count("engine-series/platform/ci/src/scripts/ci/published_release.py") == text.count("published_release.py --repo")
+    assert (WORKFLOWS / "xpcshell.yml").read_text(encoding="utf-8").count("/platform/ci/src/scripts/ci/published_release.py\n") == 2
+
+
+def test_the_rule_finds_a_hardcoded_release_tag_and_lets_placeholders_through():
+    import yaml
+    bad = yaml.safe_load("a:\n  default: firefox-68\n  env: { TAG: \"${{ inputs.published_tag || 'firefox-68' }}\" }\n  run: |\n    gh release download firefox-9 --repo x\n")
+    assert [tag for _, tag in hardcoded_release_tags(bad)] == ["firefox-68", "firefox-68", "firefox-9"]
+    fine = yaml.safe_load("a:\n  description: 'a tag (e.g. firefox-11)'\n  gate: 'a candidate: firefox-NN-candidate or firefox-69-candidate'\n"
+                          "  run: |\n    # firefox-47 moved the juggler\n    set -- art/firefox-*-stealth-linux.*\n    ls firefox-159.0-stealth-win.zip\n")
+    assert hardcoded_release_tags(fine) == []
+
+
+def test_no_workflow_hardcodes_a_firefox_release_tag_as_a_value():
+    """RULE: the engine a job compares with, tests or publishes under is resolved from the release list (scripts/ci/published_release.py) or given as an input,
+    never written in a workflow: a tag written there is stale the day the next release is published (firefox-68 stayed in the gate after firefox-69)."""
+    import yaml
+    bad = {}
+    for path in sorted(WORKFLOWS.glob("*.yml")):
+        found = hardcoded_release_tags(yaml.safe_load(path.read_text(encoding="utf-8")))
+        if found:
+            bad[path.name] = found
+    assert not bad, bad
 
 
 # ---------------------------------------------------------------- the linkage: tiny PE and ELF files made here

@@ -57,6 +57,7 @@
   "scripts/ci/payload_guard.py": "100644",
   "scripts/ci/phase.py": "100644",
   "scripts/ci/prefs_dump.js": "100644",
+  "scripts/ci/published_release.py": "100644",
   "scripts/ci/py_junit.py": "100644",
   "scripts/ci/report.py": "100644",
   "scripts/ci/reuse_run.py": "100644",

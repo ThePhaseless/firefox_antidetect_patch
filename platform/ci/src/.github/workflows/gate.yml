@@ -29,9 +29,9 @@ on:
         type: string
         default: main
       published_tag:
-        description: the engine published before, whose archives the package-ab job compares the candidate's with (its seal names the series commit it came from)
+        description: the engine published before, whose archives the package-ab job compares the candidate's with (its seal names the series commit it came from); empty - the latest published firefox-<N>, resolved at run time (scripts/ci/published_release.py)
         type: string
-        default: firefox-68
+        default: ''
 
 jobs:
   # DRIVE GATE — the firefox-8 catcher. A raw `firefox --screenshot` proves
@@ -500,7 +500,7 @@ jobs:
           - { suite: wrapper.e2e.suite.windows.3, leg: win-x86_64, runner: windows-2022, kind: win, os: windows }
           - { suite: wrapper.e2e.suite.windows.4, leg: win-x86_64, runner: windows-2022, kind: win, os: windows }
           - { suite: wrapper.e2e.suite.windows.control_a, leg: win-x86_64, runner: windows-latest, kind: win, os: windows }
-          # THE A/B ORACLE: same seed, same bytes, the engine published as firefox-68 against this candidate, on the leg's own runner. The test downloads the
+          # THE A/B ORACLE: same seed, same bytes, the engine published before (the latest firefox-<N>) against this candidate, on the leg's own runner. The test downloads the
           # published engine as the core does (the release's seal.json, then the archive under that seal), runs the host gate's dump with each (three seeds at
           # two DPRs, with the same core and wrapper) and compares every leaf: only the noise entries of the host gate's exceptions.json and the diag. keys may
           # differ. 12 visits and a 300 MB download: longer than the 25 minutes of the other legs. dump-68.json, dump-candidate.json and diff.json are the
