@@ -362,6 +362,7 @@ def _port06_is_not_under_test(monkeypatch):
     read what `check` prints about exceptions and untestable hooks are about that line, not about those rules."""
     monkeypatch.setattr(hc, "rewrite_violations", lambda root: [])
     monkeypatch.setattr(hc, "locals_violations", lambda root, base=None: [])
+    monkeypatch.setattr(hc, "namespace_violations", lambda root: [])
 
 
 def exception_series(tmp_path):
