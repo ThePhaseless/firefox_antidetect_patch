@@ -1321,11 +1321,14 @@ def budget_raise_problems(hook: dict, removed: dict, main_hook: dict, main_remov
     return found
 
 
-def contract_problems(against_main: bool = False) -> tuple[list, int, int]:
+def contract_problems(against_main: bool = False, base=None) -> tuple[list, int, int]:
     """The hook contract against tools/hook-debt.json (and, against_main, against main's list):
-    the problems, the number of hooks and the number of violations."""
+    the problems, the number of hooks and the number of violations. `base` (hook_contract.git_base_reader): C16 reads the
+    locals of Mozilla's functions from the base files, not only from the lines the hunks show."""
     hooks = hook_contract.series_hooks(ROOT)
     violations = hook_contract.contract_violations(ROOT)
+    if base is not None:
+        violations = [v for v in violations if v.rule != "C16"] + hook_contract.locals_violations(ROOT, base)
     if not HOOK_DEBT.is_file():
         return ["tools/hook-debt.json is missing: python tools/engine.py hook-debt --init"], len(hooks), len(violations)
     return (hook_contract.debt_problems(violations, hook_contract.load_debt(HOOK_DEBT),
@@ -1356,7 +1359,9 @@ def check(source: Path | None = None, tag: str | None = None, against_main: bool
                                        main_hook, main_removed, main_realign, new_raise_rows(raises, main_raises))
         found += realign_list_problems(json.loads(REALIGN.read_text(encoding="utf-8")) if REALIGN.is_file() else [],
                                        main_realign)
-    contract, n_hooks, n_violations = contract_problems(against_main)
+    base = hook_contract.git_base_reader(source, tag) if source is not None and tag else None
+    contract, n_hooks, n_violations = (contract_problems(against_main, base) if base is not None
+                                       else contract_problems(against_main))
     found += contract
     if source is not None and tag:
         found += backport_in_tag_problems(source, tag)

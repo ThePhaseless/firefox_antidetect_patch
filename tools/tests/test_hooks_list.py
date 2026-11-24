@@ -358,9 +358,10 @@ EXC_ADDED = "  DoIt(StealthCtx(this), y);" + MARK     # Mozilla's argument repla
 
 
 def _port06_is_not_under_test(monkeypatch):
-    """The series is red on the port-06 rules (C12..C15) until the engine change that fixes its rewrites lands; the tests that
+    """The series is red on the port-06 rules (C12..C16) until the engine change that fixes its rewrites lands; the tests that
     read what `check` prints about exceptions and untestable hooks are about that line, not about those rules."""
     monkeypatch.setattr(hc, "rewrite_violations", lambda root: [])
+    monkeypatch.setattr(hc, "locals_violations", lambda root, base=None: [])
 
 
 def exception_series(tmp_path):
