@@ -137,14 +137,24 @@ def starts_from_pull_request(wf: dict, workflows: dict, seen: tuple = ()) -> boo
 
 
 def jobs_of_pull_requests(workflows: dict) -> list:
-    """Each job a pull request or a comment starts that does not name a hosted runner, literally."""
+    """Each job a pull request or a comment starts that does not name a hosted runner, literally. A job that calls a workflow of this repository
+    (`./.github/workflows/<name>.yml`, as series.yml calls checks.yml) starts every job of that workflow: they are held to the same rule; a call of
+    any other workflow is a job that does not name a hosted runner."""
     found = []
+
+    def jobs_of(name: str, wf: dict, seen: tuple) -> None:
+        for job_name, job in wf["jobs"].items():
+            runs_on = job.get("runs-on", "")
+            called = str(job.get("uses", ""))
+            file = called.rsplit("/", 1)[-1]
+            if called.startswith("./.github/workflows/") and file in workflows and file not in seen:
+                jobs_of(file, workflows[file], seen + (file,))
+            elif "uses" in job or not isinstance(runs_on, str) or not HOSTED.match(runs_on):
+                found.append("%s:%s:%s" % (name, job_name, runs_on or job.get("uses")))
+
     for name, wf in workflows.items():
         if starts_from_pull_request(wf, workflows, (name,)):
-            for job_name, job in wf["jobs"].items():
-                runs_on = job.get("runs-on", "")
-                if "uses" in job or not isinstance(runs_on, str) or not HOSTED.match(runs_on):
-                    found.append("%s:%s:%s" % (name, job_name, runs_on or job.get("uses")))
+            jobs_of(name, wf, (name,))
     return found
 
 
@@ -370,6 +380,16 @@ def group_pull_requests(doc, jobs, build, steps) -> list:
     out.append(("pull requests: every job those start names a hosted runner, literally (%s)" % reachable, not reachable))
     out.append(("pull requests: the check sees a job on a label of ours",
                 jobs_of_pull_requests({"x.yml": {"on": ["pull_request"], "jobs": {"j": {"runs-on": "latitude-5-1-a"}}}}) == ["x.yml:j:latitude-5-1-a"]))
+    out.append(("pull requests: the check follows a call of a workflow of this repository into its jobs, and sees a label of ours there, or a call of another repository's",
+                jobs_of_pull_requests({"x.yml": {"on": ["pull_request"], "jobs": {"c": {"uses": "./.github/workflows/y.yml"}}},
+                                       "y.yml": {"on": {"workflow_call": None}, "jobs": {"j": {"runs-on": "latitude-5-1-a"}}}}) == ["y.yml:j:latitude-5-1-a"]
+                and jobs_of_pull_requests({"x.yml": {"on": ["pull_request"], "jobs": {"c": {"uses": "./.github/workflows/y.yml"}}},
+                                           "y.yml": {"on": {"workflow_call": None}, "jobs": {"j": {"runs-on": "ubuntu-24.04"}}}}) == []
+                and jobs_of_pull_requests({"x.yml": {"on": ["pull_request"], "jobs": {"c": {"uses": "o/r/.github/workflows/y.yml@main"}}}}) == ["x.yml:c:o/r/.github/workflows/y.yml@main"]))
+    out.append(("pull requests: the jobs of checks.yml, called by series.yml, are held to it, and so is release.yml's call of it (a candidate: no pull request starts release.yml)",
+                "checks.yml" in live and live["series.yml"]["jobs"]["checks"]["uses"] == "./.github/workflows/checks.yml"
+                and set(live["checks.yml"]["jobs"]) == {"rules", "rebuilds", "noreply-identity", "tree"}
+                and all(HOSTED.match(j["runs-on"]) for j in live["checks.yml"]["jobs"].values()) and triggers(live["checks.yml"]) == {"workflow_call"}))
     out.append(("pull requests: release.yml starts by hand, on a push to main or by schedule (a candidate that keeps the cache warm); the sweeper and the workflows they call by hand or by schedule only",
                 triggers(doc) == {"workflow_dispatch", "push", "schedule"} and doc[True]["push"] == {"branches": ["main"], "paths-ignore": ["**.md"]}
                 and triggers(live["latitude-sweeper.yml"]) == {"schedule", "workflow_dispatch", "workflow_run"}

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The steps that are there to STOP a run bind: they are read as YAML, by their keys, not as text.
 
-The tests of the checks, the guard, the reuse, the GeoIP database and the protocol mirror compared the text of a step (its `run`, its `name`). A step
+The tests of the checks (checks.yml, job `tree`), the guard, the reuse, the GeoIP database and the protocol mirror compared the text of a step (its `run`, its `name`). A step
 whose text is right and whose KEYS make it harmless passed them all: `continue-on-error: true` on the mirror check, `if: matrix.kind == 'linux'` on the
 database step (the Windows legs launch without it), `|| true` on the verify line, `exit 1` turned into `exit 0` after the guard's sleep. Each of those was
 tried on a copy of the workflows and the old tests stayed green; these are red under each of them.
@@ -62,25 +62,27 @@ def binding(step, expected_if=None):
 
 def _cases() -> list:
     out = []
-    release, gate = load("release.yml"), load("gate.yml")
+    release, gate, checks_yml = load("release.yml"), load("gate.yml"), load("checks.yml")
 
     def add(name, reason_or_bool):
         ok = reason_or_bool is True or reason_or_bool == ""
         out.append((name + ("" if ok else " [%s]" % reason_or_bool), ok))
 
-    # --- release.yml: the job `checks`, the guard, the reuse ---------------------------------------------------------------------------------------
+    # --- checks.yml: the job `tree`; release.yml: the guard, the reuse ---------------------------------------------------------------------------------
     for name in CHECK_STEPS:
-        add("checks: the step %r binds (no continue-on-error, no `if`, no `|| true`)" % name, binding(step_of(release, "checks", name)))
-    guard = step_of(release, "checks", GUARD_STEP)
+        add("checks: the step %r binds (no continue-on-error, no `if`, no `|| true`)" % name, binding(step_of(checks_yml, "tree", name)))
+    guard = step_of(release, "still-head", GUARD_STEP)
     # the guard's script reads the exit code of still_head.py after `set +e`, so `binding` is not asked about that line: the rest of it is
     run = guard["run"]
     add("guard: the step binds (no `if`, no continue-on-error, no `|| true`)",
         "continue-on-error" not in guard and "if" not in guard and re.search(r"\|\|\s*true", run) is None)
-    add("guard: a superseded run (exit code 1) cancels itself, waits for the cancellation, and then FAILS: `checks` is never green for it",
+    add("guard: a superseded run (exit code 1) cancels itself, waits for the cancellation, and then FAILS: `still-head` is never green for it, and the node needs it",
         re.search(r'if \[ "\$CODE" = 1 \]; then\s+gh run cancel "\$GITHUB_RUN_ID".*\n\s+sleep \d+\s+exit 1\s+fi', run) is not None)
     add("guard: any other code (go on, could not read) ends in exit 0", run.rstrip().endswith("exit 0"))
-    add("guard: it is the LAST step of `checks`", release["jobs"]["checks"]["steps"][-1] is guard)
-    add("guard: the node still needs `checks`", "checks" in release["jobs"]["node"]["needs"])
+    add("guard: it is the LAST step of `still-head`", release["jobs"]["still-head"]["steps"][-1] is guard)
+    add("guard: the node still needs `checks` and `still-head`", {"checks", "still-head"} <= set(release["jobs"]["node"]["needs"]))
+    add("checks: release.yml's `checks` is a call of checks.yml with no `if`, no `continue-on-error`", release["jobs"]["checks"].get("uses") == "./.github/workflows/checks.yml"
+        and "if" not in release["jobs"]["checks"] and "continue-on-error" not in release["jobs"]["checks"])
     reuse = step_of(release, "plan", REUSE_STEP)
     add("reuse: the step binds", binding(reuse, None))
 

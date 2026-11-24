@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Is this run still the head of its branch? The guard that stands in front of the node (release.yml, job `checks`, last step).
+"""Is this run still the head of its branch? The guard that stands in front of the node (release.yml, job `still-head`, after `checks`).
 
 The rule (a project decision) is: a new push cancels the old run. release.yml has a `concurrency` group per branch for it,
 which cancels a run that a newer one replaces. This is the other half: a run that was queued behind the new one, or started in the seconds

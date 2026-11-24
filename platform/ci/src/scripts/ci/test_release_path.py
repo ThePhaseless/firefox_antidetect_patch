@@ -204,10 +204,14 @@ def group_compile_only(doc) -> list:
     inputs = doc[True]["workflow_dispatch"]["inputs"]
     out.append(("compile-only: stop_after is an input, empty by default",
                 inputs["stop_after"]["default"] == "" and inputs["stop_after"]["type"] == "string"))
-    texts = [st for st in jobs["checks"]["steps"] if "stealth_check_sources.py" in st.get("run", "")]
+    import yaml
+
+    called = yaml.safe_load((WORKFLOW.parent / "checks.yml").read_text(encoding="utf-8"))
+    texts = [st for st in called["jobs"]["tree"]["steps"] if "stealth_check_sources.py" in st.get("run", "")]
     out.append(("checks: build/stealth_check_sources.py and build/stealth_check_build_files.py run on the materialized tree, before the node is rented",
                 len(texts) == 1 and "build/stealth_check_build_files.py" in texts[0]["run"] and "continue-on-error" not in texts[0]
-                and "node" not in jobs["checks"].get("needs", []) and "checks" in jobs["node"]["needs"]))
+                and "node" not in jobs["checks"].get("needs", []) and "checks" in jobs["node"]["needs"]
+                and jobs["checks"]["uses"] == "./.github/workflows/checks.yml"))
     return out
 
 
