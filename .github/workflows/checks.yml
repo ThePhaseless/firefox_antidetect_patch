@@ -74,6 +74,12 @@ jobs:
       # stored in its folder on the revision this tag vendors. Reads the tag's objects only: no build, no working tree.
       - name: The vendored backports, replayed on the Mozilla tag
         run: python .series/tools/backport_replay.py check --source source
+      # hook-02 points 3 and 7 (C16, C17): a hook that is not an anchor passes no local of Mozilla's function, and none names a function of
+      # ours in a top-level namespace other than mozilla. The plain `check` of the rules job sees only the lines a hunk shows; here the whole
+      # function is read from the tag's objects, so a local declared above the hunk's context is seen too, and the unqualified names are
+      # looked up in our own sources. Not debt: a hook that does is red.
+      - name: No hook passes a local of Mozilla's function or sits in a namespace that is not ours (read from the tag)
+        run: python .series/tools/engine.py hook-locals --source source
       # The core's checks that read the engine's source: pref types and readers,
       # prefs the binary reads, the Juggler contract and protocol, the WebGL
       # extension order, the font manifest. In the core's own CI they skip, as no
