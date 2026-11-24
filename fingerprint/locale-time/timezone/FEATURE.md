@@ -57,7 +57,7 @@ When nothing is declared (the engine launched without the core) every caller kee
   Asia/Kolkata (12:58), with `PR_GMTParameters` (UTC whatever is declared), with nothing declared (Mozilla's local time); the field or the session in
   `StealthLanguageOrSession` / `StealthTimezoneOrSession`. Negative control: the declared-zone values differ from
   UTC and from the host's (no runner is in Chatham).
-- wrapper e2e `test_a_launch_and_a_context_timezone_reach_the_page_e2e.py` (to write): browser launched with `timezone='Pacific/Chatham'`, a second
+- wrapper e2e `test_a_launch_and_a_context_timezone_reach_the_page_e2e.py`: browser launched with `timezone='Pacific/Chatham'`, a second
   context `new_context(timezone_id='Asia/Kolkata')`; in each page `Intl.DateTimeFormat().resolvedOptions().timeZone`, `new Date(2026, 9, 21)
   .getTimezoneOffset()`, `document.lastModified` of a page served with `Last-Modified: Wed, 21 Oct 2026 07:28:00 GMT` (10/21/2026 21:13:00 and
   12:58:00) and of a page with no header (the hour of the declared zone), EXSLT `date:date-time()` through `XSLTProcessor` (suffix +13:45 / +05:30)

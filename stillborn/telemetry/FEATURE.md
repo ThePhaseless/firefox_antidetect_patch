@@ -6,7 +6,6 @@ Test: node juggler/tests/pingsender_route_reaches_the_channel.test.mjs (callback
 negative control), juggler/tests/pingsender_route_lives_in_our_file.test.mjs (the program, the environment variable around the
 child, the only start of the child (ours: Mozilla's own process is never started), the only use of the program), juggler/tests/no_ping_leaves_before_the_session_proxy_is_decided.test.mjs
 (undecided / decided, network/doh); wrapper e2e
-invisible_playwright/tests/test_exit_ping_leaves_as_the_background_task_e2e.py::test_exit_ping_leaves_as_the_background_task,
 invisible_playwright/tests/test_the_shutdown_ping_leaves_by_the_background_task_e2e.py::test_the_shutdown_ping_is_sent_by_the_background_task_and_not_by_the_host_program
 
 ## What it does
