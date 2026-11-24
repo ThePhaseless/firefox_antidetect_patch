@@ -19,8 +19,9 @@
                                               tools/birth-ledger.json (tools/births.py says how)
 
 The Mozilla tag, the source branch and the commit last exported are in UPSTREAM.json;
---source / --base / --head override them (the source repository defaults to
-C:/ff/source, or $ENGINE_SOURCE).
+--base / --head override them. The source repository has no default: the commands that read
+it (status, apply, export, verify, drift, port, check --against) take --source <path> or the
+environment variable FIREFOX_SOURCE, and stop with a message when neither is given.
 
 export   writes one folder per feature (tools/layout.py says which):
            hooks.patch    our changes to Mozilla's files, as a git diff against the tag
@@ -1140,6 +1141,14 @@ def realign_list_problems(rows: list, main_rows: list | None) -> list:
 
 
 RAISE_FIELDS = ("file", "from", "to", "folder", "reason", "decided_by", "date", "test")
+RAISE_TEXT_FIELDS = ("reason", "decided_by")      # free text: may be reworded; every other field of a row is fixed
+
+
+def raise_key(row) -> str:
+    """A row of the register without its free-text fields: what identifies it against main's copy."""
+    if not isinstance(row, dict):
+        return repr(row)
+    return json.dumps({k: v for k, v in row.items() if k not in RAISE_TEXT_FIELDS}, sort_keys=True)
 
 
 def load_main_raises() -> list | None:
@@ -1150,9 +1159,10 @@ def load_main_raises() -> list | None:
 
 
 def raises_list_problems(rows: list, main_rows: list | None) -> list:
-    """tools/hook-budget-raises.json only grows: every row of main's register is on the branch as main has
-    it (none removed, none changed), and every row has its eight fields, `from` and `to` whole numbers with
-    `to` above `from`, the others text that is not empty, `date` as YYYY-MM-DD."""
+    """tools/hook-budget-raises.json only grows: every row of main's register is on the branch with the same
+    fields but the free text (RAISE_TEXT_FIELDS: none removed, none changed), and every row has its eight
+    fields, `from` and `to` whole numbers with `to` above `from`, the others text that is not empty, `date`
+    as YYYY-MM-DD."""
     found = []
     for r in rows:
         name = r.get("file") if isinstance(r, dict) else None
@@ -1168,19 +1178,22 @@ def raises_list_problems(rows: list, main_rows: list | None) -> list:
         if not (type(r["from"]) is int and type(r["to"]) is int and 0 <= r["from"] < r["to"]):
             found.append("tools/hook-budget-raises.json: the row of %s raises from %r to %r: two whole numbers, "
                          "`to` above `from`" % (name, r["from"], r["to"]))
+    keys = {raise_key(r) for r in rows}
     for m in main_rows or ():
-        if m not in rows:
+        if raise_key(m) not in keys:
             found.append("tools/hook-budget-raises.json: main's row of %s (%r to %r) is gone or changed: the "
                          "register only grows" % (m.get("file"), m.get("from"), m.get("to")))
     return found
 
 
 def new_raise_rows(rows: list, main_rows: list | None) -> list:
-    """The rows of the branch's register that main's does not have: the raises this branch declares. While
-    main has no register (None) nothing can be declared: the door must be on main before it is used."""
+    """The rows of the branch's register that main's does not have (compared without the free text): the
+    raises this branch declares. While main has no register (None) nothing can be declared: the door must be
+    on main before it is used."""
     if main_rows is None:
         return []
-    return [r for r in rows if r not in main_rows]
+    main_keys = {raise_key(m) for m in main_rows}
+    return [r for r in rows if raise_key(r) not in main_keys]
 
 
 def budget_raise_problems(hook: dict, removed: dict, main_hook: dict, main_removed: dict,
@@ -1341,6 +1354,9 @@ def status(source: Path, head: str) -> int:
     return 1
 
 
+SOURCE_COMMANDS = ("status", "apply", "export", "verify", "drift", "port")     # check needs it only with --against
+
+
 def main() -> int:
     if len(sys.argv) > 1 and sys.argv[1] == "births":
         return births.main(sys.argv[2:])      # its own options: --tree, --repo/--rev, --skeleton, --accept-changed, --prune, --tsv
@@ -1355,7 +1371,8 @@ def main() -> int:
     ap.add_argument("--shared", type=Path, default=None,
                     help="materialize: a directory every leg of this machine reaches; the tag is fetched "
                          "and the series applied there once, and each leg borrows the objects")
-    ap.add_argument("--source", type=Path, default=Path(os.environ.get("ENGINE_SOURCE", "C:/ff/source")))
+    ap.add_argument("--source", type=Path, default=Path(os.environ["FIREFOX_SOURCE"]) if os.environ.get("FIREFOX_SOURCE") else None,
+                    help="the Firefox source repository (or the environment variable FIREFOX_SOURCE); no default")
     ap.add_argument("--against", help="check: also try the backports of Mozilla commits against this tag, "
                                       "found in --source (a port does it by itself)")
     ap.add_argument("--init", action="store_true", help="hook-debt: write the list from every violation of now (once)")
@@ -1366,6 +1383,9 @@ def main() -> int:
     a = ap.parse_args()
     up = upstream()
     base, head = a.base or up["mozilla_tag"], a.head or up["source_branch"]
+    if a.command in SOURCE_COMMANDS or (a.command == "check" and a.against):
+        if a.source is None:
+            raise SystemExit("%s needs the source repository: pass --source <path> or set FIREFOX_SOURCE" % a.command)
     if a.command in ("drift", "port"):
         if not a.to:
             raise SystemExit("%s needs --to <Mozilla tag>" % a.command)
