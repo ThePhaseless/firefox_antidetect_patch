@@ -21,8 +21,8 @@
   "kind": "add",
   "form": "anchor",
   "line": "  if (mozilla::StealthIsOffInputDesktop(selected)) return false;  // STEALTH-HOOK(platform/hidden-desktop)",
-  "test": "",
-  "anchor": "",
-  "why": ""
+  "test": "gtest:StealthWindowInputDesktop.OnlyAWindowOfThisProcessOnAnotherDesktopIsOff",
+  "anchor": "if (!window_capture_helper_.IsWindowVisibleOnCurrentDesktop(selected)) { return false; }",
+  "why": "The hook needs `selected`, the local Mozilla computes from GetWindowToCapture() (private, not cheap to call again), and it must run after the visibility check and before the layered-window check so the order of the Windows calls is Mozilla's. A guard in the head of the function cannot name `selected`; the function has several early returns, so a function wrap would not give the same order."
  }
 ]
