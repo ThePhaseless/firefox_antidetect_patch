@@ -48,12 +48,22 @@ jobs:
         with:
           pattern: result-*
           path: results
-      # The gtests of this run, or of the run a reuse found: they are that tree's.
-      - name: The gtest reports of both legs
+      # The gtests of this run, or of the run a reuse found: they are that tree's. Each report is downloaded by its artifact's name, never by a pattern: with a
+      # run-id the action lists the run's artifacts through the REST API, one page of 100, and a run has more (run 45381665911: gtest-reports-win-x86_64 was not
+      # on the page and 189 hook tests went red though the win gtests had passed). By name, the files land in the folder of the artifact, which is the layout
+      # the judge reads: gtest-reports/gtest-reports-<leg>/.
+      - name: The gtest reports of the linux leg
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          pattern: gtest-reports-*
-          path: gtest-reports
+          name: gtest-reports-linux-x86_64
+          path: gtest-reports/gtest-reports-linux-x86_64
+          run-id: ${{ inputs.reuse_run_id || github.run_id }}
+          github-token: ${{ github.token }}
+      - name: The gtest reports of the win leg
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: gtest-reports-win-x86_64
+          path: gtest-reports/gtest-reports-win-x86_64
           run-id: ${{ inputs.reuse_run_id || github.run_id }}
           github-token: ${{ github.token }}
       - name: The junit of Juggler's tests (and of any other kind of test a leg keeps as junit-*)

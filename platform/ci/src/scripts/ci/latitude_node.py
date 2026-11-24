@@ -12,10 +12,16 @@ machine for both is half the price of two (measured 2026-11-04: alone, each leg 
 GitHub. The node is created for the run and deleted when both legs have ended: a server
 that is off is still billed, and nothing on its disk has to outlive the legs.
 
-    provision --run R --attempt A
-                                    create the run's node, prepare it, start one runner
-                                    per leg and see them online. Any failure: exit 1, the
-                                    node off, and the run has failed.
+    up --run R --attempt A --work DIR
+                                    create the run's node, wait for it, read its package
+                                    state into DIR and write the key of the closure of
+                                    packages to resolve against it (key= in $GITHUB_OUTPUT).
+                                    Any failure: exit 1, the node off, and the run has failed.
+    prepare --run R --attempt A --work DIR --debs DIR [--upstream FILE]
+                                    send that closure to the node, prepare it, start one
+                                    runner per leg and see them online. Any failure: the
+                                    same. Between the two, the workflow restores or resolves
+                                    the closure (release.yml, the node job).
     watch --run R --attempt A --ref REF
                                     follow both legs, turn the node off when both have ended;
                                     prints verdict= done | lost | failed | continue. A
@@ -39,8 +45,11 @@ Its cases: scripts/ci/test_latitude_node.py.
 from __future__ import annotations
 
 import argparse
+import base64
 import calendar
+import hashlib
 import http.client
+import io
 import json
 import os
 import re
@@ -49,6 +58,7 @@ import shutil
 import socket
 import subprocess
 import sys
+import tarfile
 import tempfile
 import time
 import traceback
@@ -80,7 +90,8 @@ UP_LIMIT_S = 900
 # Measured from a hosted runner to a node: 1440 and below carry everything. Kept lower, for paths not measured.
 PATH_MTU = 1200
 BOOTSTRAP_LIMIT_S = 1200
-# ONE deadline for provision(), from the create to the last runner online: the node job has 45 minutes (release.yml) and GitHub kills a job past them
+# ONE deadline for up() and prepare() together, from the create to the last runner online (up writes it into its state file, prepare reads it, the
+# steps between them spend from it): the node job has 45 minutes (release.yml) and GitHub kills a job past them
 # without letting its script delete anything. wait_up (900), the bootstrap with its retries (900 + one attempt of up to 1200) and the runners (2 x 300) add
 # up to more; each phase gets what is left of these 40 minutes and a phase with nothing left fails, so the node is deleted by this script and the
 # job never reaches the kill.
@@ -88,12 +99,12 @@ PROVISION_DEADLINE_S = 2400
 # When `off` is asked about a run whose node job did not succeed (a cancel or a kill, perhaps in the middle of the create), the first list of the API may be
 # empty a few seconds before a server it was asked to make appears in it: look again once, this long after.
 OFF_RECHECK_S = 45
-# A bootstrap that fails for the network (Ubuntu's archive or GitHub answering 502, 503, 504, a name not resolving, a download that stops) is asked
+# A bootstrap that fails for the network (GitHub answering 502, 503, 504, a name not resolving, a download that stops) is asked
 # AGAIN on the same server, which is already paid for the hour: the other way is a new server for every run that is started again, and the
 # runs of 2026-11-04 and 2026-11-08 paid seven hours for 502 and 504 answers that ended minutes later. No new attempt starts once this many seconds
-# have gone since the first, and the node is deleted as before. A failure that is not the network (a missing package, a refused sha256 of our own
-# archive, an HTTP 4xx such as a deleted asset) is final at once: node_bootstrap.sh has already asked three times, from two addresses, before it says
-# an archive does not match its sha256, and a wrong pin would otherwise be asked again for fifteen minutes on a server paid by the hour.
+# have gone since the first, and the node is deleted as before. A failure that is not the network (a missing package, a refused sha256 of a pinned
+# file, an HTTP 4xx such as a deleted asset) is final at once: node_bootstrap.sh has already asked three times, from two addresses, before it says
+# a file does not match its sha256, and a wrong pin would otherwise be asked again for fifteen minutes on a server paid by the hour.
 BOOTSTRAP_RETRY_CAP_S = 900
 BOOTSTRAP_RETRY_PAUSE_S = 60
 TRANSIENT = re.compile(r"Failed to fetch|Temporary failure|Could not resolve|Connection (?:reset|timed out|refused)|Operation timed out|Timeout was reached|"
@@ -594,7 +605,7 @@ def off_now(latitude, name) -> bool:
 
 def clear_leftovers(latitude, github, run, attempt):
     """What no run needs any more goes. That covers an earlier attempt of this run, a node
-    of this one a failed provision left, and a run already re-launched, whose watch has
+    of this one a failed up or prepare left, and a run already re-launched, whose watch has
     deleted the node, whatever the list still says. Another run's live node is that run's:
     there is no fixed machine to share, so two runs do not get in each other's way. A node
     made by hand has another name and is never touched."""
@@ -652,7 +663,7 @@ def bootstrap(ssh, clock=time.monotonic, sleep=time.sleep, deadline=None):
     the last failure otherwise, and the caller deletes the node."""
     start = clock()
     attempts = 0
-    # no new attempt starts past this time: the cap since the first, or the deadline of provision() when that comes first
+    # no new attempt starts past this time: the cap since the first, or the deadline of prepare() when that comes first
     stop_at = start + BOOTSTRAP_RETRY_CAP_S if deadline is None else min(start + BOOTSTRAP_RETRY_CAP_S, deadline)
     while True:
         attempts += 1
@@ -663,7 +674,7 @@ def bootstrap(ssh, clock=time.monotonic, sleep=time.sleep, deadline=None):
                 say("node_bootstrap.sh succeeded at attempt %d, %.0f s in" % (attempts, clock() - start))
             return out
         # What the script said, whole, in the log: the error below keeps 600 characters, and apt's account of a failure (which package,
-        # which version installed against the archive's) is longer than that (runs 44137637832 and 44139666991 kept only its last line).
+        # which version installed against the closure's) is longer than that (runs 44137637832 and 44139666991 kept only its last line).
         # Not on 255: that is ssh's own failure, the script did not speak, and the error carries all of it.
         if code != 255:
             say("::group::node_bootstrap.sh exited %d at attempt %d: its whole stderr" % (code, attempts))
@@ -678,8 +689,109 @@ def bootstrap(ssh, clock=time.monotonic, sleep=time.sleep, deadline=None):
         sleep(BOOTSTRAP_RETRY_PAUSE_S)
 
 
-def provision(latitude, github, run, attempt, make_ssh, make_key, clock=time.monotonic, sleep=time.sleep, upstream=None):
-    """The run's node ready with one runner per leg online, or NodeError with the node off."""
+#: What `up` leaves in its work directory for the steps after it: the node's package state, and the state of the run's node.
+STATUS_FILE = "dpkg-status"
+STATE_FILE = "node.json"
+#: dpkg's database on the node, and where the closure of packages goes on it: node_bootstrap.sh installs from there, and removes nothing.
+NODE_DPKG_STATUS = "/var/lib/dpkg/status"
+NODE_DEBS = "/opt/node-deps/debs"
+#: The script that resolves the closure on the GitHub runner (release.yml's node job); its bytes are part of the closure's key.
+RESOLVER = "node_deps_resolve.sh"
+CLOSURE_SEND_LIMIT_S = 900
+
+
+def bootstrap_packages() -> list:
+    """The apt packages node_bootstrap.sh installs: its PACKAGES=( ... ) array, comments dropped. The one list: the resolver reads the same."""
+    text = script_bytes("node_bootstrap.sh").decode("utf-8")
+    block = text.split("\nPACKAGES=(\n", 1)[1].split("\n)", 1)[0]
+    return [word for line in block.splitlines() for word in line.split("#", 1)[0].split()]
+
+
+def installed_state(status: bytes) -> list:
+    """Package, architecture, version and status of every stanza of a dpkg database, one line each, sorted: what the closure is resolved against.
+    Nothing else of the file (descriptions, sizes, the order of the stanzas) changes the closure."""
+    lines = []
+    for stanza in status.decode("utf-8", "replace").split("\n\n"):
+        fields = {}
+        for line in stanza.splitlines():
+            name, colon, value = line.partition(":")
+            if colon and name in ("Package", "Architecture", "Version", "Status"):
+                fields[name] = value.strip()
+        if "Package" in fields:
+            lines.append("|".join(fields.get(name, "") for name in ("Package", "Architecture", "Version", "Status")))
+    return sorted(lines)
+
+
+#: Packages of the image whose versions decide the closure (an exact-version edge of the list ends on each), named in the log of `up`.
+IMAGE_ANCHORS = ("systemd", "libc6", "python3.12", "perl-base", "gcc-14-base", "dbus-daemon")
+
+
+def image_versions(status: bytes) -> str:
+    """`name version` of IMAGE_ANCHORS as the node has them installed, `name absent` otherwise."""
+    have = {}
+    for line in installed_state(status):
+        name, arch, version, state = line.split("|")
+        if state.endswith(" installed") and arch in ("amd64", "all"):
+            have[name] = version
+    return ", ".join("%s %s" % (name, have.get(name, "absent")) for name in IMAGE_ANCHORS)
+
+
+def closure_key(status: bytes) -> str:
+    """The name of a closure: what the node has installed, the list to install and the resolver. The same image and the same list resolve
+    to the same files whenever they are asked, and any of the three changing is another closure."""
+    digest = hashlib.sha256()
+    for label, lines in (("installed", installed_state(status)), ("packages", sorted(set(bootstrap_packages()))),
+                         ("resolver", [hashlib.sha256(script_bytes(RESOLVER)).hexdigest()])):
+        digest.update(("%s\n%s\n" % (label, "\n".join(lines))).encode("utf-8"))
+    return digest.hexdigest()
+
+
+def node_status(ssh) -> bytes:
+    """The node's own dpkg database, whole. Through base64: ssh's answer is text, and the address is scrubbed from it."""
+    code, out, err = ssh("base64 -w0 %s" % NODE_DPKG_STATUS, timeout=120)
+    if code != 0:
+        raise NodeError("could not read the node's package state: %s" % (err or out)[-300:])
+    try:
+        status = base64.b64decode(out.strip(), validate=True)
+    except ValueError as exc:
+        raise NodeError("the node's package state did not arrive whole: %s" % exc) from None
+    if not installed_state(status):
+        raise NodeError("the node's package state holds no package")
+    return status
+
+
+def closure_tar(closure) -> bytes:
+    """The closure's files, flat and owned by root, as a plain tar (the .debs are compressed already)."""
+    tar_bytes = io.BytesIO()
+    with tarfile.open(fileobj=tar_bytes, mode="w") as tar:
+        for path in sorted(p for p in Path(closure).iterdir() if p.is_file()):
+            info = tar.gettarinfo(str(path), arcname=path.name)
+            info.uid = info.gid = 0
+            info.uname = info.gname = "root"
+            info.mode = 0o644
+            with open(path, "rb") as handle:
+                tar.addfile(info, handle)
+    return tar_bytes.getvalue()
+
+
+def send_closure(ssh, closure, clock, deadline):
+    """The closure into NODE_DEBS, down ssh's stdin as the scripts go, with its MB and seconds in the log."""
+    if not (Path(closure) / "Packages").is_file():
+        raise NodeError("no closure of packages in %s: the step that resolves or restores it did not leave its index" % closure)
+    payload = closure_tar(closure)
+    start = clock()
+    left = remaining(deadline, clock)
+    code, out, err = ssh("rm -rf %s && mkdir -p %s && tar -xf - -C %s" % (os.path.dirname(NODE_DEBS), NODE_DEBS, NODE_DEBS), stdin=payload,
+                         timeout=CLOSURE_SEND_LIMIT_S if left is None else max(30, min(CLOSURE_SEND_LIMIT_S, left)))
+    if code != 0:
+        raise NodeError("could not put the closure of packages on the node (exit %d): %s" % (code, (err or out)[-300:]))
+    say("the closure on the node: %.0f MB in %.0f s" % (len(payload) / 1e6, clock() - start))
+
+
+def bring_up(latitude, github, run, attempt, make_ssh, make_key, work, clock=time.monotonic, sleep=time.sleep, wall=time.time) -> str:
+    """The run's node made and answering, its package state read into `work`, and the key of the closure to resolve against it (closure_key).
+    The state file carries what prepare() needs from here, with the deadline as a time of the wall clock: the steps between the two take their
+    share of it. Any failure: the node off, and the error."""
     clear_leftovers(latitude, github, run, attempt)
     name = node_name(run, attempt)
     key = make_key()
@@ -691,6 +803,35 @@ def provision(latitude, github, run, attempt, make_ssh, make_key, clock=time.mon
         node_id = latitude.create(name, public_key)
         ssh = wait_up(latitude, node_id, make_ssh, clock, sleep, limit=min(UP_LIMIT_S, remaining(deadline, clock)))
         drop_key_of(latitude, name)
+        status = node_status(ssh)
+        found = closure_key(status)
+        work = Path(work)
+        work.mkdir(parents=True, exist_ok=True)
+        (work / STATUS_FILE).write_bytes(status)
+        (work / STATE_FILE).write_text(json.dumps({"node_id": node_id, "deadline_at": wall() + remaining(deadline, clock)}), encoding="utf-8")
+        say("the node's package state: %d packages; the closure to resolve against it is %s" % (len(installed_state(status)), found))
+        say("the node's image, the families with exact-version edges in the list: %s" % image_versions(status))
+        return found
+    except BaseException:
+        off_after_failure(latitude, github, run, attempt, clock, sleep)
+        raise
+
+
+def prepare(latitude, github, run, attempt, make_ssh, work, closure, clock=time.monotonic, sleep=time.sleep, upstream=None, wall=time.time):
+    """The node of bring_up() ready with one runner per leg online, or NodeError with the node off: the closure on it, the bootstrap, the tag's
+    fetch, the runners."""
+    work = Path(work)
+    try:
+        try:
+            state = json.loads((work / STATE_FILE).read_text(encoding="utf-8"))
+            node_id, deadline = state["node_id"], clock() + (state["deadline_at"] - wall())
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            raise NodeError("no node of this run was brought up before this step (%s)" % exc) from None
+        address = latitude.address(node_id)
+        if not address:
+            raise NodeError("the API gives no address for the node any more")
+        ssh = make_ssh(*address)
+        send_closure(ssh, closure, clock, deadline)
         out = bootstrap(ssh, clock, sleep, deadline=deadline)
         say(out.strip().splitlines()[-1] if out.strip() else "prepared")
         host_key = HOST_KEY_LINE.search(out)
@@ -828,7 +969,7 @@ class Machine:
 
     def expect_runner(self, expected, now):
         """The clock of a runner that is not coming runs while its leg waits, on a machine
-        that answers. The runner exists from before the leg can be queued: provision saw it
+        that answers. The runner exists from before the leg can be queued: prepare saw it
         online. So each watch job starts this clock at its first look, never before that."""
         if expected and self.down_since is None:
             self.runner_since = now if self.runner_since is None else self.runner_since
@@ -1129,7 +1270,7 @@ def sweep(latitude, github, now, max_age_hours=GUARD_HOURS, dry_run=False) -> li
                 latitude.delete(node["id"])
             deleted.append(node["name"])
     if not dry_run:
-        # A key whose node never came up, or was lost before provision got to it.
+        # A key whose node never came up, or was lost before prepare got to it.
         on = {node.get("name") for node in listed} - set(deleted)
         for name in latitude.drop_keys(lambda key: bool(NAME.match(key)) and key not in on):
             say("the public key of %s: dropped" % name)
@@ -1179,8 +1320,33 @@ def node_ssh(work: Path, clamp=clamp_path):
     return make
 
 
-def run_provision(a) -> int:
-    work = Path(tempfile.mkdtemp(prefix="build-node-"))
+def run_up(a) -> int:
+    work = Path(a.work)
+    try:
+        latitude, github = from_env(), github_from_env()
+        if github is None:
+            raise NodeError("GITHUB_REPOSITORY is not set")
+        output = os.environ.get("GITHUB_OUTPUT")
+        if not output:
+            raise NodeError("GITHUB_OUTPUT is not set: the closure's key has nowhere to go")
+        work.mkdir(parents=True, exist_ok=True)
+        key = bring_up(latitude, github, a.run, a.attempt, node_ssh(work), lambda: new_key(work), work)
+        try:
+            with open(output, "a", encoding="utf-8") as handle:
+                handle.write("key=%s\n" % key)
+        except OSError:
+            off_after_failure(latitude, github, a.run, a.attempt, time.monotonic, time.sleep)
+            raise
+    except (NodeError, OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as exc:
+        # Without its node the leg has nowhere to run: the run has failed.
+        print("::error::no node for %s, the run fails: %s" % (" and ".join(node_legs()), exc), file=sys.stderr)
+        shutil.rmtree(work, ignore_errors=True)
+        return 1
+    return 0
+
+
+def run_prepare(a) -> int:
+    work = Path(a.work)
     try:
         latitude, github = from_env(), github_from_env()
         if github is None:
@@ -1192,12 +1358,13 @@ def run_provision(a) -> int:
                 upstream = json.loads(Path(a.upstream).read_text(encoding="utf-8"))
             except (OSError, ValueError) as exc:
                 say("::warning::no tag fetched ahead on the node, %s unreadable: %s" % (a.upstream, exc))
-        provision(latitude, github, a.run, a.attempt, node_ssh(work), lambda: new_key(work), upstream=upstream)
+        prepare(latitude, github, a.run, a.attempt, node_ssh(work), work, a.debs, upstream=upstream)
     except (NodeError, OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as exc:
         # Without its node the leg has nowhere to run: the run has failed.
         print("::error::no node for %s, the run fails: %s" % (" and ".join(node_legs()), exc), file=sys.stderr)
         return 1
     finally:
+        # The node's private key is in it.
         shutil.rmtree(work, ignore_errors=True)
     return 0
 
@@ -1258,7 +1425,7 @@ def run_off(a) -> int:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="the build nodes of a release run")
     sub = ap.add_subparsers(dest="cmd", required=True)
-    for name in ("provision", "off", "watch"):
+    for name in ("up", "prepare", "off", "watch"):
         p = sub.add_parser(name)
         p.add_argument("--run", required=True)
         p.add_argument("--attempt", required=True)
@@ -1266,7 +1433,10 @@ def main(argv=None) -> int:
             p.add_argument("--ref", required=True)
         if name == "off":
             p.add_argument("--if-legs-done", action="store_true")
-        if name == "provision":
+        if name in ("up", "prepare"):
+            p.add_argument("--work", required=True, help="a directory that holds the node's key and state between up and prepare")
+        if name == "prepare":
+            p.add_argument("--debs", required=True, help="the closure of packages: the .debs and their Packages index")
             p.add_argument("--upstream", default="", help="the series' UPSTREAM.json: the node fetches its tag at once")
     s = sub.add_parser("sweep")
     s.add_argument("--max-age-hours", type=float, default=GUARD_HOURS)
@@ -1274,8 +1444,10 @@ def main(argv=None) -> int:
     sub.add_parser("status")
     a = ap.parse_args(argv)
 
-    if a.cmd == "provision":
-        return run_provision(a)
+    if a.cmd == "up":
+        return run_up(a)
+    if a.cmd == "prepare":
+        return run_prepare(a)
     try:
         if a.cmd == "off":
             return run_off(a)

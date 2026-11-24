@@ -50,7 +50,7 @@
   "scripts/ci/linker_shim.py": "100644",
   "scripts/ci/mozconfig.py": "100644",
   "scripts/ci/node_bootstrap.sh": "100644",
-  "scripts/ci/node_deps_build.sh": "100644",
+  "scripts/ci/node_deps_resolve.sh": "100644",
   "scripts/ci/node_runner.sh": "100644",
   "scripts/ci/objects_first.py": "100644",
   "scripts/ci/package_linux.sh": "100644",
