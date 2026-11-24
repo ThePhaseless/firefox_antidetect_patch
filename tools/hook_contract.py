@@ -35,7 +35,7 @@ Public API (stable: the HOOKS.json generator reads it):
     load_debt(path) / write_debt(path, violations) / debt_problems(violations, debt, main_debt)
     debt_summary(entries)      -> text
 
-Rules (the id is in the key): C1 a hook of more than one line (two adjacent lines are two hooks when each is a complete statement or declaration
+Rules (the id is in the key; C12..C15 are port-06, below): C1 a hook of more than one line (two adjacent lines are two hooks when each is a complete statement or declaration
 with its own marker: C1 is a line of ours without a marker in a run, or one statement over several lines); C2 marker missing; C3 the marker
 comment carries more than the marker; C4 a comment line added; C5 logic in the hook (&&, ||,
 ternary, arithmetic); C6 Mozilla lines removed or changed outside the three rewriting forms;
@@ -49,7 +49,14 @@ every hook without a test until it has one).
 
 G35, declared exception: a HOOKS.json entry with the hand fields `exception` (the reason) and `pm:
 "approvato"` is a rewritten line no form can express; contract_violations leaves out every violation of
-such a hook (C-rules, T1, T2, T3), and `check` counts them: "declared exceptions: N".
+such a hook (C1..C11, T1, T2, T3), and `check` counts them: "declared exceptions: N". The rules C12..C15 (port-06) are the
+opposite: they judge the exception itself, by its `reason_kind` (see the port-06 section below).
+Port-06 (docs/decisions/port-06-hooks-only-add.md): a hunk that removes Mozilla lines passes only as one of the rewriting forms
+(wrap-expression, wrap-call, wrap-function, declared-value, shadow) or as a declared exception with `reason_kind` expression,
+declaration, macro or skip. C12: neither. C13: a skip whose removed lines are not all kept verbatim among the added lines. C14: the
+rewrite fits wrap-expression (Mozilla's expression intact inside our line, or `||` `&&` `?:` added around it). C15: a parameter
+added to a C++ signature or call (an IDL one is a declaration). C12..C15 are never in the debt list and a declared exception does
+not leave them out.
 Forms the pm ruled in (coord/portabilita-69/design/PM-DECISIONS.md): G1/G2 renames, G15 guards with a
 value, G21 shadow, G29 call wrap, G30/G33 anchors at the end, G40 forward declarations. A multi-line Mozilla
 expression wrapped (two Mozilla lines, the marker on the first) stays a violation: the pm decides case by case.
@@ -68,6 +75,8 @@ from pathlib import Path
 
 HUNK_RE = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@ ?(.*)$")
 MARKER_RE = re.compile(r"STEALTH-HOOK\(([^)]*)\)")
+REWRITE_FORMS = ("wrap-expression", "wrap-call", "wrap-function", "declared-value", "shadow")
+REASON_KINDS = ("expression", "declaration", "macro", "skip")
 FORMS = ("guard", "notice", "wrap-expression", "wrap-call", "wrap-function", "declared-value", "registration",
          "member", "shadow", "anchor", "unknown")
 RULES = {
@@ -82,6 +91,10 @@ RULES = {
     "C9": "inside a Mozilla list or the last line of a block",
     "C10": "the called function is not named Stealth<What> and is not an existing function (tools/hook-names.json)",
     "C11": "a value of ours in a numbered space of Mozilla",
+    "C12": "a rewrite of Mozilla lines that is none of the rewriting forms and has no exception with an allowed reason_kind (port-06)",
+    "C13": "a `skip` rewrite whose removed Mozilla lines are not all kept verbatim among the added lines (port-06)",
+    "C14": "a rewrite that fits wrap-expression: Mozilla's expression survives intact in our line, or the change adds ||, && or ?: around it (port-06)",
+    "C15": "a parameter threaded through a C++ signature or call: carry it by side state, or declare it with reason_kind declaration and say why no side state can (port-06)",
     "T1": "a hook with no test (the `test` of its HOOKS.json entry is empty)",
     "T2": "an anchor hook without its `anchor` and `why` in HOOKS.json",
     "T3": "a hook whose test no round runs (gtest filter of the candidate, node job, python step)",
@@ -89,6 +102,8 @@ RULES = {
 # Rules added after main's debt list was written: main's list has no entry of them yet, so the entries
 # they add to the list are not "entries main does not have" (tools/hooks_list.py; remove this once main has them).
 INTRODUCED_RULES = {"T1", "T2", "T3"}
+# port-06: these rules are fixed by the engine change and the HOOKS.json fields, never by the debt list (debt_problems refuses them)
+PORT06_RULES = ("C12", "C13", "C14", "C15")
 
 HASH_COMMENT = {"py", "yaml", "yml", "toml", "build", "configure", "sh", "txt", "in", "ini",
                 "cfg", "cmake", "gitignore", "mk", "conf", "lock"}
@@ -126,6 +141,23 @@ class Hook:
     run_index: int = 0
     marker: str | None = None
     hunk: int = 0
+
+
+@dataclass(frozen=True)
+class Rewrite:
+    """port-06: one block of a hunk that removes Mozilla lines (a rewrite, or a deletion when `add` is empty).
+    rem / add: the removed lines and the non-blank added lines of the block; hunk_added: every added line of the git hunk
+    (a `skip` keeps Mozilla's text among them); is_form: it is one of the rewriting forms (REWRITE_FORMS); hooks: the
+    Hook of each added line (the one of a deletion)."""
+    folder: str
+    file: str
+    hunk: int
+    function: str
+    rem: tuple
+    add: tuple
+    hunk_added: tuple
+    is_form: bool
+    hooks: tuple
 
 
 @dataclass(frozen=True)
@@ -897,7 +929,13 @@ def _renames(files: list) -> set:
 def analyse_patch(folder: str, text: str):
     """-> (hooks, violations) of one hooks.patch (folder: its series folder). Does not look at
     BACKPORT.json: series_hooks skips those folders."""
-    hooks, found = [], []
+    hooks, found, _ = _analyse_patch(folder, text)
+    return hooks, found
+
+
+def _analyse_patch(folder: str, text: str):
+    """-> (hooks, violations, rewrites): the same, and every block that removes Mozilla lines (port-06)."""
+    hooks, found, rewrites = [], [], []
 
     def violate(rule, file, function, txt, detail="", hs=()):
         found.append(Violation(rule, folder, file, function, txt, _key(rule, folder, file, function, txt), detail,
@@ -934,6 +972,8 @@ def analyse_patch(folder: str, text: str):
                     hooks.append(Hook(folder, path, section, "unknown", "", "\n".join(rem), "delete", placement, 0, 0, None, hno))
                     violate("C6", path, section, "-" + "\n-".join(x.strip() for x in rem),
                             "%d Mozilla lines removed" % len(rem), hooks[-1:])
+                    rewrites.append(Rewrite(folder, path, hno, section, tuple(rem), (), tuple(x for t, x in lines if t == "+"),
+                                            False, tuple(hooks[-1:])))
                     continue
                 nonblank = [(i, x.rstrip()) for i, x in enumerate(add) if x.strip()]
                 paired = bool(rem) and len(rem) == len(nonblank)       # a rewrite line for line
@@ -993,7 +1033,10 @@ def analyse_patch(folder: str, text: str):
                                 violate("C10", path, section, x, cs[0], [hk])
                 add_text = "\n".join(x for _, x in nonblank)
                 if rem:
-                    if not (single_pair and forms and forms[0] in ("wrap-expression", "wrap-call", "wrap-function", "declared-value")):
+                    is_form = bool(single_pair and forms and forms[0] in REWRITE_FORMS)
+                    rewrites.append(Rewrite(folder, path, hno, section, tuple(rem), tuple(x for _, x in nonblank),
+                                            tuple(x for t, x in lines if t == "+"), is_form, tuple(block_hooks)))
+                    if not is_form:
                         violate("C6", path, section, "-" + "\n-".join(x.strip() for x in rem) + "\n" + add_text,
                                 "%d Mozilla lines removed, %d added" % (len(rem), len(nonblank)), block_hooks)
                 elif nonblank:
@@ -1004,7 +1047,7 @@ def analyse_patch(folder: str, text: str):
                             placement in ("list_entry", "end_of_block")
                             or (at_end and placement not in ("include_block", "build_file"))):
                         violate("C9", path, section, add_text, "placement=%s at_block_end=%s" % (placement, at_end), block_hooks)
-    return hooks, _unique(found)
+    return hooks, _unique(found), rewrites
 
 
 def _unique(found: list) -> list:
@@ -1015,6 +1058,250 @@ def _unique(found: list) -> list:
         seen[v.key] = n
         out.append(v if n == 1 else Violation(v.rule, v.folder, v.file, v.function, v.text, "%s#%d" % (v.key, n), v.detail, v.ids))
     return out
+
+
+# --------------------------------------------------------------------------- port-06: a rewrite needs a reason that holds
+# A hunk adds lines in one of the fixed forms. A rewrite of Mozilla text outside the rewriting forms (REWRITE_FORMS) is allowed
+# only as a declared exception (G35) whose `reason_kind` is one of REASON_KINDS, and only where no form can carry the value:
+#   expression   a value inside an expression Mozilla builds
+#   declaration  a signature or declaration (an IDL parameter); a C++ one only when the exception says why no side state can carry it
+#   macro        a preprocessor condition or macro (an `#if` rewrite)
+#   skip         Mozilla's statements must not run; every removed line stays verbatim among the added ones
+# C12 no allowed exception; C13 a skip that does not keep Mozilla's lines verbatim; C14 the rewrite fits wrap-expression;
+# C15 a parameter threaded through a C++ signature or call (a thread-local or a member of our side object carries it instead).
+C_FAMILY = {"cpp", "cc", "c", "h", "hpp", "mm", "m"}
+SIDE_STATE = re.compile(r"side[\s-]+state", re.I)
+DIRECTIVE_LINE = re.compile(r"^\s*#")
+
+
+def _is_exception_entry(e) -> bool:
+    """G35: an entry with the reason (`exception`) and the pm's approval (tools/hooks_list.py is_declared_exception)."""
+    return bool(e) and isinstance(e.get("exception"), str) and bool(e["exception"].strip()) and e.get("pm") == "approvato"
+
+
+def _code_of(line: str) -> str:
+    return marker_split(line.rstrip())[0]
+
+
+def _preprocessor_only(rem: tuple) -> bool:
+    lines = [x for x in rem if x.strip()]
+    return bool(lines) and all(DIRECTIVE_LINE.match(x) for x in lines)
+
+
+def _significant(t: list) -> list:
+    """The tokens of a removed text without its closing `;`, `{`, `,`: what Mozilla's expression is."""
+    t = list(t)
+    while t and t[-1] in (";", "{", ","):
+        t.pop()
+    return t
+
+
+def _find_run(needle: list, hay: list) -> int:
+    """The index where `needle` occurs as a contiguous run of `hay`, or -1."""
+    n = len(needle)
+    for k in range(len(hay) - n + 1):
+        if hay[k:k + n] == needle:
+            return k
+    return -1
+
+
+def _insertions(rem_t: list, add_t: list):
+    """Matches the tokens of the removed text as a subsequence of the added ones (leftmost). -> None if it is not one, else
+    the list of insertions (previous matched token or None, tokens inserted, next matched token or None)."""
+    i, matched = 0, []
+    for k, t in enumerate(add_t):
+        if i < len(rem_t) and t == rem_t[i]:
+            matched.append(k)
+            i += 1
+    if i < len(rem_t):
+        return None
+    out, prev = [], -1
+    for m in matched + [len(add_t)]:
+        if m - prev > 1:
+            out.append((add_t[prev] if prev >= 0 else None, add_t[prev + 1:m], add_t[m] if m < len(add_t) else None))
+        prev = m
+    return out
+
+
+QUALIFIERS = {"const", "volatile", "noexcept", "override", "final", "operator"}
+
+
+def _logic_ops(seg: list, prev=None, nxt=None) -> set:
+    """The `&&`, `||` and `?` of a token segment (the tokenizer cuts operators into single characters). An `&&` after a type
+    qualifier or in front of `=` is an rvalue reference (`const&& = delete`), not a logical and."""
+    ops = {"?"} if "?" in seg else set()
+    ctx = [prev] + list(seg) + [nxt]
+    for i in range(1, len(ctx) - 2):
+        if ctx[i] == ctx[i + 1] and ctx[i] in ("&", "|"):
+            before, after = ctx[i - 1], ctx[i + 2]
+            operand_end = before is not None and (before in (")", "]") or (re.match(r"\w", before) and before not in QUALIFIERS))
+            operand_start = after is not None and (re.match(r"[\w!(~*\-+]", after) is not None)
+            if operand_end and operand_start:
+                ops.add(ctx[i] * 2)
+    return ops
+
+
+def _depth0_comma(seg: list) -> bool:
+    """A comma of the segment outside every bracket: it separates the arguments or parameters the segment adds."""
+    depth = 0
+    for t in seg:
+        if t in ("(", "[", "{", "<"):
+            depth += 1
+        elif t in (")", "]", "}", ">"):
+            depth -= 1
+        elif t == "," and depth == 0:
+            return True
+    return False
+
+
+def _is_parameter(prev, seg: list, nxt) -> bool:
+    """An inserted segment between two matched tokens that adds an argument or a parameter to a list."""
+    if prev is None or nxt is None or any(t in (";", "{", "}") for t in seg):
+        return False
+    ops = _logic_ops(seg, prev, nxt)
+    if _depth0_comma(seg):
+        return not (ops & {"?", "||"})
+    return prev in ("(", ",") and nxt in (")", ",") and not ops
+
+
+def _rewrite_tokens(r: Rewrite):
+    rem_t = _toks(" ".join(x.strip() for x in r.rem))
+    add_t = _toks(" ".join(_code_of(x).strip() for x in r.add))
+    return rem_t, add_t
+
+
+def _verbatim_lines(r: Rewrite) -> set:
+    return {norm(_code_of(x)) for x in r.hunk_added if x.strip()}
+
+
+def _own_line_kept(r: Rewrite) -> bool:
+    """Every removed line is kept as a whole added line (a skip's shape, not a wrap)."""
+    kept = _verbatim_lines(r)
+    real = [x for x in r.rem if len(_toks(x)) >= 3]
+    return bool(real) and all(norm(x) in kept for x in real)
+
+
+def rule_c12(r: Rewrite, entry, problem: str = ""):
+    """C12: the rewrite is none of the forms and no declared exception with an allowed reason_kind covers it. -> detail or None."""
+    if r.is_form or entry is not None:
+        return None
+    return problem or ("a rewrite of Mozilla lines with no exception: write it as one of the forms, or declare it in HOOKS.json "
+                       "(`exception`, `reason_kind` in %s, `pm`)" % "/".join(REASON_KINDS))
+
+
+def rule_c13(r: Rewrite, entry):
+    """C13: a `skip` keeps every removed Mozilla line verbatim (whitespace aside) among the lines of its hunk. -> detail or None."""
+    if r.is_form or entry is None or entry.get("reason_kind") != "skip":
+        return None
+    kept = _verbatim_lines(r)
+    lost = [x.strip() for x in r.rem if x.strip() and norm(x) not in kept]
+    if lost:
+        return "skip: the Mozilla line `%s` is not kept verbatim among the added lines: keep it, inside our guard" % _squeeze(lost[0])[:100]
+    return None
+
+
+def rule_c14(r: Rewrite, entry):
+    """C14: the rewrite fits wrap-expression: (i) Mozilla's expression survives intact inside one of our lines, so it is a wrap
+    and is declared as one; (ii) the change adds `||`, `&&` or `?:` around Mozilla's expression. A skip is neither (it keeps
+    Mozilla's text as whole lines, not evaluated), and a preprocessor line cannot be wrapped. -> detail or None."""
+    if (r.is_form or (entry or {}).get("reason_kind") == "skip" or not r.add or _preprocessor_only(r.rem)
+            or file_type_of(r.file) in IDL):         # `Foo?` and `[A, B]` of an IDL are not expressions
+        return None
+    rem_t, add_t = _rewrite_tokens(r)
+    sig = _significant(rem_t)
+    if len(sig) < 3 or len(add_t) <= len(sig):
+        return None
+    # the lines of the block read as one: the recogniser of the one-line forms, on a block that spans several lines
+    form, _ = line_form(file_type_of(r.file), r.file.rsplit("/", 1)[-1], " ".join(_code_of(x).strip() for x in r.add),
+                        " ".join(x.strip() for x in r.rem), "rewrite", "mid_function", True)
+    if form in ("wrap-expression", "wrap-call") and not _own_line_kept(r):
+        return ("(i) Mozilla's expression `%s` survives intact inside our line: it is a %s, declare it as one (the "
+                "extra leading arguments and our call go around it)" % (_squeeze(" ".join(r.rem))[:90], form))
+    k = _find_run(sig, add_t)
+    if k >= 0 and not _own_line_kept(r) and calls(" ".join(add_t[:k] + add_t[k + len(sig):])):
+        return ("(i) Mozilla's expression `%s` survives intact inside our line: it is a wrap-expression, declare it as one (the "
+                "extra leading arguments and our call go around it)" % _squeeze(" ".join(r.rem))[:90])
+    ins = _insertions(sig, add_t)
+    if ins is not None:
+        ops = sorted({o for prev, seg, nxt in ins if not _depth0_comma(seg) for o in _logic_ops(seg, prev, nxt)})
+        if ops:
+            return ("(ii) the change adds `%s` around Mozilla's expression: wrap-expression fits, our call decides inside the "
+                    "expression" % "`, `".join(ops))
+    return None
+
+
+def rule_c15(r: Rewrite, entry):
+    """C15: (iii) a parameter added to a C++ signature or call that is not IDL, IPDL or WebIDL: parameter threading. It is
+    refused unless reason_kind is `declaration` and the exception names why no side state can carry it. -> detail or None."""
+    if r.is_form or (entry or {}).get("reason_kind") == "skip" or not r.add or _preprocessor_only(r.rem):
+        return None
+    if file_type_of(r.file) not in C_FAMILY:
+        return None
+    rem_t, add_t = _rewrite_tokens(r)
+    sig = _significant(rem_t)
+    if len(sig) < 2:
+        return None
+    ins = _insertions(sig, add_t)
+    if not ins:
+        return None
+    if not any(_is_parameter(prev, seg, nxt) for prev, seg, nxt in ins):
+        return None
+    if (entry or {}).get("reason_kind") == "declaration" and SIDE_STATE.search(entry.get("exception", "")):
+        return None
+    return ("(iii) a parameter is added to a C++ signature or call: carry it by our own state set by a guard at the entry "
+            "(a thread-local, or a member of our side object); otherwise declare it with reason_kind declaration and an "
+            "exception that says why no side state can carry it")
+
+
+def _exception_of(r: Rewrite, by_identity: dict):
+    """-> (entry or None, problem): the declared exception of the hooks of the block with an allowed reason_kind."""
+    declared = []
+    for hk in r.hooks:
+        for e in by_identity.get(hook_identity(hk), ()):
+            if _is_exception_entry(e):
+                declared.append(e)
+    if not declared:
+        return None, ""
+    for e in declared:
+        if e.get("reason_kind") in REASON_KINDS:
+            if e["reason_kind"] == "macro" and not (_preprocessor_only(r.rem) or any(x.rstrip().endswith("\\") for x in r.rem)):
+                return None, ("reason_kind macro, but no removed line is a preprocessor line or a macro line: a value inside an "
+                              "expression is `expression`")
+            return e, ""
+    return None, ("the exception has no `reason_kind`, or not one of %s (got %r)"
+                  % ("/".join(REASON_KINDS), declared[0].get("reason_kind")))
+
+
+def analyse_rewrites(folder: str, text: str, entries=()) -> list:
+    """port-06: the C12..C15 violations of one hooks.patch; `entries` are the HOOKS.json entries of the folder (their hand fields
+    `exception`, `reason_kind`, `pm` are what a rewrite is judged by). Each rule is a function of the block and its exception."""
+    by_identity = {}
+    for e in entries:
+        if isinstance(e, dict) and all(k in e for k in ("file", "function", "kind", "line")):
+            key = (e["file"], _squeeze(e["function"]), e["kind"], norm(e["line"]), norm(e.get("removed", "")))
+            by_identity.setdefault(key, []).append(e)
+    found = []
+    for r in _analyse_patch(folder, text)[2]:
+        if r.is_form:
+            continue
+        entry, problem = _exception_of(r, by_identity)
+        txt = "-" + "\n-".join(x.strip() for x in r.rem) + "\n" + "\n".join(x for x in r.add)
+        for rule, detail in (("C12", rule_c12(r, entry, problem)), ("C13", rule_c13(r, entry)),
+                             ("C14", rule_c14(r, entry)), ("C15", rule_c15(r, entry))):
+            if detail:
+                found.append(Violation(rule, folder, r.file, r.function, txt, _key(rule, folder, r.file, r.function, txt), detail,
+                                       tuple(hook_identity(h) for h in r.hooks)))
+    return _unique(found)
+
+
+def rewrite_violations(root) -> list:
+    """port-06: the C12..C15 violations of every non-backport folder, judged with the committed HOOKS.json hand fields."""
+    import hooks_list
+    root, found = Path(root), []
+    for folder in _folders(root):
+        found += analyse_rewrites(folder, (root / folder / "hooks.patch").read_text(encoding="utf-8", errors="replace"),
+                                  hooks_list.expected(root, folder))
+    return found
 
 
 def _folders(root: Path) -> list:
@@ -1053,7 +1340,8 @@ def contract_violations(root) -> list:
 
     kept = [v for v in _analyse(root)[1]
             if not (v.ids and all((v.folder, i) in excepted for i in v.ids)) and not end_anchor(v)]
-    return sorted(kept + hooks_list.missing_test_violations(root), key=lambda v: v.key)
+    # port-06: a declared exception does not leave these out; they judge the exception itself
+    return sorted(kept + hooks_list.missing_test_violations(root) + rewrite_violations(root), key=lambda v: v.key)
 
 
 # --------------------------------------------------------------------------- the debt list
@@ -1079,7 +1367,7 @@ def update_debt(entries: list, violations: list, init: bool = False) -> list:
     """The debt after `hook-debt`: with init, every violation of now; without, only the entries that
     still occur (a list never grows by itself)."""
     if init:
-        return [entry_of(v) for v in violations]
+        return [entry_of(v) for v in violations if v.rule not in PORT06_RULES]
     now = {v.key for v in violations}
     return [e for e in entries if e["key"] in now]
 
@@ -1090,8 +1378,14 @@ def debt_problems(violations: list, debt: list, main_debt: list | None) -> list:
     found = []
     now = {v.key: v for v in violations}
     listed = {e["key"] for e in debt}
+    for key in sorted(k for k in listed if k.split("|", 1)[0] in PORT06_RULES):
+        found.append("tools/hook-debt.json lists %s: the rules %s are never debt (port-06): fix the rewrite by an engine change or "
+                     "by its HOOKS.json exception" % (key, "/".join(PORT06_RULES)))
     for key in sorted(set(now) - listed):
         v = now[key]
+        if v.rule in PORT06_RULES:
+            found.append("%s/hooks.patch, %s: %s (%s): %s" % (v.folder, v.file, v.rule, RULES[v.rule], v.detail or _squeeze(v.text)[:100]))
+            continue
         found.append("%s/hooks.patch, %s: %s (%s): a hook breaks the contract and is not in the debt list "
                      "(tools/hook-debt.json): %s" % (v.folder, v.file, v.rule, RULES[v.rule], _squeeze(v.text)[:100]))
     for key in sorted(listed - set(now)):
