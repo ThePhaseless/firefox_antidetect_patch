@@ -96,6 +96,7 @@ RULES = {
     "C14": "a rewrite that fits wrap-expression: Mozilla's expression survives intact in our line, or the change adds ||, && or ?: around it (port-06)",
     "C15": "a parameter threaded through a C++ signature or call: carry it by side state, or declare it with reason_kind declaration and say why no side state can (port-06)",
     "C16": "a hook passes a local of Mozilla's function as an argument outside an anchor (hook-02 point 3; read from the lines the hunks show)",
+    "C17": "a Stealth-named function placed in a Mozilla namespace (JS::, js::, xpc::, gfx::, net::, ...): ours are `StealthX`, `mozilla::StealthX` or `mozilla::stealth::X`",
     "T1": "a hook with no test (the `test` of its HOOKS.json entry is empty)",
     "T2": "an anchor hook without its `anchor` and `why` in HOOKS.json",
     "T3": "a hook whose test no round runs (gtest filter of the candidate, node job, python step)",
@@ -104,7 +105,7 @@ RULES = {
 # they add to the list are not "entries main does not have" (tools/hooks_list.py; remove this once main has them).
 INTRODUCED_RULES = {"T1", "T2", "T3"}
 # port-06: these rules are fixed by the engine change and the HOOKS.json fields, never by the debt list (debt_problems refuses them)
-PORT06_RULES = ("C12", "C13", "C14", "C15", "C16")      # C16 is hook-02 point 3: it is fixed by the hook, never by the debt
+PORT06_RULES = ("C12", "C13", "C14", "C15", "C16", "C17")      # C16 and C17 are hook-02 rules: fixed by the hook, never by the debt
 
 HASH_COMMENT = {"py", "yaml", "yml", "toml", "build", "configure", "sh", "txt", "in", "ini",
                 "cfg", "cmake", "gitignore", "mk", "conf", "lock"}
@@ -645,7 +646,32 @@ def called_replacement(removed: str, code: str):
     if i + 1 >= len(r) or r[i + 1] != "(" or i + len(mc) >= len(c) or c[i + len(mc)] != "(":
         return None
     name = "".join(mc)
-    return name if (STEALTH_CHAIN.fullmatch(name) or is_known_name(name)) else None
+    if STEALTH_CHAIN.fullmatch(name) or is_known_name(name):
+        return name
+    return None
+
+
+def _namespace_chain(chain: str) -> bool:
+    """A name qualified by namespaces only (`A::B::Foo`), not a member of an object (`x.Foo`, `p->Foo`)."""
+    return "." not in chain and "->" not in chain
+
+
+def namespace_replacement(removed: str, code: str):
+    """G29, the qualifier may change: our line is Mozilla's with the qualified called name `JS::Foo` replaced by a name of ours
+    whose LAST component is Stealth-named (`mozilla::StealthFoo`, `StealthFoo`, `mozilla::stealth::StealthFoo`), the arguments and
+    the rest of the line Mozilla's, unchanged. A receiver (`x.Foo(`, `p->Foo(`) is never dropped. -> our chain or None."""
+    want = removed.strip()
+    for rm in CALL.finditer(want):
+        r_chain = rm.group(1)
+        if not _namespace_chain(r_chain) or r_chain.rsplit("::", 1)[-1] in KEYWORDS or STEALTH_NAME.match(r_chain.rsplit("::", 1)[-1]):
+            continue
+        for cm in CALL.finditer(code):
+            c_chain = cm.group(1)
+            if not _namespace_chain(c_chain) or not STEALTH_NAME.match(c_chain.rsplit("::", 1)[-1]):
+                continue
+            if _toks(code[:cm.start(1)]) == _toks(want[:rm.start(1)]) and _toks(code[cm.end(1):]) == _toks(want[rm.end(1):]):
+                return c_chain
+    return None
 
 
 def called_with_plain_arguments(removed: str, code: str):
@@ -667,7 +693,11 @@ def called_with_plain_arguments(removed: str, code: str):
             c_name = re.split(r"::|\.|->", c_chain)[-1]
             co = cm.end() - 1
             cc = _close_paren(code, co)
-            if cc < 0 or not (STEALTH_NAME.match(c_name) or is_known_name(c_name)) or c_chain[:len(c_chain) - len(c_name)] != r_prefix:
+            if cc < 0 or not (STEALTH_NAME.match(c_name) or is_known_name(c_name)):
+                continue
+            # the qualifier is Mozilla's, or it changes to ours (the new last component is Stealth-named): never a receiver
+            if c_chain[:len(c_chain) - len(c_name)] != r_prefix and not (
+                    STEALTH_NAME.match(c_name) and _namespace_chain(r_chain) and _namespace_chain(c_chain)):
                 continue
             if _toks(code[:cm.start()]) != _toks(want[:rm.start()]) or _toks(code[cc + 1:]) != _toks(want[rc + 1:]):
                 continue
@@ -727,7 +757,7 @@ def line_form(ft: str, base: str, code: str, removed: str, kind: str, placement:
         if removed and renamed_identifier(removed, code):
             return "wrap-function", code
         if pair and removed:
-            call = (called_replacement(removed, code) or _added_argument(removed, code)
+            call = (called_replacement(removed, code) or namespace_replacement(removed, code) or _added_argument(removed, code)
                     or called_with_plain_arguments(removed, code))
             if call:
                 return "wrap-call", call + "()"
@@ -1498,6 +1528,42 @@ def locals_violations(root, base=None) -> list:
     return found
 
 
+# --------------------------------------------------------------------------- C17: our functions never go into a Mozilla namespace
+# A function of ours is `StealthX` (unqualified), `mozilla::StealthX` or `mozilla::stealth::X`; a qualifier that holds a Mozilla namespace
+# (`JS::StealthX`, `js::StealthX`, `xpc::StealthX`, `mozilla::net::StealthX`, ...) puts it in Mozilla's. A class qualifier
+# (`gfxPlatformFontList::StealthX`, a member we declare) is not read as a namespace.
+MOZILLA_NAMESPACES = {"JS", "js", "xpc", "gfx", "net", "widget", "dom", "layers", "ipc", "intl", "webgpu", "CanvasUtils", "gl",
+                      "image", "css", "a11y", "wr", "places", "storage", "hal", "dom_media", "ffi"}
+QUALIFIED_STEALTH = re.compile(r"((?:[A-Za-z_]\w*::)+)((?:nr_stealth_|Stealth|stealth_)\w*)")
+
+
+def analyse_namespaces(folder: str, text: str) -> list:
+    """C17 of one hooks.patch: every hook line that names a Stealth function through a Mozilla namespace."""
+    out = []
+    for h in _analyse_patch(folder, text)[0]:
+        if not h.line or is_comment_line(h.line, file_type_of(h.file)):
+            continue
+        code = marker_split(h.line)[0]
+        if is_include(code):
+            continue
+        for m in QUALIFIED_STEALTH.finditer(_strip_literals(code)):
+            bad = [c for c in m.group(1).split("::")[:-1] if c in MOZILLA_NAMESPACES]
+            if bad:
+                txt = h.line.strip()
+                out.append(Violation("C17", folder, h.file, h.function, txt, _key("C17", folder, h.file, h.function, txt),
+                                     "%s%s is in the Mozilla namespace %s" % (m.group(1), m.group(2), "::".join(bad)), (hook_identity(h),)))
+                break
+    return _unique(out)
+
+
+def namespace_violations(root) -> list:
+    """C17 of every non-backport folder."""
+    root, found = Path(root), []
+    for folder in _folders(root):
+        found += analyse_namespaces(folder, (root / folder / "hooks.patch").read_text(encoding="utf-8", errors="replace"))
+    return found
+
+
 def _folders(root: Path) -> list:
     names = (root / "SERIES").read_text(encoding="utf-8").split()
     return [f for f in names if (root / f / "hooks.patch").is_file() and not (root / f / "BACKPORT.json").exists()]
@@ -1536,7 +1602,7 @@ def contract_violations(root) -> list:
             if not (v.ids and all((v.folder, i) in excepted for i in v.ids)) and not end_anchor(v)]
     # port-06: a declared exception does not leave these out; they judge the exception itself
     return sorted(kept + hooks_list.missing_test_violations(root) + rewrite_violations(root)
-                  + locals_violations(root), key=lambda v: v.key)
+                  + locals_violations(root) + namespace_violations(root), key=lambda v: v.key)
 
 
 # --------------------------------------------------------------------------- the debt list

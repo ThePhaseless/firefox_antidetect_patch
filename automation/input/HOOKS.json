@@ -58,7 +58,7 @@
   "file": "dom/base/nsDOMWindowUtils.cpp",
   "function": "nsDOMWindowUtils::NodesFromRect(float aX, float aY, float aTopSize,",
   "kind": "rewrite",
-  "form": "unknown",
+  "form": "wrap-call",
   "line": "  SurfaceFromElementResult result = StealthSurfaceFromCanvasAsDrawn(aCanvas);  // STEALTH-HOOK(fingerprint/canvas/as-drawn)",
   "removed": "  SurfaceFromElementResult result = nsLayoutUtils::SurfaceFromElement(aCanvas);",
   "test": "wrapper:tests/test_canvas_reads_as_drawn.py::test_random_pixels_read_back_as_drawn",
