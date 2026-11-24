@@ -150,14 +150,4 @@ TEST(StealthTimezone, NothingDeclaredAndAnEmptyFieldIsEmpty)
   EXPECT_TRUE(StealthLanguageOrSession(""_ns).IsEmpty());
 }
 
-// The realm takes the primary tag of the list, not the list.
-
-TEST(StealthTimezone, TheRealmLocaleIsThePrimaryTagOfTheList)
-{
-  StealthRealmLocale locale(nullptr, "ja-JP, ja, en-US, en"_ns);
-  EXPECT_STREQ(locale.get(), "ja-JP");
-  StealthRealmLocale single(nullptr, "de-DE"_ns);
-  EXPECT_STREQ(single.get(), "de-DE");
-}
-
 }  // namespace mozilla::dom

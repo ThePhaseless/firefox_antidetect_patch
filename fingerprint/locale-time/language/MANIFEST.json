@@ -14,7 +14,7 @@
    "feature": "session-language-declared",
    "prefs": [],
    "added": 4,
-   "removed": 4,
+   "removed": 0,
    "hunks": 3,
    "inline_logic_lines": 10,
    "hookable": "movable",
