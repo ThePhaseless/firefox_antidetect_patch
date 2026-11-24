@@ -2,10 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-// fingerprint/webgl/shader-language: la resa di uno shader destinata alla
-// PAGINA (getTranslatedShaderSource), nella lingua dichiarata da
-// `zoom.stealth.webgl.shader_output_language`. Gancio in
-// WebGLShader::CompileShader (WebGLShader.cpp); lettore in
+// fingerprint/webgl/shader-language: the rendering of a shader meant for the
+// PAGE (getTranslatedShaderSource), in the language declared by
+// `zoom.stealth.webgl.shader_output_language`. Hook in
+// WebGLShader::CompileShader (WebGLShader.cpp); reader in
 // WebGLContext::GetCompileResult (WebGLContext.cpp, StealthPageObjectCode).
 // Also the reader of the declaration itself (StealthDeclaredShaderOutput) and
 // the choice of the language to compile with (StealthShaderOutputLanguage),
@@ -29,17 +29,16 @@ namespace mozilla {
 
 namespace webgl {
 
-// L'UNICO posto che legge la lingua dichiarata, e l'unico che sa tradurre il
-// nome in una costante di ANGLE. Se questa conoscenza stesse in due punti, i
-// due potrebbero rispondere diverso e nessuno se ne accorgerebbe: e' la stessa
-// forma del difetto della geometria del mouse, dove la stessa aritmetica era
-// ricopiata in tre posti.
+// The ONLY place that reads the declared language, and the only one that knows
+// how to translate the name into an ANGLE constant. If this knowledge lived in
+// two places, the two could answer differently and nobody would notice: it is
+// the same shape as the mouse-geometry defect, where the same arithmetic was
+// copied in three places.
 //
-// `Nothing()` vuol dire "nessuna dichiarazione", e allora la lingua resta
-// quella che il contesto GL impone. Un nome dichiarato che non conosciamo e'
-// anch'esso `Nothing()` E un avviso: inventare un default sarebbe il ripiego
-// che la regola 7 vieta, e crashare qui spegnerebbe WebGL a un utente per un
-// errore di battitura in una pref.
+// `Nothing()` means "no declaration", and then the language stays the one the
+// GL context imposes. A declared name we do not know is also `Nothing()` AND a
+// warning: inventing a default would be the fallback that the rules forbid, and
+// crashing here would switch WebGL off for a user because of a typo in a pref.
 Maybe<ShShaderOutput> StealthDeclaredShaderOutput() {
   auto lock = StaticPrefs::zoom_stealth_webgl_shader_output_language();
   const nsCString declared(*lock);
@@ -50,64 +49,64 @@ Maybe<ShShaderOutput> StealthDeclaredShaderOutput() {
     return Some(SH_ESSL_OUTPUT);
   }
   NS_WARNING(
-      "zoom.stealth.webgl.shader_output_language dichiara una lingua che questa "
-      "build non conosce; la traduzione resta quella del contesto GL");
+      "zoom.stealth.webgl.shader_output_language declares a language that this "
+      "build does not know; the translation stays the one of the GL context");
   return Nothing();
 }
 
 }  // namespace webgl
 
 ShShaderOutput StealthShaderOutputLanguage(gl::GLContext* gl,
-                                           bool aPerLaPagina) {
-  // Letta sempre, anche per il driver: l'avviso per un nome sconosciuto parte
-  // a ogni costruzione del validatore.
-  const auto dichiarata = webgl::StealthDeclaredShaderOutput();
-  if (aPerLaPagina && dichiarata) {
-    return *dichiarata;
+                                           bool aForPage) {
+  // Always read, even for the driver: the warning for an unknown name fires at
+  // every construction of the validator.
+  const auto declared = webgl::StealthDeclaredShaderOutput();
+  if (aForPage && declared) {
+    return *declared;
   }
-  return ShaderOutputPerIlDriver(gl);
+  return ShaderOutputForDriver(gl);
 }
 
-// Quello che la PAGINA legge (WebGLContext::GetCompileResult), quando la
-// lingua e' dichiarata e non coincide con quella del contesto GL. Il driver ha
-// gia' ricevuto `mObjectCode` in `WebGLShader::CompileShader` e non lo si
-// tocca: i pixel non cambiano. Vuoto vuol dire "niente da dichiarare", che e'
-// il caso di ogni build Windows, dove il contesto passa da ANGLE ed e' gia'
-// nella lingua giusta.
+// What the PAGE reads (WebGLContext::GetCompileResult), when the language is
+// declared and differs from the one of the GL context. The driver has already
+// received `mObjectCode` in `WebGLShader::CompileShader` and it is not touched:
+// the pixels do not change. Empty means "nothing to declare", which is the case
+// of every Windows build, where the context goes through ANGLE and is already
+// in the right language.
 //
-// La resa destinata alla PAGINA, nella lingua dichiarata. Vuota quando non
-// c'e' niente da dichiarare o quando la lingua dichiarata e' gia' quella che
-// il contesto usa - cioe' su Windows, dove il contesto passa da ANGLE ed e'
-// gia' GLES: li' questo campo resta vuoto e non si paga niente.
+// The rendering meant for the PAGE, in the declared language. Empty when there
+// is nothing to declare or when the declared language is already the one the
+// context uses - that is, on Windows, where the context goes through ANGLE and
+// is already GLES: there this field stays empty and nothing is paid.
 //
-// Non e' una seconda fonte di verita' per la stessa cosa: sono due
-// consumatori diversi dello stesso albero validato, il driver e la pagina.
-// Cio' che si dichiara e' la LINGUA, che ha dominio finito con un elemento
-// solo; la stringa resta calcolata dal traduttore, perche' il suo dominio e'
-// infinito e una tabella sarebbe vietata.
-const std::string& WebGLShader::ObjectCodePerLaPagina() const {
-  return mObjectCodePerLaPagina;
+// It is not a second source of truth for the same thing: they are two different
+// consumers of the same validated tree, the driver and the page. What is
+// declared is the LANGUAGE, which has a finite domain with a single element;
+// the string stays computed by the translator, because its domain is infinite
+// and a table would be forbidden.
+const std::string& WebGLShader::ObjectCodeForPage() const {
+  return mObjectCodeForPage;
 }
 
-// Cio' che `WebGLContext::GetCompileResult` mette in `translatedSource`: la
-// resa per la PAGINA quando lo shader ne ha una (non vuota), altrimenti la
-// traduzione che il validatore ha fatto per il driver. E' la scelta che il
-// gancio faceva inline; l'espressione di Mozilla (`info->mObjectCode`) arriva
-// come secondo argomento, valutata una volta.
+// What `WebGLContext::GetCompileResult` puts in `translatedSource`: the
+// rendering for the PAGE when the shader has one (non-empty), otherwise the
+// translation the validator made for the driver. It is the choice the hook used
+// to make inline; Mozilla's expression (`info->mObjectCode`) arrives as the
+// second argument, evaluated once.
 const std::string& StealthPageObjectCode(const WebGLShader& aShader,
                                          const std::string& aDriverObjectCode) {
-  const auto& perLaPagina = aShader.ObjectCodePerLaPagina();
-  return perLaPagina.empty() ? aDriverObjectCode : perLaPagina;
+  const auto& forPage = aShader.ObjectCodeForPage();
+  return forPage.empty() ? aDriverObjectCode : forPage;
 }
 
-// Chiamata da WebGLShader::CompileShader con l'esito della validazione per il
-// driver; il risultato sostituisce `mObjectCodePerLaPagina` (quindi un
-// risultato vuoto azzera anche il valore di una compilazione precedente: dopo
-// una compilazione fallita non resta nessuna stringa vecchia).
+// Called by WebGLShader::CompileShader with the outcome of the validation for
+// the driver; the result replaces `mObjectCodeForPage` (so an empty result also
+// clears the value of a previous compilation: after a failed compilation no old
+// string is left).
 //
-// Membro di WebGLShader e non funzione libera perche'
-// `WebGLContext::CreateShaderValidator` e' protetta e WebGLContext dichiara
-// amica solo `WebGLShader` (WebGLContext.h `friend class WebGLShader`).
+// A member of WebGLShader and not a free function because
+// `WebGLContext::CreateShaderValidator` is protected and WebGLContext declares
+// only `WebGLShader` as a friend (WebGLContext.h `friend class WebGLShader`).
 std::string WebGLShader::StealthPerPageObjectCode(const bool aValid) {
   MOZ_ASSERT(aValid == mCompileResults->mValid);
 
@@ -115,61 +114,60 @@ std::string WebGLShader::StealthPerPageObjectCode(const bool aValid) {
     return {};
   }
 
-  // La resa per la PAGINA, quando la lingua dichiarata non e' quella che il
-  // contesto GL impone.
+  // The rendering for the PAGE, when the declared language is not the one the
+  // GL context imposes.
   //
-  // Si compila per il driver la traduzione fatta in CompileShader, cosi' il
-  // rendering non cambia di un pixel, e si produce una seconda resa nella
-  // lingua dichiarata per chi legge `getTranslatedShaderSource`. Le due escono
-  // dallo stesso traduttore ANGLE imbarcato con le stesse risorse dichiarate,
-  // quindi la seconda e' identica a quella di una build Windows per
-  // COSTRUZIONE, non per coincidenza misurata.
+  // The translation made in CompileShader is compiled for the driver, so the
+  // rendering does not change by a pixel, and a second rendering is produced in
+  // the declared language for whoever reads `getTranslatedShaderSource`. Both
+  // come out of the same ANGLE translator shipped with the same declared
+  // resources, so the second is identical to that of a Windows build by
+  // CONSTRUCTION, not by a measured coincidence.
   //
-  // Su Windows il contesto passa da ANGLE, che si presenta come GLES, quindi la
-  // lingua dichiarata coincide con quella del contesto, il confronto qui sotto
-  // e' falso e non si traduce due volte. Il costo lo paga solo la piattaforma
-  // che ha il difetto, e solo per gli shader che vengono davvero compilati.
+  // On Windows the context goes through ANGLE, which presents itself as GLES,
+  // so the declared language is the same as the context's, the comparison below
+  // is false and nothing is translated twice. Only the platform that has the
+  // defect pays the cost, and only for shaders that are actually compiled.
   //
-  // ⛔ La stringa esposta non e' quella compilata. Nessuna pagina puo'
-  // accorgersene - il driver non e' osservabile da li' - ma va scritto, perche'
-  // e' vero.
+  // WARNING: the exposed string is not the compiled one. No page can notice -
+  // the driver is not observable from there - but it must be written down,
+  // because it is true.
   gl::GLContext* const gl = mContext->gl;
-  const auto dichiarata = webgl::StealthDeclaredShaderOutput();
-  if (!dichiarata || *dichiarata == ShaderOutputPerIlDriver(gl)) {
+  const auto declared = webgl::StealthDeclaredShaderOutput();
+  if (!declared || *declared == ShaderOutputForDriver(gl)) {
     return {};
   }
 
-  // Il bit "questa e' la traduzione per la pagina" viaggia in un campo del
-  // contesto (WebGLContext::mStealthPerPage), vero solo attorno a questa
-  // chiamata sincrona, sul thread del contesto: ogni altro validatore (quello
-  // del driver, in CompileShader) lo vede falso e si costruisce come prima.
-  // La guardia lo rimette falso a ogni uscita.
+  // The bit "this is the translation for the page" travels in a field of the
+  // context (WebGLContext::mStealthPerPage), true only around this synchronous
+  // call, on the context's thread: every other validator (the driver's, in
+  // CompileShader) sees it false and is built as before. The guard sets it back
+  // to false on every exit.
   struct PerPageScope {
     bool& mFlag;
     explicit PerPageScope(bool& aFlag) : mFlag(aFlag) { mFlag = true; }
     ~PerPageScope() { mFlag = false; }
   };
-  std::unique_ptr<webgl::ShaderValidator> perLaPagina;
+  std::unique_ptr<webgl::ShaderValidator> forPage;
   {
     bool& flag = mContext->mStealthPerPage;
     PerPageScope scope(flag);
-    perLaPagina = mContext->CreateShaderValidator(mType);
+    forPage = mContext->CreateShaderValidator(mType);
   }
-  if (!perLaPagina) {
+  if (!forPage) {
     return {};
   }
 
-  const auto resa = perLaPagina->ValidateAndTranslate(mSource.c_str());
-  // Se la seconda traduzione fallisce si tiene quella del driver: una
-  // risposta nella lingua sbagliata e' un difetto di realness, una
-  // risposta vuota e' una pagina rotta.
-  if (resa && resa->mValid) {
-    return resa->mObjectCode;
+  const auto translation = forPage->ValidateAndTranslate(mSource.c_str());
+  // If the second translation fails, the driver's is kept: an answer in the
+  // wrong language is a realness defect, an empty answer is a broken page.
+  if (translation && translation->mValid) {
+    return translation->mObjectCode;
   }
 
   NS_WARNING(
-      "la resa nella lingua dichiarata non ha validato; "
-      "getTranslatedShaderSource restituira' quella del driver");
+      "the rendering in the declared language did not validate; "
+      "getTranslatedShaderSource will return the driver's one");
   return {};
 }
 

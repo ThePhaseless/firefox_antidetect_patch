@@ -564,10 +564,10 @@ def test_g29_g9_the_called_function_replaced_and_plain_arguments_added():
 
 
 def test_g1_a_rename_on_a_definition_line_may_drop_static():
-    text = rewrite("static ShShaderOutput ShaderOutput(gl::GLContext* gl) {", "ShShaderOutput ShaderOutputPerIlDriver(gl::GLContext* gl) {")
+    text = rewrite("static ShShaderOutput ShaderOutput(gl::GLContext* gl) {", "ShShaderOutput ShaderOutputForDriver(gl::GLContext* gl) {")
     assert forms_of(text) == ["wrap-function"] and rules(text) == []
     assert "C6" in rules(rewrite("static ShShaderOutput ShaderOutput(gl::GLContext* gl) {",
-                                 "ShShaderOutput ShaderOutputPerIlDriver(gl::GLContext* gl, int x) {"))
+                                 "ShShaderOutput ShaderOutputForDriver(gl::GLContext* gl, int x) {"))
 
 
 def test_a_literal_for_a_literal_or_one_macro_of_ours_for_a_token_is_a_declared_value():

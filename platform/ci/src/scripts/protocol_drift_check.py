@@ -300,57 +300,58 @@ def declared(proto: str, method: str) -> set[str] | None:
     return scheme_fields(plit, proto)
 
 
-#: ⛔ RIMOZIONI DELIBERATE, ognuna con la voce che la documenta.
+#: WARNING: DELIBERATE REMOVALS, each with the entry that documents it.
 #:
-#: Questo gate esiste per la divergenza ACCIDENTALE - un campo che il client
-#: manda e noi non dichiariamo piu' dopo un rebase, che `checkScheme` rifiuta
-#: solo a RUNTIME e con la build verde. Ma dal 2026-08-24 il progetto ha tolto
-#: da Juggler dei comandi APPOSTA, con la decisione scritta, e da allora il gate
-#: era rosso su quelle scelte: cioe' rosso per sempre, che e' la condizione in
-#: cui un gate smette di essere letto e comincia a essere aggirato.
+#: This gate exists for the ACCIDENTAL divergence - a field the client sends
+#: and we no longer declare after a rebase, which `checkScheme` rejects only
+#: at RUNTIME and with the build green. But since 2026-08-24 the project has
+#: removed commands from Juggler ON PURPOSE, with the decision written down,
+#: and since then the gate was red on those choices: that is, red forever,
+#: which is the condition in which a gate stops being read and starts being
+#: worked around.
 #:
-#: Una voce qui dice "so che il client lo manda e so che noi non lo abbiamo
-#: piu', ed e' voluto". Tutto cio' che NON e' in questa mappa resta rosso.
-#: Aggiungere una riga qui e' una decisione: va fatta solo quando la rimozione
-#: e' gia' documentata, e il rimando serve a ritrovarne la ragione.
+#: An entry here says "I know the client sends it and I know we no longer have
+#: it, and it is intended". Everything that is NOT in this map stays red.
+#: Adding a row here is a decision: it is to be made only when the removal is
+#: already documented, and the reference serves to find its reason again.
 #:
-#: ⛔ E "e' voluto" NON BASTA: la domanda vera e' SU QUALE PERCORSO il client lo
-#: manda. Misurato il 2026-08-26, al costo di una build intera di firefox-21.
-#: Questa mappa nacque con cinque voci; tre erano
-#: `Browser.setReducedMotion`, `setForcedColors` e `setContrast`, tolte dalla
-#: potatura di TargetRegistry e documentate in 20-our-patches.md 28.4. Tutte e
-#: tre le righe erano vere alla lettera. Ma quei tre comandi Playwright upstream
-#: li manda a OGNI creazione di contesto, salvo un "no-override" esplicito:
-#: quindi la loro assenza non degradava un'API poco usata, impediva
-#: `new_page()`. Il drive gate della CI e' uscito rosso su tutte e tre le gambe
-#: con "method 'Browser.setReducedMotion' is not supported", e il publish e'
-#: stato saltato - cioe' il difetto lo prese un cancello piu' a valle, dopo due
-#: ore di compilazione, mentre QUESTO gate lo aveva gia' visto e io gli avevo
-#: insegnato a tacere. Le tre voci sono uscite e i comandi sono tornati
-#: dichiarati, con l'handler che accetta il neutro e rifiuta un override.
+#: WARNING: and "it is intended" IS NOT ENOUGH: the real question is ON WHICH
+#: PATH the client sends it. Measured on 2026-08-26, at the cost of a whole
+#: firefox-21 build. This map was born with five entries; three were
+#: `Browser.setReducedMotion`, `setForcedColors` and `setContrast`, removed by
+#: the pruning of TargetRegistry and documented in the patch notes. All three
+#: rows were literally true. But upstream Playwright sends those three commands
+#: on EVERY context creation, unless an explicit "no-override" is given:
+#: so their absence did not degrade a rarely used API, it prevented
+#: `new_page()`. The CI drive gate came out red on all three legs
+#: with "method 'Browser.setReducedMotion' is not supported", and the publish
+#: was skipped - that is, the defect was caught by a gate further downstream,
+#: after two hours of compilation, while THIS gate had already seen it and it
+#: had been taught to stay silent. The three entries were removed and the
+#: commands are declared again, with the handler accepting the neutral value
+#: and refusing an override.
 #:
-#: Il criterio, da applicare prima di aggiungere una riga: se il comando sta su
-#: un percorso che un client percorre SENZA chiederlo - creazione di contesto,
-#: apertura di pagina, navigazione - non e' una rimozione accettabile, e' una
-#: rottura della pilotabilita', e va rimessa la dichiarazione. La voce rimasta
-#: passa il criterio: `Network.getResponseBody` arriva solo se qualcuno chiama
+#: The criterion, to apply before adding a row: if the command sits on a path
+#: that a client walks WITHOUT asking for it - context creation, page opening,
+#: navigation - it is not an acceptable removal, it is a break of drivability,
+#: and the declaration must be put back. The remaining entry passes the
+#: criterion: `Network.getResponseBody` arrives only if someone calls
 #: `response.body()`.
 #:
-#: ⛔ `Page.screencastFrame` E' USCITA DA QUESTA MAPPA il 2026-09-05, ed e' il
-#: modo in cui una riga qui dentro deve finire: non perche' qualcuno abbia
-#: cambiato idea sul criterio, ma perche' la CAPACITA' e' tornata. Lo
-#: screencast e' compilato - `juggler/moz.build` dichiara la directory - e
-#: l'evento e' di nuovo in `Protocol.js`, quindi non c'e' piu' niente da
-#: scusare. Una scusa che sopravvive alla ragione che l'ha prodotta e' un
-#: buco permanente in un gate.
-RIMOSSI_APPOSTA = {
-    # NetworkObserver ridotto "all'osso, non a zero" su richiesta del
-    # proprietario: via tutta la copia dei corpi delle risposte. `response.body()`
-    # RIFIUTA chiaramente, ed e' il comportamento voluto.
-    # -> 71-bug-archive.md [B170]; il degrado silenzioso di tracing/HAR che ne
-    #    consegue e' aperto in 70-known-bugs.md [B176].
+#: WARNING: `Page.screencastFrame` LEFT THIS MAP on 2026-09-05, and it is the
+#: way a row in here must end: not because anyone changed their mind about the
+#: criterion, but because the CAPABILITY came back. The screencast is
+#: compiled - `juggler/moz.build` declares the directory - and the event is
+#: back in `Protocol.js`, so there is nothing left to excuse. An excuse that
+#: outlives the reason that produced it is a permanent hole in a gate.
+REMOVED_ON_PURPOSE = {
+    # NetworkObserver reduced "to the bone, not to zero" at the owner's
+    # request: the whole copy of the response bodies is gone. `response.body()`
+    # clearly REFUSES, and that is the intended behaviour.
+    # -> archived bug B170; the silent degradation of tracing/HAR that follows
+    #    from it is open as known bug B176.
     "Network.getResponseBody":
-        "NetworkObserver all'osso [B170]; conseguenze in [B176]",
+        "NetworkObserver to the bone [B170]; consequences in [B176]",
 }
 
 
@@ -375,12 +376,12 @@ def main() -> int:
     sent = sent_payloads(region)
     events = listened_events(region)
     unheard = sorted(e for e in events if not declares_event(proto, e)
-                     and e not in RIMOSSI_APPOSTA)
+                     and e not in REMOVED_ON_PURPOSE)
     drift, unknown = [], []
     for method in sorted(sent):
         dec = declared(proto, method)
         if dec is None:
-            if method not in RIMOSSI_APPOSTA:
+            if method not in REMOVED_ON_PURPOSE:
                 unknown.append(method)
             continue
         missing = sorted(f for f in sent[method] if f not in dec)
@@ -391,14 +392,14 @@ def main() -> int:
 
     print("checked %d juggler commands and %d events from %s"
           % (len(sent), len(events), label))
-    # Un'esclusione silenziosa e' peggio di un rosso: si dice sempre cosa NON si
-    # sta guardando, e perche', cosi' il verdetto verde e' leggibile per intero.
-    visti = sorted(n for n in RIMOSSI_APPOSTA
+    # A silent exclusion is worse than a red: it always says what is NOT
+    # being looked at, and why, so the green verdict can be read in full.
+    seen_removed = sorted(n for n in REMOVED_ON_PURPOSE
                    if n in sent or n in events)
-    if visti:
-        print("\nNON contati, perche' rimossi APPOSTA (%d):" % len(visti))
-        for n in visti:
-            print("  %-28s %s" % (n, RIMOSSI_APPOSTA[n]))
+    if seen_removed:
+        print("\nNOT counted, because removed ON PURPOSE (%d):" % len(seen_removed))
+        for n in seen_removed:
+            print("  %-28s %s" % (n, REMOVED_ON_PURPOSE[n]))
     if unheard:
         print("\nEvents the client waits for that Protocol.js does not declare:")
         for e in unheard:

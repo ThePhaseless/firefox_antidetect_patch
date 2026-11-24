@@ -4,7 +4,7 @@
 # on its own (names unique, prefs grouped by their first segment, groups in
 # order) and merges them, so a pref here behaves exactly as one declared there.
 #
-# The prefs are the contract with invisible_core: names and defaults do not
+# The prefs are the contract with the core: names and defaults do not
 # change without the client. Defaults keep a build launched without the client
 # behaving as stock Firefox.
 
@@ -13,13 +13,13 @@
 #---------------------------------------------------------------------------
 
 # STEALTHFOX (firefox-50): the time zone and the language the SESSION
-# declares, written by invisible_core: an IANA zone, and an Accept-Language
+# declares, written by the core: an IANA zone, and an Accept-Language
 # list ("it-IT, it, en-US, en"). The only C++ reader is
 # intl/locale/StealthSessionPrefs.h.
 #
 # Static, with a default, so that they reach content processes: a string pref
 # with no default is kept in the parent (ShouldSanitizePreference), and the
-# language once reached no worker for that reason (71-bug-archive.md [B165]).
+# language once reached no worker for that reason (known bug B165).
 # DataMutexString with a mirror, so that any thread reads them: a worker's
 # realm options are built on the main thread, but the fallback language of
 # text without `lang` may first be asked by an OffscreenCanvas on a worker
@@ -65,7 +65,7 @@
 # noise runs on worker threads (an OffscreenCanvas in a worker) and in the GPU
 # process on the CanvasTranslator's task queue, and a plain int32_t mirror is
 # only safe to read from the main thread. Same name and same values as before:
-# it is the contract with invisible_core.
+# it is the contract with the core.
 - name: zoom.stealth.fpp.hw_seed
   type: RelaxedAtomicInt32
   value: -1
@@ -130,9 +130,9 @@
 # covers is treated as occluded, which makes its pages `hidden` and inactive
 # (rAF and timers throttled, enumerateDevices waiting). Windows has the same
 # behaviour behind widget.windows.window_occlusion_tracking.enabled, which
-# invisible_core turns off; this is the Linux side of the same declaration,
+# the core turns off; this is the Linux side of the same declaration,
 # emitted by the core from the same value. `true` keeps upstream behaviour for
-# a build launched without invisible_core.
+# a build launched without the core.
 - name: zoom.stealth.widget.occlusion_tracking.enabled
   type: RelaxedAtomicBool
   value: true
@@ -142,7 +142,7 @@
 # took it (AppWindow::WindowDeactivated): another application or another
 # session's window on the same display. It still gives it up to this session's
 # own windows, whose activation lowers it first (AppWindow::WindowActivated).
-# Declared by invisible_core; `false` keeps upstream behaviour for a build
+# Declared by the core; `false` keeps upstream behaviour for a build
 # launched without it.
 - name: zoom.stealth.focus.ignore_os_deactivation
   type: RelaxedAtomicBool
@@ -151,7 +151,7 @@
 
 # The declared screen colour depth. Without it nsScreen::PixelDepth returns
 # nsDeviceContext::GetDepth(), i.e. the REAL panel. The field-by-field audit
-# (19-field-declaration-audit.md) caught it only because it asks for proof
+# (the declaration audit) caught it only because it asks for proof
 # rather than for agreement: it reads 24 on both development machines because
 # both happen to be 24-bit, so it matched cross-OS by coincidence and not by
 # declaration. A user on a 30-bit display would report 30 under a Windows
@@ -216,7 +216,7 @@
   mirror: always
 
 # The window frame, in DEVICE pixels, measured on retail Firefox 151 on
-# Windows 11 at the four persona scales (70-known-bugs.md B258, B261). Device
+# Windows 11 at the four persona scales (known bugs B258, B261). Device
 # pixels because that is where the rule is one rule: an invisible resize border
 # on three sides (8, 9, 11, 13 at 100/125/150/200%), the browser UI above the
 # content of a maximized window, the popup UI above its content, and the
@@ -272,43 +272,43 @@
   value: ""
   mirror: always
 
-# La LINGUA in cui `getTranslatedShaderSource` risponde alla pagina. Dominio
-# finito e con un elemento solo: "essl". Vuota = nessuna dichiarazione, e la
-# lingua resta quella che il contesto GL impone.
+# The LANGUAGE in which `getTranslatedShaderSource` answers the page. A finite
+# domain with a single element: "essl". Empty = no declaration, and the
+# language stays the one the GL context imposes.
 #
-# Non e' la STRINGA a essere dichiarata - quella ha dominio infinito, perche' lo
-# shader in ingresso e' arbitrario. E' la LINGUA, che ne ha uno. La stringa la
-# calcola il traduttore ANGLE imbarcato con le stesse risorse dichiarate, quindi
-# la risposta e' identica a quella di una build Windows per costruzione e non
-# per coincidenza misurata.
+# It is not the STRING that is declared - that has an infinite domain, because
+# the incoming shader is arbitrary. It is the LANGUAGE, which has a finite one.
+# The string is computed by the ANGLE translator shipped with the same declared
+# resources, so the answer is identical to the one of a Windows build by
+# construction and not by a measured coincidence.
 #
-# Il motivo: su un contesto NON GLES (il GLX di Linux) il traduttore emette GLSL
-# desktop, e la pagina legge `#version 450` mentre `RENDERER` dichiara ANGLE.
-# ANGLE non emette mai GLSL desktop, quindi la risposta contraddice la persona
-# che dichiariamo NOI, e il confronto e' interno alla stessa pagina: non serve
-# sapere su che sistema operativo giriamo per vederlo.
+# The reason: on a NON-GLES context (the GLX of Linux) the translator emits
+# desktop GLSL, and the page reads `#version 450` while `RENDERER` declares
+# ANGLE. ANGLE never emits desktop GLSL, so the answer contradicts the persona
+# that WE declare, and the comparison is internal to the same page: there is no
+# need to know which operating system we run on to see it.
 - name: zoom.stealth.webgl.shader_output_language
   type: DataMutexString
   value: ""
   mirror: always
 
-# Lo STILE DI HINTING con cui FreeType carica un glifo, e se l'antialias e'
-# acceso. Sono i due soli parametri, dei sei che `PrepareFontOptions` chiedeva
-# al pattern fontconfig, che spostano i pixel: misurato il 2026-08-16, un
-# parametro per volta, `rgba` `lcdfilter` e `embeddedbitmap` non ne muovono
-# nessuno.
+# The HINTING STYLE with which FreeType loads a glyph, and whether antialias is
+# on. They are the only two parameters, of the six that `PrepareFontOptions`
+# asked of the fontconfig pattern, that move the pixels: measured on 2026-08-16,
+# one parameter at a time, `rgba`, `lcdfilter` and `embeddedbitmap` move none of
+# them.
 #
-# -1 = non dichiarato. Il gate delle dichiarazioni rifiuta l'avvio in quel caso,
-# perche' cadere sul pattern sarebbe chiedere alla macchina: stesso binario e
-# stessa pagina davano hash diversi al variare di `/etc/fonts`.
+# -1 = not declared. The declaration gate refuses the launch in that case,
+# because falling back to the pattern would mean asking the machine: same binary
+# and same page gave different hashes as `/etc/fonts` varied.
 #
-# hintstyle: 0 = none, 1 = slight, 2 = medium, 3 = full. Sono i valori di
-# `FC_HINT_*`, non una nostra numerazione, cosi' non c'e' una traduzione in
-# mezzo che possa divergere.
+# hintstyle: 0 = none, 1 = slight, 2 = medium, 3 = full. They are the values of
+# `FC_HINT_*`, not a numbering of ours, so there is no translation in between
+# that could diverge.
 #
-# Su Windows non esiste fontconfig e questi due non vengono letti: la
-# dichiarazione e' la stessa per le due piattaforme, ed e' il motore a leggere
-# quella che lo riguarda.
+# On Windows there is no fontconfig and these two are not read: the declaration
+# is the same for both platforms, and it is the engine that reads the one that
+# concerns it.
 - name: zoom.stealth.text.freetype_hintstyle
   type: RelaxedAtomicInt32
   value: -1
@@ -337,7 +337,7 @@
 # WebGL getParameter() int32 override table. Comma-separated "ENUM|int"
 # entries (ENUM in decimal, e.g. 3379 = GL_MAX_TEXTURE_SIZE). Used to
 # return Windows ANGLE canonical values from GetParameter(pname) when
-# the host's real driver (Mesa on Linux) would give different numbers —
+# the host's real driver (Mesa on Linux) would give different numbers -
 # A commercial fingerprinting service's parameter hash matches Windows only when this is populated.
 - name: zoom.stealth.webgl.int_params
   type: DataMutexString
@@ -357,7 +357,7 @@
   mirror: always
 
 # Windows ANGLE canonical getShaderPrecisionFormat() triples. Closes a commercial fingerprinting service's
-# webgl_extensions.shader_precisions hash signal — Linux Mesa returns
+# webgl_extensions.shader_precisions hash signal - Linux Mesa returns
 # different range/precision than Win D3D11. Format:
 # "SHADERTYPE*PRECISIONTYPE|rangeMin:rangeMax:precision,..." where
 # SHADERTYPE=35632 (FRAGMENT) or 35633 (VERTEX), PRECISIONTYPE=36336..36341
@@ -378,7 +378,7 @@
 # pixels such a canvas hands over as the source of another drawing, go through
 # gfx::StealthProjectPixels (gfx/2d/StealthCanvasProjection.h). A 2D canvas is
 # never projected (from firefox-52): it reads back as drawn, as on retail.
-# Declared by invisible_core. The name is the one the core has always written;
+# Declared by the core. The name is the one the core has always written;
 # it used to choose between two older algorithms, and
 # zoom.stealth.webgl.substitute_pixels and zoom.stealth.canvas.noise_skip_mask,
 # which tuned them, are gone with them.
@@ -392,7 +392,7 @@
 # farthest colours there and still count as a BLEND OF TWO. Such a pixel (text
 # at any contrast, the antialiased edge between two fills, a two-stop gradient)
 # is left exactly as drawn by the canvas noise; only a neighbourhood with a third
-# independent colour is touched. Declared by invisible_core (0-255); -1 is NOT
+# independent colour is touched. Declared by the core (0-255); -1 is NOT
 # DECLARED, and the declaration gate refuses it.
 - name: zoom.stealth.canvas.edge_tolerance
   type: RelaxedAtomicInt32
@@ -400,7 +400,7 @@
   mirror: always
 
 # Synthetic speech voices (comma-separated entries, each "NAME|LANG|D|L").
-# Read by SpeechSynthesis::GetVoices — when set, bypass the OS voice
+# Read by SpeechSynthesis::GetVoices - when set, bypass the OS voice
 # registry entirely and return fabricated voices with these fields. Accessors
 # on SpeechSynthesisVoice parse the URI (stealth-voice:NAME|LANG|D|L) to
 # answer GetName/GetLang/LocalService/Default queries. Empty = native list.
@@ -411,7 +411,7 @@
 
 # The branding a page reads under chrome://branding/content/ and
 # resource://usercontext-content/branding/: a file: URI of the zip archive whose
-# root entries are the files. invisible_core ships the sets (the retail brand,
+# root entries are the files. The core ships the sets (the retail brand,
 # ours) and accepts a caller's own archive; the engine keeps no stealth copy and
 # serves what is declared here as jar:, the channel class the retail uses. With
 # the engine on, empty, malformed, not a zip or holding anything but root files
@@ -428,7 +428,7 @@
 # 2026-08-07 over 48 family/size/weight combinations: Windows yields 9-19
 # levels per render and FreeType 193-256, and a detector does not need to
 # compare a hash to separate those - it can COUNT. Empty disables the snap.
-# Delivered by invisible_core rather than the font manifest: it is not a
+# Delivered by the core rather than the font manifest: it is not a
 # property of any font FILE, it is what the rasteriser does to an edge.
 #
 # Applied to the A8 GLYPH MASK, in SkScalerContext::getImage, where both the
@@ -456,7 +456,7 @@
   value: -1
   mirror: always
 
-# The whole font manifest, carried by invisible_core and preferred over the
+# The whole font manifest, carried by the core and preferred over the
 # copy in NS_GRE_DIR/fonts/. Families, per-face vertical metrics, the alias
 # table, the coverage ladder and the per-script fallback lists - one pref
 # rather than one per table, because the binary already parses this text.
@@ -471,7 +471,7 @@
 # finite and perfectly known domain, and therefore exactly the kind of value
 # that belongs where every other declared surface lives rather than in C++
 # where changing it costs a browser rebuild. Empty keeps the compiled table,
-# which stays as the floor for a browser launched without invisible_core.
+# which stays as the floor for a browser launched without the core.
 - name: zoom.stealth.fonts.generics
   type: DataMutexString
   value: ""
@@ -515,7 +515,7 @@
 # The graphics feature decisions (nsIGfxInfo::GetFeatureStatus), as
 # "NAME|STATUS[|FAILURE],..." for every live feature of
 # widget/GfxInfoFeatureDefs.inc: the statuses retail Firefox on Windows 11
-# gives the persona's real GPU, measured by invisible_core. Read by
+# gives the persona's real GPU, measured by the core. Read by
 # gfx/thebes/StealthGfxFeatureStatus.cpp; with the engine on, a missing or
 # malformed value refuses at the first decision instead of letting Mozilla
 # decide from the host's adapter.
@@ -577,12 +577,13 @@
   value: -1
   mirror: always
 
-# zoom.stealth.webrtc.public_ip e zoom.stealth.webrtc.disable_ipv6 sono state
-# TOLTE il 2026-08-25. Non erano inutilizzate: erano la SECONDA fonte. Il ponte
-# nativo (nr_stealth_bridge.cpp) leggeva pref E variabile d'ambiente, con
-# precedenze diverse da funzione a funzione, e quale delle due decidesse
-# dipendeva dalla presenza del proxy - con proxy vinceva l'ambiente, senza
-# proxy la pref. Adesso la fonte e' una sola, l'ambiente, scritta sempre da
-# entrambi i percorsi di lancio di invisible_core. Non vanno reintrodotte: un
-# valore che il motore puo' leggere da due posti puo' divergere fra i due.
+# zoom.stealth.webrtc.public_ip and zoom.stealth.webrtc.disable_ipv6 were
+# REMOVED on 2026-08-25. They were not unused: they were the SECOND source. The
+# native bridge (nr_stealth_bridge.cpp) read the pref AND the environment
+# variable, with different precedences from function to function, and which of
+# the two decided depended on the presence of the proxy - with a proxy the
+# environment won, without one the pref. Now the source is a single one, the
+# environment, always written by both launch paths of the core. They must not
+# be reintroduced: a value that the engine can read from two places can diverge
+# between the two.
 

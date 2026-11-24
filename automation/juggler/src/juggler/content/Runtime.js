@@ -39,36 +39,36 @@ function generateId() {
 
 // Stealth: JSON stringify helper source, re-evaluated on debugger re-attach.
 //
-// ⛔ SI LEGGE E SI RISCRIVE IL DESCRITTORE, MAI LA PROPRIETA'. MISURATO, NON
-// SUPPOSTO. La versione precedente faceva:
-//     const oldToJSON = Date.prototype?.toJSON;   // LETTURA   -> chiama il getter
-//     Date.prototype.toJSON = undefined;          // SCRITTURA -> chiama il setter
-//     ... Date.prototype.toJSON = oldToJSON;      // SCRITTURA -> chiama il setter
-// Se la PAGINA ha ridefinito `Date.prototype.toJSON` come accessore, quelle tre
-// operazioni entrano nel suo codice. La trappola sta in due righe:
+// (!) WE READ AND REWRITE THE DESCRIPTOR, NEVER THE PROPERTY. MEASURED, NOT
+// ASSUMED. The previous version did:
+//     const oldToJSON = Date.prototype?.toJSON;   // READ  -> calls the getter
+//     Date.prototype.toJSON = undefined;          // WRITE -> calls the setter
+//     ... Date.prototype.toJSON = oldToJSON;      // WRITE -> calls the setter
+// If the PAGE has redefined `Date.prototype.toJSON` as an accessor, those three
+// operations enter its code. The trap takes two lines:
 //     Object.defineProperty(Date.prototype, 'toJSON', {get(){...}, set(v){...}})
-// Misura 2026-08-19: registra `get, set:undefined, set:function` per OGNI
-// `evaluate` che ritorna un valore e ZERO per una che non serializza; sei scatti
-// dopo la prima, dodici dopo la seconda. Si accumula a ogni giro.
+// Measurement 2026-08-19: it records `get, set:undefined, set:function` for EVERY
+// `evaluate` that returns a value and ZERO for one that does not serialize; six
+// hits after the first, twelve after the second. It accumulates at every round.
 //
-// `getOwnPropertyDescriptor` non invoca il getter e `defineProperty` non invoca
-// il setter, quindi nessuna delle tre operazioni tocca piu' il codice della
-// pagina. Il comportamento non cambia: durante la serializzazione `toJSON` e'
-// una proprieta' dato con valore `undefined` come prima, e alla fine il
-// descrittore originale torna identico, accessore compreso.
+// `getOwnPropertyDescriptor` does not invoke the getter and `defineProperty` does not
+// invoke the setter, so none of the three operations touches the code of the
+// page any more. The behaviour does not change: during serialization `toJSON` is
+// a data property with value `undefined` as before, and at the end the original
+// descriptor comes back identical, accessor included.
 //
-// Le tre native si catturano al momento della `bind`, cosi' un aggancio
-// installato DOPO non le intercetta. Residuo dichiarato: una pagina che
-// agganci `Object.defineProperty` PRIMA ci vedrebbe comunque - e' un aggancio
-// molto piu' invasivo, che rompe siti veri, e non e' stato misurato.
+// The three natives are captured at the time of the `bind`, so a hook
+// installed AFTER does not intercept them. Declared residue: a page that
+// hooks `Object.defineProperty` BEFORE would still see us - it is a much
+// more invasive hook, which breaks real sites, and it has not been measured.
 const _STEALTH_JSON_STRINGIFY_SRC = `((stringify, getDesc, defProp, object) => {
-  const DESC_VUOTO = {value: undefined, writable: true, enumerable: false, configurable: true};
+  const EMPTY_DESC = {value: undefined, writable: true, enumerable: false, configurable: true};
   const dDate = getDesc(Date.prototype, 'toJSON');
   if (dDate)
-    defProp(Date.prototype, 'toJSON', DESC_VUOTO);
+    defProp(Date.prototype, 'toJSON', EMPTY_DESC);
   const dArray = getDesc(Array.prototype, 'toJSON');
   if (dArray)
-    defProp(Array.prototype, 'toJSON', DESC_VUOTO);
+    defProp(Array.prototype, 'toJSON', EMPTY_DESC);
 
   let hasSymbol = false;
   const result = stringify(object, (key, value) => {
@@ -365,23 +365,23 @@ class Runtime {
     this._pendingPromises.set(promiseID, {resolve: null, reject, executionContext, exceptionDetails});
 
     const rawPromise = obj.unsafeDereference();
-    // NIENTE `Cu.waiveXrays` QUI, ED E' LA DIFFERENZA FRA UN `then` NATIVO E
-    // QUELLO DELLA PAGINA.
+    // NO `Cu.waiveXrays` HERE, AND THAT IS THE DIFFERENCE BETWEEN A NATIVE `then` AND
+    // THE PAGE'S ONE.
     //
-    // Qui c'era `Cu.waiveXrays(rawPromise).then(...)`. Il waiver toglie l'Xray,
-    // quindi `.then` si risolveva sulla catena di prototipi VERA del sito: se
-    // una pagina rimpiazza `Promise.prototype.then`, il suo codice veniva
-    // eseguito e poteva CONTARE. Misurato il 2026-08-23 con
-    // `tests/gates/observable_crossings.py`: una `page.evaluate` asincrona
-    // faceva scattare la trappola **1 volta su 1**, ed era l'unico
-    // attraversamento rimasto dell'intero flusso.
+    // There used to be `Cu.waiveXrays(rawPromise).then(...)` here. The waiver removes the Xray,
+    // so `.then` was resolved on the REAL prototype chain of the site: if
+    // a page replaces `Promise.prototype.then`, its code was
+    // run and could COUNT. Measured on 2026-08-23 with
+    // an observable-crossings gate: an asynchronous `page.evaluate`
+    // set off the trap **1 time out of 1**, and it was the only
+    // crossing left in the whole flow.
     //
-    // Senza waiver, `rawPromise` resta dietro l'Xray e `.then` risolve al
-    // metodo NATIVO, che il sito non puo' sviare. Il comportamento non cambia:
-    // `Promise.prototype.then` opera sullo slot interno, non sul prototipo.
-    // Verificato su 7 casi - valore, ritardo, oggetto, promise gia' risolta,
-    // catena di await, fetch, e il RIFIUTO col messaggio intatto - 7 su 7, e il
-    // gate torna a zero attraversamenti.
+    // Without the waiver, `rawPromise` stays behind the Xray and `.then` resolves to the
+    // NATIVE method, which the site cannot divert. The behaviour does not change:
+    // `Promise.prototype.then` works on the internal slot, not on the prototype.
+    // Verified on 7 cases - value, delay, object, already resolved promise,
+    // chain of awaits, fetch, and the REJECTION with the message intact - 7 out of 7, and the
+    // gate goes back to zero crossings.
     rawPromise.then(
       () => {
         this._pendingPromises.delete(promiseID);
@@ -447,49 +447,49 @@ class ExecutionContext {
     this._domWindow = domWindow;
     this._contextGlobal = contextGlobal;
     this._debuggee = runtime._debugger.addDebuggee(contextGlobal);
-    // ⛔ DOVE SI SERIALIZZA E' UNA DECISIONE, NON UN DETTAGLIO.
+    // (!) WHERE WE SERIALIZE IS A DECISION, NOT A DETAIL.
     //
-    // Il valore di ritorno di `evaluate` veniva serializzato NEL REALM DELLA
-    // PAGINA, e `JSON.stringify` legge `toJSON` su ogni valore che tocca: se il
-    // sito ha messo un accessore su `Object.prototype.toJSON`, quelle letture
-    // sono sue e le puo' CONTARE. Misurato il 2026-08-23 su un flusso normale:
-    // click, `page.title()`, `page.content()`, i locator e una `evaluate` che
-    // torna un numero fanno **zero** attraversamenti; una `evaluate` che torna
-    // `{a:1, b:[1,2,3]}` ne fa **sei** su `toJSON` piu' **due** su
-    // `Object.defineProperty`. Erano l'unico attraversamento osservabile
-    // dell'intero flusso.
+    // The return value of `evaluate` used to be serialized IN THE REALM OF THE
+    // PAGE, and `JSON.stringify` reads `toJSON` on every value it touches: if the
+    // site has put an accessor on `Object.prototype.toJSON`, those reads
+    // are its own and it can COUNT them. Measured on 2026-08-23 on a normal flow:
+    // click, `page.title()`, `page.content()`, the locators and an `evaluate` that
+    // returns a number make **zero** crossings; an `evaluate` that returns
+    // `{a:1, b:[1,2,3]}` makes **six** on `toJSON` plus **two** on
+    // `Object.defineProperty`. They were the only observable crossing of the
+    // whole flow.
     //
-    // I due `defineProperty` erano gia' un residuo DICHIARATO nel commento di
-    // `_STEALTH_JSON_STRINGIFY_SRC` ("una pagina che agganci Object.defineProperty
-    // PRIMA ci vedrebbe comunque - non e' stato misurato"). Adesso e' misurato.
+    // The two `defineProperty` were already a DECLARED residue in the comment of
+    // `_STEALTH_JSON_STRINGIFY_SRC` ("a page that hooks Object.defineProperty
+    // BEFORE would still see us - it has not been measured"). Now it is measured.
     //
-    // Il rimedio non e' spostare `evaluate`: e' serializzare in un global che
-    // NON e' quello del sito. Da li' un oggetto della pagina si legge attraverso
-    // un Xray, che non espone la catena dei prototipi, quindi
-    // `Object.prototype.toJSON` del sito non esiste per chi serializza e il
-    // getter non parte. `wantXrays` qui non e' una scelta: e' il meccanismo.
+    // The remedy is not to move `evaluate`: it is to serialize in a global that
+    // is NOT the site's. From there an object of the page is read through
+    // an Xray, which does not expose the prototype chain, so
+    // `Object.prototype.toJSON` of the site does not exist for the one who serializes and the
+    // getter does not fire. `wantXrays` here is not a choice: it is the mechanism.
     //
-    // Nei worker `serializationGlobal` e' assente e si ricade sul global del
-    // contesto, che nei worker e' gia' l'unico che c'e'.
-    // ⛔ SI COSTRUISCE ALLA PRIMA SERIALIZZAZIONE, NON A OGNI FRAME.
+    // In the workers `serializationGlobal` is absent and we fall back on the global of the
+    // context, which in the workers is already the only one there is.
+    // (!) IT IS BUILT AT THE FIRST SERIALIZATION, NOT AT EVERY FRAME.
     //
-    // Prima il global arrivava gia' costruito, perche' era un ARGOMENTO: quindi
-    // una sandbox in piu' nasceva per ogni frame di ogni documento, anche dove
-    // nessuno serializzava mai niente. Su una pagina con cinquanta iframe sono
-    // cinquanta global pagati per nulla. Adesso arriva una FABBRICA e si chiama
-    // al primo uso vero.
+    // Before, the global arrived already built, because it was an ARGUMENT: so
+    // one more sandbox was born for every frame of every document, even where
+    // nobody ever serialized anything. On a page with fifty iframes that is
+    // fifty globals paid for nothing. Now a FACTORY arrives and it is called
+    // at the first real use.
     //
-    // `_ensureJsonStringify` era gia' pigra per una ragione diversa e piu'
-    // stretta - non toccare gli intrinseci prima del primo script della pagina -
-    // ma la sandbox sotto di lei non lo era, quindi meta' del costo restava.
-    // ⛔ E' SEMPRE UNA FABBRICA, mai un global gia' costruito. La prima stesura
-    // accettava tutti e due e distingueva con `typeof === 'function'`: un
-    // parametro che significa due cose diverse a seconda del tipo e' esattamente
-    // cio' che questo progetto ha gia' pagato una volta - `push_range` che
-    // tornava uno o tre token senza dirlo - e prima o poi qualcuno lo legge
-    // nell'altro senso. I worker non ne passano nessuna e ricadono sul proprio
-    // global, che li' e' l'unico che esista.
-    this._fabbricaSerializzazione = serializationGlobal || null;
+    // `_ensureJsonStringify` was already lazy for a different and narrower
+    // reason - not to touch the intrinsics before the first script of the page -
+    // but the sandbox under it was not, so half of the cost remained.
+    // (!) IT IS ALWAYS A FACTORY, never an already built global. The first draft
+    // accepted both and told them apart with `typeof === 'function'`: a
+    // parameter that means two different things depending on the type is exactly
+    // what this project has already paid for once - `push_range` that
+    // returned one or three tokens without saying so - and sooner or later someone reads it
+    // the other way round. The workers pass none and fall back on their own
+    // global, which there is the only one that exists.
+    this._serializationGlobalFactory = serializationGlobal || null;
     this._serializationGlobal = null;
     this._serializationDebuggeeCache = null;
     this._remoteObjects = new Map();
@@ -503,13 +503,13 @@ class ExecutionContext {
     this._jsonStringifyObject = null;
   }
 
-  // Il debuggee della serializzazione, risolto al primo uso. Nei worker non
-  // c'e' nessuna fabbrica e si ricade sul global del contesto, che li' e' l'unico
-  // che esista.
-  _serializzatore() {
+  // The debuggee of the serialization, resolved at first use. In the workers there is
+  // no factory and we fall back on the global of the context, which there is the only
+  // one that exists.
+  _serializer() {
     if (!this._serializationDebuggeeCache) {
-      const global = this._fabbricaSerializzazione
-          ? this._fabbricaSerializzazione()
+      const global = this._serializationGlobalFactory
+          ? this._serializationGlobalFactory()
           : null;
       if (global) {
         this._serializationGlobal = global;
@@ -524,7 +524,7 @@ class ExecutionContext {
 
   _ensureJsonStringify() {
     if (!this._jsonStringifyObject)
-      this._jsonStringifyObject = this._serializzatore().executeInGlobal(_STEALTH_JSON_STRINGIFY_SRC).return;
+      this._jsonStringifyObject = this._serializer().executeInGlobal(_STEALTH_JSON_STRINGIFY_SRC).return;
     return this._jsonStringifyObject;
   }
 
@@ -655,29 +655,29 @@ class ExecutionContext {
     }, this._contextGlobal, {
       defineAs: name,
     });
-    // STEALTHFOX: non enumerabile.
+    // STEALTHFOX: not enumerable.
     //
-    // exportFunction crea la proprieta' ENUMERABILE, quindi finiva dentro
-    // for..in e Object.keys(window): la scansione piu' economica che un sito
-    // possa fare. Qui passa il TRASPORTO interno di Playwright, non il nome
-    // che l'utente ha scelto (quello lo crea il controller iniettato dal lato
-    // JavaScript), quindi nasconderlo non cambia nessuna API.
+    // exportFunction creates the property ENUMERABLE, so it ended up inside
+    // for..in and Object.keys(window): the cheapest scan a site can
+    // do. What passes here is the internal TRANSPORT of Playwright, not the name
+    // the user has chosen (that one is created by the controller injected on the
+    // JavaScript side), so hiding it does not change any API.
     //
-    // Resta visibile a getOwnPropertyNames, e non puo' essere altrimenti: la
-    // pagina deve poterla chiamare. Misurato il 2026-08-24: un lancio normale
-    // non arriva mai qui, ci arriva solo chi chiama expose_function.
-    // ⛔ SENZA L'XRAY. La prima stesura leggeva il descrittore dal global
-    // avvolto, e l'Xray non lascia toccare la proprieta' sottostante: misurato,
-    // il controller diventava non enumerabile (quello lo definisce il JS
-    // iniettato, dal lato contenuto) e il canale restava dentro Object.keys.
-    // Il waiver serve a operare sull'oggetto vero, e vale solo qui: la
-    // proprieta' l'abbiamo appena creata noi, non e' del sito.
+    // It stays visible to getOwnPropertyNames, and it cannot be otherwise: the
+    // page must be able to call it. Measured on 2026-08-24: a normal launch
+    // never gets here, only whoever calls expose_function does.
+    // (!) WITHOUT THE XRAY. The first draft read the descriptor from the wrapped
+    // global, and the Xray does not let the underlying property be touched: measured,
+    // the controller became non-enumerable (that one is defined by the injected JS,
+    // on the content side) and the channel stayed inside Object.keys.
+    // The waiver is needed to operate on the real object, and holds only here: the
+    // property we have just created ourselves, it is not the site's.
     try {
-      const nudo = Cu.waiveXrays(this._contextGlobal);
-      const descr = Object.getOwnPropertyDescriptor(nudo, name);
+      const bare = Cu.waiveXrays(this._contextGlobal);
+      const descr = Object.getOwnPropertyDescriptor(bare, name);
       if (descr && descr.enumerable) {
         descr.enumerable = false;
-        Object.defineProperty(nudo, name, descr);
+        Object.defineProperty(bare, name, descr);
       }
     } catch (e) {}
     this.evaluateScriptSafely(script);
@@ -788,7 +788,7 @@ class ExecutionContext {
   }
 
   _serialize(obj) {
-    const result = this._serializzatore().executeInGlobalWithBindings('stringify(e)', {e: obj, stringify: this._ensureJsonStringify()}, {useInnerBindings: true});
+    const result = this._serializer().executeInGlobalWithBindings('stringify(e)', {e: obj, stringify: this._ensureJsonStringify()}, {useInnerBindings: true});
     if (result.throw)
       throw new Error('Object is not serializable');
     return result.return === undefined ? undefined : JSON.parse(result.return);

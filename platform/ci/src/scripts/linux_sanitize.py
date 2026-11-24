@@ -2,8 +2,8 @@
 """Binary-level sanitization of the stripped Linux Firefox build.
 
 Operates on files in-place under the staging dir.
-Replaces `/home/feder/ff-build/firefox-146.0.1` (36 bytes) with a neutral
-same-length path so that __FILE__ macros in .rodata (assertion messages,
+Replaces the build user's build-directory path (e.g. a `<home>/ff-build/firefox-146.0.1`
+of 36 bytes) with a neutral same-length path so that __FILE__ macros in .rodata (assertion messages,
 panic strings, tracing events) no longer reveal the build machine's
 layout.
 

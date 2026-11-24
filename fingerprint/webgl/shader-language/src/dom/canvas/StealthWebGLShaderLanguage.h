@@ -21,39 +21,39 @@ namespace gl {
 class GLContext;
 }  // namespace gl
 
-// La lingua che il CONTESTO GL impone, cioe' quella con cui si compila per il
-// driver, e non e' una nostra scelta. Era `static ShaderOutput`: e' diventata
-// visibile perche' ha un secondo lettore, `WebGLShader::CompileShader`, che
-// deve sapere se la lingua dichiarata coincide con questa. Esposta invece che
-// ricopiata: due copie di questa tabella divergerebbero al primo caso che
-// qualcuno aggiunge a una sola.
-// La definizione resta in WebGLShaderValidator.cpp (e' codice di Mozilla).
-ShShaderOutput ShaderOutputPerIlDriver(gl::GLContext* gl);
+// The language the GL CONTEXT imposes, that is, the one used to compile for the
+// driver; it is not our choice. It used to be `static ShaderOutput`: it became
+// visible because it has a second reader, `WebGLShader::CompileShader`, which
+// must know whether the declared language is the same as this one. Exposed
+// instead of copied: two copies of this table would diverge the first time
+// someone adds a case to only one of them.
+// The definition stays in WebGLShaderValidator.cpp (it is Mozilla code).
+ShShaderOutput ShaderOutputForDriver(gl::GLContext* gl);
 
 namespace webgl {
 
-// La lingua che la PAGINA deve vedere, dichiarata da invisible_core con
-// `zoom.stealth.webgl.shader_output_language`. `Nothing()` = nessuna
-// dichiarazione, e allora vale quella del driver. Dominio finito con un
-// elemento solo: si dichiara la LINGUA, mai la stringa.
+// The language the PAGE must see, declared by the core with
+// `zoom.stealth.webgl.shader_output_language`. `Nothing()` = no declaration,
+// and then the driver's language applies. A finite domain with a single
+// element: the LANGUAGE is declared, never the string.
 Maybe<ShShaderOutput> StealthDeclaredShaderOutput();
 
 }  // namespace webgl
 
-// La lingua con cui compilare: quella dichiarata solo se `aPerLaPagina` e se
-// c'e' una dichiarazione, altrimenti quella del contesto GL. Legge sempre la
-// pref, anche sul percorso del driver, cosi' l'avviso per un nome sconosciuto
-// parte a ogni costruzione del validatore. `aPerLaPagina` e' il campo
-// `WebGLContext::mStealthPerPage`, vero solo mentre
-// `WebGLShader::StealthPerPageObjectCode` costruisce il validatore della
-// seconda traduzione.
+// The language to compile with: the declared one only if `aForPage` is true and
+// there is a declaration, otherwise the one of the GL context. It always reads
+// the pref, even on the driver path, so that the warning for an unknown name
+// fires at every construction of the validator. `aForPage` is the field
+// `WebGLContext::mStealthPerPage`, true only while
+// `WebGLShader::StealthPerPageObjectCode` builds the validator of the second
+// translation.
 ShShaderOutput StealthShaderOutputLanguage(gl::GLContext* gl,
-                                           bool aPerLaPagina);
+                                           bool aForPage);
 
-// Quello che la PAGINA legge come codice tradotto di uno shader
-// (`WebGLContext::GetCompileResult`): la resa nella lingua dichiarata se
-// `aShader` ne ha una, altrimenti quella del driver (`aDriverObjectCode`).
-// Pura: nessun effetto, nessuna lettura di pref.
+// What the PAGE reads as the translated code of a shader
+// (`WebGLContext::GetCompileResult`): the rendering in the declared language if
+// `aShader` has one, otherwise the driver's (`aDriverObjectCode`).
+// Pure: no side effects, no pref read.
 const std::string& StealthPageObjectCode(const WebGLShader& aShader,
                                          const std::string& aDriverObjectCode);
 

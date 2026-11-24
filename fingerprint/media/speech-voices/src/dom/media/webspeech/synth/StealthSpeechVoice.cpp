@@ -50,27 +50,27 @@ void StealthVoiceMakeURI(const nsACString& aEntry, nsAString& aUri) {
   AppendUTF8toUTF16(aEntry, aUri);
 }
 
-// QUI USCIVA IL NOSTRO FORMATO INTERNO, FINO ALLA PAGINA.
+// HERE OUR INTERNAL FORMAT USED TO LEAK, ALL THE WAY TO THE PAGE.
 //
-// `mUri` e' la nostra codifica di servizio, "stealth-voice:NOME|LANG|D|L", e
-// ogni altro accessor di questo file la sa interpretare. Questo no: tornava
-// `mUri` verbatim, quindi una pagina che chiama
-// `speechSynthesis.getVoices()[0].voiceURI` leggeva una stringa che comincia
-// con la parola "stealth". Misurato il 2026-08-23 sul prodotto:
-//   a mano   -> urn:moz-tts:sapi:Microsoft David - English (United States)?en-US
-//   prodotto -> stealth-voice:Microsoft David - English (United States)|en-US|1|1
-// Non e' un camuffamento imperfetto: e' una firma che si autodenuncia, ed e'
-// l'unica superficie di tutta la sessione di misure che nominava noi.
+// `mUri` is our service encoding, "stealth-voice:NAME|LANG|D|L", and every
+// other accessor of this file knows how to interpret it. This one did not: it
+// returned `mUri` verbatim, so a page that calls
+// `speechSynthesis.getVoices()[0].voiceURI` read a string that begins with the
+// word "stealth". Measured on 2026-08-23 on the product:
+//   by hand  -> urn:moz-tts:sapi:Microsoft David - English (United States)?en-US
+//   product  -> stealth-voice:Microsoft David - English (United States)|en-US|1|1
+// It is not an imperfect disguise: it is a signature that gives itself away,
+// and it was the only surface in the whole measuring session that named us.
 //
-// Il formato retail non e' stato dedotto: e' copiato da
-// `dom/media/webspeech/synth/windows/SapiService.cpp`, che costruisce
-// `"urn:moz-tts:sapi:" + descrizione + "?" + locale`.
+// The retail format was not deduced: it is copied from
+// `dom/media/webspeech/synth/windows/SapiService.cpp`, which builds
+// `"urn:moz-tts:sapi:" + description + "?" + locale`.
 //
-// E LO SCHEMA E' SEMPRE `sapi:`, ANCHE SU LINUX. Un Firefox Linux vero direbbe
-// `speechd:` (`SpeechDispatcherService.cpp`) e uno macOS `osx:`
-// (`OSXSpeechSynthesizerService.mm`), ma noi dichiariamo Windows sempre e
-// ovunque: e' la regola 4, e ha l'effetto collaterale di rendere le due build
-// identiche anche qui.
+// AND THE SCHEME IS ALWAYS `sapi:`, EVEN ON LINUX. A real Linux Firefox would
+// say `speechd:` (`SpeechDispatcherService.cpp`) and a macOS one `osx:`
+// (`OSXSpeechSynthesizerService.mm`), but we declare Windows always and
+// everywhere: it is engine rule 4, and it has the side effect of making the two
+// builds identical here too.
 bool StealthVoiceRetailURI(const nsAString& aUri, nsAString& aOut) {
   if (!IsStealthVoiceURI(aUri)) return false;
   nsAutoString name, lang;

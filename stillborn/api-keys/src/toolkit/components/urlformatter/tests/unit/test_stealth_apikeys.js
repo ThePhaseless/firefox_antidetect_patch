@@ -13,7 +13,7 @@ const PREF_GEOLOC = "zoom.stealth.apikey.google_location_service";
 const PREF_SB = "zoom.stealth.apikey.google_safebrowsing";
 
 const MISSING_SB =
-  "STEALTHFOX: nessuna chiave dichiarata in zoom.stealth.apikey.google_safebrowsing";
+  "STEALTHFOX: no key declared in zoom.stealth.apikey.google_safebrowsing";
 
 // What Mozilla's build writes into AppConstants when no key file is given. The
 // declared key must replace it, so none of these may reach a formatted URL.

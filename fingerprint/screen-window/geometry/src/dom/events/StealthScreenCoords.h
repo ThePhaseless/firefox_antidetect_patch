@@ -27,13 +27,12 @@
 
 namespace mozilla::dom {
 
-// Lo scarto fra l'origine reale del contenuto di primo livello (l'offset su
-// schermo del root widget, cio' che mozInnerScreenX riportava prima di
-// diventare una dichiarazione) e quella dichiarata, in app units; Nothing()
-// col motore spento. UNA funzione per mozInnerScreenX/Y e per gli eventi
-// (Event.cpp): e' cosi' che screenX - clientX == mozInnerScreenX resta vero
-// anche nei popup e negli iframe. Un sottoframe somma lo scarto al PROPRIO
-// rettangolo, non lo sostituisce.
+// The shift between the real top-level content origin (the on-screen offset
+// of the root widget, what mozInnerScreenX reported before it became a
+// declaration) and the declared one, in app units; Nothing() with the engine
+// off. ONE function for mozInnerScreenX/Y and for the events (Event.cpp): this
+// is how screenX - clientX == mozInnerScreenX stays true in popups and iframes
+// too. A subframe adds the shift to its OWN rect, it does not replace it.
 //
 // Main thread only. Every call it makes is on a public API: nsPresContext,
 // nsIWidget, BrowsingContext, BrowserChild::GetDimensions.
@@ -41,12 +40,12 @@ inline Maybe<nsPoint> StealthContentOriginShift(nsPresContext* aPresContext) {
   if (!aPresContext || !gfx::StealthEngineActive()) {
     return Nothing();
   }
-  // L'origine reale e' l'offset su schermo del root widget: nel processo di
-  // contenuto e' il PuppetWidget, il cui offset e' l'origine dell'area di
-  // contenuto di primo livello - per il documento top coincide con
-  // GetInnerScreenRect(), per un sottoframe no, ed e' proprio quella
-  // differenza che va conservata. Solo chiamate al widget, niente layout:
-  // Event.cpp chiama questa funzione per ogni evento del mouse.
+  // The real origin is the on-screen offset of the root widget: in the content
+  // process it is the PuppetWidget, whose offset is the origin of the
+  // top-level content area - for the top document it coincides with
+  // GetInnerScreenRect(), for a subframe it does not, and that very
+  // difference is what must be preserved. Widget calls only, no layout:
+  // Event.cpp calls this function for every mouse event.
   nsCOMPtr<nsIWidget> rootWidget = aPresContext->GetRootWidget();
   if (!rootWidget) {
     return Nothing();
@@ -54,17 +53,17 @@ inline Maybe<nsPoint> StealthContentOriginShift(nsPresContext* aPresContext) {
   const int32_t auPerDevPx = aPresContext->AppUnitsPerDevPixel();
   const nsPoint real = LayoutDevicePixel::ToAppUnits(
       rootWidget->WidgetToScreenOffset(), auPerDevPx);
-  // Un popup si dichiara dalla sua posizione REALE: il rettangolo esterno della
-  // finestra di primo livello, che BrowserChild riceve dal genitore - anche in
-  // un iframe fuori processo, dove arriva dall'embedder. E' la stessa fonte di
-  // GetScreenXY (nsIBaseWindow::GetPosition del tree owner).
+  // A popup is declared from its REAL position: the outer rect of the
+  // top-level window, which BrowserChild receives from the parent - also in an
+  // out-of-process iframe, where it arrives from the embedder. It is the same
+  // source as GetScreenXY (nsIBaseWindow::GetPosition of the tree owner).
   Maybe<LayoutDeviceIntPoint> popupOrigin;
   Document* doc = aPresContext->Document();
   BrowsingContext* bc = doc ? doc->GetBrowsingContext() : nullptr;
   if (bc && bc->Top()->GetIsPopupRequested()) {
     BrowserChild* child = rootWidget->GetOwningBrowserChild();
     if (!child) {
-      // Il processo genitore non serve pagine: niente da dichiarare.
+      // The parent process serves no pages: nothing to declare.
       return Nothing();
     }
     LayoutDeviceIntPoint outer;
@@ -154,10 +153,11 @@ inline Maybe<nsPoint> StealthContentOriginShift(nsPresContext* aPresContext) {
 // mozInnerScreenX reported before it became a declaration - so the relation
 // the gate checks holds by construction, and both terms are widget calls the
 // original expression already made.
-// Lo scarto lo calcola UNA funzione, la stessa che chiamano mozInnerScreenX e
-// mozInnerScreenY. Quando l'aritmetica stava soltanto qui, la sostituzione
-// secca in nsGlobalWindowOuter ha ricreato dentro gli iframe la contraddizione
-// che questo blocco toglie al primo livello - misurato il 2026-08-10.
+// The shift is computed by ONE function, the same one mozInnerScreenX and
+// mozInnerScreenY call. When the arithmetic lived only here, the plain
+// substitution in nsGlobalWindowOuter recreated inside the iframes the
+// contradiction that this block removes at the top level - measured on
+// 2026-08-10.
 //
 // The sum stays in integer app units (A + (B + shift): integer addition, the
 // same value as (A + B) + shift), and the caller converts to CSS pixels once, exactly as before: no float

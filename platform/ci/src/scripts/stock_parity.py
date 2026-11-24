@@ -4,7 +4,7 @@ same version and platform.
 A page reaches the engine's own files in two ways. It probes whether a name is
 registered: `new Worker("chrome://<name>/...")` returns for a registered chrome
 package and throws SecurityError at once for an absent one, which is how a
-captcha vendor found the juggler (invisible_playwright #336). And it loads, with
+captcha vendor found the juggler (wrapper issue #336). And it loads, with
 <link>, <img> and <script>, every file of a package registered
 `contentaccessible` - its content, skin and locale alike, because the flag
 belongs to the package (nsChromeRegistry::AllowContentToAccess reads it from the
@@ -27,9 +27,9 @@ an absent file of the same package as the control). See observable().
     cannot tell ours from the retail's, or either from nothing. That covers
     buildconfig.html, which spells out our mozconfig.
   - Anything else - a stylesheet, whose rules apply to the page, a script,
-    every type nobody measured - compares by its bytes. The owner's rule (2026-10-14): "la nostra versione deve
-essere uguale identica al firefox stock, non e' accettabile che ci siano
-differenze se sono rilevabili". A difference a page cannot observe is declared
+    every type nobody measured - compares by its bytes. The owner's rule (2026-10-14): "our version must be
+exactly identical to stock firefox; it is not acceptable that there are
+differences if they are detectable". A difference a page cannot observe is declared
 in stock_parity_exceptions.json with the measurement that says so, and a
 declaration that no longer matches a difference fails the gate as well.
 
@@ -49,7 +49,7 @@ THE BRANDING A PAGE READS IS THE CORE'S, not the build's, on an engine that
 redirects it (P60): with the engine on, every URI under the branding package's
 content directory - chrome://branding/content/ and the same files through
 resource://usercontext-content/branding/ - is served from the zip archive
-invisible_core declares in zoom.stealth.branding.archive (as jar:, the channel
+the core declares in zoom.stealth.branding.archive (as jar:, the channel
 class the retail uses), and the build's own brand in omni.ja is never read. So
 on such an engine the archive's entries take the place of the package's files,
 those it lacks included, exactly as the redirect does, and they pass through
@@ -161,7 +161,7 @@ def version_of(tree: Path) -> str:
 
 def serves_declared_branding(tree: Path, platform: str) -> bool:
     """Whether the engine of `tree` serves the branding from the archive
-    invisible_core declares (the module docstring), read from its library.
+    the core declares (the module docstring), read from its library.
 
     ⛔ The declared branding is judged by its bytes and observable() ONLY
     because the engine serves it through jar:, the channel class the retail
@@ -664,12 +664,12 @@ def judge(tree: Path, retail=retail_files, exceptions: Path = EXCEPTIONS,
     """(platform, version, undeclared differences, stale declarations, size).
     `retail(version, platform)` gives the judge's Files; the selftest passes a
     tree of its own, everything else the MAR. `branding` is the archive
-    invisible_core declares, required exactly when the engine serves it."""
+    the core declares, required exactly when the engine serves it."""
     platform, version = platform_of(tree), version_of(tree)
     files = Files.from_directory(tree)
     if serves_declared_branding(tree, platform):
         if branding is None:
-            raise ParityError("this engine serves the branding invisible_core declares, not "
+            raise ParityError("this engine serves the branding the core declares, not "
                               "its own: pass the declared archive (--branding)")
         reg = Registry(files, platform)
         if BRANDING_PACKAGE not in reg.packages:
@@ -691,7 +691,7 @@ def judge_branding(archive: Path, version: str, platform: str, retail=retail_fil
     retail `version` for `platform` and the same retail serving `archive` as
     its branding, the way an engine with the redirect serves it.
 
-    The branding a page reads belongs to invisible_core, so a release of the
+    The branding a page reads belongs to the core, so a release of the
     core can change it without any build of the engine: this is the judgement
     the core's CI runs on its own declared set, with this file of the engine
     the seal pins, so that the comparison and observable() are one code."""
@@ -774,7 +774,7 @@ def selftest() -> int:
         "chrome/browsercontent/branding/wordmark.svg": '<svg viewBox="0 0 359 80"/>\n',
         "chrome/browsercontent/other.css": "o {}\n",
     }
-    # The retail's brand, as invisible_core ships it, and a build whose own
+    # The retail's brand, as the core ships it, and a build whose own
     # brand differs from it in a stylesheet and an image's size.
     RETAIL_BRAND = {"about.png": "PNG16x16", "aboutDialog.css": "#a {}\n",
                     "wordmark.svg": '<svg viewBox="0 0 359 80"/>\n'}
@@ -914,7 +914,7 @@ def selftest() -> int:
                 chrome__second_DOT_manifest="override chrome://global/content/a.css "
                 "chrome://global/content/a.css\ncontent private private/content/\n"), False, None),
         # The branding an engine with the redirect serves from the archive
-        # invisible_core declares (P60). The fifth field: (the engine library
+        # the core declares (P60). The fifth field: (the engine library
         # names the pref, the entries of the declared archive, "NOTAZIP", or None).
         ("an engine that serves the declared brand, the retail's, over its own that differs",
          mutate(**OWN_BRAND), False, None, (True, RETAIL_BRAND)),

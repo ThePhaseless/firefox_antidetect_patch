@@ -191,35 +191,35 @@ export class Juggler {
         storageReady = true;
         for (const message of heldMessages.splice(0))
           connection.receiveMessage(message);
-        // STEALTHFOX: Playwright dichiara il browser pronto SOLO quando legge
-        // questa riga sullo stdout del processo (waitForReadyState cerca la
-        // stringa esatta 'Juggler listening to the pipe' nei log del browser).
+        // STEALTHFOX: Playwright declares the browser ready ONLY when it reads
+        // this line on the process stdout (waitForReadyState looks for the exact
+        // string 'Juggler listening to the pipe' in the browser logs).
         //
-        // dump() nei moduli di sistema passa da nsJSUtils::DumpEnabled(), che
-        // senza DEBUG e senza MOZ_ENABLE_JS_DUMP - nessuno dei due definito in
-        // una nostra build di release - ricade su
-        // browser.dom.window.dump.enabled, il cui default nello StaticPrefList
-        // e' @IS_NOT_MOZILLA_OFFICIAL@. Con MOZILLA_OFFICIAL=1 vale FALSE, la
-        // riga non esce, e ogni lancio scade con il pipe perfettamente
-        // funzionante: nessun errore da nessuna parte.
+        // dump() in system modules goes through nsJSUtils::DumpEnabled(), which,
+        // without DEBUG and without MOZ_ENABLE_JS_DUMP - neither of them defined in
+        // a release build of ours - falls back to
+        // browser.dom.window.dump.enabled, whose default in StaticPrefList
+        // is @IS_NOT_MOZILLA_OFFICIAL@. With MOZILLA_OFFICIAL=1 it is FALSE, the
+        // line is not written, and every launch times out while the pipe works
+        // perfectly: no error anywhere.
         //
-        // Misurato il 2026-08-19 sullo stesso binario, tre bracci: controllo
-        // PILOTA; sola pref spenta una riga prima -> TimeoutError con
-        // PW_PIPE_READ/WRITE validi, pipe.init ok e 4 notifiche su 4; pref
-        // spenta piu' questo rimedio -> PILOTA di nuovo.
+        // Measured on 2026-08-19 on the same binary, three arms: control
+        // PASSES; only the pref turned off one line before -> TimeoutError with
+        // PW_PIPE_READ/WRITE valid, pipe.init ok and 4 notifications out of 4; pref
+        // off plus this remedy -> PASSES again.
         //
-        // Si accende SOLO intorno a questa riga e si rimette esattamente com'era
-        // (clearUserPref se non c'era un valore utente), perche' una pref lasciata
-        // accesa per tutta la sessione sarebbe una divergenza dal retail. Nessuna
-        // pagina esiste ancora a final-ui-startup, e window.dump non restituisce
-        // niente di diverso nei due stati, quindi la finestra non e' osservabile.
-        const _dumpUtente = Services.prefs.prefHasUserValue("browser.dom.window.dump.enabled");
+        // It is turned on ONLY around this line and put back exactly as it was
+        // (clearUserPref if there was no user value), because a pref left
+        // on for the whole session would be a divergence from retail. No
+        // page exists yet at final-ui-startup, and window.dump returns
+        // nothing different in the two states, so the window is not observable.
+        const _dumpHadUserValue = Services.prefs.prefHasUserValue("browser.dom.window.dump.enabled");
         const _dumpVal = Services.prefs.getBoolPref("browser.dom.window.dump.enabled", false);
         Services.prefs.setBoolPref("browser.dom.window.dump.enabled", true);
         try {
           dump(`\nJuggler listening to the pipe\n`);
         } finally {
-          if (_dumpUtente) Services.prefs.setBoolPref("browser.dom.window.dump.enabled", _dumpVal);
+          if (_dumpHadUserValue) Services.prefs.setBoolPref("browser.dom.window.dump.enabled", _dumpVal);
           else Services.prefs.clearUserPref("browser.dom.window.dump.enabled");
         }
         break;

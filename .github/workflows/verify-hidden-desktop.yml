@@ -2,9 +2,9 @@
 # verify-hidden-desktop.yml — re-run the GATE on an EXISTING build run's
 # artifacts, WITHOUT rebuilding Firefox: a test-only fix (e.g. a leg made
 # tolerant of the runner's missing WebGL) is validated against the real
-# binaries in ~10 minutes instead of a rebuild. Si chiamava verify-cloak.yml
-# fino al 2026-09-20; i guard sono quelli del wrapper sul desktop nascosto e il test
-# WebGL del wrapper.
+# binaries in ~10 minutes instead of a rebuild. It was called verify-cloak.yml
+# until 2026-09-20; the guards are the wrapper's hidden-desktop guards and the wrapper's WebGL
+# test.
 #
 # It CALLS gate.yml, the same job release.yml and republish.yml call. Until
 # 2026-10-27 it was its own copy, which said "same guard command as
@@ -14,10 +14,10 @@
 #
 # Headed-but-hidden; zero proxy / zero secrets.
 #
-# ⛔ Fino al 2026-08-26 questa intestazione diceva "The macOS legs are the only
-# place the cocoa cloak patch actually RUNS". Da quel giorno le gambe mac sono
-# uscite, quindi il cloak cocoa NON viene piu' esercitato da nessuna parte: e'
-# la conseguenza di aver smesso di spedire per mac, detta invece che cancellata.
+# Until 2026-08-26 this header said "The macOS legs are the only
+# place the cocoa cloak patch actually RUNS". Since that day the mac legs
+# are gone, so the cocoa cloak is NO LONGER exercised anywhere: that is
+# the consequence of having stopped shipping for mac, stated instead of deleted.
 # ─────────────────────────────────────────────────────────────────────────────
 name: verify-hidden-desktop
 

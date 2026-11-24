@@ -443,12 +443,12 @@ const Browser = {
         colorScheme: t.Nullable(t.Enum(['dark', 'light', 'no-preference'])),
       },
     },
-    // I tre qui sotto erano spariti insieme alla potatura di TargetRegistry.js
-    // (28.4 di 20-our-patches.md documenta la conseguenza su
-    // Page.setEmulatedMedia, non questa). Playwright upstream li manda a OGNI
-    // creazione di contesto salvo un "no-override" esplicito, quindi senza la
-    // dichiarazione un `new_page()` qualsiasi muore con "method ... is not
-    // supported". Restano dichiarati; l'handler accetta solo il valore neutro.
+    // These three below had disappeared together with the pruning of TargetRegistry.js
+    // (an earlier change documents the consequence for
+    // Page.setEmulatedMedia, not this one). Upstream Playwright sends them at EVERY
+    // context creation unless it is given an explicit "no-override", so without the
+    // declaration any `new_page()` dies with "method ... is not
+    // supported". They stay declared; the handler accepts only the neutral value.
     'setReducedMotion': {
       params: {
         browserContextId: t.Optional(t.String),
@@ -564,11 +564,11 @@ const Network = {
         base64body: t.Optional(t.String),  // base64-encoded
       },
     },
-    // Stealthfox 2026-08-30: RIMESSO. Era stato tolto il 2026-08-24 portando
-    // NetworkObserver all'osso, e la conseguenza l'ha segnalata un utente:
-    // response.text() e response.body() sono una delle tre fonti - URL, header,
-    // corpo - con cui si riconosce chi protegge un sito, e senza il corpo ne
-    // restano due. Toglieva anche i corpi dai trace e dagli HAR, in silenzio.
+    // Stealthfox 2026-08-30: PUT BACK. It had been removed on 2026-08-24 when
+    // NetworkObserver was stripped to the bone, and a user reported the consequence:
+    // response.text() and response.body() are one of the three sources - URL, headers,
+    // body - by which the protector of a site is recognized, and without the body only
+    // two are left. It also removed the bodies from the traces and the HARs, in silence.
     'getResponseBody': {
       params: {
         requestId: t.String,

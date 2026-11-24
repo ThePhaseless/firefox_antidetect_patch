@@ -121,9 +121,9 @@ function _arrowSvg() {
 // channel a test can read after shutdown. Inventing a protocol command instead
 // would add a field `checkScheme` validates only at runtime - the failure class
 // a rebase reintroduces in silence.
-//: Quanti anelli al massimo restano in coda per il frame successivo. Vedi
-//: `_onDown`: e' un tetto contro l'accumulo quando rAF non scatta, non una
-//: scelta estetica.
+//: How many rings at most stay queued for the next frame. See
+//: `_onDown`: it is a ceiling against accumulation when rAF does not fire, not an
+//: aesthetic choice.
 const MAX_PENDING_RINGS = 3;
 
 const PREF_MOVES = 'stealthfox.showcursor.moves';
@@ -223,21 +223,21 @@ export class StealthCursor {
     this._win = win;
     this._dot = null;
     this._style = null;
-    //: L'ultima posizione vista, e il frame gia' chiesto. NESSUN gestore di
-    //: input tocca il DOM: registrano numeri, e disegna `_paint` sul frame.
-    //: Vedi il commento sopra `_schedule`.
+    //: The last position seen, and the frame already requested. NO input
+    //: handler touches the DOM: they record numbers, and `_paint` draws on the frame.
+    //: See the comment above `_schedule`.
     this._pendingX = 0;
     this._pendingY = 0;
     this._pendingVisible = false;
     this._pendingPressed = false;
-    //: Una pressione VISTA da quando si e' dipinto l'ultima volta. Serve
-    //: perche' un click veloce apre e chiude dentro lo stesso frame: senza
-    //: questo, `pressed` non verrebbe mai dipinta e la pressione sparirebbe
-    //: dal disegno invece che dal percorso dell'input.
+    //: A press SEEN since the last time we painted. It is needed
+    //: because a fast click opens and closes inside the same frame: without
+    //: it, `pressed` would never be painted and the press would vanish
+    //: from the drawing instead of from the input path.
     this._sawDown = false;
-    //: Quanti anelli spawnare al prossimo frame. Un contatore, non un nodo:
-    //: creare l'elemento qui rimetterebbe nel gestore esattamente il lavoro
-    //: che questa modifica toglie.
+    //: How many rings to spawn at the next frame. A counter, not a node:
+    //: creating the element here would put back into the handler exactly the work
+    //: that this change removes.
     this._pendingRings = 0;
     this._frame = 0;
     this._listening = false;
@@ -322,9 +322,9 @@ export class StealthCursor {
       this._dot.remove();
       this._dot = null;
     }
-    // ⛔ Il frame chiesto va ANNULLATO: una callback che scatta dopo che il
-    // nodo e' stato tolto scrive su un elemento staccato, e su una finestra
-    // che sta chiudendo e' un errore in console che nessuno spiega.
+    // (!) The requested frame must be CANCELLED: a callback that fires after the
+    // node has been removed writes to a detached element, and on a window
+    // that is closing it is a console error that nobody explains.
     if (this._frame) {
       try { this._win.cancelAnimationFrame(this._frame); } catch (e) {}
       this._frame = 0;
@@ -418,48 +418,48 @@ export class StealthCursor {
     }
     if (!this._dot)
       return;
-    // ⛔ LA SCRITTURA DI STILE NON AVVIENE QUI, e questa e' la seconda volta
-    // che un lavoro dentro il percorso di consegna dell'input viene tolto da
-    // questo file. La prima era una pref scritta su timer; questa e' il
-    // `transform` scritto dentro il gestore del mousemove, cioe' nel processo
-    // padre mentre un evento di input e' in volo.
+    // (!) THE STYLE WRITE DOES NOT HAPPEN HERE, and this is the second time
+    // that work inside the input delivery path has been removed from
+    // this file. The first was a pref written on a timer; this is the
+    // `transform` written inside the mousemove handler, that is, in the parent
+    // process while an input event is in flight.
     //
-    // Misurato il 2026-08-28 a macchina VERAMENTE ferma: con l'overlay acceso
-    // la distanza mediana fra i mousemove che LA PAGINA riceve si sposta di
-    // uno scalino intero (18 ms contro 17), p = 0,0005 - e succede col cerchio
-    // come con la freccia, quindi non e' il disegno. Il controllo A/A - il
-    // banco che crede di confrontare acceso contro spento mentre l'overlay non
-    // si accende mai - riporta 0,000 ms e p = 1,0000, quindi la statistica non
-    // accusa se stessa.
+    // Measured on 2026-08-28 on a machine TRULY idle: with the overlay on
+    // the median distance between the mousemove events that THE PAGE receives shifts by
+    // one whole step (18 ms against 17), p = 0.0005 - and it happens with the circle
+    // as with the arrow, so it is not the drawing. The A/A control - the
+    // bench that believes it compares on against off while the overlay never
+    // turns on - reports 0.000 ms and p = 1.0000, so the statistic does not
+    // accuse itself.
     //
-    // ⛔ E LA MISURA PRECEDENTE CHE DICEVA "0,000 ms" ERA PRESA SOTTO CARICO.
-    // Il rumore gonfia la varianza e rende il test permutazionale meno
-    // sensibile: era un falso verde, e ha lasciato scritto in due posti che
-    // questa funzione costasse zero.
+    // (!) AND THE PREVIOUS MEASUREMENT THAT SAID "0.000 ms" WAS TAKEN UNDER LOAD.
+    // Noise inflates the variance and makes the permutation test less
+    // sensitive: it was a false green, and it left written in two places that
+    // this function cost zero.
     //
-    // La posizione si registra e basta; il disegno lo fa il frame successivo.
-    // ⛔ I NUMERI, NON L'EVENTO. Trattenere l'oggetto evento attraverso un
-    // frame lo tiene vivo insieme a cio' a cui punta, e questo file ha gia'
-    // pagato una volta per un oggetto che sopravviveva al suo giro.
+    // The position is only recorded; the drawing is done by the next frame.
+    // (!) THE NUMBERS, NOT THE EVENT. Holding the event object across a
+    // frame keeps it alive together with what it points to, and this file has already
+    // paid once for an object that outlived its round.
     this._pendingX = event.clientX;
     this._pendingY = event.clientY;
     this._pendingVisible = true;
     this._schedule();
   }
 
-  // ⛔ UN SOLO POSTO CHE TOCCA IL DOM, e questa e' la ragione per cui la
-  // correzione del 2026-08-28 non e' bastata. Quella differi' il `transform`
-  // del solo `_onMove` e lascio' gli altri tre gestori a scrivere sincroni
-  // dentro la consegna dell'input: `_onDown` aggiungeva una classe, CREAVA UN
-  // NODO, gli attaccava un listener e lo appendeva avviando un'animazione,
-  // cioe' piu' lavoro di quello che era stato tolto; `_onUp` toglieva una
-  // classe; `_onLeave` scriveva l'opacita'. Correggere solo `_onDown` sarebbe
-  // stata una pezza: dopo la correzione i posti che scrivono sarebbero stati
-  // ancora piu' di uno.
+  // (!) ONLY ONE PLACE TOUCHES THE DOM, and this is the reason why the
+  // fix of 2026-08-28 was not enough. That one deferred the `transform`
+  // of `_onMove` alone and left the other three handlers writing synchronously
+  // inside the input delivery: `_onDown` added a class, CREATED A
+  // NODE, attached a listener to it and appended it starting an animation,
+  // that is more work than what had been removed; `_onUp` removed a
+  // class; `_onLeave` wrote the opacity. Fixing only `_onDown` would have
+  // been a patch: after the fix the places that write would still have been
+  // more than one.
   //
-  // La regola adesso e' una e vale per tutti: **un gestore registra numeri e
-  // chiede il frame, non tocca niente**. Chi disegna e' `_paint`, e chi lo
-  // chiama e' il frame.
+  // The rule now is one and holds for all: **a handler records numbers and
+  // asks for the frame, it touches nothing**. The one that draws is `_paint`, and the one that
+  // calls it is the frame.
   _schedule() {
     if (this._frame)
       return;
@@ -475,10 +475,10 @@ export class StealthCursor {
     this._dot.style.opacity = this._pendingVisible ? '1' : '0';
     this._dot.style.transform =
         `translate3d(${this._pendingX}px, ${this._pendingY}px, 0)`;
-    // ⛔ Una pressione vista dentro questo frame si dipinge ANCHE se il
-    // rilascio e' gia' arrivato: un click veloce nasce e muore fra due frame,
-    // e senza questo la classe non comparirebbe mai. Il rilascio lo fa il
-    // frame dopo, che viene chiesto qui sotto.
+    // (!) A press seen inside this frame is painted EVEN if the
+    // release has already arrived: a fast click is born and dies between two frames,
+    // and without this the class would never appear. The release is done by the
+    // next frame, which is requested below.
     const press = this._pendingPressed || this._sawDown;
     this._dot.classList.toggle('pressed', press);
     while (this._pendingRings > 0) {
@@ -501,28 +501,28 @@ export class StealthCursor {
   }
 
   _onDown(event) {
-    // ⛔ NIENTE DOM QUI. Fino al 2026-08-31 questo gestore girava sincrono
-    // dentro la consegna del mousedown e creava un nodo, gli attaccava un
-    // listener e lo appendeva avviando un'animazione - piu' lavoro di quel
-    // `transform` che il rimedio del 2026-08-28 aveva tolto da `_onMove`
-    // perche' spostava di uno scalino intero i tempi che LA PAGINA misura.
-    // La stessa forma, sul percorso del click, non era misurata da nessun
-    // gate: `chrome_cursor_cost.py` inietta e ascolta solo `mousemove`, cioe'
-    // il ramo gia' corretto. Il banco che guarda questo e'
+    // (!) NO DOM HERE. Until 2026-08-31 this handler ran synchronously
+    // inside the delivery of the mousedown and created a node, attached a
+    // listener to it and appended it starting an animation - more work than the
+    // `transform` that the remedy of 2026-08-28 had removed from `_onMove`
+    // because it shifted by one whole step the times that THE PAGE measures.
+    // The same shape, on the click path, was not measured by any
+    // gate: `chrome_cursor_cost.py` injects and listens only to `mousemove`, that is
+    // the branch already fixed. The bench that looks at this one is
     // `chrome_cursor_click_cost.py`.
     //
-    // L'anello resta, con il suo perche' misurato: una pressione si legge
-    // come l'alone che GONFIA - 802 pixel di bagliore contro 715 a riposo,
-    // +12% - e non come un contorno che si allarga, perche' l'alone e' di un
-    // colore solo. Cambia solo QUANDO viene costruito: al frame, non
-    // nell'evento.
+    // The ring stays, with its measured why: a press is read
+    // as the halo that SWELLS - 802 pixels of glow against 715 at rest,
+    // +12% - and not as an outline that widens, because the halo is of
+    // one colour only. Only WHEN it is built changes: at the frame, not
+    // in the event.
     this._pendingPressed = true;
     this._sawDown = true;
-    // ⛔ Con un tetto: se la finestra chrome va in background rAF smette di
-    // scattare, e senza questo ogni pressione accumulerebbe un anello da
-    // costruire tutto insieme al ritorno. Se ne vede uno per volta comunque -
-    // l'animazione dura meno della distanza fra due click - quindi il tetto
-    // non toglie niente di visibile e toglie una raffica di nodi.
+    // (!) With a ceiling: if the chrome window goes to the background rAF stops
+    // firing, and without this every press would accumulate a ring to be
+    // built all at once on return. Only one is seen at a time anyway -
+    // the animation lasts less than the distance between two clicks - so the ceiling
+    // removes nothing visible and removes a burst of nodes.
     if (this._pendingRings < MAX_PENDING_RINGS)
       this._pendingRings++;
     this._schedule();

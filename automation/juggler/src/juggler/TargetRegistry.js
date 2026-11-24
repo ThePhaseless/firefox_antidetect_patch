@@ -1556,18 +1556,18 @@ class BrowserContext {
       "@mozilla.org/security/certoverride;1"
     ].getService(Ci.nsICertOverrideService);
     if (ignoreHTTPSErrors) {
-      // STEALTHFOX: qui c'erano due Preferences.set GLOBALI - la lista HSTS
-      // precaricata e il cert pinning - applicate solo in questo ramo e mai
-      // ripristinate nell'altro. Un solo contesto che chiedeva di ignorare gli
-      // errori di certificato lasciava tutto il browser senza HSTS e senza
-      // pinning per il resto della sessione.
-      // Il meccanismo vero della funzione e' la riga qui sotto, che e' PER
-      // CONTESTO e simmetrica; quelle due erano un colpo di accetta in piu'.
-      // Un browser senza la lista HSTS precaricata si comporta sul filo in modo
-      // diverso da ogni Firefox vero, e la differenza la vede il SERVER: e' la
-      // classe di divergenza che nessuna prova dal lato JavaScript trova.
-      // E resta anche piu' corretto: ignorare gli errori di CERTIFICATO non e'
-      // la stessa cosa che disattivare HSTS.
+      // STEALTHFOX: there were two GLOBAL Preferences.set here - the preloaded
+      // HSTS list and the cert pinning - applied only in this branch and never
+      // restored in the other. A single context that asked to ignore the
+      // certificate errors left the whole browser without HSTS and without
+      // pinning for the rest of the session.
+      // The real mechanism of the function is the line below, which is PER
+      // CONTEXT and symmetric; those two were an extra blow of the axe.
+      // A browser without the preloaded HSTS list behaves differently on the wire
+      // from every real Firefox, and the SERVER sees the difference: it is the
+      // class of divergence that no test on the JavaScript side finds.
+      // And it is also more correct this way: ignoring CERTIFICATE errors is not
+      // the same thing as turning HSTS off.
       certOverrideService.setDisableAllSecurityChecksAndLetAttackersInterceptMyDataForUserContext(this.userContextId, true);
     } else {
       certOverrideService.setDisableAllSecurityChecksAndLetAttackersInterceptMyDataForUserContext(this.userContextId, false);

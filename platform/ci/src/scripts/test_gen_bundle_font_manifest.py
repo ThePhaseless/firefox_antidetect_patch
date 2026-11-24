@@ -23,34 +23,35 @@ FONTS = os.path.normpath(os.path.join(os.path.dirname(__file__), "..",
                                       "browser", "fonts"))
 MANIFEST = os.path.join(FONTS, "bundle-fonts.list")
 
-# Le 64 famiglie del set Windows, i due font di ICONE e quella che Firefox imbarca di suo.
+# The 64 families of the Windows set, the two ICON fonts, and the one that Firefox ships by itself.
 #
-# ⛔ QUATTRO FAMIGLIE SONO USCITE IL 2026-10-24: Leelawadee, Microsoft Uighur,
-# Wingdings 2 e Wingdings 3. Un Windows 11 26H2 pulito, senza Office, non ne ha
-# nessuna (registro dei font di sistema e dell'utente, letti quel giorno), e il
-# Firefox 151 retail su quella macchina non le vede. Leelawadee e Microsoft Uighur
-# sono font di lingua che Windows installa con il tailandese e con le lingue in
-# alfabeto arabo (Features on Demand), e StandardFonts-win10.inc le nomina solo
-# nelle regole per locale (th; ar, fa), mai in kBaseFonts; Wingdings 2 e 3 non
-# sono nelle tabelle di base di Windows 10 e 11. Un set con queste quattro non e'
-# quello di nessuna macchina reale con quel Windows.
+# WARNING: FOUR FAMILIES LEFT ON 2026-10-24: Leelawadee, Microsoft Uighur,
+# Wingdings 2 and Wingdings 3. A clean Windows 11 26H2 without Office has none
+# of them (system and user font registry, read that day), and the retail
+# Firefox 151 on that machine does not see them. Leelawadee and Microsoft Uighur
+# are language fonts that Windows installs with Thai and with the languages in
+# Arabic script (Features on Demand), and StandardFonts-win10.inc names them
+# only in the per-locale rules (th; ar, fa), never in kBaseFonts; Wingdings 2
+# and 3 are not in the base tables of Windows 10 and 11. A set with these four
+# is not that of any real machine with that Windows.
 #
-# "Twemoji Mozilla" non e' un font di Windows e per un anno e' stata esclusa
-# apposta: il predicato del generatore chiedeva "viene da Microsoft?". La
-# domanda che decide la realness e' un'altra, "un Firefox vero su Windows ce
-# l'ha?", e su questo file le due risposte divergono. Aperti due retail 151
-# firmati: la loro cartella fonts/ contiene UN file, ed e' questo.
+# "Twemoji Mozilla" is not a Windows font and for a year it was excluded on
+# purpose: the generator's predicate asked "does it come from Microsoft?". The
+# question that decides realness is another one, "does a real Firefox on
+# Windows have it?", and on this file the two answers diverge. Two signed
+# retail 151 installs opened: their fonts/ folder holds ONE file, and it is
+# this one.
 #
-# Misurato il 2026-08-16, un browser per caso, contro un retail certificato: con
-# la famiglia non dichiarata una sequenza bandiera misurava 52,599998 (la somma
-# di due glifi separati, quindi nessuna legatura), con lei dichiarata misura
-# 72,0 come il giudice.
-# Fino al 2026-11-06 c'era una SECONDA COPIA in un altro repository, `EXPECTED`
-# in `scripts/ci_font_gate.py` del wrapper (invisible_playwright), e il
-# 2026-08-17 le due erano divise per mezz'ora: 71 famiglie qui, 68 là, perche'
-# nessun test le confrontava. Il font gate e' uscito con la release firefox-55,
-# dopo che il host gate (che fa la domanda generale) e' passato verde su di lei:
-# questa e' ora l'unica lista.
+# Measured on 2026-08-16, one browser per case, against a certified retail: with
+# the family undeclared a flag sequence measured 52.599998 (the sum of two
+# separate glyphs, so no ligature), with it declared it measures 72.0 like the
+# judge.
+# Until 2026-11-06 there was a SECOND COPY in another repository, `EXPECTED`
+# in `scripts/ci_font_gate.py` of the wrapper, and on 2026-08-17 the two were
+# split for half an hour: 71 families here, 68 there, because no test compared
+# them. The font gate left with the firefox-55 release, after the host gate
+# (which asks the general question) passed green on it: this is now the only
+# list.
 EXPECTED_67 = {
     "Arial","Bahnschrift","Calibri","Cambria","Cambria Math","Candara",
     "Comic Sans MS","Consolas","Constantia","Corbel","Courier New","Ebrima","Franklin Gothic",
@@ -198,12 +199,12 @@ def test_alias_table_is_present_and_canonical():
     gfx = os.path.normpath(os.path.join(os.path.dirname(__file__), "..",
                                         "gfx", "thebes"))
     aliases = dict((a.lower(), t) for a, t in build_aliases(gfx))
-    assert len(aliases) >= 40, f"solo {len(aliases)} alias"
+    assert len(aliases) >= 40, f"only {len(aliases)} aliases"
     assert aliases.get("helv") == "Microsoft Sans Serif"
     assert aliases.get("small fonts") == "Arial"
     # An alias must never point at itself, or lookup would loop on the caller.
     for a, t in aliases.items():
-        assert a != t.lower(), f"alias autoreferenziale: {a}"
+        assert a != t.lower(), f"self-referencing alias: {a}"
     # ASCII only: the C++ reader is a getline + split kept deliberately trivial.
     for a, t in aliases.items():
         assert a.isascii() and t.isascii(), f"non-ASCII: {a} -> {t}"
@@ -212,11 +213,11 @@ def test_alias_table_is_present_and_canonical():
 def test_alias_records_round_trip_through_the_manifest():
     with open(MANIFEST, "r", encoding="ascii") as f:
         on_disk = [l.rstrip("\n") for l in f if l.startswith("A|")]
-    assert on_disk, "nessun record A| nel manifest"
+    assert on_disk, "no A| record in the manifest"
     for line in on_disk:
         parts = line.split("|")
-        assert len(parts) == 3, f"record alias malformato: {line}"
-        assert parts[1] and parts[2], f"campo vuoto: {line}"
+        assert len(parts) == 3, f"malformed alias record: {line}"
+        assert parts[1] and parts[2], f"empty field: {line}"
 
 
 def main() -> int:
@@ -234,9 +235,9 @@ def main() -> int:
             print(f"  [ERROR] {t.__name__}: {type(exc).__name__}: {exc}")
     print()
     if failed:
-        print(f"{len(failed)}/{len(tests)} FALLITI")
+        print(f"{len(failed)}/{len(tests)} FAILED")
         return 1
-    print(f"tutti i {len(tests)} controlli passati")
+    print(f"all {len(tests)} checks passed")
     return 0
 
 
