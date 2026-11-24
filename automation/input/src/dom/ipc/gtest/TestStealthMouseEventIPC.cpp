@@ -69,9 +69,9 @@ TEST(StealthMouseEventIPC, TheIdIsReadOnlyWhenTheFieldBeforeItWasRead)
   }
   WidgetMouseEvent out(true, eMouseMove, nullptr);
   IPC::MessageReader reader(*msg);
-  EXPECT_FALSE(IPC::StealthReadJugglerEventId(&reader, &out, false));
+  EXPECT_FALSE(StealthReadJugglerEventId(&reader, &out, false));
   EXPECT_EQ(out.mJugglerEventId, 0u);
-  EXPECT_TRUE(IPC::StealthReadJugglerEventId(&reader, &out, true));
+  EXPECT_TRUE(StealthReadJugglerEventId(&reader, &out, true));
   EXPECT_EQ(out.mJugglerEventId, 5u);
 }
 

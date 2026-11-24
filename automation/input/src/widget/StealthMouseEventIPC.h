@@ -9,7 +9,7 @@
 #include "ipc/IPCMessageUtils.h"
 #include "mozilla/MouseEvents.h"
 
-namespace IPC {
+namespace mozilla {
 
 /**
  * Stealthfox [B217]: the id of a Juggler mouse event travels with the event
@@ -21,12 +21,12 @@ namespace IPC {
  * and the id is read only when it succeeded, as the chain short-circuits.
  * The stream order is the order of the write.
  */
-inline bool StealthReadJugglerEventId(MessageReader* aReader,
-                                      mozilla::WidgetMouseEventBase* aResult,
+inline bool StealthReadJugglerEventId(IPC::MessageReader* aReader,
+                                      WidgetMouseEventBase* aResult,
                                       bool aReadSoFar) {
-  return aReadSoFar && ReadParam(aReader, &aResult->mJugglerEventId);
+  return aReadSoFar && IPC::ReadParam(aReader, &aResult->mJugglerEventId);
 }
 
-}  // namespace IPC
+}  // namespace mozilla
 
 #endif  // mozilla_StealthMouseEventIPC_h
