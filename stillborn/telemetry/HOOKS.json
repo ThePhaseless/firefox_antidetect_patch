@@ -13,7 +13,7 @@
   "kind": "add",
   "form": "registration",
   "line": "import { StealthRoutedProcess } from \"resource://gre/modules/StealthPingsender.sys.mjs\"; // STEALTH-HOOK(stillborn/telemetry)",
-  "test": ""
+  "test": "node:juggler/tests/pingsender_route_lives_in_our_file.test.mjs#the only child the pingsender road starts is started by our runAsync"
  },
  {
   "file": "toolkit/components/telemetry/app/TelemetrySend.sys.mjs",
@@ -32,7 +32,7 @@
   "form": "wrap-expression",
   "line": "    StealthRoutedProcess(process).runAsync(params, params.length, observer); // STEALTH-HOOK(stillborn/telemetry)",
   "removed": "    process.runAsync(params, params.length, observer);",
-  "test": ""
+  "test": "node:juggler/tests/pingsender_route_lives_in_our_file.test.mjs#the only child the pingsender road starts is started by our runAsync"
  },
  {
   "file": "toolkit/components/telemetry/moz.build",

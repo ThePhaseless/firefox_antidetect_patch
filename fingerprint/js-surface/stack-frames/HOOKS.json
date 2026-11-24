@@ -14,7 +14,7 @@
   "form": "wrap-call",
   "line": "        roots, StealthUnwrapVisibleFrame(cx, principals, stack,  // STEALTH-HOOK(fingerprint/js-surface/stack-frames)",
   "removed": "        roots, UnwrapSavedFrame(cx, principals, stack,",
-  "test": ""
+  "test": "gtest:StealthStackFrames.JugglersFrameIsNotInTheStackAPageReads"
  },
  {
   "file": "js/src/vm/SavedStacks.cpp",
@@ -23,7 +23,7 @@
   "form": "wrap-call",
   "line": "      nextFrame = StealthFirstVisibleFrame(cx, principals, parent,  // STEALTH-HOOK(fingerprint/js-surface/stack-frames)",
   "removed": "      nextFrame = js::GetFirstSubsumedFrame(cx, principals, parent,",
-  "test": ""
+  "test": "gtest:StealthStackFrames.JugglersFrameIsNotInTheStackAPageReads"
  },
  {
   "file": "js/src/vm/SavedStacks.cpp",
@@ -32,6 +32,6 @@
   "form": "wrap-expression",
   "line": "          if (!FormatV8StackFrame(cx, sb, frame, indent, StealthIsLastFrame(!nextFrame))) {  // STEALTH-HOOK(fingerprint/js-surface/stack-frames)",
   "removed": "          if (!FormatV8StackFrame(cx, sb, frame, indent, !nextFrame)) {",
-  "test": ""
+  "test": "gtest:StealthStackFrames.TheV8FormatKeepsTheNewlineOfTheLastShownFrameWhenJugglersFramesEndTheStack"
  }
 ]

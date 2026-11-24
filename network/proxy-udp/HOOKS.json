@@ -14,7 +14,7 @@
   "form": "wrap-expression",
   "line": "  auto proxyConfig = StealthProxyConfigOf(mWindow.get(), mForceProxy, GetProxyConfig());  // STEALTH-HOOK(network/proxy-udp)",
   "removed": "  auto proxyConfig = GetProxyConfig();",
-  "test": ""
+  "test": "gtest:StealthPcProxyConfig.AWindowWithoutAConfigGetsTheConfigOfItsPrincipalAndItsContext"
  },
  {
   "file": "dom/media/webrtc/transport/ipc/WebrtcTCPSocket.cpp",
@@ -30,9 +30,9 @@
   "kind": "add",
   "form": "anchor",
   "line": "  if (StealthSwapTcpLookupChannel(this, channel, &rv)) return rv;  // STEALTH-HOOK(network/proxy-udp)",
-  "test": "",
-  "anchor": "",
-  "why": ""
+  "test": "node:juggler/tests/a_tcp_socket_of_a_peer_connection_is_refused_when_its_proxy_lookup_fails.test.mjs#the channel of the proxy lookup that the swap drops is never opened, and both lookups swap through one function",
+  "anchor": "the check of Mozilla's `rv = NS_NewChannel(getter_AddRefs(channel), mURI, ...)`: `if (NS_WARN_IF(NS_FAILED(rv))) { return rv; }`",
+  "why": "the guard swaps the channel Mozilla just created for the one built from the proxy config's load info, and returns its failure; `channel` and `rv` are Mozilla's locals and the swap needs both; Mozilla's NS_NewChannel and AsyncResolve stay as on the base, with their own flags"
  },
  {
   "file": "dom/media/webrtc/transport/ipc/WebrtcTCPSocket.cpp",
@@ -87,7 +87,7 @@
   "form": "wrap-expression",
   "line": "    : mPrivate(net::StealthPcUdpProxyOf(aProxyConfig, new Private({aProxyConfig}))) {}  // STEALTH-HOOK(network/proxy-udp)",
   "removed": "    : mPrivate(new Private({aProxyConfig})) {}",
-  "test": ""
+  "test": "gtest:StealthPcUdpProxyKinds.ASocks5ProxyMeasuredCoherentIsTheRoadOfTheUdpWithItsCredentials"
  },
  {
   "file": "dom/media/webrtc/transport/nr_socket_proxy_config.cpp",
@@ -379,7 +379,7 @@
   "kind": "add",
   "form": "registration",
   "line": "  async StealthProxyLookupLoadInfo(LoadInfoArgs? aLoadInfo);  // STEALTH-HOOK(network/proxy-udp)",
-  "test": ""
+  "test": "gtest:TestStealthLookupLoadInfo.EachConstructorTakesTheMessageSentRightBeforeIt"
  },
  {
   "file": "netwerk/ipc/PSocketProcess.ipdl",
@@ -387,7 +387,7 @@
   "kind": "add",
   "form": "registration",
   "line": "  async StealthProxyLookupOrigin(OriginAttributes? aOriginAttributes);  // STEALTH-HOOK(network/doh)",
-  "test": ""
+  "test": "gtest:TestStealthTRRContext.EachConstructorTakesTheMessageSentRightBeforeIt"
  },
  {
   "file": "netwerk/ipc/PSocketProcess.ipdl",
@@ -419,7 +419,7 @@
   "kind": "add",
   "form": "notice",
   "line": "  StealthEnterLookupLoadInfo();  // STEALTH-HOOK(network/proxy-udp)",
-  "test": ""
+  "test": "gtest:TestStealthLookupLoadInfo.TheLoadInfoOfALookupIsNotTheNextOnes"
  },
  {
   "file": "netwerk/ipc/ProxyConfigLookup.cpp",
@@ -427,7 +427,7 @@
   "kind": "add",
   "form": "notice",
   "line": "  StealthEnterTRRLookupContext();  // STEALTH-HOOK(network/doh)",
-  "test": ""
+  "test": "gtest:TestStealthTRRContext.TheContextOfALookupIsNotTheNextOnes"
  },
  {
   "file": "netwerk/ipc/ProxyConfigLookup.cpp",
@@ -435,9 +435,9 @@
   "kind": "add",
   "form": "anchor",
   "line": "  if (StealthSwapLookupChannel(mURI, mProxyResolveFlags, channel, &rv)) return rv;  // STEALTH-HOOK(network/proxy-udp)",
-  "test": "",
-  "anchor": "",
-  "why": ""
+  "test": "gtest:TestStealthLookupLoadInfo.TheStandInChannelIsMadeFromTheLoadInfoOfTheLookup",
+  "anchor": "the check of Mozilla's `rv = NS_NewChannel(getter_AddRefs(channel), mURI, ...)`: `if (NS_FAILED(rv)) { return rv; }`",
+  "why": "swaps the channel for the one made from the load info of the lookup and returns its failure; `channel` and `rv` are Mozilla's locals, and Mozilla's NS_NewChannel call stays whole, with no ternary arm"
  },
  {
   "file": "netwerk/ipc/ProxyConfigLookup.cpp",
@@ -445,9 +445,9 @@
   "kind": "add",
   "form": "anchor",
   "line": "  if (StealthApplyTRRLookupContext(channel, &rv)) return rv;  // STEALTH-HOOK(network/doh)",
-  "test": "",
-  "anchor": "",
-  "why": ""
+  "test": "gtest:TestStealthTRRContext.TheStandInChannelTakesTheActiveContextOfTheLookup",
+  "anchor": "the check of Mozilla's `rv = NS_NewChannel(getter_AddRefs(channel), mURI, ...)`: `if (NS_FAILED(rv)) { return rv; }`, after the line of the swap",
+  "why": "applies the DoH context to the channel and returns its failure; `channel` and `rv` are Mozilla's locals, so the line can only follow Mozilla's own check of the channel creation, and Mozilla's NS_NewChannel call stays whole"
  },
  {
   "file": "netwerk/ipc/ProxyConfigLookupChild.cpp",
@@ -455,7 +455,7 @@
   "kind": "add",
   "form": "registration",
   "line": "#include \"mozilla/net/StealthDocumentChannel.h\"  // STEALTH-HOOK(network/proxy-udp)",
-  "test": ""
+  "test": "gtest:TestStealthLookupLoadInfo.EachConstructorTakesTheMessageSentRightBeforeIt"
  },
  {
   "file": "netwerk/ipc/ProxyConfigLookupChild.cpp",
@@ -463,7 +463,7 @@
   "kind": "add",
   "form": "registration",
   "line": "#include \"mozilla/net/StealthTRRContext.h\"  // STEALTH-HOOK(network/doh)",
-  "test": ""
+  "test": "gtest:TestStealthTRRContext.EachConstructorTakesTheMessageSentRightBeforeIt"
  },
  {
   "file": "netwerk/ipc/ProxyConfigLookupChild.cpp",
@@ -471,9 +471,9 @@
   "kind": "add",
   "form": "anchor",
   "line": "  StealthSendLookupLoadInfo(socketChild);  // STEALTH-HOOK(network/proxy-udp)",
-  "test": "",
-  "anchor": "",
-  "why": ""
+  "test": "gtest:TestStealthLookupLoadInfo.EachConstructorTakesTheMessageSentRightBeforeIt",
+  "anchor": "the construction of Mozilla's `RefPtr<ProxyConfigLookupChild> child = new ProxyConfigLookupChild(std::move(aCallback));`, right before `return socketChild->SendPProxyConfigLookupConstructor(`",
+  "why": "the message is sent on the one path that sends the constructor, in the posting order the receiver relies on, so it sits on the line before the constructor and after Mozilla's check of `socketChild`, a local of Mozilla's function; a guard at the head would send it on the paths that return before the constructor"
  },
  {
   "file": "netwerk/ipc/ProxyConfigLookupChild.cpp",
@@ -481,9 +481,9 @@
   "kind": "add",
   "form": "anchor",
   "line": "  StealthSendTRRLookupContext(socketChild);  // STEALTH-HOOK(network/doh)",
-  "test": "",
-  "anchor": "",
-  "why": ""
+  "test": "gtest:TestStealthTRRContext.EachConstructorTakesTheMessageSentRightBeforeIt",
+  "anchor": "the construction of Mozilla's `RefPtr<ProxyConfigLookupChild> child = new ProxyConfigLookupChild(std::move(aCallback));`, right before `return socketChild->SendPProxyConfigLookupConstructor(`",
+  "why": "the message is sent on the one path that sends the constructor, in the posting order the receiver relies on, so it sits on the line before the constructor and after Mozilla's check of `socketChild`, a local of Mozilla's function; a guard at the head would send it on the paths that return before the constructor"
  },
  {
   "file": "netwerk/ipc/SocketProcessChild.h",
@@ -499,7 +499,7 @@
   "kind": "add",
   "form": "registration",
   "line": "#include \"mozilla/net/StealthDocumentChannel.h\"  // STEALTH-HOOK(network/proxy-udp)",
-  "test": ""
+  "test": "gtest:TestStealthLookupLoadInfo.WithoutItsMessageAConstructorHasNoLoadInfo"
  },
  {
   "file": "netwerk/ipc/SocketProcessParent.cpp",
@@ -507,7 +507,7 @@
   "kind": "add",
   "form": "registration",
   "line": "#include \"mozilla/net/StealthTRRContext.h\"  // STEALTH-HOOK(network/doh)",
-  "test": ""
+  "test": "gtest:TestStealthTRRContext.WithoutItsMessageAConstructorHasNoContext"
  },
  {
   "file": "netwerk/ipc/SocketProcessParent.cpp",
@@ -515,7 +515,7 @@
   "kind": "add",
   "form": "notice",
   "line": "  StealthTakeParkedLookupLoadInfo(this);  // STEALTH-HOOK(network/proxy-udp)",
-  "test": ""
+  "test": "gtest:TestStealthLookupLoadInfo.WithoutItsMessageAConstructorHasNoLoadInfo"
  },
  {
   "file": "netwerk/ipc/SocketProcessParent.cpp",
@@ -523,7 +523,7 @@
   "kind": "add",
   "form": "notice",
   "line": "  StealthTakeParkedTRRLookupContext(this);  // STEALTH-HOOK(network/doh)",
-  "test": ""
+  "test": "gtest:TestStealthTRRContext.WithoutItsMessageAConstructorHasNoContext"
  },
  {
   "file": "netwerk/ipc/SocketProcessParent.h",
@@ -531,7 +531,7 @@
   "kind": "add",
   "form": "member",
   "line": "  mozilla::ipc::IPCResult RecvStealthProxyLookupLoadInfo(const Maybe<LoadInfoArgs>& aLoadInfo);  // STEALTH-HOOK(network/proxy-udp)",
-  "test": ""
+  "test": "gtest:TestStealthLookupLoadInfo.EachConstructorTakesTheMessageSentRightBeforeIt"
  },
  {
   "file": "netwerk/ipc/SocketProcessParent.h",
@@ -539,7 +539,7 @@
   "kind": "add",
   "form": "member",
   "line": "  mozilla::ipc::IPCResult RecvStealthProxyLookupOrigin(const Maybe<OriginAttributes>& aOriginAttributes);  // STEALTH-HOOK(network/doh)",
-  "test": ""
+  "test": "gtest:TestStealthTRRContext.EachConstructorTakesTheMessageSentRightBeforeIt"
  },
  {
   "file": "netwerk/ipc/moz.build",
@@ -723,7 +723,7 @@
   "form": "wrap-expression",
   "line": "    status = StealthHopConnect(this, fd->lower->methods->connect)(fd->lower, &prProxy, mTimeout);  // STEALTH-HOOK(network/ipv6-literal)",
   "removed": "    status = fd->lower->methods->connect(fd->lower, &prProxy, mTimeout);",
-  "test": ""
+  "test": "gtest:StealthDeclaredNetwork.AnIPv4MappedAddressIsLeftAloneBehindAProxyAndOnTheProxyHop"
  },
  {
   "file": "netwerk/socket/nsSOCKSIOLayer.cpp",

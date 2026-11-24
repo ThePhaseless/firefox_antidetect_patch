@@ -158,9 +158,9 @@
   "kind": "add",
   "form": "anchor",
   "line": "  StealthSetTRRLookupContext(this);  // STEALTH-HOOK(network/doh)",
-  "test": "",
-  "anchor": "",
-  "why": ""
+  "test": "gtest:TestStealthTRRContext.TheContextOfAChannelIsTheContextOfItsLoadInfo",
+  "anchor": "Mozilla's `nsCOMPtr<nsICancelable> proxyRequest;` in ResolveProxy, right before `ProxyConfigLookup::Create(`",
+  "why": "the context is set on the statement before Mozilla's call of ProxyConfigLookup::Create, whose first statement takes it; at the head of ResolveProxy it would also be set on the paths that return before the lookup, and nothing would take it there"
  },
  {
   "file": "netwerk/protocol/http/TRRServiceChannel.cpp",

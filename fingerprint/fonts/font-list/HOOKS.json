@@ -73,7 +73,7 @@
   "form": "wrap-call",
   "line": "    StealthAppendFamiliesFromCollection(mSystemFonts, families, &forceClassicFams);  // STEALTH-HOOK(fingerprint/fonts/font-list)",
   "removed": "    AppendFamiliesFromCollection(mSystemFonts, families, &forceClassicFams);",
-  "test": ""
+  "test": "wrapper:tests/test_the_font_list_is_the_bundle_e2e.py::test_the_font_list_is_the_bundle_and_nothing_else"
  },
  {
   "file": "gfx/thebes/gfxDWriteFontList.cpp",
@@ -82,7 +82,7 @@
   "form": "wrap-expression",
   "line": "    if (StealthBundledFontsApply(this, mBundledFonts)) {  // STEALTH-HOOK(fingerprint/fonts/font-list)",
   "removed": "    if (mBundledFonts) {",
-  "test": ""
+  "test": "gtest:StealthFontListHooks.BundledFontsApply"
  },
  {
   "file": "gfx/thebes/gfxDWriteFontList.cpp",

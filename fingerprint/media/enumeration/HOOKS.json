@@ -49,7 +49,7 @@
   "kind": "add",
   "form": "wrap-expression",
   "line": "          StealthDeclaredEnumeration(  // STEALTH-HOOK(fingerprint/media/enumeration)",
-  "test": ""
+  "test": "gtest:StealthMediaEnumeration.WithADeclarationTheCallbackRunsLaterWithTheSameValue"
  },
  {
   "file": "dom/media/MediaManager.cpp",
@@ -58,6 +58,6 @@
   "form": "wrap-expression",
   "line": "          }),  // STEALTH-HOOK(fingerprint/media/enumeration)",
   "removed": "          },",
-  "test": ""
+  "test": "gtest:StealthMediaEnumeration.WithADeclarationTheCallbackRunsLaterWithTheSameValue"
  }
 ]

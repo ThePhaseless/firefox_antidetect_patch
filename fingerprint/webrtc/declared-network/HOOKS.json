@@ -38,7 +38,7 @@
   "form": "wrap-expression",
   "line": "    if (StealthMdnsResponderWanted(!addrstring.empty())) {  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
   "removed": "    if (!addrstring.empty()) {",
-  "test": ""
+  "test": "gtest:StealthDeclaredNetwork.TheResponderStartsOnTheLoopbackWhateverListMozillaBuilt"
  },
  {
   "file": "dom/media/webrtc/transport/ipc/StunAddrsRequestParent.cpp",
@@ -47,7 +47,7 @@
   "form": "wrap-expression",
   "line": "    : mAddrsString(StealthMdnsInterfaces(aAddrsString)) {}  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
   "removed": "    : mAddrsString(aAddrsString) {}",
-  "test": ""
+  "test": "gtest:StealthDeclaredNetwork.TheResponderStartsOnTheLoopbackWhateverListMozillaBuilt"
  },
  {
   "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
@@ -63,7 +63,7 @@
   "kind": "add",
   "form": "registration",
   "line": "mod stealth_interface;  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
-  "test": ""
+  "test": "cargo:mdns_service::stealth_tests::stealth_responder_on_the_loopback_hears_its_own_query"
  },
  {
   "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
@@ -71,7 +71,7 @@
   "kind": "add",
   "form": "unknown",
   "line": "        let stealth_if = addrs.first().copied();  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
-  "test": ""
+  "test": "cargo:mdns_service::stealth_tests::stealth_responder_on_the_loopback_hears_its_own_query"
  },
  {
   "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
@@ -79,9 +79,9 @@
   "kind": "add",
   "form": "anchor",
   "line": "        stealth_interface::set_multicast_if(&socket, stealth_if);  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
-  "test": "",
-  "anchor": "",
-  "why": ""
+  "test": "cargo:mdns_service::stealth_tests::stealth_responder_on_the_loopback_hears_its_own_query",
+  "anchor": "Mozilla's join loop `for addr in addrs { if let Err(err) = socket.join_multicast_v4(...) { warn!(...) } }`",
+  "why": "the call needs `socket` and `stealth_if`, locals of the constructor (the socket Mozilla has just configured and the first interface address taken before the loop); it follows the join loop so that the order of the two socket options is Mozilla's, and a guard at the head of the function has neither local"
  },
  {
   "file": "dom/media/webrtc/transport/moz.build",
