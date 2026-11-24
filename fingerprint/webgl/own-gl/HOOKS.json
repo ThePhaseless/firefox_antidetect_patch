@@ -9,7 +9,7 @@
  },
  {
   "file": "gfx/gl/GLContextProviderLinux.cpp",
-  "function": "already_AddRefed<GLContext> GLContextProviderLinux::CreateForCompositorWidget(",
+  "function": "already_AddRefed<GLContext> GLContextProviderLinux::CreateHeadless(",
   "kind": "add",
   "form": "guard",
   "line": "  if (StealthOwnGLRequired()) return StealthOwnGLCreateHeadless(desc, out_failureId);  // STEALTH-HOOK(fingerprint/webgl/own-gl)",
@@ -35,7 +35,7 @@
  },
  {
   "file": "gfx/gl/GLLibraryEGL.cpp",
-  "function": "std::shared_ptr<EglDisplay> GLLibraryEGL::CreateDisplay(",
+  "function": "std::shared_ptr<EglDisplay> GLLibraryEGL::CreateDisplayLocked(",
   "kind": "add",
   "form": "guard",
   "line": "  if (StealthOwnGLRequired()) return StealthOwnGLSurfacelessDisplay(*this, aProofOfLock);  // STEALTH-HOOK(fingerprint/webgl/own-gl)",

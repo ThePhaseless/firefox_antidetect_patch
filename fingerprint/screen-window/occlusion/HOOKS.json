@@ -9,7 +9,7 @@
  },
  {
   "file": "widget/gtk/nsWindow.cpp",
-  "function": "void nsWindow::DispatchPanGesture(PanGestureInput& aPanInput) {",
+  "function": "void nsWindow::OnVisibilityNotifyEvent(GdkVisibilityState aState) {",
   "kind": "rewrite",
   "form": "wrap-expression",
   "line": "  auto state = StealthOcclusionTracked(aState == GDK_VISIBILITY_FULLY_OBSCURED)  // STEALTH-HOOK(fingerprint/screen-window/occlusion)",

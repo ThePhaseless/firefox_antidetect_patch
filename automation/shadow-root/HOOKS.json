@@ -9,18 +9,19 @@
  },
  {
   "file": "dom/base/Element.cpp",
-  "function": "void Element::SetSlot(const nsAString& aName, ErrorResult& aError) {",
+  "function": "void Element::GetSlot(nsAString& aName) { GetAttr(nsGkAtoms::slot, aName); }",
   "kind": "rewrite",
   "form": "unknown",
   "line": "ShadowRoot* Element::GetShadowRootForBindings(nsIPrincipal& aSubject) const {  // STEALTH-HOOK(automation/shadow-root)",
   "removed": "ShadowRoot* Element::GetShadowRootForBindings() const {",
   "test": "wrapper:tests/test_ua_widget_not_selectable.py::test_an_author_closed_shadow_root_is_still_reachable",
-  "exception": "a parameter of ours in a Mozilla signature: the getter needs the caller's principal and the design that moved it to a member behind BinaryName was refused (the closed-root/no-root timing ratio, which a page measures, would move)",
+  "exception": "a parameter of ours in a Mozilla signature: the getter needs the caller's principal and the design that moved it to a member behind BinaryName was refused (the closed-root/no-root timing ratio, which a page measures, would move) the binding layer (NeedsSubjectPrincipal) passes the caller's principal as an argument; a side state set before the getter would be read by every caller of GetShadowRoot, the timing ratio the pm refused.",
+  "reason_kind": "declaration",
   "pm": "approvato"
  },
  {
   "file": "dom/base/Element.cpp",
-  "function": "void Element::SetSlot(const nsAString& aName, ErrorResult& aError) {",
+  "function": "ShadowRoot* Element::GetShadowRootForBindings() const {",
   "kind": "rewrite",
   "form": "wrap-expression",
   "line": "    return StealthClosedShadowRootForBindings(this, aSubject, nullptr);  // STEALTH-HOOK(automation/shadow-root)",
@@ -35,7 +36,8 @@
   "line": "  ShadowRoot* GetShadowRootForBindings(nsIPrincipal& aSubject) const;  // STEALTH-HOOK(automation/shadow-root)",
   "removed": "  ShadowRoot* GetShadowRootForBindings() const;",
   "test": "wrapper:tests/test_ua_widget_not_selectable.py::test_an_author_closed_shadow_root_is_still_reachable",
-  "exception": "a parameter of ours in a Mozilla signature: the getter needs the caller's principal and the design that moved it to a member behind BinaryName was refused (the closed-root/no-root timing ratio, which a page measures, would move)",
+  "exception": "a parameter of ours in a Mozilla signature: the getter needs the caller's principal and the design that moved it to a member behind BinaryName was refused (the closed-root/no-root timing ratio, which a page measures, would move) the binding layer (NeedsSubjectPrincipal) passes the caller's principal as an argument; a side state set before the getter would be read by every caller of GetShadowRoot, the timing ratio the pm refused.",
+  "reason_kind": "declaration",
   "pm": "approvato"
  },
  {
@@ -46,7 +48,8 @@
   "line": "  [NeedsSubjectPrincipal, BinaryName=\"shadowRootForBindings\"]  // STEALTH-HOOK(automation/shadow-root)",
   "removed": "  [BinaryName=\"shadowRootForBindings\"]",
   "test": "wrapper:tests/test_ua_widget_not_selectable.py::test_an_author_closed_shadow_root_is_still_reachable",
-  "exception": "NeedsSubjectPrincipal on the existing attribute: the binding passes the caller's principal to the getter above",
+  "exception": "NeedsSubjectPrincipal on the existing attribute: the binding passes the caller's principal to the getter above the binding layer (NeedsSubjectPrincipal) passes the caller's principal as an argument; a side state set before the getter would be read by every caller of GetShadowRoot, the timing ratio the pm refused.",
+  "reason_kind": "declaration",
   "pm": "approvato"
  }
 ]

@@ -16,6 +16,7 @@
   "removed": "#ifdef XP_WIN",
   "test": "wrapper:tests/test_native_line_endings_are_windows_e2e.py::test_native_line_endings_are_windows",
   "exception": "G35, approved by the pm (PM-DECISIONS 22/11 morning): #ifdef XP_WIN becomes #if STEALTH_NATIVE_EOL_IS_CRLF (the CRLF branch also holds on Linux: toward Windows); as on the base one Mozilla line is rewritten (already counted by check 8) and the value depends on the platform, so it cannot be a literal on Mozilla's line",
+  "reason_kind": "macro",
   "pm": "approvato"
  },
  {

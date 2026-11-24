@@ -31,7 +31,8 @@
   "line": "                                 nsISynthesizedEventCallback* aCallback,",
   "removed": "                                 nsISynthesizedEventCallback* aCallback) {",
   "test": "wrapper:tests/test_input_is_born_before_the_page_sees_it_e2e.py::test_every_key_and_move_is_born_before_its_handler_runs",
-  "exception": "G35, approved in PM-DECISIONS (automation/input): aLatency is a parameter of ours in the signature of a Mozilla method; the C++ signature of an XPIDL method is generated from the IDL, so the IDL line and this one are one change; it is the interface that Juggler and the minimal driver use",
+  "exception": "G35, approved in PM-DECISIONS (automation/input): aLatency is a parameter of ours in the signature of a Mozilla method; the C++ signature of an XPIDL method is generated from the IDL, so the IDL line and this one are one change; it is the interface that Juggler and the minimal driver use the C++ signature is generated from the XPIDL line; a side state cannot change a generated signature.",
+  "reason_kind": "declaration",
   "pm": "approvato"
  },
  {
@@ -41,7 +42,8 @@
   "form": "unknown",
   "line": "                                 double aLatency) {  // STEALTH-HOOK(fingerprint/input/event-birth)",
   "test": "wrapper:tests/test_input_is_born_before_the_page_sees_it_e2e.py::test_every_key_and_move_is_born_before_its_handler_runs",
-  "exception": "G35, approved in PM-DECISIONS (automation/input): aLatency is a parameter of ours in the signature of a Mozilla method; the C++ signature of an XPIDL method is generated from the IDL, so the IDL line and this one are one change; it is the interface that Juggler and the minimal driver use",
+  "exception": "G35, approved in PM-DECISIONS (automation/input): aLatency is a parameter of ours in the signature of a Mozilla method; the C++ signature of an XPIDL method is generated from the IDL, so the IDL line and this one are one change; it is the interface that Juggler and the minimal driver use the C++ signature is generated from the XPIDL line; a side state cannot change a generated signature.",
+  "reason_kind": "declaration",
   "pm": "approvato"
  },
  {
@@ -56,7 +58,7 @@
  },
  {
   "file": "dom/base/nsDOMWindowUtils.cpp",
-  "function": "nsDOMWindowUtils::NodesFromRect(float aX, float aY, float aTopSize,",
+  "function": "static already_AddRefed<DataSourceSurface> CanvasToDataSourceSurface(",
   "kind": "rewrite",
   "form": "wrap-call",
   "line": "  SurfaceFromElementResult result = nsLayoutUtils::StealthSurfaceFromElementAsDrawn(aCanvas);  // STEALTH-HOOK(fingerprint/canvas/as-drawn)",
@@ -107,7 +109,8 @@
   "line": "                      [optional] in nsISynthesizedEventCallback aCallback,",
   "removed": "                      [optional] in nsISynthesizedEventCallback aCallback);",
   "test": "wrapper:tests/test_input_is_born_before_the_page_sees_it_e2e.py::test_every_key_and_move_is_born_before_its_handler_runs",
-  "exception": "G35, approved in PM-DECISIONS (automation/input): aLatency is a parameter of ours in the signature of a Mozilla method; the C++ signature of an XPIDL method is generated from the IDL, so the IDL line and this one are one change; it is the interface that Juggler and the minimal driver use",
+  "exception": "G35, approved in PM-DECISIONS (automation/input): aLatency is a parameter of ours in the signature of a Mozilla method; the C++ signature of an XPIDL method is generated from the IDL, so the IDL line and this one are one change; it is the interface that Juggler and the minimal driver use the C++ signature is generated from the XPIDL line; a side state cannot change a generated signature.",
+  "reason_kind": "declaration",
   "pm": "approvato"
  },
  {
@@ -117,7 +120,8 @@
   "form": "unknown",
   "line": "                      [optional] in double aLatency);  // STEALTH-HOOK(fingerprint/input/event-birth)",
   "test": "wrapper:tests/test_input_is_born_before_the_page_sees_it_e2e.py::test_every_key_and_move_is_born_before_its_handler_runs",
-  "exception": "G35, approved in PM-DECISIONS (automation/input): aLatency is a parameter of ours in the signature of a Mozilla method; the C++ signature of an XPIDL method is generated from the IDL, so the IDL line and this one are one change; it is the interface that Juggler and the minimal driver use",
+  "exception": "G35, approved in PM-DECISIONS (automation/input): aLatency is a parameter of ours in the signature of a Mozilla method; the C++ signature of an XPIDL method is generated from the IDL, so the IDL line and this one are one change; it is the interface that Juggler and the minimal driver use the C++ signature is generated from the XPIDL line; a side state cannot change a generated signature.",
+  "reason_kind": "declaration",
   "pm": "approvato"
  },
  {
