@@ -194,13 +194,41 @@ jobs:
           chmod +x "$EXE" 2>/dev/null || true
           echo "FF_EXE=$EXE" >> "$GITHUB_ENV"
           echo "located: $EXE"
+      # TESTS AND BINARY COME FROM THE SAME COMMIT (decision ci-09). The binary here is the build of build_run_id: this run's own (the gate of release.yml) or
+      # another's (gate-only.yml, republish.yml, the reuse gate), whose series commit is not the commit pushed. The series tests below are therefore taken at
+      # the series commit the build recorded (series-commit.txt of its artifact source-commit, else the head_sha of its run); for this run's own build that
+      # commit is the pushed one and binary_series.py fails on a difference. The first checkout is only the script that resolves it.
+      - name: The CI code that resolves the binary's series commit (the pushed commit)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ github.sha }}
+          path: engine-ci
+          fetch-depth: 1
+          sparse-checkout: /platform/ci/src/scripts/ci/binary_series.py
+          sparse-checkout-cone-mode: false
+      - name: The series commit the build recorded
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: source-commit
+          path: source-commit
+          run-id: ${{ inputs.build_run_id }}
+          github-token: ${{ inputs.build_run_id != github.run_id && github.token || '' }}
+      - name: The series commit of the binary (this run's own is proved equal to the pushed commit)
+        id: binary
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_RUN_ID: ${{ inputs.build_run_id }}
+        run: python engine-ci/platform/ci/src/scripts/ci/binary_series.py run --repo "$GITHUB_REPOSITORY" --run-id "$BUILD_RUN_ID" --source-commit-dir source-commit --own-run-id "$GITHUB_RUN_ID" --own-sha "$GITHUB_SHA" --github-output "$GITHUB_OUTPUT"
       # THE SECURITY STATE THE CORE DECLARES COMES FROM ITS FILES AND FROM NOWHERE ELSE, ON THIS BINARY. A retail Firefox syncs three collections of
       # the Remote Settings bucket security-state (the intermediate certificates, the CRLite filters and OneCRL) into <profile>/security_state/. The
       # engine is a full Firefox, but RemoteSecuritySettings.init() creates none of the three clients (the hook asks ownsSync()), so it never syncs
       # them: the core fetches the data once, and the engine, launched headless and offline on a work profile with
       # zoom.stealth.securitystate.generate and the three file prefs, writes them into cert_storage, writes securitystate-result.json and quits; a normal
       # launch imports nothing and finds the copied folder. Two tests, both on this binary, both written in the series (stillborn/security-state), so the
-      # series is checked out at the commit under test. The first is `firefox -xpcshell` (the package has the shell, not the xpcshell harness), driven by a
+      # series is checked out at the commit the binary was built from. The first is `firefox -xpcshell` (the package has the shell, not the xpcshell harness), driven by a
       # script that makes a root and its intermediates and leaves on every run and reads Mozilla's CRLite test data from a file of the test folder: it
       # asks that generating from the declared files gives the same filter and delta bytes and the same answers (OneCRL, CRLite in the full filter and in a
       # delta, a preloaded intermediate), that a copied folder is used without a rewrite, that a failure says which collection and exits 1, that a
@@ -209,11 +237,11 @@ jobs:
       # under profile-after-change. The second launches the real thing, `firefox -headless -no-remote -profile <p>` as the core does, with the folders
       # of the process redirected: exit 0 and ok, the engine's version and BuildID, the hashes, the bytes of security_state/, no window, nothing printed,
       # no connection, no file outside the profile, and 66 deltas (the real list size) with the quit after the end.
-      - name: Checkout the series (the tests of the declared security state live in it)
+      - name: Checkout the series at the binary's commit (the tests of the declared security state live in it)
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           repository: ${{ github.repository }}
-          ref: ${{ github.sha }}
+          ref: ${{ steps.binary.outputs.series_commit }}
           path: engine-series
           sparse-checkout: stillborn/security-state/src/security/manager/ssl/stealth/test
           fetch-depth: 1

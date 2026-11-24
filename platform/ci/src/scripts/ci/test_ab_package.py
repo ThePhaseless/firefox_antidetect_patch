@@ -420,9 +420,10 @@ def test_an_explicit_published_tag_wins_and_the_resolver_runs_only_when_it_is_em
     assert gate["jobs"]["package-ab"]["with"]["published_tag"] == "${{ inputs.published_tag }}"
     assert (gate.get(True) or gate["on"])["workflow_call"]["inputs"]["published_tag"]["default"] == ""
     # every call of the resolver has the token and the checkout that holds the script
+    # (xpcshell.yml's main job takes it from engine-ci, the pushed commit's CI code, because its engine-series is the series at the binary's commit)
     for name in ("package-ab.yml", "xpcshell.yml"):
         text = (WORKFLOWS / name).read_text(encoding="utf-8")
-        assert text.count("engine-series/platform/ci/src/scripts/ci/published_release.py") == text.count("published_release.py --repo")
+        assert text.count("engine-series/platform/ci/src/scripts/ci/published_release.py") + text.count("engine-ci/platform/ci/src/scripts/ci/published_release.py") == text.count("published_release.py --repo")
     assert (WORKFLOWS / "xpcshell.yml").read_text(encoding="utf-8").count("/platform/ci/src/scripts/ci/published_release.py\n") == 2
 
 
@@ -757,6 +758,156 @@ def test_a_push_or_a_dispatch_with_no_run_takes_the_archives_of_the_latest_publi
     assert cand_rel[0]["if"] == "env.PREFS_CAND_TAG != ''" and "art-cand" in cand_rel[0]["run"] and "verify-asset --dir art-cand" in cand_rel[0]["run"]
     assert "verify-asset --dir art-pub" in base_rel[0]["run"] and "if" not in base_rel[0]
     assert ps.index(resolver[0]) < ps.index(cand_rel[0]) and ps.index(resolver[0]) < ps.index(base_rel[0])
+
+
+# ---------------------------------------------------------------- RULE (decision ci-09, "tests and binary come from the same commit"), over every workflow
+#
+# A job that takes an engine binary it did not build in this run (the archives of a release; the asset-* artifacts, or the dist/bin of a gtest build, of a run whose
+# id is given: another run's build, which the gate and the republish reuse) and runs tests of the engine's behaviour from the series must take those tests at the
+# series commit the binary was built from: the seal's series_commit of a release, the series-commit.txt its build recorded (else the head_sha of its run) of a run,
+# never the branch head that was pushed. It says so in one of two ways: a checkout of the series whose `ref` is the `series_commit` output of an earlier step that
+# resolves it from the binary (scripts/ci/binary_series.py), or a step that compares the binary's series commit with github.sha and fails on a difference. A job
+# that runs no test of the series on the binary is declared below, with its reason; the declaration is checked too (the job exists and still takes such a binary).
+COMMIT_RULE_DECLARED = {
+    "package-ab.yml::package-ab": "comparator: two binaries compared by scripts/ci/ab_package.py (CI code of the pushed commit); the series is only the diff of sources that explains a change",
+    "xpcshell.yml::prefs": "comparator: the preferences of two binaries dumped and compared by CI code (xpcshell_run.py prefs, prefs_dump.js); no test of the series runs",
+    "gate.yml::wrapper-e2e": "the tests are the wrapper's, from its own repository at wrapper_ref (the pairing of a binary with a wrapper ref is the caller's: the refs are today's, the bytes are that run's)",
+    "verify-assets.yml::drive": "the test is the wrapper's drive gate, from its own repository, on a release's archive; no test of the series runs",
+    "publish.yml::publish": "publisher: it seals and uploads the build's archives with the build's own series-commit.txt and runs no test on the binary",
+}
+BINARY_ARTIFACT = re.compile(r"(?<![\w-])(?:asset|gtest-bin)-")
+BINARY_ARCHIVE = re.compile(r"stealth|\*\.tar\.gz|\*\.zip")
+SERIES_REF = re.compile(r"\$\{\{\s*steps\.([\w-]+)\.outputs\.series_commit\s*\}\}")
+
+
+def takes_a_binary_it_did_not_build(job) -> bool:
+    """True when a step downloads an engine binary of a release or of a run named by id (a download-artifact with a run-id on an asset-* or gtest-bin-* artifact,
+    `gh release download` of the archives, or the API of a run's artifacts for asset-*). A release's seal or series-commit.txt alone is not a binary."""
+    for step in job.get("steps") or []:
+        uses, with_, run = str(step.get("uses", "")), step.get("with") or {}, str(step.get("run", ""))
+        if uses.startswith("actions/download-artifact") and "run-id" in with_ and BINARY_ARTIFACT.search(str(with_.get("name") or with_.get("pattern") or "")):
+            return True
+        if "gh release download" in run and BINARY_ARCHIVE.search(run):
+            return True
+        if "actions/runs/" in run and "artifacts?name=asset-" in run:
+            return True
+    return False
+
+
+def takes_its_tests_at_the_series_commit_of_the_binary(job) -> bool:
+    steps = job.get("steps") or []
+    by_id = {step["id"]: i for i, step in enumerate(steps) if step.get("id")}
+    for i, step in enumerate(steps):
+        if str(step.get("uses", "")).startswith("actions/checkout"):
+            match = SERIES_REF.fullmatch(str((step.get("with") or {}).get("ref", "")).strip())
+            if match and by_id.get(match.group(1), len(steps)) < i and "binary_series.py" in str(steps[by_id[match.group(1)]].get("run", "")):
+                return True
+        run = str(step.get("run", ""))
+        if re.search(r"series", run, re.I) and ("$GITHUB_SHA" in run or "github.sha" in run) and ("seal" in run or "series-commit" in run) and "exit 1" in run:
+            return True
+    return False
+
+
+def jobs_that_break_the_commit_rule(docs, declared=COMMIT_RULE_DECLARED) -> list:
+    """The `file::job` of every job that takes a binary it did not build and neither takes its tests at the binary's series commit nor is declared; plus every
+    declaration that names a job that is not there or no longer takes such a binary."""
+    bad, seen = [], set()
+    for name, doc in sorted(docs.items()):
+        for job_id, job in sorted(((doc or {}).get("jobs") or {}).items()):
+            key = "%s::%s" % (name, job_id)
+            if not isinstance(job, dict) or not takes_a_binary_it_did_not_build(job):
+                continue
+            seen.add(key)
+            if key not in declared and not takes_its_tests_at_the_series_commit_of_the_binary(job):
+                bad.append(key)
+    bad += ["%s (declared, but it is not a job that takes such a binary)" % key for key in sorted(set(declared) - seen)]
+    return bad
+
+
+def test_tests_and_binary_come_from_the_same_commit():
+    """RULE (ci-09): every job that downloads a binary of another run or of a release checks out the tests at that binary's series commit (or proves the two commits
+    equal), or is a declared comparator, publisher or job whose tests are not the series'. The push mode of xpcshell.yml ran the series' tests of today against
+    firefox-69 (an English console message against an Italian one): red on a test, not on the engine."""
+    docs = {path.name: _workflow(path.name) for path in sorted(WORKFLOWS.glob("*.y*ml"))}
+    assert jobs_that_break_the_commit_rule(docs) == []
+    # the two jobs that run the series' tests on such a binary read them from the checkout at the binary's commit, and nothing else puts the pushed commit there
+    for name, job_id in (("gate.yml", "gate"), ("xpcshell.yml", "xpcshell")):
+        steps = docs[name]["jobs"][job_id]["steps"]
+        series = [s for s in steps if str(s.get("uses", "")).startswith("actions/checkout") and (s["with"].get("path") == "engine-series")]
+        assert len(series) == 1 and SERIES_REF.fullmatch(series[0]["with"]["ref"]), (name, series)
+        resolve = [s for s in steps if s.get("id") == "binary"]
+        assert len(resolve) == 1 and "binary_series.py" in resolve[0]["run"] and '--own-run-id "$GITHUB_RUN_ID" --own-sha "$GITHUB_SHA"' in resolve[0]["run"], name
+    xp_resolve = [s for s in docs["xpcshell.yml"]["jobs"]["xpcshell"]["steps"] if s.get("id") == "binary"][0]["run"]
+    assert '"$RESOLVE" seal --dir art' in xp_resolve and '"$RESOLVE" run --repo' in xp_resolve  # a release's seal, or a run's build
+
+
+def test_the_commit_rule_finds_a_job_that_takes_a_binary_and_its_tests_from_the_pushed_commit_and_lets_the_others_through():
+    def job(*steps):
+        return {"jobs": {"j": {"steps": list(steps)}}}
+    artifact = {"uses": "actions/download-artifact@x", "with": {"name": "asset-${{ matrix.leg }}", "run-id": "${{ inputs.build_run_id }}"}}
+    release = {"run": 'gh release download "$TAG" --pattern seal.json --pattern "firefox-*-stealth-${{ matrix.leg }}.*" --dir art'}
+    pushed = {"uses": "actions/checkout@x", "with": {"ref": "${{ github.sha }}", "path": "engine-series"}}
+    resolve = {"id": "binary", "run": "python engine-ci/platform/ci/src/scripts/ci/binary_series.py seal --dir art --github-output \"$GITHUB_OUTPUT\""}
+    at_binary = {"uses": "actions/checkout@x", "with": {"ref": "${{ steps.binary.outputs.series_commit }}", "path": "engine-series"}}
+    compare = {"run": 'test "$SERIES_COMMIT" = "$GITHUB_SHA" || { echo "the seal names another series commit"; exit 1; }  # seal'}
+    for taken in (artifact, release):
+        assert jobs_that_break_the_commit_rule({"w.yml": job(taken, pushed)}, {}) == ["w.yml::j"]
+        assert jobs_that_break_the_commit_rule({"w.yml": job(taken, resolve, pushed)}, {}) == ["w.yml::j"]
+        assert jobs_that_break_the_commit_rule({"w.yml": job(at_binary, taken)}, {}) == ["w.yml::j"], "the commit is resolved after the checkout that uses it"
+        assert jobs_that_break_the_commit_rule({"w.yml": job(taken, {"id": "binary", "run": "echo series_commit=$X"}, at_binary)}, {}) == ["w.yml::j"], "an output that is not derived from the binary"
+        assert jobs_that_break_the_commit_rule({"w.yml": job(taken, resolve, at_binary)}, {}) == []
+        assert jobs_that_break_the_commit_rule({"w.yml": job(taken, compare)}, {}) == []
+        assert jobs_that_break_the_commit_rule({"w.yml": job(taken, pushed)}, {"w.yml::j": "declared"}) == []
+    # not a binary of another run or of a release: this run's own artifact (no run-id), a report, the seal alone
+    assert jobs_that_break_the_commit_rule({"w.yml": job({"uses": "actions/download-artifact@x", "with": {"name": "asset-linux"}}, pushed)}, {}) == []
+    assert jobs_that_break_the_commit_rule({"w.yml": job({"uses": "actions/download-artifact@x", "with": {"pattern": "gtest-reports-*", "run-id": "${{ inputs.r }}"}}, pushed)}, {}) == []
+    assert jobs_that_break_the_commit_rule({"w.yml": job({"run": 'gh release download "$T" --pattern series-commit.txt --pattern seal.json'}, pushed)}, {}) == []
+    # a declaration of a job that is not there, or that takes no such binary, is itself a failure
+    assert jobs_that_break_the_commit_rule({"w.yml": job(pushed)}, {"w.yml::j": "x", "gone.yml::k": "y"}) == [
+        "gone.yml::k (declared, but it is not a job that takes such a binary)", "w.yml::j (declared, but it is not a job that takes such a binary)"]
+
+
+def test_the_series_commit_of_a_binary_is_its_seal_s_or_its_build_s_and_a_run_s_own_is_proved_equal_to_the_pushed_commit():
+    import binary_series
+    one, two = "a" * 40, "b" * 40
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp = Path(tmp)
+        (tmp / "seal.json").write_text(json.dumps({"tag": "firefox-1", "series_commit": one}), encoding="utf-8")
+        assert binary_series.from_seal(tmp) == one
+        out = tmp / "out"
+        assert binary_series.main(["seal", "--dir", str(tmp), "--github-output", str(out), "--name", "series_commit"]) == 0 and out.read_text(encoding="utf-8") == "series_commit=%s\n" % one
+        for bad in ({"series_commit": "abc"}, {"tag": "x"}, "[]"):
+            (tmp / "seal.json").write_text(json.dumps(bad), encoding="utf-8")
+            try:
+                binary_series.from_seal(tmp)
+                raise AssertionError("a seal without a full series_commit was accepted: %r" % (bad,))
+            except binary_series.NoSeriesCommit:
+                pass
+        # a run: what its build recorded, else the head_sha of the run
+        rec = tmp / "source-commit"
+        rec.mkdir()
+        (rec / "series-commit.txt").write_text(two + "\n", encoding="utf-8")
+        assert binary_series.from_run("o/r", "7", rec) == two
+        real_run, calls = binary_series.subprocess.run, []
+        def fake(argv, **kw):
+            calls.append(argv)
+            return subprocess.CompletedProcess(argv, 0, stdout=one + "\n", stderr="")
+        binary_series.subprocess.run = fake
+        try:
+            assert binary_series.from_run("o/r", "8", tmp / "none") == one and calls[0][:3] == ["gh", "api", "repos/o/r/actions/runs/8"], calls
+            (rec / "series-commit.txt").write_text("", encoding="utf-8")
+            assert binary_series.from_run("o/r", "8", rec) == one
+            # this run's own build: equal to the pushed commit passes, another commit is an error; another run's is not compared
+            assert binary_series.from_run("o/r", "9", tmp / "none", own_run_id="9", own_sha=one) == one
+            for own_sha in (two, ""):
+                try:
+                    binary_series.from_run("o/r", "9", tmp / "none", own_run_id="9", own_sha=own_sha)
+                    raise AssertionError("the series commit of this run's own build differs from the pushed commit and it passed")
+                except binary_series.NoSeriesCommit:
+                    pass
+            assert binary_series.from_run("o/r", "8", tmp / "none", own_run_id="9", own_sha=two) == one
+        finally:
+            binary_series.subprocess.run = real_run
 
 
 # ---------------------------------------------------------------- the linkage: tiny PE and ELF files made here
