@@ -709,18 +709,52 @@ def _c17(text):
     return [v.detail for v in hc.analyse_namespaces(FOLDER, text)]
 
 
-def test_c17_a_stealth_function_never_goes_into_a_mozilla_namespace():
+def test_c17_a_stealth_function_never_lives_in_the_top_level_namespace_of_someone_else():
     for added, ns in (("  JS::StealthFoo(a, b);", "JS"), ("  js::StealthFoo(a, b);", "js"), ("  xpc::StealthFoo(a);", "xpc"),
-                      ("  mozilla::net::StealthFoo(a);", "net"), ("  gfx::StealthFoo(a);", "gfx"),
-                      ("  rv = mozilla::widget::StealthFoo();", "widget")):
+                      ("  rv = std::StealthFoo();", "std"), ("  webrtc::StealthFoo(a);", "webrtc"),
+                      ("  if (xpc::StealthFoo(a)) return;", "xpc")):
         got = _c17(top(added + MARK))
-        assert len(got) == 1 and ns in got[0], (added, got)
+        assert len(got) == 1 and ("namespace " + ns) in got[0], (added, got)
+    # ours: unqualified, mozilla and what is nested in it (written in full or relative to it), a class
     for added in ("  StealthFoo(a, b);", "  mozilla::StealthFoo(a, b);", "  mozilla::stealth::StealthFoo(a);",
-                  "  if (gfxPlatformFontList::StealthBundleOnly()) return;", "  nr_stealth_foo(a);"):
+                  "  mozilla::net::StealthFoo(a);", "  mozilla::dom::StealthFoo(a);", "  net::StealthFoo(a);", "  gfx::StealthFoo(a);",
+                  "  CanvasUtils::StealthFoo(a);", "  mozilla::CanvasUtils::StealthFoo(a);",
+                  "  if (gfxPlatformFontList::StealthBundleOnly()) return;", "  nsFoo::StealthBar(a);", "  nr_stealth_foo(a);"):
         assert _c17(top(added + MARK)) == [], added
     assert _c17(top('  #include "js::StealthFoo.h"' + MARK)) == []
+    assert _c17(top("  JS::StealthFoo(a);" + MARK, file="build/foo.rs")) == []          # C and C++ files only
     assert _c17(rewrite("  JS::Foo(a, b);", "  JS::StealthFoo(a, b);")) != []          # the rewrite G29 accepts is refused by C17
     assert _c17(rewrite("  JS::Foo(a, b);", "  mozilla::StealthFoo(a, b);")) == []
+
+
+def test_c17_an_unqualified_name_is_judged_where_our_sources_declare_it(tmp_path):
+    lines = ["#include <x>", "namespace mozilla {", "namespace net {", "bool StealthInMozilla(int a);", "}  // namespace net", "}",
+             "namespace xpc {", "bool StealthInXpc(JSContext* aCx);", "class C {", "  bool StealthMember() const;", "};", "}  // namespace xpc",
+             "bool StealthGlobal(int a);", "int StealthDefined(int a) { return 1; }",
+             "namespace JS {", "void StealthInJS() {", "  StealthCall(1);", "}", "}", "namespace {", "void StealthAnon();", "}"]
+    d = tmp_path / FOLDER / "src" / "dom"
+    d.mkdir(parents=True)
+    (d / "StealthX.h").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    (tmp_path / "SERIES").write_text(FOLDER + "\n", encoding="utf-8")
+    (tmp_path / FOLDER / "hooks.patch").write_text("", encoding="utf-8")
+    own = hc.own_function_namespaces(tmp_path)
+    assert own["StealthInMozilla"] == {"mozilla"} and own["StealthInXpc"] == {"xpc"} and own["StealthGlobal"] == {""}
+    assert own["StealthInJS"] == {"JS"} and "StealthCall" not in own and own["StealthAnon"] == {""}
+    assert "StealthMember" not in own                 # a member of a class is not a function of the namespace
+    assert own["StealthDefined"] == {""}
+    for name, bad in (("StealthInXpc", True), ("StealthInJS", True), ("StealthInMozilla", False), ("StealthGlobal", False),
+                      ("StealthAnon", False), ("StealthUnknown", False)):
+        got = [v.detail for v in hc.analyse_namespaces(FOLDER, top("  %s(a);" % name + MARK), own)]
+        assert bool(got) == bad, (name, got)
+        assert hc.analyse_namespaces(FOLDER, top("  %s(a);" % name + MARK)) == []          # without `own` an unqualified name is not judged
+    # the hook is in a `namespace xpc {` block of Mozilla's file: that alone says nothing (the call may reach ours through mozilla)
+    assert [v.rule for v in hc.analyse_namespaces(FOLDER, top("  StealthInMozilla(a);" + MARK), own)] == []
+
+
+def test_c17_the_namespace_stacks_read_the_braces_outside_comments_and_literals():
+    got = hc.namespace_stacks(["namespace a::b {", "void f() {", "  // } namespace", '  const char* s = "}";', "}", "}", "x;"])
+    assert got[1] == ["a", "b"] and got[2] == ["a", "b"] and got[4] == ["a", "b"] and got[6] == []
+    assert hc.namespace_stacks(["/* namespace q {", "*/ namespace z {", "int g;"])[2] == ["z"]
 
 
 def test_c17_is_in_the_contract_never_debt_and_a_backport_is_exempt(tmp_path):
