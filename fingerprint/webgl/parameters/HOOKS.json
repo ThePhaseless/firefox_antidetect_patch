@@ -21,9 +21,9 @@
   "kind": "add",
   "form": "anchor",
   "line": "  StealthWebGLProjectReaderSnapshot(*this, snapshot, any);  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
-  "test": "",
-  "anchor": "",
-  "why": ""
+  "test": "wrapper:tests/test_canvas_reads_as_drawn.py::test_a_non_premultiplied_webgl_canvas_reads_the_same_through_todataurl_and_toblob",
+  "anchor": "Mozilla's `if (!snapshot) return ...;` after `RefPtr<gfx::SourceSurface> snapshot = GetSurfaceSnapshot(&any);`",
+  "why": "replaces the surface Mozilla just obtained by the noise-projected one before Mozilla reads its data; `snapshot` is a local and `any` (the alpha type) is an out-parameter that the same GetSurfaceSnapshot call fills, so the initializer cannot be wrapped without passing `any`"
  },
  {
   "file": "dom/canvas/ClientWebGLContext.cpp",
@@ -31,9 +31,9 @@
   "kind": "add",
   "form": "anchor",
   "line": "  StealthWebGLProjectReaderSnapshot(*this, snapshot, any);  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
-  "test": "",
-  "anchor": "",
-  "why": ""
+  "test": "wrapper:tests/test_canvas_reads_as_drawn.py::test_a_non_premultiplied_webgl_canvas_reads_the_same_through_todataurl_and_toblob",
+  "anchor": "Mozilla's `if (!snapshot) return ...;` after `RefPtr<gfx::SourceSurface> snapshot = GetSurfaceSnapshot(&any);`",
+  "why": "replaces the surface Mozilla just obtained by the noise-projected one before Mozilla reads its data; `snapshot` is a local and `any` (the alpha type) is an out-parameter that the same GetSurfaceSnapshot call fills, so the initializer cannot be wrapped without passing `any`"
  },
  {
   "file": "dom/canvas/ClientWebGLContext.cpp",
@@ -41,7 +41,7 @@
   "kind": "add",
   "form": "guard",
   "line": "  if (StealthWebGLParameter(*this, cx, pname, retval, rv, debug)) return;  // STEALTH-HOOK(fingerprint/webgl/parameters)",
-  "test": ""
+  "test": "gtest:StealthWebGLParams.TheDeclaredRendererAndVendorAnswerTheirPnames"
  },
  {
   "file": "dom/canvas/ClientWebGLContext.cpp",
@@ -80,7 +80,7 @@
   "form": "wrap-call",
   "line": "    bool succeeded = StealthDoReadPixels(this, desc, *range);  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
   "removed": "    bool succeeded = DoReadPixels(desc, *range);",
-  "test": ""
+  "test": "wrapper:tests/test_webgl_noise_active.py::test_readpixels_of_a_partial_rectangle_projects_only_what_was_written"
  },
  {
   "file": "dom/canvas/ClientWebGLContext.cpp",
@@ -247,6 +247,6 @@
   "kind": "add",
   "form": "registration",
   "line": "UNIFIED_SOURCES += [\"TestStealthCanvasPageSnapshot.cpp\"]  # STEALTH-HOOK(fingerprint/canvas/text-metrics)",
-  "test": ""
+  "test": "gtest:StealthCanvasPageSnapshot.TheSnapshotOfTheContextIsNotTakenWhenItHasAnElement"
  }
 ]

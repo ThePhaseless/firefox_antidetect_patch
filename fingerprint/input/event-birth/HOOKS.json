@@ -111,7 +111,7 @@
   "kind": "add",
   "form": "registration",
   "line": "UNIFIED_SOURCES += [\"TestStealthCallerObject.cpp\"]  # STEALTH-HOOK(automation/hybrid-xrays)",
-  "test": ""
+  "test": "gtest:StealthCallerObject.ADecisionIsReadOnceAndAReadWithNoDecisionIsFalse"
  },
  {
   "file": "dom/base/test/gtest/moz.build",

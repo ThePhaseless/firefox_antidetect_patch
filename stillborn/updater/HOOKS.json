@@ -83,7 +83,7 @@
   "kind": "add",
   "form": "registration",
   "line": "import { StealthNoneOffered } from \"resource://gre/modules/StealthUpdate.sys.mjs\"; // STEALTH-HOOK(stillborn/updater)",
-  "test": ""
+  "test": "node:juggler/tests/updater_refuses_what_follows_the_check.test.mjs#whatever the answer offered, the check reports none"
  },
  {
   "file": "toolkit/mozapps/update/UpdateService.sys.mjs",
@@ -102,7 +102,7 @@
   "form": "wrap-expression",
   "line": "      updates = StealthNoneOffered(this.#parseUpdates(request)); // STEALTH-HOOK(stillborn/updater)",
   "removed": "      updates = this.#parseUpdates(request);",
-  "test": ""
+  "test": "node:juggler/tests/updater_refuses_what_follows_the_check.test.mjs#whatever the answer offered, the check reports none"
  },
  {
   "file": "toolkit/mozapps/update/moz.build",

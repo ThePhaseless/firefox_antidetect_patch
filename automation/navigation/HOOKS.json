@@ -41,7 +41,9 @@
   "kind": "add",
   "form": "unknown",
   "line": "  StealthNavigationLoad stealthLoad(this, aLoadState);  // STEALTH-HOOK(automation/navigation)",
-  "test": ""
+  "test": "node:juggler/tests/navigation_hook_runs_only_for_a_load_that_leaves_the_document.test.mjs#InternalLoad returns before the hook whenever sameDocument is still true, and nothing writes it after",
+  "anchor": "nsCOMPtr<nsIRequest> req; (in InternalLoad, before rv = DoURILoad(...))",
+  "why": "FIREFOX_159_0_RELEASE docshell/base/nsDocShell.cpp:8584 `bool sameDocument = ...` is its only declaration; its only writes are the by-reference argument of HandleSameDocumentNavigation at 8726-8727 (the callee sets it at 7971 and 7999); the block at 8725 returns at 8732-8741 whenever sameDocument is still true; no later line writes it; the hook sits before DoURILoad at 9002."
  },
  {
   "file": "docshell/base/nsDocShell.cpp",

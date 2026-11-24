@@ -33,7 +33,7 @@
   "form": "wrap-call",
   "line": "          StealthSetRealmLocaleOverride(  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
   "removed": "          JS::SetRealmLocaleOverride(",
-  "test": ""
+  "test": "wrapper:tests/test_context_locale_e2e.py::test_a_context_locale_reaches_navigator_intl_and_the_header"
  },
  {
   "file": "docshell/base/BrowsingContext.cpp",
@@ -120,7 +120,7 @@
   "form": "wrap-expression",
   "line": "  nsAtom* language = StealthDocumentCharsetLanguage(this, mozilla::intl::EncodingToLang::Lookup(mCharacterSet));  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
   "removed": "  nsAtom* language = mozilla::intl::EncodingToLang::Lookup(mCharacterSet);",
-  "test": ""
+  "test": "gtest:StealthDocumentLanguage.WithNoContextTheSessionsLanguageIsTheDocumentsOne"
  },
  {
   "file": "dom/base/Document.h",
@@ -144,7 +144,7 @@
   "kind": "add",
   "form": "registration",
   "line": "#include \"StealthExsltTime.h\"  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
-  "test": ""
+  "test": "node:juggler/tests/exslt_time_finds_the_source_document_as_the_file_does.test.mjs#ours finds the source document the way getSourceDocument does, and explodes in its zone"
  },
  {
   "file": "dom/xslt/xslt/txEXSLTFunctions.cpp",
@@ -153,7 +153,7 @@
   "form": "wrap-call",
   "line": "      StealthExplodeTime(aContext, time, timezone, &prtime);  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
   "removed": "      PR_ExplodeTime(time, timezone, &prtime);",
-  "test": ""
+  "test": "node:juggler/tests/exslt_time_finds_the_source_document_as_the_file_does.test.mjs#ours finds the source document the way getSourceDocument does, and explodes in its zone"
  },
  {
   "file": "js/xpconnect/src/nsXPConnect.cpp",
