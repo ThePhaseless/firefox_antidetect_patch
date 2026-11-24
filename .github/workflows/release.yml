@@ -167,8 +167,6 @@ jobs:
       - name: The source tree, the Mozilla tag with our series applied (tools/engine.py)
         shell: bash
         run: python3 .series/tools/engine.py materialize --into .
-      - name: The plan refuses what it must
-        run: python3 scripts/test_release_plan.py
       # The engine a candidate would become: the last published firefox-N plus one. The gate seals a candidate
       # firefox-N-candidate, and the wrapper's tests read N from the seal (scripts/release_plan.py says why).
       - name: The last published release
@@ -234,149 +232,37 @@ jobs:
       # names derived from the version the tree builds (never written here).
       - name: The legs and their asset names
         id: matrix
-        run: |
-          python3 scripts/ci/test_ci.py
-          # The SDK downloader's hook: run 41205185526 idled 5 hours on a
-          # download error the pool could not carry back.
-          python3 scripts/ci/test_stealth_download_watchdog.py
-          # The compile-only step's list of directories, its errors and its fallback to one directory at a time.
-          python3 scripts/ci/test_objects_first.py
-          # The build tools' hooks (python/mozbuild), through the host line of jar.py.
-          python3 scripts/ci/test_stealth_build_tools.py
-          echo "matrix=$(python3 scripts/ci matrix)" | tee -a "$GITHUB_OUTPUT"
+        run: echo "matrix=$(python3 scripts/ci matrix)" | tee -a "$GITHUB_OUTPUT"
 
-  # Everything that does not depend on the binary, BEFORE a node is turned on: a server is an hour paid whatever it does, and a run whose
-  # asset names disagree, whose Juggler's tests are red or whose release scripts do not refuse what they must, used to learn it on the node,
-  # minutes after it had been ordered (run 43156862361: «Juggler's tests without a browser», in the build, 7.9 minutes of a paid hour). The
-  # source tree is materialized here again, in parallel with `plan` (the node waits for both, and plan is as long): the cost is a GitHub runner's
-  # minutes and no later start. The last step is the guard that a newer push has not replaced this run (scripts/ci/still_head.py).
+  # Every check that guards main, BEFORE a node is turned on (a server is an hour paid whatever it does): checks.yml, the same file series.yml
+  # calls on every pull request and every push to main. Nothing is first run on main (docs/decisions/ci-07 of the series). It holds the series'
+  # rules, the proof that the series gives the declared tree, the births, the core's checks, the noreply identity, the plan's own tests and what does not
+  # read the binary (asset names, upstream source, build files, Juggler's tests, the release scripts). A candidate on a latitude/* branch, a push to
+  # main, the weekly run and a release all run it: no `if` skips it. The `plan` and this job start together; the node waits for both.
   checks:
-    name: checks
+    uses: ./.github/workflows/checks.yml
+    permissions: { contents: read }
+    with:
+      wrapper_ref: ${{ inputs.wrapper_ref || 'main' }}
+
+  # The guard that a newer push has not replaced this run (scripts/ci/still_head.py): after the checks, before the node, as the last step of
+  # `checks` used to be. It is here and not in checks.yml: it needs `actions: write` to cancel this very run (a called workflow cannot hold more
+  # permissions than its caller gives it, and this job is the only one that has them), the node must wait for it, and it means nothing for a pull request.
+  still-head:
+    name: still-head
+    needs: [checks]
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 10
     # `actions: write` to cancel this very run, and nothing else; no secret.
     permissions: { actions: write, contents: read }
     steps:
-      - name: The series (this repository, this commit)
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with: { path: .series, fetch-depth: 1 }
-      - name: The source tree, the Mozilla tag with our series applied (tools/engine.py)
-        shell: bash
-        run: python3 .series/tools/engine.py materialize --into .
-      # THE JUNIT OF OUR PYTHON TESTS OF THE TREE, for the named hook tests judge (`py:<path>::<name>`): the part `junitpart-py-checks` of the artifact
-      # `junit-py`, which the job `junit-py` puts together with the part of package-ab (the series' tools/tests). Ours only (scripts/ci/py_junit.py: the
-      # files the series adds, with something for pytest to collect), run from the tree's root so a classname is the path in the tree. First after the
-      # materialize, so that no later step that fails hides it; it does not change the verdict of this job (the judge is red for a named test that
-      # did not pass), and its upload runs whatever happened.
-      - name: Our python tests of the tree, as junit
-        continue-on-error: true
-        timeout-minutes: 8
-        shell: bash
-        run: |
-          mkdir -p junit-py/checks
-          python3 -m pip install --quiet pytest pyyaml fonttools==4.51.0
-          FILES="$(python3 scripts/ci/py_junit.py list --series .series --tree .)"
-          # The plan's own tests that hooks name (scripts/ci/ is left out of the list above): the plan runs them as plain scripts, its verdict; here they
-          # are the record, in this junit, and the `ran` step below covers them.
-          FILES="$FILES scripts/ci/test_stealth_build_tools.py scripts/ci/test_stealth_download_watchdog.py scripts/ci/test_objects_first.py scripts/test_release_plan.py"
-          python3 -m pytest $FILES -q -p no:cacheprovider -o addopts='' -o junit_family=xunit2 --rootdir=. --continue-on-collection-errors --junitxml=junit-py/checks/tree-tests.xml
-      # A junit with no test that ran (every case a collection error, or none) is a red step, here and not at the judge: nobody would read it from 200 lines
-      # of missing tests. Not continue-on-error; the upload below runs whatever this said. A test that failed ran, and its verdict is the judge's.
-      - name: The junit holds a test that ran
-        run: python3 scripts/ci/py_junit.py ran junit-py/checks/tree-tests.xml
-      - name: Keep the junit (the part of this job, junitpart-py-checks)
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: junitpart-py-checks
-          path: junit-py
-          if-no-files-found: ignore
-          retention-days: 14
-      # Cheapest gate in the pipeline, guarding the most expensive failure: the asset
-      # basename is hand-written in every matrix entry below and derived independently
-      # on the client side. When the two disagree CI publishes one name while the
-      # wrapper fetches another, so every download 404s while the build is green, the
-      # archives are valid and the release page looks correct (issue #14). Fail here in
-      # seconds instead of after five multi-hour builds.
-      - name: Check asset names match the version this tree builds
-        shell: bash
-        run: python3 scripts/check_release_naming.py
-
-      # The source the official build states (browser/config/upstream_source.txt,
-      # read by the .mozconfig) must be the retail's of the version this tree
-      # builds; a port that moves the base and leaves the file behind would
-      # write the previous release's changeset into application.ini. Seconds,
-      # here, before the build; --online also asks Mozilla's build record.
-      - name: Check the declared upstream source matches the version this tree builds
-        shell: bash
-        run: python3 scripts/check_upstream_source.py --online
-
-      # Our sources and our build files, read as text and in mozbuild's own sandbox: what a compiler or the backend finds only on the node, an
-      # hour in (build/stealth_check_sources.py, build/stealth_check_build_files.py). Neither needs an objdir. Before `node`: no machine is rented
-      # for a mozilla:: name that is not there or a source no build file lists.
-      - name: Our sources and our build files - the text checks
-        shell: bash
-        run: |
-          python3 build/stealth_check_sources.py
-          python3 build/stealth_check_build_files.py
-
-      # Juggler tested without a browser, seconds here before hours of build.
-      # The channel between its two halves: a request answered from another
-      # channel end's kept answers is never dispatched and nothing says so (a
-      # page's "main world created" was lost that way, B286). And where it loads
-      # from: never a chrome package, which a page probes by name, and every
-      # resource URL a file the build installs (wrapper issue #336).
-      - name: Juggler's tests without a browser
-        shell: bash
-        # The files, expanded by the shell: from Node 21 the arguments of
-        # --test are file patterns, and a directory is loaded as a module.
-        # One process and one junit per file, at junit-node/<tree path>.xml: the named hook tests judge (`hook-tests-judge`) reads which file
-        # each test is in from the name of the junit, whatever the reporter writes. Every file runs, and the step is red if any did.
-        run: |
-          rc=0
-          for f in juggler/tests/*.test.mjs; do
-            mkdir -p "junit-node/$(dirname "$f")"
-            node --test --test-reporter=spec --test-reporter-destination=stdout               --test-reporter=junit --test-reporter-destination="junit-node/$f.xml" "$f" || rc=1
-          done
-          exit "$rc"
-
-      # Every suite of the wrapper's list has its legs in the gate. The list (ci/required-suites.json) is the wrapper's and the matrix of the gate's
-      # `wrapper-e2e` job is written by hand: run 44834434976 learned that wrapper.e2e.fakeweb had no leg only from `wrapper-e2e-complete`, after the build.
-      - name: The wrapper's list of required suites has a leg in the gate for each
+      - name: The guard's script, from the series (this repository, this commit)
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
-          repository: oss-invisible/playwright
-          ref: ${{ inputs.wrapper_ref || 'main' }}
-          path: .wrapper
+          path: .series
           fetch-depth: 1
-          sparse-checkout: ci/required-suites.json
-      - name: Every suite of the list has its legs in gate.yml
-        shell: bash
-        run: python3 scripts/ci/gate_legs.py --required .wrapper/ci/required-suites.json
-
-      # The release scripts' own known-bad inputs: validate_release.py's
-      # retail-updater and no-juggler-name checks, and make_seal.py's refusals. A
-      # check that has only ever printed its OK line is not a gate.
-      - name: The release scripts refuse what they must
-        shell: bash
-        run: |
-          python3 scripts/validate_release.py --selftest
-          python3 scripts/test_make_seal.py
-          python3 scripts/test_check_upstream_source.py
-          python3 scripts/test_toolchain_parity.py
-          python3 scripts/test_upstream_toolchain.py
-          python3 scripts/test_memory_watch.py
-          python3 scripts/test_cpu_watch.py
-          python3 scripts/test_workflow_cache_rules.py
-      # The junit of Juggler's tests, for `hook-tests-judge`: a hook that names `node:<path>#<title>` is judged on it.
-      - name: Keep the junit of Juggler's tests
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: junit-node
-          path: junit-node
-          if-no-files-found: ignore
-          retention-days: 14
+          sparse-checkout: platform/ci/src/scripts/ci/still_head.py
+          sparse-checkout-cone-mode: false
       # A newer push to the branch has replaced this candidate (the rule is "a new push cancels the old run"; the `concurrency` above
       # cancels a run that a newer one finds in progress, this catches the one that was queued behind it). Cancelled HERE, before `node` starts:
       # the sleep keeps this job running until the cancel has landed, because a job that ended would let the node start. Exit 2 (the head could
@@ -392,7 +278,7 @@ jobs:
           RELAUNCH_OF: ${{ inputs.relaunch_of }}
         run: |
           set +e
-          python3 scripts/ci/still_head.py --event "$EVENT" --ref "$REF" --sha "$SHA" --kind "$KIND" --relaunch-of "$RELAUNCH_OF" --repository "$GITHUB_REPOSITORY"
+          python3 .series/platform/ci/src/scripts/ci/still_head.py --event "$EVENT" --ref "$REF" --sha "$SHA" --kind "$KIND" --relaunch-of "$RELAUNCH_OF" --repository "$GITHUB_REPOSITORY"
           CODE=$?
           if [ "$CODE" = 1 ]; then
             gh run cancel "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY"
@@ -435,7 +321,7 @@ jobs:
   # to hold to scripts/ci/legs.py.
   node:
     name: node
-    needs: [plan, checks]
+    needs: [plan, checks, still-head]
     # A rerun of failed jobs has no watch and no label to run on: nothing to turn on for it.
     if: needs.plan.outputs.attempt == github.run_attempt && needs.plan.outputs.reuse_run_id == ''
     runs-on: ubuntu-24.04

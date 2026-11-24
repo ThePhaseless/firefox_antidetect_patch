@@ -4,12 +4,12 @@ and a newer push replaces the old candidate (and never a release).
 
 Three things, each red on the workflow as it was:
 
-  * the job `checks`: asset names, declared upstream source, Juggler's tests without a browser and the release scripts' known-bad inputs. They used to run in
-    the build job, on the node, minutes after it had been ordered (run 43156862361: 7.9 minutes of a paid hour for «Juggler's tests without a browser»).
-    The node needs `checks` as well as `plan`;
+  * the job `checks`, a call of checks.yml (every check that guards main, the same file series.yml calls on a pull request): asset names, declared upstream
+    source, Juggler's tests without a browser and the release scripts' known-bad inputs. They used to run in the build job, on the node, minutes after it
+    had been ordered (run 43156862361: 7.9 minutes of a paid hour for «Juggler's tests without a browser»). The node needs `checks` as well as `plan`;
   * a `concurrency` group per branch, whose newer candidate cancels the older, and a group of their own for a release and a re-launch, so that no push cancels
     a release or the run a re-launch replaces (republish.yml has none);
-  * the guard `scripts/ci/still_head.py`, last step of `checks`: a candidate that was queued behind a newer push is cancelled before the node starts.
+  * the guard `scripts/ci/still_head.py`, last step of the job `still-head` (after `checks`, before the node): a candidate that was queued behind a newer push is cancelled before the node starts.
 
     python3 scripts/ci/test_release_checks.py
 """
@@ -64,34 +64,54 @@ def _cases() -> list:
     out = []
     doc = load("release.yml")
     jobs = doc["jobs"]
-    checks, node, build = jobs["checks"], jobs["node"], jobs["build"]
-    names = [s.get("name") for s in checks["steps"]]
+    checks, node, build, guard_job = jobs["checks"], jobs["node"], jobs["build"], jobs["still-head"]
+    called = load("checks.yml")
+    tree = called["jobs"]["tree"]
+    names = [s.get("name") for s in tree["steps"]]
 
-    # --- the job `checks` -------------------------------------------------------------------------------------------------------------------------
-    out.append(("checks: a job of its own, in parallel with the plan (it needs nothing), that the node waits for besides the plan",
-                "needs" not in checks and node["needs"] == ["plan", "checks"] and build["needs"] == ["plan", "node"]))
-    out.append(("checks: the four checks that do not read the binary are in it, in this order, none conditioned on a leg",
-                [n for n in names if n in CHECKS] == list(CHECKS) and not any("matrix" in str(s.get("if", "")) for s in checks["steps"])))
-    out.append(("checks: none of them is left in the build job, on the node",
-                not any(s.get("name") in CHECKS for s in build["steps"])))
-    text = " ".join(s.get("run", "") for s in checks["steps"])
+    # --- the job `checks`: a call of checks.yml, which holds every check ------------------------------------------------------------------------------
+    out.append(("checks: a job of its own that CALLS checks.yml (no `if`: every candidate, a release, the weekly run and a dispatch from a latitude/* branch run it), "
+                "in parallel with the plan (it needs nothing); the node waits for the plan, the checks and the guard",
+                checks.get("uses") == "./.github/workflows/checks.yml" and "needs" not in checks and "if" not in checks
+                and node["needs"] == ["plan", "checks", "still-head"] and build["needs"] == ["plan", "node"]))
+    out.append(("checks: the call hands over the wrapper_ref the run has (main by default), reads and nothing else",
+                checks["with"] == {"wrapper_ref": "${{ inputs.wrapper_ref || 'main' }}"} and checks["permissions"] == {"contents": "read"}
+                and called[True]["workflow_call"]["inputs"]["wrapper_ref"]["default"] == "main"))
+    out.append(("checks: the four checks that do not read the binary are in the job `tree` of checks.yml, in this order, none conditioned on a leg",
+                [n for n in names if n in CHECKS] == list(CHECKS) and not any("matrix" in str(s.get("if", "")) for s in tree["steps"])))
+    out.append(("checks: none of them is left in the build job, on the node, nor in the plan",
+                not any(s.get("name") in CHECKS for s in build["steps"] + jobs["plan"]["steps"])))
+    text = " ".join(s.get("run", "") for s in tree["steps"])
     out.append(("checks: what they run is what the build used to run",
                 "scripts/check_release_naming.py" in text and "check_upstream_source.py --online" in text and "node --test" in text and "juggler/tests/*.test.mjs" in text
                 and "validate_release.py --selftest" in text and "test_make_seal.py" in text and "test_workflow_cache_rules.py" in text))
+    plan_text = " ".join(s.get("run", "") for s in jobs["plan"]["steps"])
+    plans = ("scripts/test_release_plan.py", "scripts/ci/test_ci.py", "scripts/ci/test_stealth_download_watchdog.py", "scripts/ci/test_objects_first.py",
+             "scripts/ci/test_stealth_build_tools.py")
+    out.append(("checks: the plan's own tests moved from the plan to the job `tree`: there, once each; in the plan, none (it plans, `scripts/ci matrix` stays)",
+                all(("python3 " + t) in text for t in plans) and not any(t in plan_text for t in plans) and 'scripts/ci matrix' in plan_text))
     out.append(("checks: the tree is materialized from the series before they run, on a GitHub runner",
-                "engine.py materialize --into ." in checks["steps"][1]["run"] and checks["runs-on"] == "ubuntu-24.04" and names.index(CHECKS[0]) > 1))
-    out.append(("checks: no secret and no environment (the node job alone has them), and a token that may cancel its own run and read",
-                "secrets." not in str(checks) and "environment" not in checks and checks["permissions"] == {"actions": "write", "contents": "read"}))
-    out.append(("checks: it has a limit", 0 < checks.get("timeout-minutes", 0) <= 30))
-    out.append(("checks: the guard that a newer push has not replaced the run is its LAST step, the one that can cancel",
-                names[-1] == "Still the head of the branch" and "gh run cancel" in checks["steps"][-1]["run"]
-                and "sleep 240" in checks["steps"][-1]["run"] and "still_head.py" in checks["steps"][-1]["run"]))
-    guard = checks["steps"][-1]
-    out.append(("checks: the guard hands over the event, the ref, the commit, the kind and the re-launch, as the plan reads them",
+                "engine.py materialize --into ." in tree["steps"][1]["run"] and tree["runs-on"] == "ubuntu-24.04" and names.index(CHECKS[0]) > 1))
+    out.append(("checks: no secret and no environment in any job of checks.yml (the node job alone has them), and a token that only reads",
+                "secrets." not in str(called) and not any("environment" in j for j in called["jobs"].values()) and called["permissions"] == {"contents": "read"}
+                and not any("permissions" in j for j in called["jobs"].values())))
+    out.append(("checks: the job `tree` has a limit", 0 < tree.get("timeout-minutes", 0) <= 30))
+    out.append(("checks: the jobs the two rounds share, by name: rules, rebuilds, noreply-identity, tree",
+                list(called["jobs"]) == ["rules", "rebuilds", "noreply-identity", "tree"]))
+    gnames = [s.get("name") for s in guard_job["steps"]]
+    out.append(("guard: a job `still-head` of release.yml, after the checks (it needs nothing else), with the token that may cancel this very run and read; "
+                "the guard that a newer push has not replaced the run is its LAST step, the one that can cancel",
+                guard_job["needs"] == ["checks"] and guard_job["permissions"] == {"actions": "write", "contents": "read"} and "if" not in guard_job
+                and gnames[-1] == "Still the head of the branch" and "gh run cancel" in guard_job["steps"][-1]["run"]
+                and "sleep 240" in guard_job["steps"][-1]["run"] and "still_head.py" in guard_job["steps"][-1]["run"]))
+    guard = guard_job["steps"][-1]
+    out.append(("guard: it is not in checks.yml (a called workflow cannot cancel its caller: no `actions: write`, and it means nothing for a pull request)",
+                "still_head" not in str(called)))
+    out.append(("guard: the guard hands over the event, the ref, the commit, the kind and the re-launch, as the plan reads them",
                 guard["env"]["EVENT"] == "${{ github.event_name }}" and guard["env"]["REF"] == "${{ github.ref }}" and guard["env"]["SHA"] == "${{ github.sha }}"
                 and guard["env"]["KIND"] == "${{ inputs.kind }}" and guard["env"]["RELAUNCH_OF"] == "${{ inputs.relaunch_of }}"))
     run = guard["run"]
-    out.append(("checks: only an exit of 1 cancels; the head that cannot be read (2) goes on",
+    out.append(("guard: only an exit of 1 cancels; the head that cannot be read (2) goes on",
                 '[ "$CODE" = 1 ]' in run and run.rstrip().endswith("exit 0") and "set +e" in run))
     out.append(("node: still turned on only by the plan's attempt, and the permissions and steps the other tests hold it to are untouched",
                 node["if"].startswith("needs.plan.outputs.attempt == github.run_attempt") and node["permissions"] == {"actions": "read", "contents": "read"}

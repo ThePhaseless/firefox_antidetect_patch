@@ -86,15 +86,16 @@ def cases() -> list:
         steps["Every named test exists in this run and passed"]["env"] == {"GTESTS": "${{ inputs.gtests }}", "GTEST_FILTER_INPUT": "${{ inputs.gtest_filter }}"}
         and '--gtest-filter "$GTEST_FILTER_INPUT"' in run and '--gtests "$GTESTS"' in run
         and "--gtest-run .series/platform/ci/src/scripts/ci/gtest_run.py" in run)
-    node = next((s for s in jobs["checks"]["steps"] if s.get("name") == "Juggler's tests without a browser"), {})
-    names = [s.get("name") for s in jobs["checks"]["steps"]]
-    keep = next((s for s in jobs["checks"]["steps"] if s.get("name") == "Keep the junit of Juggler's tests"), {})
+    tree = yaml.safe_load((ROOT / ".github" / "workflows" / "checks.yml").read_text(encoding="utf-8"))["jobs"]["tree"]["steps"]
+    node = next((s for s in tree if s.get("name") == "Juggler's tests without a browser"), {})
+    names = [s.get("name") for s in tree]
+    keep = next((s for s in tree if s.get("name") == "Keep the junit of Juggler's tests"), {})
     add("checks: Juggler's tests run one file at a time with a junit each at junit-node/<tree path>.xml, and a red file is a red step",
         "juggler/tests/*.test.mjs" in node.get("run", "") and "--test-reporter=junit" in node["run"] and 'junit-node/$f.xml' in node["run"]
         and "|| rc=1" in node["run"] and node["run"].rstrip().endswith('exit "$rc"') and "if" not in node and "continue-on-error" not in node)
-    add("checks: the junit is kept whatever the tests said (always) as junit-node, before the guard, which stays the last step",
+    add("checks: the junit is kept whatever the tests said (always) as junit-node, after the tests, and the last step of the job `tree` of checks.yml",
         keep.get("if") == "always()" and keep.get("with", {}).get("name") == "junit-node" and keep["with"].get("path") == "junit-node"
-        and names.index("Keep the junit of Juggler's tests") > names.index("Juggler's tests without a browser") and names[-1] == "Still the head of the branch")
+        and names.index("Keep the junit of Juggler's tests") > names.index("Juggler's tests without a browser") and names[-1] == "Keep the junit of Juggler's tests")
     return out
 
 

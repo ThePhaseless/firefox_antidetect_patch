@@ -1,0 +1,334 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# checks.yml — EVERY check that guards main, once. Called by the two rounds that come before a merge:
+#   series.yml   on every pull request and every push to main;
+#   release.yml  on every candidate (a push to main, the weekly run, a dispatch from a latitude/* branch), and a release: the build node is
+#                turned on only after it is green (job `node` needs `checks`).
+# The same code in both: nothing is first run on main (docs/decisions/ci-07 of the series; the test that holds it is
+# tools/tests/test_every_check_runs_before_the_merge.py). A check is added HERE and nowhere else: neither series.yml nor release.yml runs one.
+#
+#   rules             the series' own rules: tools/tests (hence the workflow rule tests) and `engine.py check` (folders, manifests, hook
+#                     contract, budgets against main's, workflow copies).
+#   rebuilds          the Mozilla tag + the series = the tree declared in UPSTREAM.json (`engine.py materialize` stops when it is another
+#                     tree: this is the CI form of `engine.py verify`, which needs the source repository), the birth points against the ledger, and
+#                     the core's checks that read the engine's source.
+#   noreply-identity  every commit, tag and tagger this event makes public carries a GitHub noreply address.
+#   tree              what does not depend on the binary, on the materialized tree: the plan's own tests, the release scripts' known-bad inputs,
+#                     asset names, the declared upstream source, our sources and build files, Juggler's tests without a browser, the wrapper's
+#                     list of required suites against gate.yml, and the junit of the python and node tests for the hook tests judge.
+# `rebuilds` and `tree` each materialize the tree (about 7 to 10 minutes of a GitHub runner, no later start: they run in parallel).
+# What is NOT here: still_head.py (the guard that cancels a candidate a newer push replaced: it needs `actions: write`, a job the node waits
+# for, and means nothing for a pull request: release.yml, job `still-head`).
+# ─────────────────────────────────────────────────────────────────────────────
+name: checks
+on:
+  workflow_call:
+    inputs:
+      wrapper_ref:
+        description: >
+          invisible_playwright ref whose pin names the core under the core's checks, and whose list of required suites gate.yml must have legs for.
+          main for the series' rounds; the run's own wrapper_ref for a candidate.
+        type: string
+        default: main
+
+permissions:
+  contents: read
+
+jobs:
+  rules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+      - run: pip install pytest pyyaml
+      # The budget rule compares with main's budgets: origin/main must exist on pull requests and on a candidate's branch too.
+      - name: Main's budgets
+        run: git fetch --no-tags --depth=1 origin +refs/heads/main:refs/remotes/origin/main
+      - name: The repo's tests
+        run: python -m pytest -q tools/tests
+      - name: The series' rules (folders, manifests, hook budgets, workflow copies)
+        run: python tools/engine.py check
+
+  rebuilds:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          path: .series
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+      # `materialize` also checks the tree it makes against `exported_tree` of UPSTREAM.json and stops when it is another: the series
+      # is the engine, proven on every round.
+      - name: The Mozilla tag from Mozilla, the series applied, the declared tree
+        run: python .series/tools/engine.py materialize --into source
+      # Every place the tree makes a network request (a channel, a socket transport, a UDP or TCP socket, a lookup, a speculative
+      # connection) against tools/birth-ledger.json: a site the ledger does not have, a statement or a context signature that changed,
+      # a lost hook, or a site that carries no context and a page can reach is red. Exit 2 is the dated open items alone (red by design:
+      # a known hole nobody has decided yet). No build: the scan reads the tree this commit materializes. A port to a new tag runs the same
+      # scan at the end of `engine.py port`.
+      - name: The birth points of a request, against the ledger
+        run: python .series/tools/births.py --tree source
+      # port-04: the vendored code of a backport (hooks.patch, its checksum lines, the files it adds) is the replay of the commits
+      # stored in its folder on the revision this tag vendors. Reads the tag's objects only: no build, no working tree.
+      - name: The vendored backports, replayed on the Mozilla tag
+        run: python .series/tools/backport_replay.py check --source source
+      # The core's checks that read the engine's source: pref types and readers,
+      # prefs the binary reads, the Juggler contract and protocol, the WebGL
+      # extension order, the font manifest. In the core's own CI they skip, as no
+      # engine tree is there; here they read the tree this commit materializes,
+      # on every round and on every port to a new Firefox tag. A skip fails the
+      # step: it means a check did not read the tree.
+      # The core is the one the wrapper pins, derived, never written here: a
+      # commit written by hand is a reference that changes, and a port had to remember to
+      # move it. The resolver is the one release.yml uses for the core of a candidate
+      # (platform/ci/src/scripts/release_plan.py): it reads the core version the wrapper
+      # pins and finds the core commit of that version, and stops, naming what it found,
+      # when it cannot. The wrapper is the caller's wrapper_ref (main for the series' rounds).
+      - name: The core the wrapper pins
+        id: core
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WRAPPER_REF: ${{ inputs.wrapper_ref || 'main' }}
+        run: |
+          set -euo pipefail
+          line="$(python3 .series/platform/ci/src/scripts/release_plan.py --resolve-core-ref --wrapper-ref "$WRAPPER_REF")"
+          case "$line" in
+            core_ref=?*) ;;
+            *) echo "the resolver did not print core_ref=<ref>: $line" >&2; exit 1 ;;
+          esac
+          echo "$line"
+          echo "$line" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          repository: oss-invisible/core
+          ref: ${{ steps.core.outputs.core_ref }}
+          path: core
+          persist-credentials: false
+      - run: pip install -e "./core[dev]"
+      - name: The core's checks, against this tree
+        working-directory: core
+        shell: bash
+        env:
+          STEALTH_FIREFOX_SRC: ${{ github.workspace }}/source
+        run: |
+          # The full sha, not HEAD: the core strips "<commit>:" from git grep lines.
+          export STEALTH_FIREFOX_COMMIT="$(git -C "$STEALTH_FIREFOX_SRC" rev-parse HEAD)"
+          python -m pytest -q -rs --junitxml=../core-checks.xml \
+            tests/test_pref_types.py tests/test_prefs_surface.py \
+            tests/test_juggler_contract.py tests/test_juggler_protocol_mirror.py \
+            tests/test_webgl_extensions_follow_the_engine.py
+          python - <<'EOF'
+          import sys, xml.etree.ElementTree as ET
+          suite = ET.parse("../core-checks.xml").getroot().iter("testsuite")
+          counts = [(int(s.get("tests")), int(s.get("skipped"))) for s in suite]
+          tests, skipped = sum(t for t, _ in counts), sum(s for _, s in counts)
+          print("core checks: %d tests, %d skipped" % (tests, skipped))
+          if not tests or skipped:
+              print("::error::a core check skipped or none ran: it did not read this tree")
+              sys.exit(1)
+          EOF
+
+  # Every commit, annotated tag and tagger this event makes public must carry a GitHub
+  # noreply address. Inline, not `uses:` of another repository's workflow: no job of a workflow a pull request
+  # starts may call one (test_node_jobs_find_their_scripts.py). The steps
+  # are those of oss-invisible/core's reusable workflow; the judge is read from main of
+  # the core, never from the judged branch, and its absence there is an error. On a candidate the event is
+  # push, schedule or workflow_dispatch: the judge takes the last of them as `other` and judges the commits the branch adds to main.
+  noreply-identity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # The repository being judged, with all its history: the range of commits is
+      # computed against its refs. Commits and tags only (`tree:0`) and no file but
+      # .github: with its trees this repository is about 5 GB and the clone did not
+      # finish in 5 minutes (run 44708578369); without them about 300 MB.
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+          filter: tree:0
+          sparse-checkout: /.github/
+          sparse-checkout-cone-mode: false
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          repository: oss-invisible/core
+          ref: main
+          path: .noreply-judge
+          sparse-checkout: scripts/ci_noreply_identity.py
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - name: every address is a GitHub noreply one
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          REF: ${{ github.ref }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.event.after }}
+          SHA: ${{ github.sha }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch || 'main' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          script=.noreply-judge/scripts/ci_noreply_identity.py
+          if [ ! -f "$script" ]; then
+            echo "the judge $script is missing from main of oss-invisible/core" >&2
+            exit 1
+          fi
+          case "$EVENT" in
+            pull_request|pull_request_target)
+              python3 "$script" --event pull_request --base "$BASE_SHA" --head "$HEAD_SHA" --base-ref "$BASE_REF"
+              ;;
+            push)
+              python3 "$script" --event push --ref "$REF" --before "$BEFORE" --after "$AFTER"
+              ;;
+            *)
+              python3 "$script" --event other --head "$SHA" --default-ref "$DEFAULT_BRANCH"
+              ;;
+          esac
+
+  # Everything that does not depend on the binary, BEFORE a node is turned on: a server is an hour paid whatever it does, and a run whose
+  # asset names disagree, whose Juggler's tests are red or whose release scripts do not refuse what they must, used to learn it on the node,
+  # minutes after it had been ordered (run 43156862361: «Juggler's tests without a browser», in the build, 7.9 minutes of a paid hour). The
+  # source tree is materialized here on its own runner, in parallel with `rebuilds` and with the release's `plan`: the cost is a GitHub
+  # runner's minutes and no later start.
+  tree:
+    name: tree
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: The series (this repository, this commit)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with: { path: .series, fetch-depth: 1 }
+      - name: The source tree, the Mozilla tag with our series applied (tools/engine.py)
+        shell: bash
+        run: python3 .series/tools/engine.py materialize --into .
+      # THE JUNIT OF OUR PYTHON TESTS OF THE TREE, for the named hook tests judge (`py:<path>::<name>`): the part `junitpart-py-checks` of the artifact
+      # `junit-py`, which the job `junit-py` of release.yml puts together with the part of package-ab (the series' tools/tests). Ours only (scripts/ci/py_junit.py: the
+      # files the series adds, with something for pytest to collect), run from the tree's root so a classname is the path in the tree. First after the
+      # materialize, so that no later step that fails hides it; it does not change the verdict of this job (the judge is red for a named test that
+      # did not pass), and its upload runs whatever happened.
+      - name: Our python tests of the tree, as junit
+        continue-on-error: true
+        timeout-minutes: 8
+        shell: bash
+        run: |
+          mkdir -p junit-py/checks
+          python3 -m pip install --quiet pytest pyyaml fonttools==4.51.0
+          FILES="$(python3 scripts/ci/py_junit.py list --series .series --tree .)"
+          # The plan's own tests that hooks name (scripts/ci/ is left out of the list above): the step below runs them as plain scripts, its verdict; here they
+          # are the record, in this junit, and the `ran` step below covers them.
+          FILES="$FILES scripts/ci/test_stealth_build_tools.py scripts/ci/test_stealth_download_watchdog.py scripts/ci/test_objects_first.py scripts/test_release_plan.py"
+          python3 -m pytest $FILES -q -p no:cacheprovider -o addopts='' -o junit_family=xunit2 --rootdir=. --continue-on-collection-errors --junitxml=junit-py/checks/tree-tests.xml
+      # A junit with no test that ran (every case a collection error, or none) is a red step, here and not at the judge: nobody would read it from 200 lines
+      # of missing tests. Not continue-on-error; the upload below runs whatever this said. A test that failed ran, and its verdict is the judge's.
+      - name: The junit holds a test that ran
+        run: python3 scripts/ci/py_junit.py ran junit-py/checks/tree-tests.xml
+      - name: Keep the junit (the part of this job, junitpart-py-checks)
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: junitpart-py-checks
+          path: junit-py
+          if-no-files-found: ignore
+          retention-days: 14
+      # What the release plan stands on, refused here and not in the plan (it plans, it does not test): the plan's known-bad inputs, the legs and their
+      # asset names (scripts/ci/test_ci.py), the SDK downloader's hook (run 41205185526 idled 5 hours on a download error the pool could not carry
+      # back), the compile-only step's list of directories, its errors and its fallback to one directory at a time, and the build tools' hooks
+      # (python/mozbuild), through the host line of jar.py.
+      - name: The plan's own tests
+        shell: bash
+        run: |
+          python3 scripts/test_release_plan.py
+          python3 scripts/ci/test_ci.py
+          python3 scripts/ci/test_stealth_download_watchdog.py
+          python3 scripts/ci/test_objects_first.py
+          python3 scripts/ci/test_stealth_build_tools.py
+      # Cheapest gate in the pipeline, guarding the most expensive failure: the asset
+      # basename is hand-written in every matrix entry below and derived independently
+      # on the client side. When the two disagree CI publishes one name while the
+      # wrapper fetches another, so every download 404s while the build is green, the
+      # archives are valid and the release page looks correct (issue #14). Fail here in
+      # seconds instead of after five multi-hour builds.
+      - name: Check asset names match the version this tree builds
+        shell: bash
+        run: python3 scripts/check_release_naming.py
+
+      # The source the official build states (browser/config/upstream_source.txt,
+      # read by the .mozconfig) must be the retail's of the version this tree
+      # builds; a port that moves the base and leaves the file behind would
+      # write the previous release's changeset into application.ini. Seconds,
+      # here, before the build; --online also asks Mozilla's build record.
+      - name: Check the declared upstream source matches the version this tree builds
+        shell: bash
+        run: python3 scripts/check_upstream_source.py --online
+
+      # Our sources and our build files, read as text and in mozbuild's own sandbox: what a compiler or the backend finds only on the node, an
+      # hour in (build/stealth_check_sources.py, build/stealth_check_build_files.py). Neither needs an objdir. Before `node`: no machine is rented
+      # for a mozilla:: name that is not there or a source no build file lists.
+      - name: Our sources and our build files - the text checks
+        shell: bash
+        run: |
+          python3 build/stealth_check_sources.py
+          python3 build/stealth_check_build_files.py
+
+      # Juggler tested without a browser, seconds here before hours of build.
+      # The channel between its two halves: a request answered from another
+      # channel end's kept answers is never dispatched and nothing says so (a
+      # page's "main world created" was lost that way, B286). And where it loads
+      # from: never a chrome package, which a page probes by name, and every
+      # resource URL a file the build installs (wrapper issue #336).
+      - name: Juggler's tests without a browser
+        shell: bash
+        # The files, expanded by the shell: from Node 21 the arguments of
+        # --test are file patterns, and a directory is loaded as a module.
+        # One process and one junit per file, at junit-node/<tree path>.xml: the named hook tests judge (`hook-tests-judge`) reads which file
+        # each test is in from the name of the junit, whatever the reporter writes. Every file runs, and the step is red if any did.
+        run: |
+          rc=0
+          for f in juggler/tests/*.test.mjs; do
+            mkdir -p "junit-node/$(dirname "$f")"
+            node --test --test-reporter=spec --test-reporter-destination=stdout               --test-reporter=junit --test-reporter-destination="junit-node/$f.xml" "$f" || rc=1
+          done
+          exit "$rc"
+
+      # Every suite of the wrapper's list has its legs in the gate. The list (ci/required-suites.json) is the wrapper's and the matrix of the gate's
+      # `wrapper-e2e` job is written by hand: run 44834434976 learned that wrapper.e2e.fakeweb had no leg only from `wrapper-e2e-complete`, after the build.
+      - name: The wrapper's list of required suites has a leg in the gate for each
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          repository: oss-invisible/playwright
+          ref: ${{ inputs.wrapper_ref || 'main' }}
+          path: .wrapper
+          fetch-depth: 1
+          sparse-checkout: ci/required-suites.json
+      - name: Every suite of the list has its legs in gate.yml
+        shell: bash
+        run: python3 scripts/ci/gate_legs.py --required .wrapper/ci/required-suites.json
+
+      # The release scripts' own known-bad inputs: validate_release.py's
+      # retail-updater and no-juggler-name checks, and make_seal.py's refusals. A
+      # check that has only ever printed its OK line is not a gate.
+      - name: The release scripts refuse what they must
+        shell: bash
+        run: |
+          python3 scripts/validate_release.py --selftest
+          python3 scripts/test_make_seal.py
+          python3 scripts/test_check_upstream_source.py
+          python3 scripts/test_toolchain_parity.py
+          python3 scripts/test_upstream_toolchain.py
+          python3 scripts/test_memory_watch.py
+          python3 scripts/test_cpu_watch.py
+          python3 scripts/test_workflow_cache_rules.py
+      # The junit of Juggler's tests, for `hook-tests-judge`: a hook that names `node:<path>#<title>` is judged on it.
+      - name: Keep the junit of Juggler's tests
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: junit-node
+          path: junit-node
+          if-no-files-found: ignore
+          retention-days: 14

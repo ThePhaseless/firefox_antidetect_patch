@@ -717,6 +717,18 @@ def test_t3_node_tests_run_in_a_shell_loop(tmp_path):
     assert hl._Rounds(root).node_globs == ["juggler/tests/*.test.mjs"]
 
 
+def test_t3_node_tests_run_by_checks_yml_count(tmp_path):
+    """The node tests run in checks.yml, which the pull request round and every candidate call: a workflow other than release.yml runs them too."""
+    root = release_with(tmp_path, "      - run: echo nothing\n")
+    assert hl._Rounds(root).node_globs == []
+    assert t3_rules(root, "node:juggler/tests/x.test.mjs") == ["T3"]
+    wf = root / "platform" / "ci" / "src" / ".github" / "workflows"
+    (wf / "checks.yml").write_text("jobs:\n  tree:\n    steps:\n      - run: |\n          for f in juggler/tests/*.test.mjs; do\n"
+                                   "            node --test \"$f\" || rc=1\n          done\n", encoding="utf-8", newline="")
+    assert hl._Rounds(root).node_globs == ["juggler/tests/*.test.mjs"]
+    assert t3_rules(root, "node:juggler/tests/x.test.mjs") == []
+
+
 def test_t3_a_pytest_line_over_a_directory_runs_the_tests_under_it(tmp_path):
     root = release_with(tmp_path, "      - run: python -m pytest tools/tests -q --rootdir=.\n"
                                   "      - run: python -m pytest $SELECT -q scripts/ci/test_one.py\n")

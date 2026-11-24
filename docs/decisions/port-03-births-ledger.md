@@ -9,11 +9,11 @@ Verdicts:
 - `dead`: never runs in the product; `proof` says why.
 - `fix`: a known hole; needs `open` (since, item, owner). The scan exits 2 for it, which is red by design.
 
-`series.yml` runs the scan on pull requests and pushes to main, after `materialize`; `engine.py port` runs it at the end. `--skeleton`, `--accept-changed` (after reading each diff) and `--prune` keep the ledger.
+`checks.yml` runs the scan (job `rebuilds`), after `materialize`, on pull requests, on pushes to main and on every candidate ([ci-07](ci-07-every-check-runs-before-the-merge.md)); `engine.py port` runs it at the end. `--skeleton`, `--accept-changed` (after reading each diff) and `--prune` keep the ledger.
 
 **Why.** A request a page causes but that is made with default attributes, the system principal or a plain socket leaves outside the proxy of its context. Each such hole was once found by hand at its call site. Closing the class means a Mozilla tag that adds a birth point, or changes the context handling around one, cannot pass unseen.
 
-**Files.** `tools/births.py` (its docstring has the key of a site and the exit codes), `tools/birth-ledger.json`, `.github/workflows/series.yml` (job `rebuilds`).
+**Files.** `tools/births.py` (its docstring has the key of a site and the exit codes), `tools/birth-ledger.json`, `.github/workflows/checks.yml` (job `rebuilds`).
 
 **Don't.**
 - Accept a changed site with `--accept-changed` without reading each diff.

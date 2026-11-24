@@ -329,8 +329,8 @@ def test_run_gives_status_0_on_the_ledger_and_1_on_a_new_call(repo, tmp_path, ca
 
 
 # ------------------------------------------------------------------------------------------------------------------------ the wiring
-def test_the_scan_is_a_step_of_the_series_workflow_right_after_the_materialize_step():
-    text = (Path(__file__).resolve().parents[2] / ".github" / "workflows" / "series.yml").read_text(encoding="utf-8")
+def test_the_scan_is_a_step_of_the_checks_workflow_right_after_the_materialize_step():
+    text = (Path(__file__).resolve().parents[2] / ".github" / "workflows" / "checks.yml").read_text(encoding="utf-8")
     materialize = text.index("engine.py materialize --into source")
     step = text.index("python .series/tools/births.py --tree source")
     assert materialize < step < text.index("repository: oss-invisible/core")

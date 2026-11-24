@@ -127,7 +127,8 @@ def cases() -> list:
         len(ab) == 1 and "continue-on-error" not in ab[0] and 'exit "$RED"' in ab[0]["run"])
 
     release = load("release.yml")
-    checks = release["jobs"]["checks"]["steps"]
+    checks_yml = load("checks.yml")
+    checks = checks_yml["jobs"]["tree"]["steps"]
     tree_tests = [s for s in checks if "pytest" in str(s.get("run", ""))]
     materialize_at = index(checks, "engine.py materialize")
     add("checks: the python tests of OURS in the tree run right after the materialize (before every other step), through py_junit.py's list, as junit, and cannot fail the job",
@@ -145,7 +146,7 @@ def cases() -> list:
     add("checks: fonttools is pinned to one exact version, written once, in the pytest step (the tree and the CI pin none)",
         len(tree_tests) == 1 and tree_tests[0]["run"].count("fonttools==4.51.0") == 1
         and sum(str(s.get("run", "")).count("fonttools") for s in checks) == 1)
-    parts_py = [str((s.get("with") or {}).get("name", "")) for wf in (gate, release, load("package-ab.yml")) for job in wf["jobs"].values() for s in uploads(job)
+    parts_py = [str((s.get("with") or {}).get("name", "")) for wf in (gate, release, checks_yml, load("package-ab.yml")) for job in wf["jobs"].values() for s in uploads(job)
                 if str((s.get("with") or {}).get("name", "")).startswith("junitpart-py-")]
     add("python parts: one per job and named by it (junitpart-py-<job>), the three there are, none twice: checks, package-ab, and the gate's "
         "security-state step, one per leg (junitpart-py-security-state-<leg>)",
@@ -156,11 +157,14 @@ def cases() -> list:
     plan = release["jobs"]["plan"]["steps"]
     plain = ("scripts/ci/test_ci.py", "scripts/ci/test_stealth_download_watchdog.py", "scripts/ci/test_objects_first.py", "scripts/ci/test_stealth_build_tools.py",
              "scripts/test_release_plan.py")
-    bare = {n: [s for s in plan if "python3 " + n in str(s.get("run", ""))] for n in plain}
-    add("plan: no pip install and no junit step (nothing in the plan installs), and the verdict is unchanged: test_ci.py, the watchdog, objects_first, build_tools and "
-        "test_release_plan.py still run as plain scripts, once each, with no continue-on-error",
+    bare = {n: [s for s in checks if "python3 " + n in str(s.get("run", ""))] for n in plain}
+    add("plan: no pip install, no pytest and no junit step (nothing in the plan installs or tests: its own tests moved to the job `tree` of checks.yml)",
         not any("pip" in str(s.get("run", "")) or "pytest" in str(s.get("run", "")) or "junit" in str(s.get("name", "")).lower() for s in plan)
-        and all(len(v) == 1 and "continue-on-error" not in v[0] for v in bare.values()))
+        and not any(n in str(s.get("run", "")) for s in plan for n in plain))
+    add("checks: test_ci.py, the watchdog, objects_first, build_tools and test_release_plan.py run as plain scripts, once each, with no continue-on-error, in the step "
+        "`The plan's own tests`, after the junit upload",
+        all(len(v) == 1 and "continue-on-error" not in v[0] and v[0].get("name") == "The plan's own tests" for v in bare.values())
+        and len({id(v[0]) for v in bare.values()}) == 1 and checks.index(next(iter(bare.values()))[0]) > checks.index(keep[0]))
     add("checks: the pytest line names the plan's four tests that hooks name (scripts/ci/ is left out of py_junit's list), in the same session as the tree's tests",
         len(tree_tests) == 1 and all(n in tree_tests[0]["run"] for n in ("scripts/ci/test_stealth_build_tools.py", "scripts/ci/test_stealth_download_watchdog.py",
                                                                       "scripts/ci/test_objects_first.py", "scripts/test_release_plan.py"))

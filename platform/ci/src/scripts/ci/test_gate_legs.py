@@ -200,16 +200,18 @@ def cases() -> list:
 
     # the real release.yml: the check runs before the node
     release = yaml.safe_load((WORKFLOWS / "release.yml").read_text(encoding="utf-8"))
-    rsteps = release["jobs"]["checks"]["steps"]
+    rsteps = yaml.safe_load((WORKFLOWS / "checks.yml").read_text(encoding="utf-8"))["jobs"]["tree"]["steps"]
     check = [i for i, s in enumerate(rsteps) if "gate_legs.py" in (s.get("run") or "")]
-    add("gate legs: the checks job of release.yml runs gate_legs.py on the wrapper's list",
+    add("gate legs: the job `tree` of checks.yml (which the checks job of release.yml calls) runs gate_legs.py on the wrapper's list",
         len(check) == 1 and "--required .wrapper/ci/required-suites.json" in rsteps[check[0]]["run"])
     co = [i for i, s in enumerate(rsteps) if (s.get("with") or {}).get("path") == ".wrapper"]
     w = rsteps[co[0]]["with"] if len(co) == 1 else {}
     add("gate legs: the checks job checks out the wrapper's list at wrapper_ref (main by default) before the check",
         len(co) == 1 and len(check) == 1 and co[0] < check[0] and w.get("repository") == "oss-invisible/playwright"
         and "inputs.wrapper_ref || 'main'" in w.get("ref", "") and "ci/required-suites.json" in w.get("sparse-checkout", ""))
-    add("gate legs: the node waits for the checks job", "checks" in (release["jobs"]["node"].get("needs") or []))
+    add("gate legs: the node waits for the checks job, which calls checks.yml with the run's wrapper_ref",
+        "checks" in (release["jobs"]["node"].get("needs") or []) and release["jobs"]["checks"]["uses"] == "./.github/workflows/checks.yml"
+        and release["jobs"]["checks"]["with"]["wrapper_ref"] == "${{ inputs.wrapper_ref || 'main' }}")
 
     # the command, on a gate without the fake web's legs (what the commit before this one had): red there, green with them
     with tempfile.TemporaryDirectory() as tmp:

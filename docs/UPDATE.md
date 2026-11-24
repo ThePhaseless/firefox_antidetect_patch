@@ -133,7 +133,7 @@ python tools/births.py --repo <source> --rev port/$NEW
 
 Set `tag` in the ledger to `NEW`. Exit 0 is clean, 1 is a problem, 2 means only open items (`fix`) remain. `port` ran it on a branch that still had conflict markers, so run it now.
 
-`series.yml` runs `births.py` (job `rebuilds`) only on pull requests and pushes to `main`. The ledger must be green before the series pull request is opened, or the pull request is red.
+`checks.yml` runs `births.py` (job `rebuilds`) on pull requests, on pushes to `main` and on every candidate. The ledger must be green before the series pull request is opened, or the pull request is red.
 
 ## 8. The compile-only candidate
 
@@ -155,7 +155,7 @@ The core is the package that declares the identity values the engine reads. It f
 - **The WebGL extension lists.** The core's tests hold the official lists per Firefox version, and `WebGLExtensionID` order (`dom/canvas/WebGLTypes.h`) that `getSupportedExtensions()` follows. Edit them by hand from a measurement of the new retail, in a page, on a real Windows machine: the set the retail reports for WebGL and WebGL2, in the engine's order.
 - **The graphics device data** (`_fpforge/data/win_gfx_devices.json`): the blocklist outcome the official build gives each device, measured on the official build of the new version.
 - **The language list.** The core builds the default language list per locale from `locale_service_default_accept_languages` (`intl/locale/rust/locale_service_glue/src/lib.rs`). Compare that function between the tags and update the core's table where it changed.
-- **The pin in `series.yml`.** The `rebuilds` job checks out the core at a commit and runs its checks against the tree this repository materializes. Move that commit to the core commit made for the new version, by hand, before the pull request.
+- **The core under the checks.** The `rebuilds` job of `checks.yml` checks out the core the wrapper pins ([ci-05](decisions/ci-05-a-candidates-references-are-one-consistent-set.md)) and runs its checks against the tree this repository materializes. Nothing is moved by hand: the wrapper's pin must name the core version made for the new tag before the pull request.
 
 Run the full candidate (step 11) with `core_ref` set to that core branch and `wrapper_ref` to a wrapper ref that pins the version of the core.
 
@@ -210,7 +210,7 @@ gh api repos/oss-invisible/firefox_antidetect_patch/actions/runs/<candidate run 
 
 For each name in `assets` of `seal.json`, its `sha256` must be the one in `checksums.txt`; `series_commit` must be the `head_sha` of the candidate run.
 
-Then merge: a pull request from the series branch into `main`, with `series.yml` green (its `gate` job requires `rules`, `rebuilds` and `noreply-identity`). Merge it with a merge commit, never a squash or a rebase: `series_commit` of the seal must stay reachable from `main`. `package-ab` of the next candidate fetches the `series_commit` of the published seal by its sha, and `tools/engine.py apply` rebuilds the engine commit from it. A push to `main` also starts a candidate with the gtests; when a green run has built the same tree, it gates those bytes again instead of compiling (`scripts/ci/reuse_run.py`).
+Then merge: a pull request from the series branch into `main`, with `series.yml` green (its `gate` job requires the call of `checks.yml`: `rules`, `rebuilds`, `noreply-identity` and `tree`). Merge it with a merge commit, never a squash or a rebase: `series_commit` of the seal must stay reachable from `main`. `package-ab` of the next candidate fetches the `series_commit` of the published seal by its sha, and `tools/engine.py apply` rebuilds the engine commit from it. A push to `main` also starts a candidate with the gtests; when a green run has built the same tree, it gates those bytes again instead of compiling (`scripts/ci/reuse_run.py`).
 
 Then publish the draft, with its tag on the merge commit:
 

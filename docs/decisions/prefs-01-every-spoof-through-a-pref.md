@@ -6,7 +6,7 @@ A few declarations reach the engine as `STEALTHFOX_*` environment variables set 
 
 **Why.** A pref is the one channel the core already uses to hand the engine a declared value ([product-01](product-01-no-value-from-the-host.md)). The core checks the engine's source for every `zoom.stealth.*` name it emits, so a pref name is kept as one whole literal in our file, and a rename breaks the core's checks against the engine's source. A pref declared twice has a final value that depends on load order, which Mozilla changes without notice.
 
-**Files.** `platform/prefs/src/modules/libpref/init/StealthPrefs.js` and `StealthPrefList.yaml` (our declarations), `platform/prefs/src/modules/libpref/StealthPrefSanitize.cpp` (the prefix is let through to content processes), the tests `test_stealth_prefs_declared_once.py` and `test_stealth_prefs_final_values.py` beside them, `platform/prefs/FEATURE.md`; the core's checks that read the engine tree run in the job `rebuilds` of `.github/workflows/series.yml`.
+**Files.** `platform/prefs/src/modules/libpref/init/StealthPrefs.js` and `StealthPrefList.yaml` (our declarations), `platform/prefs/src/modules/libpref/StealthPrefSanitize.cpp` (the prefix is let through to content processes), the tests `test_stealth_prefs_declared_once.py` and `test_stealth_prefs_final_values.py` beside them, `platform/prefs/FEATURE.md`; the core's checks that read the engine tree run in the job `rebuilds` of `.github/workflows/checks.yml`.
 
 **Don't.**
 - Rename a `zoom.stealth.*` or `stealthfox.*` pref, or a `STEALTHFOX_*` variable.
