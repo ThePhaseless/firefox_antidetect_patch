@@ -196,7 +196,7 @@
    "evidence": [
     "+        \"/juggler\","
    ],
-   "notes": "Registers the Juggler directory when ENABLE_WEBDRIVER is set. The /juggler directory is our own code and is not in this list; Verified: C:/ff/source/juggler exists (moz.build, TargetRegistry.js, SessionRoute.js, components/).",
+   "notes": "Registers the Juggler directory when ENABLE_WEBDRIVER is set. The /juggler directory is our own code and is not in this list; Verified: juggler exists in the source repository (moz.build, TargetRegistry.js, SessionRoute.js, components/).",
    "verifier": {
     "changed": [
      "notes"

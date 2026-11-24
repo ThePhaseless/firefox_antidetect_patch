@@ -28,7 +28,7 @@
     "+    int32_t w = mozilla::StaticPrefs::zoom_stealth_screen_width();",
     "+              h - mozilla::StaticPrefs::zoom_stealth_screen_taskbar_px()};"
    ],
-   "notes": "Declared color depth, screen rect and avail rect from prefs; avail height is reduced by zoom.stealth.screen_taskbar_px. GetAvailRect has about 6 logic lines and reads StaticPrefs directly, so it is movable behind one call. The file adds #include mozilla/StaticPrefs_zoom.h twice (hunk 1 and again at the end of the include block); remove one. Comments mention invisible_core and a document outside the repo (19-field-declaration-audit.md); they are project references, not code. VERIFIED: duplicate #include mozilla/StaticPrefs_zoom.h confirmed at dom/base/nsScreen.cpp:9 and :23.",
+   "notes": "Declared color depth, screen rect and avail rect from prefs; avail height is reduced by zoom.stealth.screen_taskbar_px. GetAvailRect has about 6 logic lines and reads StaticPrefs directly, so it is movable behind one call. The file adds #include mozilla/StaticPrefs_zoom.h twice (hunk 1 and again at the end of the include block); remove one. Comments mention the core and a document outside the repo; they are project references, not code. VERIFIED: duplicate #include mozilla/StaticPrefs_zoom.h confirmed at dom/base/nsScreen.cpp:9 and :23.",
    "verifier": {
     "changed": [
      "prefs",

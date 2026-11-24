@@ -175,7 +175,7 @@
     "+    \"StealthBranding.h\",",
     "+    \"StealthBranding.cpp\","
    ],
-   "notes": "Registers our own files, both present in C:\\ff\\source\\netwerk\\protocol\\res. No logic.",
+   "notes": "Registers our own files, both present in netwerk/protocol/res of the source repository. No logic.",
    "verifier": {
     "changed": [],
     "why": "all fields checked against the diff; no change"

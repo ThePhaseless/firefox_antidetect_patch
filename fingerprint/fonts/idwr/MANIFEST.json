@@ -102,7 +102,7 @@
    "evidence": [
     "+DIRS += [\"idwr\"]  # STEALTH-HOOK(fingerprint/fonts/idwr)"
    ],
-   "notes": "Builds gfx/idwr (invisible_DWriteCore's DirectWrite rasterizer) into libxul, on a line of its own outside Mozilla's DIRS list."
+   "notes": "Builds gfx/idwr (our DirectWrite rasterizer) into libxul, on a line of its own outside Mozilla's DIRS list."
   }
  ]
 }
