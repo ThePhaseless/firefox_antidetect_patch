@@ -1,6 +1,8 @@
-# The engine series on every push: its own rules, then the proof that it applies to
-# the Mozilla tag and gives exactly the tree it was exported as. No Firefox build
-# here: release.yml builds it, from the same materialize step.
+# The engine series on every pull request and every push to main: ONE call of checks.yml, which holds every check that guards main (its
+# own rules, the proof that it applies to the Mozilla tag and gives exactly the tree it was exported as, the birth points, the core's checks, the
+# noreply identity, and what release.yml used to check before a node). release.yml calls the same file on every candidate: nothing is first
+# run on main (docs/decisions/ci-07-every-check-runs-before-the-merge.md). No Firefox build here: release.yml builds it. A check is added to
+# checks.yml (written in the source repository, platform/ci/src/.github/workflows/, and exported), never to this file.
 name: series
 on:
   push:
@@ -13,171 +15,21 @@ permissions:
   contents: read
 
 jobs:
-  rules:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
-        with:
-          python-version: "3.12"
-      - run: pip install pytest pyyaml
-      # The budget rule compares with main's budgets: origin/main must exist on pull requests too.
-      - name: Main's budgets
-        run: git fetch --no-tags --depth=1 origin +refs/heads/main:refs/remotes/origin/main
-      - name: The repo's tests
-        run: python -m pytest -q tools/tests
-      - name: The series' rules (folders, manifests, hook budgets, workflow copies)
-        run: python tools/engine.py check
+  checks:
+    uses: ./.github/workflows/checks.yml
+    permissions:
+      contents: read
+    with:
+      wrapper_ref: main
 
-  rebuilds:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          path: .series
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
-        with:
-          python-version: "3.12"
-      - name: The Mozilla tag from Mozilla, the series applied, the declared tree
-        run: python .series/tools/engine.py materialize --into source
-      # Every place the tree makes a network request (a channel, a socket transport, a UDP or TCP socket, a lookup, a speculative
-      # connection) against tools/birth-ledger.json: a site the ledger does not have, a statement or a context signature that changed,
-      # a lost hook, or a site that carries no context and a page can reach is red. Exit 2 is the dated open items alone (red by design:
-      # a known hole nobody has decided yet). No build: the scan reads the tree this commit materializes. A port to a new tag runs the same
-      # scan at the end of `engine.py port`.
-      - name: The birth points of a request, against the ledger
-        run: python .series/tools/births.py --tree source
-      # port-04: the vendored code of a backport (hooks.patch, its checksum lines, the files it adds) is the replay of the commits
-      # stored in its folder on the revision this tag vendors. Reads the tag's objects only: no build, no working tree.
-      - name: The vendored backports, replayed on the Mozilla tag
-        run: python .series/tools/backport_replay.py check --source source
-      # The core's checks that read the engine's source: pref types and readers,
-      # prefs the binary reads, the Juggler contract and protocol, the WebGL
-      # extension order, the font manifest. In the core's own CI they skip, as no
-      # engine tree is there; here they read the tree this commit materializes,
-      # on every push and on every port to a new Firefox tag. A skip fails the
-      # step: it means a check did not read the tree.
-      # The core is the one the wrapper of main pins, derived, never written here: a
-      # commit written by hand is a reference that changes, and a port had to remember to
-      # move it. The resolver is the one release.yml uses for the core of a candidate
-      # (platform/ci/src/scripts/release_plan.py): it reads the core version the wrapper
-      # pins and finds the core commit of that version, and stops, naming what it found,
-      # when it cannot. The core under these checks is therefore the one the wrapper of
-      # main runs with, whatever main of the core is at.
-      - name: The core the wrapper of main pins
-        id: core
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          line="$(python3 .series/platform/ci/src/scripts/release_plan.py --resolve-core-ref --wrapper-ref main)"
-          case "$line" in
-            core_ref=?*) ;;
-            *) echo "the resolver did not print core_ref=<ref>: $line" >&2; exit 1 ;;
-          esac
-          echo "$line"
-          echo "$line" >> "$GITHUB_OUTPUT"
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          repository: oss-invisible/core
-          ref: ${{ steps.core.outputs.core_ref }}
-          path: core
-          persist-credentials: false
-      - run: pip install -e "./core[dev]"
-      - name: The core's checks, against this tree
-        working-directory: core
-        shell: bash
-        env:
-          STEALTH_FIREFOX_SRC: ${{ github.workspace }}/source
-        run: |
-          # The full sha, not HEAD: the core strips "<commit>:" from git grep lines.
-          export STEALTH_FIREFOX_COMMIT="$(git -C "$STEALTH_FIREFOX_SRC" rev-parse HEAD)"
-          python -m pytest -q -rs --junitxml=../core-checks.xml \
-            tests/test_pref_types.py tests/test_prefs_surface.py \
-            tests/test_juggler_contract.py tests/test_juggler_protocol_mirror.py \
-            tests/test_webgl_extensions_follow_the_engine.py
-          python - <<'EOF'
-          import sys, xml.etree.ElementTree as ET
-          suite = ET.parse("../core-checks.xml").getroot().iter("testsuite")
-          counts = [(int(s.get("tests")), int(s.get("skipped"))) for s in suite]
-          tests, skipped = sum(t for t, _ in counts), sum(s for _, s in counts)
-          print("core checks: %d tests, %d skipped" % (tests, skipped))
-          if not tests or skipped:
-              print("::error::a core check skipped or none ran: it did not read this tree")
-              sys.exit(1)
-          EOF
-
-  # Every commit, annotated tag and tagger this event makes public must carry a GitHub
-  # noreply address. Inline, not `uses:`: no job of a workflow a pull request starts may
-  # call another repository's workflow (test_node_jobs_find_their_scripts.py). The steps
-  # are those of oss-invisible/core's reusable workflow; the judge is read from main of
-  # the core, never from the judged branch, and its absence there is an error.
-  noreply-identity:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      # The repository being judged, with all its history: the range of commits is
-      # computed against its refs. Commits and tags only (`tree:0`) and no file but
-      # .github: with its trees this repository is about 5 GB and the clone did not
-      # finish in 5 minutes (run 44708578369); without them about 300 MB.
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          fetch-depth: 0
-          filter: tree:0
-          sparse-checkout: /.github/
-          sparse-checkout-cone-mode: false
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          repository: oss-invisible/core
-          ref: main
-          path: .noreply-judge
-          sparse-checkout: scripts/ci_noreply_identity.py
-          sparse-checkout-cone-mode: false
-          persist-credentials: false
-      - name: every address is a GitHub noreply one
-        env:
-          EVENT: ${{ github.event_name }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          BASE_REF: ${{ github.event.pull_request.base.ref }}
-          REF: ${{ github.ref }}
-          BEFORE: ${{ github.event.before }}
-          AFTER: ${{ github.event.after }}
-          SHA: ${{ github.sha }}
-          DEFAULT_BRANCH: ${{ github.event.repository.default_branch || 'main' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          script=.noreply-judge/scripts/ci_noreply_identity.py
-          if [ ! -f "$script" ]; then
-            echo "the judge $script is missing from main of oss-invisible/core" >&2
-            exit 1
-          fi
-          case "$EVENT" in
-            pull_request|pull_request_target)
-              python3 "$script" --event pull_request --base "$BASE_SHA" --head "$HEAD_SHA" --base-ref "$BASE_REF"
-              ;;
-            push)
-              python3 "$script" --event push --ref "$REF" --before "$BEFORE" --after "$AFTER"
-              ;;
-            *)
-              python3 "$script" --event other --head "$SHA" --default-ref "$DEFAULT_BRANCH"
-              ;;
-          esac
-
-  # The verdict of the workflow: the one check to require. It runs when a job failed or
-  # was skipped, and refuses anything but success.
+  # The verdict of the workflow: the one check to require. It runs when the checks failed or
+  # were skipped, and refuses anything but success.
   gate:
-    needs: [rules, rebuilds, noreply-identity]
+    needs: [checks]
     if: always()
     runs-on: ubuntu-latest
     steps:
-      - name: refuse unless every job succeeded
+      - name: refuse unless the checks succeeded
         run: |
-          echo "rules: ${{ needs.rules.result }}"
-          echo "rebuilds: ${{ needs.rebuilds.result }}"
-          echo "noreply-identity: ${{ needs.noreply-identity.result }}"
-          test "${{ needs.rules.result }}" = "success"
-          test "${{ needs.rebuilds.result }}" = "success"
-          test "${{ needs.noreply-identity.result }}" = "success"
+          echo "checks: ${{ needs.checks.result }}"
+          test "${{ needs.checks.result }}" = "success"

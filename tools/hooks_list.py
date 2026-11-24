@@ -405,25 +405,8 @@ class _Rounds:
             return
         cand = (wf / CANDIDATE_WORKFLOW).read_text(encoding="utf-8", errors="replace").split("\n")
         self.filter = self._gtest_filter(cand)
-        loops = {}              # `for f in juggler/tests/*.test.mjs; do`: the globs a `$f` stands for, until `done`
-        for ln in cand:
-            code = ln.split(" #", 1)[0]
-            if ln.lstrip().startswith("#"):
-                continue
-            loop = re.match(r"^\s*for\s+(\w+)\s+in\s+(.+?);\s*do\b", code)
-            if loop:
-                loops[loop.group(1)] = self._words(loop.group(2))
-            elif re.match(r"^\s*done\b", code):
-                loops.clear()
-            m = re.search(r"\bnode\s+--test\s+(.+)$", code)
-            if m:
-                for a in self._words(m.group(1), stop=True):
-                    if a.startswith("-"):
-                        continue
-                    if a.startswith("$"):
-                        self.node_globs += loops.get(a.strip("${}"), [])
-                    else:
-                        self.node_globs.append(a)
+        for p in sorted(wf.glob("*.yml")):          # the node tests run in checks.yml, which the PR round and the candidate both call
+            self.node_globs += self._node_globs(p.read_text(encoding="utf-8", errors="replace").splitlines())
         for p in sorted(wf.glob("*.yml")):
             lines = [ln for ln in p.read_text(encoding="utf-8", errors="replace").split("\n")
                      if not ln.lstrip().startswith("#")]
@@ -443,6 +426,30 @@ class _Rounds:
                 if re.search(r"\bcargo\s+(?:\+\S+\s+)?(?:test|nextest)\b", joined):
                     self.cargo_tests.append((joined, workdir))
                 joined = ""
+
+    def _node_globs(self, lines: list) -> list:
+        """The file patterns the `node --test` lines of a workflow run, a `$f` standing for the globs of its `for` loop until `done`."""
+        found = []
+        loops = {}              # `for f in juggler/tests/*.test.mjs; do`: the globs a `$f` stands for, until `done`
+        for ln in lines:
+            code = ln.split(" #", 1)[0]
+            if ln.lstrip().startswith("#"):
+                continue
+            loop = re.match(r"^\s*for\s+(\w+)\s+in\s+(.+?);\s*do\b", code)
+            if loop:
+                loops[loop.group(1)] = self._words(loop.group(2))
+            elif re.match(r"^\s*done\b", code):
+                loops.clear()
+            m = re.search(r"\bnode\s+--test\s+(.+)$", code)
+            if m:
+                for a in self._words(m.group(1), stop=True):
+                    if a.startswith("-"):
+                        continue
+                    if a.startswith("$"):
+                        found += loops.get(a.strip("${}"), [])
+                    else:
+                        found.append(a)
+        return found
 
     @staticmethod
     def _words(text: str, stop: bool = False) -> list:

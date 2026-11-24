@@ -1,9 +1,10 @@
 """Every commit, tag and tagger of this repository carries a GitHub noreply address, and
 the series' CI is red when one does not.
 
-series.yml judges pull requests and main inline (a workflow a pull request starts may not
-call another repository's workflow); noreply-identity.yml judges the branches and tags
-series.yml does not see. Both read the judge from main of the core.
+checks.yml (called by series.yml on pull requests and main, and by release.yml on every candidate)
+judges them inline (a workflow a pull request starts may not call another repository's workflow);
+noreply-identity.yml judges the branches and tags series.yml does not see. Both read the judge from
+main of the core.
 
     python -m pytest tools/tests
 """
@@ -35,18 +36,20 @@ def test_a_workflow_that_exists_only_at_the_root_is_declared_so():
     assert {"series.yml", "noreply-identity.yml"} <= engine.ROOT_ONLY_WORKFLOWS
 
 
-def test_series_yml_gate_waits_for_the_identity_check_and_always_runs():
+def test_series_yml_gate_waits_for_the_checks_that_hold_the_identity_check_and_always_runs():
     doc = _load("series.yml")
     gate = doc["jobs"]["gate"]
     assert gate["if"] == "always()"
-    assert set(gate["needs"]) == {"rules", "rebuilds", "noreply-identity"}
+    assert set(gate["needs"]) == {"checks"}
+    assert doc["jobs"]["checks"]["uses"] == "./.github/workflows/checks.yml"
+    assert "noreply-identity" in _load("checks.yml")["jobs"]
     script = _steps_text(gate)
     for job in gate["needs"]:
         assert 'needs.%s.result }}" = "success"' % job in script, job
 
 
-def test_the_identity_job_of_series_yml_is_inline_and_reads_the_judge_from_main_of_the_core():
-    job = _load("series.yml")["jobs"]["noreply-identity"]
+def test_the_identity_job_of_checks_yml_is_inline_and_reads_the_judge_from_main_of_the_core():
+    job = _load("checks.yml")["jobs"]["noreply-identity"]
     assert "uses" not in job
     assert job["runs-on"] == "ubuntu-latest" and job["timeout-minutes"] == 10
     checkouts = [s["with"] for s in job["steps"] if s.get("uses", "").startswith("actions/checkout@")]

@@ -1,4 +1,4 @@
-"""The rules job of series.yml installs every module the repository's tools and tests
+"""The rules job of checks.yml (the one workflow both rounds call) installs every module the repository's tools and tests
 import that Python does not ship.
 
 On 2026-11-05 test_node_jobs_find_their_scripts.py started reading the workflows with
@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-SERIES_YML = ROOT / ".github" / "workflows" / "series.yml"
+SERIES_YML = ROOT / ".github" / "workflows" / "checks.yml"
 # The import name and the name pip installs it by, where they differ.
 PIP_NAME = {"yaml": "pyyaml"}
 
@@ -41,7 +41,7 @@ def rules_job_installs():
     what is missing even where yaml itself is the thing missing."""
     text = SERIES_YML.read_text(encoding="utf-8")
     job = re.search(r"^  rules:\n(.*?)(?=^  \S|\Z)", text, re.M | re.S)
-    assert job, "series.yml has no rules job"
+    assert job, "checks.yml has no rules job"
     installed = set()
     for line in re.findall(r"pip install ([^\n]+)", job.group(1)):
         installed |= {w.lower() for w in line.split() if not w.startswith("-")}
@@ -50,5 +50,5 @@ def rules_job_installs():
 
 def test_the_rules_job_installs_every_module_the_tools_import():
     missing = sorted(n for n in imported_from_outside() if PIP_NAME.get(n, n).lower() not in rules_job_installs())
-    assert not missing, ("the rules job of series.yml does not install %s, which tools/ imports: "
+    assert not missing, ("the rules job of checks.yml does not install %s, which tools/ imports: "
                          "add it to its pip install line" % ", ".join(PIP_NAME.get(n, n) for n in missing))
