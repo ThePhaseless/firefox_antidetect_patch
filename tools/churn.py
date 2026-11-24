@@ -1,0 +1,509 @@
+"""The churn of every hunk of the series: in how many of the last eight Mozilla releases did a line change near it.
+
+A hunk of a hooks.patch touches a span of Mozilla lines (a pure insertion touches the two lines it sits
+between). Its REGION is that span plus PAD lines on each side. The region is first put in the coordinates
+of the pure Mozilla file at the base tag (lines added by the earlier folders of SERIES in the same file are
+not Mozilla's and are skipped), then walked back through `git diff -U0` of every pair of consecutive
+release tags: an interval counts when some diff hunk overlaps the region, and the region is moved into the
+older file's coordinates before the next interval. A file that does not exist in the older release counts
+as changed in the interval where it appears. The churn of a hunk is the number of intervals that count.
+
+    python tools/churn.py --source <firefox repo> --base FIREFOX_159_0_RELEASE [--releases <tag,...>] [--write]
+
+--releases is the chain of release tags, oldest first, ending with the base: eight intervals are nine tags
+(default: the eight releases before the base, `FIREFOX_<N>_0_RELEASE`). The tags must exist in --source; a
+missing one is named with the command that fetches it, nothing is fetched here.
+
+tools/churn.json: {"base", "releases", "band", "hooks": [{key, folder, file, hunk, churn, which}]} sorted by
+folder, file, hunk; the same input gives the same bytes on every machine. The key is the one of
+tools/hook_contract.py (rule|folder|file|function|sha1(normalized text)[:12]) with the rule `H` and the
+changed lines of the hunk as the text: no line number, so a hunk that only moved keeps its key. A hunk of a
+backport folder is in the file with its folder (it is not a hook). `band`: a hunk is in the band when its
+churn is at least that many (BAND_MIN_CHURN).
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import subprocess
+import sys
+from collections import Counter
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import hook_contract  # noqa: E402
+
+ROOT = Path(__file__).resolve().parent.parent
+OUTPUT = ROOT / "tools" / "churn.json"
+PAD = 3                  # lines of Mozilla's code either side of a hunk that count as "near" it
+WINDOW = 8               # releases (intervals) looked back from the base
+BAND_MIN_CHURN = 2       # a hunk is in the band when this many of the intervals changed near it
+
+HUNK_HEADER = re.compile(rb"@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@ ?(.*)$")
+TAG = re.compile(r"^FIREFOX_(\d+(?:_\d+)*)_RELEASE$")
+PATH_BATCH = 24000       # bytes of paths on one command line
+
+
+class ChurnError(Exception):
+    """Something the caller can fix: a missing tag, a patch that does not apply."""
+
+
+# --------------------------------------------------------------------------- tags
+def release_label(tag: str) -> str:
+    """FIREFOX_152_0_RELEASE -> 152, FIREFOX_160_0_1_RELEASE -> 160.0.1"""
+    m = TAG.match(tag)
+    if not m:
+        return tag
+    parts = m.group(1).split("_")
+    if len(parts) > 1 and parts[-1] == "0" and len(parts) == 2:
+        parts = parts[:1]
+    return ".".join(parts)
+
+
+def default_releases(base: str) -> list:
+    """The chain of the eight releases before `base`, base last: FIREFOX_151_0_RELEASE .. FIREFOX_159_0_RELEASE."""
+    m = re.match(r"^FIREFOX_(\d+)_0_RELEASE$", base)
+    if not m:
+        raise ChurnError("cannot derive the earlier releases of %s: pass --releases" % base)
+    n = int(m.group(1))
+    return ["FIREFOX_%d_0_RELEASE" % i for i in range(n - WINDOW, n + 1)]
+
+
+def git(source, *args, check=True, input_bytes=None) -> subprocess.CompletedProcess:
+    done = subprocess.run(["git", "--literal-pathspecs", "-C", str(source), "-c", "core.quotepath=off",
+                           *args], capture_output=True, input=input_bytes)
+    if check and done.returncode:
+        raise ChurnError("git %s: %s" % (" ".join(args[:3]), done.stderr.decode(errors="replace").strip()))
+    return done
+
+
+def mozilla_repository() -> str:
+    try:
+        return json.loads((ROOT / "UPSTREAM.json").read_text(encoding="utf-8"))["mozilla_repository"]
+    except (OSError, ValueError, KeyError):
+        return "<the Mozilla repository>"
+
+
+def check_tags(source, tags: list) -> None:
+    """Every tag must be in the source; says which are not and how to fetch them, fetches nothing."""
+    missing = [t for t in tags
+               if git(source, "rev-parse", "-q", "--verify", "refs/tags/%s^{commit}" % t, check=False).returncode]
+    if missing:
+        url = mozilla_repository()
+        raise ChurnError("the source repository lacks the tags: %s\nfetch each with: git -C <source> fetch --depth=1 %s %s"
+                         % (", ".join(missing), url, "refs/tags/<tag>:refs/tags/<tag>"))
+
+
+# --------------------------------------------------------------------------- reading a hooks.patch
+def lines_of(data: bytes) -> list:
+    parts = data.split(b"\n")
+    out = [l + b"\n" for l in parts[:-1]]
+    if parts[-1]:
+        out.append(parts[-1])
+    return out
+
+
+def parse_patch(text: bytes) -> list:
+    """-> [dict(path, deleted, hunks=[dict(os, oc, section, lines=[(tag, bytes)])])]; the bytes of a line keep
+    their newline (and a carriage return), so they compare equal to the lines of the file."""
+    files, cur, i = [], None, 0
+    rows = text.split(b"\n")
+    if rows and rows[-1] == b"":
+        rows.pop()
+    n = len(rows)
+    while i < n:
+        raw = rows[i]
+        if raw.startswith(b"diff --git "):
+            _, path = hook_contract._split_diff_header(raw[len(b"diff --git "):].decode("utf-8", "replace"))
+            cur = {"path": path, "deleted": False, "hunks": []}
+            files.append(cur)
+            i += 1
+            continue
+        if cur is None:
+            i += 1
+            continue
+        if not cur["hunks"] and raw.startswith(b"deleted file mode"):
+            cur["deleted"] = True
+        m = HUNK_HEADER.match(raw)
+        if not m:
+            i += 1
+            continue
+        oc = int(m.group(2)) if m.group(2) is not None else 1
+        nc = int(m.group(4)) if m.group(4) is not None else 1
+        hunk = {"os": int(m.group(1)), "oc": oc, "section": m.group(5).decode("utf-8", "replace").strip(), "lines": []}
+        cur["hunks"].append(hunk)
+        i += 1
+        ro, rn = oc, nc
+        while (ro > 0 or rn > 0) and i < n:
+            raw = rows[i]
+            tag = raw[:1]
+            if tag == b"\\":
+                i += 1
+                continue
+            if tag == b"+":
+                rn -= 1
+            elif tag == b"-":
+                ro -= 1
+            elif tag == b" " or raw == b"":
+                ro -= 1
+                rn -= 1
+                tag = b" "
+            else:
+                break
+            hunk["lines"].append((tag, raw[1:] + b"\n"))
+            i += 1
+        while i < n and rows[i].startswith(b"\\"):       # "\ No newline at end of file" belongs to the line before
+            if hunk["lines"]:
+                t, c = hunk["lines"][-1]
+                hunk["lines"][-1] = (t, c[:-1] if c.endswith(b"\n") else c)
+            i += 1
+    return files
+
+
+def sides(h: dict):
+    return ([c for t, c in h["lines"] if t in (b" ", b"-")], [c for t, c in h["lines"] if t in (b" ", b"+")])
+
+
+def start_index(h: dict) -> int:
+    """0-based index in the old file where the old side of the hunk starts (`-N,0` names the line BEFORE the insertion)."""
+    return h["os"] if h["oc"] == 0 else h["os"] - 1
+
+
+def touched_span(h: dict):
+    """(lo, hi): old-side line numbers (1-based) of the lines the hunk changes; an insertion: its two neighbours."""
+    ln = start_index(h) + 1
+    lo = hi = None
+    for t, _ in h["lines"]:
+        if t == b" ":
+            ln += 1
+        elif t == b"-":
+            lo = ln if lo is None else lo
+            hi = ln
+            ln += 1
+        else:
+            lo = ln - 1 if lo is None else lo
+            hi = max(hi or 0, ln)
+    return lo, hi
+
+
+def locate(content: list, h: dict):
+    """Index in `content` where the old side of the hunk matches: the expected place, else the nearest."""
+    old, _ = sides(h)
+    expected = start_index(h)
+    if content[expected:expected + len(old)] == old:
+        return expected
+    best = None
+    for p in range(0, len(content) - len(old) + 1):
+        if content[p:p + len(old)] == old and (best is None or abs(p - expected) < abs(best - expected)):
+            best = p
+    return best
+
+
+def hunk_key(folder: str, path: str, h: dict) -> str:
+    text = "\n".join(t.decode() + c.decode("utf-8", "replace").rstrip("\n") for t, c in h["lines"] if t != b" ")
+    return hook_contract._key("H", folder, path, h["section"], text)
+
+
+# --------------------------------------------------------------------------- the regions of the series at the base tag
+def series_folders(root: Path) -> list:
+    return (Path(root) / "SERIES").read_text(encoding="utf-8").split()
+
+
+def regions(root, base_blob, warn=None) -> list:
+    """The hunks of every hooks.patch of SERIES, in SERIES order, each with its region in the coordinates of the
+    pure Mozilla file at the base: [dict(folder, file, hunk, key, region)]; region is None when the file is not at
+    the base (a file the series adds). `base_blob(path)` -> bytes or None, the file at the base tag.
+    The folders are layered: a folder's hunks are located in the file as the folders before it left it."""
+    root = Path(root)
+    warn = warn if warn is not None else []
+    content, mapping, out = {}, {}, []
+    for folder in series_folders(root):
+        patch = root / folder / "hooks.patch"
+        if not patch.is_file():
+            continue
+        for fd in parse_patch(patch.read_bytes()):
+            path = fd["path"]
+            if path not in content:
+                blob = base_blob(path)
+                if blob is None:
+                    content[path], mapping[path] = None, []
+                    warn.append("%s: not in the base tag" % path)
+                else:
+                    content[path] = lines_of(blob)
+                    mapping[path] = list(range(1, len(content[path]) + 1))
+            body, m = content[path] or [], mapping[path]
+            absent = content[path] is None
+            newc, newm, cursor, seen = [], [], 0, Counter()
+            for no, h in enumerate(fd["hunks"], 1):
+                p = locate(body, h)
+                if p is None:
+                    warn.append("%s %s hunk %d: the old side is not in the layered file" % (folder, path, no))
+                    p = start_index(h)
+                elif p != start_index(h):
+                    warn.append("%s %s hunk %d: offset %d" % (folder, path, no, p - start_index(h)))
+                lo, hi = touched_span(h)
+                shift = p - start_index(h)
+                lo, hi = lo + shift, hi + shift
+                region = None
+                if not absent:
+                    mapped = [m[x - 1] for x in range(max(1, lo - PAD), min(len(m), hi + PAD) + 1) if m[x - 1] is not None]
+                    if mapped:
+                        region = (min(mapped), max(mapped))
+                    else:                       # every neighbour was added by an earlier folder: the nearest Mozilla line
+                        below = [m[x] for x in range(max(0, lo - 1), -1, -1) if m[x] is not None][:1]
+                        above = [m[x] for x in range(max(0, lo - 1), len(m)) if m[x] is not None][:1]
+                        near = (below or above or [1])[0]
+                        region = (near, near)
+                        warn.append("%s %s hunk %d: every neighbour is added by an earlier folder, anchored at %d" % (folder, path, no, near))
+                    if fd["deleted"]:
+                        region = (1, max([x for x in m if x is not None] or [1]))
+                key = hunk_key(folder, path, h)
+                seen[key] += 1
+                out.append({"folder": folder, "file": path, "hunk": no,
+                            "key": key if seen[key] == 1 else "%s#%d" % (key, seen[key]), "region": region})
+                # the layered file after this hunk: Mozilla's lines keep their number, a line of ours has none
+                newc.extend(body[cursor:p])
+                newm.extend(m[cursor:p])
+                old, _ = sides(h)
+                kept, oi = m[p:p + len(old)], 0
+                for t, c in h["lines"]:
+                    if t == b" ":
+                        newc.append(c)
+                        newm.append(kept[oi] if oi < len(kept) else None)
+                        oi += 1
+                    elif t == b"-":
+                        oi += 1
+                    else:
+                        newc.append(c)
+                        newm.append(None)
+                cursor = p + len(old)
+            newc.extend(body[cursor:])
+            newm.extend(m[cursor:])
+            if not absent:
+                content[path], mapping[path] = newc, newm
+    return out
+
+
+# --------------------------------------------------------------------------- the walk through the releases
+def overlaps_new(hs: list, lo: int, hi: int) -> bool:
+    """Does some diff hunk (a, b, c, d) = -a,b +c,d touch [lo, hi] of the NEW file."""
+    for _, _, c, d in hs:
+        if d > 0:
+            if c <= hi and c + d - 1 >= lo:
+                return True
+        elif lo - 1 <= c <= hi:
+            return True
+    return False
+
+
+def map_new_to_old(hs: list, lo: int, hi: int):
+    """A region [lo, hi] of the new file -> the same region of the old one."""
+    def one(x, left):
+        delta = 0
+        for a, b, c, d in hs:
+            if d > 0:
+                if x > c + d - 1:
+                    delta += d - b
+                    continue
+                if x >= c:                              # inside the new range of the hunk
+                    if b > 0:
+                        return a if left else a + b - 1
+                    return a + 1 if left else a
+                break
+            if x > c:
+                delta += d - b
+                continue
+            break
+        return x - delta
+    nl, nh = one(lo, True), one(hi, False)
+    if nl > nh:
+        nl = nh = max(1, min(nl, nh))
+    return max(1, nl), max(1, nh)
+
+
+class Releases:
+    """The files of a chain of release tags in a repository: existence, and `git diff -U0` between neighbours."""
+
+    def __init__(self, source, tags: list, paths: list):
+        self.source, self.tags = source, tags
+        self._exists, self._diff, self._rename = {}, {}, {}
+        paths = sorted(set(paths))
+        query = "".join("%s:%s\n" % (t, p) for t in tags for p in paths).encode()
+        rows = git(source, "cat-file", "--batch-check", input_bytes=query).stdout.decode("utf-8", "replace").splitlines() if paths else []
+        i = 0
+        for t in tags:
+            for p in paths:
+                self._exists[(t, p)] = not rows[i].endswith(" missing")
+                i += 1
+        self.paths = paths
+
+    def exists(self, k: int, path: str) -> bool:
+        return self._exists.get((self.tags[k], path), False)
+
+    def blob(self, k: int, path: str):
+        done = git(self.source, "show", "%s:%s" % (self.tags[k], path), check=False)
+        return done.stdout if done.returncode == 0 else None
+
+    @staticmethod
+    def _parse(out: bytes) -> dict:
+        files, path = {}, None
+        for row in out.split(b"\n"):
+            if row.startswith(b"diff --git "):
+                m = re.match(rb"diff --git a/(.*) b/(.*)$", row)
+                path = m.group(2).decode("utf-8", "replace")
+                files[path] = []
+                continue
+            m = HUNK_HEADER.match(row)
+            if m and path is not None:
+                files[path].append((int(m.group(1)), int(m.group(2)) if m.group(2) is not None else 1,
+                                    int(m.group(3)), int(m.group(4)) if m.group(4) is not None else 1))
+        return files
+
+    def _interval(self, k: int) -> dict:
+        """The hunks of every file present in both tags of the interval k (tags[k] -> tags[k+1]), by path."""
+        if k not in self._diff:
+            both = [p for p in self.paths if self.exists(k, p) and self.exists(k + 1, p)]
+            flags = ["diff", "-U0", "--no-color", "--no-renames", "--no-ext-diff", "--no-textconv",
+                     "--src-prefix=a/", "--dst-prefix=b/", self.tags[k], self.tags[k + 1], "--"]
+            got, batch, size = {}, [], 0
+            for p in both + [None]:
+                if p is None or size + len(p) + 1 > PATH_BATCH:
+                    if batch:
+                        got.update(self._parse(git(self.source, *flags, *batch).stdout))
+                    batch, size = [], 0
+                if p is not None:
+                    batch.append(p)
+                    size += len(p) + 1
+            self._diff[k] = got
+        return self._diff[k]
+
+    def hunks(self, k: int, old_path: str, new_path: str) -> list:
+        if old_path == new_path:
+            return self._interval(k).get(new_path, [])
+        key = (k, old_path, new_path)
+        if key not in self._diff:
+            done = git(self.source, "diff", "-U0", "--no-color", "--no-renames", "--no-ext-diff", "--no-textconv",
+                       "%s:%s" % (self.tags[k], old_path), "%s:%s" % (self.tags[k + 1], new_path), check=False)
+            self._diff[key] = self._hunks_of_blobs(done.stdout)
+        return self._diff[key]
+
+    @staticmethod
+    def _hunks_of_blobs(out: bytes) -> list:
+        hs = []
+        for row in out.split(b"\n"):
+            m = HUNK_HEADER.match(row)
+            if m:
+                hs.append((int(m.group(1)), int(m.group(2)) if m.group(2) is not None else 1,
+                           int(m.group(3)), int(m.group(4)) if m.group(4) is not None else 1))
+        return hs
+
+    def renamed_from(self, k: int, new_path: str):
+        """The path in tags[k] of a file that is `new_path` in tags[k+1] (git -M50%), or None."""
+        if k not in self._rename:
+            names = {}
+            for row in git(self.source, "diff", "--name-status", "-M50%", self.tags[k], self.tags[k + 1]).stdout.decode("utf-8", "replace").splitlines():
+                parts = row.split("\t")
+                if parts[0].startswith("R") and len(parts) == 3:
+                    names[parts[2]] = parts[1]
+            self._rename[k] = names
+        return self._rename[k].get(new_path)
+
+
+def walk(rel: Releases, path: str, lo: int, hi: int) -> list:
+    """The intervals (as the index of their newer tag) in which something changed within [lo, hi] of `path` at the
+    last tag, newest first."""
+    changed, cur = [], path
+    for k in range(len(rel.tags) - 2, -1, -1):          # the interval tags[k] -> tags[k+1]; `cur` is the path in tags[k+1]
+        if not rel.exists(k + 1, cur):
+            break
+        old = cur
+        if not rel.exists(k, cur):
+            old = rel.renamed_from(k, cur)
+            if not old or not rel.exists(k, old):       # the file appears in this interval
+                changed.append(k + 1)
+                break
+        hs = rel.hunks(k, old, cur)
+        if overlaps_new(hs, lo, hi):
+            changed.append(k + 1)
+        lo, hi = map_new_to_old(hs, lo, hi)
+        cur = old
+    return changed
+
+
+# --------------------------------------------------------------------------- the result
+def in_band(churn: int) -> bool:
+    return churn >= BAND_MIN_CHURN
+
+
+def compute(root, source, base: str, releases: list | None = None, warn=None) -> dict:
+    """The data of tools/churn.json for the series in `root`, the Mozilla tags in `source`."""
+    releases = list(releases) if releases else default_releases(base)
+    if releases[-1] != base:
+        raise ChurnError("the chain of releases must end with the base %s (it ends with %s)" % (base, releases[-1]))
+    if len(set(releases)) != len(releases) or len(releases) < 2:
+        raise ChurnError("the releases are not a chain of distinct tags: %s" % ", ".join(releases))
+    check_tags(source, releases)
+    warn = warn if warn is not None else []
+    last = len(releases) - 1
+    paths = set()
+    for folder in series_folders(root):
+        patch = Path(root) / folder / "hooks.patch"
+        if patch.is_file():
+            paths.update(fd["path"] for fd in parse_patch(patch.read_bytes()))
+    rel = Releases(source, releases, list(paths))
+    found = regions(root, lambda p: rel.blob(last, p) if rel.exists(last, p) else None, warn)
+    labels = [release_label(t) for t in releases]
+    hooks = []
+    for r in found:
+        which = [] if r["region"] is None else [labels[k] for k in walk(rel, r["file"], *r["region"])]
+        which.sort(key=labels.index)
+        hooks.append({"key": r["key"], "folder": r["folder"], "file": r["file"], "hunk": r["hunk"],
+                      "churn": len(which), "which": which})
+    hooks.sort(key=lambda h: (h["folder"], h["file"], h["hunk"], h["key"]))
+    return {"base": base, "releases": releases, "band": BAND_MIN_CHURN, "hooks": hooks}
+
+
+def render(data: dict) -> bytes:
+    """The bytes of tools/churn.json: fixed key order, one-space indent, `\\n`, UTF-8, a final newline."""
+    return (json.dumps(data, indent=1, ensure_ascii=False) + "\n").encode("utf-8")
+
+
+def distribution(data: dict) -> dict:
+    return dict(sorted(Counter(h["churn"] for h in data["hooks"]).items()))
+
+
+def summary(data: dict) -> str:
+    dist = distribution(data)
+    top = max(list(dist) + [len(data["releases"]) - 1])
+    banded = sum(1 for h in data["hooks"] if in_band(h["churn"]))
+    return "\n".join(["%d hunks, base %s, %d intervals" % (len(data["hooks"]), data["base"], len(data["releases"]) - 1),
+                      "churn: " + "  ".join("%d:%d" % (c, dist.get(c, 0)) for c in range(top + 1)),
+                      "in the band (churn >= %d): %d" % (data["band"], banded)])
+
+
+def main(argv=None) -> int:
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--source", type=Path, required=True, help="a repository that has the Mozilla release tags")
+    ap.add_argument("--base", required=True, help="the Mozilla tag of the series, the last of the chain")
+    ap.add_argument("--releases", help="the tags, oldest first, comma separated, ending with the base (default: the eight before it)")
+    ap.add_argument("--write", action="store_true", help="write tools/churn.json (else only print the summary)")
+    ap.add_argument("--series", type=Path, default=ROOT, help="the series root (default: this repository)")
+    a = ap.parse_args(argv)
+    warn = []
+    try:
+        data = compute(a.series, a.source, a.base, a.releases.split(",") if a.releases else None, warn)
+    except ChurnError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    for w in warn:
+        print("warning: " + w, file=sys.stderr)
+    print(summary(data))
+    if a.write:
+        OUTPUT.write_bytes(render(data))
+        print("wrote %s" % OUTPUT.relative_to(ROOT).as_posix())
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

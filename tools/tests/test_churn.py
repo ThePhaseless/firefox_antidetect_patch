@@ -1,0 +1,276 @@
+"""The churn of the series' hunks (tools/churn.py), each rule shown on a small repository built here.
+
+Mozilla's releases are four tags of a few files; the series is one or two folders with a hooks.patch. The tests break one thing at a time:
+
+  * a region is walked through the lines Mozilla inserted and deleted before it (a change that is only near by the wrong coordinates is not counted);
+  * a hunk that inserts a line (no line of Mozilla touched) has its two neighbours, plus 3 lines each side, as its region, and the edge is exact;
+  * a file that appears in a later release counts as changed in the release where it appears;
+  * a hunk of a later folder is placed by Mozilla's lines, not by the lines an earlier folder added to the file;
+  * the file is the same bytes for the same input, wherever it is built;
+  * the band is the churn the constant says, and the file says which;
+  * the numbers of three hunks of the real series at the base 159 equal the ones measured with the first tool (skipped when the release tags are
+    not in the repository named by CHURN_TAGS_REPO).
+
+    python -m pytest tools/tests/test_churn.py
+"""
+import difflib
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import churn  # noqa: E402
+
+TAGS = ["FIREFOX_151_0_RELEASE", "FIREFOX_152_0_RELEASE", "FIREFOX_153_0_RELEASE", "FIREFOX_154_0_RELEASE"]
+BASE = TAGS[-1]
+IDENTITY = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.invalid", "GIT_COMMITTER_NAME": "t",
+            "GIT_COMMITTER_EMAIL": "t@example.invalid"}
+
+
+def git(repo, *args):
+    done = subprocess.run(["git", "-C", str(repo), "-c", "core.autocrlf=false", *args], capture_output=True,
+                          env=dict(os.environ, **IDENTITY))
+    assert done.returncode == 0, done.stderr.decode()
+    return done.stdout
+
+
+def numbered(n, prefix="line"):
+    return ["%s %d" % (prefix, i) for i in range(1, n + 1)]
+
+
+def releases():
+    """a.txt: R1 40 lines; R2 five lines inserted at the top; R3 'line 20' edited; R4 (the base) the first three lines deleted.
+    b.txt: appears in R3. c.txt: appears in R4. d.txt: line 10 edited in R2 and again in R3, as it is in R4."""
+    a1 = numbered(40)
+    a2 = numbered(5, "new") + a1
+    a3 = [("line 20 edited" if l == "line 20" else l) for l in a2]
+    a4 = a3[3:]
+    d1 = numbered(20, "d")
+    d2 = [("d 10 first" if l == "d 10" else l) for l in d1]
+    d3 = [("d 10 second" if l == "d 10 first" else l) for l in d2]
+    return [
+        {"a.txt": a1, "d.txt": d1},
+        {"a.txt": a2, "d.txt": d2},
+        {"a.txt": a3, "d.txt": d3, "b.txt": numbered(12, "b")},
+        {"a.txt": a4, "d.txt": d3, "b.txt": numbered(12, "b"), "c.txt": numbered(12, "c")},
+    ]
+
+
+@pytest.fixture()
+def source(tmp_path):
+    repo = tmp_path / "mozilla"
+    repo.mkdir()
+    git(repo, "init", "-q")
+    for tag, files in zip(TAGS, releases()):
+        for old in repo.glob("*.txt"):
+            old.unlink()
+        for name, lines in files.items():
+            (repo / name).write_bytes(("\n".join(lines) + "\n").encode())
+        git(repo, "add", "-A")
+        git(repo, "commit", "-q", "--allow-empty", "-m", tag)
+        git(repo, "tag", tag)
+    return repo
+
+
+def patch_text(name, old, new, context=3):
+    body = list(difflib.unified_diff(old, new, "a/" + name, "b/" + name, n=context, lineterm=""))
+    return "diff --git a/%s b/%s\n%s\n" % (name, name, "\n".join(body))
+
+
+def series(root, folders):
+    """folders: [(name, patch text)] in order -> a series root."""
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "SERIES").write_text("\n".join(n for n, _ in folders) + "\n", encoding="utf-8")
+    for name, text in folders:
+        (root / name).mkdir(parents=True, exist_ok=True)
+        (root / name / "hooks.patch").write_bytes(text.encode())
+    return root
+
+
+def edit(lines, number, text):
+    out = list(lines)
+    out[number - 1] = text
+    return out
+
+
+def blob_of(lines):
+    return lambda p: ("\n".join(lines) + "\n").encode() if p in ("a.txt", "d.txt") else None
+
+
+def by_hunk(data):
+    return {(h["folder"], h["file"], h["hunk"]): h for h in data["hooks"]}
+
+
+def run(root, source):
+    return churn.compute(root, source, BASE, TAGS)
+
+
+A4 = releases()[3]["a.txt"]
+D4 = releases()[3]["d.txt"]
+
+
+def test_a_region_is_walked_through_the_lines_mozilla_inserted_and_deleted_before_it(tmp_path, source):
+    # in the base "line 20 edited" (Mozilla's R3 edit) is line 22; "line 22" is line 24 (near), "line 25" is line 27 (5 away: not near)
+    assert A4[21] == "line 20 edited" and A4[23] == "line 22" and A4[26] == "line 25"
+    near = patch_text("a.txt", A4, edit(A4, 24, "line 22 hook"))
+    far = patch_text("a.txt", A4, edit(A4, 27, "line 25 hook"))
+    data = run(series(tmp_path / "s", [("fingerprint/near", near), ("fingerprint/far", far)]), source)
+    h = by_hunk(data)
+    assert h[("fingerprint/near", "a.txt", 1)]["which"] == ["153"] and h[("fingerprint/near", "a.txt", 1)]["churn"] == 1
+    assert h[("fingerprint/far", "a.txt", 1)]["which"] == [] and h[("fingerprint/far", "a.txt", 1)]["churn"] == 0
+    # the R1 -> R2 insertion at the top and the R3 -> R4 deletion at the top are not "near" the lines they shift
+    assert all(x["churn"] <= 1 for x in data["hooks"])
+
+
+def test_the_edge_of_the_region_is_three_lines(tmp_path, source):
+    # Mozilla's edit is base line 22. A rewrite of line 25 touches 25 and the line after it (the first tool's span), so its region is 22..29 (near); of line 26, 23..30 (not)
+    on25 = patch_text("a.txt", A4, edit(A4, 25, "x"))
+    on26 = patch_text("a.txt", A4, edit(A4, 26, "x"))
+    h = by_hunk(run(series(tmp_path / "s", [("fingerprint/a", on25), ("fingerprint/b", on26)]), source))
+    assert h[("fingerprint/a", "a.txt", 1)]["churn"] == 1
+    assert h[("fingerprint/b", "a.txt", 1)]["churn"] == 0
+
+
+def test_an_insertion_hunk_has_its_two_neighbours_as_the_region(tmp_path, source):
+    # an insertion between base lines 25 and 26: neighbours 25, 26, region 22..29, reaches Mozilla's edit of line 22; between 26 and 27: 23..30, does not
+    after25 = patch_text("a.txt", A4, A4[:25] + ["hook"] + A4[25:], context=0)
+    after26 = patch_text("a.txt", A4, A4[:26] + ["hook"] + A4[26:], context=0)
+    assert "@@ -25,0 +26 @@" in after25
+    one = series(tmp_path / "one", [("fingerprint/a", after25)])
+    two = series(tmp_path / "two", [("fingerprint/b", after26)])
+    assert [r["region"] for r in churn.regions(one, blob_of(A4))] == [(22, 29)]
+    assert [r["region"] for r in churn.regions(two, blob_of(A4))] == [(23, 30)]
+    assert run(one, source)["hooks"][0]["which"] == ["153"]
+    assert run(two, source)["hooks"][0]["which"] == []
+
+
+def test_a_file_that_appears_in_a_later_release_is_changed_where_it_appears(tmp_path, source):
+    b = releases()[3]["b.txt"]
+    c = releases()[3]["c.txt"]
+    root = series(tmp_path / "s", [("fingerprint/b", patch_text("b.txt", b, edit(b, 6, "x"))),
+                                   ("fingerprint/c", patch_text("c.txt", c, edit(c, 6, "x")))])
+    h = by_hunk(run(root, source))
+    assert h[("fingerprint/b", "b.txt", 1)]["which"] == ["153"]      # absent in 151 and 152, new in 153
+    assert h[("fingerprint/c", "c.txt", 1)]["which"] == ["154"]      # new in the last interval
+
+
+def test_a_file_the_series_adds_is_not_churn(tmp_path, source):
+    new = "diff --git a/e.txt b/e.txt\nnew file mode 100644\n--- /dev/null\n+++ b/e.txt\n@@ -0,0 +1,2 @@\n+one\n+two\n"
+    warned = []
+    data = churn.compute(series(tmp_path / "s", [("fingerprint/e", new)]), source, BASE, TAGS, warned)
+    assert data["hooks"][0]["churn"] == 0 and data["hooks"][0]["which"] == []
+    assert any("not in the base" in w for w in warned)
+
+
+def test_a_later_folder_is_placed_by_mozillas_lines_not_by_the_lines_an_earlier_folder_added(tmp_path, source):
+    after_first = ["hook one", "hook two"] + A4
+    first = patch_text("a.txt", A4, after_first)
+    # layered line 27 is Mozilla's line 25, its region 22..29; Mozilla's edit of line 22 is in it (the offset of 2 must not move it to 24..31)
+    second = patch_text("a.txt", after_first, edit(after_first, 27, "x"))
+    root = series(tmp_path / "s", [("fingerprint/one", first), ("fingerprint/two", second)])
+    found = churn.regions(root, blob_of(A4))
+    assert [(r["folder"], r["region"]) for r in found] == [("fingerprint/one", (1, 4)), ("fingerprint/two", (22, 29))]
+    h = by_hunk(run(root, source))
+    assert h[("fingerprint/two", "a.txt", 1)]["which"] == ["153"]
+
+
+def test_the_edges_of_a_diff_between_releases():
+    # (a, b, c, d) = -a,b +c,d ; Mozilla deleted old lines 5..6 (d == 0, the new side sits after line 4)
+    deleted = [(5, 2, 4, 0)]
+    assert churn.overlaps_new(deleted, 5, 8) and churn.overlaps_new(deleted, 1, 4)
+    assert not churn.overlaps_new(deleted, 6, 8) and not churn.overlaps_new(deleted, 1, 3)
+    assert churn.overlaps_new([(10, 0, 11, 2)], 12, 14) and not churn.overlaps_new([(10, 0, 11, 2)], 13, 14)
+    assert churn.map_new_to_old([(0, 0, 1, 5)], 27, 33) == (22, 28)                  # five lines inserted at the top
+    assert churn.map_new_to_old([(1, 3, 0, 0)], 21, 27) == (24, 30)                  # three lines deleted at the top
+
+
+def test_the_file_is_the_same_bytes_wherever_it_is_built(tmp_path, source):
+    folders = [("fingerprint/a", patch_text("a.txt", A4, edit(A4, 24, "x"))),
+               ("network/b", patch_text("d.txt", D4, edit(D4, 10, "x")))]
+    one = churn.render(run(series(tmp_path / "one", folders), source))
+    two = churn.render(run(series(tmp_path / "elsewhere" / "deeper", folders), source))
+    assert one == two
+    assert one.endswith(b"\n") and b"\r" not in one
+    hooks = json.loads(one)["hooks"]
+    assert hooks == sorted(hooks, key=lambda h: (h["folder"], h["file"], h["hunk"]))
+    assert list(hooks[0]) == ["key", "folder", "file", "hunk", "churn", "which"]
+
+
+def test_the_band_is_a_churn_of_two_and_the_file_says_so(tmp_path, source, monkeypatch):
+    # d.txt line 10 was edited in 152 and in 153: a hunk near it has churn 2
+    root = series(tmp_path / "s", [("fingerprint/d", patch_text("d.txt", D4, edit(D4, 11, "x"))),
+                                   ("fingerprint/a", patch_text("a.txt", A4, edit(A4, 24, "x")))])
+    data = run(root, source)
+    h = by_hunk(data)
+    assert data["band"] == churn.BAND_MIN_CHURN == 2
+    assert h[("fingerprint/d", "d.txt", 1)]["which"] == ["152", "153"] and churn.in_band(2)
+    assert h[("fingerprint/a", "a.txt", 1)]["churn"] == 1 and not churn.in_band(1)
+    assert churn.summary(data).splitlines()[-1] == "in the band (churn >= 2): 1"
+    monkeypatch.setattr(churn, "BAND_MIN_CHURN", 3)
+    again = run(root, source)
+    assert again["band"] == 3 and not churn.in_band(2)
+    assert churn.summary(again).splitlines()[-1] == "in the band (churn >= 3): 0"
+
+
+def test_a_hunk_that_moved_keeps_its_key(tmp_path):
+    # the same change one line further down the file: the key has no line number
+    one = series(tmp_path / "one", [("fingerprint/a", patch_text("a.txt", A4, edit(A4, 30, "x")))])
+    moved = ["pad"] + A4
+    two = series(tmp_path / "two", [("fingerprint/a", patch_text("a.txt", moved, edit(moved, 31, "x")))])
+    k1 = [r["key"] for r in churn.regions(one, blob_of(A4))]
+    k2 = [r["key"] for r in churn.regions(two, blob_of(moved))]
+    assert k1 == k2 and k1[0].startswith("H|fingerprint/a|a.txt|")
+
+
+def test_a_missing_tag_is_named_with_the_way_to_fetch_it(tmp_path, source, capsys):
+    root = series(tmp_path / "s", [("fingerprint/a", patch_text("a.txt", A4, edit(A4, 24, "x")))])
+    with pytest.raises(churn.ChurnError) as err:
+        churn.compute(root, source, BASE, ["FIREFOX_150_0_RELEASE"] + TAGS)
+    assert "FIREFOX_150_0_RELEASE" in str(err.value) and "fetch --depth=1" in str(err.value)
+    assert "FIREFOX_151_0_RELEASE" not in str(err.value).split("\n")[0]
+    code = churn.main(["--source", str(source), "--base", BASE, "--series", str(root), "--releases", "FIREFOX_150_0_RELEASE," + BASE])
+    assert code == 2 and "FIREFOX_150_0_RELEASE" in capsys.readouterr().err
+    with pytest.raises(churn.ChurnError):
+        churn.compute(root, source, BASE, TAGS[:2])          # the chain must end with the base
+
+
+def test_the_default_chain_is_the_eight_releases_before_the_base():
+    assert churn.default_releases("FIREFOX_159_0_RELEASE") == ["FIREFOX_%d_0_RELEASE" % n for n in range(151, 160)]
+    assert [churn.release_label(t) for t in ("FIREFOX_152_0_RELEASE", "FIREFOX_160_0_1_RELEASE")] == ["152", "160.0.1"]
+
+
+# --------------------------------------------------------------------------- the real series
+SNAPSHOTS = os.environ.get("CHURN_TAGS_REPO", "")
+REAL = churn.default_releases("FIREFOX_159_0_RELEASE")
+
+
+def snapshots_available():
+    if not SNAPSHOTS or not Path(SNAPSHOTS).exists():
+        return False
+    try:
+        churn.check_tags(SNAPSHOTS, REAL)
+    except churn.ChurnError:
+        return False
+    return True
+
+
+@pytest.mark.skipif(not snapshots_available(),
+                    reason="the Mozilla release tags 151..159 are not in the repository named by CHURN_TAGS_REPO")
+def test_three_hunks_of_the_series_at_159_equal_the_first_measurement():
+    data = churn.compute(churn.ROOT, SNAPSHOTS, "FIREFOX_159_0_RELEASE")
+    h = by_hunk(data)
+    assert h[("fingerprint/fonts/font-list", "gfx/thebes/gfxDWriteFontList.cpp", 5)]["which"] == ["153"]
+    assert h[("network/proxy-udp", "netwerk/socket/nsSOCKSIOLayer.cpp", 1)]["which"] == ["154"]
+    assert h[("platform/hidden-desktop", "dom/media/webrtc/moz.build", 1)]["which"] == ["152", "153", "158"]
+    rel = churn.Releases(SNAPSHOTS, REAL, ["gfx/thebes/gfxDWriteFontList.cpp"])
+    last = len(REAL) - 1
+    found = churn.regions(churn.ROOT, lambda p: rel.blob(last, p) if rel.exists(last, p) else None)
+    region = [r["region"] for r in found if (r["folder"], r["file"], r["hunk"]) ==
+              ("fingerprint/fonts/font-list", "gfx/thebes/gfxDWriteFontList.cpp", 5)]
+    assert region == [(1128, 1135)]
+    committed = json.loads((churn.ROOT / "tools" / "churn.json").read_text(encoding="utf-8"))
+    assert committed["base"] == data["base"] and committed["hooks"] == data["hooks"]
