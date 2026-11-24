@@ -923,9 +923,13 @@ def cases() -> list:
         run_dl = [st for st in steps if st.get("name", "").startswith("Download asset (the run's)")]
         pub_dl = [st for st in steps if st.get("name", "").startswith("Download asset (the published")]
         add("xpcshell.yml: the legs have 15 minutes", doc["jobs"]["xpcshell"]["timeout-minutes"] == 15)
-        add("xpcshell.yml: the published engine is firefox-68 on this workflow's own push (no build_run_id) and never because the caller's event is a push",
-            "inputs.build_run_id == ''" in env["PUBLISHED_TAG"] and "github.event_name == 'push'" in env["PUBLISHED_TAG"] and "'firefox-68'" in env["PUBLISHED_TAG"]
-            and env["PUBLISHED_TAG"].index("inputs.build_run_id == ''") < env["PUBLISHED_TAG"].index("github.event_name") and "inputs.published_tag" in env["PUBLISHED_TAG"])
+        latest = [st for st in steps if "published_release.py" in st.get("run", "")]
+        cond = latest[0].get("if", "") if latest else ""
+        add("xpcshell.yml: the published engine is the input, else the latest published one on this workflow's own push (no build_run_id), and never because the caller's event is a push",
+            env["PUBLISHED_TAG"] == "${{ inputs.published_tag }}" and len(latest) == 1 and "--name PUBLISHED_TAG" in latest[0]["run"] and "--github-env" in latest[0]["run"]
+            and "inputs.published_tag == ''" in cond and "inputs.build_run_id == ''" in cond and "github.event_name == 'push'" in cond
+            and cond.index("inputs.build_run_id == ''") < cond.index("github.event_name") and latest[0]["env"].get("GH_TOKEN") == "${{ github.token }}"
+            and steps.index(latest[0]) < steps.index(run_dl[0]) and steps.index(latest[0]) < steps.index(pub_dl[0]))
         add("xpcshell.yml: the run's artifacts are downloaded only with no published tag, the release's archives only with one",
             len(run_dl) == 1 and run_dl[0]["if"] == "env.PUBLISHED_TAG == ''" and "run-id" in run_dl[0]["with"]
             and len(pub_dl) == 1 and pub_dl[0]["if"] == "env.PUBLISHED_TAG != ''")
@@ -956,9 +960,11 @@ def cases() -> list:
         cand_i = [i for i in idx("--out prefs-out/candidate.json")]
         cmp_i = [i for i in idx("prefs-compare prefs-out/published-1.json prefs-out/candidate.json")]
         pre = [st for st in ps if "download-artifact" in st.get("uses", "") and "linux-deps" not in str((st.get("with") or {}).get("name", ""))]
-        add("xpcshell.yml prefs: a Linux leg and a Windows leg on their native runners, 15 minutes, the baseline is firefox-68",
+        add("xpcshell.yml prefs: a Linux leg and a Windows leg on their native runners, 15 minutes, the baseline is the latest published one (resolved by a step)",
             {(l["runner"], l["kind"]) for l in pj["strategy"]["matrix"]["include"]} == {("ubuntu-24.04", "linux"), ("windows-latest", "win")}
-            and pj["timeout-minutes"] == 15 and pj["env"]["PREFS_BASE_TAG"] == "firefox-68")
+            and pj["timeout-minutes"] == 15 and pj["env"]["PREFS_BASE_TAG"] == ""
+            and len([st for st in ps if "published_release.py" in st.get("run", "") and "--name PREFS_BASE_TAG" in st["run"]]) == 1
+            and idx("published_release.py")[0] < idx("gh release download")[0])
         add("xpcshell.yml prefs: the published engine is the release's archive checked against its seal (verify-asset), the candidate is the run's asset, "
             "a push to latitude/*-oracles uses the dispatch's candidate",
             len(idx("gh release download")) == 1 and len(idx("verify-asset")) == 1 and len(pre) == 1 and "44921963200" in pre[0]["with"]["run-id"] and "build_run_id" in pre[0]["with"]["run-id"]

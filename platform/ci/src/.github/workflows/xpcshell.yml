@@ -15,7 +15,7 @@
 # not the locked one, or fewer tests were collected than `min_tests` of scripts/ci/xpcshell_tests.json. The list grows as the folders land.
 #
 # WHICH ENGINE. The gate calls this with the candidate's build_run_id: the candidate's own archives are what runs. Alone, a push to a branch
-# `latitude/<name>-oracles` (the measurement) runs the PUBLISHED engine, firefox-68 unless `published_tag` says another: the release's archives are
+# `latitude/<name>-oracles` (the measurement) runs the PUBLISHED engine, the latest published firefox-<N> (scripts/ci/published_release.py) unless `published_tag` says another: the release's archives are
 # downloaded with `gh release download` and checked against the sha256 of the release's seal.json (xpcshell_run.py verify-asset), so the verdict of a
 # push is that of the engine users have, with the tests of the series at the commit pushed. `build_run_id` is for the gate call and for a dispatch
 # that names a candidate run; a `published_tag` that is set wins over it.
@@ -42,7 +42,7 @@ on:
         type: string
         default: main
       published_tag:
-        description: a release tag whose archives to test instead of the run's (empty for the candidate's own)
+        description: a release tag whose archives to test instead of the run's (empty - the candidate's own, and on this workflow's own push the latest published firefox-<N>, resolved at run time)
         type: string
         default: ''
   push:
@@ -54,7 +54,7 @@ on:
         type: string
         default: '44921963200'
       published_tag:
-        description: a release tag whose archives to test instead of the run's artifacts (empty for the run's)
+        description: a release tag whose archives to test instead of the run's artifacts (empty - the run's)
         type: string
         default: ''
 
@@ -77,10 +77,11 @@ jobs:
     env:
       TEMP: ${{ startsWith(matrix.runner, 'windows') && 'D:\a\_temp' || '/tmp' }}
       TMP: ${{ startsWith(matrix.runner, 'windows') && 'D:\a\_temp' || '/tmp' }}
-      # The release whose archives run: the input, else firefox-68 on this workflow's own push (the measurement), else none (the run's artifacts).
+      # The release whose archives run: the input, else the latest published firefox-<N> on this workflow's own push (the measurement; the step "The latest
+      # published engine" resolves it and writes PUBLISHED_TAG to GITHUB_ENV), else none (the run's artifacts).
       # A call from the gate has github.event_name of ITS caller (release.yml is also run by a push) and always has build_run_id: only a push of this
       # workflow has none, so that is what says "the measurement", never the event name alone.
-      PUBLISHED_TAG: ${{ inputs.published_tag || (inputs.build_run_id == '' && github.event_name == 'push' && 'firefox-68' || '') }}
+      PUBLISHED_TAG: ${{ inputs.published_tag }}
     timeout-minutes: 15
     strategy:
       fail-fast: false
@@ -101,6 +102,7 @@ jobs:
           sparse-checkout: |
             /UPSTREAM.json
             /platform/ci/src/scripts/ci/xpcshell_*
+            /platform/ci/src/scripts/ci/published_release.py
             /*/*/src/**/tests/
             /*/*/src/**/test/
             /*/*/*/src/**/tests/
@@ -113,6 +115,12 @@ jobs:
       - name: The declared list is exactly the set of our xpcshell tests
         shell: bash
         run: python engine-series/platform/ci/src/scripts/ci/xpcshell_run.py check --series engine-series --list engine-series/platform/ci/src/scripts/ci/xpcshell_tests.json
+      - name: The latest published engine (this workflow's own push, no published_tag given)
+        if: inputs.published_tag == '' && inputs.build_run_id == '' && github.event_name == 'push'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python engine-series/platform/ci/src/scripts/ci/published_release.py --repo "$GITHUB_REPOSITORY" --github-env "$GITHUB_ENV" --name PUBLISHED_TAG
       - name: Download asset (the run's)
         if: env.PUBLISHED_TAG == ''
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
@@ -245,7 +253,7 @@ jobs:
           retention-days: 14
 
   # ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-  # prefs: EVERY preference the packaged engine has, the published firefox-68 against the candidate, ZERO differences allowed.
+  # prefs: EVERY preference the packaged engine has, the latest published firefox-<N> against the candidate, ZERO differences allowed.
   #
   # scripts/ci/prefs_dump.js runs in `firefox -xpcshell` (the same command line and environment as the legs above, a fresh empty profile folder) and
   # writes the default branch (name, type, value, locked) and the user branch of that fresh profile. `xpcshell_run.py prefs-compare` is red on every
@@ -264,7 +272,8 @@ jobs:
     env:
       TEMP: ${{ startsWith(matrix.runner, 'windows') && 'D:\a\_temp' || '/tmp' }}
       TMP: ${{ startsWith(matrix.runner, 'windows') && 'D:\a\_temp' || '/tmp' }}
-      PREFS_BASE_TAG: firefox-68
+      # The baseline: the latest published firefox-<N>, resolved by the step "The latest published engine" below (it writes PREFS_BASE_TAG to GITHUB_ENV).
+      PREFS_BASE_TAG: ''
       PREFS_PY: engine-series/platform/ci/src/scripts/ci/xpcshell_run.py
     timeout-minutes: 15
     strategy:
@@ -284,6 +293,7 @@ jobs:
           sparse-checkout: |
             /UPSTREAM.json
             /platform/ci/src/scripts/ci/xpcshell_*
+            /platform/ci/src/scripts/ci/published_release.py
             /platform/ci/src/scripts/ci/prefs_dump.js
           sparse-checkout-cone-mode: false
       - name: Set up Python
@@ -296,6 +306,11 @@ jobs:
           path: art-cand
           run-id: ${{ inputs.build_run_id || '44921963200' }}
           github-token: ${{ (inputs.build_run_id || '44921963200') != github.run_id && github.token || '' }}
+      - name: The latest published engine
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python engine-series/platform/ci/src/scripts/ci/published_release.py --repo "$GITHUB_REPOSITORY" --github-env "$GITHUB_ENV" --name PREFS_BASE_TAG
       - name: Download the published engine (as sealed)
         shell: bash
         env:

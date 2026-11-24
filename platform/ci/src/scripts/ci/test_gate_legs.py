@@ -381,16 +381,21 @@ def package_cases(gate: dict) -> list:
     add("package-ab: the call can read the other run's artifacts and the release (actions: read, contents: read), and writes nothing",
         call.get("permissions") == {"actions": "read", "contents": "read"} and wf.get("permissions") == {"actions": "read", "contents": "read"})
     inputs = (on.get("workflow_call") or {}).get("inputs") or {}
-    add("package-ab: package-ab.yml is a reusable workflow (build_run_id, published_tag firefox-68, candidate_tag empty), and runs on its own only for a push to latitude/*-oracles",
+    add("package-ab: package-ab.yml is a reusable workflow (build_run_id, published_tag empty - the latest published, candidate_tag empty), and runs on its own only for a push to latitude/*-oracles",
         set(on) == {"workflow_call", "push"} and on["push"].get("branches") == ["latitude/*-oracles"] and set(inputs) == {"build_run_id", "published_tag", "candidate_tag"}
-        and inputs["published_tag"].get("default") == "firefox-68" and inputs["candidate_tag"].get("default") == "" and not any("required" in i for i in inputs.values()))
+        and inputs["published_tag"].get("default") == "" and inputs["candidate_tag"].get("default") == "" and not any("required" in i for i in inputs.values()))
     mode = ((job.get("strategy") or {}).get("matrix") or {}).get("mode", "")
     add("package-ab: a push runs two legs of the job, the A/B of the run and the A/A of the published tag with itself; a call with candidate_tag is the A/A alone; the gate's call is the A/B alone",
         (job["strategy"].get("fail-fast") is False) and '["ab","tag"]' in mode and "github.event_name == 'push'" in mode and "inputs.candidate_tag != '' && '[\"tag\"]'" in mode
         and mode.rstrip(" }").endswith("'[\"ab\"]')")
-        and job["env"].get("CAND_TAG") == "${{ matrix.mode == 'tag' && (inputs.candidate_tag || inputs.published_tag || 'firefox-68') || '' }}")
-    add("package-ab: a push measures run 44921963200 against firefox-68 (the inputs of a push are empty), and a call uses what the gate passed",
-        job["env"].get("BUILD_RUN_ID") == "${{ inputs.build_run_id || '44921963200' }}" and job["env"].get("TAG") == "${{ inputs.published_tag || 'firefox-68' }}")
+        and job["env"].get("CAND_TAG") == "${{ matrix.mode == 'tag' && (inputs.candidate_tag || inputs.published_tag) || '' }}")
+    add("package-ab: a push measures run 44921963200 (the inputs of a push are empty), and a call uses what the gate passed; the published engine is the input, else the latest published",
+        job["env"].get("BUILD_RUN_ID") == "${{ inputs.build_run_id || '44921963200' }}" and job["env"].get("TAG") == "${{ inputs.published_tag }}")
+    latest = [s for s in steps if "published_release.py" in str(s.get("run", ""))]
+    add("package-ab: the resolver step runs only when published_tag is empty, writes TAG (and CAND_TAG of the A/A) to GITHUB_ENV, has the token, and comes before the published download",
+        len(latest) == 1 and latest[0].get("if") == "inputs.published_tag == ''" and "--github-env \"$GITHUB_ENV\" --name TAG" in latest[0]["run"]
+        and 'echo "CAND_TAG=$LATEST" >> "$GITHUB_ENV"' in latest[0]["run"] and latest[0]["env"].get("GH_TOKEN") == "${{ github.token }}"
+        and "engine-series/platform/ci/src/scripts/ci/published_release.py" in latest[0]["run"])
     add("package-ab: 15 minutes on a GitHub runner, never the Latitude node",
         job.get("timeout-minutes") == 15 and job.get("runs-on") == "ubuntu-24.04" and "latitude-" not in text and "self-hosted" not in text)
     down = [s for s in steps if str(s.get("uses", "")).startswith("actions/download-artifact")]
@@ -401,6 +406,8 @@ def package_cases(gate: dict) -> list:
     add("package-ab: a build that recorded no source-commit is not an error of the download, the run's head_sha is the series commit",
         built[0].get("continue-on-error") is True and "series-commit.txt" in text and ".head_sha" in text)
     pub = [s for s in steps if s.get("id") == "published"]
+    add("package-ab: the resolver step comes before the published download",
+        len(latest) == 1 and len(pub) == 1 and steps.index(latest[0]) < steps.index(pub[0]))
     add("package-ab: the published release is checked against checksums.txt and its seal before anything is compared",
         len(pub) == 1 and "sha256sum -c checksums.txt" in pub[0]["run"] and pub[0]["run"].index("sha256sum -c") < pub[0]["run"].index("seal-check")
         and steps.index(pub[0]) < steps.index(down[0]))
