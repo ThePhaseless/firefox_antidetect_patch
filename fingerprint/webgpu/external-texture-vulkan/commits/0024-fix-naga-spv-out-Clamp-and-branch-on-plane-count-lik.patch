@@ -1,0 +1,167 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: feder-cr <85809106+feder-cr@users.noreply.github.com>
+Date: Sun, 1 Nov 2026 09:32:26 +0700
+Subject: [PATCH] fix(naga spv-out): Clamp and branch on plane count like the
+ HLSL helpers
+
+The HLSL external texture sample helper clamps with `clamp(x, lo, hi)`,
+which DXC lowers to `min(max(x, lo), hi)`. GLSL.std.450 `FClamp` is
+undefined when `lo > hi` (possible when the sample transform crops to less
+than a texel) and when an operand is NaN. Use `NMax` then `NMin`, which
+like DXIL's `FMax`/`FMin` return the non-NaN operand.
+
+Both HLSL helpers treat any `num_planes` other than 1 or 2 as three
+planes; the SPIR-V helpers treated anything other than 2 or 3 as one
+plane. Make three planes the default case of the switch.
+---
+ naga/src/back/spv/image.rs                | 49 ++++++++++++++++++-----
+ naga/tests/naga/spirv_external_texture.rs | 32 +++++++++++++++
+ 2 files changed, 71 insertions(+), 10 deletions(-)
+
+diff --git a/naga/src/back/spv/image.rs b/naga/src/back/spv/image.rs
+index d11506c02..4fe394077 100644
+--- a/naga/src/back/spv/image.rs
++++ b/naga/src/back/spv/image.rs
+@@ -1910,10 +1910,11 @@ impl super::Writer {
+             block,
+             Instruction::switch(
+                 num_planes_id,
+-                label_num_planes_1_id, // default
++                // Like HLSL's `if (num_planes == 1u) .. else if (num_planes == 2u) .. else ..`
++                label_num_planes_3_id, // default
+                 &[
++                    super::instructions::Case { value: 1, label_id: label_num_planes_1_id },
+                     super::instructions::Case { value: 2, label_id: label_num_planes_2_id },
+-                    super::instructions::Case { value: 3, label_id: label_num_planes_3_id },
+                 ],
+             ),
+         );
+@@ -2470,13 +2471,24 @@ impl super::Writer {
+             plane0_half_texel_id,
+         ));
+ 
++        // HLSL's `clamp(x, lo, hi)` is `min(max(x, lo), hi)`, which, unlike
++        // `FClamp`, is defined when `lo > hi`. Like DXIL's `FMax` and `FMin`,
++        // `NMax` and `NMin` return the other operand if one is NaN.
++        let plane0_coord_max_id = self.id_gen.next();
++        block.body.push(Instruction::ext_inst_gl_op(
++            self.gl450_ext_inst_id,
++            spirv::GlslStd450Op::NMax,
++            vec2f_type_id,
++            plane0_coord_max_id,
++            &[coord_transform_id, plane0_clamp_min_id],
++        ));
+         let plane0_coord_id = self.id_gen.next();
+         block.body.push(Instruction::ext_inst_gl_op(
+             self.gl450_ext_inst_id,
+-            spirv::GlslStd450Op::FClamp,
++            spirv::GlslStd450Op::NMin,
+             vec2f_type_id,
+             plane0_coord_id,
+-            &[coord_transform_id, plane0_clamp_min_id, plane0_clamp_max_id],
++            &[plane0_coord_max_id, plane0_clamp_max_id],
+         ));
+ 
+         // Load `params.num_planes`.
+@@ -2502,10 +2514,11 @@ impl super::Writer {
+             block,
+             Instruction::switch(
+                 num_planes_id,
+-                label_num_planes_1_id, // default
++                // Like HLSL's `if (num_planes == 1u) .. else if (num_planes == 2u) .. else ..`
++                label_num_planes_3_id, // default
+                 &[
++                    super::instructions::Case { value: 1, label_id: label_num_planes_1_id },
+                     super::instructions::Case { value: 2, label_id: label_num_planes_2_id },
+-                    super::instructions::Case { value: 3, label_id: label_num_planes_3_id },
+                 ],
+             ),
+         );
+@@ -2556,13 +2569,21 @@ impl super::Writer {
+                 plane1_half_texel_id,
+             ));
+ 
++            let plane1_coord_max_id = writer.id_gen.next();
++            block.body.push(Instruction::ext_inst_gl_op(
++                writer.gl450_ext_inst_id,
++                spirv::GlslStd450Op::NMax,
++                vec2f_type_id,
++                plane1_coord_max_id,
++                &[coord_transform_id, plane1_clamp_min_id],
++            ));
+             let plane1_coord_id = writer.id_gen.next();
+             block.body.push(Instruction::ext_inst_gl_op(
+                 writer.gl450_ext_inst_id,
+-                spirv::GlslStd450Op::FClamp,
++                spirv::GlslStd450Op::NMin,
+                 vec2f_type_id,
+                 plane1_coord_id,
+-                &[coord_transform_id, plane1_clamp_min_id, plane1_clamp_max_id],
++                &[plane1_coord_max_id, plane1_clamp_max_id],
+             ));
+ 
+             plane1_coord_id
+@@ -2650,13 +2671,21 @@ impl super::Writer {
+                 plane2_half_texel_id,
+             ));
+ 
++            let plane2_coord_max_id = self.id_gen.next();
++            block.body.push(Instruction::ext_inst_gl_op(
++                self.gl450_ext_inst_id,
++                spirv::GlslStd450Op::NMax,
++                vec2f_type_id,
++                plane2_coord_max_id,
++                &[coord_transform_id, plane2_clamp_min_id],
++            ));
+             let plane2_coord_id = self.id_gen.next();
+             block.body.push(Instruction::ext_inst_gl_op(
+                 self.gl450_ext_inst_id,
+-                spirv::GlslStd450Op::FClamp,
++                spirv::GlslStd450Op::NMin,
+                 vec2f_type_id,
+                 plane2_coord_id,
+-                &[coord_transform_id, plane2_clamp_min_id, plane2_clamp_max_id],
++                &[plane2_coord_max_id, plane2_clamp_max_id],
+             ));
+ 
+             let plane1_sampled_id = self.id_gen.next();
+diff --git a/naga/tests/naga/spirv_external_texture.rs b/naga/tests/naga/spirv_external_texture.rs
+index 5d37c8000..4a51f8234 100644
+--- a/naga/tests/naga/spirv_external_texture.rs
++++ b/naga/tests/naga/spirv_external_texture.rs
+@@ -466,3 +466,35 @@ fn external_texture_load_chroma_scale_matches_hlsl() {
+         assert_eq!(id(&image.operands[0]), plane0_param);
+     }
+ }
++
++/// HLSL's `clamp(x, lo, hi)` is `min(max(x, lo), hi)`, which is defined even
++/// if `lo > hi`; GLSL.std.450 `FClamp` is not. Also, like HLSL's
++/// `if (num_planes == 1) .. else if (num_planes == 2) .. else ..`, any
++/// `num_planes` other than 1 or 2 takes the three-plane path.
++#[test]
++fn external_texture_sample_matches_hlsl() {
++    let spv = compile(TEXTURE_EXTERNAL);
++    for name in [
++        "naga_external_texture_image_sample",
++        "naga_external_texture_image_load",
++    ] {
++        let function = spv.function(name);
++        assert!(
++            !spv.glsl_ops(function).contains(&GLSL_FCLAMP),
++            "{name} uses FClamp"
++        );
++        let switch = spv
++            .instructions(function)
++            .find(|inst| inst.class.opcode == Op::Switch)
++            .unwrap_or_else(|| panic!("{name} has no OpSwitch"));
++        let cases: Vec<u32> = switch.operands[2..]
++            .iter()
++            .step_by(2)
++            .map(|operand| match *operand {
++                Operand::LiteralBit32(value) => value,
++                ref other => panic!("unexpected case literal {other:?}"),
++            })
++            .collect();
++        assert_eq!(cases, [1, 2], "{name}: three planes should be the default");
++    }
++}

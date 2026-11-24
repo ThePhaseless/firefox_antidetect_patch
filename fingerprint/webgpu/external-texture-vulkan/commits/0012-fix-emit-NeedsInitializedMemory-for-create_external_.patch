@@ -1,0 +1,140 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Erich Gubler <erichdongubler@gmail.com>
+Date: Fri, 11 Sep 2026 09:59:08 +0200
+Subject: [PATCH] fix: emit `NeedsInitializedMemory` for
+ `create_external_texture_binding`
+
+(cherry picked from commit 81e38d86f498888dee0b9ffdd29766ba72396609)
+---
+ tests/tests/wgpu-gpu/external_texture/mod.rs | 69 ++++++++++++++++++++
+ wgpu-core/src/device/resource.rs             | 19 ++++++
+ 2 files changed, 88 insertions(+)
+
+diff --git a/tests/tests/wgpu-gpu/external_texture/mod.rs b/tests/tests/wgpu-gpu/external_texture/mod.rs
+index 3019f7906..b87758c9a 100644
+--- a/tests/tests/wgpu-gpu/external_texture/mod.rs
++++ b/tests/tests/wgpu-gpu/external_texture/mod.rs
+@@ -13,6 +13,8 @@ pub fn all_tests(vec: &mut Vec<GpuTestInitializer>) {
+         EXTERNAL_TEXTURE_SAMPLE,
+         EXTERNAL_TEXTURE_SAMPLE_YUV,
+         EXTERNAL_TEXTURE_SAMPLE_TRANSFORM,
++        EXTERNAL_TEXTURE_FROM_VIEW_ZERO_INIT_AFTER_DISCARD,
++        EXTERNAL_TEXTURE_ZERO_INIT_AFTER_DISCARD,
+     ]);
+ }
+ 
+@@ -1125,3 +1127,70 @@ static EXTERNAL_TEXTURE_SAMPLE_TRANSFORM: GpuTestConfiguration = GpuTestConfigur
+         );
+         assert_eq!(&samples, &[RED_F32, GREEN_F32, BLUE_F32, YELLOW_F32]);
+     });
++
++/// Tests that a `TextureView` bound to an `external_texture` binding point reads as
++/// zero when the underlying texture is uninitialized.
++///
++/// This path must register the same `NeedsInitializedMemory` init action as the
++/// ordinary sampled-texture path. Without it, nothing clears the texture before the
++/// shader samples plane 0, and the load returns whatever the allocation held.
++#[apply(gpu_test!)]
++static EXTERNAL_TEXTURE_FROM_VIEW_ZERO_INIT_AFTER_DISCARD: GpuTestConfiguration =
++    GpuTestConfiguration::new()
++        .parameters(
++            TestParameters::default()
++                .test_features_limits()
++                .features(wgpu::Features::EXTERNAL_TEXTURE),
++        )
++        .run_async(|ctx| async move {
++            let view = create_discarded_texture_and_view(&ctx);
++
++            let loads = get_loads(
++                &ctx,
++                &[[0, 0], [1, 0], [0, 1], [1, 1]],
++                wgpu::BindingResource::TextureView(&view),
++            );
++            assert_eq!(&loads, &[TRANSPARENT_BLACK_F32; 4]);
++        });
++
++/// Tests that an `ExternalTexture` reads as zero when the texture underlying one of
++/// its planes is uninitialized.
++///
++/// The same reasoning as [`EXTERNAL_TEXTURE_FROM_VIEW_ZERO_INIT_AFTER_DISCARD`]
++/// applies, but by way of `BindingResource::ExternalTexture` rather than a
++/// `TextureView` bound to the same binding point. The planes are ordinary textures
++/// owned by the caller, so they carry the same initialization state as any other
++/// texture; `Device::create_external_texture` does not write to them.
++#[apply(gpu_test!)]
++static EXTERNAL_TEXTURE_ZERO_INIT_AFTER_DISCARD: GpuTestConfiguration = GpuTestConfiguration::new()
++    .parameters(
++        TestParameters::default()
++            .test_features_limits()
++            .features(wgpu::Features::EXTERNAL_TEXTURE),
++    )
++    .run_async(|ctx| async move {
++        let view = create_discarded_texture_and_view(&ctx);
++
++        let external_texture = ctx.device.create_external_texture(
++            &wgpu::ExternalTextureDescriptor {
++                label: None,
++                width: 2,
++                height: 2,
++                format: wgpu::ExternalTextureFormat::Rgba,
++                yuv_conversion_matrix: IDENTITY_YUV_CONVERSION_MATRIX,
++                gamut_conversion_matrix: IDENTITY_GAMUT_CONVERSION_MATRIX,
++                src_transfer_function: Default::default(),
++                dst_transfer_function: Default::default(),
++                sample_transform: IDENTITY_SAMPLE_TRANSFORM,
++                load_transform: IDENTITY_LOAD_TRANSFORM,
++            },
++            &[&view],
++        );
++
++        let loads = get_loads(
++            &ctx,
++            &[[0, 0], [1, 0], [0, 1], [1, 1]],
++            wgpu::BindingResource::ExternalTexture(&external_texture),
++        );
++        assert_eq!(&loads, &[TRANSPARENT_BLACK_F32; 4]);
++    });
+diff --git a/wgpu-core/src/device/resource.rs b/wgpu-core/src/device/resource.rs
+index ad793bca6..e815c163f 100644
+--- a/wgpu-core/src/device/resource.rs
++++ b/wgpu-core/src/device/resource.rs
+@@ -3517,6 +3517,7 @@ impl Device {
+         binding: u32,
+         decl: &wgt::BindGroupLayoutEntry,
+         external_texture: &'a Arc<ExternalTexture>,
++        texture_init_actions: &mut Vec<TextureInitTrackerAction>,
+         used: &mut BindGroupStates,
+         snatch_guard: &'a SnatchGuard,
+     ) -> Result<
+@@ -3564,6 +3565,23 @@ impl Device {
+             .collect::<Result<Vec<_>, Error>>()?;
+         let planes = planes.try_into().unwrap();
+ 
++        // Iterate over the distinct planes, rather than the three bindings produced
++        // above, so that a plane repeated to fill the bindings is only recorded once.
++        for plane in external_texture.planes.iter() {
++            let texture = &plane.parent;
++            texture_init_actions.push(TextureInitTrackerAction {
++                texture: texture.clone(),
++                range: TextureInitRange {
++                    mip_range: plane.desc.range.mip_range(texture.desc.mip_level_count),
++                    layer_range: plane
++                        .desc
++                        .range
++                        .layer_range(texture.desc.array_layer_count()),
++                },
++                kind: MemoryInitKind::NeedsInitializedMemory,
++            });
++        }
++
+         used.buffers.insert_single(
+             external_texture_state.params.clone(),
+             wgt::BufferUses::UNIFORM,
+@@ -3847,6 +3865,7 @@ impl Device {
+                         binding,
+                         decl,
+                         et,
++                        &mut texture_init_actions,
+                         &mut used,
+                         &snatch_guard,
+                     )?;

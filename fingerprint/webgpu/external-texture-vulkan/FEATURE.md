@@ -18,9 +18,16 @@ prerequisites, the wgpu-core fixes that come with exposing the feature), with ou
 to the WIP where it panicked, wrote invalid SPIR-V, or computed otherwise than the HLSL
 helpers D3D12 runs (rounding, chroma scaling, clamp, plane-count default).
 
-Upstream code is category `backport`: it is not ours, so it has no hook budget; the
-check ties it to the vendored revision in BACKPORT.json and fails when Mozilla vendors
-another one, which is when it is dropped (`drop_when`).
+Upstream code is category `backport`: it is not ours, so it has no hook budget. It is
+carried as the 32 commits in `commits/` (14 upstream picks, 12 fixes of ours, 6 test-only
+commits that are not replayed), listed in BACKPORT.json and replayed on the revision the
+tag vendors ([port-04](../../../docs/decisions/port-04-backport-as-commits.md)): `hooks.patch`
+(its vendored part, checksum lines included) and the vendored file in `src/` are what the
+replay produces, and `check --against <tag>` fails when they are not. The commits the
+revision already has are dropped and recorded in `contained_in`; the whole folder is dropped
+when Mozilla vendors a wgpu that has the feature (`drop_when`). The Cargo.toml table and the
+Cargo.lock line of the `bytemuck` dependency of naga-types come from the third commit by rule;
+`workspace_dependencies` gives the workspace table they expand.
 
 Checked outside Firefox on the same code: wgpu's GPU tests on Vulkan (Mesa lavapipe)
 371/374 (all 11 external-texture tests run and pass; the 3 failures need dxc), naga's
@@ -65,4 +72,9 @@ tests, spirv-val on every external-texture module at SPIR-V 1.0 and 1.3.
 
 - `gfx/tests/gtest/TestStealthWebGPUExternalTexture.cpp`
 - `gfx/wgpu_bindings/src/stealth_external_texture.rs`
-- `third_party/rust/naga/src/common/external_texture.rs`
+
+## Upstream's file in `src/`
+
+- `third_party/rust/naga/src/common/external_texture.rs` is upstream's file, created by the
+  second commit (upstream eb4678dd0), not ours: the replay writes it, `check` compares it, and
+  once Mozilla vendors it the replay drops it.

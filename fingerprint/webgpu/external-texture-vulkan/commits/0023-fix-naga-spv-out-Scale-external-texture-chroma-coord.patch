@@ -1,0 +1,104 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: feder-cr <85809106+feder-cr@users.noreply.github.com>
+Date: Sun, 1 Nov 2026 09:31:12 +0700
+Subject: [PATCH] fix(naga spv-out): Scale external texture chroma coordinates
+ by plane 0's size
+
+The SPIR-V `textureLoad` helper for external textures divided the chroma
+plane coordinates by the result of the size query, which is `params.size`
+(the cropped size) when that is nonzero. The HLSL helper divides by the
+actual size of plane 0 and only uses the cropped size to clamp the
+coordinates. Query plane 0's actual size for the scaling.
+---
+ naga/src/back/spv/image.rs                | 17 ++++++++--
+ naga/tests/naga/spirv_external_texture.rs | 40 +++++++++++++++++++++++
+ 2 files changed, 55 insertions(+), 2 deletions(-)
+
+diff --git a/naga/src/back/spv/image.rs b/naga/src/back/spv/image.rs
+index bdf3a2092..d11506c02 100644
+--- a/naga/src/back/spv/image.rs
++++ b/naga/src/back/spv/image.rs
+@@ -1760,7 +1760,8 @@ impl super::Writer {
+             ]
+         ));
+ 
+-        // Query the size
++        // Query the size: `params.size` if nonzero (the cropped size), plane 0's
++        // actual size otherwise. Coordinates are clamped to this.
+         let plane0_size_id = self.id_gen.next();
+         block.body.push(Instruction::function_call(
+             vec2u_type_id,
+@@ -1769,12 +1770,24 @@ impl super::Writer {
+             &[plane0_id, params_id],
+         ));
+ 
++        // Chroma coordinates are scaled by the ratio of the planes' actual
++        // sizes, regardless of `params.size`.
++        let plane0_actual_size_id = self.id_gen.next();
++        let mut plane0_actual_size_inst = Instruction::image_query(
++            spirv::Op::ImageQuerySizeLod,
++            vec2u_type_id,
++            plane0_actual_size_id,
++            plane0_image_id,
++        );
++        plane0_actual_size_inst.add_operand(lod_zero_id);
++        block.body.push(plane0_actual_size_inst);
++
+         let plane0_size_float_id = self.id_gen.next();
+         block.body.push(Instruction::unary(
+             spirv::Op::ConvertUToF,
+             vec2f_type_id,
+             plane0_size_float_id,
+-            plane0_size_id,
++            plane0_actual_size_id,
+         ));
+ 
+         // Clamp coordinate to size, convert to float, extract x/y
+diff --git a/naga/tests/naga/spirv_external_texture.rs b/naga/tests/naga/spirv_external_texture.rs
+index 979e523dd..5d37c8000 100644
+--- a/naga/tests/naga/spirv_external_texture.rs
++++ b/naga/tests/naga/spirv_external_texture.rs
+@@ -426,3 +426,43 @@ fn external_texture_load_rounding_matches_hlsl() {
+         "chroma plane coordinates should use Floor: {ops:?}"
+     );
+ }
++
++/// The load helper scales chroma coordinates by `plane_size / plane0_size`
++/// using the actual size of plane 0, not the (possibly cropped) size returned
++/// by `textureDimensions`, and scales the integer plane 0 coordinates.
++#[test]
++fn external_texture_load_chroma_scale_matches_hlsl() {
++    let spv = compile(TEXTURE_EXTERNAL);
++    let function = spv.function("naga_external_texture_image_load");
++    let plane0_param = function.parameters[0].result_id.unwrap();
++    let divisions: Vec<&Instruction> = spv
++        .instructions(function)
++        .filter(|inst| inst.class.opcode == Op::FDiv)
++        .collect();
++    // Plane 1 in the two- and three-plane paths, plane 2 in the latter.
++    assert_eq!(divisions.len(), 3);
++    for division in divisions {
++        // float2(plane0_coords) * float2(planeN_size) / float2(plane0_size)
++        let product = spv.def(id(&division.operands[0]));
++        assert_eq!(product.class.opcode, Op::FMul);
++        let coords = spv.def(id(&product.operands[0]));
++        assert_eq!(
++            coords.class.opcode,
++            Op::ConvertUToF,
++            "chroma scaling should start from the integer plane 0 coordinates"
++        );
++
++        let divisor = spv.def(id(&division.operands[1]));
++        assert_eq!(divisor.class.opcode, Op::ConvertUToF);
++        let size = spv.def(id(&divisor.operands[0]));
++        assert_eq!(
++            size.class.opcode,
++            Op::ImageQuerySizeLod,
++            "chroma scaling should divide by the actual plane 0 size, not by {:?}",
++            size.class.opcode
++        );
++        let image = spv.def(id(&size.operands[0]));
++        assert_eq!(image.class.opcode, Op::Load);
++        assert_eq!(id(&image.operands[0]), plane0_param);
++    }
++}

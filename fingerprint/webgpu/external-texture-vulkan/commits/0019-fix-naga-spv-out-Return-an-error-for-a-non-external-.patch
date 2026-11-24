@@ -1,0 +1,131 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: feder-cr <85809106+feder-cr@users.noreply.github.com>
+Date: Sun, 1 Nov 2026 09:21:55 +0700
+Subject: [PATCH] fix(naga spv-out): Return an error for a non-external texture
+ binding
+
+Writing a `texture_external` global whose binding map entry was not marked
+`external_texture` hit an `assert!`. Return a new
+`Error::ExternalTextureBindingMismatch` instead.
+
+With `fake_missing_bindings` (the default), a `texture_external` without a
+binding map entry also hit the assertion, since the fake binding was not
+marked as external. Give it fake external texture bindings: the planes and
+parameters at four consecutive bindings starting at its own.
+---
+ naga/src/back/spv/mod.rs                  |  2 +
+ naga/src/back/spv/writer.rs               | 23 ++++++----
+ naga/tests/naga/spirv_external_texture.rs | 56 +++++++++++++++++++++++
+ 3 files changed, 72 insertions(+), 9 deletions(-)
+
+diff --git a/naga/src/back/spv/mod.rs b/naga/src/back/spv/mod.rs
+index e063d84ca..77be4dea6 100644
+--- a/naga/src/back/spv/mod.rs
++++ b/naga/src/back/spv/mod.rs
+@@ -180,6 +180,8 @@ pub enum Error {
+     SpirvVersionTooLow(u8, u8),
+     #[error("mapping of {0:?} is missing")]
+     MissingBinding(crate::ResourceBinding),
++    #[error("{0:?} is an external texture, but its mapping is not marked `external_texture`")]
++    ExternalTextureBindingMismatch(crate::ResourceBinding),
+ }
+ 
+ #[derive(Default)]
+diff --git a/naga/src/back/spv/writer.rs b/naga/src/back/spv/writer.rs
+index b843774eb..f5f84c33e 100644
+--- a/naga/src/back/spv/writer.rs
++++ b/naga/src/back/spv/writer.rs
+@@ -3733,15 +3733,20 @@ impl Writer {
+         ir_module: &crate::Module,
+         global_variable: &crate::GlobalVariable,
+     ) -> Result<ExternalTexture, Error> {
+-        let binding = global_variable
+-            .binding
+-            .as_ref()
+-            .map(|b| self.resolve_resource_binding(b))
+-            .transpose()?;
+-
+-        if let Some(binding) = binding {
+-            assert!(binding.external_texture);
+-        }
++        let binding = match global_variable.binding {
++            None => None,
++            Some(ref res_binding) => Some(match self.binding_map.get(res_binding) {
++                Some(info) if info.external_texture => *info,
++                Some(_) => return Err(Error::ExternalTextureBindingMismatch(*res_binding)),
++                None if self.fake_missing_bindings => BindingInfo {
++                    descriptor_set: res_binding.group,
++                    binding: res_binding.binding,
++                    binding_array_size: None,
++                    external_texture: true,
++                },
++                None => return Err(Error::MissingBinding(*res_binding)),
++            }),
++        };
+ 
+         // Write three globals for the planes
+         let plane_ty = LookupType::Local(LocalType::EXTERNAL_TEXTURE_PLANE);
+diff --git a/naga/tests/naga/spirv_external_texture.rs b/naga/tests/naga/spirv_external_texture.rs
+index a4c1c30eb..16e284598 100644
+--- a/naga/tests/naga/spirv_external_texture.rs
++++ b/naga/tests/naga/spirv_external_texture.rs
+@@ -310,3 +310,59 @@ fn external_texture_forward_only() {
+     let spv = compile(TEXTURE_EXTERNAL_FORWARD_ONLY);
+     spv.assert_well_typed();
+ }
++
++/// A binding map entry for a `texture_external` that doesn't say so is an
++/// error, not a panic.
++#[test]
++fn external_texture_binding_not_marked_external() {
++    let mut map = binding_map();
++    map.get_mut(&naga::ResourceBinding {
++        group: 0,
++        binding: 0,
++    })
++    .unwrap()
++    .external_texture = false;
++    let result = std::panic::catch_unwind(|| try_compile(TEXTURE_EXTERNAL, &options(map, false)));
++    match result {
++        Ok(Err(error)) => assert_eq!(
++            format!("{error:?}"),
++            "ExternalTextureBindingMismatch(ResourceBinding { group: 0, binding: 0 })"
++        ),
++        Ok(Ok(_)) => panic!("expected an error"),
++        Err(_) => panic!("SPIR-V writer panicked"),
++    }
++}
++
++/// With `fake_missing_bindings`, a `texture_external` without a binding map
++/// entry gets fake bindings like any other resource.
++#[test]
++fn external_texture_fake_missing_bindings() {
++    let words = std::panic::catch_unwind(|| {
++        try_compile(
++            TEXTURE_EXTERNAL,
++            &options(spv::BindingMap::default(), true),
++        )
++    })
++    .expect("SPIR-V writer panicked")
++    .expect("SPIR-V write failed");
++    let spv = Spv::new(words);
++    spv.assert_well_typed();
++
++    // The planes and parameters take four consecutive bindings starting at
++    // the resource's binding.
++    let mut bindings: Vec<u32> = spv
++        .module
++        .annotations
++        .iter()
++        .filter(|inst| {
++            inst.class.opcode == Op::Decorate
++                && inst.operands[1] == Operand::Decoration(spirv::Decoration::Binding)
++        })
++        .map(|inst| match inst.operands[2] {
++            Operand::LiteralBit32(binding) => binding,
++            ref other => panic!("unexpected binding operand {other:?}"),
++        })
++        .collect();
++    bindings.sort();
++    assert_eq!(bindings, [0, 1, 1, 2, 3]);
++}

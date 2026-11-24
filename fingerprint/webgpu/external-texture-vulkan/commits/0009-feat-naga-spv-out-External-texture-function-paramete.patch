@@ -1,0 +1,519 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Andy Leiserson <aleiserson@mozilla.com>
+Date: Tue, 21 Jul 2026 14:55:42 -0700
+Subject: [PATCH] feat(naga spv-out): External texture function parameters
+
+(cherry picked from commit fc19430c86a2fcb7ab44d240a4b2e325813f2721)
+---
+ naga/src/back/spv/block.rs                    |  81 +++++++++++-
+ naga/src/back/spv/image.rs                    |   3 +-
+ naga/src/back/spv/mod.rs                      |  20 ++-
+ naga/src/back/spv/writer.rs                   | 120 ++++++++++++++++++
+ .../in/wgsl/texture-external-argument.toml    |   9 ++
+ .../in/wgsl/texture-external-argument.wgsl    |  15 +++
+ .../spv/wgsl-texture-external-argument.spvasm |  99 +++++++++++++++
+ ...wgsl-texture-external-argument.spvasm.glsl |  47 +++++++
+ 8 files changed, 387 insertions(+), 7 deletions(-)
+ create mode 100644 naga/tests/in/wgsl/texture-external-argument.toml
+ create mode 100644 naga/tests/in/wgsl/texture-external-argument.wgsl
+ create mode 100644 naga/tests/out/spv/wgsl-texture-external-argument.spvasm
+ create mode 100644 naga/tests/out/spv/wgsl-texture-external-argument.spvasm.glsl
+
+diff --git a/naga/src/back/spv/block.rs b/naga/src/back/spv/block.rs
+index 37f136212..f77115e06 100644
+--- a/naga/src/back/spv/block.rs
++++ b/naga/src/back/spv/block.rs
+@@ -3514,6 +3514,74 @@ impl BlockContext<'_> {
+         Instruction::composite_construct(result_type_id, id, &parts)
+     }
+ 
++    /// Push the SPIR-V arguments for an external texture `Call` argument.
++    ///
++    /// An external texture is a single logical argument, but is passed as three
++    /// plane textures followed by the parameters buffer. See
++    /// [`Writer::write_external_texture_function_parameters`] for the callee
++    /// side.
++    ///
++    /// [`Writer::write_external_texture_function_parameters`]: super::Writer::write_external_texture_function_parameters
++    fn push_external_texture_call_arguments(
++        &mut self,
++        argument: Handle<crate::Expression>,
++        block: &mut Block,
++    ) -> Result<(), Error> {
++        match self.ir_function.expressions[argument] {
++            crate::Expression::GlobalVariable(handle) => {
++                let external_texture = &self.writer.external_textures[&handle];
++                let plane_ids = [
++                    external_texture.planes[0].var_id,
++                    external_texture.planes[1].var_id,
++                    external_texture.planes[2].var_id,
++                ];
++                let params_var_id = external_texture.params.var_id;
++
++                // The planes are passed as pointers, like any texture global.
++                self.temp_list.extend_from_slice(&plane_ids);
++
++                // The parameters buffer is passed by value, so load it out of
++                // the (`Block`-wrapped) uniform buffer.
++                let params_type_id = self.writer.get_handle_type_id(
++                    self.ir_module
++                        .special_types
++                        .external_texture_params
++                        .expect("external textures should have generated a parameters type"),
++                );
++                let params_pointer_type_id = self
++                    .writer
++                    .get_pointer_type_id(params_type_id, spirv::StorageClass::Uniform);
++                let zero_id = self.get_index_constant(0);
++                let params_pointer_id = self.gen_id();
++                block.body.push(Instruction::access_chain(
++                    params_pointer_type_id,
++                    params_pointer_id,
++                    params_var_id,
++                    &[zero_id],
++                ));
++                let params_id = self.gen_id();
++                block.body.push(Instruction::load(
++                    params_type_id,
++                    params_id,
++                    params_pointer_id,
++                    None,
++                ));
++                self.temp_list.push(params_id);
++            }
++            crate::Expression::FunctionArgument(index) => {
++                // The external texture argument was itself expanded into four
++                // consecutive parameters, which we forward directly.
++                let offset = self.function.parameter_offsets[index as usize] as usize;
++                for parameter in &self.function.parameters[offset..offset + 4] {
++                    self.temp_list
++                        .push(parameter.instruction.result_id.unwrap());
++                }
++            }
++            ref other => unreachable!("Unexpected external texture expression {:?}", other),
++        }
++        Ok(())
++    }
++
+     /// Generate one or more SPIR-V blocks for `naga_block`.
+     ///
+     /// Use `label_id` as the label for the SPIR-V entry point block.
+@@ -3935,7 +4003,18 @@ impl BlockContext<'_> {
+                     let id = self.gen_id();
+                     self.temp_list.clear();
+                     for &argument in arguments {
+-                        self.temp_list.push(self.cached[argument]);
++                        if self.fun_info[argument]
++                            .ty
++                            .inner_with(&self.ir_module.types)
++                            .is_external_image()
++                        {
++                            // An external texture is a single logical argument,
++                            // but is passed as four SPIR-V arguments: three
++                            // planes and a parameters buffer.
++                            self.push_external_texture_call_arguments(argument, &mut block)?;
++                        } else {
++                            self.temp_list.push(self.cached[argument]);
++                        }
+                     }
+ 
+                     let type_id = match result {
+diff --git a/naga/src/back/spv/image.rs b/naga/src/back/spv/image.rs
+index c185806cd..34efe084a 100644
+--- a/naga/src/back/spv/image.rs
++++ b/naga/src/back/spv/image.rs
+@@ -378,7 +378,8 @@ impl BlockContext<'_> {
+                 self.writer.global_variables[handle].handle_id
+             }
+             crate::Expression::FunctionArgument(i) => {
+-                self.function.parameters[i as usize].handle_id
++                let offset = self.function.parameter_offsets[i as usize] as usize;
++                self.function.parameters[offset].handle_id
+             }
+             crate::Expression::Access { .. } | crate::Expression::AccessIndex { .. } => {
+                 self.cached[expr_handle]
+diff --git a/naga/src/back/spv/mod.rs b/naga/src/back/spv/mod.rs
+index 2f38fb1af..e52dac9eb 100644
+--- a/naga/src/back/spv/mod.rs
++++ b/naga/src/back/spv/mod.rs
+@@ -252,6 +252,15 @@ struct EntryPointContext {
+ struct Function {
+     signature: Option<Instruction>,
+     parameters: Vec<FunctionArgument>,
++    /// Maps each Naga function argument to the index within [`parameters`] of
++    /// the first SPIR-V parameter it expands to.
++    ///
++    /// Most arguments map to a single parameter, but an external texture
++    /// argument expands to four consecutive parameters (three planes and a
++    /// parameters buffer).
++    ///
++    /// [`parameters`]: Function::parameters
++    parameter_offsets: Vec<u32>,
+     variables: crate::FastHashMap<Handle<crate::LocalVariable>, LocalVariable>,
+     /// Map from a local variable that is a ray query to its u32 tracker.
+     ray_query_initialization_tracker_variables:
+@@ -317,10 +326,11 @@ impl Function {
+     fn parameter_id(&self, index: u32) -> Word {
+         match self.entry_point_context {
+             Some(ref context) => context.argument_ids[index as usize],
+-            None => self.parameters[index as usize]
+-                .instruction
+-                .result_id
+-                .unwrap(),
++            None => {
++                let offset = self.parameter_offsets[index as usize] as usize;
++                self.parameters[offset].instruction.result_id.unwrap()
++                // TODO: assert not external texture
++            }
+         }
+     }
+ }
+@@ -1242,7 +1252,7 @@ pub fn supported_capabilities() -> crate::valid::Capabilities {
+         | Caps::RAY_HIT_VERTEX_POSITION
+         | Caps::SHADER_FLOAT16
+         | Caps::SHADER_INT16
+-        // No TEXTURE_EXTERNAL
++        | Caps::TEXTURE_EXTERNAL
+         | Caps::SHADER_FLOAT16_IN_FLOAT32
+         | Caps::SHADER_BARYCENTRICS
+         | Caps::MESH_SHADER
+diff --git a/naga/src/back/spv/writer.rs b/naga/src/back/spv/writer.rs
+index 3892bf57e..45a2d4725 100644
+--- a/naga/src/back/spv/writer.rs
++++ b/naga/src/back/spv/writer.rs
+@@ -1298,6 +1298,23 @@ impl Writer {
+                 };
+                 ep_context.argument_ids.push(id);
+             } else {
++                function
++                    .parameter_offsets
++                    .push(function.parameters.len() as u32);
++                if ir_module.types[argument.ty].inner.is_external_image() {
++                    // An external texture is a single logical argument, but it
++                    // is passed as four SPIR-V parameters: three planes and a
++                    // parameters buffer.
++                    self.write_external_texture_function_parameters(
++                        &mut function,
++                        &mut prelude,
++                        &mut parameter_type_ids,
++                        argument.ty,
++                        argument.name.as_deref(),
++                        ir_module,
++                    )?;
++                    continue;
++                }
+                 let argument_id = self.id_gen.next();
+                 let instruction = Instruction::function_parameter(argument_type_id, argument_id);
+                 if self.flags.contains(WriterFlags::DEBUG) {
+@@ -1471,6 +1488,41 @@ impl Writer {
+                 continue;
+             }
+ 
++            if ir_module.types[var.ty].inner.is_external_image() {
++                // External textures are lowered to separate plane and
++                // parameter globals held in `external_textures`; the dummy
++                // entry in `global_variables` must not be processed here.
++                if let Some(ref mut iface) = interface {
++                    if self.physical_layout.version >= 0x10400 {
++                        let external_texture = &self.external_textures[&handle];
++                        for plane in &external_texture.planes {
++                            iface.varying_ids.push(plane.var_id);
++                        }
++                        iface.varying_ids.push(external_texture.params.var_id);
++                    }
++                }
++                // TODO: ideally we would lower this in a way that enables handling
++                // them the same as regular globals
++                let plane_type_id = self.get_type_id(LookupType::Local(LocalType::EXTERNAL_TEXTURE_PLANE));
++                let params_type_id = self.get_handle_type_id(ir_module.special_types.external_texture_params.unwrap());
++                for &(var, type_id) in &[
++                    (&self.external_textures[&handle].planes[0], plane_type_id),
++                    (&self.external_textures[&handle].planes[1], plane_type_id),
++                    (&self.external_textures[&handle].planes[2], plane_type_id),
++                    (&self.external_textures[&handle].params, params_type_id),
++                ] {
++                    let mut gv = self.global_variables[handle].clone();
++                    let id = self.id_gen.next();
++                    prelude
++                        .body
++                        .push(Instruction::load(type_id, id, gv.var_id, None));
++                    gv.access_id = gv.var_id;
++                    gv.handle_id = id;
++                    self.global_variables[handle] = gv;
++                }
++                continue;
++            }
++
+             let mut gv = self.global_variables[handle].clone();
+             if let Some(ref mut iface) = interface {
+                 // Have to include global variables in the interface
+@@ -3655,6 +3707,74 @@ impl Writer {
+         })
+     }
+ 
++    /// Emit the SPIR-V function parameters for an external texture argument.
++    ///
++    /// A `texture_external` is a single logical function argument, but it is
++    /// lowered to four SPIR-V parameters: three plane textures followed by the
++    /// parameters buffer. The planes are passed as `UniformConstant` pointers,
++    /// like any other texture argument, and the parameters buffer is passed by
++    /// value.
++    fn write_external_texture_function_parameters(
++        &mut self,
++        function: &mut Function,
++        prelude: &mut Block,
++        parameter_type_ids: &mut Vec<Word>,
++        ty: Handle<crate::Type>,
++        name: Option<&str>,
++        ir_module: &crate::Module,
++    ) -> Result<(), Error> {
++        // Each plane is an ordinary 2D sampled float texture.
++        let plane_pointer_type_id =
++            self.get_handle_pointer_type_id(ty, spirv::StorageClass::UniformConstant);
++        let plane_image_type_id = self.get_handle_type_id(ty);
++        for plane in 0..3 {
++            let argument_id = self.id_gen.next();
++            let instruction = Instruction::function_parameter(plane_pointer_type_id, argument_id);
++            if self.flags.contains(WriterFlags::DEBUG) {
++                if let Some(name) = name {
++                    self.debugs.push(Instruction::name(
++                        argument_id,
++                        &format!("{name}_plane{plane}"),
++                    ));
++                }
++            }
++            let handle_id = self.id_gen.next();
++            prelude.body.push(Instruction::load(
++                plane_image_type_id,
++                handle_id,
++                argument_id,
++                None,
++            ));
++            function.parameters.push(FunctionArgument {
++                instruction,
++                handle_id,
++            });
++            parameter_type_ids.push(plane_pointer_type_id);
++        }
++
++        let params_type_id = self.get_handle_type_id(
++            ir_module
++                .special_types
++                .external_texture_params
++                .expect("external textures should have generated a parameters type"),
++        );
++        let argument_id = self.id_gen.next();
++        let instruction = Instruction::function_parameter(params_type_id, argument_id);
++        if self.flags.contains(WriterFlags::DEBUG) {
++            if let Some(name) = name {
++                self.debugs
++                    .push(Instruction::name(argument_id, &format!("{name}_params")));
++            }
++        }
++        function.parameters.push(FunctionArgument {
++            instruction,
++            handle_id: 0,
++        });
++        parameter_type_ids.push(params_type_id);
++
++        Ok(())
++    }
++
+     /// Write the necessary decorations for a struct member.
+     ///
+     /// Emit decorations for the `index`'th member of the struct type
+diff --git a/naga/tests/in/wgsl/texture-external-argument.toml b/naga/tests/in/wgsl/texture-external-argument.toml
+new file mode 100644
+index 000000000..fa2bf9c4a
+--- /dev/null
++++ b/naga/tests/in/wgsl/texture-external-argument.toml
+@@ -0,0 +1,9 @@
++capabilities = "TEXTURE_EXTERNAL"
++targets = "SPIRV"
++
++[spv]
++version = [1, 1]
++
++[[spv.binding_map]]
++bind_target = { descriptor_set = 0, binding = 0, binding_array_size = 4 }
++resource_binding = { group = 0, binding = 0 }
+diff --git a/naga/tests/in/wgsl/texture-external-argument.wgsl b/naga/tests/in/wgsl/texture-external-argument.wgsl
+new file mode 100644
+index 000000000..26760f6a2
+--- /dev/null
++++ b/naga/tests/in/wgsl/texture-external-argument.wgsl
+@@ -0,0 +1,15 @@
++@group(0) @binding(0)
++var tex: texture_external;
++
++fn inner(t: texture_external) -> u32 {
++  return 0u;
++}
++
++fn outer(t: texture_external) -> u32 {
++  return inner(t);
++}
++
++@compute @workgroup_size(1)
++fn main() {
++  _ = outer(tex);
++}
+diff --git a/naga/tests/out/spv/wgsl-texture-external-argument.spvasm b/naga/tests/out/spv/wgsl-texture-external-argument.spvasm
+new file mode 100644
+index 000000000..b8db25065
+--- /dev/null
++++ b/naga/tests/out/spv/wgsl-texture-external-argument.spvasm
+@@ -0,0 +1,99 @@
++; SPIR-V
++; Version: 1.1
++; Generator: rspirv
++; Bound: 53
++OpCapability Shader
++%1 = OpExtInstImport "GLSL.std.450"
++OpMemoryModel Logical GLSL450
++OpEntryPoint GLCompute %46 "main"
++OpExecutionMode %46 LocalSize 1 1 1
++OpMemberDecorate %12 0 Offset 0
++OpMemberDecorate %12 1 Offset 4
++OpMemberDecorate %12 2 Offset 8
++OpMemberDecorate %12 3 Offset 12
++OpMemberDecorate %13 0 Offset 0
++OpMemberDecorate %13 0 ColMajor
++OpMemberDecorate %13 0 MatrixStride 16
++OpMemberDecorate %13 1 Offset 64
++OpMemberDecorate %13 1 ColMajor
++OpMemberDecorate %13 1 MatrixStride 16
++OpMemberDecorate %13 2 Offset 112
++OpMemberDecorate %13 3 Offset 128
++OpMemberDecorate %13 4 Offset 144
++OpMemberDecorate %13 4 ColMajor
++OpMemberDecorate %13 4 MatrixStride 8
++OpMemberDecorate %13 5 Offset 168
++OpMemberDecorate %13 5 ColMajor
++OpMemberDecorate %13 5 MatrixStride 8
++OpMemberDecorate %13 6 Offset 192
++OpMemberDecorate %13 7 Offset 200
++OpDecorate %15 DescriptorSet 0
++OpDecorate %15 Binding 0
++OpDecorate %17 DescriptorSet 0
++OpDecorate %17 Binding 1
++OpDecorate %18 DescriptorSet 0
++OpDecorate %18 Binding 2
++OpDecorate %19 DescriptorSet 0
++OpDecorate %19 Binding 3
++OpDecorate %20 Block
++OpMemberDecorate %20 0 Offset 0
++%2 = OpTypeVoid
++%3 = OpTypeFloat 32
++%4 = OpTypeInt 32 0
++%5 = OpTypeVector %4 2
++%7 = OpTypeVector %3 2
++%6 = OpTypeMatrix %7 3
++%9 = OpTypeVector %3 3
++%8 = OpTypeMatrix %9 3
++%11 = OpTypeVector %3 4
++%10 = OpTypeMatrix %11 4
++%12 = OpTypeStruct %3 %3 %3 %3
++%13 = OpTypeStruct %10 %8 %12 %12 %6 %6 %5 %4
++%14 = OpTypeImage %3 2D 0 0 0 1 Unknown
++%16 = OpTypePointer UniformConstant %14
++%15 = OpVariable  %16  UniformConstant
++%17 = OpVariable  %16  UniformConstant
++%18 = OpVariable  %16  UniformConstant
++%20 = OpTypeStruct %13
++%21 = OpTypePointer Uniform %20
++%19 = OpVariable  %21  Uniform
++%31 = OpTypeFunction %4 %16 %16 %16 %13
++%32 = OpConstant  %4  0
++%47 = OpTypeFunction %2
++%50 = OpTypePointer Uniform %13
++%30 = OpFunction  %4  None %31
++%23 = OpFunctionParameter  %16
++%25 = OpFunctionParameter  %16
++%27 = OpFunctionParameter  %16
++%29 = OpFunctionParameter  %13
++%22 = OpLabel
++%24 = OpLoad  %14  %23
++%26 = OpLoad  %14  %25
++%28 = OpLoad  %14  %27
++OpBranch %33
++%33 = OpLabel
++OpReturnValue %32
++OpFunctionEnd
++%42 = OpFunction  %4  None %31
++%35 = OpFunctionParameter  %16
++%37 = OpFunctionParameter  %16
++%39 = OpFunctionParameter  %16
++%41 = OpFunctionParameter  %13
++%34 = OpLabel
++%36 = OpLoad  %14  %35
++%38 = OpLoad  %14  %37
++%40 = OpLoad  %14  %39
++OpBranch %43
++%43 = OpLabel
++%44 = OpFunctionCall  %4  %30 %35 %37 %39 %41
++OpReturnValue %44
++OpFunctionEnd
++%46 = OpFunction  %2  None %47
++%45 = OpLabel
++OpBranch %48
++%48 = OpLabel
++%51 = OpAccessChain  %50  %19 %32
++%52 = OpLoad  %13  %51
++%49 = OpFunctionCall  %4  %42 %15 %17 %18 %52
++OpReturn
++OpFunctionEnd
+\ No newline at end of file
+diff --git a/naga/tests/out/spv/wgsl-texture-external-argument.spvasm.glsl b/naga/tests/out/spv/wgsl-texture-external-argument.spvasm.glsl
+new file mode 100644
+index 000000000..e599c5f14
+--- /dev/null
++++ b/naga/tests/out/spv/wgsl-texture-external-argument.spvasm.glsl
+@@ -0,0 +1,47 @@
++#version 460
++#extension GL_EXT_scalar_block_layout : require
++layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
++
++struct _12
++{
++    float _m0;
++    float _m1;
++    float _m2;
++    float _m3;
++};
++
++struct _13
++{
++    mat4 _m0;
++    mat3 _m1;
++    _12 _m2;
++    _12 _m3;
++    mat3x2 _m4;
++    mat3x2 _m5;
++    uvec2 _m6;
++    uint _m7;
++};
++
++layout(set = 0, binding = 3, std430) uniform _20_19
++{
++    _13 _m0;
++} _19;
++
++layout(set = 0, binding = 0) uniform texture2D _15;
++layout(set = 0, binding = 1) uniform texture2D _17;
++layout(set = 0, binding = 2) uniform texture2D _18;
++
++uint _30(texture2D _23, texture2D _25, texture2D _27, _13 _29)
++{
++    return 0u;
++}
++
++uint _42(texture2D _35, texture2D _37, texture2D _39, _13 _41)
++{
++    return _30(_35, _37, _39, _41);
++}
++
++void main()
++{
++}
++

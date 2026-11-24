@@ -1,0 +1,24 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Andy Leiserson <aleiserson@mozilla.com>
+Date: Mon, 21 Sep 2026 16:48:42 -0700
+Subject: [PATCH] feat(hal vulkan): Unconditionally expose
+ `Features::EXTERNAL_TEXTURE`
+
+(cherry picked from commit fbf9484e6d8b0806cbc81034347bc511ea9ed3bf)
+---
+ wgpu-hal/src/vulkan/adapter.rs | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/wgpu-hal/src/vulkan/adapter.rs b/wgpu-hal/src/vulkan/adapter.rs
+index 6b1fdaefa..537580490 100644
+--- a/wgpu-hal/src/vulkan/adapter.rs
++++ b/wgpu-hal/src/vulkan/adapter.rs
+@@ -1125,6 +1125,8 @@ impl PhysicalDeviceFeatures {
+                 || caps.supports_extension(c"VK_KHR_shader_draw_parameters"),
+         );
+ 
++        features.insert(F::EXTERNAL_TEXTURE);
++
+         (features, dl_flags)
+     }
+ }

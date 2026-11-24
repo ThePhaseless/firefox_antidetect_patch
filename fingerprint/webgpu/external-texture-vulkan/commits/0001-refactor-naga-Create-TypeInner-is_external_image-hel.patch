@@ -1,0 +1,191 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Andy Leiserson <aleiserson@mozilla.com>
+Date: Tue, 21 Jul 2026 09:24:26 -0700
+Subject: [PATCH] refactor(naga): Create `TypeInner::is_external_image` helper
+
+(cherry picked from commit 0ce78c5d0c18487691e68ed41225634f19558fd2)
+---
+ naga/src/back/hlsl/writer.rs  | 27 ++++-----------------------
+ naga/src/back/msl/writer.rs   | 18 +++---------------
+ naga/src/proc/namer.rs        | 16 ++--------------
+ naga/src/proc/type_methods.rs | 11 +++++++++++
+ naga/src/valid/type.rs        |  8 +-------
+ 5 files changed, 21 insertions(+), 59 deletions(-)
+
+diff --git a/naga/src/back/hlsl/writer.rs b/naga/src/back/hlsl/writer.rs
+index 6032a4f16..401e2aace 100644
+--- a/naga/src/back/hlsl/writer.rs
++++ b/naga/src/back/hlsl/writer.rs
+@@ -1037,14 +1037,7 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
+         // External textures are handled entirely differently, so defer entirely to that method.
+         // We do so prior to calling resolve_resource_binding() below, as we even need to resolve
+         // their bindings separately.
+-        let is_external_texture = matches!(
+-            *handle_ty,
+-            TypeInner::Image {
+-                class: crate::ImageClass::External,
+-                ..
+-            }
+-        );
+-        if is_external_texture {
++        if handle_ty.is_external_image() {
+             return self.write_global_external_texture(module, handle, global);
+         }
+ 
+@@ -1935,11 +1928,7 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
+     ) -> BackendResult {
+         // External texture arguments must be expanded into separate
+         // arguments for each plane and the params buffer.
+-        if let TypeInner::Image {
+-            class: crate::ImageClass::External,
+-            ..
+-        } = module.types[arg.ty].inner
+-        {
++        if module.types[arg.ty].inner.is_external_image() {
+             return self.write_function_external_texture_argument(module, handle, index);
+         }
+ 
+@@ -4129,11 +4118,7 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
+                 // also know that external textures can only ever be used as an argument to another
+                 // function. Therefore we can simply emit each of the expanded arguments in a
+                 // consecutive comma-separated list.
+-                if let TypeInner::Image {
+-                    class: crate::ImageClass::External,
+-                    ..
+-                } = *ty
+-                {
++                if ty.is_external_image() {
+                     let plane_names = [0, 1, 2].map(|i| {
+                         &self.names[&func_ctx
+                             .external_texture_argument_key(pos, ExternalTextureNameKey::Plane(i))]
+@@ -4329,11 +4314,7 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
+                 // will have been expanded to separate consecutive arguments for each
+                 // plane and the parameters buffer. Therefore we can simply emit each of
+                 // the expanded global variables in a consecutive comma-separated list.
+-                if let TypeInner::Image {
+-                    class: crate::ImageClass::External,
+-                    ..
+-                } = *ty
+-                {
++                if ty.is_external_image() {
+                     let plane_names = [0, 1, 2].map(|i| {
+                         &self.names[&NameKey::ExternalTextureGlobalVariable(
+                             handle,
+diff --git a/naga/src/back/msl/writer.rs b/naga/src/back/msl/writer.rs
+index 78a7e0ab7..944430105 100644
+--- a/naga/src/back/msl/writer.rs
++++ b/naga/src/back/msl/writer.rs
+@@ -1232,11 +1232,7 @@ impl<W: Write> Writer<W> {
+         kind: crate::ScalarKind,
+         context: &ExpressionContext,
+     ) -> BackendResult {
+-        if let crate::TypeInner::Image {
+-            class: crate::ImageClass::External,
+-            ..
+-        } = *context.resolve_type(image)
+-        {
++        if context.resolve_type(image).is_external_image() {
+             write!(self.out, "{IMAGE_SIZE_EXTERNAL_FUNCTION}(")?;
+             self.put_expression(image, context, true)?;
+             write!(self.out, ")")?;
+@@ -1500,11 +1496,7 @@ impl<W: Write> Writer<W> {
+         mut address: TexelAddress,
+         context: &ExpressionContext,
+     ) -> BackendResult {
+-        if let crate::TypeInner::Image {
+-            class: crate::ImageClass::External,
+-            ..
+-        } = *context.resolve_type(image)
+-        {
++        if context.resolve_type(image).is_external_image() {
+             write!(self.out, "{IMAGE_LOAD_EXTERNAL_FUNCTION}(")?;
+             self.put_expression(image, context, true)?;
+             write!(self.out, ", ")?;
+@@ -8131,11 +8123,7 @@ template <typename A>
+                         )?;
+                         self.put_inline_sampler_properties(back::Level(2), sampler, options)?;
+                         writeln!(self.out, "{});", back::INDENT)?;
+-                    } else if let crate::TypeInner::Image {
+-                        class: crate::ImageClass::External,
+-                        ..
+-                    } = module.types[var.ty].inner
+-                    {
++                    } else if module.types[var.ty].inner.is_external_image() {
+                         // Wrap the individual arguments for each external texture global
+                         // in a struct which can be easily passed around.
+                         let wrapper_name = &self.names[&NameKey::GlobalVariable(handle)];
+diff --git a/naga/src/proc/namer.rs b/naga/src/proc/namer.rs
+index 5baa1c19d..c5fc23ec6 100644
+--- a/naga/src/proc/namer.rs
++++ b/naga/src/proc/namer.rs
+@@ -323,13 +323,7 @@ impl Namer {
+                 let name = self.call_or(&arg.name, "param");
+                 output.insert(NameKey::FunctionArgument(fun_handle, index as u32), name);
+ 
+-                if matches!(
+-                    module.types[arg.ty].inner,
+-                    crate::TypeInner::Image {
+-                        class: crate::ImageClass::External,
+-                        ..
+-                    }
+-                ) {
++                if module.types[arg.ty].inner.is_external_image() {
+                     let base = arg.name.as_deref().unwrap_or("param");
+                     for &(suffix, ext_key) in ExternalTextureNameKey::ALL {
+                         let name = self.call(&format!("{base}_{suffix}"));
+@@ -354,13 +348,7 @@ impl Namer {
+             let name = self.call_or(&var.name, "global");
+             output.insert(NameKey::GlobalVariable(handle), name);
+ 
+-            if matches!(
+-                module.types[var.ty].inner,
+-                crate::TypeInner::Image {
+-                    class: crate::ImageClass::External,
+-                    ..
+-                }
+-            ) {
++            if module.types[var.ty].inner.is_external_image() {
+                 let base = var.name.as_deref().unwrap_or("global");
+                 for &(suffix, ext_key) in ExternalTextureNameKey::ALL {
+                     let name = self.call(&format!("{base}_{suffix}"));
+diff --git a/naga/src/proc/type_methods.rs b/naga/src/proc/type_methods.rs
+index 6052869a7..6ce66d80f 100644
+--- a/naga/src/proc/type_methods.rs
++++ b/naga/src/proc/type_methods.rs
+@@ -508,6 +508,17 @@ impl crate::TypeInner {
+         }
+     }
+ 
++    /// Return true if `self` is an external texture.
++    pub const fn is_external_image(&self) -> bool {
++        matches!(
++            self,
++            crate::TypeInner::Image {
++                class: crate::ImageClass::External,
++                ..
++            }
++        )
++    }
++
+     /// Determine whether `self` automatically converts to `goal`.
+     ///
+     /// If Naga IR's automatic conversions will convert `self` to
+diff --git a/naga/src/valid/type.rs b/naga/src/valid/type.rs
+index 3b5abcbf9..2832ccd1b 100644
+--- a/naga/src/valid/type.rs
++++ b/naga/src/valid/type.rs
+@@ -970,13 +970,7 @@ impl super::Validator {
+                         _ => return Err(TypeError::BindingArrayBaseTypeNotStruct(base)),
+                     };
+                 }
+-                if matches!(
+-                    gctx.types[base].inner,
+-                    crate::TypeInner::Image {
+-                        class: crate::ImageClass::External,
+-                        ..
+-                    }
+-                ) {
++                if gctx.types[base].inner.is_external_image() {
+                     // Binding arrays of external textures are not yet supported.
+                     // See <https://github.com/gfx-rs/wgpu/issues/8027>. Note that
+                     // `validate_global_var` relies on this error being raised here.

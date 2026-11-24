@@ -1,0 +1,428 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: feder-cr <85809106+feder-cr@users.noreply.github.com>
+Date: Sun, 1 Nov 2026 09:19:26 +0700
+Subject: [PATCH] fix(naga spv-out): Pass external texture globals to functions
+ correctly
+
+When a `texture_external` global is passed to a function, the call site
+loaded the parameters buffer through an `OpAccessChain` typed with the
+regular `NagaExternalTextureParams` struct, but the uniform variable holds
+the std140-compatible struct (its `mat3x2` members are split into
+columns), so the module was invalid. The function prelude already loads
+the std140 value and converts it to the regular type; pass that value.
+
+That conversion function was only registered when some function sampled,
+loaded or queried an external texture, so a module that only forwarded an
+external texture global panicked when writing the prelude. Register it
+whenever a function uses an external texture global.
+---
+ naga/src/back/spv/block.rs                |  39 +--
+ naga/src/back/spv/writer.rs               |  10 +
+ naga/tests/naga/main.rs                   |   1 +
+ naga/tests/naga/spirv_external_texture.rs | 297 ++++++++++++++++++++++
+ 4 files changed, 317 insertions(+), 30 deletions(-)
+ create mode 100644 naga/tests/naga/spirv_external_texture.rs
+
+diff --git a/naga/src/back/spv/block.rs b/naga/src/back/spv/block.rs
+index f77115e06..e64b8c305 100644
+--- a/naga/src/back/spv/block.rs
++++ b/naga/src/back/spv/block.rs
+@@ -3525,7 +3525,6 @@ impl BlockContext<'_> {
+     fn push_external_texture_call_arguments(
+         &mut self,
+         argument: Handle<crate::Expression>,
+-        block: &mut Block,
+     ) -> Result<(), Error> {
+         match self.ir_function.expressions[argument] {
+             crate::Expression::GlobalVariable(handle) => {
+@@ -3535,37 +3534,17 @@ impl BlockContext<'_> {
+                     external_texture.planes[1].var_id,
+                     external_texture.planes[2].var_id,
+                 ];
+-                let params_var_id = external_texture.params.var_id;
++                // The parameters are passed by value. The function prelude has
++                // already loaded them from the std140-compatible uniform buffer
++                // and converted them to the regular parameters type.
++                let params_id = external_texture.params.handle_id;
++                assert_ne!(
++                    params_id, 0,
++                    "external texture parameters not loaded in the function prelude"
++                );
+ 
+                 // The planes are passed as pointers, like any texture global.
+                 self.temp_list.extend_from_slice(&plane_ids);
+-
+-                // The parameters buffer is passed by value, so load it out of
+-                // the (`Block`-wrapped) uniform buffer.
+-                let params_type_id = self.writer.get_handle_type_id(
+-                    self.ir_module
+-                        .special_types
+-                        .external_texture_params
+-                        .expect("external textures should have generated a parameters type"),
+-                );
+-                let params_pointer_type_id = self
+-                    .writer
+-                    .get_pointer_type_id(params_type_id, spirv::StorageClass::Uniform);
+-                let zero_id = self.get_index_constant(0);
+-                let params_pointer_id = self.gen_id();
+-                block.body.push(Instruction::access_chain(
+-                    params_pointer_type_id,
+-                    params_pointer_id,
+-                    params_var_id,
+-                    &[zero_id],
+-                ));
+-                let params_id = self.gen_id();
+-                block.body.push(Instruction::load(
+-                    params_type_id,
+-                    params_id,
+-                    params_pointer_id,
+-                    None,
+-                ));
+                 self.temp_list.push(params_id);
+             }
+             crate::Expression::FunctionArgument(index) => {
+@@ -4011,7 +3990,7 @@ impl BlockContext<'_> {
+                             // An external texture is a single logical argument,
+                             // but is passed as four SPIR-V arguments: three
+                             // planes and a parameters buffer.
+-                            self.push_external_texture_call_arguments(argument, &mut block)?;
++                            self.push_external_texture_call_arguments(argument)?;
+                         } else {
+                             self.temp_list.push(self.cached[argument]);
+                         }
+diff --git a/naga/src/back/spv/writer.rs b/naga/src/back/spv/writer.rs
+index 17d42619f..b843774eb 100644
+--- a/naga/src/back/spv/writer.rs
++++ b/naga/src/back/spv/writer.rs
+@@ -679,6 +679,16 @@ impl Writer {
+             }
+         }
+ 
++        // The prelude of a function that uses an external texture global
++        // converts its parameters from the std140-compatible type, even if the
++        // function only passes the texture on to other functions.
++        uses_external_texture_params |= ir_module
++            .global_variables
++            .iter()
++            .any(|(handle, var)| {
++                !info[handle].is_empty() && ir_module.types[var.ty].inner.is_external_image()
++            });
++
+         if uses_external_texture_params {
+             self.write_wrapped_convert_from_std140_compat_type(
+                 ir_module,
+diff --git a/naga/tests/naga/main.rs b/naga/tests/naga/main.rs
+index 7253e3cdf..6afd1eede 100644
+--- a/naga/tests/naga/main.rs
++++ b/naga/tests/naga/main.rs
+@@ -2,6 +2,7 @@ mod example_wgsl;
+ mod snapshots;
+ mod spirv_capabilities;
+ mod spirv_debug_info;
++mod spirv_external_texture;
+ mod spirv_roundtrip;
+ mod validation;
+ mod wgsl_errors;
+diff --git a/naga/tests/naga/spirv_external_texture.rs b/naga/tests/naga/spirv_external_texture.rs
+new file mode 100644
+index 000000000..ac40510d3
+--- /dev/null
++++ b/naga/tests/naga/spirv_external_texture.rs
+@@ -0,0 +1,297 @@
++/*!
++Tests for the SPIR-V lowering of `texture_external`.
++
++The SPIR-V helpers must compute exactly the same values as the HLSL ones (see
++`back::hlsl::help`), so besides checking that the generated module is well
++typed, these tests check the shape of the generated helper functions.
++*/
++
++#![cfg(all(feature = "wgsl-in", spv_out))]
++
++use std::collections::HashMap;
++
++use naga::back::spv;
++use rspirv::dr::{Instruction, Module, Operand};
++use spirv::{Op, Word};
++
++const TEXTURE_EXTERNAL: &str = include_str!("../in/wgsl/texture-external.wgsl");
++const TEXTURE_EXTERNAL_ARGUMENT: &str = include_str!("../in/wgsl/texture-external-argument.wgsl");
++const TEXTURE_EXTERNAL_FORWARD_ONLY: &str =
++    include_str!("../in/wgsl/texture-external-forward-only.wgsl");
++
++// GLSL.std.450 instruction numbers.
++const GLSL_ROUND: u32 = 1;
++const GLSL_ROUND_EVEN: u32 = 2;
++const GLSL_FLOOR: u32 = 8;
++const GLSL_FCLAMP: u32 = 43;
++
++fn binding_map() -> spv::BindingMap {
++    let mut map = spv::BindingMap::default();
++    map.insert(
++        naga::ResourceBinding {
++            group: 0,
++            binding: 0,
++        },
++        spv::BindingInfo {
++            descriptor_set: 0,
++            binding: 0,
++            binding_array_size: None,
++            external_texture: true,
++        },
++    );
++    map.insert(
++        naga::ResourceBinding {
++            group: 0,
++            binding: 1,
++        },
++        spv::BindingInfo {
++            descriptor_set: 0,
++            binding: 4,
++            binding_array_size: None,
++            external_texture: false,
++        },
++    );
++    map
++}
++
++fn options(binding_map: spv::BindingMap, fake_missing_bindings: bool) -> spv::Options<'static> {
++    spv::Options {
++        lang_version: (1, 1),
++        flags: spv::WriterFlags::DEBUG | spv::WriterFlags::LABEL_VARYINGS,
++        binding_map,
++        fake_missing_bindings,
++        ..Default::default()
++    }
++}
++
++fn try_compile(source: &str, options: &spv::Options) -> Result<Vec<u32>, spv::Error> {
++    let module = naga::front::wgsl::parse_str(source)
++        .unwrap_or_else(|e| panic!("WGSL parse failed:\n{}", e.emit_to_string(source)));
++    let info = naga::valid::Validator::new(
++        naga::valid::ValidationFlags::all(),
++        naga::valid::Capabilities::TEXTURE_EXTERNAL,
++    )
++    .validate(&module)
++    .expect("validation failed");
++    spv::write_vec(&module, &info, options, None)
++}
++
++fn compile(source: &str) -> Spv {
++    let words = try_compile(source, &options(binding_map(), false)).expect("SPIR-V write failed");
++    Spv::new(words)
++}
++
++/// A parsed SPIR-V module with the lookup tables the checks below need.
++struct Spv {
++    module: Module,
++    /// Result id to defining instruction (types, constants, variables, values).
++    defs: HashMap<Word, Instruction>,
++    /// Value id to its type id.
++    value_types: HashMap<Word, Word>,
++    /// Function id to its `OpTypeFunction` id.
++    function_types: HashMap<Word, Word>,
++    /// `OpConstant` id to its (32-bit) value.
++    constants: HashMap<Word, u32>,
++    names: HashMap<Word, String>,
++}
++
++fn id(operand: &Operand) -> Word {
++    match *operand {
++        Operand::IdRef(id) => id,
++        ref other => panic!("expected an id, got {other:?}"),
++    }
++}
++
++impl Spv {
++    fn new(words: Vec<u32>) -> Self {
++        let module = rspirv::dr::load_words(words).expect("rspirv could not parse the module");
++        let mut spv = Spv {
++            defs: HashMap::new(),
++            value_types: HashMap::new(),
++            function_types: HashMap::new(),
++            constants: HashMap::new(),
++            names: HashMap::new(),
++            module,
++        };
++        let mut all = Vec::new();
++        all.extend(spv.module.types_global_values.iter().cloned());
++        for function in &spv.module.functions {
++            let def = function.def.as_ref().unwrap();
++            spv.function_types
++                .insert(def.result_id.unwrap(), id(&def.operands[1]));
++            all.extend(function.parameters.iter().cloned());
++            for block in &function.blocks {
++                all.extend(block.instructions.iter().cloned());
++            }
++        }
++        for inst in all {
++            if inst.class.opcode == Op::Constant {
++                if let Operand::LiteralBit32(value) = inst.operands[0] {
++                    spv.constants.insert(inst.result_id.unwrap(), value);
++                }
++            }
++            if let Some(result_id) = inst.result_id {
++                if let Some(result_type) = inst.result_type {
++                    spv.value_types.insert(result_id, result_type);
++                }
++                spv.defs.insert(result_id, inst);
++            }
++        }
++        for inst in &spv.module.debug_names {
++            if inst.class.opcode == Op::Name {
++                if let Operand::LiteralString(ref name) = inst.operands[1] {
++                    spv.names.insert(id(&inst.operands[0]), name.clone());
++                }
++            }
++        }
++        spv
++    }
++
++    fn def(&self, id: Word) -> &Instruction {
++        self.defs
++            .get(&id)
++            .unwrap_or_else(|| panic!("%{id} has no definition"))
++    }
++
++    fn type_of(&self, value: Word) -> Word {
++        *self
++            .value_types
++            .get(&value)
++            .unwrap_or_else(|| panic!("%{value} has no type"))
++    }
++
++    fn pointee(&self, pointer_type: Word) -> Option<Word> {
++        let def = self.def(pointer_type);
++        (def.class.opcode == Op::TypePointer).then(|| id(&def.operands[1]))
++    }
++
++    fn function(&self, name: &str) -> &rspirv::dr::Function {
++        self.module
++            .functions
++            .iter()
++            .find(|f| {
++                self.names.get(&f.def.as_ref().unwrap().result_id.unwrap())
++                    == Some(&name.to_string())
++            })
++            .unwrap_or_else(|| panic!("no function named {name}"))
++    }
++
++    fn instructions<'a>(
++        &'a self,
++        function: &'a rspirv::dr::Function,
++    ) -> impl Iterator<Item = &'a Instruction> + 'a {
++        function.blocks.iter().flat_map(|b| b.instructions.iter())
++    }
++
++    fn all_instructions(&self) -> impl Iterator<Item = &Instruction> + '_ {
++        self.module
++            .functions
++            .iter()
++            .flat_map(|f| self.instructions(f))
++    }
++
++    /// GLSL.std.450 instruction numbers used by `function`.
++    fn glsl_ops(&self, function: &rspirv::dr::Function) -> Vec<u32> {
++        self.instructions(function)
++            .filter(|inst| inst.class.opcode == Op::ExtInst)
++            .map(|inst| match inst.operands[1] {
++                Operand::LiteralExtInstInteger(op) => op,
++                ref other => panic!("unexpected ext inst operand {other:?}"),
++            })
++            .collect()
++    }
++
++    /// Check that the operand and result types of the instructions the
++    /// external texture lowering emits agree with each other.
++    ///
++    /// This is a small subset of what `spirv-val` checks, enough to catch
++    /// mismatched pointer/value and struct-layout types.
++    fn type_errors(&self) -> Vec<String> {
++        let mut errors = Vec::new();
++        for inst in self.all_instructions() {
++            let result = inst.result_id.unwrap_or(0);
++            match inst.class.opcode {
++                Op::Load => {
++                    let pointer = id(&inst.operands[0]);
++                    match self.pointee(self.type_of(pointer)) {
++                        Some(pointee) if Some(pointee) == inst.result_type => {}
++                        pointee => errors.push(format!(
++                            "%{result} = OpLoad %{:?} %{pointer}: pointer to {pointee:?}",
++                            inst.result_type
++                        )),
++                    }
++                }
++                Op::AccessChain => {
++                    let base = id(&inst.operands[0]);
++                    let Some(mut current) = self.pointee(self.type_of(base)) else {
++                        errors.push(format!("%{result} = OpAccessChain on non-pointer %{base}"));
++                        continue;
++                    };
++                    for index in &inst.operands[1..] {
++                        let ty = self.def(current);
++                        current = match ty.class.opcode {
++                            Op::TypeStruct => {
++                                let member = self.constants[&id(index)] as usize;
++                                id(&ty.operands[member])
++                            }
++                            _ => id(&ty.operands[0]),
++                        };
++                    }
++                    let result_pointee = self.pointee(inst.result_type.unwrap());
++                    if result_pointee != Some(current) {
++                        errors.push(format!(
++                            "%{result} = OpAccessChain: result points to {result_pointee:?}, \
++                             but the indexed type is %{current}"
++                        ));
++                    }
++                }
++                Op::FunctionCall => {
++                    let callee = id(&inst.operands[0]);
++                    let function_type = self.def(self.function_types[&callee]);
++                    let return_type = id(&function_type.operands[0]);
++                    let parameter_types: Vec<Word> =
++                        function_type.operands[1..].iter().map(id).collect();
++                    let argument_types: Vec<Word> = inst.operands[1..]
++                        .iter()
++                        .map(|arg| self.type_of(id(arg)))
++                        .collect();
++                    if inst.result_type != Some(return_type) || argument_types != parameter_types
++                    {
++                        errors.push(format!(
++                            "%{result} = OpFunctionCall %{callee}: argument types \
++                             {argument_types:?} != parameter types {parameter_types:?}"
++                        ));
++                    }
++                }
++                Op::ImageFetch
++                | Op::ImageQuerySizeLod
++                | Op::ImageQuerySize
++                | Op::ImageQueryLevels
++                | Op::SampledImage => {
++                    let image = id(&inst.operands[0]);
++                    let image_type = self.def(self.type_of(image));
++                    if image_type.class.opcode != Op::TypeImage {
++                        errors.push(format!(
++                            "%{result} = {:?} on %{image}, which is a {:?}, not an image",
++                            inst.class.opcode, image_type.class.opcode
++                        ));
++                    }
++                }
++                _ => {}
++            }
++        }
++        errors
++    }
++
++    fn assert_well_typed(&self) {
++        let errors = self.type_errors();
++        assert!(errors.is_empty(), "type errors:\n{}", errors.join("\n"));
++    }
++}
++
++/// A `texture_external` global that is only ever forwarded, never sampled.
++#[test]
++fn external_texture_forward_only() {
++    let spv = compile(TEXTURE_EXTERNAL_FORWARD_ONLY);
++    spv.assert_well_typed();
++}

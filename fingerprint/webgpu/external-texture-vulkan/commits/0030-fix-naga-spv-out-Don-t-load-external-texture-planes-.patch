@@ -1,0 +1,132 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: feder-cr <85809106+feder-cr@users.noreply.github.com>
+Date: Sun, 1 Nov 2026 10:08:35 +0700
+Subject: [PATCH] fix(naga spv-out): Don't load external texture planes in
+ function preludes
+
+The planes of external texture globals and parameters are passed to the
+helper functions and to other functions as pointers, and only loaded by
+the helpers, but every function prelude also loaded them. Remove those
+dead `OpLoad`s.
+---
+ naga/src/back/spv/writer.rs               | 27 +++++------------
+ naga/tests/naga/spirv_external_texture.rs | 35 +++++++++++++++++++++++
+ 2 files changed, 42 insertions(+), 20 deletions(-)
+
+diff --git a/naga/src/back/spv/writer.rs b/naga/src/back/spv/writer.rs
+index f5f84c33e..22bd63c09 100644
+--- a/naga/src/back/spv/writer.rs
++++ b/naga/src/back/spv/writer.rs
+@@ -1363,7 +1363,6 @@ impl Writer {
+                     // parameters buffer.
+                     self.write_external_texture_function_parameters(
+                         &mut function,
+-                        &mut prelude,
+                         &mut parameter_type_ids,
+                         argument.ty,
+                         argument.name.as_deref(),
+@@ -1559,21 +1558,15 @@ impl Writer {
+                 }
+                 // TODO: ideally we would lower this in a way that enables handling
+                 // them the same as regular globals
+-                let plane_type_id = self.get_type_id(LookupType::Local(LocalType::EXTERNAL_TEXTURE_PLANE));
+                 let params_ty = ir_module.special_types.external_texture_params.unwrap();
+                 let params_type_id = self.get_handle_type_id(params_ty);
+                 let params_std140_type_id = self.std140_compat_uniform_types[&params_ty].type_id;
+                 let params_std140_pointer_type_id = self.get_pointer_type_id(params_std140_type_id, spirv::StorageClass::Uniform);
+                 let index_id = self.get_index_constant(0);
++                // The planes are passed to the helper functions and to other
++                // functions as pointers (their `var_id`s), so nothing is loaded
++                // for them here.
+                 let external_texture = self.external_textures.get_mut(&handle).unwrap();
+-                for plane_var in external_texture.planes.each_mut() {
+-                    let id = self.id_gen.next();
+-                    prelude
+-                        .body
+-                        .push(Instruction::load(plane_type_id, id, plane_var.var_id, None));
+-                    plane_var.access_id = plane_var.var_id;
+-                    plane_var.handle_id = id;
+-                }
+                 let params_std140_pointer_id = self.id_gen.next();
+                 prelude.body.push(Instruction::access_chain(
+                     params_std140_pointer_type_id,
+@@ -3804,7 +3797,6 @@ impl Writer {
+     fn write_external_texture_function_parameters(
+         &mut self,
+         function: &mut Function,
+-        prelude: &mut Block,
+         parameter_type_ids: &mut Vec<Word>,
+         ty: Handle<crate::Type>,
+         name: Option<&str>,
+@@ -3813,7 +3805,6 @@ impl Writer {
+         // Each plane is an ordinary 2D sampled float texture.
+         let plane_pointer_type_id =
+             self.get_handle_pointer_type_id(ty, spirv::StorageClass::UniformConstant);
+-        let plane_image_type_id = self.get_handle_type_id(ty);
+         for plane in 0..3 {
+             let argument_id = self.id_gen.next();
+             let instruction = Instruction::function_parameter(plane_pointer_type_id, argument_id);
+@@ -3825,16 +3816,12 @@ impl Writer {
+                     ));
+                 }
+             }
+-            let handle_id = self.id_gen.next();
+-            prelude.body.push(Instruction::load(
+-                plane_image_type_id,
+-                handle_id,
+-                argument_id,
+-                None,
+-            ));
++            // External texture parameters are used through
++            // `get_external_texture_plane_id` and
++            // `get_external_texture_params_id`, never through `handle_id`.
+             function.parameters.push(FunctionArgument {
+                 instruction,
+-                handle_id,
++                handle_id: 0,
+             });
+             parameter_type_ids.push(plane_pointer_type_id);
+         }
+diff --git a/naga/tests/naga/spirv_external_texture.rs b/naga/tests/naga/spirv_external_texture.rs
+index 3fd02f786..222fd4d91 100644
+--- a/naga/tests/naga/spirv_external_texture.rs
++++ b/naga/tests/naga/spirv_external_texture.rs
+@@ -743,3 +743,38 @@ fn external_texture_single_entry_point() {
+         }
+     }
+ }
++
++/// The planes are passed around as pointers and only loaded by the helper
++/// functions, so no function should load a plane it doesn't use.
++#[test]
++fn external_texture_no_dead_plane_loads() {
++    for source in [
++        TEXTURE_EXTERNAL,
++        TEXTURE_EXTERNAL_ARGUMENT,
++        TEXTURE_EXTERNAL_FORWARD_ONLY,
++    ] {
++        let spv = compile(source);
++        for function in &spv.module.functions {
++            let used: std::collections::HashSet<Word> = spv
++                .instructions(function)
++                .flat_map(|inst| inst.operands.iter())
++                .filter_map(|operand| match *operand {
++                    Operand::IdRef(id) => Some(id),
++                    _ => None,
++                })
++                .collect();
++            for inst in spv.instructions(function) {
++                let result = inst.result_id.unwrap_or(0);
++                if inst.class.opcode == Op::Load
++                    && spv.def(inst.result_type.unwrap()).class.opcode == Op::TypeImage
++                {
++                    assert!(
++                        used.contains(&result),
++                        "%{result} = OpLoad of plane %{} is never used",
++                        id(&inst.operands[0])
++                    );
++                }
++            }
++        }
++    }
++}

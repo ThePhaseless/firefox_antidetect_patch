@@ -47,6 +47,10 @@ jobs:
       # scan at the end of `engine.py port`.
       - name: The birth points of a request, against the ledger
         run: python .series/tools/births.py --tree source
+      # port-04: the vendored code of a backport (hooks.patch, its checksum lines, the files it adds) is the replay of the commits
+      # stored in its folder on the revision this tag vendors. Reads the tag's objects only: no build, no working tree.
+      - name: The vendored backports, replayed on the Mozilla tag
+        run: python .series/tools/backport_replay.py check --source source
       # The core's checks that read the engine's source: pref types and readers,
       # prefs the binary reads, the Juggler contract and protocol, the WebGL
       # extension order, the font manifest. In the core's own CI they skip, as no

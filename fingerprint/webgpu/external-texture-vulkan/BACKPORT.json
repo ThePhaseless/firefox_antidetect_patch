@@ -1,36 +1,222 @@
 {
  "upstream": "https://github.com/gfx-rs/wgpu",
  "vendored": "4f4dc63098fae64a0e6d1d3dc6f4f328da8fd5c8",
+ "workspace_dependencies": {
+  "bytemuck": {
+   "version": "1.22",
+   "features": [
+    "extern_crate_alloc",
+    "min_const_generics"
+   ]
+  }
+ },
  "commits": [
-  "0ce78c5d0 refactor(naga): Create TypeInner::is_external_image helper",
-  "eb4678dd0 refactor(naga): Expose indices of ExternalTextureParams members",
-  "66e992c3a refactor(types): Move ExternalTextureTransferFunction to naga-types",
-  "de3dd5d1c refactor(naga spv-out): Add wrapped function preamble helper (WIP, PR #10600)",
-  "d1be86f2e fix debug info (WIP, with de3dd5d1c)",
-  "1c7ea0952 use function helper for ray tracing (WIP, with de3dd5d1c)",
-  "49325ca0a feat(vulkan): External texture binding support (#10768, merged 2026-10-29)",
-  "63bc1bb38 feat(naga spv-out): External texture globals (WIP, andyleiserson/wgpu external-texture)",
-  "fc19430c8 feat(naga spv-out): External texture function parameters (WIP)",
-  "826569e8e feat(naga spv-out): External texture helper functions (WIP)",
-  "fbf9484e6 feat(hal vulkan): Unconditionally expose Features::EXTERNAL_TEXTURE (WIP)",
-  "81e38d86f fix: emit NeedsInitializedMemory for create_external_texture_binding",
-  "5086e107a fix: emit NeedsInitializedMemory for create_external_texture_binding_from_view (#10276)",
-  "0342e2fba fix(core): Check same-device for external texture planes (#10636)"
+  {
+   "file": "commits/0001-refactor-naga-Create-TypeInner-is_external_image-hel.patch",
+   "sha256": "05cbe5a69f4bf48391ba42ec397cb2001fef9240c3349e6592adb073d53827bf",
+   "kind": "upstream",
+   "upstream_sha": "0ce78c5d0c18487691e68ed41225634f19558fd2",
+   "contained_in": null
+  },
+  {
+   "file": "commits/0002-refactor-naga-Expose-indices-of-ExternalTextureParam.patch",
+   "sha256": "bd66b1d2408d4fc4c529b4594d937f730d9c9c18499a16f7057669ddad2941b7",
+   "kind": "upstream",
+   "upstream_sha": "eb4678dd0823d0f2679c76ccb6c4d13dd775aa6f",
+   "contained_in": null
+  },
+  {
+   "file": "commits/0003-refactor-types-Move-ExternalTextureTransferFunction-.patch",
+   "sha256": "90e029c0ccd01b0c12b422235d59ab69c158c52b6b305f1c681ce646c711a36e",
+   "kind": "upstream",
+   "upstream_sha": "66e992c3a130a7fb0ea24897eaa312892ffbf9a5",
+   "contained_in": null
+  },
+  {
+   "file": "commits/0004-refactor-naga-spv-out-Add-wrapped-function-preamble-.patch",
+   "sha256": "dc7433df2b7df0c9f32612b30d1332402cbe2977a5f0e5ddb9e7c3bdac9e93bd",
+   "kind": "upstream",
+   "upstream_sha": "de3dd5d1c358a25239f85a198deb99d77d8ef713",
+   "contained_in": null
+  },
+  {
+   "file": "commits/0005-fix-debug-info.patch",
+   "sha256": "5ae82e5269a999b392aa3e76c8736685b98d91dd126dddde834d8c11531d44fe",
+   "kind": "upstream",
+   "upstream_sha": "d1be86f2e9a22edab8e4fec5da935b6204325ecc",
+   "contained_in": null
+  },
+  {
+   "file": "commits/0006-use-function-helper-for-ray-tracing.patch",
+   "sha256": "50ff969e6f28a3d3a732ebed0dae7a8347b6a46b1b567fbb63f654e36258fbea",
+   "kind": "upstream",
+   "upstream_sha": "1c7ea095249479594022dc6effb7504c00cbe012",
+   "contained_in": null
+  },
+  {
+   "file": "commits/0007-feat-vulkan-External-texture-binding-support-10768.patch",
+   "sha256": "81d5f12115b6415ca7cd198b7d7c1289caa2268a36731210f537f7efdaba54ab",
+   "kind": "upstream",
+   "upstream_sha": "49325ca0a13bdc0787b1601138096cce743dd29e",
+   "contained_in": null
+  },
+  {
+   "file": "commits/0008-feat-naga-spv-out-External-texture-globals.patch",
+   "sha256": "f5edd73cdc6550dedcb4af708fc4127a0885b1c63063a1be8462583eb7c72515",
+   "kind": "upstream",
+   "upstream_sha": "63bc1bb381e1dcc6eaa805eaa09c581d20444df7",
+   "contained_in": null
+  },
+  {
+   "file": "commits/0009-feat-naga-spv-out-External-texture-function-paramete.patch",
+   "sha256": "5adb408df81e6ccf4f6d180caf103552a6b866f976194c1327a531d121f8dd3e",
+   "kind": "upstream",
+   "upstream_sha": "fc19430c86a2fcb7ab44d240a4b2e325813f2721",
+   "contained_in": null
+  },
+  {
+   "file": "commits/0010-feat-naga-spv-out-External-texture-helper-functions.patch",
+   "sha256": "4f9969ff95cf82cad674b73bba1b37e7f5edcf0c80f1c37b938662b1b970f0be",
+   "kind": "upstream",
+   "upstream_sha": "826569e8e1097a411a1a23c5397abfa1417d59c9",
+   "contained_in": null
+  },
+  {
+   "file": "commits/0011-feat-hal-vulkan-Unconditionally-expose-Features-EXTE.patch",
+   "sha256": "1bd0ab82ea5cb334520cfd2e890baa69e6f3080a7b17b2c1aa095eae3c2f2797",
+   "kind": "upstream",
+   "upstream_sha": "fbf9484e6d8b0806cbc81034347bc511ea9ed3bf",
+   "contained_in": null
+  },
+  {
+   "file": "commits/0012-fix-emit-NeedsInitializedMemory-for-create_external_.patch",
+   "sha256": "4cc649ed1a48851892c644c9369b258c280e9559f8f9774298ceeadbb049413e",
+   "kind": "upstream",
+   "upstream_sha": "81e38d86f498888dee0b9ffdd29766ba72396609",
+   "contained_in": null
+  },
+  {
+   "file": "commits/0013-fix-emit-NeedsInitializedMemory-for-create_external_.patch",
+   "sha256": "80988ab7add48f526e4db53655b10f6a5127417756a161be27b7d8c61aa9eff4",
+   "kind": "upstream",
+   "upstream_sha": "5086e107a210a1a45c677c16bf55b2665a20ec5f",
+   "contained_in": null
+  },
+  {
+   "file": "commits/0014-fix-core-Check-same-device-for-external-texture-plan.patch",
+   "sha256": "e2bbb15258e66ad4c18adce28eee7ccf7a13e072ce99893e44c773c4174d415a",
+   "kind": "upstream",
+   "upstream_sha": "0342e2fba5b2d4992f569a019b73a4e1e8270858",
+   "contained_in": null
+  },
+  {
+   "file": "commits/0015-test-external-texture-zero-init-tests-as-upstream-at.patch",
+   "sha256": "f11239b68d156ffb7e086cb8deaa02b23d230e83c711bde9781d5d0c219e9ce7",
+   "kind": "test",
+   "contained_in": null
+  },
+  {
+   "file": "commits/0016-test-naga-spv-out-External-texture-SPIR-V-test-input.patch",
+   "sha256": "31d2d87f55101725daed9a55e7416eeb5896a24d16cb6294105a56c218534941",
+   "kind": "test",
+   "contained_in": null
+  },
+  {
+   "file": "commits/0017-fix-naga-spv-out-Pass-external-texture-globals-to-fu.patch",
+   "sha256": "5539539639aa8ca9ceb68aa8a9ba0e749e459b4be4e05d9316305143e5048d6b",
+   "kind": "ours",
+   "contained_in": null
+  },
+  {
+   "file": "commits/0018-fix-naga-spv-out-Use-external-texture-function-param.patch",
+   "sha256": "5c4eebb24e9da05df1b200cbe8cee1ead9a023929d3dc8acf547c27b937d98e4",
+   "kind": "ours",
+   "contained_in": null
+  },
+  {
+   "file": "commits/0019-fix-naga-spv-out-Return-an-error-for-a-non-external-.patch",
+   "sha256": "0810cd4a5324904c0e7fb0b2c6cd6fdb21bd3cda061c34c5c9e4df2e0c5cffa5",
+   "kind": "ours",
+   "contained_in": null
+  },
+  {
+   "file": "commits/0020-fix-naga-spv-out-Splat-the-condition-of-the-external.patch",
+   "sha256": "af0b7f5054833e7fb9e221a44b83de597669b5464cd4baf391fc83de9bce1ca2",
+   "kind": "ours",
+   "contained_in": null
+  },
+  {
+   "file": "commits/0021-fix-naga-spv-out-Fetch-external-texture-planes-with-.patch",
+   "sha256": "0d7f8bd4e6b93cbbde1caf7efff8bd9205ac9efdd70ffbab04b614a9fe9200ed",
+   "kind": "ours",
+   "contained_in": null
+  },
+  {
+   "file": "commits/0022-fix-naga-spv-out-Round-external-texture-load-coordin.patch",
+   "sha256": "b2637baaf05cfd6c0e14f4606278c22ee46479796c4fbd046c7543142b67e641",
+   "kind": "ours",
+   "contained_in": null
+  },
+  {
+   "file": "commits/0023-fix-naga-spv-out-Scale-external-texture-chroma-coord.patch",
+   "sha256": "b8c9af3a8db9f4416b4203b3535e3e227b963ec5761c96b9d1a9857f3b9840cb",
+   "kind": "ours",
+   "contained_in": null
+  },
+  {
+   "file": "commits/0024-fix-naga-spv-out-Clamp-and-branch-on-plane-count-lik.patch",
+   "sha256": "82c55d98d12de1d9fb127c7a738e9a92fc42b4e3d44a54aa58dd26e0ef49a860",
+   "kind": "ours",
+   "contained_in": null
+  },
+  {
+   "file": "commits/0025-test-naga-Update-SPIR-V-snapshots-for-the-picked-spv.patch",
+   "sha256": "352648677794558453d21ae45f01383a5abff2efcebd7d529142ad8243086ba9",
+   "kind": "test",
+   "contained_in": null
+  },
+  {
+   "file": "commits/0026-test-naga-spv-out-Add-external-texture-SPIR-V-snapsh.patch",
+   "sha256": "e07345d38d51d1f60916350f85887ff6f71594874d3de1f67926108ca4dbc8cc",
+   "kind": "test",
+   "contained_in": null
+  },
+  {
+   "file": "commits/0027-fix-naga-spv-out-Compute-external-texture-sample-bou.patch",
+   "sha256": "3d8fae0a939aebdadc7061ed8fec50203d99073568519919789b6f422f9f8374",
+   "kind": "ours",
+   "contained_in": null
+  },
+  {
+   "file": "commits/0028-fix-naga-spv-out-Saturate-external-texture-load-coor.patch",
+   "sha256": "8920cb75f79832e32e539bb91c99d21ed856c7e5a33581986b5ee3f90983389c",
+   "kind": "ours",
+   "contained_in": null
+  },
+  {
+   "file": "commits/0029-test-naga-spv-out-Test-external-textures-with-SPIR-V.patch",
+   "sha256": "fb2c0dace50135111efdcd30c977160972d26a4cf2e420a7dbb40dbcf0c8010a",
+   "kind": "test",
+   "contained_in": null
+  },
+  {
+   "file": "commits/0030-fix-naga-spv-out-Don-t-load-external-texture-planes-.patch",
+   "sha256": "2b44a48ea9d212e7ccbb9471d355412d3f250f07d8385df99be89f8d4419a8b5",
+   "kind": "ours",
+   "contained_in": null
+  },
+  {
+   "file": "commits/0031-fix-naga-spv-out-Reset-external-texture-ids-per-func.patch",
+   "sha256": "773079cc23f4b8529efd406b3cee703465c15d16936e905028abfc90663a233f",
+   "kind": "ours",
+   "contained_in": null
+  },
+  {
+   "file": "commits/0032-test-naga-spv-out-Update-external-texture-SPIR-V-sna.patch",
+   "sha256": "14943ea637b7f45a93f1d0b1a85a815364c493ebcbb0d1433b351e859d99f7d7",
+   "kind": "test",
+   "contained_in": null
+  }
  ],
- "ours": [
-  "fix(naga spv-out): Pass external texture globals to functions correctly (std140 params; conversion registered for every used global)",
-  "fix(naga spv-out): Use external texture function parameters correctly (params id, plane pointers)",
-  "fix(naga spv-out): Return an error for a non-external texture binding",
-  "fix(naga spv-out): Splat the condition of the external texture size select (SPIR-V < 1.4)",
-  "fix(naga spv-out): Fetch external texture planes with an explicit Lod",
-  "fix(naga spv-out): Round external texture load coordinates like HLSL (RoundEven, Floor)",
-  "fix(naga spv-out): Scale external texture chroma coordinates by plane 0's size",
-  "fix(naga spv-out): Clamp and branch on plane count like the HLSL helpers",
-  "fix(naga spv-out): Compute external texture sample bounds with NMin/NMax",
-  "fix(naga spv-out): Saturate external texture load coordinates at 0",
-  "fix(naga spv-out): Don't load external texture planes in function preludes",
-  "fix(naga spv-out): Reset external texture ids per function, return errors"
- ],
- "ours_where": "branch bp159-fix of a clone of the upstream wgpu repository (4f4dc63 + the commits above + ours), with naga tests and spirv-val checks",
  "drop_when": "Mozilla vendors a wgpu whose naga spv-out and Vulkan hal have external textures: at that port take Mozilla's files and keep only what upstream still lacks, compared with ours"
 }

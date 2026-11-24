@@ -1,0 +1,171 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: feder-cr <85809106+feder-cr@users.noreply.github.com>
+Date: Sun, 1 Nov 2026 10:04:22 +0700
+Subject: [PATCH] fix(naga spv-out): Compute external texture sample bounds
+ with NMin/NMax
+
+The HLSL sample helper computes the sample bounds with `min` and `max`,
+which are DXIL's `FMin` and `FMax`: if one operand is NaN, they return the
+other. GLSL.std.450 `FMin`/`FMax` are undefined for NaN operands; use
+`NMin`/`NMax`, which match.
+
+Also test the exact clamp sequence: per plane,
+`NMin(NMax(coords, bounds.xy + half_texel), bounds.zw - half_texel)`, and
+every sample uses a clamped coordinate.
+---
+ naga/src/back/spv/image.rs                |   6 +-
+ naga/tests/naga/spirv_external_texture.rs | 102 ++++++++++++++++++++++
+ 2 files changed, 106 insertions(+), 2 deletions(-)
+
+diff --git a/naga/src/back/spv/image.rs b/naga/src/back/spv/image.rs
+index 4fe394077..19b2b16ad 100644
+--- a/naga/src/back/spv/image.rs
++++ b/naga/src/back/spv/image.rs
+@@ -2373,10 +2373,12 @@ impl super::Writer {
+             bounds_max_norm_id,
+         ));
+ 
++        // HLSL's `min` and `max` are DXIL's `FMin` and `FMax`, which return
++        // the other operand if one is NaN, like `NMin` and `NMax`.
+         let bounds_min_id = self.id_gen.next();
+         block.body.push(Instruction::ext_inst_gl_op(
+             self.gl450_ext_inst_id,
+-            spirv::GlslStd450Op::FMin,
++            spirv::GlslStd450Op::NMin,
+             vec2f_type_id,
+             bounds_min_id,
+             &[bounds_min_xform_id, bounds_max_xform_id],
+@@ -2385,7 +2387,7 @@ impl super::Writer {
+         let bounds_max_id = self.id_gen.next();
+         block.body.push(Instruction::ext_inst_gl_op(
+             self.gl450_ext_inst_id,
+-            spirv::GlslStd450Op::FMax,
++            spirv::GlslStd450Op::NMax,
+             vec2f_type_id,
+             bounds_max_id,
+             &[bounds_min_xform_id, bounds_max_xform_id],
+diff --git a/naga/tests/naga/spirv_external_texture.rs b/naga/tests/naga/spirv_external_texture.rs
+index 4a51f8234..4fedb6416 100644
+--- a/naga/tests/naga/spirv_external_texture.rs
++++ b/naga/tests/naga/spirv_external_texture.rs
+@@ -23,7 +23,11 @@ const TEXTURE_EXTERNAL_FORWARD_ONLY: &str =
+ const GLSL_ROUND: u32 = 1;
+ const GLSL_ROUND_EVEN: u32 = 2;
+ const GLSL_FLOOR: u32 = 8;
++const GLSL_FMIN: u32 = 37;
++const GLSL_FMAX: u32 = 40;
+ const GLSL_FCLAMP: u32 = 43;
++const GLSL_NMIN: u32 = 79;
++const GLSL_NMAX: u32 = 80;
+ 
+ fn binding_map() -> spv::BindingMap {
+     let mut map = spv::BindingMap::default();
+@@ -190,6 +194,22 @@ impl Spv {
+             .flat_map(|f| self.instructions(f))
+     }
+ 
++    /// The GLSL.std.450 instruction number of `inst`, if it is an `OpExtInst`.
++    fn ext_op(&self, inst: &Instruction) -> Option<u32> {
++        if inst.class.opcode != Op::ExtInst {
++            return None;
++        }
++        match inst.operands[1] {
++            Operand::LiteralExtInstInteger(op) => Some(op),
++            ref other => panic!("unexpected ext inst operand {other:?}"),
++        }
++    }
++
++    /// The operands of the `OpExtInst` `inst`.
++    fn ext_args(&self, inst: &Instruction) -> Vec<Word> {
++        inst.operands[2..].iter().map(id).collect()
++    }
++
+     /// GLSL.std.450 instruction numbers used by `function`.
+     fn glsl_ops(&self, function: &rspirv::dr::Function) -> Vec<u32> {
+         self.instructions(function)
+@@ -498,3 +518,85 @@ fn external_texture_sample_matches_hlsl() {
+         assert_eq!(cases, [1, 2], "{name}: three planes should be the default");
+     }
+ }
++
++/// The sample helper computes, like the HLSL one:
++///
++/// ```hlsl
++/// float4 bounds = float4(min(bounds_min, bounds_max), max(bounds_min, bounds_max));
++/// float2 planeN_coords = clamp(coords, bounds.xy + planeN_half_texel, bounds.zw - planeN_half_texel);
++/// ```
++///
++/// where DXIL's `FMin`/`FMax` are SPIR-V's `NMin`/`NMax` and `clamp(x, lo, hi)`
++/// is `min(max(x, lo), hi)`.
++#[test]
++fn external_texture_sample_clamp_matches_hlsl() {
++    let spv = compile(TEXTURE_EXTERNAL);
++    let function = spv.function("naga_external_texture_image_sample");
++    let insts: Vec<&Instruction> = spv.instructions(function).collect();
++    let ops = spv.glsl_ops(function);
++    assert!(
++        !ops.contains(&GLSL_FMIN) && !ops.contains(&GLSL_FMAX),
++        "FMin/FMax are undefined for NaN operands: {ops:?}"
++    );
++
++    let transforms: Vec<Word> = insts
++        .iter()
++        .filter(|inst| inst.class.opcode == Op::MatrixTimesVector)
++        .map(|inst| inst.result_id.unwrap())
++        .collect();
++    let [bounds_min_xform, bounds_max_xform, coords] = transforms[..] else {
++        panic!("expected three sample transforms, got {transforms:?}");
++    };
++    let find = |op: u32, args: &[Word]| -> Vec<Word> {
++        insts
++            .iter()
++            .filter(|inst| spv.ext_op(inst) == Some(op) && spv.ext_args(inst) == args)
++            .map(|inst| inst.result_id.unwrap())
++            .collect()
++    };
++    let [bounds_min] = find(GLSL_NMIN, &[bounds_min_xform, bounds_max_xform])[..] else {
++        panic!("bounds.xy should be NMin(bounds_min, bounds_max)");
++    };
++    let [bounds_max] = find(GLSL_NMAX, &[bounds_min_xform, bounds_max_xform])[..] else {
++        panic!("bounds.zw should be NMax(bounds_min, bounds_max)");
++    };
++
++    let mut clamped = Vec::new();
++    for inst in &insts {
++        let result = inst.result_id.unwrap_or(0);
++        if spv.ext_op(inst) != Some(GLSL_NMIN) || result == bounds_min {
++            continue;
++        }
++        let [max, hi] = spv.ext_args(inst)[..] else {
++            panic!("%{result}: NMin takes two operands");
++        };
++        let max = spv.def(max);
++        assert_eq!(spv.ext_op(max), Some(GLSL_NMAX), "%{result}: min(max(x, lo), hi)");
++        let [x, lo] = spv.ext_args(max)[..] else {
++            panic!("NMax takes two operands");
++        };
++        assert_eq!(x, coords, "%{result}: the transformed coordinates are clamped");
++        let lo = spv.def(lo);
++        let hi = spv.def(hi);
++        assert_eq!(lo.class.opcode, Op::FAdd, "%{result}: bounds.xy + half_texel");
++        assert_eq!(hi.class.opcode, Op::FSub, "%{result}: bounds.zw - half_texel");
++        assert_eq!(id(&lo.operands[0]), bounds_min);
++        assert_eq!(id(&hi.operands[0]), bounds_max);
++        assert_eq!(lo.operands[1], hi.operands[1], "%{result}: same half texel");
++        assert_eq!(spv.def(id(&lo.operands[1])).class.opcode, Op::FDiv);
++        clamped.push(result);
++    }
++    // Plane 0 once, plane 1 in the two- and three-plane paths, plane 2 once.
++    assert_eq!(clamped.len(), 4, "{clamped:?}");
++
++    for inst in &insts {
++        if inst.class.opcode == Op::ImageSampleExplicitLod {
++            let coordinate = id(&inst.operands[1]);
++            assert!(
++                clamped.contains(&coordinate),
++                "%{}: sampled at unclamped %{coordinate}",
++                inst.result_id.unwrap()
++            );
++        }
++    }
++}

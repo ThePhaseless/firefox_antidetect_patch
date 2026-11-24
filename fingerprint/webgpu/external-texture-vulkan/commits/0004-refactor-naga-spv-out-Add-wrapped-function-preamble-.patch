@@ -1,0 +1,272 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Andy Leiserson <aleiserson@mozilla.com>
+Date: Fri, 24 Jul 2026 14:28:30 -0700
+Subject: [PATCH] refactor(naga spv-out): Add wrapped function preamble helper
+
+(cherry picked from commit de3dd5d1c358a25239f85a198deb99d77d8ef713)
+---
+ naga/src/back/spv/helpers.rs |  63 +++++++++++++++++
+ naga/src/back/spv/writer.rs  | 132 +++++++++--------------------------
+ 2 files changed, 97 insertions(+), 98 deletions(-)
+
+diff --git a/naga/src/back/spv/helpers.rs b/naga/src/back/spv/helpers.rs
+index 05d5c1ecc..623835851 100644
+--- a/naga/src/back/spv/helpers.rs
++++ b/naga/src/back/spv/helpers.rs
+@@ -1,8 +1,12 @@
+ use alloc::{vec, vec::Vec};
++use core::array;
+ 
+ use arrayvec::ArrayVec;
+ use spirv::Word;
+ 
++use super::{
++    Function, FunctionArgument, Instruction, LookupFunctionType, WrappedFunction, WriterFlags,
++};
+ use crate::{Handle, UniqueArena};
+ 
+ pub(super) fn bytes_to_words(bytes: &[u8]) -> Vec<Word> {
+@@ -183,6 +187,65 @@ pub fn is_uniform_matcx2_struct_member_access(
+     false
+ }
+ 
++impl super::Writer {
++    /// Begin writing a new wrapped function.
++    ///
++    /// Writes the SPIR-V `OpFunction` and `OpFunctionParameter` operations.
++    ///
++    /// If [`WriterFlags::DEBUG`] is active, adds debugging information to
++    /// `self.debugs`.
++    ///
++    /// Does not otherwise emit any of the function prelude that
++    /// [`Self::write_function`] would generate. In particular, does not load
++    /// handle arguments or set `FunctionArgument::handle_id`.
++    pub(super) fn write_wrapped_function_preamble<const N: usize>(
++        &mut self,
++        wrapped: WrappedFunction,
++        name: &str,
++        parameters: &[(Word, &'static str); N],
++        return_type_id: Word,
++    ) -> (Function, [Word; N]) {
++        let mut parameter_type_ids = Vec::with_capacity(N);
++
++        let function_id = self.id_gen.next();
++        let mut function = Function::default();
++
++        let param_ids = array::from_fn(|i| {
++            let (param_type_id, _) = parameters[i];
++            parameter_type_ids.push(param_type_id);
++
++            let param_id = self.id_gen.next();
++            function.parameters.push(FunctionArgument {
++                instruction: Instruction::function_parameter(param_type_id, param_id),
++                handle_id: 0,
++            });
++            param_id
++        });
++
++        if self.flags.contains(WriterFlags::DEBUG) {
++            self.debugs.push(Instruction::name(function_id, name));
++
++            for (id, name) in parameters.iter().copied() {
++                self.debugs.push(Instruction::name(id, name));
++            }
++        }
++
++        let function_type_id = self.get_function_type(LookupFunctionType {
++            parameter_type_ids,
++            return_type_id,
++        });
++        function.signature = Some(Instruction::function(
++            return_type_id,
++            function_id,
++            spirv::FunctionControl::empty(),
++            function_type_id,
++        ));
++        self.wrapped_functions.insert(wrapped, function_id);
++
++        (function, param_ids)
++    }
++}
++
+ ///HACK: this is taken from std unstable, remove it when std's floor_char_boundary is stable
+ /// and available in our msrv.
+ trait U8Internal {
+diff --git a/naga/src/back/spv/writer.rs b/naga/src/back/spv/writer.rs
+index 74d1bfe24..587a8ab04 100644
+--- a/naga/src/back/spv/writer.rs
++++ b/naga/src/back/spv/writer.rs
+@@ -676,53 +676,27 @@ impl Writer {
+             left_type_id,
+             right_type_id,
+         };
+-        let function_id = match self.wrapped_functions.entry(wrapped) {
+-            Entry::Occupied(_) => return Ok(()),
+-            Entry::Vacant(e) => *e.insert(self.id_gen.next()),
+-        };
+-
+-        let scalar = return_type.scalar();
+-
+-        if self.flags.contains(WriterFlags::DEBUG) {
+-            let function_name = match op {
+-                crate::BinaryOperator::Divide => "naga_div",
+-                crate::BinaryOperator::Modulo => "naga_mod",
+-                _ => unreachable!(),
+-            };
+-            self.debugs
+-                .push(Instruction::name(function_id, function_name));
++        if self.wrapped_functions.contains_key(&wrapped) {
++            return Ok(());
+         }
+-        let mut function = Function::default();
+ 
+-        let function_type_id = self.get_function_type(LookupFunctionType {
+-            parameter_type_ids: vec![left_type_id, right_type_id],
+-            return_type_id,
+-        });
+-        function.signature = Some(Instruction::function(
+-            return_type_id,
+-            function_id,
+-            spirv::FunctionControl::empty(),
+-            function_type_id,
+-        ));
++        let function_name = match op {
++            crate::BinaryOperator::Divide => "naga_div",
++            crate::BinaryOperator::Modulo => "naga_mod",
++            _ => unreachable!(),
++        };
+ 
+-        let lhs_id = self.id_gen.next();
+-        let rhs_id = self.id_gen.next();
+-        if self.flags.contains(WriterFlags::DEBUG) {
+-            self.debugs.push(Instruction::name(lhs_id, "lhs"));
+-            self.debugs.push(Instruction::name(rhs_id, "rhs"));
+-        }
+-        let left_par = Instruction::function_parameter(left_type_id, lhs_id);
+-        let right_par = Instruction::function_parameter(right_type_id, rhs_id);
+-        for instruction in [left_par, right_par] {
+-            function.parameters.push(FunctionArgument {
+-                instruction,
+-                handle_id: 0,
+-            });
+-        }
++        let (mut function, [lhs_id, rhs_id]) = self.write_wrapped_function_preamble(
++            wrapped,
++            function_name,
++            &[(left_type_id, "lhs"), (right_type_id, "rhs")],
++            return_type_id,
++        );
+ 
+         let label_id = self.id_gen.next();
+         let mut block = Block::new(label_id);
+ 
++        let scalar = return_type.scalar();
+         let bool_type = return_type.with_scalar(crate::Scalar::BOOL);
+         let bool_type_id = self.get_numeric_type_id(bool_type);
+ 
+@@ -887,35 +861,18 @@ impl Writer {
+         }
+         // Check if we've already emitted this function.
+         let wrapped = WrappedFunction::ConvertFromStd140CompatType { r#type };
+-        let function_id = match self.wrapped_functions.entry(wrapped) {
+-            Entry::Occupied(_) => return Ok(()),
+-            Entry::Vacant(e) => *e.insert(self.id_gen.next()),
+-        };
+-        if self.flags.contains(WriterFlags::DEBUG) {
+-            self.debugs.push(Instruction::name(
+-                function_id,
+-                &format!("{:?}_from_std140", r#type.for_debug(&ir_module.types)),
+-            ));
++        if self.wrapped_functions.contains_key(&wrapped) {
++            return Ok(());
+         }
+-        let param_type_id = self.std140_compat_uniform_types[&r#type].type_id;
++
+         let return_type_id = self.get_handle_type_id(r#type);
+ 
+-        let mut function = Function::default();
+-        let function_type_id = self.get_function_type(LookupFunctionType {
+-            parameter_type_ids: vec![param_type_id],
++        let (mut function, [param_id]) = self.write_wrapped_function_preamble(
++            wrapped,
++            &format!("{:?}_from_std140", r#type.for_debug(&ir_module.types)),
++            &[(self.std140_compat_uniform_types[&r#type].type_id, "value")],
+             return_type_id,
+-        });
+-        function.signature = Some(Instruction::function(
+-            return_type_id,
+-            function_id,
+-            spirv::FunctionControl::empty(),
+-            function_type_id,
+-        ));
+-        let param_id = self.id_gen.next();
+-        function.parameters.push(FunctionArgument {
+-            instruction: Instruction::function_parameter(param_type_id, param_id),
+-            handle_id: 0,
+-        });
++        );
+ 
+         let label_id = self.id_gen.next();
+         let mut block = Block::new(label_id);
+@@ -1119,15 +1076,8 @@ impl Writer {
+         r#type: Handle<crate::Type>,
+     ) -> Result<(), Error> {
+         let wrapped = WrappedFunction::MatCx2GetColumn { r#type };
+-        let function_id = match self.wrapped_functions.entry(wrapped) {
+-            Entry::Occupied(_) => return Ok(()),
+-            Entry::Vacant(e) => *e.insert(self.id_gen.next()),
+-        };
+-        if self.flags.contains(WriterFlags::DEBUG) {
+-            self.debugs.push(Instruction::name(
+-                function_id,
+-                &format!("{:?}_get_column", r#type.for_debug(&ir_module.types)),
+-            ));
++        if self.wrapped_functions.contains_key(&wrapped) {
++            return Ok(());
+         }
+ 
+         let crate::TypeInner::Matrix {
+@@ -1139,33 +1089,19 @@ impl Writer {
+             unreachable!();
+         };
+ 
+-        let mut function = Function::default();
+         let matrix_type_id = self.get_handle_type_id(r#type);
+         let column_index_type_id = self.get_u32_type_id();
+         let column_type_id = self.get_numeric_type_id(NumericType::Vector { size: rows, scalar });
+-        let matrix_param_id = self.id_gen.next();
+-        let column_index_param_id = self.id_gen.next();
+-        function.parameters.push(FunctionArgument {
+-            instruction: Instruction::function_parameter(matrix_type_id, matrix_param_id),
+-            handle_id: 0,
+-        });
+-        function.parameters.push(FunctionArgument {
+-            instruction: Instruction::function_parameter(
+-                column_index_type_id,
+-                column_index_param_id,
+-            ),
+-            handle_id: 0,
+-        });
+-        let function_type_id = self.get_function_type(LookupFunctionType {
+-            parameter_type_ids: vec![matrix_type_id, column_index_type_id],
+-            return_type_id: column_type_id,
+-        });
+-        function.signature = Some(Instruction::function(
+-            column_type_id,
+-            function_id,
+-            spirv::FunctionControl::empty(),
+-            function_type_id,
+-        ));
++        let (mut function, [matrix_param_id, column_index_param_id]) = self
++            .write_wrapped_function_preamble(
++                wrapped,
++                &format!("{:?}_get_column", r#type.for_debug(&ir_module.types)),
++                &[
++                    (matrix_type_id, "matrix"),
++                    (column_index_type_id, "column_index"),
++                ],
++                column_type_id,
++            );
+ 
+         let label_id = self.id_gen.next();
+         let mut block = Block::new(label_id);

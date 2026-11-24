@@ -1,0 +1,84 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: feder-cr <85809106+feder-cr@users.noreply.github.com>
+Date: Sun, 1 Nov 2026 10:05:44 +0700
+Subject: [PATCH] fix(naga spv-out): Saturate external texture load coordinates
+ at 0
+
+The HLSL load helper converts the rounded plane 0 coordinates with
+`uint2(..)`, which on D3D saturates negative values and NaN to 0.
+`OpConvertFToU` is undefined for them; clamp with `NMax(x, 0.0)` first.
+---
+ naga/src/back/spv/image.rs                | 13 ++++++++-
+ naga/tests/naga/spirv_external_texture.rs | 33 +++++++++++++++++++++++
+ 2 files changed, 45 insertions(+), 1 deletion(-)
+
+diff --git a/naga/src/back/spv/image.rs b/naga/src/back/spv/image.rs
+index 19b2b16ad..a68b29f7e 100644
+--- a/naga/src/back/spv/image.rs
++++ b/naga/src/back/spv/image.rs
+@@ -1869,12 +1869,23 @@ impl super::Writer {
+             &[load_transform_out_id],
+         ));
+ 
++        // D3D's float to uint conversion saturates negative values and NaN to
++        // 0, while `OpConvertFToU` is undefined for them.
++        let plane0_coord_nonnegative_id = self.id_gen.next();
++        block.body.push(Instruction::ext_inst_gl_op(
++            self.gl450_ext_inst_id,
++            spirv::GlslStd450Op::NMax,
++            vec2f_type_id,
++            plane0_coord_nonnegative_id,
++            &[plane0_coord_float_id, self.get_constant_null(vec2f_type_id)],
++        ));
++
+         let plane0_coord_id = self.id_gen.next();
+         block.body.push(Instruction::unary(
+             spirv::Op::ConvertFToU,
+             vec2u_type_id,
+             plane0_coord_id,
+-            plane0_coord_float_id,
++            plane0_coord_nonnegative_id,
+         ));
+ 
+         // Chroma coordinates are scaled from the integer plane 0 coordinates:
+diff --git a/naga/tests/naga/spirv_external_texture.rs b/naga/tests/naga/spirv_external_texture.rs
+index 4fedb6416..cace3de08 100644
+--- a/naga/tests/naga/spirv_external_texture.rs
++++ b/naga/tests/naga/spirv_external_texture.rs
+@@ -600,3 +600,36 @@ fn external_texture_sample_clamp_matches_hlsl() {
+         }
+     }
+ }
++
++/// HLSL's `uint2(round(..))` saturates negative values and NaN to 0 on D3D;
++/// `OpConvertFToU` is undefined for them, so the load helper clamps first.
++#[test]
++fn external_texture_load_plane0_coords_saturate() {
++    let spv = compile(TEXTURE_EXTERNAL);
++    let function = spv.function("naga_external_texture_image_load");
++    let conversions: Vec<&Instruction> = spv
++        .instructions(function)
++        .filter(|inst| inst.class.opcode == Op::ConvertFToU)
++        .filter(|inst| {
++            // The plane 0 conversion, as opposed to the chroma ones, which
++            // convert `Floor` results.
++            let operand = spv.def(id(&inst.operands[0]));
++            spv.ext_op(operand) != Some(GLSL_FLOOR)
++        })
++        .collect();
++    let [conversion] = conversions[..] else {
++        panic!("expected one plane 0 coordinate conversion");
++    };
++    let operand = spv.def(id(&conversion.operands[0]));
++    assert_eq!(
++        spv.ext_op(operand),
++        Some(GLSL_NMAX),
++        "plane 0 coordinates should be NMax(x, 0) before OpConvertFToU, not {:?}",
++        operand.class.opcode
++    );
++    let [rounded, zero] = spv.ext_args(operand)[..] else {
++        panic!("NMax takes two operands");
++    };
++    assert_eq!(spv.ext_op(spv.def(rounded)), Some(GLSL_ROUND_EVEN));
++    assert_eq!(spv.def(zero).class.opcode, Op::ConstantNull);
++}
