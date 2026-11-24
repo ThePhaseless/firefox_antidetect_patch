@@ -26,9 +26,11 @@ When nothing is declared (the engine launched without the core) every caller kee
   (`nullptr` for an empty override stays Mozilla's line). Ours is in namespace `mozilla::dom`; it takes the primary tag of the list (a realm's Intl
   locale is one BCP-47 tag, `navigator.languages` keeps the list), sets it with `JS::SetRealmLocaleOverride`, then refreshes the language of
   the realm's extant document: tag, Mozilla's set, refresh, in that order. Include in a block of ours.
-- `dom/base/Document.cpp`, `Document.h`: `GetFormattedTimeString` (document.lastModified) takes the document as a parameter of ours
-  (declared exception, G35) and calls `StealthExplodeTime(aDocument, aTime, <Mozilla's parameters>, &prtime)` in place of
-  `PR_ExplodeTime`; its two callers pass `this` (G9). Mozilla's choice of `PR_GMTParameters` (resistFingerprinting asks UTC) or
+- `dom/base/Document.cpp`: `GetFormattedTimeString` (document.lastModified) is Mozilla's static function with Mozilla's signature and
+  calls; it has no document. Each of its two callers (`GetLastModified`, `RetrieveRelevantHeaders`) has an anchor,
+  `StealthNoteTimeDocument(this);`, right before the call, and the call of `PR_ExplodeTime` in it is `StealthExplodeTime(aTime, <Mozilla's
+  parameters>, &prtime)` (a wrap-call, Mozilla's arguments in place), which takes the noted document and clears it; with none noted it is
+  `PR_ExplodeTime` itself. Mozilla's choice of `PR_GMTParameters` (resistFingerprinting asks UTC) or
   `PR_LocalTimeParameters` stays Mozilla's: with GMT it is `PR_ExplodeTime`, with local time it is the declared zone's wall clock
   (daylight saving included, computed with ICU; `tm_params` split into standard time and daylight saving as `PR_LocalTimeParameters`
   does, EXSLT prints their sum), or `PR_LocalTimeParameters` when nothing is declared. A zone ICU does not know is exploded as UTC,
@@ -53,7 +55,7 @@ When nothing is declared (the engine launched without the core) every caller kee
 
 ## Tests
 
-- `TestStealthTimezone.cpp` (gtest, suite `StealthTimezone`): `StealthExplodeTime` with a declared Pacific/Chatham (21:13, offsets 12:45 + 1h) and
+- `TestStealthTimezone.cpp` (gtest, suite `StealthTimezone`): the noted document is for the next call only, two noted documents with opposite zones do not leak, and nothing noted is Mozilla's `PR_ExplodeTime` (`TheNotedDocumentIsForTheNextCallOnly`, `TwoNotedDocumentsWithOppositeZonesDoNotLeak`, `NothingNotedIsMozillasPRExplodeTime`); `StealthExplodeTime` with a declared Pacific/Chatham (21:13, offsets 12:45 + 1h) and
   Asia/Kolkata (12:58), with `PR_GMTParameters` (UTC whatever is declared), with nothing declared (Mozilla's local time); the field or the session in
   `StealthLanguageOrSession` / `StealthTimezoneOrSession`. Negative control: the declared-zone values differ from
   UTC and from the host's (no runner is in Chatham).

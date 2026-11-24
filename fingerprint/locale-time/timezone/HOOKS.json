@@ -65,33 +65,21 @@
  {
   "file": "dom/base/Document.cpp",
   "function": "static void GetFormattedTimeString(PRTime aTime, bool aUniversal,",
-  "kind": "add",
-  "form": "unknown",
-  "line": "                                   const Document* aDocument,  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
-  "test": "wrapper:tests/test_a_launch_and_a_context_timezone_reach_the_page_e2e.py::test_a_launch_and_a_context_timezone_reach_the_page",
-  "exception": "a parameter of ours in the signature of Mozilla's static GetFormattedTimeString, which does not receive the document and cannot be wrapped; the line is a pure addition between two Mozilla lines (G35, approved by the pm in PM-DECISIONS.md: fingerprint/locale-time/timezone)",
-  "pm": "approvato"
- },
- {
-  "file": "dom/base/Document.cpp",
-  "function": "static void GetFormattedTimeString(PRTime aTime, bool aUniversal,",
   "kind": "rewrite",
-  "form": "unknown",
-  "line": "  StealthExplodeTime(aDocument, aTime, aUniversal ? PR_GMTParameters : PR_LocalTimeParameters, &prtime);  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
-  "removed": "  PR_ExplodeTime(aTime, aUniversal ? PR_GMTParameters : PR_LocalTimeParameters,\n                 &prtime);",
-  "test": "wrapper:tests/test_a_launch_and_a_context_timezone_reach_the_page_e2e.py::test_a_launch_and_a_context_timezone_reach_the_page",
-  "exception": "the explode call of the same static takes our document in front of Mozilla's own arguments; the two Mozilla lines of the call become one (G35, approved by the pm in PM-DECISIONS.md)",
-  "pm": "approvato"
+  "form": "wrap-call",
+  "line": "  StealthExplodeTime(aTime, aUniversal ? PR_GMTParameters : PR_LocalTimeParameters,  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "removed": "  PR_ExplodeTime(aTime, aUniversal ? PR_GMTParameters : PR_LocalTimeParameters,",
+  "test": "gtest:StealthTimezone.NothingNotedIsMozillasPRExplodeTime"
  },
  {
   "file": "dom/base/Document.cpp",
   "function": "void Document::GetLastModified(nsAString& aLastModified) const {",
-  "kind": "rewrite",
-  "form": "wrap-call",
-  "line": "                           this, aLastModified);  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
-  "removed": "                           aLastModified);",
-  "test": "wrapper:tests/test_a_launch_and_a_context_timezone_reach_the_page_e2e.py::test_a_launch_and_a_context_timezone_reach_the_page",
-  "why": "G9: the call of Mozilla's static gains the document, `this`, as its argument (the parameter itself is the G35 exception above); the line stays rewritten"
+  "kind": "add",
+  "form": "anchor",
+  "line": "    StealthNoteTimeDocument(this);  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "test": "gtest:StealthTimezone.TheNotedDocumentIsForTheNextCallOnly",
+  "anchor": "the `} else {` of Mozilla's `if (!mLastModified.IsEmpty())`, right before `GetFormattedTimeString(PR_Now(), ...)`",
+  "why": "the caller's `this` is noted before Mozilla's static GetFormattedTimeString runs; the static function has no access to the document and a wrap of it cannot see it, and the note belongs on the paths that call it, not at the head of the member function, which also returns the stored header without calling it"
  },
  {
   "file": "dom/base/Document.cpp",
@@ -106,12 +94,12 @@
  {
   "file": "dom/base/Document.cpp",
   "function": "void Document::RetrieveRelevantHeaders(nsIChannel* aChannel) {",
-  "kind": "rewrite",
-  "form": "wrap-call",
-  "line": "                           this, mLastModified);  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
-  "removed": "                           mLastModified);",
-  "test": "wrapper:tests/test_a_launch_and_a_context_timezone_reach_the_page_e2e.py::test_a_launch_and_a_context_timezone_reach_the_page",
-  "why": "G9: the call of Mozilla's static gains the document, `this`, as its argument (the parameter itself is the G35 exception above); the line stays rewritten"
+  "kind": "add",
+  "form": "anchor",
+  "line": "    StealthNoteTimeDocument(this);  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "test": "gtest:StealthTimezone.TheNotedDocumentIsForTheNextCallOnly",
+  "anchor": "Mozilla's `if (modDate != 0) {`, right before `GetFormattedTimeString(modDate, ...)`",
+  "why": "the caller's `this` is noted before Mozilla's static GetFormattedTimeString runs; the static function has no access to the document and a wrap of it cannot see it, and the note belongs on the paths that call it, not at the head of the member function, which also returns the stored header without calling it"
  },
  {
   "file": "dom/base/Document.cpp",
