@@ -152,7 +152,8 @@ def selftest() -> int:
         ("the runtime shipped beside the binaries", {
             "firefox.exe": ok_exe, "mozglue.dll": make_pe(["kernel32.dll", "vcruntime140.dll"]),
             "vcruntime140.dll": make_pe(["kernel32.dll"])}, False),
-        ("the runtime imported and not shipped (every build until firefox-48)", {
+        # Every build of the engine before the 48th release failed this case: the runtime was imported and not shipped.
+        ("the runtime imported and not shipped (every build of the old series)", {
             "firefox.exe": ok_exe, "mozglue.dll": make_pe(["kernel32.dll", "vcruntime140.dll"])}, True),
         ("a delay-loaded DLL that is not shipped", {
             "firefox.exe": make_pe(["kernel32.dll"], delay_imports=["notshipped.dll"])}, True),

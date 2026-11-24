@@ -59,12 +59,14 @@ def cache(leg: Leg, plan: Plan) -> Layer:
 
 
 def symbols(leg: Leg, plan: Plan) -> Layer:
+    # The first build with symbols lost all three legs out of memory: the run is in the history of this repository (40437686466 is the run that proved it);
+    # the text below says what it showed, without naming it.
     return Layer("symbols", (
         "Line tables and function names, the least that turns a crash dump into "
         "file:line; the shipped files carry none (Linux strips, Windows keeps the "
         ".pdb in the symbols artifact). The value reaches C and C++ only: with any "
         "debug symbols rust.configure asks rustc for FULL debuginfo, and the first "
-        "run with symbols lost all three legs out of memory (run 40437686466). "
+        "run with symbols lost all three legs out of memory. "
         "rust.mk puts the environment's RUSTFLAGS after its defaults, so line "
         "tables win for Rust too."), [
         "ac_add_options --enable-debug-symbols=-gline-tables-only",

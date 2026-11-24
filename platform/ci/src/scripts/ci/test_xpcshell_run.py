@@ -916,22 +916,22 @@ def cases() -> list:
         on = doc.get(True, doc.get("on", {}))
         legs = doc["jobs"]["xpcshell"]["strategy"]["matrix"]["include"]
         steps = doc["jobs"]["xpcshell"]["steps"]
-        add("xpcshell.yml: a workflow_call with build_run_id, wrapper_ref and published_tag, a push on latitude/*-oracles, no schedule, the dispatch's candidate as default",
+        add("xpcshell.yml: a workflow_call with build_run_id, wrapper_ref and published_tag, a push on latitude/*-oracles, no schedule, the dispatch's run empty by default (no run id written in the workflow)",
             set(on["workflow_call"]["inputs"]) == {"build_run_id", "wrapper_ref", "published_tag"} and on["push"]["branches"] == ["latitude/*-oracles"] and "schedule" not in on
-            and "'44921963200'" in text and on["workflow_dispatch"]["inputs"]["build_run_id"]["default"] == "44921963200")
+            and on["workflow_dispatch"]["inputs"]["build_run_id"]["default"] == "")
         env = doc["jobs"]["xpcshell"]["env"]
         run_dl = [st for st in steps if st.get("name", "").startswith("Download asset (the run's)")]
         pub_dl = [st for st in steps if st.get("name", "").startswith("Download asset (the published")]
         add("xpcshell.yml: the legs have 15 minutes", doc["jobs"]["xpcshell"]["timeout-minutes"] == 15)
         latest = [st for st in steps if "published_release.py" in st.get("run", "")]
         cond = latest[0].get("if", "") if latest else ""
-        add("xpcshell.yml: the published engine is the input, else the latest published one on this workflow's own push (no build_run_id), and never because the caller's event is a push",
+        add("xpcshell.yml: the published engine is the input, else the latest published one on this workflow's own push or dispatch (no build_run_id), and never because the caller's event is a push",
             env["PUBLISHED_TAG"] == "${{ inputs.published_tag }}" and len(latest) == 1 and "--name PUBLISHED_TAG" in latest[0]["run"] and "--github-env" in latest[0]["run"]
-            and "inputs.published_tag == ''" in cond and "inputs.build_run_id == ''" in cond and "github.event_name == 'push'" in cond
-            and cond.index("inputs.build_run_id == ''") < cond.index("github.event_name") and latest[0]["env"].get("GH_TOKEN") == "${{ github.token }}"
+            and "inputs.published_tag == ''" in cond and "inputs.build_run_id == ''" in cond and "github.workflow == 'xpcshell'" in cond and "github.event_name" not in cond
+            and cond.index("inputs.build_run_id == ''") < cond.index("github.workflow") and latest[0]["env"].get("GH_TOKEN") == "${{ github.token }}"
             and steps.index(latest[0]) < steps.index(run_dl[0]) and steps.index(latest[0]) < steps.index(pub_dl[0]))
         add("xpcshell.yml: the run's artifacts are downloaded only with no published tag, the release's archives only with one",
-            len(run_dl) == 1 and run_dl[0]["if"] == "env.PUBLISHED_TAG == ''" and "run-id" in run_dl[0]["with"]
+            len(run_dl) == 1 and run_dl[0]["if"] == "env.PUBLISHED_TAG == ''" and run_dl[0]["with"]["run-id"] == "${{ inputs.build_run_id || github.run_id }}"
             and len(pub_dl) == 1 and pub_dl[0]["if"] == "env.PUBLISHED_TAG != ''")
         add("xpcshell.yml: the published download is `gh release download` of the seal and the leg's archive, then verify-asset (the sha256 of the seal) before anything is extracted",
             len(pub_dl) == 1 and "gh release download" in pub_dl[0]["run"] and "--pattern seal.json" in pub_dl[0]["run"] and "xpcshell_run.py verify-asset" in pub_dl[0]["run"]
@@ -960,15 +960,17 @@ def cases() -> list:
         cand_i = [i for i in idx("--out prefs-out/candidate.json")]
         cmp_i = [i for i in idx("prefs-compare prefs-out/published-1.json prefs-out/candidate.json")]
         pre = [st for st in ps if "download-artifact" in st.get("uses", "") and "linux-deps" not in str((st.get("with") or {}).get("name", ""))]
+        cand_rel = [st for st in ps if st.get("name", "").startswith("Download the candidate (the latest published")]
         add("xpcshell.yml prefs: a Linux leg and a Windows leg on their native runners, 15 minutes, the baseline is the latest published one (resolved by a step)",
             {(l["runner"], l["kind"]) for l in pj["strategy"]["matrix"]["include"]} == {("ubuntu-24.04", "linux"), ("windows-latest", "win")}
             and pj["timeout-minutes"] == 15 and pj["env"]["PREFS_BASE_TAG"] == ""
-            and len([st for st in ps if "published_release.py" in st.get("run", "") and "--name PREFS_BASE_TAG" in st["run"]]) == 1
+            and len([st for st in ps if "published_release.py" in st.get("run", "") and 'echo "PREFS_BASE_TAG=$LATEST" >> "$GITHUB_ENV"' in st["run"]]) == 1
             and idx("published_release.py")[0] < idx("gh release download")[0])
-        add("xpcshell.yml prefs: the published engine is the release's archive checked against its seal (verify-asset), the candidate is the run's asset, "
-            "a push to latitude/*-oracles uses the dispatch's candidate",
-            len(idx("gh release download")) == 1 and len(idx("verify-asset")) == 1 and len(pre) == 1 and "44921963200" in pre[0]["with"]["run-id"] and "build_run_id" in pre[0]["with"]["run-id"]
-            and "asset-${{ matrix.leg }}" == pre[0]["with"]["name"])
+        add("xpcshell.yml prefs: the published engine is the release's archive checked against its seal (verify-asset), the candidate is the run's asset (the call's run, else this run's own), "
+            "and on this workflow's own push or dispatch with no run it is the latest published release's archive, checked against its seal the same way",
+            len(idx("gh release download")) == 2 and len(idx("verify-asset")) == 2 and len(pre) == 1 and pre[0]["with"]["run-id"] == "${{ inputs.build_run_id || github.run_id }}"
+            and pre[0]["if"] == "env.PREFS_CAND_TAG == ''" and "asset-${{ matrix.leg }}" == pre[0]["with"]["name"]
+            and len(cand_rel) == 1 and cand_rel[0]["if"] == "env.PREFS_CAND_TAG != ''" and "verify-asset --dir art-cand" in cand_rel[0]["run"] and "$PREFS_CAND_TAG" in cand_rel[0]["run"])
         add("xpcshell.yml prefs: the A/A (published dumped twice, compared with --control) comes before the candidate is extracted or dumped",
             len(control_i) == 1 and len(cand_i) == 1 and control_i[0] < cand_i[0] < cmp_i[0]
             and runs_text[control_i[0]].count("prefs --binary") == 2 and "art-pub" in runs_text[control_i[0]] and "art-cand" not in runs_text[control_i[0]]

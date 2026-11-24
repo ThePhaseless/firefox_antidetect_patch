@@ -385,16 +385,16 @@ def package_cases(gate: dict) -> list:
         set(on) == {"workflow_call", "push"} and on["push"].get("branches") == ["latitude/*-oracles"] and set(inputs) == {"build_run_id", "published_tag", "candidate_tag"}
         and inputs["published_tag"].get("default") == "" and inputs["candidate_tag"].get("default") == "" and not any("required" in i for i in inputs.values()))
     mode = ((job.get("strategy") or {}).get("matrix") or {}).get("mode", "")
-    add("package-ab: a push runs two legs of the job, the A/B of the run and the A/A of the published tag with itself; a call with candidate_tag is the A/A alone; the gate's call is the A/B alone",
+    add("package-ab: a push runs two legs of the job, the A/B of two releases (the latest against the one before it) and the A/A of the latest with itself; a call with candidate_tag is the A/A alone; the gate's call is the A/B alone",
         (job["strategy"].get("fail-fast") is False) and '["ab","tag"]' in mode and "github.event_name == 'push'" in mode and "inputs.candidate_tag != '' && '[\"tag\"]'" in mode
         and mode.rstrip(" }").endswith("'[\"ab\"]')")
         and job["env"].get("CAND_TAG") == "${{ matrix.mode == 'tag' && (inputs.candidate_tag || inputs.published_tag) || '' }}")
-    add("package-ab: a push measures run 44921963200 (the inputs of a push are empty), and a call uses what the gate passed; the published engine is the input, else the latest published",
-        job["env"].get("BUILD_RUN_ID") == "${{ inputs.build_run_id || '44921963200' }}" and job["env"].get("TAG") == "${{ inputs.published_tag }}")
+    add("package-ab: a call uses the run the gate passed, else this run's own (never a run id written in the workflow); the published engine is the input, else the latest published",
+        job["env"].get("BUILD_RUN_ID") == "${{ inputs.build_run_id || github.run_id }}" and job["env"].get("TAG") == "${{ inputs.published_tag }}")
     latest = [s for s in steps if "published_release.py" in str(s.get("run", ""))]
-    add("package-ab: the resolver step runs only when published_tag is empty, writes TAG (and CAND_TAG of the A/A) to GITHUB_ENV, has the token, and comes before the published download",
-        len(latest) == 1 and latest[0].get("if") == "inputs.published_tag == ''" and "--github-env \"$GITHUB_ENV\" --name TAG" in latest[0]["run"]
-        and 'echo "CAND_TAG=$LATEST" >> "$GITHUB_ENV"' in latest[0]["run"] and latest[0]["env"].get("GH_TOKEN") == "${{ github.token }}"
+    add("package-ab: the resolver step runs only when published_tag is empty, writes TAG (and CAND_TAG of the A/A, and of the A/B of two releases on its own push, with --rank 2 for the base) to GITHUB_ENV, has the token",
+        len(latest) == 1 and latest[0].get("if") == "inputs.published_tag == ''" and 'echo "TAG=$BASE" >> "$GITHUB_ENV"' in latest[0]["run"]
+        and 'echo "CAND_TAG=$LATEST" >> "$GITHUB_ENV"' in latest[0]["run"] and "--rank 2" in latest[0]["run"] and latest[0]["env"].get("GH_TOKEN") == "${{ github.token }}"
         and "engine-series/platform/ci/src/scripts/ci/published_release.py" in latest[0]["run"])
     add("package-ab: 15 minutes on a GitHub runner, never the Latitude node",
         job.get("timeout-minutes") == 15 and job.get("runs-on") == "ubuntu-24.04" and "latitude-" not in text and "self-hosted" not in text)

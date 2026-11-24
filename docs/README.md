@@ -33,3 +33,5 @@ Read this first; open a decision only when your change touches it.
 | [repo-01](decisions/repo-01-noreply-identity.md) | Commits use the noreply identity, enforced by `noreply-identity.yml`. |
 | [repo-02](decisions/repo-02-no-studied-system-names.md) | No name of a studied detection system, fingerprinting service, test site or competing browser anywhere in the repository; describe the check instead. |
 | [ci-01](decisions/ci-01-builds-from-main-or-latitude-branches.md) | Engine builds run only on `main` or a `latitude/<name>` branch born from `main`; a release runs only from `main`. |
+| [ci-02](decisions/ci-02-derived-never-written.md) | A reference to something that changes (a release, a run, a core or wrapper version, another repository's commit) is resolved at run time; an explicit input wins. |
+| [ci-09](decisions/ci-09-tests-and-binary-from-the-same-commit.md) | A test of the engine runs against a binary built from the same series commit; a run that takes another binary takes that binary's tests. |

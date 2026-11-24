@@ -759,7 +759,7 @@ def group_bootstrap():
                 bootstrap.count("apt-get update -qq -o APT::Update::Error-Mode=any") == 2 and "apt-get update -qq\n" not in bootstrap))
     out.append(("bootstrap: every download by version and sha256, nothing else fetched, the runner's version pinned",
                 all(v in bootstrap for v in ("RUNNER_VERSION=", "RUNNER_SHA256=", "NODE_SHA256=", "RUSTUP_SHA256=", "NODE_DEPS_SHA256="))
-                and bootstrap.count("fetch \"https://") == 3 and bootstrap.count('fetch "$NODE_DEPS_URL" "$NODE_DEPS_SHA256"') == 1
+                and bootstrap.count("fetch \"https://") == 2 and bootstrap.count('fetch "$(asset_api_url ') == 1 and bootstrap.count('fetch "$NODE_DEPS_URL" "$NODE_DEPS_SHA256"') == 1
                 and "cmake -S" not in bootstrap and "KhronosGroup" not in bootstrap))
     as_runner = next(l for l in bootstrap.splitlines() if l.startswith("as_runner()"))
     out.append(("bootstrap: its checks see the PATH the job will have, where glslang 14 comes before Ubuntu's 11.8",
@@ -1273,17 +1273,22 @@ def group_node_deps():
     build = (HERE / "node_deps_build.sh").read_text(encoding="utf-8").replace("\r\n", "\n")
     name = re.search(r"^NODE_DEPS=(node-deps-\d{8}-[0-9a-f]{12})$", bootstrap, re.M)
     sha = re.search(r"^NODE_DEPS_SHA256=([0-9a-f]{64})$", bootstrap, re.M)
-    out.append(("node deps: the archive is named and pinned by sha256, and its URL is this repository's release asset, through the API",
-                bool(name and sha) and re.search(r"^NODE_DEPS_ASSET=[0-9]+$", bootstrap, re.M) is not None
-                and "https://api.github.com/repos/oss-invisible/firefox_antidetect_patch/releases/assets/$NODE_DEPS_ASSET" in bootstrap))
+    out.append(("node deps: the archive is named and pinned by sha256, and its address is derived at run time from this repository's release of that name and its file NAME.tar (no asset id written)",
+                bool(name and sha) and re.search(r"^[A-Z_]*ASSET[A-Z_]*=", bootstrap, re.M) is None and "releases/assets/" not in bootstrap
+                and 'NODE_DEPS_URL="${NODE_DEPS_URL:-$(asset_api_url oss-invisible/firefox_antidetect_patch "$NODE_DEPS" "$NODE_DEPS.tar")}"' in bootstrap
+                and bootstrap.index("asset_api_url() {") < bootstrap.index('NODE_DEPS_URL="${NODE_DEPS_URL:-') < bootstrap.index('fetch "$NODE_DEPS_URL"')))
     fetch = bootstrap.split("fetch() {", 1)[1].split(chr(10) + "}", 1)[0]
-    out.append(("node deps: every GitHub release file comes through the API by asset id first, asked for its bytes, and the direct address second, in rounds (2026-11-08: releases/download answered 504 for hours, the API now and then, two candidates lost their node)",
-                re.search(r"^RUNNER_ASSET=[0-9]+$", bootstrap, re.M) is not None
-                and 'fetch "https://api.github.com/repos/actions/runner/releases/assets/$RUNNER_ASSET"' in bootstrap
+    out.append(("node deps: every GitHub release file comes through the API first, its address derived from the release and the file name, asked for its bytes, and the direct address second, in rounds (2026-11-08: releases/download answered 504 for hours, the API now and then, two candidates lost their node)",
+                'RUNNER_FILE="actions-runner-linux-x64-$RUNNER_VERSION.tar.gz"' in bootstrap
+                and 'fetch "$(asset_api_url actions/runner "v$RUNNER_VERSION" "$RUNNER_FILE")"' in bootstrap
                 and 'fetch "$NODE_DEPS_URL" "$NODE_DEPS_SHA256" /tmp/node-deps.tar "$NODE_DEPS_WEB_URL"' in bootstrap
                 and bootstrap.count("releases/download") == 2
-                and '-H "Accept: application/octet-stream"' in fetch and 'for url in "$1" ${4:+"$4"}' in fetch
+                and '-H "Accept: application/octet-stream"' in fetch and 'for url in ${1:+"$1"} ${4:+"$4"}' in fetch
                 and "for round in 1 2 3" in fetch and fetch.index("sha256sum -c") < fetch.index("return 0")))
+    out.append(("node deps: python3, which reads the API's answer, comes from the image's sources only when missing, before the first lookup, and the lookup is one call without a token",
+                'command -v python3' in bootstrap and "ca-certificates curl python3" in bootstrap
+                and bootstrap.index("ca-certificates curl python3") < bootstrap.index('NODE_DEPS_URL="${NODE_DEPS_URL:-')
+                and "Authorization" not in bootstrap and "GITHUB_TOKEN" not in bootstrap and bootstrap.count("api.github.com/repos/") == 2))
     out.append(("node deps: the builder names it as the bootstrap reads it, a plain tar a fresh node can open",
                 'NAME="node-deps-$(date -u +%Y%m%d)-$HASH"' in build and '-cf "$OUT/$NAME.tar"' in build and "zstd" not in build))
     out.append(("node deps: glslang comes built in the archive, at the version and from the source the bootstrap pins",
@@ -1339,18 +1344,58 @@ def group_node_deps():
                 done.returncode == 0 and done.stdout == "the archive" and done.stderr.count("(round 1)") == 1))
     # The runner's call as bash reads it: four words, the direct address last (a literal
     # backslash-n once made the fourth word "n" and the direct address a fifth, never tried).
-    begin = bootstrap.index('  fetch "https://api.github.com/repos/actions/runner/')
+    begin = bootstrap.index('  fetch "$(asset_api_url actions/runner')
     lines = []
     for line in bootstrap[begin:].splitlines():
         lines.append(line)
         if not line.endswith(chr(92)):
             break
-    script = chr(10).join(["RUNNER_ASSET=1", "RUNNER_SHA256=s", "RUNNER_VERSION=9",
-                           'fetch() { echo "$#"; printf %s "$4"; }'] + lines)
+    script = chr(10).join(["RUNNER_SHA256=s", "RUNNER_VERSION=9", 'RUNNER_FILE="actions-runner-linux-x64-$RUNNER_VERSION.tar.gz"',
+                           'asset_api_url() { echo "API:$1:$2:$3"; }', 'fetch() { echo "$#"; echo "$1"; printf %s "$4"; }'] + lines)
     done = subprocess.run(["bash", "-c", script], capture_output=True, text=True, timeout=30)
     words = done.stdout.splitlines()
-    out.append(("node deps: the runner's call gives fetch four words, the direct address the fourth (%s)" % words,
-                words[:1] == ["4"] and done.stdout.endswith("https://github.com/actions/runner/releases/download/v9/actions-runner-linux-x64-9.tar.gz")))
+    out.append(("node deps: the runner's call gives fetch four words, the API address derived from the release v<version> and the file's name first, the direct address the fourth (%s)" % words,
+                words[:2] == ["4", "API:actions/runner:v9:actions-runner-linux-x64-9.tar.gz"]
+                and done.stdout.endswith("https://github.com/actions/runner/releases/download/v9/actions-runner-linux-x64-9.tar.gz")))
+    # asset_api_url as bash runs it, with curl faked: the release is asked for by its tag, the file is taken by its exact name, and nothing is said (the script
+    # goes on, set -e or not) when the API is down, answers something else, has no such file, or names an address that is not the API's.
+    begin = bootstrap.index("asset_api_url() {")
+    asset_api_url = bootstrap[begin:bootstrap.index("\n}\n", begin) + 3]
+    release = json.dumps({"name": "v1", "id": 5, "assets": [
+        {"id": 11, "name": "x-1.tar.sha256", "url": "https://api.github.com/repos/o/r/releases/assets/11"},
+        {"id": 12, "name": "x-1.tar", "url": "https://api.github.com/repos/o/r/releases/assets/12"},
+        {"id": 13, "name": "other.tar", "url": "https://elsewhere.example/releases/assets/13"}]})
+    derived = {}
+    with tempfile.TemporaryDirectory() as tmp:
+        (Path(tmp) / "release.json").write_text(release)
+        asked = (Path(tmp) / "asked").as_posix()
+        show = 'cat "%s/release.json"' % Path(tmp).as_posix()
+        for case, (curl_body, file_name) in {"found": (show, "x-1.tar"), "no such file": (show, "y.tar"), "not the API's address": (show, "other.tar"),
+                                             "API down": ("return 22", "x-1.tar"), "not json": ("echo '<html>'", "x-1.tar")}.items():
+            script = "\n".join(["set -euo pipefail", 'curl() { echo "$*" > "%s"; %s; }' % (asked, curl_body), asset_api_url,
+                                'U="$(asset_api_url o/r v1 %s)"' % file_name, 'echo "[$U]"'])
+            derived[case] = subprocess.run(["bash", "-c", script], capture_output=True, text=True, timeout=60)
+        request = Path(asked).read_text()
+    out.append(("node deps: asset_api_url asks the API for the release by its tag and returns the address of the file of that exact name (%s)" % derived["found"].stdout.strip(),
+                derived["found"].returncode == 0 and derived["found"].stdout.strip() == "[https://api.github.com/repos/o/r/releases/assets/12]"
+                and "https://api.github.com/repos/o/r/releases/tags/v1" in request and "Authorization" not in request))
+    out.append(("node deps: asset_api_url says nothing, and the script goes on, when the API is down, answers something else, has no such file or names a foreign address",
+                all(derived[case].returncode == 0 and derived[case].stdout.strip() == "[]" for case in ("no such file", "not the API's address", "API down", "not json"))))
+    # An empty first address (the API gave none) is not tried: the second serves the file in round 1, with no failure said for the empty one.
+    with tempfile.TemporaryDirectory() as tmp:
+        good = Path(tmp) / "node-deps.tar"
+        good.write_bytes(b"the archive")
+        digest = hashlib.sha256(b"the archive").hexdigest()
+        script = "\n".join([
+            "set -euo pipefail",
+            "FETCH_PAUSE=0",
+            'die() { echo "node_bootstrap: ERROR: $*" >&2; exit 1; }',
+            fetch,
+            'fetch "" "%s" "%s/got.tar" "file://%s"' % (digest, tmp, good),
+            'cat "%s/got.tar"' % tmp])
+        done = subprocess.run(["bash", "-c", script], capture_output=True, text=True, timeout=30)
+    out.append(("node deps: no address from the API: the direct address alone serves the file in round 1, nothing failed on the way",
+                done.returncode == 0 and done.stdout == "the archive" and "round" not in done.stderr))
     # apt_install as bash runs it, with apt, dpkg and the rest faked: a refusal of apt says which package, which dependency, which version
     # is installed against the archive's, and exits with apt's code; an install that works says nothing.
     begin = bootstrap.index("apt_install() {")

@@ -809,7 +809,8 @@ def selftest() -> int:
     manifest = base["chrome/chrome.manifest"]
     cases = [
         ("the same surface, ours loose and the retail in omni.ja", mutate(), False, None),
-        ("a content juggler package (every build until firefox-47)",
+        # Every build of the engine before the 47th release registered this package.
+        ("a content juggler package (every build of the old series)",
          mutate(chrome__chrome_DOT_manifest=manifest + "content juggler juggler/content/\n"), True, None),
         ("a package the retail registers and we do not",
          mutate(chrome__chrome_DOT_manifest=manifest.replace("content private private/content/\n", "")),
@@ -895,7 +896,8 @@ def selftest() -> int:
         ("an svg drawn differently in the same box",
          mutate(chrome__toolkit__content__global__w_DOT_svg='<svg viewBox="0 0 359 80"><g><path d="M1 1h8"/></g></svg>\n'),
          False, None),
-        ("an svg whose viewBox differs (the wordmarks until firefox-48)",
+        # The wordmarks of every build before the 48th release had another viewBox.
+        ("an svg whose viewBox differs (the wordmarks of the old series)",
          mutate(chrome__toolkit__content__global__w_DOT_svg='<svg viewBox="0 0 372 99"><path d="M0 0h9"/></svg>\n'),
          True, None),
         ("an svg whose <style> could size its root",

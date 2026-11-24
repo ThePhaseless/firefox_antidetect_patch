@@ -20,6 +20,7 @@
   "scripts/ci/__main__.py": "100644",
   "scripts/ci/ab_package.py": "100644",
   "scripts/ci/background.py": "100644",
+  "scripts/ci/binary_series.py": "100644",
   "scripts/ci/cache_rules.py": "100644",
   "scripts/ci/cargo_junit.py": "100644",
   "scripts/ci/cargo_oracles.py": "100644",

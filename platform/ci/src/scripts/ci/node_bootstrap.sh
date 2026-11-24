@@ -30,17 +30,17 @@ flock -w 1500 9 || { echo "node_bootstrap: ERROR: another bootstrap on this node
 # Until 2026-11-04 the packages came from Ubuntu's snapshot service at every start: it
 # was down for most of that day (503, 502) and slow when up, and no node could start.
 # A new set: node_deps_build.sh, then the archive up as a pre-release under its name,
-# and its asset id here.
-# GitHub's release files come through the API first, by asset id, and the direct
-# address second: on 2026-11-08 the direct one answered 504 for hours, and the API
-# now and then; two candidates lost their node to it.
+# and its name and sha256 here.
+# GitHub's release files come through the API first, and the direct address second:
+# on 2026-11-08 the direct one answered 504 for hours, and the API now and then; two
+# candidates lost their node to it. The API's address of a file is never written
+# here: it is derived at run time from the release's tag and the file's name
+# (asset_api_url below), since an asset id is a number GitHub gives, not one to keep.
 NODE_DEPS=node-deps-20261104-aeaa295d91a7
 NODE_DEPS_SHA256=96b646085471d7b50e26b9756f462b22565513873f5687277db3f7cdb238f059
-NODE_DEPS_ASSET=709796661
-NODE_DEPS_URL="${NODE_DEPS_URL:-https://api.github.com/repos/oss-invisible/firefox_antidetect_patch/releases/assets/$NODE_DEPS_ASSET}"
 NODE_DEPS_WEB_URL="https://github.com/oss-invisible/firefox_antidetect_patch/releases/download/$NODE_DEPS/$NODE_DEPS.tar"
 RUNNER_VERSION=2.338.2
-RUNNER_ASSET=678460500
+RUNNER_FILE="actions-runner-linux-x64-$RUNNER_VERSION.tar.gz"
 RUNNER_SHA256=baebf204307bac6193480852732f0aba2ae97b6c5597c244f4d5558390147c40
 NODE_VERSION=22.23.4
 NODE_SHA256=1805bcd35e6815559bd2eb97db438d3fdb0eb3a5e6a977b7c1badca76337e9ce
@@ -76,14 +76,26 @@ die() { echo "node_bootstrap: ERROR: $*" >&2; exit 1; }
 
 export DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a LANG=C.UTF-8
 
-fetch() { # url sha256 file [second-url]
+# The API's address of one file of a release, from the release's tag and the file's name: one unauthenticated call (the node has no token), asked again by curl
+# on a timeout or a 5xx. Nothing when the API does not answer or the release has no such file: fetch() then goes on with its second address.
+asset_api_url() { # owner/repo release-tag file-name
+  curl -fsSL --retry 5 --retry-delay 5 --connect-timeout 30 --max-time 120 -H "Accept: application/vnd.github+json" \
+       "https://api.github.com/repos/$1/releases/tags/$2" 2>/dev/null \
+    | python3 -c 'import json, sys
+for asset in json.load(sys.stdin).get("assets", []):
+    if asset.get("name") == sys.argv[1] and asset.get("url", "").startswith("https://api.github.com/repos/"):
+        print(asset["url"])
+        break' "$3" 2>/dev/null || true
+}
+
+fetch() { # url sha256 file [second-url]; an empty url is skipped (the API gave none)
   [ -f "$3" ] && echo "$2  $3" | sha256sum -c --quiet - 2>/dev/null && return 0
   # Both of GitHub's addresses gave 504 for minutes on 2026-11-08, never both for
   # long: three rounds over the API's address, then the direct one. The API answers a
   # release asset with its bytes only when asked for them. The sha256 decides.
   local round url
   for round in 1 2 3; do
-    for url in "$1" ${4:+"$4"}; do
+    for url in ${1:+"$1"} ${4:+"$4"}; do
       if curl -fsSL --retry 5 --retry-delay 5 --connect-timeout 30 --max-time 900 \
            -H "Accept: application/octet-stream" -o "$3" "$url" \
          && echo "$2  $3" | sha256sum -c --quiet -; then
@@ -93,7 +105,7 @@ fetch() { # url sha256 file [second-url]
     done
     sleep "${FETCH_PAUSE:-30}"
   done
-  die "$1 does not match its sha256, from any address, in 3 rounds"
+  die "${1:-$4} does not match its sha256, from any address, in 3 rounds"
 }
 
 # apt from the archive, silent while it works and whole when it does not. Its last line alone ("E: Unable to correct problems, you have
@@ -165,10 +177,12 @@ printf '%s\n' 'Acquire::http::Timeout "60";' 'Acquire::https::Timeout "60";' 'Ac
   > /etc/apt/apt.conf.d/80-ci-network
 # The download needs curl and CA certificates, and a fresh node once had no
 # certificates: then, and only then, they come from the image's own sources first.
-if ! command -v curl >/dev/null || [ ! -s /etc/ssl/certs/ca-certificates.crt ]; then
+# python3 reads GitHub's answer for the address of a file (asset_api_url).
+if ! command -v curl >/dev/null || ! command -v python3 >/dev/null || [ ! -s /etc/ssl/certs/ca-certificates.crt ]; then
   apt-get update -qq -o APT::Update::Error-Mode=any
-  apt-get install -y -qq --no-install-recommends ca-certificates curl >/dev/null
+  apt-get install -y -qq --no-install-recommends ca-certificates curl python3 >/dev/null
 fi
+NODE_DEPS_URL="${NODE_DEPS_URL:-$(asset_api_url oss-invisible/firefox_antidetect_patch "$NODE_DEPS" "$NODE_DEPS.tar")}"
 fetch "$NODE_DEPS_URL" "$NODE_DEPS_SHA256" /tmp/node-deps.tar "$NODE_DEPS_WEB_URL"
 rm -rf "$DEPS" && mkdir -p "$DEPS"
 tar -xf /tmp/node-deps.tar -C "$DEPS"
@@ -214,9 +228,9 @@ cp -a "$DEPS/glslang-root/usr/local/." /usr/local/
 echo "== actions-runner $RUNNER_VERSION"
 R=/home/runner/actions-runner
 if [ "$(as_runner "$R/bin/Runner.Listener" --version 2>/dev/null)" != "$RUNNER_VERSION" ]; then
-  fetch "https://api.github.com/repos/actions/runner/releases/assets/$RUNNER_ASSET" \
+  fetch "$(asset_api_url actions/runner "v$RUNNER_VERSION" "$RUNNER_FILE")" \
     "$RUNNER_SHA256" /tmp/actions-runner.tar.gz \
-    "https://github.com/actions/runner/releases/download/v$RUNNER_VERSION/actions-runner-linux-x64-$RUNNER_VERSION.tar.gz"
+    "https://github.com/actions/runner/releases/download/v$RUNNER_VERSION/$RUNNER_FILE"
   rm -rf "$R" && install -d -o runner -g runner "$R"
   as_runner tar -xzf /tmp/actions-runner.tar.gz -C "$R"
   rm -f /tmp/actions-runner.tar.gz

@@ -5,7 +5,9 @@
 # profile, the structured log) and scripts/ci/xpcshell_support.json locks the unmodified Mozilla files that the tests import (head.js, the modules of
 # resource://testing-common/, the head files of the manifests: a path and a sha256 each, at the tag of the series' UPSTREAM.json).
 #
-# WHERE THE FILES COME FROM. Ours (the tests): the series, checked out at the commit under test, sparse (`<group>/<folder>/src/**/tests/`).
+# WHERE THE FILES COME FROM. Ours (the tests): the series, checked out at the commit THE BINARY WAS BUILT FROM (decision ci-09: tests and binary come from the same
+# commit; the seal's series_commit of a release, the series-commit.txt of a run's build, and for this run's own build the pushed commit, proved equal), sparse
+# (`<group>/<folder>/src/**/tests/`); the runner and the resolvers are the pushed commit's.
 # Mozilla's: raw.githubusercontent.com/mozilla-firefox/firefox/<tag>/<path>, one request per file (27 files, 4.2 MB, the biggest is sinon 3.7 MB),
 # each checked against the lock. A clone of the tag (even blobless and depth 1: every tree of Firefox) or a source archive is hundreds of MB for what
 # is a handful of files, and GitHub is already the one host the legs read. No cache entry: the repository's Actions cache is capped and release.yml's
@@ -14,11 +16,12 @@
 # THE VERDICT is this job's: red when a test fails or is skipped, a process exits non-zero or hangs, a declared file collects no test, a support file is
 # not the locked one, or fewer tests were collected than `min_tests` of scripts/ci/xpcshell_tests.json. The list grows as the folders land.
 #
-# WHICH ENGINE. The gate calls this with the candidate's build_run_id: the candidate's own archives are what runs. Alone, a push to a branch
-# `latitude/<name>-oracles` (the measurement) runs the PUBLISHED engine, the latest published firefox-<N> (scripts/ci/published_release.py) unless `published_tag` says another: the release's archives are
+# WHICH ENGINE. The gate calls this with the candidate's build_run_id: the candidate's own archives are what runs (a call that names none: this run's own).
+# Alone, a push to a branch `latitude/<name>-oracles` (the measurement), or a dispatch that gives neither `build_run_id` nor `published_tag`, runs the
+# PUBLISHED engine, the latest published firefox-<N> (scripts/ci/published_release.py) unless `published_tag` says another: the release's archives are
 # downloaded with `gh release download` and checked against the sha256 of the release's seal.json (xpcshell_run.py verify-asset), so the verdict of a
-# push is that of the engine users have, with the tests of the series at the commit pushed. `build_run_id` is for the gate call and for a dispatch
-# that names a candidate run; a `published_tag` that is set wins over it.
+# push is that of the engine users have, with the tests of the series at the commit that engine was built from. No run id is written here: a run's artifacts expire.
+# `build_run_id` is for the gate call and for a dispatch that names a candidate run; a `published_tag` that is set wins over it.
 #
 # THE LIST IS THE SET. Before anything is downloaded, `xpcshell_run.py check` computes from the series checkout the xpcshell tests of OURS (test_*.js in
 # an xpcshell folder of a feature's src/) and compares them with scripts/ci/xpcshell_tests.json: a test of ours that the list does not run is red, so
@@ -42,7 +45,7 @@ on:
         type: string
         default: main
       published_tag:
-        description: a release tag whose archives to test instead of the run's (empty - the candidate's own, and on this workflow's own push the latest published firefox-<N>, resolved at run time)
+        description: a release tag whose archives to test instead of the run's (empty - the candidate's own, and on this workflow's own push or dispatch with no build_run_id the latest published firefox-<N>, resolved at run time)
         type: string
         default: ''
   push:
@@ -50,11 +53,11 @@ on:
   workflow_dispatch:
     inputs:
       build_run_id:
-        description: the run whose asset-* artifacts to test
+        description: the run whose asset-* artifacts to test (empty, with no published_tag - the latest published firefox-<N>, resolved at run time)
         type: string
-        default: '44921963200'
+        default: ''
       published_tag:
-        description: a release tag whose archives to test instead of the run's artifacts (empty - the run's)
+        description: a release tag whose archives to test instead of the run's artifacts (empty - the run's, or the latest published firefox-<N> when build_run_id is empty too)
         type: string
         default: ''
 
@@ -77,10 +80,10 @@ jobs:
     env:
       TEMP: ${{ startsWith(matrix.runner, 'windows') && 'D:\a\_temp' || '/tmp' }}
       TMP: ${{ startsWith(matrix.runner, 'windows') && 'D:\a\_temp' || '/tmp' }}
-      # The release whose archives run: the input, else the latest published firefox-<N> on this workflow's own push (the measurement; the step "The latest
-      # published engine" resolves it and writes PUBLISHED_TAG to GITHUB_ENV), else none (the run's artifacts).
-      # A call from the gate has github.event_name of ITS caller (release.yml is also run by a push) and always has build_run_id: only a push of this
-      # workflow has none, so that is what says "the measurement", never the event name alone.
+      # The release whose archives run: the input, else the latest published firefox-<N> on this workflow's own push or dispatch with no build_run_id (the
+      # measurement; the step "The latest published engine" resolves it and writes PUBLISHED_TAG to GITHUB_ENV), else none (the run's artifacts).
+      # A call from the gate has github.event_name of ITS caller (release.yml is also run by a push), but github.workflow is the caller's name too: only this
+      # workflow's own event has github.workflow == 'xpcshell', so that is what says "the measurement", never the event name alone.
       PUBLISHED_TAG: ${{ inputs.published_tag }}
     timeout-minutes: 15
     strategy:
@@ -90,46 +93,98 @@ jobs:
           - { leg: linux-x86_64, runner: ubuntu-24.04, kind: linux }
           - { leg: win-x86_64, runner: windows-latest, kind: win }
     steps:
-      # The tests are ours and live in the series, and so does the runner: the commit under test, sparse, as gate.yml does for the tests of the
-      # security state. `/*/*/src/**/tests/` is every tests folder of every folder of the series; UPSTREAM.json names the Mozilla tag.
-      - name: Checkout the series (our tests, the runner, the Mozilla tag)
+      # TESTS AND BINARY COME FROM THE SAME COMMIT (decision ci-09). The binary here is never built by this job: a release's archives, or the archives of a run
+      # (another's, or this run's, built by an earlier job). So the tests are the series at the commit the binary was built from, not the commit pushed: the
+      # series_commit of the seal for a release, the series-commit.txt that the build recorded (else the head_sha of its run) for a run, and for this run's own
+      # build the commit pushed, which the resolver proves equal (binary_series.py fails on a difference). The first checkout is only the CI code that
+      # resolves and runs (the pushed commit: the runner, the resolvers); the second is the series at that commit and holds the tests, their list
+      # (xpcshell_tests.json), the lock of Mozilla's files (xpcshell_support.json) and UPSTREAM.json, all read from it.
+      - name: Checkout the CI code (the pushed commit - the runner and the resolvers)
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           repository: ${{ github.repository }}
           ref: ${{ github.sha }}
+          path: engine-ci
+          fetch-depth: 1
+          sparse-checkout: |
+            /platform/ci/src/scripts/ci/xpcshell_run.py
+            /platform/ci/src/scripts/ci/published_release.py
+            /platform/ci/src/scripts/ci/binary_series.py
+          sparse-checkout-cone-mode: false
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with: { python-version: '3.11' }
+      - name: The latest published engine (this workflow's own push or dispatch, no published_tag and no build_run_id given)
+        if: inputs.published_tag == '' && inputs.build_run_id == '' && github.workflow == 'xpcshell'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python engine-ci/platform/ci/src/scripts/ci/published_release.py --repo "$GITHUB_REPOSITORY" --github-env "$GITHUB_ENV" --name PUBLISHED_TAG
+      # WHICH SERIES COMMIT THE BINARY CAME FROM, before anything big is downloaded: the release's seal.json (a few kB), or the artifact source-commit of the run.
+      - name: The seal of the published engine
+        if: env.PUBLISHED_TAG != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          mkdir -p art
+          gh release download "$PUBLISHED_TAG" -R "$GITHUB_REPOSITORY" --pattern seal.json --dir art
+      - name: The series commit the run's build recorded
+        if: env.PUBLISHED_TAG == ''
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: source-commit
+          path: source-commit
+          run-id: ${{ inputs.build_run_id || github.run_id }}
+          github-token: ${{ (inputs.build_run_id || github.run_id) != github.run_id && github.token || '' }}
+      - name: The series commit of the binary (the seal's, or the build's; this run's own is proved equal to the pushed commit)
+        id: binary
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_RUN_ID: ${{ inputs.build_run_id || github.run_id }}
+        run: |
+          set -e
+          RESOLVE=engine-ci/platform/ci/src/scripts/ci/binary_series.py
+          if [ -n "$PUBLISHED_TAG" ]; then
+            python "$RESOLVE" seal --dir art --github-output "$GITHUB_OUTPUT"
+          else
+            python "$RESOLVE" run --repo "$GITHUB_REPOSITORY" --run-id "$BUILD_RUN_ID" --source-commit-dir source-commit --own-run-id "$GITHUB_RUN_ID" --own-sha "$GITHUB_SHA" --github-output "$GITHUB_OUTPUT"
+          fi
+      # The tests are ours and live in the series, at that commit, sparse, as gate.yml does for the tests of the security state. `/*/*/src/**/tests/` is every
+      # tests folder of every folder of the series; UPSTREAM.json names the Mozilla tag.
+      - name: Checkout the series at the binary's commit (our tests, their list and minimum, the lock of Mozilla's files, the Mozilla tag)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ steps.binary.outputs.series_commit }}
           path: engine-series
           fetch-depth: 1
           sparse-checkout: |
             /UPSTREAM.json
-            /platform/ci/src/scripts/ci/xpcshell_*
-            /platform/ci/src/scripts/ci/published_release.py
+            /platform/ci/src/scripts/ci/xpcshell_tests.json
+            /platform/ci/src/scripts/ci/xpcshell_support.json
             /*/*/src/**/tests/
             /*/*/src/**/test/
             /*/*/*/src/**/tests/
             /*/*/*/src/**/test/
           sparse-checkout-cone-mode: false
-      - name: Set up Python
-        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
-        with: { python-version: '3.11' }
-      # No download, no install: the list and the series, in the first seconds of the job.
+      # No binary download, no install: the list and the series, in the first seconds of the job.
       - name: The declared list is exactly the set of our xpcshell tests
         shell: bash
-        run: python engine-series/platform/ci/src/scripts/ci/xpcshell_run.py check --series engine-series --list engine-series/platform/ci/src/scripts/ci/xpcshell_tests.json
-      - name: The latest published engine (this workflow's own push, no published_tag given)
-        if: inputs.published_tag == '' && inputs.build_run_id == '' && github.event_name == 'push'
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: python engine-series/platform/ci/src/scripts/ci/published_release.py --repo "$GITHUB_REPOSITORY" --github-env "$GITHUB_ENV" --name PUBLISHED_TAG
+        run: python engine-ci/platform/ci/src/scripts/ci/xpcshell_run.py check --series engine-series --list engine-series/platform/ci/src/scripts/ci/xpcshell_tests.json
       - name: Download asset (the run's)
         if: env.PUBLISHED_TAG == ''
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: asset-${{ matrix.leg }}
           path: art
-          # another run's artifacts need the token; this run's do not. A push to latitude/*-oracles has no input: the measurement's candidate.
-          run-id: ${{ inputs.build_run_id || '44921963200' }}
-          github-token: ${{ (inputs.build_run_id || '44921963200') != github.run_id && github.token || '' }}
+          # another run's artifacts need the token; this run's do not. A call that names no run reads this run's own; this workflow's own push or
+          # dispatch with no build_run_id never gets here (the step above made PUBLISHED_TAG the latest published release).
+          run-id: ${{ inputs.build_run_id || github.run_id }}
+          github-token: ${{ (inputs.build_run_id || github.run_id) != github.run_id && github.token || '' }}
       # The published engine: the release's seal.json and this leg's archive, the archive's sha256 checked against the seal (as the core does).
       - name: Download asset (the published engine's, as sealed)
         if: env.PUBLISHED_TAG != ''
@@ -139,8 +194,8 @@ jobs:
         run: |
           set -e
           mkdir -p art
-          gh release download "$PUBLISHED_TAG" -R "$GITHUB_REPOSITORY" --pattern seal.json --pattern "firefox-*-stealth-${{ matrix.leg }}.*" --dir art
-          python engine-series/platform/ci/src/scripts/ci/xpcshell_run.py verify-asset --dir art --leg ${{ matrix.leg }}
+          gh release download "$PUBLISHED_TAG" -R "$GITHUB_REPOSITORY" --clobber --pattern seal.json --pattern "firefox-*-stealth-${{ matrix.leg }}.*" --dir art
+          python engine-ci/platform/ci/src/scripts/ci/xpcshell_run.py verify-asset --dir art --leg ${{ matrix.leg }}
       - name: The Linux packages (the run's linux-deps job, no mirror)
         if: matrix.kind == 'linux'
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
@@ -189,12 +244,12 @@ jobs:
           [ -z "$missing" ] || { echo "missing libraries:"; echo "$missing"; exit 1; }
       - name: Mozilla's unmodified test files, at the tag, as locked
         shell: bash
-        run: python engine-series/platform/ci/src/scripts/ci/xpcshell_run.py fetch --series engine-series --into xpc-support
+        run: python engine-ci/platform/ci/src/scripts/ci/xpcshell_run.py fetch --series engine-series --lock engine-series/platform/ci/src/scripts/ci/xpcshell_support.json --into xpc-support
       - name: Our xpcshell tests on the packaged binary - every listed test runs and passes
         shell: bash
         run: |
           PREFIX=""; [ "${{ matrix.kind }}" = linux ] && PREFIX="xvfb-run -a"
-          $PREFIX python engine-series/platform/ci/src/scripts/ci/xpcshell_run.py run --binary "$FF_EXE" --series engine-series --support xpc-support --out xpcshell-result
+          $PREFIX python engine-ci/platform/ci/src/scripts/ci/xpcshell_run.py run --binary "$FF_EXE" --series engine-series --support xpc-support --list engine-series/platform/ci/src/scripts/ci/xpcshell_tests.json --lock engine-series/platform/ci/src/scripts/ci/xpcshell_support.json --out xpcshell-result
       - name: The seconds of every file and test
         if: always()
         shell: bash
@@ -262,8 +317,10 @@ jobs:
   # THE CONTROL COMES FIRST. The published engine is dumped TWICE and the two are compared (the A/A): a difference there is "broken control" (exit 2),
   # the dump is not repeatable, and nothing is read from the candidate. Both engines are extracted to the same folder (`ff`) and dumped with the same
   # profile folder, so that no value that holds a path can differ between them. The published engine is the release's archive, checked against the
-  # sha256 of its seal.json (verify-asset); the candidate is the run's asset-<leg> artifact (build_run_id; a push to latitude/*-oracles has none and uses
-  # the dispatch's default). `published_tag` is for the legs above: the baseline here is PREFS_BASE_TAG.
+  # sha256 of its seal.json (verify-asset); the candidate is the run's asset-<leg> artifact (build_run_id; a call that names none: this run's own). This
+  # workflow's own push or dispatch with no build_run_id has no run to take: its candidate is the latest published release's archive too, checked the same
+  # way (so its prefs verdict is the engine against itself, the control of the job). `published_tag` is for the legs above: the baseline here is
+  # PREFS_BASE_TAG.
   # ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
   prefs:
     name: prefs-${{ matrix.leg }}
@@ -274,6 +331,9 @@ jobs:
       TMP: ${{ startsWith(matrix.runner, 'windows') && 'D:\a\_temp' || '/tmp' }}
       # The baseline: the latest published firefox-<N>, resolved by the step "The latest published engine" below (it writes PREFS_BASE_TAG to GITHUB_ENV).
       PREFS_BASE_TAG: ''
+      # The candidate's release: empty - the run's asset; the same step sets it to the latest published firefox-<N> when this workflow's own push or dispatch
+      # names no build_run_id.
+      PREFS_CAND_TAG: ''
       PREFS_PY: engine-series/platform/ci/src/scripts/ci/xpcshell_run.py
     timeout-minutes: 15
     strategy:
@@ -299,18 +359,36 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with: { python-version: '3.11' }
-      - name: Download the candidate (the run's asset)
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: asset-${{ matrix.leg }}
-          path: art-cand
-          run-id: ${{ inputs.build_run_id || '44921963200' }}
-          github-token: ${{ (inputs.build_run_id || '44921963200') != github.run_id && github.token || '' }}
       - name: The latest published engine
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python engine-series/platform/ci/src/scripts/ci/published_release.py --repo "$GITHUB_REPOSITORY" --github-env "$GITHUB_ENV" --name PREFS_BASE_TAG
+          OWN_RUN: ${{ inputs.build_run_id == '' && github.workflow == 'xpcshell' && 'yes' || '' }}
+        run: |
+          set -euo pipefail
+          LATEST="$(python engine-series/platform/ci/src/scripts/ci/published_release.py --repo "$GITHUB_REPOSITORY")"
+          echo "the latest published engine: $LATEST"
+          echo "PREFS_BASE_TAG=$LATEST" >> "$GITHUB_ENV"
+          # this workflow's own push or dispatch names no run: its candidate is that release too
+          if [ -n "$OWN_RUN" ]; then echo "PREFS_CAND_TAG=$LATEST" >> "$GITHUB_ENV"; fi
+      - name: Download the candidate (the run's asset)
+        if: env.PREFS_CAND_TAG == ''
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: asset-${{ matrix.leg }}
+          path: art-cand
+          run-id: ${{ inputs.build_run_id || github.run_id }}
+          github-token: ${{ (inputs.build_run_id || github.run_id) != github.run_id && github.token || '' }}
+      - name: Download the candidate (the latest published engine's, as sealed)
+        if: env.PREFS_CAND_TAG != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          mkdir -p art-cand
+          gh release download "$PREFS_CAND_TAG" -R "$GITHUB_REPOSITORY" --pattern seal.json --pattern "firefox-*-stealth-${{ matrix.leg }}.*" --dir art-cand
+          python "$PREFS_PY" verify-asset --dir art-cand --leg ${{ matrix.leg }}
       - name: Download the published engine (as sealed)
         shell: bash
         env:

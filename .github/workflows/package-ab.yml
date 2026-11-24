@@ -11,11 +11,14 @@
 #
 # THE CANDIDATE is the asset-* artifacts of one run (inputs.build_run_id), or, when inputs.candidate_tag is set, the archives of that release (checked against its
 # seal and checksums.txt like the published one): the A/A, the published engine against itself, whose verdict is red when ANYTHING changed, of any class.
-# THE CANDIDATE of a run: the asset-* artifacts of inputs.build_run_id. THE SERIES COMMIT it was built from is the one that run recorded (series-commit.txt
-# of its artifact source-commit), else the head_sha of that run; the commit is fetched when this checkout's history does not hold it (a run of another branch).
-# Called by gate.yml (so it runs beside the rest of the gate, on the build's own archives) and on a push to latitude/*-oracles, for a run of its own: there
-# the candidate is run 44921963200 (latitude/firefox-69-noglx, whose archives are kept until 2026-11-28) against the latest published firefox-<N>, with the comparator of the pushed commit;
-# and the A/A of that release with itself, as a second leg of the same job (matrix mode: ab, tag).
+# THE CANDIDATE of a run: the asset-* artifacts of inputs.build_run_id (none given in a call: this run's own). THE SERIES COMMIT it was built from is the one
+# that run recorded (series-commit.txt of its artifact source-commit), else the head_sha of that run; the commit is fetched when this checkout's history does
+# not hold it (a run of another branch).
+# Called by gate.yml (so it runs beside the rest of the gate, on the build's own archives) and on a push to latitude/*-oracles, which has no inputs and no run
+# of its own to measure: no run id is written here (a run's artifacts expire), the push takes the archives of the releases. Its A/B leg is an A/B of two
+# releases (the candidate_tag path below): the latest published firefox-<N> against the one published before it (scripts/ci/published_release.py, --rank 2),
+# the comparator being the pushed commit's; its second leg is the A/A of the latest published release with itself (matrix mode: ab, tag). Both releases are
+# checked against their seal.json and checksums.txt before anything is compared.
 # ─────────────────────────────────────────────────────────────────────────────
 name: package-ab
 
@@ -23,7 +26,7 @@ on:
   workflow_call:
     inputs:
       build_run_id:
-        description: the run whose asset-* artifacts are the candidate (the caller's own, or another's)
+        description: the run whose asset-* artifacts are the candidate (the caller's own, or another's); empty - this run's own
         type: string
         default: ''
       published_tag:
@@ -53,16 +56,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # a call with candidate_tag is the tag leg alone; a push is both legs (the A/B of the measured run, and the A/A of the published tag with itself);
+        # a call with candidate_tag is the tag leg alone; a push is both legs (the A/B of the latest published release against the one before it, and the A/A of
+        # the latest published release with itself);
         # any other call (the gate's) is the A/B of its build
         mode: ${{ fromJSON(inputs.candidate_tag != '' && '["tag"]' || github.event_name == 'push' && '["ab","tag"]' || '["ab"]') }}
     env:
-      # A push has no inputs: its candidate is the measured run (its artifacts expire 2026-11-28), its published engine the latest published firefox-<N>.
-      BUILD_RUN_ID: ${{ inputs.build_run_id || '44921963200' }}
+      # The run whose artifacts are the candidate: the input, else this run's own (a call that names none). A push has no inputs and measures no run: its
+      # candidate is a release (CAND_TAG), so these artifacts are never read there.
+      BUILD_RUN_ID: ${{ inputs.build_run_id || github.run_id }}
       # The published engine: the input when it is set; when it is empty, the step "The latest published engine" below resolves it and writes TAG (and
-      # CAND_TAG of the A/A) to GITHUB_ENV, which the steps after it read.
+      # CAND_TAG of a push's legs) to GITHUB_ENV, which the steps after it read.
       TAG: ${{ inputs.published_tag }}
-      # the release whose archives are the candidate: the tag leg only (the A/A when it is the published one)
+      # the release whose archives are the candidate: the tag leg (the A/A when it is the published one); on a push's A/B leg the resolver step sets it
       CAND_TAG: ${{ matrix.mode == 'tag' && (inputs.candidate_tag || inputs.published_tag) || '' }}
     steps:
       - name: Checkout the series (its history is the diff of the sources; its scripts are the comparator)
@@ -99,6 +104,8 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
       # Only when no published_tag was given: the latest release that is published (not a draft, not a prerelease) and named firefox-<N>. An explicit input wins.
+      # On this workflow's own push (no inputs, no run to measure) the A/B leg is two releases: the latest is the candidate and the one before it the published
+      # engine; the A/A leg is the latest with itself.
       - name: The latest published engine (no published_tag given)
         if: inputs.published_tag == ''
         shell: bash
@@ -106,12 +113,23 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           MODE: ${{ matrix.mode }}
           CANDIDATE_TAG: ${{ inputs.candidate_tag }}
+          OWN_PUSH: ${{ github.event_name == 'push' && github.workflow == 'package-ab' && inputs.build_run_id == '' && 'yes' || '' }}
         run: |
           set -euo pipefail
-          LATEST="$(python engine-series/platform/ci/src/scripts/ci/published_release.py --repo "$GITHUB_REPOSITORY" --github-env "$GITHUB_ENV" --name TAG)"
+          RESOLVE="python engine-series/platform/ci/src/scripts/ci/published_release.py --repo $GITHUB_REPOSITORY"
+          LATEST="$($RESOLVE)"
           echo "the latest published engine: $LATEST"
-          # the A/A (a push's tag leg) compares the published engine with itself
-          if [ "$MODE" = tag ] && [ -z "$CANDIDATE_TAG" ]; then echo "CAND_TAG=$LATEST" >> "$GITHUB_ENV"; fi
+          BASE="$LATEST"
+          if [ "$MODE" = ab ] && [ -n "$OWN_PUSH" ]; then
+            # no run to measure: the A/B of two releases, the latest against the one published before it
+            BASE="$($RESOLVE --rank 2)"
+            echo "the one published before it: $BASE"
+            echo "CAND_TAG=$LATEST" >> "$GITHUB_ENV"
+          elif [ "$MODE" = tag ] && [ -z "$CANDIDATE_TAG" ]; then
+            # the A/A (a push's tag leg) compares the published engine with itself
+            echo "CAND_TAG=$LATEST" >> "$GITHUB_ENV"
+          fi
+          echo "TAG=$BASE" >> "$GITHUB_ENV"
       - name: The published engine, verified against its seal and checksums.txt
         id: published
         shell: bash
