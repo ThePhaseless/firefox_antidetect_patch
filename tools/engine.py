@@ -274,6 +274,25 @@ def apply(source: Path, base: str, branch: str, force: bool) -> str:
     return tree
 
 
+def add_files(source: Path, folder: str, manifest: dict, env: dict) -> None:
+    """Puts the files a folder adds (`manifest["added"]`, path -> mode) into the index of
+    `env`, with a fixed number of git processes whatever their count: one `hash-object`
+    for all the bytes (--no-filters: stored verbatim, as --stdin did) and one
+    `update-index` for all the entries. Per file it was two processes and a rewrite of
+    the whole index (775 files over 79 folders: 261-388 s of "apply" on GitHub's Windows
+    runner, 27 s batched)."""
+    added = manifest["added"]
+    if not added:
+        return
+    paths = [str(ROOT / folder / "src" / path) for path in added]
+    shas = git(source, "hash-object", "-w", "--no-filters", "--stdin-paths",
+               input_bytes=("\n".join(paths) + "\n").encode()).decode().split()
+    if len(shas) != len(paths):
+        raise SystemExit("%s: hash-object returned %d objects for %d files" % (folder, len(shas), len(paths)))
+    lines = "".join("%s %s\t%s\n" % (mode, sha, path) for (path, mode), sha in zip(added.items(), shas))
+    git(source, "update-index", "--add", "--index-info", env=env, input_bytes=lines.encode())
+
+
 def build_stack(source: Path, base: str) -> list:
     """The series on `base`, as [(folder, commit, tree)] in SERIES order (the first entry
     is the tag itself, folder None). Writes objects only, moves no ref."""
@@ -297,11 +316,7 @@ def build_stack(source: Path, base: str) -> list:
                     raise SystemExit("%s does not apply on %s:\n%s"
                                      % (folder, base, done.stderr.decode(errors="replace")))
             manifest = json.loads((ROOT / folder / "MANIFEST.json").read_text(encoding="utf-8"))
-            for path, mode in manifest["added"].items():
-                data = (ROOT / folder / "src" / path).read_bytes()
-                sha = git(source, "hash-object", "-w", "--stdin", input_bytes=data).decode().strip()
-                git(source, "update-index", "--add", "--cacheinfo", "%s,%s,%s" % (mode, sha, path),
-                    env=env)
+            add_files(source, folder, manifest, env)
             tree = git(source, "write-tree", env=env).decode().strip()
             parent = git(source, "commit-tree", tree, "-p", parent, "-m", folder, env=env).decode().strip()
             layers.append((folder, parent, tree))
@@ -584,11 +599,7 @@ def verify(source: Path, base: str, head: str) -> int:
             if patch.exists():
                 git(source, "apply", "--cached", "--whitespace=nowarn", str(patch), env=env)
             manifest = json.loads((ROOT / folder / "MANIFEST.json").read_text(encoding="utf-8"))
-            for path, mode in manifest["added"].items():
-                data = (ROOT / folder / "src" / path).read_bytes()
-                sha = git(source, "hash-object", "-w", "--stdin", input_bytes=data).decode().strip()
-                git(source, "update-index", "--add", "--cacheinfo", "%s,%s,%s" % (mode, sha, path),
-                    env=env)
+            add_files(source, folder, manifest, env)
         built = git(source, "write-tree", env=env).decode().strip()
     expected = git(source, "rev-parse", "%s^{tree}" % head).decode().strip()
     if built == expected:

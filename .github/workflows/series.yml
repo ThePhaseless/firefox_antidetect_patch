@@ -53,13 +53,31 @@ jobs:
       # engine tree is there; here they read the tree this commit materializes,
       # on every push and on every port to a new Firefox tag. A skip fails the
       # step: it means a check did not read the tree.
-      # The core is pinned by commit, like the actions: a core change cannot turn
-      # this check red with no engine change. A port moves it to the core commit
-      # made for that Firefox (today 69.82.0, the core of firefox-69 with its seal).
+      # The core is the one the wrapper of main pins, derived, never written here: a
+      # commit written by hand is a reference that changes, and a port had to remember to
+      # move it. The resolver is the one release.yml uses for the core of a candidate
+      # (platform/ci/src/scripts/release_plan.py): it reads the core version the wrapper
+      # pins and finds the core commit of that version, and stops, naming what it found,
+      # when it cannot. The core under these checks is therefore the one the wrapper of
+      # main runs with, whatever main of the core is at.
+      - name: The core the wrapper of main pins
+        id: core
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          line="$(python3 .series/platform/ci/src/scripts/release_plan.py --resolve-core-ref --wrapper-ref main)"
+          case "$line" in
+            core_ref=?*) ;;
+            *) echo "the resolver did not print core_ref=<ref>: $line" >&2; exit 1 ;;
+          esac
+          echo "$line"
+          echo "$line" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           repository: oss-invisible/core
-          ref: f598297cd22120432c7fbe3508af4926b367e469
+          ref: ${{ steps.core.outputs.core_ref }}
           path: core
           persist-credentials: false
       - run: pip install -e "./core[dev]"

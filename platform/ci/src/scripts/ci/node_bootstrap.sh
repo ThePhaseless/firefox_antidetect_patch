@@ -4,10 +4,10 @@
 #
 #     ssh ubuntu@node 'sudo -n bash -s' < scripts/ci/node_bootstrap.sh
 #
-# What a job on ubuntu-24.04 finds already installed, this installs, at fixed
-# versions: the apt packages and glslang from one archive of ours (NODE_DEPS, made
-# by scripts/ci/node_deps_build.sh, a release asset of this repository), the rest
-# by version and sha256, all checked by sha256. A user `runner` with
+# What a job on ubuntu-24.04 finds already installed, this installs: the apt packages
+# from the closure resolved against THIS node's own image (scripts/ci/node_deps_resolve.sh
+# on the GitHub runner, sent by latitude_node.py prepare into /opt/node-deps/debs before
+# this runs), glslang and the rest by version and sha256, all checked by sha256. A user `runner` with
 # home /home/runner, as on GitHub's runners, so the job's paths (HOME, ~/pgo,
 # ~/.mozbuild) are the same; the runner itself in ~/actions-runner, jobs in ~/work,
 # Python's in /opt/hostedtoolcache. Unlike GitHub's, this user has no sudo: what a job
@@ -21,24 +21,22 @@
 set -euo pipefail
 
 # ONE bootstrap at a time on the node. A client that lost its ssh (exit 255) asks again while the first run, orphaned, still goes on: both would
-# `rm -rf /opt/node-deps` and `ssh-keygen -A` under each other. The second waits for the first, then runs over a node that is prepared.
+# run apt and `ssh-keygen -A` under each other. The second waits for the first, then runs over a node that is prepared.
 exec 9>/run/node_bootstrap.lock
 flock -w 1500 9 || { echo "node_bootstrap: ERROR: another bootstrap on this node did not end in 1500 s" >&2; exit 1; }
 
 # Every version in one place.
-# The node's apt packages and glslang, every .deb at the version its MANIFEST lists.
-# Until 2026-11-04 the packages came from Ubuntu's snapshot service at every start: it
-# was down for most of that day (503, 502) and slow when up, and no node could start.
-# A new set: node_deps_build.sh, then the archive up as a pre-release under its name,
-# and its name and sha256 here.
 # GitHub's release files come through the API first, and the direct address second:
 # on 2026-11-08 the direct one answered 504 for hours, and the API now and then; two
 # candidates lost their node to it. The API's address of a file is never written
 # here: it is derived at run time from the release's tag and the file's name
 # (asset_api_url below), since an asset id is a number GitHub gives, not one to keep.
-NODE_DEPS=node-deps-20261104-aeaa295d91a7
-NODE_DEPS_SHA256=96b646085471d7b50e26b9756f462b22565513873f5687277db3f7cdb238f059
-NODE_DEPS_WEB_URL="https://github.com/oss-invisible/firefox_antidetect_patch/releases/download/$NODE_DEPS/$NODE_DEPS.tar"
+# glslang, Ubuntu 24.04's at a version of our own choosing (lavapipe's shaders need 12.2 or later): one fixed
+# release asset of this repository, a tar of glslang-root/usr/local.
+GLSLANG_VERSION=14.0.0
+GLSLANG=glslang-14.0.0-5e10b724aba0
+GLSLANG_SHA256=5e10b724aba0426efa763694675e1d4a39bab1fe4a99c9d1f2b17d0571712cbf
+GLSLANG_WEB_URL="https://github.com/oss-invisible/firefox_antidetect_patch/releases/download/$GLSLANG/$GLSLANG.tar"
 RUNNER_VERSION=2.338.2
 RUNNER_FILE="actions-runner-linux-x64-$RUNNER_VERSION.tar.gz"
 RUNNER_SHA256=baebf204307bac6193480852732f0aba2ae97b6c5597c244f4d5558390147c40
@@ -46,12 +44,7 @@ NODE_VERSION=22.23.4
 NODE_SHA256=1805bcd35e6815559bd2eb97db438d3fdb0eb3a5e6a977b7c1badca76337e9ce
 RUSTUP_VERSION=1.29.3
 RUSTUP_SHA256=b1c8cb14e30889e7e2999e6b69e62d9e9b9ffc0f4df8180564d306d9680e6c55
-# Ubuntu 24.04's, at a version of our own choosing. Lavapipe's shaders need 12.2 or later.
-# Built into NODE_DEPS from this source (node_deps_build.sh reads both lines).
-GLSLANG_VERSION=14.0.0
-GLSLANG_SHA256=80bbb916a23e94ea9cbfb1acb5d1a44a7e0c9613bcf5b5947c03f2273bdc92b0
-
-# What apt installs, from NODE_DEPS only (node_deps_build.sh reads this list).
+# What apt installs, from the closure only (node_deps_resolve.sh reads this list).
 PACKAGES=(
   # the job's steps; sudo is for this script's as_runner
   sudo git curl ca-certificates python3 python3-venv
@@ -108,14 +101,14 @@ fetch() { # url sha256 file [second-url]; an empty url is skipped (the API gave 
   die "${1:-$4} does not match its sha256, from any address, in 3 rounds"
 }
 
-# apt from the archive, silent while it works and whole when it does not. Its last line alone ("E: Unable to correct problems, you have
+# apt from the closure, silent while it works and whole when it does not. Its last line alone ("E: Unable to correct problems, you have
 # held broken packages", runs 44137637832 and 44139666991) names no package and no version. On a failure: apt's whole answer, the
 # solver's own account of the same request, and for every package apt named the version installed on the node against the one the
-# archive holds; then what apt did on this node before this script, and apt's exit code, with its E: lines last.
+# closure holds; then what apt did on this node before this script, and apt's exit code, with its E: lines last.
 apt_install() {
   local log rc=0 names
   log="$(mktemp)"
-  apt-get install -y -q --no-install-recommends --allow-downgrades "$@" > "$log" 2>&1 || rc=$?
+  apt-get install -y -q --no-install-recommends "$@" > "$log" 2>&1 || rc=$?
   if [ "$rc" = 0 ]; then
     rm -f "$log"
     return 0
@@ -125,12 +118,10 @@ apt_install() {
     echo "node_bootstrap: apt-get install exited $rc; its whole answer:"
     cat "$log"
     echo "node_bootstrap: the solver on the same request (apt-get -s, Debug::pkgProblemResolver):"
-    apt-get install -s -q --no-install-recommends --allow-downgrades -o Debug::pkgProblemResolver=yes "$@" 2>&1 | tail -n 200
-    echo "node_bootstrap: the pins of glibc (${GLIBC_PREFS:-none}):"
-    cat "${GLIBC_PREFS:-/dev/null}" 2>&1
+    apt-get install -s -q --no-install-recommends -o Debug::pkgProblemResolver=yes "$@" 2>&1 | tail -n 200
     names="$( { grep -oE '^ +[a-z0-9][a-z0-9.+:-]* :' "$log" | sed -E 's/^ +//; s/ :$//'
                 grep -oE '(Pre-?Depends|Depends|Breaks|Conflicts): [a-z0-9][a-z0-9.+:-]*' "$log" | sed -E 's/^[^:]+: //'; } | sort -u | tr '\n' ' ')"
-    echo "node_bootstrap: the packages apt named, installed on the node (dpkg) and in the archive (apt-cache policy): ${names:-none}"
+    echo "node_bootstrap: the packages apt named, installed on the node (dpkg) and in the closure (apt-cache policy): ${names:-none}"
     if [ -n "$names" ]; then
       # shellcheck disable=SC2086 # one word per package
       dpkg-query -W -f='${binary:Package} ${Version} ${db:Status-Abbrev}\n' $names 2>&1
@@ -148,52 +139,23 @@ apt_install() {
   exit "$rc"
 }
 
-# glibc at the archive's version, and only glibc. It is the one family our packages ask for at the EXACT version of the image's
-# runtime: build-essential needs libc6-dev, which needs libc6 (= its own version), and Mozilla's wine needs libc6-i386, which needs
-# libc6 (= its own version). An image renewed by the provider can hold a newer libc6 than the archive (run 44157672212: libc6
-# 2.39-0ubuntu8.12 against the archive's 8.9), and apt does not go back to the archive's on its own. So every package of the archive
-# whose source is glibc is pinned to the archive's version, from the index apt reads (debs/Packages, epoch included), at 1001, and the
-# install may go down to it. libc-bin and locales of the image stay where they are: they ask libc6 for a range inside 2.39, not for a
-# version. Nothing else is pinned: the rest of the image stays the image's. Should another family conflict one day, the install fails
-# with apt's account above, and the answer is a fixed image, not a wider pin.
-GLIBC_PREFS=/etc/apt/preferences.d/80-node-deps-glibc
-glibc_pins() { # debs/Packages -> an apt preferences file on stdout
-  awk 'BEGIN { RS = ""; FS = "\n" }
-       { pkg = src = ver = ""
-         for (i = 1; i <= NF; i++) {
-           if ($i ~ /^Package: /) pkg = substr($i, 10)
-           else if ($i ~ /^Source: /) { src = substr($i, 9); sub(/ .*/, "", src) }
-           else if ($i ~ /^Version: /) ver = substr($i, 10)
-         }
-         if (src == "") src = pkg
-         if (src == "glibc" && pkg != "" && ver != "") printf "Package: %s\nPin: version %s\nPin-Priority: 1001\n\n", pkg, ver }' "$1"
-}
-
+# The closure latitude_node.py prepare sent: the .debs this node's own image needs for PACKAGES, resolved on the GitHub runner against this
+# node's dpkg database at its start (scripts/ci/node_deps_resolve.sh), with their index. Every exact-version edge (libpam-systemd on systemd,
+# python3.12-venv on python3.12, libc6-dev on libc6) is met by the versions of that same moment, so nothing is pinned and nothing goes down.
+# A fixed archive resolved as if nothing were installed failed on the provider's newer image, which held systemd 255.4-1ubuntu8.19 while
+# the archive's libpam-systemd asked for 8.18 exactly.
 DEPS=/opt/node-deps
-echo "== apt, from $NODE_DEPS"
+echo "== apt, from the closure resolved against this node's own image"
 # apt has no network timeout of its own (run 41248997155 waited 5h40 on a mirror).
 # A machine just installed may be running its own daily apt: wait for its lock.
 printf '%s\n' 'Acquire::http::Timeout "60";' 'Acquire::https::Timeout "60";' 'Acquire::Retries "5";' 'DPkg::Lock::Timeout "600";' \
   > /etc/apt/apt.conf.d/80-ci-network
-# The download needs curl and CA certificates, and a fresh node once had no
-# certificates: then, and only then, they come from the image's own sources first.
-# python3 reads GitHub's answer for the address of a file (asset_api_url).
-if ! command -v curl >/dev/null || ! command -v python3 >/dev/null || [ ! -s /etc/ssl/certs/ca-certificates.crt ]; then
-  apt-get update -qq -o APT::Update::Error-Mode=any
-  apt-get install -y -qq --no-install-recommends ca-certificates curl python3 >/dev/null
-fi
-NODE_DEPS_URL="${NODE_DEPS_URL:-$(asset_api_url oss-invisible/firefox_antidetect_patch "$NODE_DEPS" "$NODE_DEPS.tar")}"
-fetch "$NODE_DEPS_URL" "$NODE_DEPS_SHA256" /tmp/node-deps.tar "$NODE_DEPS_WEB_URL"
-rm -rf "$DEPS" && mkdir -p "$DEPS"
-tar -xf /tmp/node-deps.tar -C "$DEPS"
-rm -f /tmp/node-deps.tar
-# The archive's index and nothing else: no source on the network, so no mirror can be
-# down, slow or a day ahead. trusted=yes because the check is the sha256 above.
+[ -f "$DEPS/debs/Packages" ] || die "no closure of packages in $DEPS/debs: latitude_node.py prepare sends it before this script"
+# The closure's index and nothing else: no source on the network, so no mirror can be
+# down, slow or a day ahead. trusted=yes because the closure comes from this job's own resolver, over ssh.
 echo "deb [trusted=yes] file:$DEPS/debs ./" > /etc/apt/sources.list
 rm -f /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources
 apt-get update -qq -o APT::Update::Error-Mode=any
-glibc_pins "$DEPS/debs/Packages" > "$GLIBC_PREFS"
-[ -s "$GLIBC_PREFS" ] || die "the archive's index names no package of glibc: nothing to pin libc6-dev and libc6-i386 to"
 apt_install "${PACKAGES[@]}"
 
 echo "== the user"
@@ -222,8 +184,13 @@ if [ "$(as_runner rustup --version 2>/dev/null | awk 'NR==1{print $2}')" != "$RU
   rm -f /tmp/rustup-init
 fi
 
-echo "== glslang $GLSLANG_VERSION, in /usr/local/bin, built into $NODE_DEPS"
-cp -a "$DEPS/glslang-root/usr/local/." /usr/local/
+echo "== glslang $GLSLANG_VERSION, in /usr/local/bin"
+GLSLANG_URL="${GLSLANG_URL:-$(asset_api_url oss-invisible/firefox_antidetect_patch "$GLSLANG" "$GLSLANG.tar")}"
+fetch "$GLSLANG_URL" "$GLSLANG_SHA256" /tmp/glslang.tar "$GLSLANG_WEB_URL"
+rm -rf "$DEPS/glslang" && mkdir -p "$DEPS/glslang"
+tar -xf /tmp/glslang.tar -C "$DEPS/glslang"
+rm -f /tmp/glslang.tar
+cp -a "$DEPS/glslang/glslang-root/usr/local/." /usr/local/
 
 echo "== actions-runner $RUNNER_VERSION"
 R=/home/runner/actions-runner
@@ -280,4 +247,4 @@ for _ in $(seq 30); do
 done
 [ "$served" = "$host_key" ] || die "sshd does not serve the host key just made"
 echo "node_bootstrap: host key: $host_key"
-echo "node_bootstrap: ready (runner $RUNNER_VERSION, node $NODE_VERSION, rustup $RUSTUP_VERSION, glslang $GLSLANG_VERSION, apt $NODE_DEPS)"
+echo "node_bootstrap: ready (runner $RUNNER_VERSION, node $NODE_VERSION, rustup $RUSTUP_VERSION, glslang $GLSLANG_VERSION, apt from the closure)"

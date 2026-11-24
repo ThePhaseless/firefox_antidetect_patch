@@ -42,6 +42,17 @@ def load(name):
     return yaml.safe_load((WORKFLOWS / name).read_text(encoding="utf-8"))
 
 
+def pattern_downloads(doc):
+    """The `actions/download-artifact` steps of a workflow document whose `with:` has a `pattern:` together with `run-id:` or `github-token:`, as "job / step"."""
+    found = []
+    for job_name, job in (doc.get("jobs") or {}).items():
+        for step in job.get("steps") or []:
+            with_ = step.get("with") or {}
+            if "actions/download-artifact" in str(step.get("uses", "")) and "pattern" in with_ and ("run-id" in with_ or "github-token" in with_):
+                found.append("%s / %s" % (job_name, step.get("name", step.get("id", "?"))))
+    return found
+
+
 def group_of(doc, inputs, ref="refs/heads/main", run_id=7):
     """The concurrency group and cancel-in-progress GitHub gives a run, by the workflow's own expressions."""
     context = {"inputs": inputs, "github": {"ref": ref, "run_id": run_id}}
@@ -84,7 +95,7 @@ def _cases() -> list:
                 '[ "$CODE" = 1 ]' in run and run.rstrip().endswith("exit 0") and "set +e" in run))
     out.append(("node: still turned on only by the plan's attempt, and the permissions and steps the other tests hold it to are untouched",
                 node["if"].startswith("needs.plan.outputs.attempt == github.run_attempt") and node["permissions"] == {"actions": "read", "contents": "read"}
-                and not any("if" in s for s in node["steps"])))
+                and all(s["if"] == "steps.closure.outputs.cache-hit != 'true'" for s in node["steps"] if "if" in s)))
 
     # --- the concurrency --------------------------------------------------------------------------------------------------------------------------
     push = group_of(doc, {})
@@ -189,6 +200,23 @@ def _cases() -> list:
     legs_run = str(by_name[0].get("run", "")) if by_name else ""
     out.append(("publish: each archive is downloaded by its name, asset-<leg>, for every leg of the tree (scripts/ci matrix), and a missing one is red",
                 len(by_name) == 1 and "_src/scripts/ci matrix" in legs_run and "for leg in $LEGS" in legs_run and "exit 1" in legs_run))
+    # --- no workflow downloads a run's artifacts by a pattern across runs (run 45381665911: hook-tests-judge listed one page of 100 of 125+ artifacts, did not find
+    # gtest-reports-win-x86_64, and 189 hook tests went red though the win gtests had passed). With `run-id` or `github-token` the action lists the run's artifacts
+    # through the REST API, one page of 100: a name is the only form that finds its artifact.
+    import yaml
+
+    bad = {}
+    for path in sorted(WORKFLOWS.glob("*.yml")):
+        offenders = pattern_downloads(yaml.safe_load(path.read_text(encoding="utf-8")) or {})
+        if offenders:
+            bad[path.name] = offenders
+    old_judge = {"jobs": {"judge": {"steps": [{"name": "The gtest reports of both legs", "uses": "actions/download-artifact@v4",
+                                              "with": {"pattern": "gtest-reports-*", "path": "gtest-reports", "run-id": "1", "github-token": "t"}},
+                                             {"name": "The junit", "uses": "actions/download-artifact@v4", "with": {"pattern": "junit-*", "path": "junit"}},
+                                             {"name": "By name", "uses": "actions/download-artifact@v4", "with": {"name": "a", "run-id": "1", "github-token": "t"}}]}}}
+    out.append(("no workflow downloads by `pattern:` together with `run-id:` or `github-token:` (one page of 100 artifacts; run 45381665911 lost gtest-reports-win-x86_64)%s"
+                % ("" if not bad else ": " + "; ".join("%s: %s" % (f, ", ".join(o)) for f, o in bad.items())),
+                not bad and pattern_downloads(old_judge) == ["judge / The gtest reports of both legs"]))
     # --- the Linux legs of the gate and of its xpcshell read no mirror (republish 45297517213: `playwright install-deps firefox` at 102 kB/s, a green
     # leg cancelled at its 25 minutes). Their apt reads only the run's linux-deps repository (linux-deps.yml): its own sources list, sources folder and
     # lists folder, and installs the roots by name with --no-download (wrapper PR #584: .deb files installed against another image build wanted a fetch).
@@ -228,7 +256,7 @@ def _cases() -> list:
     out.append(("linux-deps.yml: a root may be a name a package of the repository provides, the entry is per release of the image (not per build), "
                 "the closure is downloaded 8 at a time and every package of it is checked",
                 "Provides: (.*, )?$e" in deps_run and 'RELEASE="${ImageVersion%%.*}"' in deps_run and "$ImageVersion-$SHA" not in deps_run
-                and "xargs -n 20 -P 8 apt-get download -qq -o Acquire::Retries=5" in deps_run and "of the closure was not downloaded" in deps_run and "MB in $((T1 - T0)) s" in deps_run
+                and "Reverse Provides:" in deps_run and "not by one package" in deps_run and "xargs -n 20 -P 8 apt-get download -qq -o Acquire::Retries=5" in deps_run and "of the closure was not downloaded" in deps_run and "MB in $((T1 - T0)) s" in deps_run
                 and load("linux-deps.yml")["jobs"]["debs"]["timeout-minutes"] == 20))
     out.append(("linux-deps.yml: the archive is read only when the entry of this image and list is missing",
                 all(st.get("if") == "steps.restore.outputs.cache-hit != 'true'" for st in deps_steps

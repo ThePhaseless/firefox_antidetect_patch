@@ -50,6 +50,8 @@ jobs:
   cargo-tests:
     name: cargo-tests-${{ matrix.leg }}
     runs-on: ${{ matrix.runner }}
+    # measured: max 12m22s over 24 runs (45025164169..45423466521), margin 21% (win-x86_64, the slower leg; the one cancel, 45423466521, had
+    # every step done at 14m53s: a compile at 6m03 against 2m33-3m56, on top of the tree's 6 minutes that build_stack's batching removes)
     timeout-minutes: 15
     strategy:
       fail-fast: false

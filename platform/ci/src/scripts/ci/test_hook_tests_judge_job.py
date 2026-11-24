@@ -71,9 +71,17 @@ def cases() -> list:
     add("hook-tests-judge: it binds (no continue-on-error, no `|| true`, no `if` on its steps)",
         "continue-on-error" not in str(job) and "|| true" not in run and not any("if" in s for s in job["steps"]))
     dl = [s["with"] for s in job["steps"] if str(s.get("uses", "")).startswith("actions/download-artifact")]
+    sys.path.insert(0, str(HERE))
+    import legs
+
+    reports = [w for w in dl if str(w.get("name", "")).startswith("gtest-reports-")]
     add("hook-tests-judge: it downloads the wrapper results, the gtest reports (of the run a reuse found, else this one) and the junit of the run",
-        [w["pattern"] for w in dl] == ["result-*", "gtest-reports-*", "junit-*"] and "inputs.reuse_run_id || github.run_id" in str(dl[1].get("run-id", ""))
-        and job.get("permissions", {}).get("actions") == "read")
+        [w.get("pattern") for w in dl if "pattern" in w] == ["result-*", "junit-*"] and len(dl) == 2 + len(reports)
+        and all("inputs.reuse_run_id || github.run_id" in str(w.get("run-id", "")) for w in reports) and job.get("permissions", {}).get("actions") == "read")
+    add("hook-tests-judge: each gtest report is downloaded by its artifact's name, gtest-reports-<leg> for every leg of the tree, into the folder the judge reads "
+        "(a pattern with a run-id saw one page of 100 artifacts: run 45381665911 lost the win report)",
+        sorted(w["name"] for w in reports) == sorted("gtest-reports-%s" % l.leg for l in legs.LEGS)
+        and all(w.get("path") == "gtest-reports/%s" % w["name"] and "pattern" not in w and w.get("github-token") for w in reports))
     add("hook-tests-judge: the judge is handed the plan's filter and gtests, and the table of platform-only suites of the candidate's gtest_run.py",
         steps["Every named test exists in this run and passed"]["env"] == {"GTESTS": "${{ inputs.gtests }}", "GTEST_FILTER_INPUT": "${{ inputs.gtest_filter }}"}
         and '--gtest-filter "$GTEST_FILTER_INPUT"' in run and '--gtests "$GTESTS"' in run
