@@ -256,8 +256,18 @@ def group_cache_sharing(doc, jobs, build, steps) -> list:
                 and 'key=lavapipe-${{ matrix.leg }}-' in steps.get("WebGPU's Vulkan driver (linux-x86_64) - its inputs", {}).get("run", "")))
     out.append(("cache: no build leg on GitHub's runners, so none reads an entry the node writes: no executable of the node's runs there",
                 not [l.leg for l in legs.LEGS if not l.node]))
-    all_files = "\n".join(p.read_text(encoding="utf-8") for p in WORKFLOWS.glob("*.yml") if p.name != "release.yml")
-    out.append(("cache: and no other workflow restores a cache at all", "actions/cache" not in all_files))
+    all_files = "\n".join(p.read_text(encoding="utf-8") for p in WORKFLOWS.glob("*.yml") if p.name not in ("release.yml", "linux-deps.yml"))
+    out.append(("cache: and no other workflow restores a cache at all, but linux-deps.yml", "actions/cache" not in all_files))
+    # linux-deps.yml keeps Ubuntu's .deb files of the Linux jobs (republish 45297517213: a mirror at 102 kB/s): written and read by its one job, on GitHub's
+    # ubuntu-24.04, under keys of its own (linux-deps-<image>-<list>), so nothing the node writes is read there and nothing it writes reaches the node.
+    deps_doc = load((WORKFLOWS / "linux-deps.yml").read_text(encoding="utf-8"))
+    deps_jobs = deps_doc["jobs"]
+    deps_caches = [st for j in deps_jobs.values() for st in j.get("steps", []) if str(st.get("uses", "")).startswith("actions/cache")]
+    deps_spec = " ".join(str(st.get("run", "")) for j in deps_jobs.values() for st in j.get("steps", []))
+    out.append(("cache: linux-deps.yml's entries are .deb files, on GitHub's ubuntu-24.04 only, under linux-deps-<ImageOS>-<ImageVersion>-<sha of the list>",
+                list(deps_jobs) == ["debs"] and deps_jobs["debs"]["runs-on"] == "ubuntu-24.04" and len(deps_caches) == 2
+                and all(st["with"]["key"] == "${{ steps.spec.outputs.key }}" and st["with"]["path"] == "/tmp/linux-deps" for st in deps_caches)
+                and 'echo "key=linux-deps-$ImageOS-$ImageVersion-$SHA"' in deps_spec))
     lavapipe = steps.get("WebGPU's Vulkan driver (linux-x86_64) - built before", {})
     tool = steps.get("Toolchains - restore", {})
     out.append(("cache: the executables' entries are the node legs' only", "matrix.leg == 'linux-x86_64'" in lavapipe.get("if", "") and tool.get("if") == "matrix.node"))

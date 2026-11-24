@@ -189,6 +189,32 @@ def _cases() -> list:
     legs_run = str(by_name[0].get("run", "")) if by_name else ""
     out.append(("publish: each archive is downloaded by its name, asset-<leg>, for every leg of the tree (scripts/ci matrix), and a missing one is red",
                 len(by_name) == 1 and "_src/scripts/ci matrix" in legs_run and "for leg in $LEGS" in legs_run and "exit 1" in legs_run))
+    # --- the Linux legs of the gate and of its xpcshell read no mirror (republish 45297517213: `playwright install-deps firefox` at 102 kB/s, a green
+    # leg cancelled at its 25 minutes): every package is a file of the run's linux-deps job (linux-deps.yml), installed with --no-download.
+    import re as _re
+    legs_of = {"gate.yml": ("gate", "wrapper-e2e"), "xpcshell.yml": ("xpcshell", "prefs")}
+    for wf_name, job_names in legs_of.items():
+        wf_jobs = load(wf_name)["jobs"]
+        for job_name in job_names:
+            job = wf_jobs.get(job_name) or {}
+            text = "\n".join(str(st.get("run", "")) for st in job.get("steps", []))
+            installs = _re.findall(r"apt-get\s+(?:-\S+\s+)*install\b[^\n]*", text)
+            mirror = [l for l in installs if "--no-download" not in l]
+            out.append(("%s %s: no `playwright install-deps`, no `apt-get update`, every `apt-get install` with --no-download (%s)" % (wf_name, job_name, "; ".join(mirror) or "none from the mirror"),
+                        bool(job) and "install-deps" not in text and "apt-get update" not in text and not mirror))
+            need = job.get("needs")
+            need = [need] if isinstance(need, str) else list(need or [])
+            deps_jobs = [n for n in need if str((wf_jobs.get(n) or {}).get("uses", "")) == "./.github/workflows/linux-deps.yml"]
+            fetched = [st for st in job.get("steps", []) if "download-artifact" in str(st.get("uses", ""))
+                       and str((st.get("with") or {}).get("name", "")) in ["${{ needs.%s.outputs.artifact }}" % n for n in deps_jobs]]
+            out.append(("%s %s: its packages are the files of a linux-deps.yml job it needs, downloaded before they are installed" % (wf_name, job_name),
+                        len(deps_jobs) == 1 and len(fetched) == 1 and installs != []
+                        and job["steps"].index(fetched[0]) < min(i for i, st in enumerate(job["steps"]) if "--no-download" in str(st.get("run", "")))))
+    deps_run = "\n".join(str(st.get("run", "")) for st in load("linux-deps.yml")["jobs"]["debs"]["steps"])
+    out.append(("linux-deps.yml: the archive is read only when the entry of this image and list is missing, and the list names Playwright's install-deps for Firefox",
+                "install-deps --dry-run firefox" in deps_run and "--download-only" in deps_run
+                and all(st.get("if") == "steps.restore.outputs.cache-hit != 'true'" for st in load("linux-deps.yml")["jobs"]["debs"]["steps"]
+                        if "apt-get" in str(st.get("run", "")) or str(st.get("uses", "")).startswith("actions/cache/save"))))
     return out
 
 

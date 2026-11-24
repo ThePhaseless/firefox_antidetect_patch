@@ -955,7 +955,7 @@ def cases() -> list:
         control_i = [i for i in idx("--control")]
         cand_i = [i for i in idx("--out prefs-out/candidate.json")]
         cmp_i = [i for i in idx("prefs-compare prefs-out/published-1.json prefs-out/candidate.json")]
-        pre = [st for st in ps if "download-artifact" in st.get("uses", "")]
+        pre = [st for st in ps if "download-artifact" in st.get("uses", "") and "linux-deps" not in str((st.get("with") or {}).get("name", ""))]
         add("xpcshell.yml prefs: a Linux leg and a Windows leg on their native runners, 15 minutes, the baseline is firefox-68",
             {(l["runner"], l["kind"]) for l in pj["strategy"]["matrix"]["include"]} == {("ubuntu-24.04", "linux"), ("windows-latest", "win")}
             and pj["timeout-minutes"] == 15 and pj["env"]["PREFS_BASE_TAG"] == "firefox-68")
@@ -976,7 +976,7 @@ def cases() -> list:
             and "--out prefs-out/diff.json" in runs_text[cmp_i[0]] and "--out prefs-out/control-diff.json" in runs_text[control_i[0]]
             and any(st.get("uses", "").startswith("actions/upload-artifact") and "always()" in st.get("if", "") and st["with"]["path"] == "prefs-out" for st in ps))
         add("xpcshell.yml prefs: the checkout reaches the dump script", any("/platform/ci/src/scripts/ci/prefs_dump.js" in str((st.get("with") or {}).get("sparse-checkout", "")) for st in ps))
-        add("xpcshell.yml prefs: the existing xpcshell job is still the one the cases above read (three jobs: the prefs job does not replace it, and the junit job only puts the legs' junit together)", set(doc["jobs"]) == {"xpcshell", "prefs", "junit"})
+        add("xpcshell.yml prefs: the existing xpcshell job is still the one the cases above read (three jobs: the prefs job does not replace it, and the junit job only puts the legs' junit together)", set(doc["jobs"]) == {"xpcshell", "prefs", "junit", "linux-deps"})
     except Exception as exc:  # noqa: BLE001
         add("xpcshell.yml reads as the cases above expect: %s" % exc, False)
     return out

@@ -61,8 +61,17 @@ on:
 permissions: { actions: read, contents: read }
 
 jobs:
+  # The Ubuntu packages of the Linux legs, from Ubuntu's archive once per runner image and list (linux-deps.yml), never by a leg.
+  linux-deps:
+    name: linux-deps-xpcshell
+    uses: ./.github/workflows/linux-deps.yml
+    with:
+      name: xpcshell
+      packages_no_recommends: xvfb libgtk-3-0t64 libdbus-glib-1-2 libxt6t64 libasound2t64 libx11-xcb1
+
   xpcshell:
     name: xpcshell-${{ matrix.leg }}
+    needs: linux-deps
     runs-on: ${{ matrix.runner }}
     # TEMP and TMP on D:\a\_temp (see gate.yml): every run makes a profile in TEMP and on C: they saturate the disk.
     env:
@@ -124,11 +133,21 @@ jobs:
           mkdir -p art
           gh release download "$PUBLISHED_TAG" -R "$GITHUB_REPOSITORY" --pattern seal.json --pattern "firefox-*-stealth-${{ matrix.leg }}.*" --dir art
           python engine-series/platform/ci/src/scripts/ci/xpcshell_run.py verify-asset --dir art --leg ${{ matrix.leg }}
+      - name: The Linux packages (the run's linux-deps job, no mirror)
+        if: matrix.kind == 'linux'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ${{ needs.linux-deps.outputs.artifact }}
+          path: /tmp/linux-deps
       - name: Linux libraries and a display for the shell
         if: matrix.kind == 'linux'
+        shell: bash
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends xvfb libgtk-3-0t64 libdbus-glib-1-2 libxt6t64 libasound2t64 libx11-xcb1
+          set -euo pipefail
+          read -r OS VER < /tmp/linux-deps/image.txt
+          [ "$OS $VER" = "$ImageOS $ImageVersion" ] || echo "::warning::the packages were resolved on $OS $VER, this runner is $ImageOS $ImageVersion: a package apt names as missing below is the difference of the two images"
+          set -- /tmp/linux-deps/*.deb
+          if [ -e "$1" ]; then sudo apt-get install -y -qq --no-download --no-install-recommends "$@"; fi
       - name: Extract + locate firefox binary
         shell: bash
         run: |
@@ -234,6 +253,7 @@ jobs:
   # ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
   prefs:
     name: prefs-${{ matrix.leg }}
+    needs: linux-deps
     runs-on: ${{ matrix.runner }}
     env:
       TEMP: ${{ startsWith(matrix.runner, 'windows') && 'D:\a\_temp' || '/tmp' }}
@@ -279,11 +299,21 @@ jobs:
           mkdir -p art-pub
           gh release download "$PREFS_BASE_TAG" -R "$GITHUB_REPOSITORY" --pattern seal.json --pattern "firefox-*-stealth-${{ matrix.leg }}.*" --dir art-pub
           python "$PREFS_PY" verify-asset --dir art-pub --leg ${{ matrix.leg }}
+      - name: The Linux packages (the run's linux-deps job, no mirror)
+        if: matrix.kind == 'linux'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ${{ needs.linux-deps.outputs.artifact }}
+          path: /tmp/linux-deps
       - name: Linux libraries and a display for the shell
         if: matrix.kind == 'linux'
+        shell: bash
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends xvfb libgtk-3-0t64 libdbus-glib-1-2 libxt6t64 libasound2t64 libx11-xcb1
+          set -euo pipefail
+          read -r OS VER < /tmp/linux-deps/image.txt
+          [ "$OS $VER" = "$ImageOS $ImageVersion" ] || echo "::warning::the packages were resolved on $OS $VER, this runner is $ImageOS $ImageVersion: a package apt names as missing below is the difference of the two images"
+          set -- /tmp/linux-deps/*.deb
+          if [ -e "$1" ]; then sudo apt-get install -y -qq --no-download --no-install-recommends "$@"; fi
       # The control: the published engine twice. Red here (exit 2, "BROKEN CONTROL") means the dump is not repeatable: the candidate is not read.
       - name: Control (A/A) - the published engine dumped twice must not differ
         shell: bash

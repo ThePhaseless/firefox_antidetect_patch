@@ -45,8 +45,27 @@ jobs:
   # Each leg runs on its NATIVE runner so we test the real artifact, not a cross
   # surrogate. Playwright is pinned to a version validated against this build's
   # juggler; bump it in lockstep when the juggler is re-synced from upstream.
+  # THE UBUNTU PACKAGES OF THE LINUX LEGS, from Ubuntu's archive once per runner image and list (linux-deps.yml), never by a leg: republish 45297517213 lost
+  # a green leg to its 25 minutes because a mirror served `playwright install-deps firefox` at 102 kB/s. The legs install the files with --no-download.
+  linux-deps-gate:
+    name: linux-deps-gate
+    uses: ./.github/workflows/linux-deps.yml
+    with:
+      name: gate
+      playwright_wrapper_ref: ${{ inputs.wrapper_ref }}
+  # The e2e legs: xvfb (with xauth, its recommend, for xvfb-run), strace (the fontconfig suite, the host oracle and its recorder), gdb and elfutils (the cores of
+  # a browser that did not end with 0), and what Playwright's install-deps names for Firefox.
+  linux-deps-e2e:
+    name: linux-deps-e2e
+    uses: ./.github/workflows/linux-deps.yml
+    with:
+      name: e2e
+      packages: xvfb strace gdb elfutils
+      playwright_wrapper_ref: ${{ inputs.wrapper_ref }}
+
   gate:
     name: gate-${{ matrix.leg }}
+    needs: linux-deps-gate
     runs-on: ${{ matrix.runner }}
     # TEMP and TMP on D:\a\_temp (the runner's temp folder): the Firefox profiles land in TEMP and on C: they saturate the disk (queue up to 144,
     # latencies up to 4 s, parent main thread still 40-60 s). On the job, not in a step: `runner.temp` is not readable in a job's `env`.
@@ -136,9 +155,21 @@ jobs:
         # Bump the pin file in lockstep when the juggler is re-synced from upstream.
         shell: bash
         run: python -m pip install --quiet "playwright==$(cat scripts/playwright_pin.txt)"
+      - name: The Linux packages (the run's linux-deps-gate job, no mirror)
+        if: matrix.kind == 'linux'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ${{ needs.linux-deps-gate.outputs.artifact }}
+          path: /tmp/linux-deps
       - name: Linux system deps for headless firefox
         if: matrix.kind == 'linux'
-        run: sudo "$(which python)" -m playwright install-deps firefox
+        shell: bash
+        run: |
+          set -euo pipefail
+          read -r OS VER < /tmp/linux-deps/image.txt
+          [ "$OS $VER" = "$ImageOS $ImageVersion" ] || echo "::warning::the packages were resolved on $OS $VER, this runner is $ImageOS $ImageVersion: a package apt names as missing below is the difference of the two images"
+          set -- /tmp/linux-deps/*.deb
+          if [ -e "$1" ]; then sudo apt-get install -y -qq --no-download --no-install-recommends "$@"; fi
       - name: Extract + locate firefox binary
         shell: bash
         run: |
@@ -386,6 +417,7 @@ jobs:
   # on an engine older than firefox-63) run here and are never skipped.
   wrapper-e2e:
     name: ${{ matrix.suite }}-${{ matrix.leg }}
+    needs: linux-deps-e2e
     runs-on: ${{ matrix.runner }}
     # TEMP and TMP on D:\a\_temp (the runner's temp folder): the Firefox profiles land in TEMP and on C: they saturate the disk (queue up to 144,
     # latencies up to 4 s, parent main thread still 40-60 s). On the job, not in a step: `runner.temp` is not readable in a job's `env`.
@@ -548,33 +580,37 @@ jobs:
       - name: The security state (set by the repository, same bytes every run)
         shell: bash
         run: python scripts/ci_lab_security_state.py set --pin ci/security-state.pin.json
+      - name: The Linux packages (the run's linux-deps-e2e job, no mirror)
+        if: matrix.kind == 'linux'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ${{ needs.linux-deps-e2e.outputs.artifact }}
+          path: /tmp/linux-deps
+      # Firefox's runtime libraries and a virtual display, strace (the fontconfig suite traces the opens of the browser; the parts of the whole e2e suite carry the
+      # fontconfig e2e files too; the host oracle and the test of its recorder trace the whole tree of the browser), gdb and elfutils: one list for every Linux leg.
       - name: Linux system deps (Firefox runtime libs, a virtual display)
         if: matrix.kind == 'linux'
+        shell: bash
         run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb
-          # the fontconfig suite traces the opens of the browser: strace is not in the runner image (setsid is, util-linux).
-          # The parts of the whole e2e suite carry the fontconfig e2e files too, and e2e.yml installs it for every Linux run.
-          # The host oracle traces the whole tree of the browser with strace, and so does the test of its recorder.
-          case "${{ matrix.suite }}" in wrapper.e2e.fontconfig|wrapper.e2e.suite.*|wrapper.e2e.ab_host|wrapper.e2e.ab_host_crash) sudo apt-get install -y strace;; esac
+          set -euo pipefail
+          read -r OS VER < /tmp/linux-deps/image.txt
+          [ "$OS $VER" = "$ImageOS $ImageVersion" ] || echo "::warning::the packages were resolved on $OS $VER, this runner is $ImageOS $ImageVersion: a package apt names as missing below is the difference of the two images"
+          set -- /tmp/linux-deps/*.deb
+          if [ -e "$1" ]; then sudo apt-get install -y -qq --no-download --no-install-recommends "$@"; fi
           # TEMPORARY: remove after the pm judged the trace of the -11 at exit.
           # tests/test_security_state_engine_e2e.py, on a crash of the engine in generate mode: a core file where kernel.core_pattern says, and gdb to read it (the test
           # deletes the core and saves stderr and the backtrace in $RUNNER_TEMP/invpw-evidence/security-state-generate/, which "Keep what the tests saved" uploads).
           case "${{ matrix.suite }}" in wrapper.e2e.securitystate)
-            sudo apt-get install -y gdb
             mkdir -p "$RUNNER_TEMP/invpw-cores"
             sudo sysctl -w kernel.core_pattern="$RUNNER_TEMP/invpw-cores/core.%e.%p"
             echo "INVPW_CORE_DIR=$RUNNER_TEMP/invpw-cores" >> "$GITHUB_ENV";;
           esac
-          python -m pip install --quiet "playwright==$(cat scripts/playwright_pin.txt)"
-          sudo "$(which python)" -m playwright install-deps firefox
       # What a browser that did not end with 0 leaves is read with gdb (every thread's backtrace, the libraries with their build ids from elfutils). The kernel writes the core
       # where its pattern says, so the pattern points at a folder of the job (INVPW_CORE_DIR). Nothing here reaches a launch that does not crash: no environment variable of the
       # browser, no pref. The recorder's own test (ab_host_crash) needs it as much as the oracles.
       - name: Cores of a browser that did not end with 0 (gdb, elfutils, where the kernel writes them)
         if: matrix.kind == 'linux' && (matrix.suite == 'wrapper.e2e.ab_oracle' || matrix.suite == 'wrapper.e2e.ab_network' || matrix.suite == 'wrapper.e2e.ab_host' || matrix.suite == 'wrapper.e2e.ab_host_crash')
         run: |
-          sudo apt-get install -y gdb elfutils
           mkdir -p "$RUNNER_TEMP/cores"
           chmod 1777 "$RUNNER_TEMP/cores"
           sudo sysctl -w kernel.core_pattern="$RUNNER_TEMP/cores/core.%e.%p.%t"

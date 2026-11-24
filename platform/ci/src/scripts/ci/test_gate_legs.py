@@ -156,14 +156,17 @@ def cases() -> list:
     # the Linux legs of the oracles and of the recorder: gdb, elfutils and the kernel's core pattern pointed at INVPW_CORE_DIR, before the suite; strace for the host ones
     cores = [s for s in steps if "$RUNNER_TEMP/cores" in str(s.get("run", ""))]
     cond = str(cores[0].get("if", "")) if len(cores) == 1 else ""
-    add("gate legs: the cores step of the oracles' legs installs gdb and elfutils, sets the pattern to $RUNNER_TEMP/cores, exports INVPW_CORE_DIR, on Linux, for the four suites, before the suite",
+    e2e_deps = ((gate["jobs"].get("linux-deps-e2e") or {}).get("with") or {})
+    e2e_list = str(e2e_deps.get("packages", "")).split()
+    add("gate legs: the cores step of the oracles' legs has gdb and elfutils (the linux-deps-e2e list), sets the pattern to $RUNNER_TEMP/cores, exports INVPW_CORE_DIR, on Linux, for the four suites, before the suite",
         len(cores) == 1 and "matrix.kind == 'linux'" in cond and all("matrix.suite == '%s'" % o in cond for o in ORACLES + (CRASH,))
-        and "apt-get install -y gdb elfutils" in cores[0]["run"] and 'mkdir -p "$RUNNER_TEMP/cores"' in cores[0]["run"] and 'chmod 1777 "$RUNNER_TEMP/cores"' in cores[0]["run"]
+        and {"gdb", "elfutils"} <= set(e2e_list) and "apt-get" not in cores[0]["run"]
+        and 'mkdir -p "$RUNNER_TEMP/cores"' in cores[0]["run"] and 'chmod 1777 "$RUNNER_TEMP/cores"' in cores[0]["run"]
         and 'kernel.core_pattern="$RUNNER_TEMP/cores/core.%e.%p.%t"' in cores[0]["run"]
         and 'echo "INVPW_CORE_DIR=$RUNNER_TEMP/cores" >> "$GITHUB_ENV"' in cores[0]["run"] and "matrix.os" not in cond and names.index(cores[0]["name"]) < suite)
     deps = " ".join(str(s.get("run", "")) for s in steps if s.get("name") == "Linux system deps (Firefox runtime libs, a virtual display)")
-    add("gate legs: the host oracle's leg and the recorder's leg install strace (in the system deps step, with the fontconfig ones)",
-        "wrapper.e2e.ab_host|wrapper.e2e.ab_host_crash)" in deps and "install -y strace" in deps and "wrapper.e2e.fontconfig|" in deps)
+    add("gate legs: the host oracle's leg and the recorder's leg have strace, as the fontconfig ones (the linux-deps-e2e list, installed by the system deps step of every Linux leg)",
+        "strace" in e2e_list and "apt-get install -y -qq --no-download --no-install-recommends" in deps and gate["jobs"]["wrapper-e2e"].get("needs") == "linux-deps-e2e")
 
     # a leg first, its row second: a suite the wrapper's list does not have yet is said, not failed, and nothing else is skipped
     listed = [i for i, s in enumerate(steps) if "LISTED=1" in str(s.get("run", ""))]
