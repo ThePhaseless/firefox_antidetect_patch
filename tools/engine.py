@@ -57,7 +57,7 @@ check    needs no Firefox: SERIES lists exactly the folders that exist, every fo
          rewritten more of its own lines than tools/removed-budget.json allows. Both
          budgets only go down (a hook budget goes above main's only with the row the branch adds to
          tools/hook-budget-raises.json, a register that only grows: from main's budget to the new one,
-         with its folder, reason, who decided, date and test): logic belongs in our own files, Mozilla's files get hooks,
+         with its folder, reason, who decided, date and test; the removed budget the same way, with `budget: "removed"`): logic belongs in our own files, Mozilla's files get hooks,
          and Mozilla's lines stay as Mozilla wrote them (a removed or rewritten line
          conflicts at a port like an added one, and a copy of it in a file of ours
          stops following Mozilla). A Mozilla file outside vendored code can be a backport (category
@@ -1209,6 +1209,7 @@ def realign_list_problems(rows: list, main_rows: list | None) -> list:
 
 
 RAISE_FIELDS = ("file", "from", "to", "folder", "reason", "decided_by", "date", "test")
+RAISE_BUDGETS = ("hook", "removed")              # what a row raises: our lines (the default) or the removed lines of Mozilla's
 RAISE_TEXT_FIELDS = ("reason", "decided_by")      # free text: may be reworded; every other field of a row is fixed
 
 
@@ -1234,9 +1235,12 @@ def raises_list_problems(rows: list, main_rows: list | None) -> list:
     found = []
     for r in rows:
         name = r.get("file") if isinstance(r, dict) else None
-        if not isinstance(r, dict) or set(r) != set(RAISE_FIELDS):
-            found.append("tools/hook-budget-raises.json: a row of %s does not have exactly the fields %s"
-                         % (name or "no file", ", ".join(RAISE_FIELDS)))
+        if not isinstance(r, dict) or set(r) not in (set(RAISE_FIELDS), set(RAISE_FIELDS) | {"budget"}):
+            found.append("tools/hook-budget-raises.json: a row of %s does not have exactly the fields %s (and, to raise "
+                         "the removed budget, `budget`)" % (name or "no file", ", ".join(RAISE_FIELDS)))
+            continue
+        if r.get("budget", "hook") not in RAISE_BUDGETS:
+            found.append("tools/hook-budget-raises.json: the row of %s has the budget %r: %s" % (name, r["budget"], " or ".join(RAISE_BUDGETS)))
             continue
         if not all(isinstance(r[k], str) and r[k].strip() for k in RAISE_FIELDS if k not in ("from", "to")):
             found.append("tools/hook-budget-raises.json: the row of %s has an empty field: file, folder, reason, "
@@ -1271,19 +1275,29 @@ def budget_raise_problems(hook: dict, removed: dict, main_hook: dict, main_remov
     main's own budget has reached that value the row has been consumed and main's value is the limit.
     raises are the rows the branch ADDS to tools/hook-budget-raises.json (new_raise_rows): a hook budget
     of a file main patches may go above main's only with one such row, `from` main's budget and `to` the
-    branch's; a row that raises nothing, or one of a file main does not patch, is a failure too."""
+    branch's; a row that raises nothing, or one of a file main does not patch, is a failure too. A row with
+    `budget: "removed"` does the same for the removed budget: `from` main's removed budget (0 when it has none),
+    `to` the branch's; one raise per file and budget."""
     limits = realign_limits(realign)
     found = []
     declared = {}
+    declared_removed = {}
     for r in raises or ():
         path = r.get("file")
-        if path in declared:
-            found.append("%s: two rows in tools/hook-budget-raises.json: one raise per file and branch" % path)
+        is_removed = r.get("budget", "hook") == "removed"
+        table = declared_removed if is_removed else declared
+        if path in table:
+            found.append("%s: two rows in tools/hook-budget-raises.json: one raise per file, budget and branch" % path)
             continue
-        declared[path] = r
+        table[path] = r
         if path not in main_hook:
             found.append("%s: a row in tools/hook-budget-raises.json for a file main does not patch: a new file "
                          "has its 5 lines, no raise" % path)
+        elif is_removed:
+            if r.get("from") != main_removed.get(path, 0) or r.get("to") != removed.get(path):
+                found.append("%s: tools/hook-budget-raises.json raises the removed budget from %r to %r, but main's is %d and "
+                             "the branch's %s: `from` is main's, `to` the new one" % (path, r.get("from"), r.get("to"),
+                                                                                    main_removed.get(path, 0), removed.get(path)))
         elif r.get("from") != main_hook[path] or r.get("to") != hook.get(path):
             found.append("%s: tools/hook-budget-raises.json raises from %r to %r, but main's budget is %d and the "
                          "branch's %s: `from` is main's, `to` the new one" % (path, r.get("from"), r.get("to"),
@@ -1311,6 +1325,8 @@ def budget_raise_problems(hook: dict, removed: dict, main_hook: dict, main_remov
             limit, what = 5, "5"
         if (path, "removed") in limits and limits[(path, "removed")] > limit:
             limit, what = limits[(path, "removed")], "the realigned %d" % limits[(path, "removed")]
+        if n > limit and path in declared_removed:
+            continue          # declared: its row is judged above
         if n > limit:
             if path in main_hook or what != "5":
                 found.append("%s: removed budget %d is above %s: budgets only go down, leave "
