@@ -4,7 +4,7 @@ For whoever does the next move, an engineer or an LLM agent. No script does it: 
 
 `OLD` is `mozilla_tag` in `UPSTREAM.json`, `NEW` the target tag (the commands below read them as shell variables, `OLD=FIREFOX_...`). `<source>` is the source repository (`--source`, or the environment variable `FIREFOX_SOURCE`). Commands run in the root of this repository. `<R>` is the number of the engine release: the last published `firefox-<R-1>` plus one. It counts our releases, not Firefox versions.
 
-Rules behind it: [port-01](decisions/port-01-one-run.md), [port-02](decisions/port-02-stable-retail-of-the-target.md), [port-03](decisions/port-03-births-ledger.md), [hook-02](decisions/hook-02-shape-and-contract.md), [backport-01](decisions/backport-01-upstream-code-as-is.md), [ci-01](decisions/ci-01-builds-from-main-or-latitude-branches.md). The hook forms are in [STRUCTURE.md](STRUCTURE.md).
+Rules behind it: [port-01](decisions/port-01-one-run.md), [port-02](decisions/port-02-stable-retail-of-the-target.md), [port-03](decisions/port-03-births-ledger.md), [hook-02](decisions/hook-02-shape-and-contract.md), [backport-01](decisions/backport-01-upstream-code-as-is.md), [port-04](decisions/port-04-backport-as-commits.md), [ci-01](decisions/ci-01-builds-from-main-or-latitude-branches.md). The hook forms are in [STRUCTURE.md](STRUCTURE.md).
 
 ## What can break, and what tells you
 
@@ -13,7 +13,7 @@ Rules behind it: [port-01](decisions/port-01-one-run.md), [port-02](decisions/po
 | Hooks (`hooks.patch`) | Mozilla changed the lines next to ours, or removed the code | `port`: the list of conflicts |
 | Function wraps and our own code that calls Mozilla APIs | A renamed body (`<Name>_Mozilla`) or a Mozilla function we call changed its signature | `prebuild` (seconds), then the compile-only candidate |
 | Backports of a Mozilla commit | The tag already contains the commit | `port`, and `check --against <NEW>` |
-| Vendored backports (`third_party/rust/`) | Mozilla vendors another revision, or regenerated a checksum | `check` (the vendored revision is no longer in the patch), then `port` |
+| Vendored backports (`third_party/rust/`) | Mozilla vendors another revision, or regenerated a checksum | `check` (the vendored revision is no longer in the patch), then `port`, which replays the commits |
 | Behaviour | A hook applies and compiles, but the value is now born somewhere else | The hook's own test, which has a negative control (`HOOKS.json`, rule [hook-04](decisions/hook-04-one-test-per-hook.md)) |
 | Network births | Mozilla added a place that creates a request, or changed the context handling around one | `births.py`: NEW, CHANGED, MOVED, GONE |
 | Values pinned to the old retail | The retail of the new version gives another value | The re-measure of step 10, and the retail parity checks of the build |
@@ -70,8 +70,8 @@ Resolve each file listed as a conflict, `git add`, commit on the branch. A folde
 | Changed the line that gives a default (`declared-value`) | Take Mozilla's line; put our value back on it only if that line still gives the default. A pref is declared once |
 | Changed the statement an `anchor` hook follows | Read the statement named in `anchor` in `HOOKS.json`; put the hook right after it, or after what replaced it. If a guard or a wrap now says the same, use that form |
 | Removed or moved the code the hook sits in | Find where the value is born now and hook there; the folder's `FEATURE.md` says why the value mattered. If nothing decides it any more, the hook goes and its test tells whether the feature still holds. A folder that owns nothing is removed by `export` |
-| A vendored backport (`third_party/rust/`) | Take Mozilla's file. Keep only what upstream still lacks, as upstream code. Set `vendored` in `BACKPORT.json` to the revision Mozilla vendors now ([backport-01](decisions/backport-01-upstream-code-as-is.md)) |
-| A `.cargo-checksum.json` | Regenerate, never merge: take Mozilla's file and replace, in its `files` map, the sha256 of each file of the crate we changed; leave `package` as Mozilla has it |
+| A vendored backport (`third_party/rust/`) | Nothing is merged: `port` replays the commits of its `BACKPORT.json` on the revision the new tag vendors and puts the result on the branch, in a commit of its own, over what the merge made of those paths. It prints the commits the revision already has and the commits that do not apply. Run `python tools/backport_replay.py record --source <source> --tag <NEW> --folder <folder>`: it sets `vendored` and, on each commit the revision has, `contained_in`. A commit that does not apply is rebased in a clone of the upstream repository onto the revision (`git rebase`, then `git format-patch`), its patch file replaced in `commits/` and its `sha256` updated; then run `python tools/backport_replay.py report` until it has no conflict ([port-04](decisions/port-04-backport-as-commits.md)) |
+| A `.cargo-checksum.json` | Regenerate, never merge: the replay writes it with `tools/regen_checksums.py` (the sha256 of each file of the crate the commits changed; `package` stays as Mozilla has it) |
 | A backport of a Mozilla commit the tag already has | Restore its files to the tag's (`git checkout <NEW> -- <file>`) so the branch no longer changes them, and delete its record from `tools/inventory.json`. `export` removes the folder |
 | A numbered space (flag bits, enums, IDL constants) now uses a value of ours | Move our constant in our own file to a value Mozilla leaves free, and keep its test ([hook-05](decisions/hook-05-no-values-in-mozilla-numbered-spaces.md)) |
 
@@ -95,7 +95,7 @@ python -m pytest -q tools/tests
 - A hook whose text changed lost its hand fields. `check` asks for them: fill `test` (and `anchor` and `why` for an anchor) in the `HOOKS.json` of the folder, and the `Test:` line of its `FEATURE.md`. `python tools/engine.py hooks-list` rewrites every `HOOKS.json` from the `hooks.patch` files alone.
 - `tools/inventory.json` records, for each Mozilla file, how many lines of ours it has, how many of Mozilla's it removes and how many hunks. `check` names each record that differs from the new `hooks.patch`: rewrite the numbers by hand.
 - `hook-debt` drops the entries that are resolved and never adds one; a violation that is not in `tools/hook-debt.json` is a failure. `shrink-budget` lowers the budgets to what the patches carry. A budget above `origin/main`'s needs a row in `tools/hook-budget-raises.json`: you do not raise one in a move.
-- `check --against <NEW>` also tries each backport of a Mozilla commit against the tag and fails if the tag has it. `check` reads `origin/main` for the budgets and fetches it once if it is missing.
+- `check --against <NEW>` also tries each backport of a Mozilla commit against the tag and fails if the tag has it, and replays the commits of each vendored backport on the revision the tag vendors and fails if the folder's vendored part (`hooks.patch`, checksum lines, new files in `src/`) is not that replay. `check` reads `origin/main` for the budgets and fetches it once if it is missing.
 
 ## 6. Before any build: `prebuild`
 

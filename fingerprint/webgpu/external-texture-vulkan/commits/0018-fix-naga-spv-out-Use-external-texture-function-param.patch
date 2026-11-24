@@ -1,0 +1,129 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: feder-cr <85809106+feder-cr@users.noreply.github.com>
+Date: Sun, 1 Nov 2026 09:21:03 +0700
+Subject: [PATCH] fix(naga spv-out): Use external texture function parameters
+ correctly
+
+Sampling, loading or querying a `texture_external` function parameter
+panicked: the parameters buffer parameter was recorded with a zero
+`handle_id`, which `get_external_texture_params_id` then rejected. Use the
+`OpFunctionParameter` id instead; the parameters are passed by value.
+
+The planes had the same problem in the other direction: for parameters,
+`get_external_texture_plane_id` returned the image loaded in the prelude,
+but the helper functions take plane pointers (and load them themselves),
+as is done for globals. Pass the plane parameters themselves.
+
+`Function::parameter_id` now asserts that the argument maps to a single
+SPIR-V parameter, and an external texture argument is no longer cached
+through it.
+---
+ naga/src/back/spv/block.rs                | 11 +++++++++++
+ naga/src/back/spv/image.rs                | 13 +++++++++++--
+ naga/src/back/spv/mod.rs                  | 10 +++++++++-
+ naga/tests/naga/spirv_external_texture.rs | 15 +++++++++++++++
+ 4 files changed, 46 insertions(+), 3 deletions(-)
+
+diff --git a/naga/src/back/spv/block.rs b/naga/src/back/spv/block.rs
+index e64b8c305..5223555a4 100644
+--- a/naga/src/back/spv/block.rs
++++ b/naga/src/back/spv/block.rs
+@@ -2047,6 +2047,17 @@ impl BlockContext<'_> {
+             crate::Expression::Load { pointer } => {
+                 self.write_checked_load(pointer, block, AccessTypeAdjustment::None, result_type_id)?
+             }
++            // External textures are expanded into several parameters, which
++            // are accessed through `get_external_texture_plane_id` and
++            // `get_external_texture_params_id`, like external texture globals.
++            crate::Expression::FunctionArgument(_)
++                if self.fun_info[expr_handle]
++                    .ty
++                    .inner_with(&self.ir_module.types)
++                    .is_external_image() =>
++            {
++                0
++            }
+             crate::Expression::FunctionArgument(index) => self.function.parameter_id(index),
+             crate::Expression::CallResult(_)
+             | crate::Expression::AtomicResult { .. }
+diff --git a/naga/src/back/spv/image.rs b/naga/src/back/spv/image.rs
+index 1b489d6c3..88dd9dcc1 100644
+--- a/naga/src/back/spv/image.rs
++++ b/naga/src/back/spv/image.rs
+@@ -406,8 +406,13 @@ impl BlockContext<'_> {
+                 self.writer.external_textures[&handle].planes[plane].var_id
+             }
+             crate::Expression::FunctionArgument(i) => {
++                // The helper functions take the planes as pointers, like the
++                // plane globals' `var_id`s, so pass the parameters themselves.
+                 let offset = self.function.parameter_offsets[i as usize] as usize;
+-                self.function.parameters[offset + plane].handle_id
++                self.function.parameters[offset + plane]
++                    .instruction
++                    .result_id
++                    .unwrap()
+             }
+             crate::Expression::Access { .. } | crate::Expression::AccessIndex { .. } => {
+                 // https://github.com/gfx-rs/wgpu/issues/8027
+@@ -432,8 +437,12 @@ impl BlockContext<'_> {
+                 self.writer.external_textures[&handle].params.handle_id
+             }
+             crate::Expression::FunctionArgument(i) => {
++                // The parameters buffer is passed by value.
+                 let offset = self.function.parameter_offsets[i as usize] as usize;
+-                self.function.parameters[offset + 3].handle_id
++                self.function.parameters[offset + 3]
++                    .instruction
++                    .result_id
++                    .unwrap()
+             }
+             crate::Expression::Access { .. } | crate::Expression::AccessIndex { .. } => {
+                 // https://github.com/gfx-rs/wgpu/issues/8027
+diff --git a/naga/src/back/spv/mod.rs b/naga/src/back/spv/mod.rs
+index 934a03ef7..e063d84ca 100644
+--- a/naga/src/back/spv/mod.rs
++++ b/naga/src/back/spv/mod.rs
+@@ -328,8 +328,16 @@ impl Function {
+             Some(ref context) => context.argument_ids[index as usize],
+             None => {
+                 let offset = self.parameter_offsets[index as usize] as usize;
++                let end = self
++                    .parameter_offsets
++                    .get(index as usize + 1)
++                    .map_or(self.parameters.len(), |&end| end as usize);
++                assert_eq!(
++                    end - offset,
++                    1,
++                    "argument {index} is an external texture, which has no single parameter id"
++                );
+                 self.parameters[offset].instruction.result_id.unwrap()
+-                // TODO: assert not external texture
+             }
+         }
+     }
+diff --git a/naga/tests/naga/spirv_external_texture.rs b/naga/tests/naga/spirv_external_texture.rs
+index ac40510d3..a4c1c30eb 100644
+--- a/naga/tests/naga/spirv_external_texture.rs
++++ b/naga/tests/naga/spirv_external_texture.rs
+@@ -289,6 +289,21 @@ impl Spv {
+     }
+ }
+ 
++/// `textureSampleBaseClampToEdge`, `textureLoad` and `textureDimensions` on a
++/// `texture_external` function parameter, and forwarding the parameter.
++#[test]
++fn external_texture_parameter() {
++    let spv = compile(TEXTURE_EXTERNAL_ARGUMENT);
++    spv.assert_well_typed();
++}
++
++/// Passing a `texture_external` global to a function.
++#[test]
++fn external_texture_global_argument() {
++    let spv = compile(TEXTURE_EXTERNAL);
++    spv.assert_well_typed();
++}
++
+ /// A `texture_external` global that is only ever forwarded, never sampled.
+ #[test]
+ fn external_texture_forward_only() {

@@ -1,0 +1,120 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Andy Leiserson <aleiserson@mozilla.com>
+Date: Wed, 22 Jul 2026 11:14:52 -0700
+Subject: [PATCH] refactor(types): Move ExternalTextureTransferFunction to
+ naga-types
+
+(cherry picked from commit 66e992c3a130a7fb0ea24897eaa312892ffbf9a5)
+---
+ Cargo.lock                                 |  1 +
+ naga-types/Cargo.toml                      |  1 +
+ naga-types/src/lib.rs                      | 26 +++++++++++++++++++++
+ wgpu-types/src/texture/external_texture.rs | 27 ++--------------------
+ 4 files changed, 30 insertions(+), 25 deletions(-)
+
+diff --git a/Cargo.lock b/Cargo.lock
+index e1410ca20..b653e7b72 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -2437,6 +2437,7 @@ name = "naga-types"
+ version = "30.0.0"
+ dependencies = [
+  "arbitrary",
++ "bytemuck",
+  "hashbrown 0.17.1",
+  "indexmap",
+  "rustc-hash 1.1.0",
+diff --git a/naga-types/Cargo.toml b/naga-types/Cargo.toml
+index 0c2ff890f..a1242d1b7 100644
+--- a/naga-types/Cargo.toml
++++ b/naga-types/Cargo.toml
+@@ -22,6 +22,7 @@ std = []
+ 
+ [dependencies]
+ arbitrary = { workspace = true, features = ["derive"], optional = true }
++bytemuck = { workspace = true, features = ["derive"] }
+ hashbrown.workspace = true
+ indexmap.workspace = true
+ rustc-hash.workspace = true
+diff --git a/naga-types/src/lib.rs b/naga-types/src/lib.rs
+index 72b58a4c2..1bb2a9ecc 100644
+--- a/naga-types/src/lib.rs
++++ b/naga-types/src/lib.rs
+@@ -199,6 +199,32 @@ pub struct TaskDispatchLimits {
+     pub max_mesh_workgroups_total: u32,
+ }
+ 
++/// Parameters describing a gamma encoding transfer function in the form
++/// tf = { k * linear                   | linear < b
++///      { a * pow(linear, 1/g) - (a-1) | linear >= b
++#[repr(C)]
++#[derive(Clone, Copy, Debug, PartialEq, bytemuck::Zeroable, bytemuck::Pod)]
++#[cfg_attr(feature = "serialize", derive(serde::Serialize))]
++#[cfg_attr(feature = "deserialize", derive(serde::Deserialize))]
++#[allow(missing_docs)]
++pub struct ExternalTextureTransferFunction {
++    pub a: f32,
++    pub b: f32,
++    pub g: f32,
++    pub k: f32,
++}
++
++impl Default for ExternalTextureTransferFunction {
++    fn default() -> Self {
++        Self {
++            a: 1.0,
++            b: 1.0,
++            g: 1.0,
++            k: 1.0,
++        }
++    }
++}
++
+ /// Corresponds to [WebGPU `GPUVertexFormat`](
+ /// https://gpuweb.github.io/gpuweb/#enumdef-gpuvertexformat).
+ #[repr(u32)]
+diff --git a/wgpu-types/src/texture/external_texture.rs b/wgpu-types/src/texture/external_texture.rs
+index 5d729b604..8f403e024 100644
+--- a/wgpu-types/src/texture/external_texture.rs
++++ b/wgpu-types/src/texture/external_texture.rs
+@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
+ #[cfg(doc)]
+ use crate::TextureFormat;
+ 
++pub use nt::ExternalTextureTransferFunction;
++
+ /// Format of an `ExternalTexture`. This indicates the number of underlying
+ /// planes used by the `ExternalTexture` as well as each plane's format.
+ #[repr(C)]
+@@ -19,31 +21,6 @@ pub enum ExternalTextureFormat {
+     Yu12,
+ }
+ 
+-/// Parameters describing a gamma encoding transfer function in the form
+-/// tf = { k * linear                   | linear < b
+-///      { a * pow(linear, 1/g) - (a-1) | linear >= b
+-#[repr(C)]
+-#[derive(Clone, Copy, Debug, PartialEq, bytemuck::Zeroable, bytemuck::Pod)]
+-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+-#[allow(missing_docs)]
+-pub struct ExternalTextureTransferFunction {
+-    pub a: f32,
+-    pub b: f32,
+-    pub g: f32,
+-    pub k: f32,
+-}
+-
+-impl Default for ExternalTextureTransferFunction {
+-    fn default() -> Self {
+-        Self {
+-            a: 1.0,
+-            b: 1.0,
+-            g: 1.0,
+-            k: 1.0,
+-        }
+-    }
+-}
+-
+ /// Describes an [`ExternalTexture`](../wgpu/struct.ExternalTexture.html).
+ ///
+ /// Note that [`width`] and [`height`] are the values that should be returned by

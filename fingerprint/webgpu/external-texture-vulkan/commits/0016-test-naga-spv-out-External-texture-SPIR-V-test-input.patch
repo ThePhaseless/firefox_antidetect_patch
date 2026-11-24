@@ -1,0 +1,145 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: feder-cr <85809106+feder-cr@users.noreply.github.com>
+Date: Sun, 1 Nov 2026 09:16:29 +0700
+Subject: [PATCH] test(naga spv-out): External texture SPIR-V test inputs
+
+Rename the forward-only texture-external-argument test to
+texture-external-forward-only, add a texture-external-argument test that
+samples, loads and queries a texture_external parameter and forwards it,
+and add the SPIR-V target to texture-external. Mark the external texture
+bindings in the SPIR-V binding maps as external_texture.
+---
+ .../in/wgsl/texture-external-argument.toml    |  6 +++-
+ .../in/wgsl/texture-external-argument.wgsl    | 29 +++++++++++++++----
+ .../wgsl/texture-external-forward-only.toml   | 11 +++++++
+ .../wgsl/texture-external-forward-only.wgsl   | 15 ++++++++++
+ naga/tests/in/wgsl/texture-external.toml      | 15 +++++++++-
+ 5 files changed, 69 insertions(+), 7 deletions(-)
+ create mode 100644 naga/tests/in/wgsl/texture-external-forward-only.toml
+ create mode 100644 naga/tests/in/wgsl/texture-external-forward-only.wgsl
+
+diff --git a/naga/tests/in/wgsl/texture-external-argument.toml b/naga/tests/in/wgsl/texture-external-argument.toml
+index fa2bf9c4a..8ac816390 100644
+--- a/naga/tests/in/wgsl/texture-external-argument.toml
++++ b/naga/tests/in/wgsl/texture-external-argument.toml
+@@ -5,5 +5,9 @@ targets = "SPIRV"
+ version = [1, 1]
+ 
+ [[spv.binding_map]]
+-bind_target = { descriptor_set = 0, binding = 0, binding_array_size = 4 }
++bind_target = { descriptor_set = 0, binding = 0, external_texture = true }
+ resource_binding = { group = 0, binding = 0 }
++
++[[spv.binding_map]]
++bind_target = { descriptor_set = 0, binding = 4 }
++resource_binding = { group = 0, binding = 1 }
+diff --git a/naga/tests/in/wgsl/texture-external-argument.wgsl b/naga/tests/in/wgsl/texture-external-argument.wgsl
+index 26760f6a2..c49fc25ec 100644
+--- a/naga/tests/in/wgsl/texture-external-argument.wgsl
++++ b/naga/tests/in/wgsl/texture-external-argument.wgsl
+@@ -1,15 +1,34 @@
+ @group(0) @binding(0)
+ var tex: texture_external;
++@group(0) @binding(1)
++var samp: sampler;
+ 
+-fn inner(t: texture_external) -> u32 {
++// Takes an external texture but never uses it.
++fn ignore(t: texture_external) -> u32 {
+   return 0u;
+ }
+ 
+-fn outer(t: texture_external) -> u32 {
+-  return inner(t);
++// Samples, loads and queries an external texture parameter.
++fn use_param(t: texture_external, s: sampler) -> vec4<f32> {
++  let a = textureSampleBaseClampToEdge(t, s, vec2(0.5f));
++  let b = textureLoad(t, vec2(1i));
++  let c = textureLoad(t, vec2(1u));
++  let d = textureDimensions(t);
++  return a + b + c + vec2f(d).xyxy;
++}
++
++// Only forwards its external texture parameter.
++fn forward(t: texture_external) -> vec4<f32> {
++  _ = ignore(t);
++  return use_param(t, samp);
++}
++
++@fragment
++fn fragment_main() -> @location(0) vec4<f32> {
++  return forward(tex) + use_param(tex, samp);
+ }
+ 
+ @compute @workgroup_size(1)
+-fn main() {
+-  _ = outer(tex);
++fn compute_main() {
++  _ = forward(tex);
+ }
+diff --git a/naga/tests/in/wgsl/texture-external-forward-only.toml b/naga/tests/in/wgsl/texture-external-forward-only.toml
+new file mode 100644
+index 000000000..7f5c59ee0
+--- /dev/null
++++ b/naga/tests/in/wgsl/texture-external-forward-only.toml
+@@ -0,0 +1,11 @@
++# A `texture_external` global that is only ever forwarded to functions, never
++# sampled, loaded or queried.
++capabilities = "TEXTURE_EXTERNAL"
++targets = "SPIRV"
++
++[spv]
++version = [1, 1]
++
++[[spv.binding_map]]
++bind_target = { descriptor_set = 0, binding = 0, external_texture = true }
++resource_binding = { group = 0, binding = 0 }
+diff --git a/naga/tests/in/wgsl/texture-external-forward-only.wgsl b/naga/tests/in/wgsl/texture-external-forward-only.wgsl
+new file mode 100644
+index 000000000..26760f6a2
+--- /dev/null
++++ b/naga/tests/in/wgsl/texture-external-forward-only.wgsl
+@@ -0,0 +1,15 @@
++@group(0) @binding(0)
++var tex: texture_external;
++
++fn inner(t: texture_external) -> u32 {
++  return 0u;
++}
++
++fn outer(t: texture_external) -> u32 {
++  return inner(t);
++}
++
++@compute @workgroup_size(1)
++fn main() {
++  _ = outer(tex);
++}
+diff --git a/naga/tests/in/wgsl/texture-external.toml b/naga/tests/in/wgsl/texture-external.toml
+index 6e12c515e..07973e1fb 100644
+--- a/naga/tests/in/wgsl/texture-external.toml
++++ b/naga/tests/in/wgsl/texture-external.toml
+@@ -1,5 +1,5 @@
+ capabilities = "TEXTURE_EXTERNAL"
+-targets = "HLSL | IR | METAL | WGSL"
++targets = "HLSL | IR | METAL | SPIRV | WGSL"
+ 
+ [msl.per_entry_point_map.compute_main]
+ resources = [
+@@ -43,3 +43,16 @@ bind_target.planes = [
+     { space = 0, register = 2 },
+ ]
+ bind_target.params = { space = 0, register = 3 }
++
++[spv]
++version = [1, 1]
++
++# The external texture occupies four consecutive bindings: three planes
++# (0, 1, 2) and the parameters buffer (3).
++[[spv.binding_map]]
++resource_binding = { group = 0, binding = 0 }
++bind_target = { descriptor_set = 0, binding = 0, external_texture = true }
++
++[[spv.binding_map]]
++resource_binding = { group = 0, binding = 1 }
++bind_target = { descriptor_set = 0, binding = 4 }

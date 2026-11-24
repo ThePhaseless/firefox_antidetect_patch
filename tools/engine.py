@@ -64,7 +64,12 @@ check    needs no Firefox: SERIES lists exactly the folders that exist, every fo
          backport, no budget) only as the diff of one commit of Mozilla's own repository, in a folder of
          platform/backports/ of its own: its BACKPORT.json names the commit and the sha256 of the diff, the diff is in the folder, and
          hooks.patch carries it byte for byte; with --against <tag> (and in a port) a tag that
-         already holds the change fails. Every STEALTH-HOOK(<folder>) tag, in a hooks.patch and in the
+         already holds the change fails. Vendored code (third_party/rust, Cargo.lock) is carried as the ordered
+         list of upstream and our commits stored in the folder (BACKPORT.json, commits/*.patch, port-04): the
+         record, the sha256 of every commit file and the absence of any path outside the series are checked
+         offline; with --against <tag> the vendored part of hooks.patch, its checksum lines and the new files
+         must equal the replay of the commits on the revision the tag vendors (tools/backport_replay.py).
+         Every STEALTH-HOOK(<folder>) tag, in a hooks.patch and in the
          evidence of an inventory record, names a folder of SERIES, and the added, removed and hunk
          counts of each inventory record are those of its file in the hooks.patch. A C++ file of ours has no control character (a carriage return inside a
          string literal ended the literal and broke the build of a test) and no byte outside ASCII inside a
@@ -88,6 +93,7 @@ from collections import defaultdict
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import backport_replay  # noqa: E402
 import births  # noqa: E402
 import hook_contract  # noqa: E402
 import hooks_list  # noqa: E402
@@ -359,9 +365,23 @@ def port(source: Path, old: str, new: str, branch: str, force: bool, check_birth
         title = folder if not conflicts else "%s (CONFLICT: %s)" % (folder, ", ".join(conflicts))
         current = git(source, "commit-tree", tree, "-p", current, "-m", title, env=env).decode().strip()
         report.append((folder, conflicts))
+    # The vendored code of a backport is not merged: its commits are replayed on the revision the new tag vendors, and
+    # the result replaces what the merge made of those paths (port-04). A conflict is a commit to rebase onto that revision.
+    replay_bad = []
+    for backport in backport_replay.backport_folders(ROOT):
+        name = backport_replay.label(backport, ROOT)
+        try:
+            current, replayed = backport_replay.apply_to_commit(source, new, backport, current, when=when)
+        except backport_replay.Stop as stop:
+            replay_bad.append((name + " (replay of its commits)", [str(stop)]))
+            continue
+        # what the merge left in conflict among the vendored paths the replay has just written is resolved
+        report = [(f, [c for c in cs if not backport_replay.in_scope(c)] if f == name else cs) for f, cs in report]
+        print("REPLAY %s: wgpu %s, %d commits already in the revision (python tools/backport_replay.py record writes "
+              "them to BACKPORT.json)" % (name, replayed.revision[:10], len(replayed.dropped)))
     git(source, "update-ref", ref, current)
     bad = [(f, c) for f, c in report if c]
-    for folder, conflicts in bad:
+    for folder, conflicts in bad + replay_bad:
         print("CONFLICT %s: %s" % (folder, ", ".join(conflicts)))
     already = backport_in_tag_problems(source, new)
     for problem in already:
@@ -378,7 +398,7 @@ def port(source: Path, old: str, new: str, branch: str, force: bool, check_birth
                                 tsv=Path(tempfile.gettempdir()) / ("births-port-%s.tsv" % new))
         else:
             print("birth points not scanned: %s is not a Firefox tree" % branch)
-    return 1 if bad or already or status == 1 else 0
+    return 1 if bad or replay_bad or already or status == 1 else 0
 
 
 def drift(source: Path, old: str, new: str) -> int:
@@ -845,6 +865,42 @@ def backport_in_tag_problems(source: Path, tag: str) -> list:
     return found
 
 
+def vendored_backports() -> list:
+    """[(folder, record)] of the folders whose BACKPORT.json is vendored code from an upstream that is not Mozilla's repository."""
+    found = []
+    for folder in existing_folders():
+        record = ROOT / folder / BACKPORT
+        if record.exists():
+            data = json.loads(record.read_text(encoding="utf-8"))
+            if not is_mozilla_upstream(data.get("upstream")):
+                found.append((folder, data))
+    return found
+
+
+def backport_record_problems() -> list:
+    """The offline half of port-04: each vendored backport's record is the object form, every commit file is in the folder
+    with the sha256 the record gives, nothing points outside the series."""
+    found = []
+    for folder, data in vendored_backports():
+        found += backport_replay.record_problems(ROOT / folder, data)
+    return found
+
+
+def backport_replay_problems(source: Path, tag: str) -> list:
+    """The other half: the vendored part of each backport folder (hooks.patch, checksum lines, new files) against the replay of
+    its commits on the revision `tag` vendors. Needs the tag's tree in `source`."""
+    found = []
+    for folder, data in vendored_backports():
+        if backport_replay.record_problems(ROOT / folder, data):
+            continue            # reported by backport_record_problems; there is nothing to replay
+        try:
+            found += backport_replay.folder_problems(backport_replay.replay(source, tag, ROOT / folder, data),
+                                                     ROOT / folder, data)
+        except backport_replay.Stop as stop:
+            found.append("%s: %s" % (folder, stop))
+    return found
+
+
 def _digit_separator(text: str, i: int) -> bool:
     """text[i] is an apostrophe: inside a number (1'000, 0x1'0000) and not the start of a character literal (u'|', L'x')."""
     j = i - 1
@@ -1073,6 +1129,7 @@ def problems() -> list:
         if (ROOT / f / "hooks.patch").exists():
             found += patch_cr_problems(f, (ROOT / f / "hooks.patch").read_bytes())
     found += hooks_list.problems(ROOT)
+    found += backport_record_problems()
     found += births.ledger_problems(births.load_ledger(), set(listed))
     series_wf = {p.name: p.read_bytes() for p in WORKFLOWS_SERIES.glob("*.yml")}
     root_wf = {p.name: p.read_bytes() for p in WORKFLOWS_ROOT.glob("*.yml")}
@@ -1303,6 +1360,7 @@ def check(source: Path | None = None, tag: str | None = None, against_main: bool
     found += contract
     if source is not None and tag:
         found += backport_in_tag_problems(source, tag)
+        found += backport_replay_problems(source, tag)
     for p in found:
         print("FAIL", p)
     if not found:

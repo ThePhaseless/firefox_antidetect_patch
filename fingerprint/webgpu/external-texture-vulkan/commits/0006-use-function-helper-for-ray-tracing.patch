@@ -1,0 +1,295 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Andy Leiserson <aleiserson@mozilla.com>
+Date: Mon, 12 Oct 2026 18:29:49 -0700
+Subject: [PATCH] use function helper for ray tracing
+
+(cherry picked from commit 1c7ea095249479594022dc6effb7504c00cbe012)
+---
+ naga/src/back/spv/helpers.rs      | 26 +++++++++---
+ naga/src/back/spv/ray/mod.rs      | 36 +---------------
+ naga/src/back/spv/ray/pipeline.rs |  8 +++-
+ naga/src/back/spv/ray/query.rs    | 69 +++++++++++++++++++++++--------
+ naga/src/back/spv/writer.rs       |  6 +--
+ 5 files changed, 81 insertions(+), 64 deletions(-)
+
+diff --git a/naga/src/back/spv/helpers.rs b/naga/src/back/spv/helpers.rs
+index f7decbc82..15dd44625 100644
+--- a/naga/src/back/spv/helpers.rs
++++ b/naga/src/back/spv/helpers.rs
+@@ -188,7 +188,23 @@ pub fn is_uniform_matcx2_struct_member_access(
+ }
+ 
+ impl super::Writer {
+-    /// Begin writing a new wrapped function.
++    /// Write the signature for a [`WrappedFunction`].
++    ///
++    /// Same as [`Self::write_function_signature`], but additionally adds the function
++    /// to `self.wrapped_functions`.
++    pub(super) fn write_wrapped_function_signature<const N: usize>(
++        &mut self,
++        wrapped: WrappedFunction,
++        name: &str,
++        parameters: &[(Word, &'static str); N],
++        return_type_id: Word,
++    ) -> (Function, [Word; N]) {
++        let (f, id, args) = self.write_function_signature(name, parameters, return_type_id);
++        self.wrapped_functions.insert(wrapped, id);
++        (f, args)
++    }
++
++    /// Write the signature for an internal helper function.
+     ///
+     /// Writes the SPIR-V `OpFunction` and `OpFunctionParameter` operations.
+     ///
+@@ -198,13 +214,12 @@ impl super::Writer {
+     /// Does not otherwise emit any of the function prelude that
+     /// [`Self::write_function`] would generate. In particular, does not load
+     /// handle arguments or set `FunctionArgument::handle_id`.
+-    pub(super) fn write_wrapped_function_preamble<const N: usize>(
++    pub(super) fn write_function_signature<const N: usize>(
+         &mut self,
+-        wrapped: WrappedFunction,
+         name: &str,
+         parameters: &[(Word, &'static str); N],
+         return_type_id: Word,
+-    ) -> (Function, [Word; N]) {
++    ) -> (Function, Word, [Word; N]) {
+         let mut parameter_type_ids = Vec::with_capacity(N);
+ 
+         let function_id = self.id_gen.next();
+@@ -238,9 +253,8 @@ impl super::Writer {
+             spirv::FunctionControl::empty(),
+             function_type_id,
+         ));
+-        self.wrapped_functions.insert(wrapped, function_id);
+ 
+-        (function, param_ids)
++        (function, function_id, param_ids)
+     }
+ }
+ 
+diff --git a/naga/src/back/spv/ray/mod.rs b/naga/src/back/spv/ray/mod.rs
+index a7f672e64..65a724536 100644
+--- a/naga/src/back/spv/ray/mod.rs
++++ b/naga/src/back/spv/ray/mod.rs
+@@ -7,7 +7,7 @@ pub mod query;
+ 
+ use alloc::{vec, vec::Vec};
+ 
+-use super::{Block, Function, FunctionArgument, Instruction, LookupFunctionType, Writer};
++use super::{Block, Instruction, Writer};
+ 
+ struct ExtractedRayDesc {
+     ray_flags_id: spirv::Word,
+@@ -417,38 +417,4 @@ impl Writer {
+         }
+         current_combined
+     }
+-
+-    // returns the id of the function, the function, and ids for its arguments.
+-    fn write_function_signature(
+-        &mut self,
+-        arg_types: &[spirv::Word],
+-        return_ty: spirv::Word,
+-    ) -> (spirv::Word, Function, Vec<spirv::Word>) {
+-        let func_ty = self.get_function_type(LookupFunctionType {
+-            parameter_type_ids: Vec::from(arg_types),
+-            return_type_id: return_ty,
+-        });
+-
+-        let mut function = Function::default();
+-        let func_id = self.id_gen.next();
+-        function.signature = Some(Instruction::function(
+-            return_ty,
+-            func_id,
+-            spirv::FunctionControl::empty(),
+-            func_ty,
+-        ));
+-
+-        let mut arg_ids = Vec::with_capacity(arg_types.len());
+-
+-        for (idx, &arg_ty) in arg_types.iter().enumerate() {
+-            let id = self.id_gen.next();
+-            let instruction = Instruction::function_parameter(arg_ty, id);
+-            function.parameters.push(FunctionArgument {
+-                instruction,
+-                handle_id: idx as u32,
+-            });
+-            arg_ids.push(id);
+-        }
+-        (func_id, function, arg_ids)
+-    }
+ }
+diff --git a/naga/src/back/spv/ray/pipeline.rs b/naga/src/back/spv/ray/pipeline.rs
+index 57c67ac11..386a1c02c 100644
+--- a/naga/src/back/spv/ray/pipeline.rs
++++ b/naga/src/back/spv/ray/pipeline.rs
+@@ -27,8 +27,12 @@ impl Writer {
+                 .expect("ray desc should be set if `traceRays` is called"),
+         );
+ 
+-        let (func_id, mut function, arg_ids) = self.write_function_signature(
+-            &[acceleration_structure_type_id, ray_desc_type_id],
++        let (mut function, func_id, arg_ids) = self.write_function_signature(
++            "trace_ray",
++            &[
++                (acceleration_structure_type_id, "as"),
++                (ray_desc_type_id, "ray_desc"),
++            ],
+             self.void_type,
+         );
+ 
+diff --git a/naga/src/back/spv/ray/query.rs b/naga/src/back/spv/ray/query.rs
+index 69bd50d26..fc713875e 100644
+--- a/naga/src/back/spv/ray/query.rs
++++ b/naga/src/back/spv/ray/query.rs
+@@ -58,8 +58,12 @@ impl Writer {
+ 
+         let argument_type_id = self.get_ray_query_pointer_id();
+ 
+-        let (func_id, mut function, arg_ids) = self.write_function_signature(
+-            &[argument_type_id, flag_pointer_type_id],
++        let (mut function, func_id, arg_ids) = self.write_function_signature(
++            "ray_query_get_intersection",
++            &[
++                (argument_type_id, "ray_query"),
++                (flag_pointer_type_id, "flag"),
++            ],
+             intersection_type_id,
+         );
+ 
+@@ -523,13 +527,14 @@ impl Writer {
+         let f32_type_id = self.get_f32_type_id();
+         let f32_ptr_ty = self.get_pointer_type_id(f32_type_id, spirv::StorageClass::Function);
+ 
+-        let (func_id, mut function, arg_ids) = self.write_function_signature(
++        let (mut function, func_id, arg_ids) = self.write_function_signature(
++            "ray_query_initialize",
+             &[
+-                ray_query_type_id,
+-                acceleration_structure_type_id,
+-                ray_desc_type_id,
+-                u32_ptr_ty,
+-                f32_ptr_ty,
++                (ray_query_type_id, "ray_query"),
++                (acceleration_structure_type_id, "as"),
++                (ray_desc_type_id, "ray_desc"),
++                (u32_ptr_ty, "init_tracker"),
++                (f32_ptr_ty, "t_max_tracker"),
+             ],
+             self.void_type,
+         );
+@@ -650,8 +655,14 @@ impl Writer {
+         let bool_type_id = self.get_bool_type_id();
+         let bool_ptr_ty = self.get_pointer_type_id(bool_type_id, spirv::StorageClass::Function);
+ 
+-        let (func_id, mut function, arg_ids) =
+-            self.write_function_signature(&[ray_query_type_id, u32_ptr_ty], bool_type_id);
++        let (mut function, func_id, arg_ids) = self.write_function_signature(
++            "ray_query_proceed",
++            &[
++                (ray_query_type_id, "ray_query"),
++                (u32_ptr_ty, "init_tracker"),
++            ],
++            bool_type_id,
++        );
+ 
+         let query_id = arg_ids[0];
+         let init_tracker_id = arg_ids[1];
+@@ -798,8 +809,14 @@ impl Writer {
+ 
+         let bool_type_id = self.get_bool_type_id();
+ 
+-        let (func_id, mut function, arg_ids) = self.write_function_signature(
+-            &[ray_query_type_id, u32_ptr_ty, f32_type_id, f32_ptr_type_id],
++        let (mut function, func_id, arg_ids) = self.write_function_signature(
++            "ray_query_generate_intersection",
++            &[
++                (ray_query_type_id, "ray_query"),
++                (u32_ptr_ty, "init_tracker"),
++                (f32_type_id, "depth"),
++                (f32_ptr_type_id, "t_max_tracker"),
++            ],
+             self.void_type,
+         );
+ 
+@@ -1093,8 +1110,14 @@ impl Writer {
+ 
+         let bool_type_id = self.get_bool_type_id();
+ 
+-        let (func_id, mut function, arg_ids) =
+-            self.write_function_signature(&[ray_query_type_id, u32_ptr_ty], self.void_type);
++        let (mut function, func_id, arg_ids) = self.write_function_signature(
++            "ray_query_confirm_intersection",
++            &[
++                (ray_query_type_id, "ray_query"),
++                (u32_ptr_ty, "init_tracker"),
++            ],
++            self.void_type,
++        );
+ 
+         let query_id = arg_ids[0];
+         let init_tracker_id = arg_ids[1];
+@@ -1255,8 +1278,12 @@ impl Writer {
+ 
+         let bool_type_id = self.get_bool_type_id();
+ 
+-        let (func_id, mut function, arg_ids) = self.write_function_signature(
+-            &[ray_query_type_id, u32_ptr_ty],
++        let (mut function, func_id, arg_ids) = self.write_function_signature(
++            "ray_query_get_vertex_position",
++            &[
++                (ray_query_type_id, "ray_query"),
++                (u32_ptr_ty, "init_tracker"),
++            ],
+             rq_get_vertex_positions_ty_id,
+         );
+ 
+@@ -1417,8 +1444,14 @@ impl Writer {
+ 
+         let bool_type_id = self.get_bool_type_id();
+ 
+-        let (func_id, mut function, arg_ids) =
+-            self.write_function_signature(&[ray_query_type_id, u32_ptr_ty], self.void_type);
++        let (mut function, func_id, arg_ids) = self.write_function_signature(
++            "ray_query_terminate",
++            &[
++                (ray_query_type_id, "ray_query"),
++                (u32_ptr_ty, "init_tracker"),
++            ],
++            self.void_type,
++        );
+ 
+         let query_id = arg_ids[0];
+         let init_tracker_id = arg_ids[1];
+diff --git a/naga/src/back/spv/writer.rs b/naga/src/back/spv/writer.rs
+index 587a8ab04..6981f8d89 100644
+--- a/naga/src/back/spv/writer.rs
++++ b/naga/src/back/spv/writer.rs
+@@ -686,7 +686,7 @@ impl Writer {
+             _ => unreachable!(),
+         };
+ 
+-        let (mut function, [lhs_id, rhs_id]) = self.write_wrapped_function_preamble(
++        let (mut function, [lhs_id, rhs_id]) = self.write_wrapped_function_signature(
+             wrapped,
+             function_name,
+             &[(left_type_id, "lhs"), (right_type_id, "rhs")],
+@@ -867,7 +867,7 @@ impl Writer {
+ 
+         let return_type_id = self.get_handle_type_id(r#type);
+ 
+-        let (mut function, [param_id]) = self.write_wrapped_function_preamble(
++        let (mut function, [param_id]) = self.write_wrapped_function_signature(
+             wrapped,
+             &format!("{:?}_from_std140", r#type.for_debug(&ir_module.types)),
+             &[(self.std140_compat_uniform_types[&r#type].type_id, "value")],
+@@ -1093,7 +1093,7 @@ impl Writer {
+         let column_index_type_id = self.get_u32_type_id();
+         let column_type_id = self.get_numeric_type_id(NumericType::Vector { size: rows, scalar });
+         let (mut function, [matrix_param_id, column_index_param_id]) = self
+-            .write_wrapped_function_preamble(
++            .write_wrapped_function_signature(
+                 wrapped,
+                 &format!("{:?}_get_column", r#type.for_debug(&ir_module.types)),
+                 &[

@@ -1,0 +1,125 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: feder-cr <85809106+feder-cr@users.noreply.github.com>
+Date: Sun, 1 Nov 2026 09:27:21 +0700
+Subject: [PATCH] fix(naga spv-out): Round external texture load coordinates
+ like HLSL
+
+The HLSL `textureLoad` helper for external textures computes
+
+    plane0_coords = uint2(round(mul(float3(coords, 1.0), load_transform)));
+    plane1_coords = uint2(floor(float2(plane0_coords) * float2(plane1_size) / float2(plane0_size)));
+
+The SPIR-V helper used GLSL.std.450 `Round` for both, which rounds halfway
+cases in an implementation-defined direction, while HLSL's `round` rounds
+them to even and the chroma coordinates use `floor`. It also scaled the
+rounded float coordinates rather than the converted integer ones. Use
+`RoundEven` for plane 0, scale `float2(plane0_coords)` and `Floor` the
+chroma plane coordinates.
+---
+ naga/src/back/spv/image.rs                | 22 ++++++++++++++++-----
+ naga/tests/naga/spirv_external_texture.rs | 24 +++++++++++++++++++++++
+ 2 files changed, 41 insertions(+), 5 deletions(-)
+
+diff --git a/naga/src/back/spv/image.rs b/naga/src/back/spv/image.rs
+index 82861c75e..bdf3a2092 100644
+--- a/naga/src/back/spv/image.rs
++++ b/naga/src/back/spv/image.rs
+@@ -1845,10 +1845,12 @@ impl super::Writer {
+             load_transform_in_id,
+         ));
+ 
++        // HLSL's `round` rounds halfway cases to even; GLSL.std.450 `Round`
++        // rounds them in an implementation-defined direction.
+         let plane0_coord_float_id = self.id_gen.next();
+         block.body.push(Instruction::ext_inst_gl_op(
+             self.gl450_ext_inst_id,
+-            spirv::GlslStd450Op::Round,
++            spirv::GlslStd450Op::RoundEven,
+             vec2f_type_id,
+             plane0_coord_float_id,
+             &[load_transform_out_id],
+@@ -1862,6 +1864,16 @@ impl super::Writer {
+             plane0_coord_float_id,
+         ));
+ 
++        // Chroma coordinates are scaled from the integer plane 0 coordinates:
++        // `float2(plane0_coords)` in HLSL.
++        let plane0_coord_uint_float_id = self.id_gen.next();
++        block.body.push(Instruction::unary(
++            spirv::Op::ConvertUToF,
++            vec2f_type_id,
++            plane0_coord_uint_float_id,
++            plane0_coord_id,
++        ));
++
+         // Load `params.num_planes`.
+         let num_planes_id = self.id_gen.next();
+         block.body.push(Instruction::composite_extract(
+@@ -1917,7 +1929,7 @@ impl super::Writer {
+                 spirv::Op::FMul,
+                 vec2f_type_id,
+                 coord_mul_id,
+-                plane0_coord_float_id,
++                plane0_coord_uint_float_id,
+                 plane1_size_float_id,
+             ));
+ 
+@@ -1933,7 +1945,7 @@ impl super::Writer {
+             let plane1_coord_float_id = writer.id_gen.next();
+             block.body.push(Instruction::ext_inst_gl_op(
+                 writer.gl450_ext_inst_id,
+-                spirv::GlslStd450Op::Round,
++                spirv::GlslStd450Op::Floor,
+                 vec2f_type_id,
+                 plane1_coord_float_id,
+                 &[coord_div_id],
+@@ -2003,7 +2015,7 @@ impl super::Writer {
+                 spirv::Op::FMul,
+                 vec2f_type_id,
+                 coord_mul_id,
+-                plane0_coord_float_id,
++                plane0_coord_uint_float_id,
+                 plane2_size_float_id,
+             ));
+ 
+@@ -2019,7 +2031,7 @@ impl super::Writer {
+             let plane2_coord_float_id = self.id_gen.next();
+             block.body.push(Instruction::ext_inst_gl_op(
+                 self.gl450_ext_inst_id,
+-                spirv::GlslStd450Op::Round,
++                spirv::GlslStd450Op::Floor,
+                 vec2f_type_id,
+                 plane2_coord_float_id,
+                 &[coord_div_id],
+diff --git a/naga/tests/naga/spirv_external_texture.rs b/naga/tests/naga/spirv_external_texture.rs
+index 6a134556b..979e523dd 100644
+--- a/naga/tests/naga/spirv_external_texture.rs
++++ b/naga/tests/naga/spirv_external_texture.rs
+@@ -402,3 +402,27 @@ fn external_texture_fetch_has_lod() {
+         }
+     }
+ }
++
++/// The load helper rounds exactly like the HLSL one: plane 0 coordinates use
++/// `round` (round half to even in HLSL/DXIL), chroma coordinates use `floor`.
++#[test]
++fn external_texture_load_rounding_matches_hlsl() {
++    let spv = compile(TEXTURE_EXTERNAL);
++    let ops = spv.glsl_ops(spv.function("naga_external_texture_image_load"));
++    assert!(
++        !ops.contains(&GLSL_ROUND),
++        "GLSL.std.450 Round rounds halfway cases in an implementation-defined direction"
++    );
++    assert_eq!(
++        ops.iter().filter(|&&op| op == GLSL_ROUND_EVEN).count(),
++        1,
++        "plane 0 coordinates should use RoundEven: {ops:?}"
++    );
++    // Plane 1 coordinates are computed in both the two- and three-plane
++    // paths, plane 2 coordinates only in the three-plane path.
++    assert_eq!(
++        ops.iter().filter(|&&op| op == GLSL_FLOOR).count(),
++        3,
++        "chroma plane coordinates should use Floor: {ops:?}"
++    );
++}

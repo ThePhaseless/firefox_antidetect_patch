@@ -1,0 +1,2338 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: feder-cr <85809106+feder-cr@users.noreply.github.com>
+Date: Sun, 1 Nov 2026 09:34:39 +0700
+Subject: [PATCH] test(naga): Update SPIR-V snapshots for the picked spv-out
+ refactors
+
+These outputs were not regenerated when the spv-out refactors were picked
+(the WGSL snapshot test panicked on texture-external-argument before
+reaching them). The changes are id renumbering only, plus `OpName`s for
+the parameters of wrapped helper functions in access, mat_cx2 and
+mat_cx2_f16; they are identical to what the unfixed branch generates.
+---
+ .../out/spv/wgsl-9890-no-rq-hoist.spvasm      |  50 +++----
+ naga/tests/out/spv/wgsl-access.spvasm         |  30 ++--
+ .../out/spv/wgsl-aliased-ray-query.spvasm     | 118 +++++++--------
+ naga/tests/out/spv/wgsl-collatz.spvasm        |  18 +--
+ .../spv/wgsl-debug-symbol-large-source.spvasm |  18 +--
+ .../out/spv/wgsl-debug-symbol-terrain.spvasm  |  18 +--
+ naga/tests/out/spv/wgsl-globals.spvasm        |  26 ++--
+ naga/tests/out/spv/wgsl-image.spvasm          |  22 +--
+ .../out/spv/wgsl-int-div-unchecked.spvasm     |  18 +--
+ .../out/spv/wgsl-int-signed-remainder.spvasm  |  48 +++---
+ naga/tests/out/spv/wgsl-int16.spvasm          |  32 ++--
+ .../spv/wgsl-mat2-uniform-alignment.spvasm    |  12 +-
+ naga/tests/out/spv/wgsl-mat_cx2.spvasm        |  63 ++++----
+ naga/tests/out/spv/wgsl-mat_cx2_f16.spvasm    |  71 +++++----
+ naga/tests/out/spv/wgsl-operators.spvasm      |  96 ++++++------
+ .../spv/wgsl-overrides-ray-query.main.spvasm  |  50 +++----
+ .../wgsl-ray-query-no-init-tracking.spvasm    | 138 +++++++++---------
+ naga/tests/out/spv/wgsl-ray-query.spvasm      | 138 +++++++++---------
+ .../out/spv/wgsl-ray-tracing-pipeline.spvasm  |  24 +--
+ naga/tests/out/spv/wgsl-skybox.spvasm         |  16 +-
+ 20 files changed, 513 insertions(+), 493 deletions(-)
+
+diff --git a/naga/tests/out/spv/wgsl-9890-no-rq-hoist.spvasm b/naga/tests/out/spv/wgsl-9890-no-rq-hoist.spvasm
+index d90817c91..39414fabe 100644
+--- a/naga/tests/out/spv/wgsl-9890-no-rq-hoist.spvasm
++++ b/naga/tests/out/spv/wgsl-9890-no-rq-hoist.spvasm
+@@ -46,7 +46,7 @@ OpDecorate %9 Binding 0
+ %40 = OpConstantComposite  %36  %15 %15
+ %41 = OpConstant  %4  4294967295
+ %42 = OpConstantComposite  %36  %41 %41
+-%64 = OpTypeFunction %2 %27 %3 %8 %25 %29
++%70 = OpTypeFunction %2 %27 %3 %8 %25 %29
+ %72 = OpTypeVector %38 3
+ %93 = OpConstant  %4  256
+ %96 = OpConstant  %4  512
+@@ -56,22 +56,22 @@ OpDecorate %9 Binding 0
+ %118 = OpConstant  %4  64
+ %121 = OpConstant  %4  128
+ %147 = OpTypePointer Function %38
+-%148 = OpTypeFunction %38 %27 %25
++%151 = OpTypeFunction %38 %27 %25
+ %154 = OpConstantFalse  %38
+ %165 = OpConstant  %4  6
+-%65 = OpFunction  %2  None %64
+-%66 = OpFunctionParameter  %27
+-%67 = OpFunctionParameter  %3
+-%68 = OpFunctionParameter  %8
+-%69 = OpFunctionParameter  %25
+-%70 = OpFunctionParameter  %29
++%64 = OpFunction  %2  None %70
++%65 = OpFunctionParameter  %27
++%66 = OpFunctionParameter  %3
++%67 = OpFunctionParameter  %8
++%68 = OpFunctionParameter  %25
++%69 = OpFunctionParameter  %29
+ %71 = OpLabel
+-%73 = OpCompositeExtract  %4  %68 0
+-%74 = OpCompositeExtract  %4  %68 1
+-%75 = OpCompositeExtract  %6  %68 2
+-%76 = OpCompositeExtract  %6  %68 3
+-%77 = OpCompositeExtract  %7  %68 4
+-%78 = OpCompositeExtract  %7  %68 5
++%73 = OpCompositeExtract  %4  %67 0
++%74 = OpCompositeExtract  %4  %67 1
++%75 = OpCompositeExtract  %6  %67 2
++%76 = OpCompositeExtract  %6  %67 3
++%77 = OpCompositeExtract  %7  %67 4
++%78 = OpCompositeExtract  %7  %67 5
+ %79 = OpFOrdLessThanEqual  %38  %75 %76
+ %80 = OpFOrdGreaterThanEqual  %38  %75 %21
+ %81 = OpIsInf  %72  %77
+@@ -128,24 +128,24 @@ OpDecorate %9 Binding 0
+ %139 = OpLogicalAnd  %38  %138 %92
+ %140 = OpLogicalAnd  %38  %139 %100
+ %141 = OpLogicalAnd  %38  %140 %112
+-OpStore %70 %76
++OpStore %69 %76
+ OpSelectionMerge %142 None
+ OpBranchConditional %141 %144 %143
+ %144 = OpLabel
+-OpRayQueryInitializeKHR %66 %67 %73 %74 %77 %75 %78 %76
+-OpStore %69 %17
++OpRayQueryInitializeKHR %65 %66 %73 %74 %77 %75 %78 %76
++OpStore %68 %17
+ OpBranch %142
+ %143 = OpLabel
+ OpBranch %142
+ %142 = OpLabel
+ OpReturn
+ OpFunctionEnd
+-%149 = OpFunction  %38  None %148
+-%150 = OpFunctionParameter  %27
+-%151 = OpFunctionParameter  %25
++%148 = OpFunction  %38  None %151
++%149 = OpFunctionParameter  %27
++%150 = OpFunctionParameter  %25
+ %152 = OpLabel
+ %153 = OpVariable  %147  Function %154
+-%155 = OpLoad  %4  %151
++%155 = OpLoad  %4  %150
+ %158 = OpBitwiseAnd  %4  %155 %17
+ %159 = OpINotEqual  %38  %158 %15
+ %160 = OpBitwiseAnd  %4  %155 %16
+@@ -155,11 +155,11 @@ OpFunctionEnd
+ OpSelectionMerge %156 None
+ OpBranchConditional %163 %157 %156
+ %157 = OpLabel
+-%164 = OpRayQueryProceedKHR  %38  %150
++%164 = OpRayQueryProceedKHR  %38  %149
+ OpStore %153 %164
+ %166 = OpSelect  %4  %164 %115 %165
+ %167 = OpBitwiseOr  %4  %155 %166
+-OpStore %151 %167
++OpStore %150 %167
+ OpBranch %156
+ %156 = OpLabel
+ %168 = OpLoad  %38  %153
+@@ -208,8 +208,8 @@ OpStore %28 %15
+ %61 = OpConvertUToF  %6  %60
+ %62 = OpCompositeConstruct  %7  %61 %61 %61
+ %63 = OpCompositeConstruct  %8  %17 %18 %19 %20 %62 %23
+-%145 = OpFunctionCall  %2  %65 %26 %14 %63 %28 %30
+-%146 = OpFunctionCall  %38  %149 %26 %28
++%145 = OpFunctionCall  %2  %64 %26 %14 %63 %28 %30
++%146 = OpFunctionCall  %38  %148 %26 %28
+ OpBranch %59
+ %59 = OpLabel
+ OpBranch %35
+diff --git a/naga/tests/out/spv/wgsl-access.spvasm b/naga/tests/out/spv/wgsl-access.spvasm
+index 1678c50d4..f190ccfa0 100644
+--- a/naga/tests/out/spv/wgsl-access.spvasm
++++ b/naga/tests/out/spv/wgsl-access.spvasm
+@@ -313,12 +313,18 @@ OpName %60 "baz"
+ OpName %63 "qux"
+ OpName %66 "nested_mat_cx2"
+ OpName %69 "mat3x2<f32>_get_column"
++OpName %70 "matrix"
++OpName %71 "column_index"
+ OpName %84 "test_matrix_within_struct_accesses"
+ OpName %113 "idx"
+ OpName %115 "t"
+ OpName %186 "array<mat4x2<f32>, 2>_from_std140"
++OpName %187 "value"
+ OpName %190 "mat4x2<f32>_from_std140"
++OpName %191 "value"
+ OpName %204 "mat4x2<f32>_get_column"
++OpName %205 "matrix"
++OpName %206 "column_index"
+ OpName %221 "test_matrix_within_array_within_struct_accesses"
+ OpName %232 "idx"
+ OpName %233 "t"
+@@ -524,8 +530,8 @@ OpDecorate %483 Location 0
+ %141 = OpTypePointer Uniform %9
+ %172 = OpTypePointer Function %22
+ %174 = OpTypePointer Function %13
+-%187 = OpTypeFunction %26 %50
+-%191 = OpTypeFunction %25 %49
++%188 = OpTypeFunction %26 %50
++%192 = OpTypeFunction %25 %49
+ %207 = OpTypeFunction %13 %25 %4
+ %222 = OpTypePointer Uniform %51
+ %224 = OpTypePointer Uniform %27
+@@ -754,22 +760,22 @@ OpLine %3 65 5
+ OpStore %185 %112
+ OpReturn
+ OpFunctionEnd
+-%190 = OpFunction  %25  None %191
+-%192 = OpFunctionParameter  %49
++%190 = OpFunction  %25  None %192
++%191 = OpFunctionParameter  %49
+ %193 = OpLabel
+-%194 = OpCompositeExtract  %13  %192 0
+-%195 = OpCompositeExtract  %13  %192 1
+-%196 = OpCompositeExtract  %13  %192 2
+-%197 = OpCompositeExtract  %13  %192 3
++%194 = OpCompositeExtract  %13  %191 0
++%195 = OpCompositeExtract  %13  %191 1
++%196 = OpCompositeExtract  %13  %191 2
++%197 = OpCompositeExtract  %13  %191 3
+ %198 = OpCompositeConstruct  %25  %194 %195 %196 %197
+ OpReturnValue %198
+ OpFunctionEnd
+-%186 = OpFunction  %26  None %187
+-%188 = OpFunctionParameter  %50
++%186 = OpFunction  %26  None %188
++%187 = OpFunctionParameter  %50
+ %189 = OpLabel
+-%199 = OpCompositeExtract  %49  %188 0
++%199 = OpCompositeExtract  %49  %187 0
+ %200 = OpFunctionCall  %25  %190 %199
+-%201 = OpCompositeExtract  %49  %188 1
++%201 = OpCompositeExtract  %49  %187 1
+ %202 = OpFunctionCall  %25  %190 %201
+ %203 = OpCompositeConstruct  %26  %200 %202
+ OpReturnValue %203
+diff --git a/naga/tests/out/spv/wgsl-aliased-ray-query.spvasm b/naga/tests/out/spv/wgsl-aliased-ray-query.spvasm
+index 0d4d87dc6..751e80fde 100644
+--- a/naga/tests/out/spv/wgsl-aliased-ray-query.spvasm
++++ b/naga/tests/out/spv/wgsl-aliased-ray-query.spvasm
+@@ -62,7 +62,7 @@ OpDecorate %13 Binding 0
+ %33 = OpTypePointer Function %7
+ %35 = OpConstant  %7  0
+ %36 = OpTypePointer Function %5
+-%39 = OpTypeFunction %2 %32 %4 %8 %33 %36
++%45 = OpTypeFunction %2 %32 %4 %8 %33 %36
+ %47 = OpTypeVector %10 3
+ %68 = OpConstant  %7  256
+ %71 = OpConstant  %7  512
+@@ -75,7 +75,7 @@ OpDecorate %13 Binding 0
+ %122 = OpTypePointer Function %11
+ %123 = OpTypePointer Function %9
+ %124 = OpTypePointer Function %10
+-%125 = OpTypeFunction %12 %32 %33
++%128 = OpTypeFunction %12 %32 %33
+ %130 = OpConstantNull  %12
+ %158 = OpConstant  %7  5
+ %160 = OpConstant  %7  6
+@@ -83,21 +83,21 @@ OpDecorate %13 Binding 0
+ %164 = OpConstant  %7  10
+ %173 = OpConstant  %7  7
+ %175 = OpConstant  %7  8
+-%184 = OpTypeFunction %2 %32 %33 %5 %36
+-%225 = OpTypeFunction %2 %32 %33
+-%40 = OpFunction  %2  None %39
+-%41 = OpFunctionParameter  %32
+-%42 = OpFunctionParameter  %4
+-%43 = OpFunctionParameter  %8
+-%44 = OpFunctionParameter  %33
+-%45 = OpFunctionParameter  %36
++%189 = OpTypeFunction %2 %32 %33 %5 %36
++%228 = OpTypeFunction %2 %32 %33
++%39 = OpFunction  %2  None %45
++%40 = OpFunctionParameter  %32
++%41 = OpFunctionParameter  %4
++%42 = OpFunctionParameter  %8
++%43 = OpFunctionParameter  %33
++%44 = OpFunctionParameter  %36
+ %46 = OpLabel
+-%48 = OpCompositeExtract  %7  %43 0
+-%49 = OpCompositeExtract  %7  %43 1
+-%50 = OpCompositeExtract  %5  %43 2
+-%51 = OpCompositeExtract  %5  %43 3
+-%52 = OpCompositeExtract  %6  %43 4
+-%53 = OpCompositeExtract  %6  %43 5
++%48 = OpCompositeExtract  %7  %42 0
++%49 = OpCompositeExtract  %7  %42 1
++%50 = OpCompositeExtract  %5  %42 2
++%51 = OpCompositeExtract  %5  %42 3
++%52 = OpCompositeExtract  %6  %42 4
++%53 = OpCompositeExtract  %6  %42 5
+ %54 = OpFOrdLessThanEqual  %10  %50 %51
+ %55 = OpFOrdGreaterThanEqual  %10  %50 %19
+ %56 = OpIsInf  %47  %52
+@@ -154,24 +154,24 @@ OpDecorate %13 Binding 0
+ %114 = OpLogicalAnd  %10  %113 %67
+ %115 = OpLogicalAnd  %10  %114 %75
+ %116 = OpLogicalAnd  %10  %115 %87
+-OpStore %45 %51
++OpStore %44 %51
+ OpSelectionMerge %117 None
+ OpBranchConditional %116 %119 %118
+ %119 = OpLabel
+-OpRayQueryInitializeKHR %41 %42 %48 %49 %52 %50 %53 %51
+-OpStore %44 %30
++OpRayQueryInitializeKHR %40 %41 %48 %49 %52 %50 %53 %51
++OpStore %43 %30
+ OpBranch %117
+ %118 = OpLabel
+ OpBranch %117
+ %117 = OpLabel
+ OpReturn
+ OpFunctionEnd
+-%126 = OpFunction  %12  None %125
+-%127 = OpFunctionParameter  %32
+-%128 = OpFunctionParameter  %33
++%125 = OpFunction  %12  None %128
++%126 = OpFunctionParameter  %32
++%127 = OpFunctionParameter  %33
+ %129 = OpLabel
+ %131 = OpVariable  %121  Function %130
+-%132 = OpLoad  %7  %128
++%132 = OpLoad  %7  %127
+ %133 = OpBitwiseAnd  %7  %132 %90
+ %134 = OpINotEqual  %10  %133 %35
+ %135 = OpBitwiseAnd  %7  %132 %23
+@@ -181,7 +181,7 @@ OpFunctionEnd
+ OpSelectionMerge %140 None
+ OpBranchConditional %138 %139 %140
+ %139 = OpLabel
+-%141 = OpRayQueryGetIntersectionTypeKHR  %7  %127 %35
++%141 = OpRayQueryGetIntersectionTypeKHR  %7  %126 %35
+ %142 = OpIEqual  %10  %141 %35
+ %143 = OpSelect  %7  %142 %30 %28
+ %144 = OpAccessChain  %33  %131 %35
+@@ -190,13 +190,13 @@ OpStore %144 %143
+ OpSelectionMerge %147 None
+ OpBranchConditional %145 %146 %147
+ %146 = OpLabel
+-%148 = OpRayQueryGetIntersectionInstanceCustomIndexKHR  %7  %127 %35
+-%149 = OpRayQueryGetIntersectionInstanceIdKHR  %7  %127 %35
+-%150 = OpRayQueryGetIntersectionInstanceShaderBindingTableRecordOffsetKHR  %7  %127 %35
+-%151 = OpRayQueryGetIntersectionGeometryIndexKHR  %7  %127 %35
+-%152 = OpRayQueryGetIntersectionPrimitiveIndexKHR  %7  %127 %35
+-%153 = OpRayQueryGetIntersectionObjectToWorldKHR  %11  %127 %35
+-%154 = OpRayQueryGetIntersectionWorldToObjectKHR  %11  %127 %35
++%148 = OpRayQueryGetIntersectionInstanceCustomIndexKHR  %7  %126 %35
++%149 = OpRayQueryGetIntersectionInstanceIdKHR  %7  %126 %35
++%150 = OpRayQueryGetIntersectionInstanceShaderBindingTableRecordOffsetKHR  %7  %126 %35
++%151 = OpRayQueryGetIntersectionGeometryIndexKHR  %7  %126 %35
++%152 = OpRayQueryGetIntersectionPrimitiveIndexKHR  %7  %126 %35
++%153 = OpRayQueryGetIntersectionObjectToWorldKHR  %11  %126 %35
++%154 = OpRayQueryGetIntersectionWorldToObjectKHR  %11  %126 %35
+ %155 = OpAccessChain  %33  %131 %90
+ OpStore %155 %148
+ %156 = OpAccessChain  %33  %131 %28
+@@ -215,11 +215,11 @@ OpStore %165 %154
+ OpSelectionMerge %168 None
+ OpBranchConditional %166 %167 %168
+ %167 = OpLabel
+-%169 = OpRayQueryGetIntersectionTKHR  %5  %127 %35
++%169 = OpRayQueryGetIntersectionTKHR  %5  %126 %35
+ %170 = OpAccessChain  %36  %131 %30
+ OpStore %170 %169
+-%171 = OpRayQueryGetIntersectionBarycentricsKHR  %9  %127 %35
+-%172 = OpRayQueryGetIntersectionFrontFaceKHR  %10  %127 %35
++%171 = OpRayQueryGetIntersectionBarycentricsKHR  %9  %126 %35
++%172 = OpRayQueryGetIntersectionFrontFaceKHR  %10  %126 %35
+ %174 = OpAccessChain  %123  %131 %173
+ OpStore %174 %171
+ %176 = OpAccessChain  %124  %131 %175
+@@ -233,15 +233,15 @@ OpBranch %140
+ %177 = OpLoad  %12  %131
+ OpReturnValue %177
+ OpFunctionEnd
+-%185 = OpFunction  %2  None %184
+-%186 = OpFunctionParameter  %32
+-%187 = OpFunctionParameter  %33
+-%188 = OpFunctionParameter  %5
+-%189 = OpFunctionParameter  %36
++%184 = OpFunction  %2  None %189
++%185 = OpFunctionParameter  %32
++%186 = OpFunctionParameter  %33
++%187 = OpFunctionParameter  %5
++%188 = OpFunctionParameter  %36
+ %190 = OpLabel
+ %191 = OpVariable  %36  Function
+ %192 = OpVariable  %36  Function
+-%195 = OpLoad  %7  %187
++%195 = OpLoad  %7  %186
+ %196 = OpBitwiseAnd  %7  %195 %90
+ %197 = OpINotEqual  %10  %196 %35
+ %198 = OpBitwiseAnd  %7  %195 %23
+@@ -251,42 +251,42 @@ OpFunctionEnd
+ OpSelectionMerge %194 None
+ OpBranchConditional %201 %193 %194
+ %193 = OpLabel
+-%202 = OpRayQueryGetIntersectionTypeKHR  %7  %186 %35
++%202 = OpRayQueryGetIntersectionTypeKHR  %7  %185 %35
+ %203 = OpIEqual  %10  %202 %30
+-%204 = OpRayQueryGetRayTMinKHR  %5  %186
+-%205 = OpRayQueryGetIntersectionTypeKHR  %7  %186 %30
++%204 = OpRayQueryGetRayTMinKHR  %5  %185
++%205 = OpRayQueryGetIntersectionTypeKHR  %7  %185 %30
+ %206 = OpIEqual  %10  %205 %35
+ OpSelectionMerge %207 None
+ OpBranchConditional %206 %208 %209
+ %208 = OpLabel
+-%210 = OpLoad  %5  %189
++%210 = OpLoad  %5  %188
+ OpStore %192 %210
+ OpBranch %207
+ %209 = OpLabel
+-%211 = OpRayQueryGetIntersectionTKHR  %5  %186 %35
++%211 = OpRayQueryGetIntersectionTKHR  %5  %185 %35
+ OpStore %192 %211
+ OpBranch %207
+ %207 = OpLabel
+-%212 = OpFOrdGreaterThanEqual  %10  %188 %204
++%212 = OpFOrdGreaterThanEqual  %10  %187 %204
+ %213 = OpLoad  %5  %192
+-%214 = OpFOrdLessThanEqual  %10  %188 %213
++%214 = OpFOrdLessThanEqual  %10  %187 %213
+ %215 = OpLogicalAnd  %10  %212 %214
+ %216 = OpLogicalAnd  %10  %215 %203
+ OpSelectionMerge %218 None
+ OpBranchConditional %216 %217 %218
+ %217 = OpLabel
+-OpRayQueryGenerateIntersectionKHR %186 %188
++OpRayQueryGenerateIntersectionKHR %185 %187
+ OpBranch %218
+ %218 = OpLabel
+ OpBranch %194
+ %194 = OpLabel
+ OpReturn
+ OpFunctionEnd
+-%226 = OpFunction  %2  None %225
+-%227 = OpFunctionParameter  %32
+-%228 = OpFunctionParameter  %33
++%225 = OpFunction  %2  None %228
++%226 = OpFunctionParameter  %32
++%227 = OpFunctionParameter  %33
+ %229 = OpLabel
+-%232 = OpLoad  %7  %228
++%232 = OpLoad  %7  %227
+ %233 = OpBitwiseAnd  %7  %232 %90
+ %234 = OpINotEqual  %10  %233 %35
+ %235 = OpBitwiseAnd  %7  %232 %23
+@@ -296,19 +296,19 @@ OpFunctionEnd
+ OpSelectionMerge %231 None
+ OpBranchConditional %238 %230 %231
+ %230 = OpLabel
+-%239 = OpRayQueryGetIntersectionTypeKHR  %7  %227 %35
++%239 = OpRayQueryGetIntersectionTypeKHR  %7  %226 %35
+ %240 = OpIEqual  %10  %239 %35
+ OpSelectionMerge %242 None
+ OpBranchConditional %240 %241 %242
+ %241 = OpLabel
+-OpRayQueryConfirmIntersectionKHR %227
++OpRayQueryConfirmIntersectionKHR %226
+ OpBranch %242
+ %242 = OpLabel
+ OpBranch %231
+ %231 = OpLabel
+ OpReturn
+ OpFunctionEnd
+-%245 = OpFunction  %2  None %225
++%245 = OpFunction  %2  None %228
+ %246 = OpFunctionParameter  %32
+ %247 = OpFunctionParameter  %33
+ %248 = OpLabel
+@@ -335,14 +335,14 @@ OpFunctionEnd
+ %18 = OpLoad  %4  %13
+ OpBranch %38
+ %38 = OpLabel
+-%120 = OpFunctionCall  %2  %40 %31 %18 %27 %34 %37
+-%178 = OpFunctionCall  %12  %126 %31 %34
++%120 = OpFunctionCall  %2  %39 %31 %18 %27 %34 %37
++%178 = OpFunctionCall  %12  %125 %31 %34
+ %179 = OpCompositeExtract  %7  %178 0
+ %180 = OpIEqual  %10  %179 %28
+ OpSelectionMerge %181 None
+ OpBranchConditional %180 %182 %183
+ %182 = OpLabel
+-%219 = OpFunctionCall  %2  %185 %31 %34 %29 %37
++%219 = OpFunctionCall  %2  %184 %31 %34 %29 %37
+ OpReturn
+ %183 = OpLabel
+ %220 = OpCompositeExtract  %7  %178 0
+@@ -350,7 +350,7 @@ OpReturn
+ OpSelectionMerge %222 None
+ OpBranchConditional %221 %223 %224
+ %223 = OpLabel
+-%243 = OpFunctionCall  %2  %226 %31 %34
++%243 = OpFunctionCall  %2  %225 %31 %34
+ OpReturn
+ %224 = OpLabel
+ %244 = OpFunctionCall  %2  %245 %31 %34
+diff --git a/naga/tests/out/spv/wgsl-collatz.spvasm b/naga/tests/out/spv/wgsl-collatz.spvasm
+index f40ee191d..9a0f8752a 100644
+--- a/naga/tests/out/spv/wgsl-collatz.spvasm
++++ b/naga/tests/out/spv/wgsl-collatz.spvasm
+@@ -46,8 +46,8 @@ OpMemberName %6 0 "data"
+ OpName %6 "PrimeIndices"
+ OpName %8 "v_indices"
+ OpName %10 "naga_mod"
+-OpName %12 "lhs"
+-OpName %13 "rhs"
++OpName %11 "lhs"
++OpName %12 "rhs"
+ OpName %21 "naga_div"
+ OpName %22 "lhs"
+ OpName %23 "rhs"
+@@ -71,7 +71,7 @@ OpDecorate %81 BuiltIn GlobalInvocationId
+ %7 = OpTypeVector %4 3
+ %9 = OpTypePointer StorageBuffer %6
+ %8 = OpVariable  %9  StorageBuffer
+-%11 = OpTypeFunction %4 %4 %4
++%13 = OpTypeFunction %4 %4 %4
+ %15 = OpTypeBool
+ %16 = OpConstant  %4  0
+ %18 = OpConstant  %4  1
+@@ -91,16 +91,16 @@ OpDecorate %81 BuiltIn GlobalInvocationId
+ %85 = OpTypeFunction %2
+ %87 = OpTypePointer StorageBuffer %5
+ %89 = OpTypePointer StorageBuffer %4
+-%10 = OpFunction  %4  None %11
++%10 = OpFunction  %4  None %13
++%11 = OpFunctionParameter  %4
+ %12 = OpFunctionParameter  %4
+-%13 = OpFunctionParameter  %4
+ %14 = OpLabel
+-%17 = OpIEqual  %15  %13 %16
+-%19 = OpSelect  %4  %17 %18 %13
+-%20 = OpUMod  %4  %12 %19
++%17 = OpIEqual  %15  %12 %16
++%19 = OpSelect  %4  %17 %18 %12
++%20 = OpUMod  %4  %11 %19
+ OpReturnValue %20
+ OpFunctionEnd
+-%21 = OpFunction  %4  None %11
++%21 = OpFunction  %4  None %13
+ %22 = OpFunctionParameter  %4
+ %23 = OpFunctionParameter  %4
+ %24 = OpLabel
+diff --git a/naga/tests/out/spv/wgsl-debug-symbol-large-source.spvasm b/naga/tests/out/spv/wgsl-debug-symbol-large-source.spvasm
+index cde846a4b..6cf4d5651 100644
+--- a/naga/tests/out/spv/wgsl-debug-symbol-large-source.spvasm
++++ b/naga/tests/out/spv/wgsl-debug-symbol-large-source.spvasm
+@@ -7551,8 +7551,8 @@ OpName %282 "p"
+ OpName %283 "min_max_height"
+ OpName %284 "terrain_vertex"
+ OpName %313 "naga_div"
+-OpName %315 "lhs"
+-OpName %316 "rhs"
++OpName %314 "lhs"
++OpName %315 "rhs"
+ OpName %322 "vert_index"
+ OpName %323 "chunk_size"
+ OpName %324 "chunk_corner"
+@@ -7772,7 +7772,7 @@ OpDecorate %614 Location 0
+ %289 = OpConstant  %4  -0.1
+ %290 = OpConstantComposite  %6  %289 %74
+ %291 = OpConstantComposite  %6  %74 %289
+-%314 = OpTypeFunction %8 %8 %8
++%316 = OpTypeFunction %8 %8 %8
+ %326 = OpTypeFunction %6 %8 %10 %11
+ %343 = OpTypeFunction %5 %6
+ %344 = OpConstant  %4  23
+@@ -8181,13 +8181,13 @@ OpLine %3 7239 12
+ %312 = OpCompositeConstruct  %14  %293 %311
+ OpReturnValue %312
+ OpFunctionEnd
+-%313 = OpFunction  %8  None %314
++%313 = OpFunction  %8  None %316
++%314 = OpFunctionParameter  %8
+ %315 = OpFunctionParameter  %8
+-%316 = OpFunctionParameter  %8
+ %317 = OpLabel
+-%318 = OpIEqual  %112  %316 %135
+-%319 = OpSelect  %8  %318 %126 %316
+-%320 = OpUDiv  %8  %315 %319
++%318 = OpIEqual  %112  %315 %135
++%319 = OpSelect  %8  %318 %126 %315
++%320 = OpUDiv  %8  %314 %319
+ OpReturnValue %320
+ OpFunctionEnd
+ %325 = OpFunction  %6  None %326
+@@ -8342,7 +8342,7 @@ OpLine %3 7275 5
+ OpStore %426 %408
+ OpReturn
+ OpFunctionEnd
+-%427 = OpFunction  %8  None %314
++%427 = OpFunction  %8  None %316
+ %428 = OpFunctionParameter  %8
+ %429 = OpFunctionParameter  %8
+ %430 = OpLabel
+diff --git a/naga/tests/out/spv/wgsl-debug-symbol-terrain.spvasm b/naga/tests/out/spv/wgsl-debug-symbol-terrain.spvasm
+index a6abe8092..aac6e9f59 100644
+--- a/naga/tests/out/spv/wgsl-debug-symbol-terrain.spvasm
++++ b/naga/tests/out/spv/wgsl-debug-symbol-terrain.spvasm
+@@ -387,8 +387,8 @@ OpName %282 "p"
+ OpName %283 "min_max_height"
+ OpName %284 "terrain_vertex"
+ OpName %313 "naga_div"
+-OpName %315 "lhs"
+-OpName %316 "rhs"
++OpName %314 "lhs"
++OpName %315 "rhs"
+ OpName %322 "vert_index"
+ OpName %323 "chunk_size"
+ OpName %324 "chunk_corner"
+@@ -608,7 +608,7 @@ OpDecorate %614 Location 0
+ %289 = OpConstant  %4  -0.1
+ %290 = OpConstantComposite  %6  %289 %74
+ %291 = OpConstantComposite  %6  %74 %289
+-%314 = OpTypeFunction %8 %8 %8
++%316 = OpTypeFunction %8 %8 %8
+ %326 = OpTypeFunction %6 %8 %10 %11
+ %343 = OpTypeFunction %5 %6
+ %344 = OpConstant  %4  23
+@@ -1017,13 +1017,13 @@ OpLine %3 96 12
+ %312 = OpCompositeConstruct  %14  %293 %311
+ OpReturnValue %312
+ OpFunctionEnd
+-%313 = OpFunction  %8  None %314
++%313 = OpFunction  %8  None %316
++%314 = OpFunctionParameter  %8
+ %315 = OpFunctionParameter  %8
+-%316 = OpFunctionParameter  %8
+ %317 = OpLabel
+-%318 = OpIEqual  %112  %316 %135
+-%319 = OpSelect  %8  %318 %126 %316
+-%320 = OpUDiv  %8  %315 %319
++%318 = OpIEqual  %112  %315 %135
++%319 = OpSelect  %8  %318 %126 %315
++%320 = OpUDiv  %8  %314 %319
+ OpReturnValue %320
+ OpFunctionEnd
+ %325 = OpFunction  %6  None %326
+@@ -1178,7 +1178,7 @@ OpLine %3 132 5
+ OpStore %426 %408
+ OpReturn
+ OpFunctionEnd
+-%427 = OpFunction  %8  None %314
++%427 = OpFunction  %8  None %316
+ %428 = OpFunctionParameter  %8
+ %429 = OpFunctionParameter  %8
+ %430 = OpLabel
+diff --git a/naga/tests/out/spv/wgsl-globals.spvasm b/naga/tests/out/spv/wgsl-globals.spvasm
+index 7253b9aab..b97b06d60 100644
+--- a/naga/tests/out/spv/wgsl-globals.spvasm
++++ b/naga/tests/out/spv/wgsl-globals.spvasm
+@@ -124,8 +124,8 @@ OpDecorate %138 BuiltIn LocalInvocationIndex
+ %73 = OpTypePointer Function %23
+ %75 = OpTypePointer StorageBuffer %8
+ %77 = OpTypePointer StorageBuffer %4
+-%97 = OpTypeFunction %20 %26
+-%106 = OpTypeFunction %15 %25
++%98 = OpTypeFunction %20 %26
++%107 = OpTypeFunction %15 %25
+ %116 = OpTypePointer StorageBuffer %11
+ %118 = OpTypePointer Uniform %13
+ %120 = OpTypePointer Uniform %8
+@@ -196,22 +196,22 @@ OpStore %81 %70
+ %95 = OpVectorTimesScalar  %8  %94 %69
+ OpReturn
+ OpFunctionEnd
+-%96 = OpFunction  %20  None %97
+-%98 = OpFunctionParameter  %26
++%96 = OpFunction  %20  None %98
++%97 = OpFunctionParameter  %26
+ %99 = OpLabel
+-%100 = OpCompositeExtract  %10  %98 0
+-%101 = OpCompositeExtract  %10  %98 1
+-%102 = OpCompositeExtract  %10  %98 2
+-%103 = OpCompositeExtract  %10  %98 3
++%100 = OpCompositeExtract  %10  %97 0
++%101 = OpCompositeExtract  %10  %97 1
++%102 = OpCompositeExtract  %10  %97 2
++%103 = OpCompositeExtract  %10  %97 3
+ %104 = OpCompositeConstruct  %20  %100 %101 %102 %103
+ OpReturnValue %104
+ OpFunctionEnd
+-%105 = OpFunction  %15  None %106
+-%107 = OpFunctionParameter  %25
++%105 = OpFunction  %15  None %107
++%106 = OpFunctionParameter  %25
+ %108 = OpLabel
+-%109 = OpCompositeExtract  %10  %107 0
+-%110 = OpCompositeExtract  %10  %107 1
+-%111 = OpCompositeExtract  %10  %107 2
++%109 = OpCompositeExtract  %10  %106 0
++%110 = OpCompositeExtract  %10  %106 1
++%111 = OpCompositeExtract  %10  %106 2
+ %112 = OpCompositeConstruct  %15  %109 %110 %111
+ OpReturnValue %112
+ OpFunctionEnd
+diff --git a/naga/tests/out/spv/wgsl-image.spvasm b/naga/tests/out/spv/wgsl-image.spvasm
+index 21532c12c..93c6cbe04 100644
+--- a/naga/tests/out/spv/wgsl-image.spvasm
++++ b/naga/tests/out/spv/wgsl-image.spvasm
+@@ -248,8 +248,8 @@ OpName %64 "image_2d_depth"
+ OpName %66 "image_2d_array_depth"
+ OpName %68 "image_cube_depth"
+ OpName %70 "naga_mod"
+-OpName %72 "lhs"
+-OpName %73 "rhs"
++OpName %71 "lhs"
++OpName %72 "rhs"
+ OpName %95 "local_id"
+ OpName %98 "main"
+ OpName %197 "local_id"
+@@ -384,7 +384,7 @@ OpDecorate %551 Location 0
+ %66 = OpVariable  %67  UniformConstant
+ %69 = OpTypePointer UniformConstant %28
+ %68 = OpVariable  %69  UniformConstant
+-%71 = OpTypeFunction %14 %14 %14
++%73 = OpTypeFunction %14 %14 %14
+ %76 = OpTypeBool
+ %75 = OpTypeVector %76 2
+ %77 = OpConstant  %15  0
+@@ -443,19 +443,19 @@ OpDecorate %551 Location 0
+ %539 = OpTypeVector %15 4
+ %540 = OpTypeSampledImage %18
+ %551 = OpVariable  %221  Output
+-%70 = OpFunction  %14  None %71
++%70 = OpFunction  %14  None %73
++%71 = OpFunctionParameter  %14
+ %72 = OpFunctionParameter  %14
+-%73 = OpFunctionParameter  %14
+ %74 = OpLabel
+-%79 = OpIEqual  %75  %73 %78
+-%84 = OpIEqual  %75  %72 %82
+-%85 = OpIEqual  %75  %73 %83
++%79 = OpIEqual  %75  %72 %78
++%84 = OpIEqual  %75  %71 %82
++%85 = OpIEqual  %75  %72 %83
+ %86 = OpLogicalAnd  %75  %84 %85
+ %87 = OpLogicalOr  %75  %79 %86
+-%90 = OpSelect  %14  %87 %89 %73
+-%91 = OpSDiv  %14  %72 %90
++%90 = OpSelect  %14  %87 %89 %72
++%91 = OpSDiv  %14  %71 %90
+ %92 = OpIMul  %14  %91 %90
+-%93 = OpISub  %14  %72 %92
++%93 = OpISub  %14  %71 %92
+ OpReturnValue %93
+ OpFunctionEnd
+ %98 = OpFunction  %2  None %99
+diff --git a/naga/tests/out/spv/wgsl-int-div-unchecked.spvasm b/naga/tests/out/spv/wgsl-int-div-unchecked.spvasm
+index 75f9ced54..f0ed86371 100644
+--- a/naga/tests/out/spv/wgsl-int-div-unchecked.spvasm
++++ b/naga/tests/out/spv/wgsl-int-div-unchecked.spvasm
+@@ -9,7 +9,7 @@ OpEntryPoint GLCompute %24 "main"
+ OpExecutionMode %24 LocalSize 1 1 1
+ %2 = OpTypeVoid
+ %3 = OpTypeInt 32 1
+-%5 = OpTypeFunction %3 %3 %3
++%7 = OpTypeFunction %3 %3 %3
+ %9 = OpTypeBool
+ %10 = OpConstant  %3  0
+ %12 = OpConstant  %3  -2147483648
+@@ -21,19 +21,19 @@ OpExecutionMode %24 LocalSize 1 1 1
+ %28 = OpTypeInt 32 0
+ %29 = OpConstant  %28  5
+ %30 = OpConstant  %28  2
+-%4 = OpFunction  %3  None %5
++%4 = OpFunction  %3  None %7
++%5 = OpFunctionParameter  %3
+ %6 = OpFunctionParameter  %3
+-%7 = OpFunctionParameter  %3
+ %8 = OpLabel
+-%11 = OpIEqual  %9  %7 %10
+-%14 = OpIEqual  %9  %6 %12
+-%15 = OpIEqual  %9  %7 %13
++%11 = OpIEqual  %9  %6 %10
++%14 = OpIEqual  %9  %5 %12
++%15 = OpIEqual  %9  %6 %13
+ %16 = OpLogicalAnd  %9  %14 %15
+ %17 = OpLogicalOr  %9  %11 %16
+-%19 = OpSelect  %3  %17 %18 %7
+-%20 = OpSDiv  %3  %6 %19
++%19 = OpSelect  %3  %17 %18 %6
++%20 = OpSDiv  %3  %5 %19
+ %21 = OpIMul  %3  %20 %19
+-%22 = OpISub  %3  %6 %21
++%22 = OpISub  %3  %5 %21
+ OpReturnValue %22
+ OpFunctionEnd
+ %24 = OpFunction  %2  None %25
+diff --git a/naga/tests/out/spv/wgsl-int-signed-remainder.spvasm b/naga/tests/out/spv/wgsl-int-signed-remainder.spvasm
+index 0e9f8683a..92828ed20 100644
+--- a/naga/tests/out/spv/wgsl-int-signed-remainder.spvasm
++++ b/naga/tests/out/spv/wgsl-int-signed-remainder.spvasm
+@@ -9,21 +9,21 @@ OpEntryPoint GLCompute %55 "main"
+ OpExecutionMode %55 LocalSize 1 1 1
+ %2 = OpTypeVoid
+ %3 = OpTypeInt 32 1
+-%5 = OpTypeFunction %3 %3 %3
++%7 = OpTypeFunction %3 %3 %3
+ %9 = OpTypeBool
+ %10 = OpConstant  %3  0
+ %12 = OpConstant  %3  -2147483648
+ %13 = OpConstant  %3  -1
+ %18 = OpConstant  %3  1
+ %23 = OpTypeVector %3 2
+-%25 = OpTypeFunction %23 %23 %23
++%27 = OpTypeFunction %23 %23 %23
+ %29 = OpTypeVector %9 2
+ %30 = OpConstantComposite  %23  %10 %10
+ %32 = OpConstantComposite  %23  %12 %12
+ %33 = OpConstantComposite  %23  %13 %13
+ %38 = OpConstantComposite  %23  %18 %18
+ %43 = OpTypeInt 32 0
+-%45 = OpTypeFunction %43 %43 %43
++%47 = OpTypeFunction %43 %43 %43
+ %49 = OpConstant  %43  0
+ %51 = OpConstant  %43  1
+ %56 = OpTypeFunction %2
+@@ -33,43 +33,43 @@ OpExecutionMode %55 LocalSize 1 1 1
+ %60 = OpConstantComposite  %23  %58 %58
+ %61 = OpConstant  %43  5
+ %62 = OpConstant  %43  2
+-%4 = OpFunction  %3  None %5
++%4 = OpFunction  %3  None %7
++%5 = OpFunctionParameter  %3
+ %6 = OpFunctionParameter  %3
+-%7 = OpFunctionParameter  %3
+ %8 = OpLabel
+-%11 = OpIEqual  %9  %7 %10
+-%14 = OpIEqual  %9  %6 %12
+-%15 = OpIEqual  %9  %7 %13
++%11 = OpIEqual  %9  %6 %10
++%14 = OpIEqual  %9  %5 %12
++%15 = OpIEqual  %9  %6 %13
+ %16 = OpLogicalAnd  %9  %14 %15
+ %17 = OpLogicalOr  %9  %11 %16
+-%19 = OpSelect  %3  %17 %18 %7
+-%20 = OpSDiv  %3  %6 %19
++%19 = OpSelect  %3  %17 %18 %6
++%20 = OpSDiv  %3  %5 %19
+ %21 = OpIMul  %3  %20 %19
+-%22 = OpISub  %3  %6 %21
++%22 = OpISub  %3  %5 %21
+ OpReturnValue %22
+ OpFunctionEnd
+-%24 = OpFunction  %23  None %25
++%24 = OpFunction  %23  None %27
++%25 = OpFunctionParameter  %23
+ %26 = OpFunctionParameter  %23
+-%27 = OpFunctionParameter  %23
+ %28 = OpLabel
+-%31 = OpIEqual  %29  %27 %30
+-%34 = OpIEqual  %29  %26 %32
+-%35 = OpIEqual  %29  %27 %33
++%31 = OpIEqual  %29  %26 %30
++%34 = OpIEqual  %29  %25 %32
++%35 = OpIEqual  %29  %26 %33
+ %36 = OpLogicalAnd  %29  %34 %35
+ %37 = OpLogicalOr  %29  %31 %36
+-%39 = OpSelect  %23  %37 %38 %27
+-%40 = OpSDiv  %23  %26 %39
++%39 = OpSelect  %23  %37 %38 %26
++%40 = OpSDiv  %23  %25 %39
+ %41 = OpIMul  %23  %40 %39
+-%42 = OpISub  %23  %26 %41
++%42 = OpISub  %23  %25 %41
+ OpReturnValue %42
+ OpFunctionEnd
+-%44 = OpFunction  %43  None %45
++%44 = OpFunction  %43  None %47
++%45 = OpFunctionParameter  %43
+ %46 = OpFunctionParameter  %43
+-%47 = OpFunctionParameter  %43
+ %48 = OpLabel
+-%50 = OpIEqual  %9  %47 %49
+-%52 = OpSelect  %43  %50 %51 %47
+-%53 = OpUMod  %43  %46 %52
++%50 = OpIEqual  %9  %46 %49
++%52 = OpSelect  %43  %50 %51 %46
++%53 = OpUMod  %43  %45 %52
+ OpReturnValue %53
+ OpFunctionEnd
+ %55 = OpFunction  %2  None %56
+diff --git a/naga/tests/out/spv/wgsl-int16.spvasm b/naga/tests/out/spv/wgsl-int16.spvasm
+index 68f90c073..f30b1c9e9 100644
+--- a/naga/tests/out/spv/wgsl-int16.spvasm
++++ b/naga/tests/out/spv/wgsl-int16.spvasm
+@@ -98,7 +98,7 @@ OpDecorate %392 BuiltIn LocalInvocationIndex
+ %38 = OpVariable  %40  StorageBuffer
+ %42 = OpTypePointer Workgroup %4
+ %41 = OpVariable  %42  Workgroup
+-%44 = OpTypeFunction %3 %3 %3
++%46 = OpTypeFunction %3 %3 %3
+ %48 = OpTypeBool
+ %49 = OpConstant  %3  0
+ %51 = OpConstant  %3  -32768
+@@ -139,7 +139,7 @@ OpDecorate %392 BuiltIn LocalInvocationIndex
+ %216 = OpTypePointer StorageBuffer %5
+ %220 = OpTypePointer StorageBuffer %6
+ %224 = OpTypePointer StorageBuffer %7
+-%243 = OpTypeFunction %4 %4 %4
++%245 = OpTypeFunction %4 %4 %4
+ %247 = OpConstant  %4  0
+ %261 = OpTypeFunction %4 %4
+ %267 = OpConstant  %4  5
+@@ -172,20 +172,20 @@ OpDecorate %392 BuiltIn LocalInvocationIndex
+ %392 = OpVariable  %375  Input
+ %397 = OpConstant  %5  264
+ %403 = OpConstant  %5  11
+-%43 = OpFunction  %3  None %44
++%43 = OpFunction  %3  None %46
++%44 = OpFunctionParameter  %3
+ %45 = OpFunctionParameter  %3
+-%46 = OpFunctionParameter  %3
+ %47 = OpLabel
+-%50 = OpIEqual  %48  %46 %49
+-%53 = OpIEqual  %48  %45 %51
+-%54 = OpIEqual  %48  %46 %52
++%50 = OpIEqual  %48  %45 %49
++%53 = OpIEqual  %48  %44 %51
++%54 = OpIEqual  %48  %45 %52
+ %55 = OpLogicalAnd  %48  %53 %54
+ %56 = OpLogicalOr  %48  %50 %55
+-%57 = OpSelect  %3  %56 %21 %46
+-%58 = OpSDiv  %3  %45 %57
++%57 = OpSelect  %3  %56 %21 %45
++%58 = OpSDiv  %3  %44 %57
+ OpReturnValue %58
+ OpFunctionEnd
+-%59 = OpFunction  %3  None %44
++%59 = OpFunction  %3  None %46
+ %60 = OpFunctionParameter  %3
+ %61 = OpFunctionParameter  %3
+ %62 = OpLabel
+@@ -371,16 +371,16 @@ OpStore %240 %239
+ %241 = OpLoad  %3  %96
+ OpReturnValue %241
+ OpFunctionEnd
+-%242 = OpFunction  %4  None %243
++%242 = OpFunction  %4  None %245
++%243 = OpFunctionParameter  %4
+ %244 = OpFunctionParameter  %4
+-%245 = OpFunctionParameter  %4
+ %246 = OpLabel
+-%248 = OpIEqual  %48  %245 %247
+-%249 = OpSelect  %4  %248 %94 %245
+-%250 = OpUDiv  %4  %244 %249
++%248 = OpIEqual  %48  %244 %247
++%249 = OpSelect  %4  %248 %94 %244
++%250 = OpUDiv  %4  %243 %249
+ OpReturnValue %250
+ OpFunctionEnd
+-%251 = OpFunction  %4  None %243
++%251 = OpFunction  %4  None %245
+ %252 = OpFunctionParameter  %4
+ %253 = OpFunctionParameter  %4
+ %254 = OpLabel
+diff --git a/naga/tests/out/spv/wgsl-mat2-uniform-alignment.spvasm b/naga/tests/out/spv/wgsl-mat2-uniform-alignment.spvasm
+index e0dc13bfe..21eece159 100644
+--- a/naga/tests/out/spv/wgsl-mat2-uniform-alignment.spvasm
++++ b/naga/tests/out/spv/wgsl-mat2-uniform-alignment.spvasm
+@@ -28,18 +28,18 @@ OpMemberDecorate %10 0 Offset 0
+ %10 = OpTypeStruct %8
+ %11 = OpTypePointer Uniform %10
+ %9 = OpVariable  %11  Uniform
+-%13 = OpTypeFunction %7 %8
++%14 = OpTypeFunction %7 %8
+ %23 = OpTypeFunction %2
+ %24 = OpTypePointer Uniform %8
+ %26 = OpTypeInt 32 0
+ %25 = OpConstant  %26  0
+ %28 = OpTypePointer Uniform %7
+-%12 = OpFunction  %7  None %13
+-%14 = OpFunctionParameter  %8
++%12 = OpFunction  %7  None %14
++%13 = OpFunctionParameter  %8
+ %15 = OpLabel
+-%16 = OpCompositeExtract  %3  %14 0
+-%18 = OpCompositeExtract  %5  %14 1
+-%19 = OpCompositeExtract  %5  %14 2
++%16 = OpCompositeExtract  %3  %13 0
++%18 = OpCompositeExtract  %5  %13 1
++%19 = OpCompositeExtract  %5  %13 2
+ %17 = OpCompositeConstruct  %4  %18 %19
+ %20 = OpCompositeConstruct  %7  %16 %17
+ OpReturnValue %20
+diff --git a/naga/tests/out/spv/wgsl-mat_cx2.spvasm b/naga/tests/out/spv/wgsl-mat_cx2.spvasm
+index 10fcb1692..a8f5da905 100644
+--- a/naga/tests/out/spv/wgsl-mat_cx2.spvasm
++++ b/naga/tests/out/spv/wgsl-mat_cx2.spvasm
+@@ -274,17 +274,24 @@ OpName %34 "u_am"
+ OpName %37 "s_sasm"
+ OpName %40 "u_sasm"
+ OpName %43 "mat2x2<f32>_from_std140"
++OpName %44 "value"
+ OpName %50 "mat2x2<f32>_get_column"
++OpName %51 "matrix"
++OpName %52 "column_index"
+ OpName %63 "access_m"
+ OpName %72 "idx"
+ OpName %137 "StructWithMat_from_std140"
++OpName %138 "value"
+ OpName %146 "access_sm"
+ OpName %152 "idx"
+ OpName %230 "array<mat2x2<f32>, 4>_from_std140"
++OpName %231 "value"
+ OpName %244 "access_am"
+ OpName %250 "idx"
+ OpName %402 "StructWithArrayOfStructOfMat_from_std140"
++OpName %403 "value"
+ OpName %407 "array<StructWithMat, 4>_from_std140"
++OpName %408 "value"
+ OpName %423 "access_sasm"
+ OpName %429 "idx"
+ OpName %615 "main"
+@@ -377,7 +384,7 @@ OpMemberDecorate %41 0 Offset 0
+ %41 = OpTypeStruct %18
+ %42 = OpTypePointer Uniform %41
+ %40 = OpVariable  %42  Uniform
+-%44 = OpTypeFunction %4 %14
++%45 = OpTypeFunction %4 %14
+ %53 = OpTypeFunction %5 %4 %11
+ %64 = OpTypeFunction %2
+ %65 = OpTypePointer StorageBuffer %4
+@@ -390,28 +397,28 @@ OpMemberDecorate %41 0 Offset 0
+ %84 = OpTypePointer StorageBuffer %6
+ %99 = OpTypePointer Uniform %5
+ %107 = OpTypePointer Uniform %6
+-%138 = OpTypeFunction %8 %15
++%139 = OpTypeFunction %8 %15
+ %147 = OpTypePointer StorageBuffer %8
+ %149 = OpTypePointer Uniform %15
+ %151 = OpTypePointer Uniform %8
+ %178 = OpConstant  %11  1
+-%231 = OpTypeFunction %9 %16
++%232 = OpTypeFunction %9 %16
+ %245 = OpTypePointer StorageBuffer %9
+ %247 = OpTypePointer Uniform %16
+ %249 = OpTypePointer Uniform %9
+-%403 = OpTypeFunction %13 %18
+-%408 = OpTypeFunction %12 %17
++%404 = OpTypeFunction %13 %18
++%409 = OpTypeFunction %12 %17
+ %424 = OpTypePointer StorageBuffer %13
+ %426 = OpTypePointer Uniform %18
+ %428 = OpTypePointer Uniform %13
+ %434 = OpTypePointer StorageBuffer %12
+ %484 = OpTypePointer Uniform %12
+ %485 = OpTypePointer Uniform %17
+-%43 = OpFunction  %4  None %44
+-%45 = OpFunctionParameter  %14
++%43 = OpFunction  %4  None %45
++%44 = OpFunctionParameter  %14
+ %46 = OpLabel
+-%47 = OpCompositeExtract  %5  %45 0
+-%48 = OpCompositeExtract  %5  %45 1
++%47 = OpCompositeExtract  %5  %44 0
++%48 = OpCompositeExtract  %5  %44 1
+ %49 = OpCompositeConstruct  %4  %47 %48
+ OpReturnValue %49
+ OpFunctionEnd
+@@ -543,11 +550,11 @@ OpLine %3 55 5
+ OpStore %136 %125
+ OpReturn
+ OpFunctionEnd
+-%137 = OpFunction  %8  None %138
+-%139 = OpFunctionParameter  %15
++%137 = OpFunction  %8  None %139
++%138 = OpFunctionParameter  %15
+ %140 = OpLabel
+-%142 = OpCompositeExtract  %5  %139 0
+-%143 = OpCompositeExtract  %5  %139 1
++%142 = OpCompositeExtract  %5  %138 0
++%143 = OpCompositeExtract  %5  %138 1
+ %141 = OpCompositeConstruct  %4  %142 %143
+ %144 = OpCompositeConstruct  %8  %141
+ OpReturnValue %144
+@@ -693,16 +700,16 @@ OpLine %3 100 5
+ OpStore %229 %217
+ OpReturn
+ OpFunctionEnd
+-%230 = OpFunction  %9  None %231
+-%232 = OpFunctionParameter  %16
++%230 = OpFunction  %9  None %232
++%231 = OpFunctionParameter  %16
+ %233 = OpLabel
+-%234 = OpCompositeExtract  %14  %232 0
++%234 = OpCompositeExtract  %14  %231 0
+ %235 = OpFunctionCall  %4  %43 %234
+-%236 = OpCompositeExtract  %14  %232 1
++%236 = OpCompositeExtract  %14  %231 1
+ %237 = OpFunctionCall  %4  %43 %236
+-%238 = OpCompositeExtract  %14  %232 2
++%238 = OpCompositeExtract  %14  %231 2
+ %239 = OpFunctionCall  %4  %43 %238
+-%240 = OpCompositeExtract  %14  %232 3
++%240 = OpCompositeExtract  %14  %231 3
+ %241 = OpFunctionCall  %4  %43 %240
+ %242 = OpCompositeConstruct  %9  %235 %237 %239 %241
+ OpReturnValue %242
+@@ -973,24 +980,24 @@ OpLine %3 162 5
+ OpStore %401 %370
+ OpReturn
+ OpFunctionEnd
+-%407 = OpFunction  %12  None %408
+-%409 = OpFunctionParameter  %17
++%407 = OpFunction  %12  None %409
++%408 = OpFunctionParameter  %17
+ %410 = OpLabel
+-%411 = OpCompositeExtract  %15  %409 0
++%411 = OpCompositeExtract  %15  %408 0
+ %412 = OpFunctionCall  %8  %137 %411
+-%413 = OpCompositeExtract  %15  %409 1
++%413 = OpCompositeExtract  %15  %408 1
+ %414 = OpFunctionCall  %8  %137 %413
+-%415 = OpCompositeExtract  %15  %409 2
++%415 = OpCompositeExtract  %15  %408 2
+ %416 = OpFunctionCall  %8  %137 %415
+-%417 = OpCompositeExtract  %15  %409 3
++%417 = OpCompositeExtract  %15  %408 3
+ %418 = OpFunctionCall  %8  %137 %417
+ %419 = OpCompositeConstruct  %12  %412 %414 %416 %418
+ OpReturnValue %419
+ OpFunctionEnd
+-%402 = OpFunction  %13  None %403
+-%404 = OpFunctionParameter  %18
++%402 = OpFunction  %13  None %404
++%403 = OpFunctionParameter  %18
+ %405 = OpLabel
+-%420 = OpCompositeExtract  %17  %404 0
++%420 = OpCompositeExtract  %17  %403 0
+ %406 = OpFunctionCall  %12  %407 %420
+ %421 = OpCompositeConstruct  %13  %406
+ OpReturnValue %421
+diff --git a/naga/tests/out/spv/wgsl-mat_cx2_f16.spvasm b/naga/tests/out/spv/wgsl-mat_cx2_f16.spvasm
+index e7cfd366b..97b0fddd6 100644
+--- a/naga/tests/out/spv/wgsl-mat_cx2_f16.spvasm
++++ b/naga/tests/out/spv/wgsl-mat_cx2_f16.spvasm
+@@ -285,17 +285,24 @@ OpName %34 "u_am"
+ OpName %37 "s_sasm"
+ OpName %40 "u_sasm"
+ OpName %43 "mat4x2<f16>_from_std140"
++OpName %44 "value"
+ OpName %52 "mat4x2<f16>_get_column"
++OpName %53 "matrix"
++OpName %54 "column_index"
+ OpName %69 "access_m"
+ OpName %78 "idx"
+ OpName %143 "StructWithMat_from_std140"
++OpName %144 "value"
+ OpName %154 "access_sm"
+ OpName %160 "idx"
+ OpName %256 "array<mat4x2<f16>, 4>_from_std140"
++OpName %257 "value"
+ OpName %270 "access_am"
+ OpName %276 "idx"
+ OpName %428 "StructWithArrayOfStructOfMat_from_std140"
++OpName %429 "value"
+ OpName %433 "array<StructWithMat, 4>_from_std140"
++OpName %434 "value"
+ OpName %449 "access_sasm"
+ OpName %455 "idx"
+ OpName %673 "main"
+@@ -392,7 +399,7 @@ OpMemberDecorate %41 0 Offset 0
+ %41 = OpTypeStruct %18
+ %42 = OpTypePointer Uniform %41
+ %40 = OpVariable  %42  Uniform
+-%44 = OpTypeFunction %4 %14
++%45 = OpTypeFunction %4 %14
+ %55 = OpTypeFunction %5 %4 %11
+ %70 = OpTypeFunction %2
+ %71 = OpTypePointer StorageBuffer %4
+@@ -405,32 +412,32 @@ OpMemberDecorate %41 0 Offset 0
+ %90 = OpTypePointer StorageBuffer %6
+ %105 = OpTypePointer Uniform %5
+ %113 = OpTypePointer Uniform %6
+-%144 = OpTypeFunction %8 %15
++%145 = OpTypeFunction %8 %15
+ %155 = OpTypePointer StorageBuffer %8
+ %157 = OpTypePointer Uniform %15
+ %159 = OpTypePointer Uniform %8
+ %186 = OpConstant  %11  1
+ %187 = OpConstant  %11  2
+ %188 = OpConstant  %11  3
+-%257 = OpTypeFunction %9 %16
++%258 = OpTypeFunction %9 %16
+ %271 = OpTypePointer StorageBuffer %9
+ %273 = OpTypePointer Uniform %16
+ %275 = OpTypePointer Uniform %9
+-%429 = OpTypeFunction %13 %18
+-%434 = OpTypeFunction %12 %17
++%430 = OpTypeFunction %13 %18
++%435 = OpTypeFunction %12 %17
+ %450 = OpTypePointer StorageBuffer %13
+ %452 = OpTypePointer Uniform %18
+ %454 = OpTypePointer Uniform %13
+ %460 = OpTypePointer StorageBuffer %12
+ %510 = OpTypePointer Uniform %12
+ %511 = OpTypePointer Uniform %17
+-%43 = OpFunction  %4  None %44
+-%45 = OpFunctionParameter  %14
++%43 = OpFunction  %4  None %45
++%44 = OpFunctionParameter  %14
+ %46 = OpLabel
+-%47 = OpCompositeExtract  %5  %45 0
+-%48 = OpCompositeExtract  %5  %45 1
+-%49 = OpCompositeExtract  %5  %45 2
+-%50 = OpCompositeExtract  %5  %45 3
++%47 = OpCompositeExtract  %5  %44 0
++%48 = OpCompositeExtract  %5  %44 1
++%49 = OpCompositeExtract  %5  %44 2
++%50 = OpCompositeExtract  %5  %44 3
+ %51 = OpCompositeConstruct  %4  %47 %48 %49 %50
+ OpReturnValue %51
+ OpFunctionEnd
+@@ -568,13 +575,13 @@ OpLine %3 57 5
+ OpStore %142 %131
+ OpReturn
+ OpFunctionEnd
+-%143 = OpFunction  %8  None %144
+-%145 = OpFunctionParameter  %15
++%143 = OpFunction  %8  None %145
++%144 = OpFunctionParameter  %15
+ %146 = OpLabel
+-%148 = OpCompositeExtract  %5  %145 0
+-%149 = OpCompositeExtract  %5  %145 1
+-%150 = OpCompositeExtract  %5  %145 2
+-%151 = OpCompositeExtract  %5  %145 3
++%148 = OpCompositeExtract  %5  %144 0
++%149 = OpCompositeExtract  %5  %144 1
++%150 = OpCompositeExtract  %5  %144 2
++%151 = OpCompositeExtract  %5  %144 3
+ %147 = OpCompositeConstruct  %4  %148 %149 %150 %151
+ %152 = OpCompositeConstruct  %8  %147
+ OpReturnValue %152
+@@ -736,16 +743,16 @@ OpLine %3 102 5
+ OpStore %255 %243
+ OpReturn
+ OpFunctionEnd
+-%256 = OpFunction  %9  None %257
+-%258 = OpFunctionParameter  %16
++%256 = OpFunction  %9  None %258
++%257 = OpFunctionParameter  %16
+ %259 = OpLabel
+-%260 = OpCompositeExtract  %14  %258 0
++%260 = OpCompositeExtract  %14  %257 0
+ %261 = OpFunctionCall  %4  %43 %260
+-%262 = OpCompositeExtract  %14  %258 1
++%262 = OpCompositeExtract  %14  %257 1
+ %263 = OpFunctionCall  %4  %43 %262
+-%264 = OpCompositeExtract  %14  %258 2
++%264 = OpCompositeExtract  %14  %257 2
+ %265 = OpFunctionCall  %4  %43 %264
+-%266 = OpCompositeExtract  %14  %258 3
++%266 = OpCompositeExtract  %14  %257 3
+ %267 = OpFunctionCall  %4  %43 %266
+ %268 = OpCompositeConstruct  %9  %261 %263 %265 %267
+ OpReturnValue %268
+@@ -1016,24 +1023,24 @@ OpLine %3 164 5
+ OpStore %427 %396
+ OpReturn
+ OpFunctionEnd
+-%433 = OpFunction  %12  None %434
+-%435 = OpFunctionParameter  %17
++%433 = OpFunction  %12  None %435
++%434 = OpFunctionParameter  %17
+ %436 = OpLabel
+-%437 = OpCompositeExtract  %15  %435 0
++%437 = OpCompositeExtract  %15  %434 0
+ %438 = OpFunctionCall  %8  %143 %437
+-%439 = OpCompositeExtract  %15  %435 1
++%439 = OpCompositeExtract  %15  %434 1
+ %440 = OpFunctionCall  %8  %143 %439
+-%441 = OpCompositeExtract  %15  %435 2
++%441 = OpCompositeExtract  %15  %434 2
+ %442 = OpFunctionCall  %8  %143 %441
+-%443 = OpCompositeExtract  %15  %435 3
++%443 = OpCompositeExtract  %15  %434 3
+ %444 = OpFunctionCall  %8  %143 %443
+ %445 = OpCompositeConstruct  %12  %438 %440 %442 %444
+ OpReturnValue %445
+ OpFunctionEnd
+-%428 = OpFunction  %13  None %429
+-%430 = OpFunctionParameter  %18
++%428 = OpFunction  %13  None %430
++%429 = OpFunctionParameter  %18
+ %431 = OpLabel
+-%446 = OpCompositeExtract  %17  %430 0
++%446 = OpCompositeExtract  %17  %429 0
+ %432 = OpFunctionCall  %12  %433 %446
+ %447 = OpCompositeConstruct  %13  %432
+ OpReturnValue %447
+diff --git a/naga/tests/out/spv/wgsl-operators.spvasm b/naga/tests/out/spv/wgsl-operators.spvasm
+index 4852fd430..2a1d6fdf9 100644
+--- a/naga/tests/out/spv/wgsl-operators.spvasm
++++ b/naga/tests/out/spv/wgsl-operators.spvasm
+@@ -36,7 +36,7 @@ OpDecorate %562 BuiltIn WorkgroupId
+ %29 = OpConstant  %3  0.1
+ %30 = OpConstantComposite  %6  %28 %28 %28 %28
+ %34 = OpTypeVector %7 4
+-%51 = OpTypeFunction %6 %6 %6
++%53 = OpTypeFunction %6 %6 %6
+ %55 = OpConstantComposite  %6  %28 %28 %28 %28
+ %57 = OpConstant  %5  -2147483648
+ %58 = OpConstant  %5  -1
+@@ -77,21 +77,21 @@ OpDecorate %562 BuiltIn WorkgroupId
+ %151 = OpConstantNull  %7
+ %153 = OpConstantNull  %7
+ %155 = OpConstantNull  %7
+-%202 = OpTypeFunction %5 %5 %5
+-%214 = OpTypeFunction %11 %11 %11
++%204 = OpTypeFunction %5 %5 %5
++%216 = OpTypeFunction %11 %11 %11
+ %218 = OpConstant  %11  0
+ %220 = OpConstant  %11  1
+ %223 = OpTypeVector %5 2
+-%225 = OpTypeFunction %223 %223 %223
++%227 = OpTypeFunction %223 %223 %223
+ %229 = OpConstantComposite  %223  %28 %28
+ %231 = OpConstantComposite  %223  %57 %57
+ %232 = OpConstantComposite  %223  %58 %58
+ %237 = OpConstantComposite  %223  %21 %21
+-%241 = OpTypeFunction %10 %10 %10
++%243 = OpTypeFunction %10 %10 %10
+ %245 = OpConstantComposite  %10  %218 %218 %218
+ %247 = OpConstantComposite  %10  %220 %220 %220
+ %290 = OpTypeVector %11 2
+-%292 = OpTypeFunction %290 %290 %290
++%294 = OpTypeFunction %290 %290 %290
+ %296 = OpConstantComposite  %290  %218 %218
+ %298 = OpConstantComposite  %290  %220 %220
+ %310 = OpConstant  %11  2
+@@ -137,19 +137,19 @@ OpBranch %31
+ %49 = OpFAdd  %4  %48 %40
+ OpReturnValue %49
+ OpFunctionEnd
+-%50 = OpFunction  %6  None %51
++%50 = OpFunction  %6  None %53
++%51 = OpFunctionParameter  %6
+ %52 = OpFunctionParameter  %6
+-%53 = OpFunctionParameter  %6
+ %54 = OpLabel
+-%56 = OpIEqual  %34  %53 %55
+-%61 = OpIEqual  %34  %52 %59
+-%62 = OpIEqual  %34  %53 %60
++%56 = OpIEqual  %34  %52 %55
++%61 = OpIEqual  %34  %51 %59
++%62 = OpIEqual  %34  %52 %60
+ %63 = OpLogicalAnd  %34  %61 %62
+ %64 = OpLogicalOr  %34  %56 %63
+-%66 = OpSelect  %6  %64 %65 %53
+-%67 = OpSDiv  %6  %52 %66
++%66 = OpSelect  %6  %64 %65 %52
++%67 = OpSDiv  %6  %51 %66
+ %68 = OpIMul  %6  %67 %66
+-%69 = OpISub  %6  %52 %68
++%69 = OpISub  %6  %51 %68
+ OpReturnValue %69
+ OpFunctionEnd
+ %73 = OpFunction  %4  None %74
+@@ -318,51 +318,51 @@ OpBranch %196
+ %200 = OpLoad  %7  %154
+ OpReturn
+ OpFunctionEnd
+-%201 = OpFunction  %5  None %202
++%201 = OpFunction  %5  None %204
++%202 = OpFunctionParameter  %5
+ %203 = OpFunctionParameter  %5
+-%204 = OpFunctionParameter  %5
+ %205 = OpLabel
+-%206 = OpIEqual  %7  %204 %28
+-%207 = OpIEqual  %7  %203 %57
+-%208 = OpIEqual  %7  %204 %58
++%206 = OpIEqual  %7  %203 %28
++%207 = OpIEqual  %7  %202 %57
++%208 = OpIEqual  %7  %203 %58
+ %209 = OpLogicalAnd  %7  %207 %208
+ %210 = OpLogicalOr  %7  %206 %209
+-%211 = OpSelect  %5  %210 %21 %204
+-%212 = OpSDiv  %5  %203 %211
++%211 = OpSelect  %5  %210 %21 %203
++%212 = OpSDiv  %5  %202 %211
+ OpReturnValue %212
+ OpFunctionEnd
+-%213 = OpFunction  %11  None %214
++%213 = OpFunction  %11  None %216
++%214 = OpFunctionParameter  %11
+ %215 = OpFunctionParameter  %11
+-%216 = OpFunctionParameter  %11
+ %217 = OpLabel
+-%219 = OpIEqual  %7  %216 %218
+-%221 = OpSelect  %11  %219 %220 %216
+-%222 = OpUDiv  %11  %215 %221
++%219 = OpIEqual  %7  %215 %218
++%221 = OpSelect  %11  %219 %220 %215
++%222 = OpUDiv  %11  %214 %221
+ OpReturnValue %222
+ OpFunctionEnd
+-%224 = OpFunction  %223  None %225
++%224 = OpFunction  %223  None %227
++%225 = OpFunctionParameter  %223
+ %226 = OpFunctionParameter  %223
+-%227 = OpFunctionParameter  %223
+ %228 = OpLabel
+-%230 = OpIEqual  %135  %227 %229
+-%233 = OpIEqual  %135  %226 %231
+-%234 = OpIEqual  %135  %227 %232
++%230 = OpIEqual  %135  %226 %229
++%233 = OpIEqual  %135  %225 %231
++%234 = OpIEqual  %135  %226 %232
+ %235 = OpLogicalAnd  %135  %233 %234
+ %236 = OpLogicalOr  %135  %230 %235
+-%238 = OpSelect  %223  %236 %237 %227
+-%239 = OpSDiv  %223  %226 %238
++%238 = OpSelect  %223  %236 %237 %226
++%239 = OpSDiv  %223  %225 %238
+ OpReturnValue %239
+ OpFunctionEnd
+-%240 = OpFunction  %10  None %241
++%240 = OpFunction  %10  None %243
++%241 = OpFunctionParameter  %10
+ %242 = OpFunctionParameter  %10
+-%243 = OpFunctionParameter  %10
+ %244 = OpLabel
+-%246 = OpIEqual  %114  %243 %245
+-%248 = OpSelect  %10  %246 %247 %243
+-%249 = OpUDiv  %10  %242 %248
++%246 = OpIEqual  %114  %242 %245
++%248 = OpSelect  %10  %246 %247 %242
++%249 = OpUDiv  %10  %241 %248
+ OpReturnValue %249
+ OpFunctionEnd
+-%250 = OpFunction  %5  None %202
++%250 = OpFunction  %5  None %204
+ %251 = OpFunctionParameter  %5
+ %252 = OpFunctionParameter  %5
+ %253 = OpLabel
+@@ -377,7 +377,7 @@ OpFunctionEnd
+ %262 = OpISub  %5  %251 %261
+ OpReturnValue %262
+ OpFunctionEnd
+-%263 = OpFunction  %11  None %214
++%263 = OpFunction  %11  None %216
+ %264 = OpFunctionParameter  %11
+ %265 = OpFunctionParameter  %11
+ %266 = OpLabel
+@@ -386,7 +386,7 @@ OpFunctionEnd
+ %269 = OpUMod  %11  %264 %268
+ OpReturnValue %269
+ OpFunctionEnd
+-%270 = OpFunction  %223  None %225
++%270 = OpFunction  %223  None %227
+ %271 = OpFunctionParameter  %223
+ %272 = OpFunctionParameter  %223
+ %273 = OpLabel
+@@ -401,7 +401,7 @@ OpFunctionEnd
+ %282 = OpISub  %223  %271 %281
+ OpReturnValue %282
+ OpFunctionEnd
+-%283 = OpFunction  %10  None %241
++%283 = OpFunction  %10  None %243
+ %284 = OpFunctionParameter  %10
+ %285 = OpFunctionParameter  %10
+ %286 = OpLabel
+@@ -410,16 +410,16 @@ OpFunctionEnd
+ %289 = OpUMod  %10  %284 %288
+ OpReturnValue %289
+ OpFunctionEnd
+-%291 = OpFunction  %290  None %292
++%291 = OpFunction  %290  None %294
++%292 = OpFunctionParameter  %290
+ %293 = OpFunctionParameter  %290
+-%294 = OpFunctionParameter  %290
+ %295 = OpLabel
+-%297 = OpIEqual  %135  %294 %296
+-%299 = OpSelect  %290  %297 %298 %294
+-%300 = OpUDiv  %290  %293 %299
++%297 = OpIEqual  %135  %293 %296
++%299 = OpSelect  %290  %297 %298 %293
++%300 = OpUDiv  %290  %292 %299
+ OpReturnValue %300
+ OpFunctionEnd
+-%301 = OpFunction  %290  None %292
++%301 = OpFunction  %290  None %294
+ %302 = OpFunctionParameter  %290
+ %303 = OpFunctionParameter  %290
+ %304 = OpLabel
+diff --git a/naga/tests/out/spv/wgsl-overrides-ray-query.main.spvasm b/naga/tests/out/spv/wgsl-overrides-ray-query.main.spvasm
+index da6e298c7..75cbed584 100644
+--- a/naga/tests/out/spv/wgsl-overrides-ray-query.main.spvasm
++++ b/naga/tests/out/spv/wgsl-overrides-ray-query.main.spvasm
+@@ -44,7 +44,7 @@ OpDecorate %10 Binding 0
+ %31 = OpConstant  %6  0
+ %32 = OpTypePointer Function %3
+ %34 = OpConstant  %3  0
+-%36 = OpTypeFunction %2 %28 %4 %8 %29 %32
++%42 = OpTypeFunction %2 %28 %4 %8 %29 %32
+ %44 = OpTypeBool
+ %45 = OpTypeVector %44 3
+ %66 = OpConstant  %6  256
+@@ -62,22 +62,22 @@ OpDecorate %10 Binding 0
+ %128 = OpConstant  %6  4294967295
+ %129 = OpConstantComposite  %124  %128 %128
+ %142 = OpTypePointer Function %44
+-%143 = OpTypeFunction %44 %28 %29
++%146 = OpTypeFunction %44 %28 %29
+ %149 = OpConstantFalse  %44
+ %160 = OpConstant  %6  6
+-%37 = OpFunction  %2  None %36
+-%38 = OpFunctionParameter  %28
+-%39 = OpFunctionParameter  %4
+-%40 = OpFunctionParameter  %8
+-%41 = OpFunctionParameter  %29
+-%42 = OpFunctionParameter  %32
++%36 = OpFunction  %2  None %42
++%37 = OpFunctionParameter  %28
++%38 = OpFunctionParameter  %4
++%39 = OpFunctionParameter  %8
++%40 = OpFunctionParameter  %29
++%41 = OpFunctionParameter  %32
+ %43 = OpLabel
+-%46 = OpCompositeExtract  %6  %40 0
+-%47 = OpCompositeExtract  %6  %40 1
+-%48 = OpCompositeExtract  %3  %40 2
+-%49 = OpCompositeExtract  %3  %40 3
+-%50 = OpCompositeExtract  %7  %40 4
+-%51 = OpCompositeExtract  %7  %40 5
++%46 = OpCompositeExtract  %6  %39 0
++%47 = OpCompositeExtract  %6  %39 1
++%48 = OpCompositeExtract  %3  %39 2
++%49 = OpCompositeExtract  %3  %39 3
++%50 = OpCompositeExtract  %7  %39 4
++%51 = OpCompositeExtract  %7  %39 5
+ %52 = OpFOrdLessThanEqual  %44  %48 %49
+ %53 = OpFOrdGreaterThanEqual  %44  %48 %34
+ %54 = OpIsInf  %45  %50
+@@ -134,24 +134,24 @@ OpDecorate %10 Binding 0
+ %113 = OpLogicalAnd  %44  %112 %65
+ %114 = OpLogicalAnd  %44  %113 %73
+ %115 = OpLogicalAnd  %44  %114 %85
+-OpStore %42 %49
++OpStore %41 %49
+ OpSelectionMerge %116 None
+ OpBranchConditional %115 %118 %117
+ %118 = OpLabel
+-OpRayQueryInitializeKHR %38 %39 %46 %47 %50 %48 %51 %49
+-OpStore %41 %86
++OpRayQueryInitializeKHR %37 %38 %46 %47 %50 %48 %51 %49
++OpStore %40 %86
+ OpBranch %116
+ %117 = OpLabel
+ OpBranch %116
+ %116 = OpLabel
+ OpReturn
+ OpFunctionEnd
+-%144 = OpFunction  %44  None %143
+-%145 = OpFunctionParameter  %28
+-%146 = OpFunctionParameter  %29
++%143 = OpFunction  %44  None %146
++%144 = OpFunctionParameter  %28
++%145 = OpFunctionParameter  %29
+ %147 = OpLabel
+ %148 = OpVariable  %142  Function %149
+-%150 = OpLoad  %6  %146
++%150 = OpLoad  %6  %145
+ %153 = OpBitwiseAnd  %6  %150 %86
+ %154 = OpINotEqual  %44  %153 %31
+ %155 = OpBitwiseAnd  %6  %150 %16
+@@ -161,11 +161,11 @@ OpFunctionEnd
+ OpSelectionMerge %151 None
+ OpBranchConditional %158 %152 %151
+ %152 = OpLabel
+-%159 = OpRayQueryProceedKHR  %44  %145
++%159 = OpRayQueryProceedKHR  %44  %144
+ OpStore %148 %159
+ %161 = OpSelect  %6  %159 %89 %160
+ %162 = OpBitwiseOr  %6  %150 %161
+-OpStore %146 %162
++OpStore %145 %162
+ OpBranch %151
+ %151 = OpLabel
+ %163 = OpLoad  %44  %148
+@@ -180,7 +180,7 @@ OpFunctionEnd
+ %15 = OpLoad  %4  %10
+ OpBranch %35
+ %35 = OpLabel
+-%119 = OpFunctionCall  %2  %37 %27 %15 %26 %30 %33
++%119 = OpFunctionCall  %2  %36 %27 %15 %26 %30 %33
+ OpBranch %120
+ %120 = OpLabel
+ OpLoopMerge %121 %123 None
+@@ -200,7 +200,7 @@ OpBranchConditional %134 %121 %135
+ OpStore %130 %140
+ OpBranch %122
+ %122 = OpLabel
+-%141 = OpFunctionCall  %44  %144 %27 %30
++%141 = OpFunctionCall  %44  %143 %27 %30
+ OpSelectionMerge %164 None
+ OpBranchConditional %141 %164 %165
+ %165 = OpLabel
+diff --git a/naga/tests/out/spv/wgsl-ray-query-no-init-tracking.spvasm b/naga/tests/out/spv/wgsl-ray-query-no-init-tracking.spvasm
+index 8fe3b2044..dc7ca2ccb 100644
+--- a/naga/tests/out/spv/wgsl-ray-query-no-init-tracking.spvasm
++++ b/naga/tests/out/spv/wgsl-ray-query-no-init-tracking.spvasm
+@@ -68,7 +68,7 @@ OpMemberDecorate %18 0 Offset 0
+ %35 = OpConstant  %6  0
+ %36 = OpTypePointer Function %3
+ %38 = OpConstant  %3  0
+-%41 = OpTypeFunction %2 %32 %5 %12 %33 %36
++%47 = OpTypeFunction %2 %32 %5 %12 %33 %36
+ %49 = OpTypeVector %8 3
+ %70 = OpConstant  %6  256
+ %73 = OpConstant  %6  512
+@@ -85,13 +85,13 @@ OpMemberDecorate %18 0 Offset 0
+ %132 = OpConstant  %6  4294967295
+ %133 = OpConstantComposite  %128  %132 %132
+ %146 = OpTypePointer Function %8
+-%147 = OpTypeFunction %8 %32 %33
++%150 = OpTypeFunction %8 %32 %33
+ %153 = OpConstantFalse  %8
+ %164 = OpConstant  %6  6
+ %172 = OpTypePointer Function %10
+ %173 = OpTypePointer Function %9
+ %174 = OpTypePointer Function %7
+-%175 = OpTypeFunction %10 %32 %33
++%178 = OpTypeFunction %10 %32 %33
+ %180 = OpConstantNull  %10
+ %203 = OpConstant  %6  3
+ %206 = OpConstant  %6  5
+@@ -110,21 +110,21 @@ OpMemberDecorate %18 0 Offset 0
+ %260 = OpTypePointer StorageBuffer %4
+ %268 = OpConstantComposite  %12  %27 %28 %29 %30 %251 %252
+ %269 = OpConstant  %3  10
+-%326 = OpTypeFunction %2 %32 %33 %3 %36
+-%367 = OpTypeFunction %2 %32 %33
+-%42 = OpFunction  %2  None %41
+-%43 = OpFunctionParameter  %32
+-%44 = OpFunctionParameter  %5
+-%45 = OpFunctionParameter  %12
+-%46 = OpFunctionParameter  %33
+-%47 = OpFunctionParameter  %36
++%331 = OpTypeFunction %2 %32 %33 %3 %36
++%370 = OpTypeFunction %2 %32 %33
++%41 = OpFunction  %2  None %47
++%42 = OpFunctionParameter  %32
++%43 = OpFunctionParameter  %5
++%44 = OpFunctionParameter  %12
++%45 = OpFunctionParameter  %33
++%46 = OpFunctionParameter  %36
+ %48 = OpLabel
+-%50 = OpCompositeExtract  %6  %45 0
+-%51 = OpCompositeExtract  %6  %45 1
+-%52 = OpCompositeExtract  %3  %45 2
+-%53 = OpCompositeExtract  %3  %45 3
+-%54 = OpCompositeExtract  %4  %45 4
+-%55 = OpCompositeExtract  %4  %45 5
++%50 = OpCompositeExtract  %6  %44 0
++%51 = OpCompositeExtract  %6  %44 1
++%52 = OpCompositeExtract  %3  %44 2
++%53 = OpCompositeExtract  %3  %44 3
++%54 = OpCompositeExtract  %4  %44 4
++%55 = OpCompositeExtract  %4  %44 5
+ %56 = OpFOrdLessThanEqual  %8  %52 %53
+ %57 = OpFOrdGreaterThanEqual  %8  %52 %38
+ %58 = OpIsInf  %49  %54
+@@ -181,24 +181,24 @@ OpMemberDecorate %18 0 Offset 0
+ %117 = OpLogicalAnd  %8  %116 %69
+ %118 = OpLogicalAnd  %8  %117 %77
+ %119 = OpLogicalAnd  %8  %118 %89
+-OpStore %47 %53
++OpStore %46 %53
+ OpSelectionMerge %120 None
+ OpBranchConditional %119 %122 %121
+ %122 = OpLabel
+-OpRayQueryInitializeKHR %43 %44 %50 %51 %54 %52 %55 %53
+-OpStore %46 %90
++OpRayQueryInitializeKHR %42 %43 %50 %51 %54 %52 %55 %53
++OpStore %45 %90
+ OpBranch %120
+ %121 = OpLabel
+ OpBranch %120
+ %120 = OpLabel
+ OpReturn
+ OpFunctionEnd
+-%148 = OpFunction  %8  None %147
+-%149 = OpFunctionParameter  %32
+-%150 = OpFunctionParameter  %33
++%147 = OpFunction  %8  None %150
++%148 = OpFunctionParameter  %32
++%149 = OpFunctionParameter  %33
+ %151 = OpLabel
+ %152 = OpVariable  %146  Function %153
+-%154 = OpLoad  %6  %150
++%154 = OpLoad  %6  %149
+ %157 = OpBitwiseAnd  %6  %154 %90
+ %158 = OpINotEqual  %8  %157 %35
+ %159 = OpBitwiseAnd  %6  %154 %27
+@@ -208,22 +208,22 @@ OpFunctionEnd
+ OpSelectionMerge %155 None
+ OpBranchConditional %162 %156 %155
+ %156 = OpLabel
+-%163 = OpRayQueryProceedKHR  %8  %149
++%163 = OpRayQueryProceedKHR  %8  %148
+ OpStore %152 %163
+ %165 = OpSelect  %6  %163 %93 %164
+ %166 = OpBitwiseOr  %6  %154 %165
+-OpStore %150 %166
++OpStore %149 %166
+ OpBranch %155
+ %155 = OpLabel
+ %167 = OpLoad  %8  %152
+ OpReturnValue %167
+ OpFunctionEnd
+-%176 = OpFunction  %10  None %175
+-%177 = OpFunctionParameter  %32
+-%178 = OpFunctionParameter  %33
++%175 = OpFunction  %10  None %178
++%176 = OpFunctionParameter  %32
++%177 = OpFunctionParameter  %33
+ %179 = OpLabel
+ %181 = OpVariable  %172  Function %180
+-%182 = OpLoad  %6  %178
++%182 = OpLoad  %6  %177
+ %183 = OpBitwiseAnd  %6  %182 %93
+ %184 = OpINotEqual  %8  %183 %35
+ %185 = OpBitwiseAnd  %6  %182 %27
+@@ -232,20 +232,20 @@ OpFunctionEnd
+ OpSelectionMerge %189 None
+ OpBranchConditional %187 %188 %189
+ %188 = OpLabel
+-%190 = OpRayQueryGetIntersectionTypeKHR  %6  %177 %90
++%190 = OpRayQueryGetIntersectionTypeKHR  %6  %176 %90
+ %191 = OpAccessChain  %33  %181 %35
+ OpStore %191 %190
+ %192 = OpINotEqual  %8  %190 %35
+ OpSelectionMerge %194 None
+ OpBranchConditional %192 %193 %194
+ %193 = OpLabel
+-%195 = OpRayQueryGetIntersectionInstanceCustomIndexKHR  %6  %177 %90
+-%196 = OpRayQueryGetIntersectionInstanceIdKHR  %6  %177 %90
+-%197 = OpRayQueryGetIntersectionInstanceShaderBindingTableRecordOffsetKHR  %6  %177 %90
+-%198 = OpRayQueryGetIntersectionGeometryIndexKHR  %6  %177 %90
+-%199 = OpRayQueryGetIntersectionPrimitiveIndexKHR  %6  %177 %90
+-%200 = OpRayQueryGetIntersectionObjectToWorldKHR  %9  %177 %90
+-%201 = OpRayQueryGetIntersectionWorldToObjectKHR  %9  %177 %90
++%195 = OpRayQueryGetIntersectionInstanceCustomIndexKHR  %6  %176 %90
++%196 = OpRayQueryGetIntersectionInstanceIdKHR  %6  %176 %90
++%197 = OpRayQueryGetIntersectionInstanceShaderBindingTableRecordOffsetKHR  %6  %176 %90
++%198 = OpRayQueryGetIntersectionGeometryIndexKHR  %6  %176 %90
++%199 = OpRayQueryGetIntersectionPrimitiveIndexKHR  %6  %176 %90
++%200 = OpRayQueryGetIntersectionObjectToWorldKHR  %9  %176 %90
++%201 = OpRayQueryGetIntersectionWorldToObjectKHR  %9  %176 %90
+ %202 = OpAccessChain  %33  %181 %93
+ OpStore %202 %195
+ %204 = OpAccessChain  %33  %181 %203
+@@ -261,14 +261,14 @@ OpStore %210 %200
+ %212 = OpAccessChain  %173  %181 %211
+ OpStore %212 %201
+ %213 = OpIEqual  %8  %190 %90
+-%216 = OpRayQueryGetIntersectionTKHR  %3  %177 %90
++%216 = OpRayQueryGetIntersectionTKHR  %3  %176 %90
+ %217 = OpAccessChain  %36  %181 %90
+ OpStore %217 %216
+ OpSelectionMerge %215 None
+ OpBranchConditional %213 %214 %215
+ %214 = OpLabel
+-%218 = OpRayQueryGetIntersectionBarycentricsKHR  %7  %177 %90
+-%219 = OpRayQueryGetIntersectionFrontFaceKHR  %8  %177 %90
++%218 = OpRayQueryGetIntersectionBarycentricsKHR  %7  %176 %90
++%219 = OpRayQueryGetIntersectionFrontFaceKHR  %8  %176 %90
+ %221 = OpAccessChain  %174  %181 %220
+ OpStore %221 %218
+ %223 = OpAccessChain  %146  %181 %222
+@@ -295,7 +295,7 @@ OpFunctionEnd
+ OpBranch %39
+ %39 = OpLabel
+ %40 = OpCompositeConstruct  %12  %27 %28 %29 %30 %21 %22
+-%123 = OpFunctionCall  %2  %42 %31 %24 %40 %34 %37
++%123 = OpFunctionCall  %2  %41 %31 %24 %40 %34 %37
+ OpBranch %124
+ %124 = OpLabel
+ OpLoopMerge %125 %127 None
+@@ -315,7 +315,7 @@ OpBranchConditional %138 %125 %139
+ OpStore %134 %144
+ OpBranch %126
+ %126 = OpLabel
+-%145 = OpFunctionCall  %8  %148 %31 %34
++%145 = OpFunctionCall  %8  %147 %31 %34
+ OpSelectionMerge %168 None
+ OpBranchConditional %145 %168 %169
+ %169 = OpLabel
+@@ -329,7 +329,7 @@ OpBranch %127
+ %127 = OpLabel
+ OpBranch %124
+ %125 = OpLabel
+-%225 = OpFunctionCall  %10  %176 %31 %34
++%225 = OpFunctionCall  %10  %175 %31 %34
+ OpReturnValue %225
+ OpFunctionEnd
+ %229 = OpFunction  %4  None %230
+@@ -370,7 +370,7 @@ OpStore %259 %258
+ OpStore %264 %263
+ OpReturn
+ OpFunctionEnd
+-%275 = OpFunction  %10  None %175
++%275 = OpFunction  %10  None %178
+ %276 = OpFunctionParameter  %32
+ %277 = OpFunctionParameter  %33
+ %278 = OpLabel
+@@ -437,15 +437,15 @@ OpBranch %288
+ %319 = OpLoad  %10  %279
+ OpReturnValue %319
+ OpFunctionEnd
+-%327 = OpFunction  %2  None %326
+-%328 = OpFunctionParameter  %32
+-%329 = OpFunctionParameter  %33
+-%330 = OpFunctionParameter  %3
+-%331 = OpFunctionParameter  %36
++%326 = OpFunction  %2  None %331
++%327 = OpFunctionParameter  %32
++%328 = OpFunctionParameter  %33
++%329 = OpFunctionParameter  %3
++%330 = OpFunctionParameter  %36
+ %332 = OpLabel
+ %333 = OpVariable  %36  Function
+ %334 = OpVariable  %36  Function
+-%337 = OpLoad  %6  %329
++%337 = OpLoad  %6  %328
+ %338 = OpBitwiseAnd  %6  %337 %93
+ %339 = OpINotEqual  %8  %338 %35
+ %340 = OpBitwiseAnd  %6  %337 %27
+@@ -455,42 +455,42 @@ OpFunctionEnd
+ OpSelectionMerge %336 None
+ OpBranchConditional %343 %335 %336
+ %335 = OpLabel
+-%344 = OpRayQueryGetIntersectionTypeKHR  %6  %328 %35
++%344 = OpRayQueryGetIntersectionTypeKHR  %6  %327 %35
+ %345 = OpIEqual  %8  %344 %90
+-%346 = OpRayQueryGetRayTMinKHR  %3  %328
+-%347 = OpRayQueryGetIntersectionTypeKHR  %6  %328 %90
++%346 = OpRayQueryGetRayTMinKHR  %3  %327
++%347 = OpRayQueryGetIntersectionTypeKHR  %6  %327 %90
+ %348 = OpIEqual  %8  %347 %35
+ OpSelectionMerge %349 None
+ OpBranchConditional %348 %350 %351
+ %350 = OpLabel
+-%352 = OpLoad  %3  %331
++%352 = OpLoad  %3  %330
+ OpStore %334 %352
+ OpBranch %349
+ %351 = OpLabel
+-%353 = OpRayQueryGetIntersectionTKHR  %3  %328 %35
++%353 = OpRayQueryGetIntersectionTKHR  %3  %327 %35
+ OpStore %334 %353
+ OpBranch %349
+ %349 = OpLabel
+-%354 = OpFOrdGreaterThanEqual  %8  %330 %346
++%354 = OpFOrdGreaterThanEqual  %8  %329 %346
+ %355 = OpLoad  %3  %334
+-%356 = OpFOrdLessThanEqual  %8  %330 %355
++%356 = OpFOrdLessThanEqual  %8  %329 %355
+ %357 = OpLogicalAnd  %8  %354 %356
+ %358 = OpLogicalAnd  %8  %357 %345
+ OpSelectionMerge %360 None
+ OpBranchConditional %358 %359 %360
+ %359 = OpLabel
+-OpRayQueryGenerateIntersectionKHR %328 %330
++OpRayQueryGenerateIntersectionKHR %327 %329
+ OpBranch %360
+ %360 = OpLabel
+ OpBranch %336
+ %336 = OpLabel
+ OpReturn
+ OpFunctionEnd
+-%368 = OpFunction  %2  None %367
+-%369 = OpFunctionParameter  %32
+-%370 = OpFunctionParameter  %33
++%367 = OpFunction  %2  None %370
++%368 = OpFunctionParameter  %32
++%369 = OpFunctionParameter  %33
+ %371 = OpLabel
+-%374 = OpLoad  %6  %370
++%374 = OpLoad  %6  %369
+ %375 = OpBitwiseAnd  %6  %374 %93
+ %376 = OpINotEqual  %8  %375 %35
+ %377 = OpBitwiseAnd  %6  %374 %27
+@@ -500,19 +500,19 @@ OpFunctionEnd
+ OpSelectionMerge %373 None
+ OpBranchConditional %380 %372 %373
+ %372 = OpLabel
+-%381 = OpRayQueryGetIntersectionTypeKHR  %6  %369 %35
++%381 = OpRayQueryGetIntersectionTypeKHR  %6  %368 %35
+ %382 = OpIEqual  %8  %381 %35
+ OpSelectionMerge %384 None
+ OpBranchConditional %382 %383 %384
+ %383 = OpLabel
+-OpRayQueryConfirmIntersectionKHR %369
++OpRayQueryConfirmIntersectionKHR %368
+ OpBranch %384
+ %384 = OpLabel
+ OpBranch %373
+ %373 = OpLabel
+ OpReturn
+ OpFunctionEnd
+-%387 = OpFunction  %2  None %367
++%387 = OpFunction  %2  None %370
+ %388 = OpFunctionParameter  %32
+ %389 = OpFunctionParameter  %33
+ %390 = OpLabel
+@@ -539,14 +539,14 @@ OpFunctionEnd
+ %267 = OpLoad  %5  %15
+ OpBranch %273
+ %273 = OpLabel
+-%274 = OpFunctionCall  %2  %42 %270 %267 %268 %271 %272
++%274 = OpFunctionCall  %2  %41 %270 %267 %268 %271 %272
+ %320 = OpFunctionCall  %10  %275 %270 %271
+ %321 = OpCompositeExtract  %6  %320 0
+ %322 = OpIEqual  %8  %321 %203
+ OpSelectionMerge %323 None
+ OpBranchConditional %322 %324 %325
+ %324 = OpLabel
+-%361 = OpFunctionCall  %2  %327 %270 %271 %269 %272
++%361 = OpFunctionCall  %2  %326 %270 %271 %269 %272
+ OpReturn
+ %325 = OpLabel
+ %362 = OpCompositeExtract  %6  %320 0
+@@ -554,7 +554,7 @@ OpReturn
+ OpSelectionMerge %364 None
+ OpBranchConditional %363 %365 %366
+ %365 = OpLabel
+-%385 = OpFunctionCall  %2  %368 %270 %271
++%385 = OpFunctionCall  %2  %367 %270 %271
+ OpReturn
+ %366 = OpLabel
+ %386 = OpFunctionCall  %2  %387 %270 %271
+diff --git a/naga/tests/out/spv/wgsl-ray-query.spvasm b/naga/tests/out/spv/wgsl-ray-query.spvasm
+index 8fe3b2044..dc7ca2ccb 100644
+--- a/naga/tests/out/spv/wgsl-ray-query.spvasm
++++ b/naga/tests/out/spv/wgsl-ray-query.spvasm
+@@ -68,7 +68,7 @@ OpMemberDecorate %18 0 Offset 0
+ %35 = OpConstant  %6  0
+ %36 = OpTypePointer Function %3
+ %38 = OpConstant  %3  0
+-%41 = OpTypeFunction %2 %32 %5 %12 %33 %36
++%47 = OpTypeFunction %2 %32 %5 %12 %33 %36
+ %49 = OpTypeVector %8 3
+ %70 = OpConstant  %6  256
+ %73 = OpConstant  %6  512
+@@ -85,13 +85,13 @@ OpMemberDecorate %18 0 Offset 0
+ %132 = OpConstant  %6  4294967295
+ %133 = OpConstantComposite  %128  %132 %132
+ %146 = OpTypePointer Function %8
+-%147 = OpTypeFunction %8 %32 %33
++%150 = OpTypeFunction %8 %32 %33
+ %153 = OpConstantFalse  %8
+ %164 = OpConstant  %6  6
+ %172 = OpTypePointer Function %10
+ %173 = OpTypePointer Function %9
+ %174 = OpTypePointer Function %7
+-%175 = OpTypeFunction %10 %32 %33
++%178 = OpTypeFunction %10 %32 %33
+ %180 = OpConstantNull  %10
+ %203 = OpConstant  %6  3
+ %206 = OpConstant  %6  5
+@@ -110,21 +110,21 @@ OpMemberDecorate %18 0 Offset 0
+ %260 = OpTypePointer StorageBuffer %4
+ %268 = OpConstantComposite  %12  %27 %28 %29 %30 %251 %252
+ %269 = OpConstant  %3  10
+-%326 = OpTypeFunction %2 %32 %33 %3 %36
+-%367 = OpTypeFunction %2 %32 %33
+-%42 = OpFunction  %2  None %41
+-%43 = OpFunctionParameter  %32
+-%44 = OpFunctionParameter  %5
+-%45 = OpFunctionParameter  %12
+-%46 = OpFunctionParameter  %33
+-%47 = OpFunctionParameter  %36
++%331 = OpTypeFunction %2 %32 %33 %3 %36
++%370 = OpTypeFunction %2 %32 %33
++%41 = OpFunction  %2  None %47
++%42 = OpFunctionParameter  %32
++%43 = OpFunctionParameter  %5
++%44 = OpFunctionParameter  %12
++%45 = OpFunctionParameter  %33
++%46 = OpFunctionParameter  %36
+ %48 = OpLabel
+-%50 = OpCompositeExtract  %6  %45 0
+-%51 = OpCompositeExtract  %6  %45 1
+-%52 = OpCompositeExtract  %3  %45 2
+-%53 = OpCompositeExtract  %3  %45 3
+-%54 = OpCompositeExtract  %4  %45 4
+-%55 = OpCompositeExtract  %4  %45 5
++%50 = OpCompositeExtract  %6  %44 0
++%51 = OpCompositeExtract  %6  %44 1
++%52 = OpCompositeExtract  %3  %44 2
++%53 = OpCompositeExtract  %3  %44 3
++%54 = OpCompositeExtract  %4  %44 4
++%55 = OpCompositeExtract  %4  %44 5
+ %56 = OpFOrdLessThanEqual  %8  %52 %53
+ %57 = OpFOrdGreaterThanEqual  %8  %52 %38
+ %58 = OpIsInf  %49  %54
+@@ -181,24 +181,24 @@ OpMemberDecorate %18 0 Offset 0
+ %117 = OpLogicalAnd  %8  %116 %69
+ %118 = OpLogicalAnd  %8  %117 %77
+ %119 = OpLogicalAnd  %8  %118 %89
+-OpStore %47 %53
++OpStore %46 %53
+ OpSelectionMerge %120 None
+ OpBranchConditional %119 %122 %121
+ %122 = OpLabel
+-OpRayQueryInitializeKHR %43 %44 %50 %51 %54 %52 %55 %53
+-OpStore %46 %90
++OpRayQueryInitializeKHR %42 %43 %50 %51 %54 %52 %55 %53
++OpStore %45 %90
+ OpBranch %120
+ %121 = OpLabel
+ OpBranch %120
+ %120 = OpLabel
+ OpReturn
+ OpFunctionEnd
+-%148 = OpFunction  %8  None %147
+-%149 = OpFunctionParameter  %32
+-%150 = OpFunctionParameter  %33
++%147 = OpFunction  %8  None %150
++%148 = OpFunctionParameter  %32
++%149 = OpFunctionParameter  %33
+ %151 = OpLabel
+ %152 = OpVariable  %146  Function %153
+-%154 = OpLoad  %6  %150
++%154 = OpLoad  %6  %149
+ %157 = OpBitwiseAnd  %6  %154 %90
+ %158 = OpINotEqual  %8  %157 %35
+ %159 = OpBitwiseAnd  %6  %154 %27
+@@ -208,22 +208,22 @@ OpFunctionEnd
+ OpSelectionMerge %155 None
+ OpBranchConditional %162 %156 %155
+ %156 = OpLabel
+-%163 = OpRayQueryProceedKHR  %8  %149
++%163 = OpRayQueryProceedKHR  %8  %148
+ OpStore %152 %163
+ %165 = OpSelect  %6  %163 %93 %164
+ %166 = OpBitwiseOr  %6  %154 %165
+-OpStore %150 %166
++OpStore %149 %166
+ OpBranch %155
+ %155 = OpLabel
+ %167 = OpLoad  %8  %152
+ OpReturnValue %167
+ OpFunctionEnd
+-%176 = OpFunction  %10  None %175
+-%177 = OpFunctionParameter  %32
+-%178 = OpFunctionParameter  %33
++%175 = OpFunction  %10  None %178
++%176 = OpFunctionParameter  %32
++%177 = OpFunctionParameter  %33
+ %179 = OpLabel
+ %181 = OpVariable  %172  Function %180
+-%182 = OpLoad  %6  %178
++%182 = OpLoad  %6  %177
+ %183 = OpBitwiseAnd  %6  %182 %93
+ %184 = OpINotEqual  %8  %183 %35
+ %185 = OpBitwiseAnd  %6  %182 %27
+@@ -232,20 +232,20 @@ OpFunctionEnd
+ OpSelectionMerge %189 None
+ OpBranchConditional %187 %188 %189
+ %188 = OpLabel
+-%190 = OpRayQueryGetIntersectionTypeKHR  %6  %177 %90
++%190 = OpRayQueryGetIntersectionTypeKHR  %6  %176 %90
+ %191 = OpAccessChain  %33  %181 %35
+ OpStore %191 %190
+ %192 = OpINotEqual  %8  %190 %35
+ OpSelectionMerge %194 None
+ OpBranchConditional %192 %193 %194
+ %193 = OpLabel
+-%195 = OpRayQueryGetIntersectionInstanceCustomIndexKHR  %6  %177 %90
+-%196 = OpRayQueryGetIntersectionInstanceIdKHR  %6  %177 %90
+-%197 = OpRayQueryGetIntersectionInstanceShaderBindingTableRecordOffsetKHR  %6  %177 %90
+-%198 = OpRayQueryGetIntersectionGeometryIndexKHR  %6  %177 %90
+-%199 = OpRayQueryGetIntersectionPrimitiveIndexKHR  %6  %177 %90
+-%200 = OpRayQueryGetIntersectionObjectToWorldKHR  %9  %177 %90
+-%201 = OpRayQueryGetIntersectionWorldToObjectKHR  %9  %177 %90
++%195 = OpRayQueryGetIntersectionInstanceCustomIndexKHR  %6  %176 %90
++%196 = OpRayQueryGetIntersectionInstanceIdKHR  %6  %176 %90
++%197 = OpRayQueryGetIntersectionInstanceShaderBindingTableRecordOffsetKHR  %6  %176 %90
++%198 = OpRayQueryGetIntersectionGeometryIndexKHR  %6  %176 %90
++%199 = OpRayQueryGetIntersectionPrimitiveIndexKHR  %6  %176 %90
++%200 = OpRayQueryGetIntersectionObjectToWorldKHR  %9  %176 %90
++%201 = OpRayQueryGetIntersectionWorldToObjectKHR  %9  %176 %90
+ %202 = OpAccessChain  %33  %181 %93
+ OpStore %202 %195
+ %204 = OpAccessChain  %33  %181 %203
+@@ -261,14 +261,14 @@ OpStore %210 %200
+ %212 = OpAccessChain  %173  %181 %211
+ OpStore %212 %201
+ %213 = OpIEqual  %8  %190 %90
+-%216 = OpRayQueryGetIntersectionTKHR  %3  %177 %90
++%216 = OpRayQueryGetIntersectionTKHR  %3  %176 %90
+ %217 = OpAccessChain  %36  %181 %90
+ OpStore %217 %216
+ OpSelectionMerge %215 None
+ OpBranchConditional %213 %214 %215
+ %214 = OpLabel
+-%218 = OpRayQueryGetIntersectionBarycentricsKHR  %7  %177 %90
+-%219 = OpRayQueryGetIntersectionFrontFaceKHR  %8  %177 %90
++%218 = OpRayQueryGetIntersectionBarycentricsKHR  %7  %176 %90
++%219 = OpRayQueryGetIntersectionFrontFaceKHR  %8  %176 %90
+ %221 = OpAccessChain  %174  %181 %220
+ OpStore %221 %218
+ %223 = OpAccessChain  %146  %181 %222
+@@ -295,7 +295,7 @@ OpFunctionEnd
+ OpBranch %39
+ %39 = OpLabel
+ %40 = OpCompositeConstruct  %12  %27 %28 %29 %30 %21 %22
+-%123 = OpFunctionCall  %2  %42 %31 %24 %40 %34 %37
++%123 = OpFunctionCall  %2  %41 %31 %24 %40 %34 %37
+ OpBranch %124
+ %124 = OpLabel
+ OpLoopMerge %125 %127 None
+@@ -315,7 +315,7 @@ OpBranchConditional %138 %125 %139
+ OpStore %134 %144
+ OpBranch %126
+ %126 = OpLabel
+-%145 = OpFunctionCall  %8  %148 %31 %34
++%145 = OpFunctionCall  %8  %147 %31 %34
+ OpSelectionMerge %168 None
+ OpBranchConditional %145 %168 %169
+ %169 = OpLabel
+@@ -329,7 +329,7 @@ OpBranch %127
+ %127 = OpLabel
+ OpBranch %124
+ %125 = OpLabel
+-%225 = OpFunctionCall  %10  %176 %31 %34
++%225 = OpFunctionCall  %10  %175 %31 %34
+ OpReturnValue %225
+ OpFunctionEnd
+ %229 = OpFunction  %4  None %230
+@@ -370,7 +370,7 @@ OpStore %259 %258
+ OpStore %264 %263
+ OpReturn
+ OpFunctionEnd
+-%275 = OpFunction  %10  None %175
++%275 = OpFunction  %10  None %178
+ %276 = OpFunctionParameter  %32
+ %277 = OpFunctionParameter  %33
+ %278 = OpLabel
+@@ -437,15 +437,15 @@ OpBranch %288
+ %319 = OpLoad  %10  %279
+ OpReturnValue %319
+ OpFunctionEnd
+-%327 = OpFunction  %2  None %326
+-%328 = OpFunctionParameter  %32
+-%329 = OpFunctionParameter  %33
+-%330 = OpFunctionParameter  %3
+-%331 = OpFunctionParameter  %36
++%326 = OpFunction  %2  None %331
++%327 = OpFunctionParameter  %32
++%328 = OpFunctionParameter  %33
++%329 = OpFunctionParameter  %3
++%330 = OpFunctionParameter  %36
+ %332 = OpLabel
+ %333 = OpVariable  %36  Function
+ %334 = OpVariable  %36  Function
+-%337 = OpLoad  %6  %329
++%337 = OpLoad  %6  %328
+ %338 = OpBitwiseAnd  %6  %337 %93
+ %339 = OpINotEqual  %8  %338 %35
+ %340 = OpBitwiseAnd  %6  %337 %27
+@@ -455,42 +455,42 @@ OpFunctionEnd
+ OpSelectionMerge %336 None
+ OpBranchConditional %343 %335 %336
+ %335 = OpLabel
+-%344 = OpRayQueryGetIntersectionTypeKHR  %6  %328 %35
++%344 = OpRayQueryGetIntersectionTypeKHR  %6  %327 %35
+ %345 = OpIEqual  %8  %344 %90
+-%346 = OpRayQueryGetRayTMinKHR  %3  %328
+-%347 = OpRayQueryGetIntersectionTypeKHR  %6  %328 %90
++%346 = OpRayQueryGetRayTMinKHR  %3  %327
++%347 = OpRayQueryGetIntersectionTypeKHR  %6  %327 %90
+ %348 = OpIEqual  %8  %347 %35
+ OpSelectionMerge %349 None
+ OpBranchConditional %348 %350 %351
+ %350 = OpLabel
+-%352 = OpLoad  %3  %331
++%352 = OpLoad  %3  %330
+ OpStore %334 %352
+ OpBranch %349
+ %351 = OpLabel
+-%353 = OpRayQueryGetIntersectionTKHR  %3  %328 %35
++%353 = OpRayQueryGetIntersectionTKHR  %3  %327 %35
+ OpStore %334 %353
+ OpBranch %349
+ %349 = OpLabel
+-%354 = OpFOrdGreaterThanEqual  %8  %330 %346
++%354 = OpFOrdGreaterThanEqual  %8  %329 %346
+ %355 = OpLoad  %3  %334
+-%356 = OpFOrdLessThanEqual  %8  %330 %355
++%356 = OpFOrdLessThanEqual  %8  %329 %355
+ %357 = OpLogicalAnd  %8  %354 %356
+ %358 = OpLogicalAnd  %8  %357 %345
+ OpSelectionMerge %360 None
+ OpBranchConditional %358 %359 %360
+ %359 = OpLabel
+-OpRayQueryGenerateIntersectionKHR %328 %330
++OpRayQueryGenerateIntersectionKHR %327 %329
+ OpBranch %360
+ %360 = OpLabel
+ OpBranch %336
+ %336 = OpLabel
+ OpReturn
+ OpFunctionEnd
+-%368 = OpFunction  %2  None %367
+-%369 = OpFunctionParameter  %32
+-%370 = OpFunctionParameter  %33
++%367 = OpFunction  %2  None %370
++%368 = OpFunctionParameter  %32
++%369 = OpFunctionParameter  %33
+ %371 = OpLabel
+-%374 = OpLoad  %6  %370
++%374 = OpLoad  %6  %369
+ %375 = OpBitwiseAnd  %6  %374 %93
+ %376 = OpINotEqual  %8  %375 %35
+ %377 = OpBitwiseAnd  %6  %374 %27
+@@ -500,19 +500,19 @@ OpFunctionEnd
+ OpSelectionMerge %373 None
+ OpBranchConditional %380 %372 %373
+ %372 = OpLabel
+-%381 = OpRayQueryGetIntersectionTypeKHR  %6  %369 %35
++%381 = OpRayQueryGetIntersectionTypeKHR  %6  %368 %35
+ %382 = OpIEqual  %8  %381 %35
+ OpSelectionMerge %384 None
+ OpBranchConditional %382 %383 %384
+ %383 = OpLabel
+-OpRayQueryConfirmIntersectionKHR %369
++OpRayQueryConfirmIntersectionKHR %368
+ OpBranch %384
+ %384 = OpLabel
+ OpBranch %373
+ %373 = OpLabel
+ OpReturn
+ OpFunctionEnd
+-%387 = OpFunction  %2  None %367
++%387 = OpFunction  %2  None %370
+ %388 = OpFunctionParameter  %32
+ %389 = OpFunctionParameter  %33
+ %390 = OpLabel
+@@ -539,14 +539,14 @@ OpFunctionEnd
+ %267 = OpLoad  %5  %15
+ OpBranch %273
+ %273 = OpLabel
+-%274 = OpFunctionCall  %2  %42 %270 %267 %268 %271 %272
++%274 = OpFunctionCall  %2  %41 %270 %267 %268 %271 %272
+ %320 = OpFunctionCall  %10  %275 %270 %271
+ %321 = OpCompositeExtract  %6  %320 0
+ %322 = OpIEqual  %8  %321 %203
+ OpSelectionMerge %323 None
+ OpBranchConditional %322 %324 %325
+ %324 = OpLabel
+-%361 = OpFunctionCall  %2  %327 %270 %271 %269 %272
++%361 = OpFunctionCall  %2  %326 %270 %271 %269 %272
+ OpReturn
+ %325 = OpLabel
+ %362 = OpCompositeExtract  %6  %320 0
+@@ -554,7 +554,7 @@ OpReturn
+ OpSelectionMerge %364 None
+ OpBranchConditional %363 %365 %366
+ %365 = OpLabel
+-%385 = OpFunctionCall  %2  %368 %270 %271
++%385 = OpFunctionCall  %2  %367 %270 %271
+ OpReturn
+ %366 = OpLabel
+ %386 = OpFunctionCall  %2  %387 %270 %271
+diff --git a/naga/tests/out/spv/wgsl-ray-tracing-pipeline.spvasm b/naga/tests/out/spv/wgsl-ray-tracing-pipeline.spvasm
+index 44f4e9917..17a5aeb7d 100644
+--- a/naga/tests/out/spv/wgsl-ray-tracing-pipeline.spvasm
++++ b/naga/tests/out/spv/wgsl-ray-tracing-pipeline.spvasm
+@@ -68,7 +68,7 @@ OpDecorate %193 BuiltIn PrimitiveId
+ %35 = OpConstant  %7  0.01
+ %36 = OpConstant  %7  100
+ %37 = OpConstantComposite  %8  %28 %28 %28
+-%49 = OpTypeFunction %2 %5 %9
++%52 = OpTypeFunction %2 %5 %9
+ %54 = OpTypeBool
+ %55 = OpTypeVector %54 3
+ %76 = OpConstant  %3  256
+@@ -101,16 +101,16 @@ OpDecorate %193 BuiltIn PrimitiveId
+ %179 = OpVariable  %152  HitAttributeKHR
+ %191 = OpVariable  %143  Input
+ %193 = OpVariable  %143  Input
+-%50 = OpFunction  %2  None %49
+-%51 = OpFunctionParameter  %5
+-%52 = OpFunctionParameter  %9
++%49 = OpFunction  %2  None %52
++%50 = OpFunctionParameter  %5
++%51 = OpFunctionParameter  %9
+ %53 = OpLabel
+-%56 = OpCompositeExtract  %3  %52 0
+-%57 = OpCompositeExtract  %3  %52 1
+-%58 = OpCompositeExtract  %7  %52 2
+-%59 = OpCompositeExtract  %7  %52 3
+-%60 = OpCompositeExtract  %8  %52 4
+-%61 = OpCompositeExtract  %8  %52 5
++%56 = OpCompositeExtract  %3  %51 0
++%57 = OpCompositeExtract  %3  %51 1
++%58 = OpCompositeExtract  %7  %51 2
++%59 = OpCompositeExtract  %7  %51 3
++%60 = OpCompositeExtract  %8  %51 4
++%61 = OpCompositeExtract  %8  %51 5
+ %62 = OpFOrdLessThanEqual  %54  %58 %59
+ %63 = OpFOrdGreaterThanEqual  %54  %58 %28
+ %64 = OpIsInf  %55  %60
+@@ -170,7 +170,7 @@ OpDecorate %193 BuiltIn PrimitiveId
+ OpSelectionMerge %126 None
+ OpBranchConditional %125 %128 %127
+ %128 = OpLabel
+-OpTraceRayKHR %51 %56 %57 %32 %32 %32 %60 %58 %61 %59 %12
++OpTraceRayKHR %50 %56 %57 %32 %32 %32 %60 %58 %61 %59 %12
+ OpBranch %126
+ %127 = OpLabel
+ OpBranch %126
+@@ -195,7 +195,7 @@ OpStore %12 %27
+ %46 = OpFSub  %8  %45 %31
+ %47 = OpFAdd  %8  %33 %46
+ %48 = OpCompositeConstruct  %9  %32 %34 %35 %36 %37 %47
+-%129 = OpFunctionCall  %2  %50 %26 %48
++%129 = OpFunctionCall  %2  %49 %26 %48
+ OpReturn
+ OpFunctionEnd
+ %139 = OpFunction  %2  None %25
+diff --git a/naga/tests/out/spv/wgsl-skybox.spvasm b/naga/tests/out/spv/wgsl-skybox.spvasm
+index f3e4be2cc..09e0a1b91 100644
+--- a/naga/tests/out/spv/wgsl-skybox.spvasm
++++ b/naga/tests/out/spv/wgsl-skybox.spvasm
+@@ -49,7 +49,7 @@ OpDecorate %105 Location 0
+ %17 = OpVariable  %18  UniformConstant
+ %20 = OpTypePointer UniformConstant %13
+ %19 = OpVariable  %20  UniformConstant
+-%22 = OpTypeFunction %10 %10 %10
++%24 = OpTypeFunction %10 %10 %10
+ %26 = OpTypeBool
+ %27 = OpConstant  %10  0
+ %29 = OpConstant  %10  -2147483648
+@@ -81,17 +81,17 @@ OpDecorate %105 Location 0
+ %102 = OpVariable  %103  Input
+ %105 = OpVariable  %43  Output
+ %111 = OpTypeSampledImage %12
+-%21 = OpFunction  %10  None %22
++%21 = OpFunction  %10  None %24
++%22 = OpFunctionParameter  %10
+ %23 = OpFunctionParameter  %10
+-%24 = OpFunctionParameter  %10
+ %25 = OpLabel
+-%28 = OpIEqual  %26  %24 %27
+-%31 = OpIEqual  %26  %23 %29
+-%32 = OpIEqual  %26  %24 %30
++%28 = OpIEqual  %26  %23 %27
++%31 = OpIEqual  %26  %22 %29
++%32 = OpIEqual  %26  %23 %30
+ %33 = OpLogicalAnd  %26  %31 %32
+ %34 = OpLogicalOr  %26  %28 %33
+-%36 = OpSelect  %10  %34 %35 %24
+-%37 = OpSDiv  %10  %23 %36
++%36 = OpSelect  %10  %34 %35 %23
++%37 = OpSDiv  %10  %22 %36
+ OpReturnValue %37
+ OpFunctionEnd
+ %46 = OpFunction  %2  None %47

@@ -1,0 +1,110 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: feder-cr <85809106+feder-cr@users.noreply.github.com>
+Date: Sun, 1 Nov 2026 09:25:03 +0700
+Subject: [PATCH] fix(naga spv-out): Fetch external texture planes with an
+ explicit Lod
+
+`naga_external_texture_image_load` emitted `OpImageFetch` without a `Lod`
+image operand. Pass Lod 0, like the HLSL helper's `Load(uint3(coords, 0u))`
+and naga's regular `textureLoad` on sampled images.
+---
+ naga/src/back/spv/image.rs                | 15 +++++++++------
+ naga/tests/naga/spirv_external_texture.rs | 20 ++++++++++++++++++++
+ 2 files changed, 29 insertions(+), 6 deletions(-)
+
+diff --git a/naga/src/back/spv/image.rs b/naga/src/back/spv/image.rs
+index bbaff245c..82861c75e 100644
+--- a/naga/src/back/spv/image.rs
++++ b/naga/src/back/spv/image.rs
+@@ -1720,6 +1720,9 @@ impl super::Writer {
+                 vec4f_type_id,
+             );
+ 
++        // Like HLSL's `Load(uint3(coords, 0u))`, fetch from level 0.
++        let lod_zero_id = self.get_index_constant(0);
++
+         let label_id = self.id_gen.next();
+         let mut block = Block::new(label_id);
+ 
+@@ -1963,7 +1966,7 @@ impl super::Writer {
+                 .generate(
+                     &mut self.id_gen,
+                     plane0_coord_id,
+-                    None,
++                    Some(lod_zero_id),
+                     None,
+                     &mut block,
+                 );
+@@ -2039,7 +2042,7 @@ impl super::Writer {
+                 .generate(
+                     &mut self.id_gen,
+                     plane1_coord_id,
+-                    None,
++                    Some(lod_zero_id),
+                     None,
+                     &mut block,
+                 );
+@@ -2053,7 +2056,7 @@ impl super::Writer {
+                 .generate(
+                     &mut self.id_gen,
+                     plane2_coord_id,
+-                    None,
++                    Some(lod_zero_id),
+                     None,
+                     &mut block,
+                 );
+@@ -2104,7 +2107,7 @@ impl super::Writer {
+                 .generate(
+                     &mut self.id_gen,
+                     plane0_coord_id,
+-                    None,
++                    Some(lod_zero_id),
+                     None,
+                     &mut block,
+                 );
+@@ -2128,7 +2131,7 @@ impl super::Writer {
+                 .generate(
+                     &mut self.id_gen,
+                     plane1_coord_id,
+-                    None,
++                    Some(lod_zero_id),
+                     None,
+                     &mut block,
+                 );
+@@ -2176,7 +2179,7 @@ impl super::Writer {
+             .generate(
+                 &mut self.id_gen,
+                 plane0_coord_id,
+-                None,
++                Some(lod_zero_id),
+                 None,
+                 &mut block,
+             );
+diff --git a/naga/tests/naga/spirv_external_texture.rs b/naga/tests/naga/spirv_external_texture.rs
+index 9bf8ccdc5..6a134556b 100644
+--- a/naga/tests/naga/spirv_external_texture.rs
++++ b/naga/tests/naga/spirv_external_texture.rs
+@@ -382,3 +382,23 @@ fn external_texture_fake_missing_bindings() {
+     bindings.sort();
+     assert_eq!(bindings, [0, 1, 1, 2, 3]);
+ }
++
++/// Every `OpImageFetch` takes an explicit level of detail.
++#[test]
++fn external_texture_fetch_has_lod() {
++    let spv = compile(TEXTURE_EXTERNAL);
++    let fetches: Vec<&Instruction> = spv
++        .all_instructions()
++        .filter(|inst| inst.class.opcode == Op::ImageFetch)
++        .collect();
++    assert!(!fetches.is_empty());
++    for fetch in fetches {
++        match fetch.operands.get(2) {
++            Some(&Operand::ImageOperands(mask)) if mask.contains(spirv::ImageOperands::LOD) => {}
++            other => panic!(
++                "%{} = OpImageFetch without Lod (image operands {other:?})",
++                fetch.result_id.unwrap()
++            ),
++        }
++    }
++}

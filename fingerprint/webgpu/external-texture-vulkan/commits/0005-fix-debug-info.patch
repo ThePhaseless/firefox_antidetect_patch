@@ -1,0 +1,50 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Andy Leiserson <aleiserson@mozilla.com>
+Date: Mon, 12 Oct 2026 18:29:49 -0700
+Subject: [PATCH] fix debug info
+
+(cherry picked from commit d1be86f2e9a22edab8e4fec5da935b6204325ecc)
+---
+ naga/src/back/spv/helpers.rs | 16 +++++++---------
+ 1 file changed, 7 insertions(+), 9 deletions(-)
+
+diff --git a/naga/src/back/spv/helpers.rs b/naga/src/back/spv/helpers.rs
+index 623835851..f7decbc82 100644
+--- a/naga/src/back/spv/helpers.rs
++++ b/naga/src/back/spv/helpers.rs
+@@ -208,10 +208,13 @@ impl super::Writer {
+         let mut parameter_type_ids = Vec::with_capacity(N);
+ 
+         let function_id = self.id_gen.next();
++        if self.flags.contains(WriterFlags::DEBUG) {
++            self.debugs.push(Instruction::name(function_id, name));
++        }
+         let mut function = Function::default();
+ 
+         let param_ids = array::from_fn(|i| {
+-            let (param_type_id, _) = parameters[i];
++            let (param_type_id, param_name) = parameters[i];
+             parameter_type_ids.push(param_type_id);
+ 
+             let param_id = self.id_gen.next();
+@@ -219,17 +222,12 @@ impl super::Writer {
+                 instruction: Instruction::function_parameter(param_type_id, param_id),
+                 handle_id: 0,
+             });
++            if self.flags.contains(WriterFlags::DEBUG) {
++                self.debugs.push(Instruction::name(param_id, param_name));
++            }
+             param_id
+         });
+ 
+-        if self.flags.contains(WriterFlags::DEBUG) {
+-            self.debugs.push(Instruction::name(function_id, name));
+-
+-            for (id, name) in parameters.iter().copied() {
+-                self.debugs.push(Instruction::name(id, name));
+-            }
+-        }
+-
+         let function_type_id = self.get_function_type(LookupFunctionType {
+             parameter_type_ids,
+             return_type_id,
