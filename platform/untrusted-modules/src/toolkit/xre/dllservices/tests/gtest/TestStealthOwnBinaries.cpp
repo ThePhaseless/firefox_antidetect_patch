@@ -10,11 +10,13 @@
 
 #include <iterator>
 #include <windows.h>
-#include <psapi.h>
 
 #include "gtest/gtest.h"
 
 #include "mozilla/RefPtr.h"
+#include "mozilla/UntrustedModulesProcessor.h"
+#include "mozilla/ipc/FileDescriptor.h"
+#include "nsWindowsHelpers.h"
 
 #include "mozilla/UntrustedModulesData.h"
 #include "mozilla/ModuleVersionInfo.h"
@@ -87,14 +89,28 @@ TEST(StealthOwnBinaries, TheSignatureLookupIsMadeOnlyForAModuleThatIsNotOurOwn)
 
 namespace {
 
-// The path of a module of this process as the loader records it (the name of its mapped section, \Device\...): the form
-// ModuleRecord takes.
+// The NT path of the file of a module of this process, the way Mozilla's untrusted-modules code produces the
+// aResolvedNtPath a ModuleRecord takes: the file is opened with the access and sharing the loader uses and handed to
+// ValidateAndResolveModuleFile (UntrustedModulesProcessor.cpp:165, called at :1224 to get the path ModuleRecord is made from), which
+// gives the \Device\HarddiskVolumeN\... form. An empty result is a failure of the test, not a reason to skip it.
 nsString NtPathOfModule(HMODULE aModule) {
-  wchar_t mapped[MAX_PATH + 1] = {};
-  if (!::GetMappedFileNameW(::GetCurrentProcess(), aModule, mapped, std::size(mapped))) {
+  wchar_t dosPath[MAX_PATH * 4] = {};
+  const DWORD len = ::GetModuleFileNameW(aModule, dosPath, std::size(dosPath));
+  if (len == 0 || len >= std::size(dosPath)) {
     return nsString();
   }
-  return nsString(mapped);
+  nsAutoHandle file(::CreateFileW(dosPath, SYNCHRONIZE | FILE_EXECUTE | FILE_READ_DATA,
+                                  FILE_SHARE_READ | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING,
+                                  FILE_ATTRIBUTE_NORMAL, nullptr));
+  if (file.get() == INVALID_HANDLE_VALUE) {
+    return nsString();
+  }
+  mozilla::ipc::FileDescriptor fd(file.get());
+  nsAutoString resolved;
+  if (!fd.IsValid() || !mozilla::ValidateAndResolveModuleFile(fd, resolved)) {
+    return nsString();
+  }
+  return nsString(resolved);
 }
 
 }  // namespace
