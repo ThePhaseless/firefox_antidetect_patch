@@ -17,6 +17,9 @@
                                               in seconds (tools/prebuild.py)
     python tools/engine.py births --tree <dir>   every place the tree makes a network request, against
                                               tools/birth-ledger.json (tools/births.py says how)
+    python tools/engine.py range-diff --source <repo> [--old-series <ref>] [--fetch] [--write | --check]
+                                              the layers of the old series on its tag against the new series on its
+                                              tag, in ports/range-diff.txt, on a partial clone (tools/range_diff.py)
 
 The Mozilla tag, the source branch and the commit last exported are in UPSTREAM.json;
 --base / --head override them. The source repository has no default: the commands that read
@@ -49,6 +52,11 @@ hooks list (tools/hooks_list.py): each non-backport folder has a HOOKS.json gene
          and why (T2) or a test no round runs (T3) is debt in tools/hook-debt.json. A hook with `exception` and
          `pm: "approvato"` in its entry is a declared exception (G35): left out of the contract, counted by `check`; one with
          `untestable` and that `pm` has no T1 and is counted too.
+
+folders  (tools/folders.py, series-02) every SERIES folder without a BACKPORT.json has one FOLDER.json, by hand: relation product,
+         or defect with upstream not-filed or a Mozilla bug URL, and for a defect an optional fixed_in release; `check` fails a
+         missing file, another shape, a backport that has one, a FOLDER.json outside SERIES and a fixed_in at or before the tag;
+         `port` stops, before it merges, when a fixed_in is at or before the new tag.
 
 check    needs no Firefox: SERIES lists exactly the folders that exist, every folder has
          its MANIFEST and FEATURE.md, every file of ours is listed and present, each
@@ -96,6 +104,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import backport_replay  # noqa: E402
 import births  # noqa: E402
+import folders  # noqa: E402
 import hook_contract  # noqa: E402
 import hooks_list  # noqa: E402
 import layout  # noqa: E402
@@ -304,7 +313,7 @@ def apply(source: Path, base: str, branch: str, force: bool) -> str:
     return tree
 
 
-def add_files(source: Path, folder: str, manifest: dict, env: dict) -> None:
+def add_files(source: Path, folder: str, manifest: dict, env: dict, root: Path | None = None) -> None:
     """Puts the files a folder adds (`manifest["added"]`, path -> mode) into the index of
     `env`, with a fixed number of git processes whatever their count: one `hash-object`
     for all the bytes (--no-filters: stored verbatim, as --stdin did) and one
@@ -314,7 +323,7 @@ def add_files(source: Path, folder: str, manifest: dict, env: dict) -> None:
     added = manifest["added"]
     if not added:
         return
-    paths = [str(ROOT / folder / "src" / path) for path in added]
+    paths = [str((ROOT if root is None else Path(root)) / folder / "src" / path) for path in added]
     shas = git(source, "hash-object", "-w", "--no-filters", "--stdin-paths",
                input_bytes=("\n".join(paths) + "\n").encode()).decode().split()
     if len(shas) != len(paths):
@@ -323,9 +332,15 @@ def add_files(source: Path, folder: str, manifest: dict, env: dict) -> None:
     git(source, "update-index", "--add", "--index-info", env=env, input_bytes=lines.encode())
 
 
-def build_stack(source: Path, base: str) -> list:
+def build_stack(source: Path, base: str, root: Path | None = None, missing_ok: bool = False) -> list:
     """The series on `base`, as [(folder, commit, tree)] in SERIES order (the first entry
-    is the tag itself, folder None). Writes objects only, moves no ref."""
+    is the tag itself, folder None). Writes objects only, moves no ref.
+
+    `root` is the series to apply (default: this repository's; the old series of `range-diff` is another directory).
+    `missing_ok` is for a partial clone (tools/range_diff.py): the trees are all there and the blobs only of the files the
+    series patches, so `write-tree` must not look for the blob of every file of a directory it rewrites."""
+    root = ROOT if root is None else Path(root)
+    listed = (root / "SERIES").read_text(encoding="utf-8").split()
     parent = git(source, "rev-parse", "%s^{commit}" % base).decode().strip()
     layers = [(None, parent, git(source, "rev-parse", "%s^{tree}" % parent).decode().strip())]
     # Every layer is dated with the tag's own commit date: the same series on the same
@@ -337,17 +352,17 @@ def build_stack(source: Path, base: str) -> list:
         env = dict(os.environ, GIT_INDEX_FILE=str(Path(tmp) / "index"), **IDENTITY,
                    GIT_AUTHOR_DATE=when, GIT_COMMITTER_DATE=when)
         git(source, "read-tree", parent, env=env)
-        for folder in series_folders():
-            patch = ROOT / folder / "hooks.patch"
+        for folder in listed:
+            patch = root / folder / "hooks.patch"
             if patch.exists():
                 done = subprocess.run(["git", "-C", str(source), "apply", "--cached", "--whitespace=nowarn",
                                        str(patch)], capture_output=True, env=env)
                 if done.returncode:
                     raise SystemExit("%s does not apply on %s:\n%s"
                                      % (folder, base, done.stderr.decode(errors="replace")))
-            manifest = json.loads((ROOT / folder / "MANIFEST.json").read_text(encoding="utf-8"))
-            add_files(source, folder, manifest, env)
-            tree = git(source, "write-tree", env=env).decode().strip()
+            manifest = json.loads((root / folder / "MANIFEST.json").read_text(encoding="utf-8"))
+            add_files(source, folder, manifest, env, root)
+            tree = git(source, "write-tree", *(["--missing-ok"] if missing_ok else []), env=env).decode().strip()
             parent = git(source, "commit-tree", tree, "-p", parent, "-m", folder, env=env).decode().strip()
             layers.append((folder, parent, tree))
     return layers
@@ -369,6 +384,16 @@ def port(source: Path, old: str, new: str, branch: str, force: bool, check_birth
                           capture_output=True).returncode:
             raise SystemExit("%s is not in %s: fetch it first, e.g. git -C %s fetch --depth 1 %s "
                              "refs/tags/%s:refs/tags/%s" % (tag, source, source, upstream()["mozilla_repository"], tag, tag))
+    # series-02: a folder that says Mozilla ships its fix at the new tag or before is a decision to take before anything is merged.
+    stops = folders.fixed_in_stops(ROOT, new)
+    if stops:
+        raise SystemExit(
+            "port stopped before it merged anything: %d folder(s) say Mozilla ships their fix in %s or before:\n%s\n"
+            "fix: decide each one in the source repository, then run the port again: drop the folder (remove its change on the source branch, "
+            "then `python tools/engine.py export`, which removes the folder with its FOLDER.json) or rebase it onto Mozilla's fix and change "
+            "or delete its fixed_in; read what Mozilla shipped before you decide (the bug is in its FOLDER.json)\n"
+            "next: python tools/engine.py port --to %s --source <source>\nrule: %s"
+            % (len(stops), new, "\n".join("  %s: fixed_in %s" % s for s in stops), new, folders.RULE))
     ref = "refs/heads/%s" % branch
     if subprocess.run(["git", "-C", str(source), "rev-parse", "-q", "--verify", ref],
                       capture_output=True).returncode == 0 and not force:
@@ -1395,6 +1420,7 @@ def untestable_hooks() -> int:
 
 def check(source: Path | None = None, tag: str | None = None, against_main: bool = False) -> int:
     found = problems()
+    found += folders.problems(ROOT)       # series-02: every folder states its relation to Mozilla (tools/folders.py)
     if against_main:      # the CLI does; it needs git and origin/main, problems() and the tests' fakes do not
         main_hook, main_removed = load_main_budgets()
         main_realign = load_main_realign()
@@ -1497,9 +1523,12 @@ def main() -> int:
     if len(sys.argv) > 1 and sys.argv[1] == "prebuild":
         import prebuild
         return prebuild.main(sys.argv[2:])    # its own options: --head, --base, --folder, --checks, --json (tools/prebuild.py)
+    if len(sys.argv) > 1 and sys.argv[1] == "range-diff":
+        import range_diff
+        return range_diff.main(sys.argv[2:], build_stack)    # its own options: --source, --old-series, --fetch, --write, --check, --decide
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("command", choices=["status", "apply", "materialize", "export", "verify", "check",
-                                        "shrink-budget", "hook-debt", "hooks-list", "drift", "port", "births", "hook-locals"])
+                                        "shrink-budget", "hook-debt", "hooks-list", "drift", "port", "births", "hook-locals", "range-diff"])
     ap.add_argument("--to", help="drift/port: the Mozilla tag to move to (a stable release, never a beta)")
     ap.add_argument("--into", type=Path, default=Path("."), help="materialize: the directory to make the tree")
     ap.add_argument("--shared", type=Path, default=None,
