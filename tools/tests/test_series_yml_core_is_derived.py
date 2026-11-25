@@ -2,9 +2,10 @@
 wrapper_ref main and release.yml with the run's own) reads the core the wrapper pins, derived by
 the release resolver, never a commit written in the workflow (decision ci-05).
 
-It was a literal sha moved by hand at each port. The step `core` runs
+It was a literal sha moved by hand at each port. The job `core-ref` (its step `core`) runs
 `release_plan.py --resolve-core-ref --wrapper-ref "$WRAPPER_REF"`, appends its one `core_ref=<ref>`
-line to $GITHUB_OUTPUT, and the checkout of the core takes `steps.core.outputs.core_ref`.
+line to $GITHUB_OUTPUT and gives it as the job's output; the core's wheelhouse (`py-deps-core`, ci-03)
+and the checkout of the core in `rebuilds` both take `needs.core-ref.outputs.core_ref`: one core.
 
     python -m pytest tools/tests
 """
@@ -30,14 +31,21 @@ def _core_checkout(steps):
 
 
 def check(text):
-    steps = _rebuilds(text)
+    doc = yaml.safe_load(text)
+    jobs = doc["jobs"]
+    steps = jobs["rebuilds"]["steps"]
     at = _core_checkout(steps)
     ref = str(steps[at]["with"]["ref"])
-    assert ref == "${{ steps.core.outputs.core_ref }}", "the core ref is the output of the resolver step, not %r" % ref
+    want = "${{ needs.core-ref.outputs.core_ref }}"
+    assert ref == want, "the core ref is the output of the job core-ref, not %r" % ref
     assert not re.search(r"[0-9a-f]{40}", ref)
-    resolver = [i for i, s in enumerate(steps) if s.get("id") == "core"]
-    assert len(resolver) == 1 and resolver[0] < at, "the resolver step `core` comes before the core checkout"
-    step = steps[resolver[0]]
+    assert "core-ref" in jobs["rebuilds"].get("needs", []), "rebuilds waits for the job core-ref"
+    core = jobs["core-ref"]
+    assert core["outputs"]["core_ref"] == "${{ steps.core.outputs.core_ref }}", "core-ref gives its resolver step's output"
+    assert str((jobs["py-deps-core"].get("with") or {}).get("core_ref")) == want, "the core's wheelhouse is built from the same core"
+    resolver = [s for s in core["steps"] if s.get("id") == "core"]
+    assert len(resolver) == 1, "the resolver step `core` in the job core-ref"
+    step = resolver[0]
     run = step["run"]
     assert 'platform/ci/src/scripts/release_plan.py --resolve-core-ref --wrapper-ref "$WRAPPER_REF"' in run
     assert step["env"]["WRAPPER_REF"] == "${{ inputs.wrapper_ref || 'main' }}", "the wrapper is the caller's wrapper_ref, main by default"
@@ -45,8 +53,9 @@ def check(text):
     assert "set -euo pipefail" in run, "a resolver that fails fails the job"
     assert step["env"]["GH_TOKEN"] == "${{ github.token }}", "the resolver reads the wrapper through gh api"
     # the resolver is read from the series checkout, which comes first
+    i = core["steps"].index(step)
     assert any(s.get("uses", "").startswith("actions/checkout@") and s.get("with", {}).get("path") == ".series"
-               for s in steps[:resolver[0]])
+               for s in core["steps"][:i])
     return True
 
 
@@ -68,7 +77,7 @@ def test_no_forty_hex_core_reference_is_written_in_the_workflow():
 def test_the_known_bad_workflow_is_refused():
     """The workflow as it was: a literal commit in the checkout and no resolver step."""
     old = CHECKS_YML.read_text(encoding="utf-8").replace(
-        "${{ steps.core.outputs.core_ref }}", "f598297cd22120432c7fbe3508af4926b367e469")
+        "${{ needs.core-ref.outputs.core_ref }}", "f598297cd22120432c7fbe3508af4926b367e469")
     try:
         check(old)
     except AssertionError:

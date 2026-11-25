@@ -11,6 +11,7 @@ that none of it can change a leg's verdict.
 """
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
@@ -90,8 +91,8 @@ def cases() -> list:
     convert = [s for s in steps if "cargo_junit.py" in str(s.get("run", ""))]
     cargo_at, verdict_at = index(steps, "cargo test -p"), index(steps, "cargo_oracles.py verdict")
     parts = [s for s in uploads(cargo["jobs"]["cargo-tests"]) if str((s.get("with") or {}).get("name", "")).startswith("junitpart-cargo-")]
-    add("cargo: the log becomes junit in a step that runs whatever cargo said, after cargo and before the verdict, and cannot fail the job",
-        len(convert) == 1 and always(convert[0]) and convert[0].get("continue-on-error") is True and cargo_at < steps.index(convert[0]) < verdict_at
+    add("cargo: the log becomes junit in a step that runs whatever cargo said, after cargo and before the verdict, and binds (no continue-on-error: no test binary in the log is a red)",
+        len(convert) == 1 and always(convert[0]) and "continue-on-error" not in convert[0] and cargo_at < steps.index(convert[0]) < verdict_at
         and "gfx/wr/cargo-test.log" in convert[0]["run"] and "--out junit-cargo/${{ matrix.leg }}" in convert[0]["run"])
     cmd = str(steps[cargo_at]["run"]) if cargo_at >= 0 else ""
     mdns_run = [s for s in steps if s.get("id") == "cargo-mdns"]
@@ -115,8 +116,8 @@ def cases() -> list:
     package = load("package-ab.yml")["jobs"]["package-ab"]["steps"]   # the job lives in the reusable workflow package-ab.yml
     pytest_step = [s for s in package if "pytest" in str(s.get("run", ""))]
     published_at = index(package, "gh release download")
-    add("package: the series' python tests run first in the job (before the published engine is fetched), as junit, from the series checkout, and cannot fail the job",
-        len(pytest_step) == 1 and package.index(pytest_step[0]) < published_at and pytest_step[0].get("continue-on-error") is True
+    add("package: the series' python tests run first in the job (before the published engine is fetched), as junit, from the series checkout, and binds (no continue-on-error: a failed test is a red of the job)",
+        len(pytest_step) == 1 and package.index(pytest_step[0]) < published_at and "continue-on-error" not in pytest_step[0]
         and pytest_step[0].get("working-directory") == "engine-series" and "tools/tests" in pytest_step[0]["run"]
         and "--junitxml=../junit-py/package-ab/" in pytest_step[0]["run"] and "--rootdir=." in pytest_step[0]["run"])
     keep = [s for s in package if (s.get("with") or {}).get("name") == "junitpart-py-package-ab"]
@@ -131,8 +132,8 @@ def cases() -> list:
     checks = checks_yml["jobs"]["tree"]["steps"]
     tree_tests = [s for s in checks if "pytest" in str(s.get("run", ""))]
     materialize_at = index(checks, "engine.py materialize")
-    add("checks: the python tests of OURS in the tree run right after the materialize (before every other step), through py_junit.py's list, as junit, and cannot fail the job",
-        len(tree_tests) == 1 and checks.index(tree_tests[0]) == materialize_at + 1 and tree_tests[0].get("continue-on-error") is True
+    add("checks: the python tests of OURS in the tree run right after the materialize (before every other step), through py_junit.py's list, as junit, and binds (no continue-on-error: a failed test is a red of the job)",
+        len(tree_tests) == 1 and checks.index(tree_tests[0]) == materialize_at + 1 and "continue-on-error" not in tree_tests[0]
         and "scripts/ci/py_junit.py list --series .series --tree ." in tree_tests[0]["run"] and "--rootdir=." in tree_tests[0]["run"]
         and "--junitxml=junit-py/checks/" in tree_tests[0]["run"])
     keep = [s for s in checks if (s.get("with") or {}).get("name") == "junitpart-py-checks"]
@@ -143,17 +144,24 @@ def cases() -> list:
         "not continue-on-error (the upload is if: always(), so the junit is kept)",
         len(ran_step) == 1 and checks.index(ran_step[0]) == checks.index(tree_tests[0]) + 1 and checks.index(ran_step[0]) < checks.index(keep[0])
         and "continue-on-error" not in ran_step[0] and not ran_step[0].get("if"))
-    add("checks: fonttools is pinned to one exact version, written once, in the pytest step (the tree and the CI pin none)",
-        len(tree_tests) == 1 and tree_tests[0]["run"].count("fonttools==4.51.0") == 1
-        and sum(str(s.get("run", "")).count("fonttools") for s in checks) == 1)
+    tools_in = (ROOT / "scripts" / "ci" / "locks" / "tools.in").read_text(encoding="utf-8")
+    tools_lock = (ROOT / "scripts" / "ci" / "locks" / "tools.txt").read_text(encoding="utf-8")
+    add("checks: fonttools is pinned to one exact version, written once, in the tools lock's input (scripts/ci/locks/tools.in, which the lock holds with its hashes); "
+        "no step of the job names it or any other package (the pytest step installs the lock, offline)",
+        len([l for l in tools_in.splitlines() if l.startswith("fonttools")]) == 1 and "fonttools==4.51.0" in tools_in.splitlines()
+        and re.search(r"^fonttools==4\.51\.0 \\$", tools_lock, re.M) and re.search(r"^    --hash=sha256:[0-9a-f]{64}", tools_lock, re.M)
+        and sum(str(s.get("run", "")).count("fonttools") for s in checks) == 0)
     parts_py = [str((s.get("with") or {}).get("name", "")) for wf in (gate, release, checks_yml, load("package-ab.yml")) for job in wf["jobs"].values() for s in uploads(job)
                 if str((s.get("with") or {}).get("name", "")).startswith("junitpart-py-")]
     add("python parts: one per job and named by it (junitpart-py-<job>), the three there are, none twice: checks, package-ab, and the gate's "
         "security-state step, one per leg (junitpart-py-security-state-<leg>)",
         sorted(parts_py) == ["junitpart-py-checks", "junitpart-py-package-ab", "junitpart-py-security-state-${{ matrix.leg }}"])
     add("checks: pytest does not stop at a file that cannot be imported (--continue-on-collection-errors: run 45025164169 had one collection error, "
-        "fontTools missing for scripts/test_gen_bundle_font_manifest.py, and no test of the tree wrote a result), and the step installs fonttools",
-        len(tree_tests) == 1 and "--continue-on-collection-errors" in tree_tests[0]["run"] and "fonttools" in tree_tests[0]["run"])
+        "fontTools missing for scripts/test_gen_bundle_font_manifest.py, and no test of the tree wrote a result), and the step installs the lock that holds fonttools",
+        len(tree_tests) == 1 and "--continue-on-collection-errors" in tree_tests[0]["run"]
+        and '--no-index --find-links "$RUNNER_TEMP/py-deps" --require-hashes -r "$RUNNER_TEMP/py-deps/lock.txt"' in tree_tests[0]["run"]
+        and tree_tests[0]["run"].index("pip install") < tree_tests[0]["run"].index("pytest")
+        and "fonttools==4.51.0 " in tools_lock)
     plan = release["jobs"]["plan"]["steps"]
     plain = ("scripts/ci/test_ci.py", "scripts/ci/test_stealth_download_watchdog.py", "scripts/ci/test_objects_first.py", "scripts/ci/test_stealth_build_tools.py",
              "scripts/test_release_plan.py")

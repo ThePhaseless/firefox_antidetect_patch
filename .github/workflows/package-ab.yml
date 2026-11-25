@@ -49,8 +49,18 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'push' && github.workflow == 'package-ab' }}
 
 jobs:
+  # The series' own tests' packages (pytest, pyyaml: scripts/ci/locks/tools.txt) from the index ONCE per runner image, Python and lock (py-deps.yml); the job
+  # installs from the wheelhouse, offline, by name. Python 3.11, as the job's. A name of its own: checks.yml, in the same run, has a wheelhouse of Python 3.12.
+  py-deps:
+    uses: ./.github/workflows/py-deps.yml
+    with:
+      name: tools-package-ab
+      python: '3.11'
+      lock: scripts/ci/locks/tools.txt
+
   package-ab:
     name: package-ab${{ matrix.mode == 'tag' && ' (A/A)' || '' }}
+    needs: py-deps
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     strategy:
@@ -80,20 +90,25 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with: { python-version: '3.11' }
+      - name: The wheelhouse of the run's py-deps job
+        if: matrix.mode == 'ab'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: py-deps-tools-package-ab-linux
+          path: ${{ runner.temp }}/py-deps
       # THE JUNIT OF THE SERIES' OWN PYTHON TESTS (tools/tests, the ones `series.yml` runs on the series' own push), for the named hook tests judge: the part
       # `junitpart-py-package-ab` of the artifact `junit-py` (put together with the `checks` job's part by the job `junit-py` of release.yml), a testcase per test
       # named `py:tools/tests/<file>::<test>` there. This job has the series checkout whole, with its history. It comes first, before anything that can stop the
-      # job, and neither it nor its upload changes the verdict of this job (the judge is the one that is red for a named test that did not pass). `--rootdir=.` so
+      # job; a failed test turns this job red now (the judge is red for a named test that did not pass as well), and its upload runs whatever happened. `--rootdir=.` so
       # the classname is the path in the series. The A/B leg only: the A/A leg of a push would upload the same name twice.
       - name: The series' own python tests, as junit
         if: matrix.mode == 'ab'
-        continue-on-error: true
         timeout-minutes: 8
         shell: bash
         working-directory: engine-series
         run: |
           mkdir -p ../junit-py/package-ab
-          python -m pip install --quiet pytest pyyaml
+          python -m pip install --quiet --no-index --find-links "$RUNNER_TEMP/py-deps" --require-hashes -r "$RUNNER_TEMP/py-deps/lock.txt"
           python -m pytest tools/tests -q -p no:cacheprovider -o addopts='' -o junit_family=xunit2 --rootdir=. --junitxml=../junit-py/package-ab/tools-tests.xml
       - name: Keep the junit (the part of this job, junitpart-py-package-ab)
         if: always() && matrix.mode == 'ab'
@@ -179,6 +194,7 @@ jobs:
       - name: The series commit the candidate was built from
         id: built
         if: env.CAND_TAG == ''
+        # continue-on-error: an optional download (a build from before the artifact existed has none; the head_sha of its run is the fallback)
         continue-on-error: true
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:

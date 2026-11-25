@@ -37,18 +37,28 @@ def imported_from_outside():
 
 
 def rules_job_installs():
-    """The words after `pip install` in the rules job, read as text: this test must say
-    what is missing even where yaml itself is the thing missing."""
+    """What the rules job installs, read as text (this test must say what is missing even where yaml itself is the thing missing): it installs
+    offline from a py-deps wheelhouse (ci-03), so the names are those of the lock its py-deps call resolves: the `lock:` of the call the job
+    needs, read from the series' copy (platform/ci/src/<lock>), one `name==version` per entry."""
     text = SERIES_YML.read_text(encoding="utf-8")
     job = re.search(r"^  rules:\n(.*?)(?=^  \S|\Z)", text, re.M | re.S)
     assert job, "checks.yml has no rules job"
+    needs = re.search(r"needs:\s*\[?([\w, -]+)\]?", job.group(1))
+    assert needs, "the rules job of checks.yml needs no py-deps call: it would install from the index (ci-03)"
     installed = set()
-    for line in re.findall(r"pip install ([^\n]+)", job.group(1)):
-        installed |= {w.lower() for w in line.split() if not w.startswith("-")}
+    for need in [n.strip() for n in needs.group(1).split(",") if n.strip()]:
+        call = re.search(r"^  %s:\n(.*?)(?=^  \S|\Z)" % re.escape(need), text, re.M | re.S)
+        lock = call and re.search(r"lock:\s*([\w./-]+)", call.group(1))
+        if lock:
+            for line in (ROOT / "platform/ci/src" / lock.group(1)).read_text(encoding="utf-8").splitlines():
+                entry = re.match(r"^([A-Za-z0-9_.-]+)==", line)
+                if entry:
+                    installed.add(entry.group(1).lower().replace("_", "-"))
+    assert "--no-index" in job.group(1), "the rules job of checks.yml installs from the index, not from its wheelhouse (ci-03)"
     return installed
 
 
 def test_the_rules_job_installs_every_module_the_tools_import():
     missing = sorted(n for n in imported_from_outside() if PIP_NAME.get(n, n).lower() not in rules_job_installs())
     assert not missing, ("the rules job of checks.yml does not install %s, which tools/ imports: "
-                         "add it to its pip install line" % ", ".join(PIP_NAME.get(n, n) for n in missing))
+                         "add it to the lock the rules job installs (scripts/ci/locks/<name>.in, then py_deps.py lock)" % ", ".join(PIP_NAME.get(n, n) for n in missing))

@@ -208,6 +208,7 @@ jobs:
           sparse-checkout: /platform/ci/src/scripts/ci/binary_series.py
           sparse-checkout-cone-mode: false
       - name: The series commit the build recorded
+        # continue-on-error: an optional download (a build from before the artifact existed has none; the next step falls back to the head_sha of its run)
         continue-on-error: true
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:

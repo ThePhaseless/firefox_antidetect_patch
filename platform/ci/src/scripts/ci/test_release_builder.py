@@ -117,8 +117,14 @@ def live_workflows() -> dict:
     root, with this tree's copy of each it has (tools/engine.py check holds the two equal).
     The source tree's other files, as Mozilla's pr-handler.yml, are on no branch of ours."""
     tree = tree_workflows()
-    return {p.name: tree.get(p.name) or load(p.read_text(encoding="utf-8"))
+    live = {p.name: tree.get(p.name) or load(p.read_text(encoding="utf-8"))
             for p in sorted((series_root() / ".github" / "workflows").glob("*.yml"))}
+    # A workflow this tree adds is on the series' branches as soon as it is exported: a call of it from a file already there is a call of a live workflow
+    # (py-deps.yml, called by checks.yml, which a pull request starts), whether or not the series repository checked out here has it yet.
+    for name, wf in tree.items():
+        if name != "pr-handler.yml":
+            live.setdefault(name, wf)
+    return live
 
 
 def starts_from_pull_request(wf: dict, workflows: dict, seen: tuple = ()) -> bool:
@@ -142,14 +148,27 @@ def jobs_of_pull_requests(workflows: dict) -> list:
     any other workflow is a job that does not name a hosted runner."""
     found = []
 
-    def jobs_of(name: str, wf: dict, seen: tuple) -> None:
+    def matrix_hosted(wf: dict, job: dict, handed: dict) -> bool:
+        """`runs-on: ${{ matrix.runner }}` over `fromJSON(inputs.runners)`: hosted when the list the call hands over (else the input's default) is all hosted labels."""
+        matrix = (job.get("strategy") or {}).get("matrix") or {}
+        if job.get("runs-on") != "${{ matrix.runner }}" or matrix.get("runner") != "${{ fromJSON(inputs.runners) }}":
+            return False
+        on = wf.get(True, wf.get("on")) or {}
+        declared = (((on.get("workflow_call") or {}).get("inputs") or {}).get("runners") or {}).get("default", "")
+        try:
+            labels = json.loads(handed.get("runners", declared))
+        except (TypeError, ValueError):
+            return False
+        return isinstance(labels, list) and bool(labels) and all(isinstance(l, str) and HOSTED.match(l) for l in labels)
+
+    def jobs_of(name: str, wf: dict, seen: tuple, handed: dict = {}) -> None:
         for job_name, job in wf["jobs"].items():
             runs_on = job.get("runs-on", "")
             called = str(job.get("uses", ""))
             file = called.rsplit("/", 1)[-1]
             if called.startswith("./.github/workflows/") and file in workflows and file not in seen:
-                jobs_of(file, workflows[file], seen + (file,))
-            elif "uses" in job or not isinstance(runs_on, str) or not HOSTED.match(runs_on):
+                jobs_of(file, workflows[file], seen + (file,), job.get("with") or {})
+            elif "uses" in job or not isinstance(runs_on, str) or not (HOSTED.match(runs_on) or matrix_hosted(wf, job, handed)):
                 found.append("%s:%s:%s" % (name, job_name, runs_on or job.get("uses")))
 
     for name, wf in workflows.items():
@@ -270,8 +289,8 @@ def group_cache_sharing(doc, jobs, build, steps) -> list:
                 and 'key=lavapipe-${{ matrix.leg }}-' in steps.get("WebGPU's Vulkan driver (linux-x86_64) - its inputs", {}).get("run", "")))
     out.append(("cache: no build leg on GitHub's runners, so none reads an entry the node writes: no executable of the node's runs there",
                 not [l.leg for l in legs.LEGS if not l.node]))
-    all_files = "\n".join(p.read_text(encoding="utf-8") for p in WORKFLOWS.glob("*.yml") if p.name not in ("release.yml", "linux-deps.yml"))
-    out.append(("cache: and no other workflow restores a cache at all, but linux-deps.yml", "actions/cache" not in all_files))
+    all_files = "\n".join(p.read_text(encoding="utf-8") for p in WORKFLOWS.glob("*.yml") if p.name not in ("release.yml", "linux-deps.yml", "py-deps.yml"))
+    out.append(("cache: and no other workflow restores a cache at all, but linux-deps.yml and py-deps.yml (the resolvers, keyed by the image they resolved on: ci-03)", "actions/cache" not in all_files))
     # linux-deps.yml keeps Ubuntu's .deb files of the Linux jobs (republish 45297517213: a mirror at 102 kB/s): written and read by its one job, on GitHub's
     # ubuntu-24.04, under keys of its own (linux-deps-<image>-<list>), so nothing the node writes is read there and nothing it writes reaches the node.
     deps_doc = load((WORKFLOWS / "linux-deps.yml").read_text(encoding="utf-8"))
@@ -388,8 +407,20 @@ def group_pull_requests(doc, jobs, build, steps) -> list:
                 and jobs_of_pull_requests({"x.yml": {"on": ["pull_request"], "jobs": {"c": {"uses": "o/r/.github/workflows/y.yml@main"}}}}) == ["x.yml:c:o/r/.github/workflows/y.yml@main"]))
     out.append(("pull requests: the jobs of checks.yml, called by series.yml, are held to it, and so is release.yml's call of it (a candidate: no pull request starts release.yml)",
                 "checks.yml" in live and live["series.yml"]["jobs"]["checks"]["uses"] == "./.github/workflows/checks.yml"
-                and set(live["checks.yml"]["jobs"]) == {"rules", "rebuilds", "noreply-identity", "tree"}
-                and all(HOSTED.match(j["runs-on"]) for j in live["checks.yml"]["jobs"].values()) and triggers(live["checks.yml"]) == {"workflow_call"}))
+                and set(live["checks.yml"]["jobs"]) == {"py-deps-tools", "core-ref", "py-deps-core", "rules", "rebuilds", "noreply-identity", "tree"}
+                and all(HOSTED.match(j["runs-on"]) for j in live["checks.yml"]["jobs"].values() if "uses" not in j)
+                and all(j["uses"] == "./.github/workflows/py-deps.yml" and "runners" not in j["with"] for j in live["checks.yml"]["jobs"].values() if "uses" in j)
+                and triggers(live["checks.yml"]) == {"workflow_call"}))
+    # py-deps.yml's jobs run on `matrix.runner` over its `runners` input: hosted only while the list is (the default, or what the call hands over).
+    fanned = lambda default, handed: {"x.yml": {"on": ["pull_request"], "jobs": {"c": {"uses": "./.github/workflows/y.yml", "with": handed}}},
+                                      "y.yml": {"on": {"workflow_call": {"inputs": {"runners": {"default": default}}}},
+                                                "jobs": {"j": {"runs-on": "${{ matrix.runner }}", "strategy": {"matrix": {"runner": "${{ fromJSON(inputs.runners) }}"}}}}}}
+    out.append(("pull requests: a matrix of runners from an input is hosted when the list is: the default's, or the one the call hands over (a label of ours, or a matrix of another shape, is not)",
+                jobs_of_pull_requests(fanned('["ubuntu-24.04", "windows-latest"]', {})) == []
+                and jobs_of_pull_requests(fanned('["ubuntu-24.04"]', {"runners": '["windows-2022"]'})) == []
+                and jobs_of_pull_requests(fanned('["ubuntu-24.04"]', {"runners": '["latitude-5-1-a"]'})) == ["y.yml:j:${{ matrix.runner }}"]
+                and jobs_of_pull_requests(fanned('["latitude-5-1-a"]', {})) == ["y.yml:j:${{ matrix.runner }}"]
+                and jobs_of_pull_requests(fanned("", {})) == ["y.yml:j:${{ matrix.runner }}"]))
     out.append(("pull requests: release.yml starts by hand, on a push to main or by schedule (a candidate that keeps the cache warm); the sweeper and the workflows they call by hand or by schedule only",
                 triggers(doc) == {"workflow_dispatch", "push", "schedule"} and doc[True]["push"] == {"branches": ["main"], "paths-ignore": ["**.md"]}
                 and triggers(live["latitude-sweeper.yml"]) == {"schedule", "workflow_dispatch", "workflow_run"}
@@ -516,8 +547,11 @@ def group_watch_and_stop(doc, jobs, build, steps) -> list:
 
 def group_node_steps(doc, jobs, build, steps) -> list:
     out = []
-    swap = steps.get("Free disk + 32G swap (Linux runners)", {})
-    out.append(("node: no disk cleaning and no swap on it", swap.get("if") == "runner.environment == 'github-hosted'"))
+    hosted_only = [n for n, st in steps.items() if "runner.environment == 'github-hosted'" in str(st.get("if", ""))]
+    hosted_work = [n for n, st in steps.items() if re.search(r"\b(swapon|mkswap|zramctl|apt-get|rm -rf /usr/share)", str(st.get("run", "")))]
+    out.append(("node: no step of the build job runs only on a GitHub runner (the legs never run there: scripts/ci/legs.py), and none cleans a disk, makes a swap or reads an apt mirror "
+                "(%s)" % (hosted_only + hosted_work),
+                not hosted_only and not hosted_work and all(leg.node and not leg.runner for leg in legs.LEGS)))
     parallel = steps.get("The node - compile jobs from its limits", {})
     out.append(("node: its parallelism only on it, and an empty answer stops the step (finding 16)",
                 parallel.get("if") == "runner.environment != 'github-hosted'"

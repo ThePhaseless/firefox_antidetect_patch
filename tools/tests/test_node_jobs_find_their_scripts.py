@@ -44,14 +44,28 @@ def test_no_pull_request_reaches_a_runner_of_ours():
     hosted = re.compile(r"^(ubuntu|windows|macos)-[\w.-]+$")
     docs = {wf.name: yaml.safe_load(wf.read_text(encoding="utf-8")) for wf in WORKFLOWS.glob("*.yml")}
 
-    def reach(name, doc, seen=(), docs=docs):
+    def runners_of(job, doc, given):
+        """The runners a job names: its literal `runs-on`, or, for `runs-on: ${{ matrix.runner }}` over `fromJSON(inputs.runners)` (py-deps.yml),
+        the list its caller passes (or the input's default): each must then be a hosted runner's literal name."""
+        runs_on = str(job.get("runs-on", ""))
+        matrix = ((job.get("strategy") or {}).get("matrix") or {})
+        if runs_on == "${{ matrix.runner }}" and str(matrix.get("runner", "")).replace(" ", "") == "${{fromJSON(inputs.runners)}}":
+            inputs = ((doc.get(True, doc.get("on")) or {}).get("workflow_call") or {}).get("inputs") or {}
+            value = given.get("runners", (inputs.get("runners") or {}).get("default", "[]"))
+            try:
+                return [str(r) for r in json.loads(value)]
+            except (TypeError, ValueError):
+                return [str(value)]
+        return [runs_on]
+
+    def reach(name, doc, seen=(), docs=docs, given=None):
         """Every job a run of this workflow starts, the jobs of the workflows it calls included, that does not name a hosted runner."""
         bad = []
         for job_name, job in doc["jobs"].items():
             local = str(job.get("uses", ""))
             if local.startswith("./.github/workflows/") and local.rsplit("/", 1)[1] in docs and local not in seen:
-                bad += reach(local.rsplit("/", 1)[1], docs[local.rsplit("/", 1)[1]], seen + (local,), docs)
-            elif "uses" in job or not hosted.match(str(job.get("runs-on", ""))):
+                bad += reach(local.rsplit("/", 1)[1], docs[local.rsplit("/", 1)[1]], seen + (local,), docs, job.get("with") or {})
+            elif "uses" in job or not all(hosted.match(r) for r in runners_of(job, doc, given or {})):
                 bad.append("%s: %s" % (name, job_name))
         return bad
 
@@ -67,6 +81,12 @@ def test_no_pull_request_reaches_a_runner_of_ours():
     probe = {"a.yml": {"jobs": {"c": {"uses": "./.github/workflows/b.yml"}}}, "b.yml": {"jobs": {"j": {"runs-on": "latitude-5-1-a"}}}}
     assert reach("a.yml", probe["a.yml"], docs=probe) == ["b.yml: j"]
     assert reach("a.yml", {"jobs": {"c": {"uses": "oss-invisible/core/.github/workflows/x.yml@main"}}}, docs=probe) == ["a.yml: c"]
+    # a called workflow whose runner comes from its caller (py-deps.yml): a hosted list passes, a label of ours does not
+    called = {"on": {"workflow_call": {"inputs": {"runners": {"default": '["ubuntu-24.04"]'}}}},
+              "jobs": {"w": {"runs-on": "${{ matrix.runner }}", "strategy": {"matrix": {"runner": "${{ fromJSON(inputs.runners) }}"}}}}}
+    probe2 = {"p.yml": called}
+    assert reach("a.yml", {"jobs": {"c": {"uses": "./.github/workflows/p.yml", "with": {"runners": '["ubuntu-24.04", "windows-latest"]'}}}}, docs=probe2) == []
+    assert reach("a.yml", {"jobs": {"c": {"uses": "./.github/workflows/p.yml", "with": {"runners": '["latitude-5-1-a"]'}}}}, docs=probe2) == ["p.yml: w"]
 
 
 def test_every_script_exists_and_starts_without_the_tree():

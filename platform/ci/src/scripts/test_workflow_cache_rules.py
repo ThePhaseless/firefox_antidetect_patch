@@ -10,8 +10,8 @@
   3. the size per leg times three legs fits the repository's 150 GB, and is
      at least 30 GB: a PGO + LTO build writes more than 15, and a cache smaller
      than a build evicts itself (run 40557157874 reused 0.2%);
-  4. at least 32 GB of swap: the Windows leg's full-LTO link used 24.4 of 24
-     (run 40520853142).
+  4. no swap, no disk cleaning and no step that only a GitHub runner runs: both legs compile on the build node (scripts/ci/legs.py), 800 GB of disk and 96 GB
+     of memory, and a step gated to a hosted runner could never run.
 
 Run it directly: `python3 scripts/test_workflow_cache_rules.py`.
 """
@@ -39,8 +39,6 @@ def main() -> int:
     save = step(text, "Compile cache - save this leg's")
     cond = re.search(r"^\s+if: (.*)$", save, re.M).group(1)
     size = int(re.search(r"SCCACHE_CACHE_SIZE=(\d+)G", text).group(1))
-    swap = int(re.search(r"fallocate -l (\d+)G \"\$SWAPFILE\"", text).group(1))
-    swap_step = step(text, "Free disk + 32G swap (Linux runners)")
     cases = [
         ("the Build step has id build", re.search(r"^\s+id: build$", build, re.M) is not None),
         ("the save waits for the Build step to have started",
@@ -50,11 +48,10 @@ def main() -> int:
         ("%d legs of %d GB fit the repository's %d GB" % (LEGS, size, REPO_LIMIT_GB),
          LEGS * size <= REPO_LIMIT_GB),
         ("the cache per leg (%d GB) holds a PGO + LTO build" % size, size >= 30),
-        ("the swap (%d GB) holds the Windows full-LTO link" % swap, swap >= 32),
-        ("the compressed swap in RAM comes before the file (zram priority 100, file 10)",
-         "swapon -p 100 \"$ZRAM\"" in swap_step and "swapon -p 10 \"$SWAPFILE\"" in swap_step),
-        ("a runner without zram says so instead of building as if it had it",
-         "::warning::no usable zram" in swap_step),
+        ("no swap and no disk cleaning in the workflow: the legs run on the node, which needs neither",
+         not re.search(r"\b(swapon|mkswap|zramctl|fallocate)\b|Free disk", text)),
+        ("no step of the build job is gated to a GitHub runner (`runner.environment == 'github-hosted'`): it could never run on the node",
+         "runner.environment == 'github-hosted'" not in text),
     ]
     failures = 0
     for name, ok in cases:

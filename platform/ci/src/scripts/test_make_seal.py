@@ -34,15 +34,11 @@ are checked here only to the extent of not writing a seal; the exhaustive set
 lives with the range file. And nothing here touches a real archive: the point is
 that these run in seconds with no build.
 
-Run it standalone - `python scripts/test_make_seal.py` - because this repository
-has no pytest configuration and a gate that needs one would not run.
-
-
-RUN IT DIRECTLY: `python scripts/test_make_seal.py`. This is NOT a pytest suite - it
-carries its own case registry and passes each case a temp directory, so
-`pytest` collects it by name, finds no fixture called `d`, and reports every
-case as an ERROR. That reads exactly like a broken gate, and it cost one
-wrong conclusion on 2026-08-02 before the file was run the way it is built.
+Run it standalone - `python scripts/test_make_seal.py` - where its own runner
+passes each case a fresh temporary directory, or with pytest, which gets the
+same directory from the `d` fixture below (the `checks` job's `tree` step runs
+this file both ways). Both give a case an empty directory that is removed
+afterwards, so a case cannot tell which runner called it.
 """
 from __future__ import annotations
 
@@ -58,6 +54,17 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import make_seal as m  # noqa: E402
+
+try:  # the standalone runner needs no pytest; under pytest the cases get `d` from here
+    import pytest
+except ImportError:  # pragma: no cover
+    pytest = None
+
+if pytest is not None:
+    @pytest.fixture
+    def d(tmp_path: Path) -> Path:
+        """The empty temporary directory `main()` gives each case."""
+        return tmp_path
 
 
 # --------------------------------------------------------------- fixtures

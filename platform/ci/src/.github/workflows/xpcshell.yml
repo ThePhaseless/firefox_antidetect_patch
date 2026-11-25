@@ -132,6 +132,7 @@ jobs:
           gh release download "$PUBLISHED_TAG" -R "$GITHUB_REPOSITORY" --pattern seal.json --dir art
       - name: The series commit the run's build recorded
         if: env.PUBLISHED_TAG == ''
+        # continue-on-error: an optional download (a build from before the artifact existed has none; the head_sha of its run is the fallback)
         continue-on-error: true
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
@@ -292,6 +293,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Both legs' junit
+        # continue-on-error: an optional download (a leg that never got to upload its part leaves none); the judge is red for a named test with no junit
         continue-on-error: true
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:

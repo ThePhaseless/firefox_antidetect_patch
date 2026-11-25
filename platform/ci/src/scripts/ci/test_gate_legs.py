@@ -400,7 +400,8 @@ def package_cases(gate: dict) -> list:
         and "engine-series/platform/ci/src/scripts/ci/published_release.py" in latest[0]["run"])
     add("package-ab: 15 minutes on a GitHub runner, never the Latitude node",
         job.get("timeout-minutes") == 15 and job.get("runs-on") == "ubuntu-24.04" and "latitude-" not in text and "self-hosted" not in text)
-    down = [s for s in steps if str(s.get("uses", "")).startswith("actions/download-artifact")]
+    # the candidate's artifacts, of the run named by BUILD_RUN_ID (the wheelhouse of the job's py-deps call is this run's own: no run-id)
+    down = [s for s in steps if str(s.get("uses", "")).startswith("actions/download-artifact") and "run-id" in (s.get("with") or {})]
     add("package-ab: the candidate is the asset-* of both legs and the source-commit of one run, read with the token when it is another run's",
         [(s["with"]["name"]) for s in down] == ["asset-linux-x86_64", "asset-win-x86_64", "source-commit"]
         and all(s["with"]["run-id"] == "${{ env.BUILD_RUN_ID }}" and "github.run_id" in s["with"]["github-token"] for s in down))

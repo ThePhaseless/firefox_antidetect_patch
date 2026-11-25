@@ -27,14 +27,19 @@ CALL = "./.github/workflows/checks.yml"
 
 # The jobs of checks.yml and the command each one runs (a substring of a step's `run`). Written by hand, so that a check dropped from checks.yml is a red
 # test and not a shorter list: add a command here when a check is added there.
+# The one workflow a job of checks.yml may call: the resolver of its Python packages (ci-03).
+PY_DEPS = "./.github/workflows/py-deps.yml"
+
 CHECK_COMMANDS = {
     # series.yml's `rules`
     "rules": ["pytest -q tools/tests", "tools/engine.py check"],
     # series.yml's `rebuilds`: the tree the series makes is the declared one (the CI form of `engine.py verify`: materialize stops on another tree),
     # the births, the core's checks that read the tree
-    "rebuilds": ["engine.py materialize --into source", "tools/births.py --tree source", "tools/backport_replay.py check --source source", "release_plan.py --resolve-core-ref",
+    "rebuilds": ["engine.py materialize --into source", "tools/births.py --tree source", "tools/backport_replay.py check --source source",
                  "tests/test_pref_types.py", "tests/test_prefs_surface.py", "tests/test_juggler_contract.py", "tests/test_juggler_protocol_mirror.py",
                  "tests/test_webgl_extensions_follow_the_engine.py"],
+    # the core the wrapper pins, resolved once for the wheelhouse and the checkout of rebuilds (ci-05)
+    "core-ref": ["release_plan.py --resolve-core-ref"],
     # series.yml's `noreply-identity`
     "noreply-identity": ["ci_noreply_identity.py"],
     # release.yml's plan (its own tests) and checks
@@ -110,8 +115,10 @@ def problems(series, release, checks):
     if set(_events(checks)) != {"workflow_call"}:
         out.append("checks.yml runs on %s; it is called, never started" % sorted(_events(checks)))
     for job_name, job in checks["jobs"].items():
-        if "if" in job or "needs" in job or "uses" in job or job.get("continue-on-error"):
-            out.append("checks.yml: the job %s can be skipped or passed (if, needs, uses or continue-on-error)" % job_name)
+        # A job may wait for another job of checks.yml (a red one fails the call) and call only the resolver of its packages (ci-03); never an
+        # `if` or continue-on-error, which skip or pass a check.
+        if "if" in job or job.get("continue-on-error") or ("uses" in job and job["uses"] != PY_DEPS):
+            out.append("checks.yml: the job %s can be skipped or passed (if, continue-on-error, or a call of something but %s)" % (job_name, PY_DEPS))
 
     # (c) nothing of what the two files checked before is missing
     for job_name in OLD_SERIES_JOBS + ("tree",):
@@ -166,6 +173,9 @@ def test_a_call_that_skips_a_candidate_is_red():
     assert any("the node does not wait for `checks`" in p for p in problems(series, release, checks))
     series, release, checks = _real()
     checks["jobs"]["rebuilds"]["if"] = "github.event_name == 'pull_request'"
+    assert any("the job rebuilds can be skipped" in p for p in problems(series, release, checks))
+    series, release, checks = _real()
+    checks["jobs"]["rebuilds"]["uses"] = "./.github/workflows/gate.yml"
     assert any("the job rebuilds can be skipped" in p for p in problems(series, release, checks))
 
 

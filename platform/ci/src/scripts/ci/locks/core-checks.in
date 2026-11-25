@@ -1,0 +1,17 @@
+# Input of the core-checks lock; `python scripts/ci/py_deps.py lock core-checks` writes core-checks.txt from it.
+# python-version: 3.11
+# exclude-newer: 2026-11-25T00:00:00Z
+# source: oss-invisible/core v69.82.0 pyproject.toml sha256 c0d14a4d26d3650005076ab72347eb24fba4b89e643f514e7f7334bd0a2ac174
+build>=1
+maxminddb>=2.2
+platformdirs>=4
+psutil>=5.9
+pytest>=7
+pytest-mock>=3
+pytest-rerunfailures>=14
+pytest-timeout>=2
+pytest-xdist>=3
+requests[socks]>=2.31
+responses>=0.24
+ruff>=0.6
+tzdata>=2024.1

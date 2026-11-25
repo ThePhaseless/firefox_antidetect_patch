@@ -133,11 +133,10 @@ jobs:
           date +%s > ../../../../../.t2
           cargo test --lib -- stealth_tests:: 2>&1 | tee -a ../../../../../gfx/wr/cargo-test.log
       # THE JUNIT for the named hook tests judge (hook-tests-judge.yml reads the artifact `junit-cargo`): one file per test binary, a testcase per test named
-      # as cargo prints it, written from the log above (scripts/ci/cargo_junit.py, libtest's text: no nightly flag). It never changes the verdict: this step
-      # does not fail the job, and the upload below runs whatever the tests said.
+      # as cargo prints it, written from the log above (scripts/ci/cargo_junit.py, libtest's text: no nightly flag). It runs whatever cargo said, and its own
+      # failure (a log with no test binary in it: the tests did not run) is a red of the leg; the upload below runs whatever this step said.
       - name: The junit of the cargo tests (one file per test binary)
         if: always()
-        continue-on-error: true
         run: python scripts/ci/cargo_junit.py gfx/wr/cargo-test.log --out junit-cargo/${{ matrix.leg }} --packages webrender,mdns_service
       - name: Keep the junit (this leg's part of junit-cargo)
         if: always()
@@ -175,6 +174,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Both legs' junit
+        # continue-on-error: an optional download (a leg that never got to upload its part leaves none); the judge is red for a named test with no junit
         continue-on-error: true
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
