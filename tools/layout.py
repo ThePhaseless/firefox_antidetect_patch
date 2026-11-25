@@ -11,8 +11,8 @@ The layout is one folder per feature, grouped by what the feature does:
 
 GROUP_ORDER is also the order the series is applied in.
 
-FEATURES maps the feature names of the inventory (tools/inventory.json, one
-record per Mozilla file we modify) to their folder. The files we add to Firefox's tree have no table:
+FEATURES maps the feature names of the inventory (the `inventory` of each folder's MANIFEST.json, one
+record per Mozilla file the folder holds lines of) to their folder. The files we add to Firefox's tree have no table:
 the folder that holds `<folder>/src/<path>` owns it (own_file_folder); a file the series has not seen yet is
 placed once, by `export --own <path>=<folder>`.
 """

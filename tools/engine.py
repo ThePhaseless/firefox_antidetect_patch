@@ -45,7 +45,7 @@ export   writes one folder per feature (tools/layout.py says which):
          SERIES, the order the folders are applied in, and UPSTREAM.json's
          "exported_from". A folder that no longer owns anything is removed.
          It also writes what it can compute (repo-06): the `added`, `removed`, `hunks` and `inline_logic_lines` of every record of
-         tools/inventory.json (one per file and folder) from the folder's hooks.patch (the hand fields stay; a (file, folder) with no record
+         the `inventory` of each folder's MANIFEST.json (one per file and folder, the one place that has it) from the folder's hooks.patch (the hand fields stay; a (file, folder) with no record
          gets one with its counts, category, feature and hookable, and an empty anchor and notes for a hand), the entry of tools/hook-budget.json
          and tools/removed-budget.json (keyed <file>|<folder>) of a (file, folder) patched for the first time, at the counted value, and
          tools/gtest-suites.json. A line no folder owns stops the export before it writes anything. The owner of a file of ours is the
@@ -130,7 +130,6 @@ import split  # noqa: E402
 from failure import fail  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
-INVENTORY = ROOT / "tools" / "inventory.json"
 UPSTREAM = ROOT / "UPSTREAM.json"
 BUDGET = ROOT / "tools" / "hook-budget.json"
 REMOVED_BUDGET = ROOT / "tools" / "removed-budget.json"
@@ -215,8 +214,25 @@ def changed_files(source: Path, base: str, head: str):
     return result
 
 
-def inventory_records(path: Path = None) -> list:
-    return json.loads((INVENTORY if path is None else path).read_text(encoding="utf-8"))
+def inventory_records() -> list:
+    """The inventory of the series: one record per (file, folder), each in the `inventory` of the MANIFEST.json of its folder (the one place
+    that has it), the folders in SERIES order. `export` writes them: the computed fields from the folder's hooks.patch, the hand fields
+    kept from the committed record."""
+    found = []
+    for folder in sorted(existing_folders(), key=layout.folder_sort_key):
+        found += json.loads((ROOT / folder / "MANIFEST.json").read_text(encoding="utf-8")).get("inventory", [])
+    return found
+
+
+def legacy_inventory() -> Path:
+    """The file the inventory used to be kept in, as a second copy of the MANIFEST ones: it must not exist (repo-07)."""
+    return ROOT / "tools" / "inventory.json"
+
+
+def record_where(record: dict) -> str:
+    """Where an inventory record lives: the MANIFEST.json of its folder."""
+    folder = record_folder(record)
+    return "%s/MANIFEST.json" % folder if folder else "the MANIFEST.json of the folder of the feature %s" % record.get("feature")
 
 
 def records_by_file(records: list) -> dict:
@@ -257,9 +273,10 @@ def owners(source: Path, base: str, head: str, declared: dict | None = None):
             if status in ("M", "D"):   # D: a Mozilla file we delete is ours to own like any change
                 if path not in by_file:
                     raise SystemExit(halt(fail(
-                        "tools/inventory.json", "the modified file %s is not in the inventory" % path,
-                        "add its record to %s (feature, category, anchor, hookable, notes), then run the export again; export writes its counts" % INVENTORY.name,
-                        R_SERIES), again))
+                        "the `inventory` of the MANIFEST.json files", "the modified file %s has no record: its category (backport or not) and its feature, "
+                        "which the export cannot derive (a backport has no markers, a binary file or a removal with no marker has no folder)" % path,
+                        "add its record (feature, category, anchor, hookable, notes) to the `inventory` of the MANIFEST.json of its folder, then run the "
+                        "export again; export writes its counts and keeps the rest", R_SERIES), again))
                 recs = by_file[path]
                 folder = min((layout.feature_folder(r["feature"]) for r in recs), key=layout.folder_sort_key)
                 modified[path] = (folder, "backport" if any(r["category"] == "backport" for r in recs) else recs[0]["category"])
@@ -394,7 +411,7 @@ def derived_record(path: str, folder: str, diff: dict, category: str, feature: s
 
 
 def inventory_after(old: list, modified: dict, diffs: dict, patches: dict, say=print) -> tuple:
-    """-> (the new inventory, {(file, folder): record}). `old` is tools/inventory.json; `modified` {file: [folders that own lines of it]};
+    """-> (the new inventory, {(file, folder): record}). `old` is the inventory of the MANIFEST.json files before the export; `modified` {file: [folders that own lines of it]};
     `diffs` {(file, folder): file_diffs entry}; `patches` {folder: hooks.patch bytes}. One record per (file, folder). The record of the
     folder that held a file keeps its hand fields (anchor, notes, verifier, prefs, hookable, ...) and takes the counts of its folder's part.
     A record whose folder owns no line of its file any more moves, hand fields and all, to the one folder that now owns the lines no old
@@ -416,7 +433,7 @@ def inventory_after(old: list, modified: dict, diffs: dict, patches: dict, say=p
                 fresh[(path, f)], carried[id(r)] = record, record
         if orphans and len(uncovered) > 1:
             raise SystemExit(halt(fail(
-                "tools/inventory.json, the record of %s" % path,
+                "the `inventory` of the MANIFEST.json files, the record of %s" % path,
                 "its folder %s owns no line of the file any more, and the lines are now the folders' %s: the record cannot say which keeps it"
                 % (", ".join(sorted({record_folder(r) or r["feature"] for r in orphans})), ", ".join(uncovered)),
                 "set the `feature` of the record to one that maps to the folder that keeps it (tools/layout.py FEATURES), then run the export again",
@@ -461,6 +478,7 @@ def export(source: Path, base: str, head: str, declared: dict | None = None) -> 
     require_descends(source, base, head)
     plan, by_file, split_plan = owners(source, base, head, declared)
     series = sorted(plan, key=layout.folder_sort_key)
+    committed_inventory = inventory_records()       # before a folder is removed or a MANIFEST.json written: the hand fields come from here
     patches = split.folder_patches(source, base, head, split_plan, series)
     if patches.problems:
         raise SystemExit(halt("\n".join(str(p) for p in patches.problems), command("export", "--source", "<source>", "--head", head)))
@@ -494,7 +512,7 @@ def export(source: Path, base: str, head: str, declared: dict | None = None) -> 
     for folder in series:
         for path in plan[folder]["modified"]:
             modified[path].append(folder)
-    inventory, fresh = inventory_after(inventory_records(), modified, diffs, patches)
+    inventory, fresh = inventory_after(committed_inventory, modified, diffs, patches)
     for folder in series:
         owned = plan[folder]
         manifest = {
@@ -507,7 +525,6 @@ def export(source: Path, base: str, head: str, declared: dict | None = None) -> 
         feature_md = ROOT / folder / "FEATURE.md"
         if not feature_md.exists():
             feature_md.write_text(describe(folder, manifest), encoding="utf-8", newline="\n")
-    write_json(INVENTORY, inventory)
     hook_budget, removed_budget = new_budgets({budget_key(p, f): d for (p, f), d in diffs.items()}, {r["file"]: r for r in inventory})
     write_json(BUDGET, hook_budget)
     write_json(REMOVED_BUDGET, removed_budget)
@@ -1115,7 +1132,7 @@ def record_count_problems(records: list, diffs: dict) -> list:
     has: those of its file in the hooks.patch of its folder (`diffs`: (file, folder) -> file_diffs entry; the folder is the one the record's
     feature maps to). The three fields are written by `export` (computed_record); one that differs was edited by hand or not refreshed, and
     reads as truth to whoever sizes a hook from it. A record has no `evidence`."""
-    found = evidence_problems("tools/inventory.json", records)
+    found = []
     for r in records:
         diff = diffs.get((r["file"], record_folder(r)), diffs.get(r["file"]))
         if diff is None:
@@ -1125,7 +1142,7 @@ def record_count_problems(records: list, diffs: dict) -> list:
         real = (diff["added"], diff["removed"], diff["hunks"])
         if have != real:
             found.append(fail(
-                "tools/inventory.json", "the record of %s in %s says added %s, removed %s, hunks %s; its hooks.patch has %d, %d, %d"
+                record_where(r), "the record of %s in %s says added %s, removed %s, hunks %s; its hooks.patch has %d, %d, %d"
                 % ((r["file"], record_folder(r) or r.get("feature")) + have + real),
                 "do not edit a count: `%s` writes added, removed and hunks of every record from its hooks.patch" % again, R_SERIES))
     return found
@@ -1143,7 +1160,7 @@ def record_inline_problems(records: list, diffs: dict, patches: dict) -> list:
         real = inline_logic_of(folder, patches[folder], r["file"])
         if r.get("inline_logic_lines") != real:
             found.append(fail(
-                "tools/inventory.json", "the record of %s in %s says inline_logic_lines %s; the folder's part of the file in its hooks.patch has %d"
+                record_where(r), "the record of %s in %s says inline_logic_lines %s; the folder's part of the file in its hooks.patch has %d"
                 % (r["file"], folder, r.get("inline_logic_lines"), real),
                 "do not edit inline_logic_lines: `%s` writes it from the hooks.patch of the folder" % command("export", "--source", "<source>"), R_TOOL_WRITES))
     return found
@@ -1165,12 +1182,12 @@ def inventory_hand_problems(records: list, diffs: dict) -> list:
         for field in INVENTORY_HAND_FIELDS:
             if not (isinstance(r.get(field), str) and r[field].strip()):
                 found.append(fail(
-                    "tools/inventory.json, the record of %s in %s" % (r["file"], record_folder(r) or r.get("feature")),
+                    "%s, the record of %s in %s" % (record_where(r), r["file"], record_folder(r) or r.get("feature")),
                     "its `%s` is empty: the text of an inventory record is written by hand" % field,
                     "write `%s` in the record (what the hook is, in words; read the folder's part of the file in its hooks.patch)" % field, R_ONE_FACT))
         if r.get("hookable") not in INVENTORY_HOOKABLE:
             found.append(fail(
-                "tools/inventory.json, the record of %s in %s" % (r["file"], record_folder(r) or r.get("feature")),
+                "%s, the record of %s in %s" % (record_where(r), r["file"], record_folder(r) or r.get("feature")),
                 "its `hookable` is %r, not one of %s" % (r.get("hookable"), ", ".join(INVENTORY_HOOKABLE)),
                 "set `hookable` to `already-hook` when every line of the folder's part is a hook form, `movable` when the logic can move into a "
                 "file of ours, `hard` when it cannot", R_ONE_FACT))
@@ -1178,7 +1195,7 @@ def inventory_hand_problems(records: list, diffs: dict) -> list:
 
 
 def evidence_problems(where: str, records: list) -> list:
-    """repo-07: an inventory record (in tools/inventory.json or in the `inventory` of a MANIFEST.json) has no `evidence` field. The lines it
+    """repo-07: an inventory record (in the `inventory` of a MANIFEST.json) has no `evidence` field. The lines it
     quoted are the lines of the hooks.patch of its folder, which is the one place that has them."""
     return [fail("%s, the record of %s" % (where, r.get("file")), "it has an `evidence` field, a second copy of the lines its hooks.patch adds and removes",
                  "delete the field: the lines are the hooks.patch itself (`git diff` shows them; `%s` writes the record without it)" % command("export", "--source", "<source>"),
@@ -1377,7 +1394,7 @@ def backport_in_tag_problems(source: Path, tag: str) -> list:
                 found.append(fail(
                     folder, "the tag %s already contains the backport of %s (commit %s)" % (tag, path, data.get("commit")),
                     "take the backport out of the series: restore its files to the tag's (`git checkout %s -- %s`), delete its record "
-                    "from tools/inventory.json, and export" % (tag, path), R_BACKPORT))
+                    "from the `inventory` of its folder's MANIFEST.json, and export" % (tag, path), R_BACKPORT))
     return found
 
 
@@ -1610,6 +1627,9 @@ def problems() -> list:
                                       "export the series again: the manifest lists every file under src/", R_SERIES))
         found += manifest_hash_problems(folder, d, manifest)
         found += evidence_problems("%s/MANIFEST.json" % folder, manifest.get("inventory", []))
+        found += [fail("%s/MANIFEST.json" % folder, "the record of %s (feature %s) belongs to the folder %s, not to this one" % (r["file"], r.get("feature"), record_folder(r)),
+                       "move the record to the `inventory` of the MANIFEST.json of the folder its feature maps to (tools/layout.py FEATURES)", R_ONE_FACT)
+                  for r in manifest.get("inventory", []) if record_folder(r) != folder]
         patch = d / "hooks.patch"
         touched = added_lines(patch) if patch.exists() else {}
         removed = removed_lines(patch) if patch.exists() else {}
@@ -1645,7 +1665,10 @@ def problems() -> list:
                               "remove it from the file (`%s` lowers budgets, it does not remove a file)" % command("shrink-budget"), R_BUDGET))
     patches = {f: (ROOT / f / "hooks.patch").read_text(encoding="utf-8", errors="replace")
                for f in present if (ROOT / f / "hooks.patch").exists()}
-    records = json.loads(INVENTORY.read_text(encoding="utf-8"))
+    records = inventory_records()
+    if legacy_inventory().exists():
+        found.append(fail("tools/inventory.json", "the file exists: it is a second copy of the `inventory` of the MANIFEST.json files, which are the one place that has the records",
+                          "delete tools/inventory.json: the inventory lives in each folder's MANIFEST.json (`export` writes it, a hand edits only the hand fields there)", R_ONE_FACT))
     found += hook_tag_problems(set(listed), patches)
     diffs = {}
     for f in present:

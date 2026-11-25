@@ -84,7 +84,7 @@ def make_series(tmp_path, folders):
     (series / "tools" / "tests").mkdir(parents=True)
     for tool in TOOLS.glob("*.py"):
         shutil.copy(tool, series / "tools" / tool.name)
-    for name, empty in {"hook-budget.json": {}, "removed-budget.json": {}, "hook-debt.json": [], "inventory.json": [],
+    for name, empty in {"hook-budget.json": {}, "removed-budget.json": {}, "hook-debt.json": [],
                         "hook-budget-raises.json": [], "budget-realign-69.json": []}.items():
         (series / "tools" / name).write_text(json.dumps(empty) + "\n", encoding="utf-8")
     shutil.copy(TOOLS / "hook-names.json", series / "tools" / "hook-names.json")
@@ -216,7 +216,7 @@ def test_the_checkout_takes_exactly_what_the_export_wrote_and_a_no_op_touches_no
 def test_a_path_constant_of_engine_follows_the_scratch_root_and_comes_back(tmp_path):
     here = engine.ROOT
     named = {n: v for n, v in vars(engine).items() if isinstance(v, Path) and (v == here or here in v.parents)}
-    assert {"ROOT", "UPSTREAM", "INVENTORY", "BUDGET", "REMOVED_BUDGET", "HOOK_DEBT", "WORKFLOWS_ROOT"} <= set(named)
+    assert {"ROOT", "UPSTREAM", "BUDGET", "REMOVED_BUDGET", "HOOK_DEBT", "WORKFLOWS_ROOT"} <= set(named)
     with engine.rebased(tmp_path):
         for name, value in named.items():
             assert getattr(engine, name) == tmp_path / value.relative_to(here), name

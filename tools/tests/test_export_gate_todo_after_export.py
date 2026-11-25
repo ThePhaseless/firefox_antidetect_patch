@@ -87,7 +87,7 @@ def world(tmp_path, monkeypatch):
     (source / FILE).write_bytes(text_of(True).encode())
     git(source, "commit", "-qam", "second folder")
     series = make_series(tmp_path, [A, B])
-    (series / "tools" / "inventory.json").write_text(json.dumps([RECORD]), encoding="utf-8")
+    (series / A / "MANIFEST.json").write_text(json.dumps({"inventory": [RECORD]}, indent=1) + "\n", encoding="utf-8")   # the first folder's hand work
     (series / "tools" / "tests" / "test_nothing_to_see.py").write_text("def test_it_runs():\n    pass\n", encoding="utf-8")
     (series / "tools" / "tests" / "test_quiet_anchors.py").write_text(RESTATING_TEST, encoding="utf-8")
     engine.export_into(series, source, TAG, first, {})           # the previous export; its hand work is the record above and the rows
@@ -108,7 +108,7 @@ def check_by_its_own_functions(monkeypatch):
         if command[1:] != ["tools/engine.py", "check"]:
             return real(command, cwd)
         with engine.rebased(Path(cwd)):
-            records = json.loads(engine.INVENTORY.read_text(encoding="utf-8"))
+            records = engine.inventory_records()
             found = engine.inventory_hand_problems(records, engine.folder_diffs())
             found += [v.failure for v in hook_contract.churn_violations(engine.ROOT) if v.failure is not None]
         lines = [str(f) for f in found] + extra
@@ -180,15 +180,17 @@ def test_the_gate_before_the_tolerance_refuses_the_same_export(world, monkeypatc
 
 def test_an_empty_field_of_a_record_the_export_did_not_derive_is_red(world):
     series, source, head = world
-    kept = json.loads((series / "tools" / "inventory.json").read_text(encoding="utf-8"))
+    kept = json.loads((series / A / "MANIFEST.json").read_text(encoding="utf-8"))["inventory"]
     kept[0]["anchor"] = ""                         # the record of the first folder, which the checkout had: a hand left it empty
-    (series / "tools" / "inventory.json").write_text(json.dumps(kept), encoding="utf-8")
+    manifest = json.loads((series / A / "MANIFEST.json").read_text(encoding="utf-8"))
+    manifest["inventory"] = kept
+    (series / A / "MANIFEST.json").write_text(json.dumps(manifest, indent=1) + "\n", encoding="utf-8")
     commit(series, "an empty anchor")
     before = snapshot(series)
     with pytest.raises(SystemExit) as stopped:
         run_gate(world)
     message = str(stopped.value)
-    assert "FAIL tools/inventory.json, the record of %s in %s: its `anchor` is empty" % (FILE, A) in message, message
+    assert "FAIL %s/MANIFEST.json, the record of %s in %s: its `anchor` is empty" % (A, FILE, A) in message, message
     assert "the record of %s in %s" % (FILE, B) not in message, "the record the export derived is not what stops it"
     assert snapshot(series) == before
 
@@ -234,9 +236,9 @@ def test_a_line_that_is_not_a_failure_the_check_made_is_red_and_a_crash_is_too(w
 
 def test_only_the_two_classes_are_named_and_only_for_what_the_export_made():
     news = export_gate.News({(FILE, B)}, {(B, FILE, 1)}, {(B, "whole.txt")})
-    mine = export_gate.fail("tools/inventory.json, the record of %s in %s" % (FILE, B), "its `notes` is empty: the text of an inventory record is written by hand",
+    mine = export_gate.fail("%s/MANIFEST.json, the record of %s in %s" % (B, FILE, B), "its `notes` is empty: the text of an inventory record is written by hand",
                             "write `notes` in the record", "repo-07-one-fact-one-place")
-    other_record = export_gate.fail("tools/inventory.json, the record of %s in %s" % (FILE, A), "its `notes` is empty: x", "write it", "repo-07-one-fact-one-place")
+    other_record = export_gate.fail("%s/MANIFEST.json, the record of %s in %s" % (A, FILE, A), "its `notes` is empty: x", "write it", "repo-07-one-fact-one-place")
     row = lambda folder, hunk: export_gate.fail(  # noqa: E731
         "%s/hooks.patch, %s, f()" % (folder, FILE), "C18: the hook `X();`%s has no churn row in tools/churn.json" % (", hunk %d," % hunk if hunk else ""),
         "run churn", export_gate.RULE)
@@ -263,7 +265,7 @@ def test_a_hook_found_by_a_c_plus_plus_context_with_a_colon_is_read_whole():
     failure = export_gate.parse_failure(line)
     assert failure is not None and failure.where == where and failure.what.startswith("C18: the hook `X();`"), failure
     assert export_gate.tolerated(failure, news).startswith("TODO after export: a.h: C18: the hook `X();`, hunk 2, has no churn row")
-    record = "tools/inventory.json, the record of a.h in %s" % B
+    record = "%s/MANIFEST.json, the record of a.h in %s" % (B, B)
     line = str(export_gate.fail(record, "its `notes` is empty: a record: it was derived", "write `notes`", "repo-07-one-fact-one-place"))
     assert export_gate.parse_failure(line).where == record
 
@@ -299,8 +301,8 @@ def test_the_tests_the_gate_lets_through_exist():
 
 def test_the_record_is_told_by_its_field_and_its_key_and_not_by_the_sentence():
     news = export_gate.News({(FILE, B)}, set(), set())
-    where = "tools/inventory.json, the record of %s in %s" % (FILE, B)
-    other = "tools/inventory.json, the record of %s in %s" % (FILE, A)
+    where = "%s/MANIFEST.json, the record of %s in %s" % (B, FILE, B)
+    other = "%s/MANIFEST.json, the record of %s in %s" % (A, FILE, A)
     for sentence in ("the text of an inventory record is written by hand", "some other words", "x"):
         assert export_gate.tolerated(export_gate.fail(where, "its `anchor` is empty: " + sentence, "write it", "repo-07-one-fact-one-place"), news)
         assert export_gate.tolerated(export_gate.fail(other, "its `anchor` is empty: " + sentence, "write it", "repo-07-one-fact-one-place"), news) is None

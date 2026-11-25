@@ -20,6 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import engine  # noqa: E402
 import folders  # noqa: E402
 import layout  # noqa: E402
+from seed_inventory import seed_inventory  # noqa: E402
 from test_apply_builds_the_layer_stack import run, world  # noqa: E402,F401
 from test_port import new_tag  # noqa: E402
 
@@ -294,20 +295,18 @@ def test_export_never_writes_or_deletes_a_folder_json(world, tmp_path, monkeypat
     (gone / "MANIFEST.json").write_text(json.dumps({"modified": [], "added": {}}), encoding="utf-8")
     (gone / "FOLDER.json").write_bytes(b'{"relation": "product"}\n')
     (root / "SERIES").write_text("platform/b\nfingerprint/a\nport/gone\n", encoding="utf-8")
-    inventory = tmp_path / "inventory.json"
-    inventory.write_text(json.dumps([{"file": "mozilla.txt", "feature": "x", "category": "hook", "hookable": "yes"}]), encoding="utf-8")
     upstream = tmp_path / "UPSTREAM.json"
     upstream.write_text(json.dumps({"mozilla_tag": "TAG", "source_branch": "series"}), encoding="utf-8")
     for name in ("BUDGET", "REMOVED_BUDGET"):      # export writes the entry of a file patched for the first time: into a copy
         (tmp_path / (name + ".json")).write_text("{}", encoding="utf-8")
         monkeypatch.setattr(engine, name, tmp_path / (name + ".json"))
-    monkeypatch.setattr(engine, "INVENTORY", inventory)
     monkeypatch.setattr(engine, "UPSTREAM", upstream)
     monkeypatch.setattr(engine, "WORKFLOWS_SERIES", tmp_path / "wf-series")
     monkeypatch.setattr(engine, "WORKFLOWS_ROOT", tmp_path / "wf-root")
     monkeypatch.setattr(layout, "feature_folder", lambda feature: "fingerprint/a")
     monkeypatch.setattr(layout, "own_file_folder", lambda path, held, declared=None: "fingerprint/a" if path.startswith("dom/") else "platform/b")
     monkeypatch.setattr(layout, "GROUP_ORDER", ["platform", "fingerprint", "port"])
+    seed_inventory(root, [{"file": "mozilla.txt", "feature": "x", "category": "hook", "hookable": "yes"}])
     engine.export(world, "TAG", "series")
     for name, data in keep.items():
         assert (root / name / "FOLDER.json").read_bytes() == data, "%s: its FOLDER.json is as the author wrote it" % name

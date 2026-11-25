@@ -11,7 +11,7 @@ Mozilla's logic is never copied into our files. Where a hook wraps or extends a 
 
 **Why.** Every line in a Mozilla file can conflict at the next tag. A call into our own file is the smallest surface, and a copy of Mozilla's logic stops following Mozilla. Long comments belong in our file and in `FEATURE.md`; the hook line carries only the marker.
 
-**Files.** `tools/layout.py` (`FEATURES`), `tools/inventory.json`, `<folder>/src/`; the rung table in [STRUCTURE.md](../STRUCTURE.md); the shape of a hook: [hook-02](hook-02-shape-and-contract.md).
+**Files.** `tools/layout.py` (`FEATURES`), `<folder>/MANIFEST.json` (`inventory`), `<folder>/src/`; the rung table in [STRUCTURE.md](../STRUCTURE.md); the shape of a hook: [hook-02](hook-02-shape-and-contract.md).
 
 **Don't.**
 - Put logic, a comment or a constant in a Mozilla file.

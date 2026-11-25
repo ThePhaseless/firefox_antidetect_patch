@@ -25,6 +25,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import engine  # noqa: E402
 import layout  # noqa: E402
+from seed_inventory import seed_inventory, set_inventory  # noqa: E402
 from test_apply_builds_the_layer_stack import run  # noqa: E402
 
 A, B = "fingerprint/a", "network/b"
@@ -61,17 +62,16 @@ def world(tmp_path, monkeypatch):
     series = tmp_path / "engine"
     series.mkdir()
     (series / "SERIES").write_text("", encoding="utf-8")
-    inventory = tmp_path / "inventory.json"
-    inventory.write_text(json.dumps([RECORD]), encoding="utf-8")
     budget, removed = tmp_path / "hook-budget.json", tmp_path / "removed-budget.json"
     budget.write_text(json.dumps({FILE: 9}), encoding="utf-8")         # the old budget, per file, with a slack of 2
     removed.write_text(json.dumps({FILE: 3}), encoding="utf-8")
     upstream = tmp_path / "UPSTREAM.json"
     upstream.write_text(json.dumps({"mozilla_tag": "TAG", "source_branch": "head"}), encoding="utf-8")
-    for name, value in (("ROOT", series), ("INVENTORY", inventory), ("BUDGET", budget), ("REMOVED_BUDGET", removed), ("UPSTREAM", upstream),
+    for name, value in (("ROOT", series), ("BUDGET", budget), ("REMOVED_BUDGET", removed), ("UPSTREAM", upstream),
                         ("WORKFLOWS_SERIES", tmp_path / "wf-series"), ("WORKFLOWS_ROOT", tmp_path / "wf-root")):
         monkeypatch.setattr(engine, name, value)
     monkeypatch.setattr(layout, "FEATURES", {"fa": A, "nb": B})
+    seed_inventory(series, [RECORD])
     return src, series
 
 
@@ -141,9 +141,9 @@ def test_a_folder_whose_lines_are_all_gone_is_removed(world, capsys):
 def test_the_inventory_has_one_record_per_file_and_folder(world):
     src, series = world
     export(world)
-    records = json.loads(engine.INVENTORY.read_text(encoding="utf-8"))
-    assert [(r["file"], layout.feature_folder(r["feature"])) for r in records] == [(FILE, A), (FILE, B)]
-    kept, born = records
+    records = engine.inventory_records()
+    assert [(r["file"], layout.feature_folder(r["feature"])) for r in records] == [(FILE, B), (FILE, A)]
+    born, kept = records
     # the record of the folder that held the file keeps every hand field and takes the counts of its part
     assert (kept["anchor"], kept["notes"], kept["prefs"], kept["verifier"], kept["hookable"]) == (
         "by hand: the anchor", "by hand: the notes", ["a.pref"], {"changed": [], "why": "kept"}, "movable")
@@ -158,35 +158,92 @@ def test_the_inventory_has_one_record_per_file_and_folder(world):
 
 def test_check_refuses_the_empty_text_of_a_derived_record_and_says_where_what_how_and_which_rule(world):
     export(world)
-    found = engine.inventory_hand_problems(json.loads(engine.INVENTORY.read_text(encoding="utf-8")), engine.folder_diffs())
-    assert len(found) == 2 and all(f.startswith("FAIL tools/inventory.json, the record of mozilla.txt in network/b: its `") for f in found), found
+    found = engine.inventory_hand_problems(engine.inventory_records(), engine.folder_diffs())
+    assert len(found) == 2 and all(f.startswith("FAIL network/b/MANIFEST.json, the record of mozilla.txt in network/b: its `") for f in found), found
     assert "its `anchor` is empty" in found[0] and "its `notes` is empty" in found[1]
     assert all(". Fix: write `" in f and ". Rule: docs/decisions/repo-07-one-fact-one-place.md" in f for f in found)
 
 
 def test_an_empty_anchor_is_red_through_problems_and_check_not_only_the_cli(world, capsys):
     export(world)
-    mine = "tools/inventory.json, the record of mozilla.txt in network/b: its `%s` is empty"
+    mine = "network/b/MANIFEST.json, the record of mozilla.txt in network/b: its `%s` is empty"
     found = engine.problems()
     assert [f for f in found if mine % "anchor" in f] and [f for f in found if mine % "notes" in f], found
     assert engine.check() != 0 and mine % "anchor" in capsys.readouterr().out
-    records = json.loads(engine.INVENTORY.read_text(encoding="utf-8"))
+    records = engine.inventory_records()
     for r in records:
         if layout.feature_folder(r["feature"]) == B:
             r["anchor"], r["notes"] = "by hand: the anchor", "by hand: the notes"
-    engine.write_json(engine.INVENTORY, records)
+    set_inventory(engine.ROOT, records)
     assert not [f for f in engine.problems() if "its `anchor` is empty" in f or "its `notes` is empty" in f]
+
+
+# ------------------------------------------------------------------------------------------------ the inventory has one place
+
+def red(found, where, what):
+    return [f for f in found if f.startswith("FAIL " + where) and what in f]
+
+
+def test_the_inventory_lives_in_the_manifests_of_the_folders_and_nowhere_else(world):
+    src, series = world
+    export(world)
+    assert not (series / "tools" / "inventory.json").exists()
+    assert engine.inventory_records() == manifest_of(series, B)["inventory"] + manifest_of(series, A)["inventory"], "the folders in SERIES order"
+    assert not red(engine.problems(), "tools/inventory.json", "the file exists")
+
+
+def test_a_tools_inventory_json_that_reappears_is_red_and_says_where_what_how_and_which_rule(world):
+    src, series = world
+    export(world)
+    (series / "tools").mkdir(exist_ok=True)
+    (series / "tools" / "inventory.json").write_text(json.dumps(engine.inventory_records()), encoding="utf-8")
+    (found,) = red(engine.problems(), "tools/inventory.json", "the file exists")
+    assert "delete tools/inventory.json: the inventory lives in each folder's MANIFEST.json" in found
+    assert found.endswith("Rule: docs/decisions/repo-07-one-fact-one-place.md"), found
+    assert engine.check() != 0
+
+
+def test_a_record_in_the_manifest_of_another_folder_is_red(world):
+    src, series = world
+    export(world)
+    stray = manifest_of(series, A)["inventory"][0]
+    other = manifest_of(series, B)
+    other["inventory"].append(stray)
+    engine.write_json(series / B / "MANIFEST.json", other)
+    (found,) = red(engine.problems(), "%s/MANIFEST.json" % B, "belongs to the folder %s, not to this one" % A)
+    assert "move the record to the `inventory` of the MANIFEST.json of the folder its feature maps to" in found
+
+
+def test_a_computed_field_edited_by_hand_in_a_manifest_is_red_and_names_export(world):
+    """The computed fields (added, removed, hunks, inline_logic_lines) of a record are the hooks.patch's; the record is in the MANIFEST only."""
+    src, series = world
+    export(world)
+    manifest = manifest_of(series, A)
+    manifest["inventory"][0]["added"] = 99
+    engine.write_json(series / A / "MANIFEST.json", manifest)
+    (found,) = red(engine.problems(), "%s/MANIFEST.json" % A, "the record of mozilla.txt in %s says added 99" % A)
+    assert "python tools/engine.py export" in found and found.endswith("Rule: docs/decisions/series-01-export-is-the-only-writer.md"), found
+
+
+def test_export_keeps_the_hand_fields_of_the_manifest_record_and_a_hand_edit_of_them_is_the_authors(world):
+    src, series = world
+    export(world)
+    manifest = manifest_of(series, A)
+    manifest["inventory"][0]["notes"] = "by hand, again"
+    engine.write_json(series / A / "MANIFEST.json", manifest)
+    export(world)
+    assert manifest_of(series, A)["inventory"][0]["notes"] == "by hand, again"
 
 
 def test_a_stale_inline_logic_lines_is_red_and_export_writes_it_for_every_record(world):
     export(world)
-    records = json.loads(engine.INVENTORY.read_text(encoding="utf-8"))
+    records = engine.inventory_records()
     patches = {B: (world[1] / B / "hooks.patch").read_bytes(), A: (world[1] / A / "hooks.patch").read_bytes()}
     assert [r["inline_logic_lines"] for r in records] == [engine.inline_logic_of(layout.feature_folder(r["feature"]), patches[layout.feature_folder(r["feature"])], FILE) for r in records]
     records[0]["inline_logic_lines"] = 99
-    engine.write_json(engine.INVENTORY, records)
+    set_inventory(engine.ROOT, records)
     found = [f for f in engine.problems() if "inline_logic_lines" in f]
-    assert len(found) == 1 and "the record of mozilla.txt in fingerprint/a says inline_logic_lines 99" in found[0], found
+    assert len(found) == 1 and "the record of mozilla.txt in network/b says inline_logic_lines 99" in found[0], found
     assert ". Fix: do not edit inline_logic_lines: `" in found[0] and "export" in found[0] and ". Rule: docs/decisions/repo-06-" in found[0]
     export(world)
     assert not [f for f in engine.problems() if "inline_logic_lines" in f]
@@ -195,14 +252,14 @@ def test_a_stale_inline_logic_lines_is_red_and_export_writes_it_for_every_record
 def test_export_writes_inline_logic_lines_of_a_record_whose_file_is_not_split(world):
     src, series = world
     export(world)
-    records = json.loads(engine.INVENTORY.read_text(encoding="utf-8"))
+    records = engine.inventory_records()
     for r in records:
         r["inline_logic_lines"] = 77
-    engine.write_json(engine.INVENTORY, records)
+    set_inventory(engine.ROOT, records)
     run(src, "checkout", "-q", "-B", "only-b", "TAG")
     commit(src, BASE.replace("int v5;\n", "int v5;\nB3();  // STEALTH-HOOK(network/b)\n"), "only B")
     export(world, "only-b")
-    (record,) = json.loads(engine.INVENTORY.read_text(encoding="utf-8"))
+    (record,) = engine.inventory_records()
     assert record["inline_logic_lines"] == engine.inline_logic_of(B, (series / B / "hooks.patch").read_bytes(), FILE) != 77
 
 
@@ -212,7 +269,7 @@ def test_a_record_whose_folder_owns_no_line_any_more_moves_with_its_hand_text_to
     only_b = BASE.replace("int v5;\n", "int v5;\nB3();  // STEALTH-HOOK(network/b)\n")
     commit(src, only_b, "only B")
     export(world, "only-b")
-    records = json.loads(engine.INVENTORY.read_text(encoding="utf-8"))
+    records = engine.inventory_records()
     assert [(r["file"], layout.feature_folder(r["feature"])) for r in records] == [(FILE, B)]
     assert records[0]["anchor"] == "by hand: the anchor" and records[0]["notes"] == "by hand: the notes" and records[0]["feature"] == "nb"
     assert "the record of mozilla.txt moved from fingerprint/a to network/b" in capsys.readouterr().out
@@ -261,7 +318,7 @@ def test_a_marker_naming_no_folder_stops_the_export(world):
 
 def test_a_file_of_category_backport_stays_whole_in_the_folder_of_its_inventory_feature(world):
     src, series = world
-    engine.INVENTORY.write_text(json.dumps([dict(RECORD, category="backport", feature="nb")]), encoding="utf-8")
+    set_inventory(series, [dict(RECORD, category="backport", feature="nb")])
     export(world)
     assert (series / B / "hooks.patch").is_file() and not (series / A / "hooks.patch").exists()
     assert "+A1();" in patch_of(series, B) and "+B1();" in patch_of(series, B)

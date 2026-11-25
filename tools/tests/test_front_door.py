@@ -184,14 +184,11 @@ def test_verify_that_finds_a_difference_ends_with_next_export(world, capsys):
 
 
 def test_export_of_a_file_nobody_owns_ends_with_next(world, tmp_path, monkeypatch):
-    inventory = tmp_path / "inventory.json"
-    inventory.write_text("[]")
-    monkeypatch.setattr(engine, "INVENTORY", inventory)
     run(world, "checkout", "-q", "-B", "modified", "TAG")
     (world / "mozilla.txt").write_bytes(b"one\nhook();\ntwo\nmore\n")
     run(world, "commit", "-qam", "a modified file with no record")
     text = stop_text(lambda: engine.export(world, "TAG", "modified"))
-    assert "mozilla.txt is not in the inventory" in text and "Rule: docs/decisions/series-01" in text and assert_next(text) == "export"
+    assert "the modified file mozilla.txt has no record" in text and "Rule: docs/decisions/series-01" in text and assert_next(text) == "export"
     run(world, "checkout", "-q", "-B", "added", "TAG")
     (world / "nowhere").mkdir()
     (world / "nowhere" / "own.txt").write_bytes(b"ours\n")

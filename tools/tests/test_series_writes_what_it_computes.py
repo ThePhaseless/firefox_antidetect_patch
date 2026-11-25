@@ -25,6 +25,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import engine  # noqa: E402
 import gtest_list  # noqa: E402
 import layout  # noqa: E402
+from seed_inventory import seed_inventory  # noqa: E402
 from test_apply_builds_the_layer_stack import run, world  # noqa: E402,F401
 
 EXPORT = "python tools/engine.py export"
@@ -63,7 +64,7 @@ def test_a_count_edited_by_hand_fails_and_the_message_names_export():
 def test_an_evidence_field_fails_and_the_message_says_where_the_fix_and_the_rule():
     diffs = engine.file_diffs(DIFF)
     good = engine.computed_record({"file": "a.cpp", "category": "hook"}, diffs["a.cpp"])
-    found = engine.record_count_problems([dict(good, evidence=["-old"])], diffs)
+    found = engine.evidence_problems("x/z/MANIFEST.json", [dict(good, evidence=["-old"])])
     assert len(found) == 1 and "a.cpp" in found[0] and "evidence" in found[0] and "delete the field" in found[0], found
     assert "Rule: docs/decisions/repo-07-one-fact-one-place.md" in found[0], found
     # the same record inside a MANIFEST.json is refused with its own where
@@ -72,7 +73,7 @@ def test_an_evidence_field_fails_and_the_message_says_where_the_fix_and_the_rule
 
 
 def test_every_record_as_committed_is_what_export_writes():
-    records = json.loads(engine.INVENTORY.read_text(encoding="utf-8"))
+    records = engine.inventory_records()
     diffs = {}
     for folder in engine.existing_folders():
         patch = engine.ROOT / folder / "hooks.patch"
@@ -87,21 +88,20 @@ def test_every_record_as_committed_is_what_export_writes():
 def exported(world, tmp_path, monkeypatch):
     """The two-file repository with its series in a throwaway directory; every file export writes outside the series is a copy."""
     root = engine.ROOT
-    inventory = tmp_path / "inventory.json"
-    inventory.write_text(json.dumps([{"file": "mozilla.txt", "feature": "x", "category": "hook", "hookable": "yes", "notes": "mine"}]), encoding="utf-8")
     budget, removed = tmp_path / "hook-budget.json", tmp_path / "removed-budget.json"
     budget.write_text("{}\n", encoding="utf-8")
     removed.write_text("{}\n", encoding="utf-8")
     upstream = tmp_path / "UPSTREAM.json"
     upstream.write_text(json.dumps({"mozilla_tag": "TAG", "source_branch": "series"}), encoding="utf-8")
-    for name, value in (("INVENTORY", inventory), ("BUDGET", budget), ("REMOVED_BUDGET", removed), ("UPSTREAM", upstream),
+    for name, value in (("BUDGET", budget), ("REMOVED_BUDGET", removed), ("UPSTREAM", upstream),
                         ("WORKFLOWS_SERIES", tmp_path / "wf-series"), ("WORKFLOWS_ROOT", tmp_path / "wf-root")):
         monkeypatch.setattr(engine, name, value)
     monkeypatch.setattr(layout, "feature_folder", lambda feature: "fingerprint/a")
     monkeypatch.setattr(layout, "GROUP_ORDER", ["platform", "fingerprint", "port"])
     run(world, "checkout", "-q", "-B", "work", "TAG")
     engine.apply(world, "TAG", "series", force=False)
-    return world, root, inventory, budget, removed
+    seed_inventory(root, [{"file": "mozilla.txt", "feature": "x", "category": "hook", "hookable": "yes", "notes": "mine"}])
+    return world, root, None, budget, removed
 
 
 def test_export_writes_the_budget_of_a_file_new_to_the_series_and_leaves_the_others(exported):
@@ -128,7 +128,7 @@ def test_export_writes_the_removed_budget_of_a_new_file_that_loses_mozillas_line
 def test_export_writes_the_counts_of_the_record_and_keeps_the_hand_fields(exported):
     world, root, inventory, budget, removed = exported
     engine.export(world, "TAG", "series")
-    record = json.loads(inventory.read_text(encoding="utf-8"))[0]
+    (record,) = engine.inventory_records()
     assert (record["added"], record["removed"], record["hunks"]) == (1, 0, 1) and "evidence" not in record
     assert record["notes"] == "mine" and record["feature"] == "x"
     manifest = json.loads((root / "fingerprint" / "a" / "MANIFEST.json").read_text(encoding="utf-8"))

@@ -232,7 +232,7 @@ SOCKS_LAYER = "netwerk/socket/nsSOCKSIOLayer.cpp"
 
 
 def _record(file):
-    return next(r for r in json.loads(engine.INVENTORY.read_text(encoding="utf-8")) if r["file"] == file)
+    return next(r for r in engine.inventory_records() if r["file"] == file)
 
 
 def _patch_text(file, folder=None):
@@ -264,21 +264,23 @@ def test_a_hook_of_a_patch_tagged_with_a_folder_that_does_not_exist_fails():
                                     {"network/proxy-udp": patch.replace("socks-udp-h3", "proxy-udp")}) == []
 
 
-def test_the_check_refuses_an_evidence_field_in_the_inventory(tmp_path, monkeypatch):
-    # repo-07: the lines are the hooks.patch itself; a record that quotes them again is red, where = the record, fix = delete it
-    records = json.loads(engine.INVENTORY.read_text(encoding="utf-8"))
-    first = next(r for r in records if r["file"] == SOCKS_LAYER)          # one record of the file: it has one per folder that patches it
-    first["evidence"] = ["+  nsSOCKSUDPIOLayerWarm(proxy);  // STEALTH-HOOK(network/proxy-udp)"]
-    path = tmp_path / "inventory.json"
-    path.write_text(json.dumps(records), encoding="utf-8")
-    monkeypatch.setattr(engine, "INVENTORY", path)
-    found = [p for p in engine.problems() if "evidence" in p]
+def test_the_check_refuses_an_evidence_field_in_the_inventory():
+    # repo-07: the lines are the hooks.patch itself; a record that quotes them again is red, where = the MANIFEST.json of its folder, fix = delete it
+    first = dict(next(r for r in engine.inventory_records() if r["file"] == SOCKS_LAYER),     # one record of the file: it has one per folder that patches it
+                 evidence=["+  nsSOCKSUDPIOLayerWarm(proxy);  // STEALTH-HOOK(network/proxy-udp)"])
+    found = engine.evidence_problems(engine.record_where(first), [first])
     assert len(found) == 1, found
     assert SOCKS_LAYER in found[0] and "delete the field" in found[0] and "Rule: docs/decisions/repo-07-one-fact-one-place.md" in found[0], found
+    assert "MANIFEST.json" in found[0], found
+
+
+def test_the_committed_series_has_no_second_copy_of_the_inventory():
+    assert not engine.legacy_inventory().exists()
+    assert not [p for p in engine.problems() if p.startswith("FAIL tools/inventory.json")]
 
 
 def test_the_committed_series_has_no_evidence_field_anywhere():
-    assert not [r["file"] for r in json.loads(engine.INVENTORY.read_text(encoding="utf-8")) if "evidence" in r]
+    assert not [r["file"] for r in engine.inventory_records() if "evidence" in r]
     for f in engine.existing_folders():
         manifest = json.loads((engine.ROOT / f / "MANIFEST.json").read_text(encoding="utf-8"))
         assert not [r["file"] for r in manifest.get("inventory", []) if "evidence" in r], f
@@ -301,8 +303,7 @@ def _counts():
 
 
 def test_every_record_as_committed_has_the_counts_of_its_patch():
-    records = json.loads(engine.INVENTORY.read_text(encoding="utf-8"))
-    assert engine.record_count_problems(records, _counts()) == []
+    assert engine.record_count_problems(engine.inventory_records(), _counts()) == []
 
 
 def test_the_record_of_the_accept_language_hook_is_its_own():
@@ -319,14 +320,12 @@ def test_a_record_with_the_counts_of_another_feature_fails():
                and "python tools/engine.py export" in p for p in found), found
 
 
-def test_the_check_reads_the_counts_of_the_inventory(tmp_path, monkeypatch):
-    records = json.loads(engine.INVENTORY.read_text(encoding="utf-8"))
+def test_the_check_reads_the_counts_of_the_inventory(monkeypatch):
+    records = engine.inventory_records()
     for r in records:
         if r["file"] == HTTP_HANDLER:
             r["removed"] = 0
-    path = tmp_path / "inventory.json"
-    path.write_text(json.dumps(records), encoding="utf-8")
-    monkeypatch.setattr(engine, "INVENTORY", path)
+    monkeypatch.setattr(engine, "inventory_records", lambda: records)
     assert any(HTTP_HANDLER in p and "removed 0" in p for p in engine.problems())
 
 

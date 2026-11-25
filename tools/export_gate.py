@@ -225,9 +225,9 @@ FAILURE_LINE = re.compile(r"^FAIL ")
 # other line at its first ": "; a split that does not rebuild the line is refused (parse_failure).
 FAIL_LINES = tuple(re.compile(r"^FAIL " + head + r"\. Fix: (?P<fix>.+)\. Rule: docs/decisions/(?P<rule>.+)\.md$") for head in (
     r"(?P<where>.+?): (?P<what>C18: the hook .+)",
-    r"(?P<where>tools/inventory\.json, the record of .+?): (?P<what>its `.+)",
+    r"(?P<where>.+?, the record of .+?): (?P<what>its `.+)",
     r"(?P<where>.+?): (?P<what>.+)"))
-INVENTORY_WHERE = re.compile(r"^tools/inventory\.json, the record of (?P<file>.+) in (?P<folder>.+)$")
+INVENTORY_WHERE = re.compile(r"^.+, the record of (?P<file>.+) in (?P<folder>.+)$")
 EMPTY_HAND_FIELD = re.compile(r"^its `(?:anchor|notes|hookable)` is ")
 HOOK_WHERE = re.compile(r"^(?P<folder>.+)/hooks\.patch, (?P<file>[^,]+)(?:, .*)?$")
 NO_CHURN_ROW = re.compile(r"^C18: the hook `.*`(?:, hunk (?P<hunk>\d+),)? has no churn row in tools/churn\.json$")
@@ -271,11 +271,20 @@ class News:
 def _inventory_keys(root: Path) -> set:
     """(file, folder) of every record of tools/inventory.json under `root` (folder: the one of the record's feature, None if it has none)."""
     import layout
+    keys = set()
+    try:                   # the inventory lives in each folder's MANIFEST.json (repo-07: one place)
+        for line in (Path(root) / "SERIES").read_text(encoding="utf-8").split():
+            try:
+                kept = json.loads((Path(root) / line / "MANIFEST.json").read_text(encoding="utf-8")).get("inventory") or []
+            except (OSError, ValueError):
+                continue
+            keys.update((record["file"], line) for record in kept)
+    except OSError:
+        pass
     try:
         records = json.loads((Path(root) / "tools" / "inventory.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        return set()
-    keys = set()
+        return keys
     for record in records:
         try:
             folder = layout.feature_folder(record["feature"])
