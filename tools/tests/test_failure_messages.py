@@ -35,7 +35,7 @@ from failure import FailureError, fail  # noqa: E402
 REPO = TOOLS.parent
 RULE = "repo-04-every-failure-says-where-what-fix-rule"
 SCOPE = ("engine.py", "hook_contract.py", "hooks_list.py", "export_gate.py", "layout.py", "births.py", "prebuild.py",
-         "backport_replay.py", "churn.py", "folders.py", "range_diff.py", "failure.py")
+         "backport_replay.py", "churn.py", "folders.py", "range_diff.py", "failure.py", "gtest_list.py")
 # The one place that may hold the template of a failure line: failure.py's own renderer.
 TEMPLATE = {("failure.py", "_render")}
 

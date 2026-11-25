@@ -6,7 +6,7 @@ Where each kind of change goes. The engine is Firefox as a patch series on a Moz
 
 | Layer | What it is | Where | Registered in |
 |---|---|---|---|
-| Our own files | `Stealth*` code and its tests, stored byte for byte | `<folder>/src/<tree path>` | `layout.OWN_FILES` (first match wins) |
+| Our own files | `Stealth*` code and its tests, stored byte for byte | `<folder>/src/<tree path>` | Nothing: the folder that holds `<folder>/src/<path>` owns it; a new file is placed once with `export --own` |
 | Hooks | One-line changes to Mozilla files, each with `STEALTH-HOOK(<folder>)` on the line | `<folder>/hooks.patch` | `tools/inventory.json` (one record per Mozilla file) and `layout.FEATURES` |
 | Backports | Upstream code carried until the tag has it | `platform/backports/<name>/` (a Mozilla commit, or the upstream commits of a vendored crate that no feature of ours needs); vendored code under `third_party/rust/` in the folder that needs it | `BACKPORT.json` in the folder |
 
@@ -24,7 +24,7 @@ A folder holds `hooks.patch`, `src/`, `MANIFEST.json`, `FEATURE.md`, `HOOKS.json
 | A Mozilla commit carried ahead | `platform/backports/<name>/` |
 | A fix tied to one Firefox version, with its reason to expire | `port/<name>` |
 
-The groups are the order the series is applied in (`layout.GROUP_ORDER`). A new Mozilla file we modify needs an inventory record and a `layout.FEATURES` entry; a new file of ours needs a `layout.OWN_FILES` pattern. `export` stops until both exist.
+The groups are the order the series is applied in (`layout.GROUP_ORDER`). A new Mozilla file we modify needs an inventory record and a `layout.FEATURES` entry; a new file of ours that no folder holds under `src/` yet is placed once, `export --own <path or dir/>=<folder>`, and the folder that holds it owns it from then on. `export` stops until both exist.
 
 ## Which rung
 
@@ -153,8 +153,9 @@ Rule: [hook-03](decisions/hook-03-budgets-and-debt-only-go-down.md).
 | File | What it is |
 |---|---|
 | `tools/engine.py` | The commands: `export`, `verify`, `check`, `port` and the rest |
-| `tools/layout.py` | `GROUP_ORDER`; `FEATURES`: inventory feature name to folder; `OWN_FILES`: path pattern of a file of ours to folder |
-| `tools/inventory.json` | One record per Mozilla file we modify: file, category, feature, prefs, added / removed / hunk counts, anchor, notes. `check` compares the counts with `hooks.patch` |
+| `tools/layout.py` | `GROUP_ORDER`; `FEATURES`: inventory feature name to folder; the owner of a file of ours, read from the `src/` trees (no table) |
+| `tools/inventory.json` | One record per Mozilla file we modify: file, category, feature, prefs, anchor, notes (by hand); added / removed / hunk counts and evidence (written by `export` from `hooks.patch`; `check` refuses a different value) |
+| `tools/gtest-suites.json` | The gtest suites the `HOOKS.json` files name, sorted, each marked windows-only or linux-only where its tests are built on one platform; written by `gtest-list --write` |
 | `tools/hook_contract.py`, `tools/hooks_list.py` | The contract and the `HOOKS.json` generator |
 | `tools/folders.py`, `tools/range_diff.py` | The `FOLDER.json` check; the range-diff of a port |
 | `tools/prebuild.py`, `tools/births.py` | Static checks before a build; the birth-point scan |
@@ -164,7 +165,10 @@ Rule: [hook-03](decisions/hook-03-budgets-and-debt-only-go-down.md).
 
 | File | Written by |
 |---|---|
-| `<folder>/hooks.patch`, `<folder>/src/`, `<folder>/MANIFEST.json` | `export` |
+| `<folder>/hooks.patch`, `<folder>/src/`, `<folder>/MANIFEST.json` (with the `sha256` of every file under `src/`) | `export` |
+| `tools/inventory.json`: `added`, `removed`, `hunks`, `evidence` of each record | `export` (from `hooks.patch`) |
+| `tools/hook-budget.json`, `tools/removed-budget.json`: the entry of a Mozilla file patched for the first time | `export`, at the counted value |
+| `tools/gtest-suites.json` | `gtest-list --write`, and `export` |
 | A folder that owns nothing any more | `export` removes it |
 | `SERIES` | `export` |
 | `UPSTREAM.json`: `exported_from`, `exported_tree` | `export` |
@@ -176,7 +180,7 @@ Rule: [hook-03](decisions/hook-03-budgets-and-debt-only-go-down.md).
 | `ports/range-diff.txt` | `range-diff --write`, at every port |
 | `<folder>/BACKPORT.json` and the upstream diff beside it | By hand |
 | `UPSTREAM.json`: `mozilla_tag`, `source_branch` | `port`: it writes both once its branch exists |
-| `tools/layout.py`, `tools/inventory.json`, `tools/hook-budget-raises.json`, `tools/hook-names.json`, `tools/birth-ledger.json` | By hand |
+| `tools/layout.py`, `tools/inventory.json` (feature, category, anchor, hookable, notes, verifier), `tools/hook-budget-raises.json`, `tools/hook-names.json`, `tools/birth-ledger.json` | By hand |
 | `tools/hook-budget.json`, `tools/removed-budget.json` | By hand, downward; `shrink-budget` |
 | `tools/hook-debt.json` | `hook-debt` only |
 | `.github/workflows/series.yml`, `.github/workflows/noreply-identity.yml` | By hand |
@@ -187,7 +191,7 @@ Rule: [hook-03](decisions/hook-03-budgets-and-debt-only-go-down.md).
 1. In the source repository, on the source branch: the change, its test, the commit.
 2. Here: `export`. It first runs the node tests and the tree's python tests on the head's tree; then it writes the series into a scratch copy of the checkout, runs `engine.py check` and `tools/tests` (`-n auto`) on that copy, and only if all is green replaces the series of the checkout with it. A red leaves the checkout untouched.
 3. `verify`: it must say `identical`.
-4. `hook-debt` drops the resolved debt; `shrink-budget` after logic moved; a Mozilla file new to the series needs its row in `tools/hook-budget.json` (at most 5 lines).
+4. `hook-debt` drops the resolved debt; `shrink-budget` after logic moved; a Mozilla file new to the series gets its row in `tools/hook-budget.json` from `export` (at most 5 lines: more is a failure of `check`).
 5. A folder `export` made anew has no `FOLDER.json`: write it (`product`, or `defect` with its `upstream`). Fill the hand fields of the touched `HOOKS.json` (`test`; `anchor` and `why` for an anchor) and the `Test:` line of `FEATURE.md`.
 6. `check`, and `python -m pytest -q tools/tests`.
 7. Commit here with the same title as the source commit.

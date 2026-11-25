@@ -21,7 +21,7 @@ import export_gate  # noqa: E402
 def test_the_export_of_the_command_line_goes_through_the_gate_before_it_writes():
     text = (Path(engine.__file__)).read_text(encoding="utf-8")
     branch = text[text.index('if a.command == "export":'):text.index("return verify(")]
-    assert "export_gate.gate(" in branch and "export_into(scratch, a.source, base, head)" in branch, \
+    assert "export_gate.gate(" in branch and "export_into(scratch, a.source, base, head, declared)" in branch, \
         "engine.py export must hand the gate the write into its scratch tree"
     assert branch.index("export_gate.gate(") < branch.index("export_into("), "the write is an argument of the gate"
     assert "export(a.source" not in branch, "no way to the write that does not go through the gate"

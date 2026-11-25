@@ -298,12 +298,15 @@ def test_export_never_writes_or_deletes_a_folder_json(world, tmp_path, monkeypat
     inventory.write_text(json.dumps([{"file": "mozilla.txt", "feature": "x", "category": "hook", "hookable": "yes"}]), encoding="utf-8")
     upstream = tmp_path / "UPSTREAM.json"
     upstream.write_text(json.dumps({"mozilla_tag": "TAG", "source_branch": "series"}), encoding="utf-8")
+    for name in ("BUDGET", "REMOVED_BUDGET"):      # export writes the entry of a file patched for the first time: into a copy
+        (tmp_path / (name + ".json")).write_text("{}", encoding="utf-8")
+        monkeypatch.setattr(engine, name, tmp_path / (name + ".json"))
     monkeypatch.setattr(engine, "INVENTORY", inventory)
     monkeypatch.setattr(engine, "UPSTREAM", upstream)
     monkeypatch.setattr(engine, "WORKFLOWS_SERIES", tmp_path / "wf-series")
     monkeypatch.setattr(engine, "WORKFLOWS_ROOT", tmp_path / "wf-root")
     monkeypatch.setattr(layout, "feature_folder", lambda feature: "fingerprint/a")
-    monkeypatch.setattr(layout, "own_file_folder", lambda path: "fingerprint/a" if path.startswith("dom/") else "platform/b")
+    monkeypatch.setattr(layout, "own_file_folder", lambda path, held, declared=None: "fingerprint/a" if path.startswith("dom/") else "platform/b")
     monkeypatch.setattr(layout, "GROUP_ORDER", ["platform", "fingerprint", "port"])
     engine.export(world, "TAG", "series")
     for name, data in keep.items():
@@ -314,7 +317,7 @@ def test_export_never_writes_or_deletes_a_folder_json(world, tmp_path, monkeypat
     (world / "net.txt").write_text("x\n", encoding="utf-8")
     run(world, "add", "net.txt")
     run(world, "commit", "-qm", "net")
-    monkeypatch.setattr(layout, "own_file_folder", lambda path: "fingerprint/n" if path == "net.txt" else
+    monkeypatch.setattr(layout, "own_file_folder", lambda path, held, declared=None: "fingerprint/n" if path == "net.txt" else
                         ("fingerprint/a" if path.startswith("dom/") else "platform/b"))
     engine.export(world, "TAG", "more")
     assert (root / "fingerprint" / "n" / "MANIFEST.json").is_file() and not (root / "fingerprint" / "n" / "FOLDER.json").exists()

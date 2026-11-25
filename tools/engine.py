@@ -9,6 +9,7 @@ Every command that stops (non-zero exit) ends with `next: <the exact command to 
     python tools/engine.py verify    rebuild the tree from the series, compare
     python tools/engine.py check     the series' own rules, offline (also in CI)
     python tools/engine.py hooks-list   write every folder's HOOKS.json from its hooks.patch (the export does it too)
+    python tools/engine.py gtest-list [--write]   tools/gtest-suites.json: the gtest suites the hooks name (the export writes it too)
     python tools/engine.py hook-debt    drop the entries of tools/hook-debt.json that no longer occur
                                         (--init writes the list from scratch, --summary only counts it)
     python tools/engine.py apply --head <branch>   the series as a branch: tag + one commit per folder
@@ -35,12 +36,17 @@ environment variable FIREFOX_SOURCE, and stop with a message when neither is giv
 export   writes one folder per feature (tools/layout.py says which):
            hooks.patch    our changes to Mozilla's files, as a git diff against the tag
            src/<path>     the files we add to the tree, byte for byte
-           MANIFEST.json  what the folder owns (regenerated on every export)
+           MANIFEST.json  what the folder owns (regenerated on every export): `modified`, `added` (path -> mode), `sha256` (path -> the
+                          hash of the file under src/), `inventory` (the records of the modified files)
            FEATURE.md     the feature's description, created once and then edited by hand
            HOOKS.json     the folder's hooks, one entry per hook (tools/hooks_list.py); the hand fields
                           (test, anchor, why) of the committed file are kept
          SERIES, the order the folders are applied in, and UPSTREAM.json's
          "exported_from". A folder that no longer owns anything is removed.
+         It also writes what it can compute (repo-06): the `added`, `removed`, `hunks` and `evidence` of every record of
+         tools/inventory.json from the hooks.patch (the hand fields stay), the entry of tools/hook-budget.json and tools/removed-budget.json
+         of a Mozilla file patched for the first time, at the counted value, and tools/gtest-suites.json. The owner of a file of ours is the
+         folder that holds it under src/; a new file that no folder holds is placed once with `--own <path>=<folder>`.
 
 verify   rebuilds the tree from the series on top of the tag, in a throwaway git index
          (no checkout of Firefox, works in a bare repository), and compares it with the
@@ -85,7 +91,9 @@ check    needs no Firefox: SERIES lists exactly the folders that exist, every fo
          must equal the replay of the commits on the revision the tag vendors (tools/backport_replay.py).
          Every STEALTH-HOOK(<folder>) tag, in a hooks.patch and in the
          evidence of an inventory record, names a folder of SERIES, and the added, removed and hunk
-         counts of each inventory record are those of its file in the hooks.patch. A C++ file of ours has no control character (a carriage return inside a
+         counts and the evidence of each inventory record are those of its file in the hooks.patch (`export` writes them; a hand edit fails
+         and the message names `export`). The MANIFEST of a folder has the sha256 of every file under its src/, and each file has those bytes.
+         tools/gtest-suites.json is what `gtest-list --write` writes. A C++ file of ours has no control character (a carriage return inside a
          string literal ended the literal and broke the build of a test) and no byte outside ASCII inside a
          string or character literal: write them as escapes. No file of ours has a carriage return: not under
          <folder>/src/ (a binary file, with a NUL byte, apart) and not in a line a hooks.patch adds to a Mozilla
@@ -112,6 +120,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import backport_replay  # noqa: E402
 import births  # noqa: E402
 import folders  # noqa: E402
+import gtest_list  # noqa: E402
 import hook_contract  # noqa: E402
 import hooks_list  # noqa: E402
 import layout  # noqa: E402
@@ -184,9 +193,7 @@ def series_folders() -> list:
 
 
 def existing_folders() -> list:
-    return sorted(str(p.parent.relative_to(ROOT)).replace("\\", "/")
-                  for p in ROOT.glob("*/**/MANIFEST.json")
-                  if p.relative_to(ROOT).parts[0] in layout.GROUP_ORDER and "src" not in p.relative_to(ROOT).parts)
+    return layout.folders_on_disk(ROOT)
 
 
 def changed_files(source: Path, base: str, head: str):
@@ -202,10 +209,13 @@ def changed_files(source: Path, base: str, head: str):
     return result
 
 
-def owners(source: Path, base: str, head: str):
-    """folder -> {"modified": [paths], "added": [(path, mode)]}"""
+def owners(source: Path, base: str, head: str, declared: dict | None = None):
+    """folder -> {"modified": [paths], "added": [(path, mode)]}. A file of ours belongs to the folder that holds it under src/
+    (layout.own_file_folder); `declared` (`export --own`) places the files that no folder holds yet."""
     records = {r["file"]: r for r in json.loads(INVENTORY.read_text(encoding="utf-8"))}
     plan = defaultdict(lambda: {"modified": [], "added": []})
+    held = layout.src_owners(ROOT)[0]
+    unowned = []
     again = command("export", "--source", "<source>", "--head", head)
     for status, mode, path in changed_files(source, base, head):
         try:
@@ -213,18 +223,27 @@ def owners(source: Path, base: str, head: str):
                 if path not in records:
                     raise SystemExit(halt(fail(
                         "tools/inventory.json", "the modified file %s is not in the inventory" % path,
-                        "add its record to %s (feature, category, anchor, hookable, notes), then run the export again" % INVENTORY.name,
+                        "add its record to %s (feature, category, anchor, hookable, notes), then run the export again; export writes its counts and evidence" % INVENTORY.name,
                         R_SERIES), again))
                 plan[layout.feature_folder(records[path]["feature"])]["modified"].append(path)
             elif status == "A":
-                plan[layout.own_file_folder(path)]["added"].append((path, mode))
+                plan[layout.own_file_folder(path, held, declared)]["added"].append((path, mode))
             else:
                 raise SystemExit(halt(fail(
                     "git diff %s %s" % (base, head), "status %s for %s is not one export handles (M, D and A are)" % (status, path),
                     "make the change on the source branch an addition, a modification or a deletion of a file, then run the export again",
                     R_SERIES), again))
-        except KeyError as unowned:       # layout.py: a feature with no folder, a file of ours that no folder owns
-            raise SystemExit(halt(unowned.args[0], again)) from None
+        except KeyError as unowned_file:       # layout.py: a feature with no folder, a file of ours that no folder holds
+            if status != "A":
+                raise SystemExit(halt(unowned_file.args[0], again)) from None
+            unowned.append(path)
+    if unowned:
+        raise SystemExit(halt(fail(
+            "python tools/engine.py export", "no folder owns our new %s: %s (under no folder's src/ yet)"
+            % ("file" if len(unowned) == 1 else "files", ", ".join(unowned)),
+            "name the folder of each once with --own <path or dir/>=<folder> (a folder of SERIES, or a new one under %s); "
+            "the export writes the file under that folder's src/ and it is owned from then on" % "/".join(layout.GROUP_ORDER), R_SERIES),
+            command("export", "--source", "<source>", "--head", head, *[part for p in unowned for part in ("--own", "%s=<folder>" % p)])))
     return plan, records
 
 
@@ -239,13 +258,35 @@ def require_descends(source: Path, base: str, head: str) -> None:
             R_SERIES), command("apply", "--source", "<source>", "--head", head, "--force")))
 
 
-def export(source: Path, base: str, head: str) -> None:
+def new_budgets(diffs: dict, records: dict) -> tuple:
+    """The budget entries a hooks.patch needs and the budgets do not have yet: (hook, removed), each {file: count}. A Mozilla file the series
+    patches for the first time gets its entry at the counted value (hook budget: our lines; removed budget: Mozilla's lines it loses, only
+    when there are some). A file with an entry keeps it (`shrink-budget` lowers it, a raise is a row in tools/hook-budget-raises.json),
+    and upstream code (category backport) has none."""
+    hook = json.loads(BUDGET.read_text(encoding="utf-8"))
+    removed = json.loads(REMOVED_BUDGET.read_text(encoding="utf-8"))
+    for path, diff in sorted(diffs.items()):
+        if records.get(path, {}).get("category") == "backport":
+            continue
+        if path not in hook:
+            hook[path] = diff["added"]
+        if diff["removed"] and path not in removed:
+            removed[path] = diff["removed"]
+    return dict(sorted(hook.items())), dict(sorted(removed.items()))
+
+
+def export(source: Path, base: str, head: str, declared: dict | None = None) -> None:
+    """Writes the series from the head. What a tool can write, a tool writes (repo-06): besides the folders, SERIES and UPSTREAM.json, it
+    writes the `added`, `removed`, `hunks` and `evidence` of every inventory record from its hooks.patch (the hand fields stay), the budget
+    entries of the Mozilla files patched for the first time, and the sha256 of every file under src/ in the folder's MANIFEST.json.
+    `declared` is `--own`: {path or dir/: folder} for the new files no folder holds yet."""
     require_descends(source, base, head)
-    plan, records = owners(source, base, head)
+    plan, records = owners(source, base, head, declared)
     series = sorted(plan, key=layout.folder_sort_key)
     for gone in sorted(set(existing_folders()) - set(series)):
         shutil.rmtree(ROOT / gone)
         print("removed %s: it owns nothing any more" % gone)
+    fresh, diffs = {}, {}
     for folder in series:
         out = ROOT / folder
         out.mkdir(parents=True, exist_ok=True)
@@ -258,21 +299,34 @@ def export(source: Path, base: str, head: str) -> None:
             patch.unlink()
         if (out / "src").exists():
             shutil.rmtree(out / "src")
+        sha256 = {}
         for path, mode in owned["added"]:
             target = out / "src" / path
             target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(git(source, "cat-file", "blob", "%s:%s" % (head, path)))
+            data = git(source, "cat-file", "blob", "%s:%s" % (head, path))
+            target.write_bytes(data)
+            sha256[path] = hashlib.sha256(data).hexdigest()
+        folder_diffs = _diffs_of(patch) if patch.exists() else {}
+        diffs.update(folder_diffs)
+        for path in owned["modified"]:
+            fresh[path] = computed_record(records[path], folder_diffs[path])
         manifest = {
             "modified": sorted(owned["modified"]),
             "added": {path: mode for path, mode in sorted(owned["added"])},
-            "inventory": [records[p] for p in sorted(owned["modified"])],
+            "sha256": dict(sorted(sha256.items())),
+            "inventory": [fresh[p] for p in sorted(owned["modified"])],
         }
         write_json(out / "MANIFEST.json", manifest)
         feature_md = out / "FEATURE.md"
         if not feature_md.exists():
             feature_md.write_text(describe(folder, manifest), encoding="utf-8", newline="\n")
+    write_json(INVENTORY, [fresh.get(r["file"], r) for r in json.loads(INVENTORY.read_text(encoding="utf-8"))])
+    hook_budget, removed_budget = new_budgets(diffs, records)
+    write_json(BUDGET, hook_budget)
+    write_json(REMOVED_BUDGET, removed_budget)
     (ROOT / "SERIES").write_text("\n".join(series) + "\n", encoding="utf-8", newline="\n")
     print(write_hooks_list())
+    print(write_gtest_list())
     sync_workflows()
     up = upstream()
     up["exported_from"] = git(source, "rev-parse", head).decode().strip()
@@ -300,15 +354,20 @@ def rebased(root: Path):
         vars(module).update({name: old[name] for name in moved})
 
 
-def export_into(root: Path, source: Path, base: str, head: str) -> None:
+def export_into(root: Path, source: Path, base: str, head: str, declared: dict | None = None) -> None:
     """`export` writing into the checkout at `root` (the scratch copy of the gate) instead of this one."""
     with rebased(root):
-        export(source, base, head)
+        export(source, base, head, declared)
 
 
 def write_hooks_list() -> str:
     """Every folder's HOOKS.json from its hooks.patch (the export and `hooks-list` both come here)."""
     return "HOOKS.json: " + hooks_list.summary_line(hooks_list.write_all(ROOT))
+
+
+def write_gtest_list() -> str:
+    """tools/gtest-suites.json from the HOOKS.json files and the sources (the export and `gtest-list --write` both come here)."""
+    return gtest_list.write(ROOT)
 
 
 def sync_workflows() -> None:
@@ -790,43 +849,56 @@ def verify(source: Path, base: str, head: str) -> int:
 PATCH_FILE = re.compile(r"^diff --git a/(\S+) b/")
 
 
-def _patch_lines(patch: Path, sign: str) -> dict:
-    # Counted only inside hunks, so the ---/+++ header is never a line, and a line
-    # that itself starts with -- or ++ is.
-    counts, current, in_hunk = {}, None, False
-    for line in patch.read_text(encoding="utf-8", errors="replace").splitlines():
+def file_diffs(patch_text: str) -> dict:
+    """Mozilla file -> {"added", "removed", "hunks", "evidence"} of its diff in a hooks.patch. Counted only inside hunks, so the ---/+++
+    header is never a line, and a line that itself starts with -- or ++ is. `evidence` is every line the hunks add or remove, verbatim with
+    its sign, the blank ones left out: it is what the inventory quotes, and `export` writes it from here."""
+    out, current, in_hunk = {}, None, False
+    for line in patch_text.splitlines():
         m = PATCH_FILE.match(line)
         if m:
             current, in_hunk = m.group(1), False
-            counts[current] = 0
-        elif line.startswith("@@"):
+            out[current] = {"added": 0, "removed": 0, "hunks": 0, "evidence": []}
+        elif line.startswith("@@") and current:
             in_hunk = True
-        elif current and in_hunk and line.startswith(sign):
-            counts[current] += 1
-    return counts
+            out[current]["hunks"] += 1
+        elif current and in_hunk and line[:1] in ("+", "-"):
+            out[current]["added" if line[0] == "+" else "removed"] += 1
+            if line[1:].strip():
+                out[current]["evidence"].append(line)
+    return out
+
+
+def _diffs_of(patch: Path) -> dict:
+    return file_diffs(patch.read_text(encoding="utf-8", errors="replace"))
 
 
 def added_lines(patch: Path) -> dict:
     """Mozilla file -> lines we add to it, read from a hooks.patch."""
-    return _patch_lines(patch, "+")
+    return {path: d["added"] for path, d in _diffs_of(patch).items()}
 
 
 def removed_lines(patch: Path) -> dict:
     """Mozilla file -> lines of Mozilla's we remove or rewrite, read from a hooks.patch."""
-    return _patch_lines(patch, "-")
+    return {path: d["removed"] for path, d in _diffs_of(patch).items()}
 
 
 def hunk_counts(patch: Path) -> dict:
     """Mozilla file -> hunks of its diff, read from a hooks.patch."""
-    counts, current = {}, None
-    for line in patch.read_text(encoding="utf-8", errors="replace").splitlines():
-        m = PATCH_FILE.match(line)
-        if m:
-            current = m.group(1)
-            counts[current] = 0
-        elif line.startswith("@@") and current:
-            counts[current] += 1
-    return counts
+    return {path: d["hunks"] for path, d in _diffs_of(patch).items()}
+
+
+RECORD_ORDER = ("file", "category", "feature", "prefs", "added", "removed", "hunks", "inline_logic_lines", "hookable", "anchor", "evidence",
+                "notes", "verifier")
+
+
+def computed_record(record: dict, diff: dict) -> dict:
+    """The record with the four fields of its hooks.patch (`added`, `removed`, `hunks`, `evidence`) as the diff has them. The hand fields
+    (feature, category, anchor, hookable, notes, verifier, ...) are the record's own. A backport (upstream code, category `backport`) quotes
+    no evidence: its diff is Mozilla's commit, named by the BACKPORT.json beside it. Keys are in RECORD_ORDER, the rest after them."""
+    fresh = dict(record, added=diff["added"], removed=diff["removed"], hunks=diff["hunks"],
+                 evidence=[] if record.get("category") == "backport" else list(diff["evidence"]))
+    return {**{k: fresh[k] for k in RECORD_ORDER if k in fresh}, **{k: v for k, v in fresh.items() if k not in RECORD_ORDER}}
 
 
 HOOK_TAG = re.compile(r"STEALTH-HOOK\(([^)]*)\)")
@@ -854,21 +926,53 @@ def hook_tag_problems(folders: set, records: list, patches: dict) -> list:
     return found
 
 
-def record_count_problems(records: list, counts: dict) -> list:
-    """Each inventory record says how many lines of ours (added), of Mozilla's (removed) and how
-    many hunks its file has: the numbers of the file in its hooks.patch (`counts`: file ->
-    (added, removed, hunks)). A record written once and never refreshed, or copied from another
-    feature, reads as truth to whoever sizes a hook from it."""
+def record_count_problems(records: list, diffs: dict) -> list:
+    """Each inventory record says how many lines of ours (added), of Mozilla's (removed) and how many hunks its file has, and quotes
+    the lines (evidence): those of its file in the hooks.patch (`diffs`: file -> file_diffs entry). The four fields are written by `export`
+    (computed_record); one that differs was edited by hand or not refreshed, and reads as truth to whoever sizes a hook from it."""
     found = []
     for r in records:
-        real = counts.get(r["file"])
-        if real is None:
+        diff = diffs.get(r["file"])
+        if diff is None:
             continue
+        again = command("export", "--source", "<source>")
         have = (r.get("added"), r.get("removed"), r.get("hunks"))
-        if have != tuple(real):
+        real = (diff["added"], diff["removed"], diff["hunks"])
+        if have != real:
             found.append(fail(
                 "tools/inventory.json", "the record of %s says added %s, removed %s, hunks %s; its hooks.patch has %d, %d, %d"
-                % ((r["file"],) + have + tuple(real)), "rewrite the record from the diff against the tag", R_SERIES))
+                % ((r["file"],) + have + real),
+                "do not edit a count: `%s` writes added, removed, hunks and evidence of every record from its hooks.patch" % again, R_SERIES))
+        if r.get("evidence") != computed_record(r, diff)["evidence"]:
+            found.append(fail(
+                "tools/inventory.json", "the evidence of %s is not the lines its hooks.patch adds and removes" % r["file"],
+                "do not edit the evidence: `%s` writes it from the hooks.patch" % again, R_SERIES))
+    return found
+
+
+def manifest_hash_problems(folder: str, d: Path, manifest: dict) -> list:
+    """The MANIFEST.json of a folder carries the sha256 of every file under its src/ (written by `export`): one missing, one left over for
+    a file the folder no longer has, or a file whose bytes are not the recorded ones (a hand edit of src/, a merge that took one side)."""
+    found = []
+    hashes = manifest.get("sha256")
+    again = command("export", "--source", "<source>")
+    if not isinstance(hashes, dict):
+        hashes = {}
+        if manifest["added"]:
+            found.append(fail("%s/MANIFEST.json" % folder, "it has no `sha256` map for the %d files it adds" % len(manifest["added"]),
+                              "do not write it by hand: `%s` records the sha256 of every file under src/" % again, R_SERIES))
+            return found
+    for path in sorted(set(manifest["added"]) - set(hashes)):
+        found.append(fail("%s/MANIFEST.json" % folder, "it has no sha256 for %s" % path,
+                          "do not write it by hand: `%s` records the sha256 of every file under src/" % again, R_SERIES))
+    for path in sorted(set(hashes) - set(manifest["added"])):
+        found.append(fail("%s/MANIFEST.json" % folder, "it has a sha256 for %s, which the folder does not add" % path,
+                          "do not edit the manifest: `%s` writes it" % again, R_SERIES))
+    for path in sorted(set(manifest["added"]) & set(hashes)):
+        file = d / "src" / path
+        if file.is_file() and hashlib.sha256(file.read_bytes()).hexdigest() != hashes[path]:
+            found.append(fail("%s/src/%s" % (folder, path), "its bytes are not the sha256 its MANIFEST.json records",
+                              "src/ is written by the export only: `%s` writes it again from the source (a hand edit is made in the source)" % again, R_SERIES))
     return found
 
 
@@ -1249,6 +1353,9 @@ def problems() -> list:
                               "export the series again: it writes SERIES in the order of tools/layout.py", R_SERIES))
     budget = json.loads(BUDGET.read_text(encoding="utf-8"))
     removed_budget = json.loads(REMOVED_BUDGET.read_text(encoding="utf-8"))
+    for path, first, second in layout.src_owners(ROOT)[1]:
+        found.append(fail(path, "it is under the src/ of both %s and %s" % (first, second),
+                          "a file of ours has one owner: export again with --own %s=<folder> naming the one that keeps it" % path, R_SERIES))
     seen = {}
     for folder in present:
         d = ROOT / folder
@@ -1265,6 +1372,7 @@ def problems() -> list:
             for extra in sorted(on_disk - set(manifest["added"])):
                 found.append(fail("%s/src/%s" % (folder, extra), "it is not in the MANIFEST of its folder",
                                       "export the series again: the manifest lists every file under src/", R_SERIES))
+        found += manifest_hash_problems(folder, d, manifest)
         patch = d / "hooks.patch"
         touched = added_lines(patch) if patch.exists() else {}
         removed = removed_lines(patch) if patch.exists() else {}
@@ -1304,19 +1412,19 @@ def problems() -> list:
                for f in present if (ROOT / f / "hooks.patch").exists()}
     records = json.loads(INVENTORY.read_text(encoding="utf-8"))
     found += hook_tag_problems(set(listed), records, patches)
-    counts = {}
+    diffs = {}
     for f in present:
         patch = ROOT / f / "hooks.patch"
         if patch.exists():
-            added, removed, hunks = added_lines(patch), removed_lines(patch), hunk_counts(patch)
-            counts.update({path: (added[path], removed.get(path, 0), hunks.get(path, 0)) for path in added})
-    found += record_count_problems(records, counts)
+            diffs.update(_diffs_of(patch))
+    found += record_count_problems(records, diffs)
     found += own_cxx_problems()
     found += own_cr_problems()
     for f in present:
         if (ROOT / f / "hooks.patch").exists():
             found += patch_cr_problems(f, (ROOT / f / "hooks.patch").read_bytes())
     found += hooks_list.problems(ROOT)
+    found += gtest_list.problems(ROOT)       # repo-06: tools/gtest-suites.json is what `gtest-list --write` writes
     found += backport_record_problems()
     found += births.ledger_problems(births.load_ledger(), set(listed))
     series_wf = {p.name: p.read_bytes() for p in WORKFLOWS_SERIES.glob("*.yml")}
@@ -1678,6 +1786,7 @@ COMMAND_LINES = (
     ("drift", "our patched Mozilla files that Mozilla changed between the tag and --to"),
     ("port", "move the series to the tag --to: every conflict in one run, then UPSTREAM.json is written"),
     ("hooks-list", "write every folder's HOOKS.json from its hooks.patch (the export does it too)"),
+    ("gtest-list", "the gtest suites the hooks name, in tools/gtest-suites.json (--write writes it, without it only compares; the export writes it too)"),
     ("hook-debt", "drop the entries of tools/hook-debt.json that no longer occur (--summary only counts)"),
     ("hook-locals", "hooks that pass a local of Mozilla's function, read from the tag in the source"),
     ("shrink-budget", "lower the budgets to the lines the patches carry now"),
@@ -1713,12 +1822,30 @@ def build_parser() -> argparse.ArgumentParser:
                     help="the Firefox source repository (or the environment variable FIREFOX_SOURCE); no default")
     ap.add_argument("--against", help="check: also try the backports of Mozilla commits against this tag, "
                                       "found in --source (a port does it by itself)")
+    ap.add_argument("--own", action="append", default=[], metavar="PATH=FOLDER",
+                    help="export: the folder of a new file of ours that no folder holds yet (PATH ends with / for every new file under it); "
+                         "a file already under a folder's src/ needs none")
+    ap.add_argument("--write", action="store_true", help="gtest-list: write tools/gtest-suites.json (without it the file is only compared)")
     ap.add_argument("--init", action="store_true", help="hook-debt: write the list from every violation of now (once)")
     ap.add_argument("--summary", action="store_true", help="hook-debt: count the list per rule and folder, write nothing")
     ap.add_argument("--base", help="the Mozilla tag the series is on (default: mozilla_tag of UPSTREAM.json)")
     ap.add_argument("--head", help="the source branch (default: source_branch of UPSTREAM.json; apply: the branch it creates; port: the branch it makes)")
     ap.add_argument("--force", action="store_true", help="apply/port: rebuild an existing branch")
     return ap
+
+
+def declared_owners(values: list) -> dict:
+    """`--own PATH=FOLDER` (repeated) as {path or dir/: folder}; a value that is not that shape, or names a folder outside the groups, stops."""
+    declared = {}
+    for value in values:
+        path, equals, folder = value.partition("=")
+        if not (path and equals and folder) or folder.split("/")[0] not in layout.GROUP_ORDER or folder.count("/") < 1:
+            raise SystemExit(halt(fail(
+                "python tools/engine.py export --own %s" % value, "it is not <path or dir/>=<folder>, with a folder under one of %s" % ", ".join(layout.GROUP_ORDER),
+                "write --own dom/base/StealthX.cpp=fingerprint/js-surface/stack-frames (a folder of SERIES, or a new one under a group)", R_SERIES),
+                command("export", "--source", "<source>")))
+        declared[path] = folder
+    return declared
 
 
 def head_verdict(source: Path, base: str, head: str) -> str:
@@ -1828,6 +1955,18 @@ def main() -> int:
     if a.command == "hooks-list":
         print(write_hooks_list())
         return 0
+    if a.command == "gtest-list":
+        if a.write:
+            print(write_gtest_list())
+            return 0
+        found = gtest_list.problems(ROOT)
+        for p in found:
+            print(p)
+        if found:
+            print("next: %s" % command("gtest-list", "--write"))
+        else:
+            print("ok: " + gtest_list.FILE + " is what gtest-list --write writes")
+        return 1 if found else 0
     if a.command == "shrink-budget":
         shrink_budget()
         return 0
@@ -1837,7 +1976,8 @@ def main() -> int:
         # The tests the build job runs, on the head's tree and on the series about to be written; the checkout takes the series
         # only if they are green (tools/export_gate.py). The write is not reachable from here except through the gate.
         import export_gate
-        export_gate.gate(a.source, head, lambda scratch: export_into(scratch, a.source, base, head), ROOT)
+        declared = declared_owners(a.own)
+        export_gate.gate(a.source, head, lambda scratch: export_into(scratch, a.source, base, head, declared), ROOT)
         return 0
     return verify(a.source, base, head)
 

@@ -282,8 +282,7 @@ def _counts():
     for f in engine.existing_folders():
         patch = engine.ROOT / f / "hooks.patch"
         if patch.exists():
-            a, r, h = engine.added_lines(patch), engine.removed_lines(patch), engine.hunk_counts(patch)
-            out.update({p: (a[p], r.get(p, 0), h.get(p, 0)) for p in a})
+            out.update(engine._diffs_of(patch))
     return out
 
 
@@ -303,7 +302,7 @@ def test_a_record_with_the_counts_of_another_feature_fails():
     record = dict(_record(HTTP_HANDLER), added=18, hunks=6)
     found = engine.record_count_problems([record], _counts())
     assert any(HTTP_HANDLER in p and "says added 18, removed 1, hunks 6" in p and "has 3, 1, 2" in p
-               for p in found), found
+               and "python tools/engine.py export" in p for p in found), found
 
 
 def test_the_check_reads_the_counts_of_the_inventory(tmp_path, monkeypatch):

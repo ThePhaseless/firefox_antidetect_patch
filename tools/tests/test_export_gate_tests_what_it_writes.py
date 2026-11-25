@@ -101,7 +101,7 @@ def run_gate(world, gate=None):
     """`engine.py export` of the series of `world`: the engine of this module, pointed at the series, through the gate."""
     series, source, head = world
     with engine.rebased(series):
-        (gate or export_gate.gate)(source, head, lambda scratch: engine.export_into(scratch, source, "FIREFOX_159_0_RELEASE", head), series)
+        (gate or export_gate.gate)(source, head, lambda scratch: engine.export_into(scratch, source, "FIREFOX_159_0_RELEASE", head, {OURS: FOLDER}), series)
 
 
 @pytest.fixture(autouse=True)

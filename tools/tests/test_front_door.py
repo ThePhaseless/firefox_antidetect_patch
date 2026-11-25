@@ -198,7 +198,8 @@ def test_export_of_a_file_nobody_owns_ends_with_next(world, tmp_path, monkeypatc
     run(world, "add", ".")
     run(world, "commit", "-qm", "a file of ours no folder owns")
     text = stop_text(lambda: engine.export(world, "TAG", "added"))
-    assert "no folder owns our file nowhere/own.txt" in text and "tools/layout.py" in text and assert_next(text) == "export"
+    assert "no folder owns our new file: nowhere/own.txt" in text and "--own nowhere/own.txt=<folder>" in text
+    assert assert_next(text) == "export"
 
 
 def test_port_stops_end_with_next_port(world, upstream_file):
