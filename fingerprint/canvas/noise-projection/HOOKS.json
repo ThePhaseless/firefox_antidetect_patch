@@ -83,6 +83,22 @@
   "test": "wrapper:tests/test_every_reader_of_a_webgl_canvas_agrees_e2e.py::test_an_offscreen_webgl_canvas_reads_as_its_element_does"
  },
  {
+  "file": "dom/canvas/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"StealthWebGLParams.cpp\"]  # STEALTH-HOOK(fingerprint/webgl/parameters)",
+  "test": "wrapper:tests/test_a_declared_webgl_extension_survives_its_use_e2e.py::test_every_declared_extension_can_be_called_and_the_page_still_answers"
+ },
+ {
+  "file": "dom/canvas/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"StealthWebGLShaderLanguage.cpp\"]  # STEALTH-HOOK(fingerprint/webgl/shader-language)",
+  "test": "wrapper:tests/test_webgl_shader_language_e2e.py::test_get_translated_shader_source_is_in_the_declared_language_and_the_driver_still_compiles"
+ },
+ {
   "file": "dom/html/HTMLCanvasElement.cpp",
   "function": "void HTMLCanvasElement::SetFrameCapture(",
   "kind": "rewrite",
@@ -107,6 +123,14 @@
   "form": "wrap-function",
   "line": "  already_AddRefed<gfx::SourceSurface> GetSurfaceSnapshotAsDrawn(gfxAlphaType* aOutAlphaType = nullptr, gfx::DrawTarget* aTarget = nullptr);  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
   "test": "wrapper:tests/test_every_reader_of_a_webgl_canvas_agrees_e2e.py::test_every_reader_of_a_webgl_canvas_element_reads_the_same_bytes"
+ },
+ {
+  "file": "dom/html/HTMLCanvasElement.h",
+  "function": "class HTMLCanvasElement final : public nsGenericHTMLElement,",
+  "kind": "add",
+  "form": "member",
+  "line": "  already_AddRefed<gfx::SourceSurface> StealthGetSurfaceSnapshot(uint32_t aSurfaceFlags, gfxAlphaType* aOutAlphaType = nullptr, gfx::DrawTarget* aTarget = nullptr);  // STEALTH-HOOK(fingerprint/canvas/as-drawn)",
+  "test": "wrapper:tests/test_moz_element_paints_a_webgl_canvas_as_drawn_e2e.py::test_moz_element_paints_a_webgl_canvas_as_drawn"
  },
  {
   "file": "dom/html/moz.build",
@@ -232,11 +256,35 @@
  },
  {
   "file": "gfx/2d/moz.build",
+  "function": "EXPORTS.mozilla.gfx += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "EXPORTS.mozilla.gfx += [\"StealthGlyphCoverage.h\"]  # STEALTH-HOOK(fingerprint/fonts/metrics)",
+  "test": "gtest:StealthGlyphCoverage.A8MaskIsOnTheLadder"
+ },
+ {
+  "file": "gfx/2d/moz.build",
+  "function": "EXPORTS.mozilla.gfx += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "EXPORTS.mozilla.gfx += [\"StealthRefuse.h\"]  # STEALTH-HOOK(platform/declaration-gate)",
+  "test": "gtest:StealthGfxFeatureStatus.EveryLiveFeatureAnswersFromTheDeclaration"
+ },
+ {
+  "file": "gfx/2d/moz.build",
   "function": "UNIFIED_SOURCES += [",
   "kind": "add",
   "form": "registration",
   "line": "UNIFIED_SOURCES += [\"StealthCanvasProjection.cpp\"]  # STEALTH-HOOK(fingerprint/canvas/noise-projection)",
   "test": "gtest:StealthCanvasProjection.IsAProjection"
+ },
+ {
+  "file": "gfx/2d/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"StealthGlyphCoverage.cpp\"]  # STEALTH-HOOK(fingerprint/fonts/metrics)",
+  "test": "gtest:StealthGlyphCoverage.A8MaskIsOnTheLadder"
  },
  {
   "file": "gfx/tests/gtest/moz.build",
@@ -251,73 +299,71 @@
   "function": "UNIFIED_SOURCES += [",
   "kind": "add",
   "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"TestStealthWebGPUDeclaration.cpp\"]  # STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
+  "test": "gtest:StealthWebGPUDeclaration.EveryLimitIsSetFromTheDeclaration"
+ },
+ {
+  "file": "gfx/tests/gtest/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
   "line": "UNIFIED_SOURCES += [\"TestStealthWebGPUExternalTexture.cpp\"]  # STEALTH-HOOK(fingerprint/webgpu/external-texture-vulkan)",
   "test": "gtest:StealthWebGPUExternalTexture.SampledLoadedQueriedThroughAParameter"
  },
  {
-  "file": "dom/canvas/ClientWebGLContext.cpp",
-  "function": "",
+  "file": "gfx/tests/gtest/moz.build",
+  "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
+  "kind": "add",
+  "form": "unknown",
+  "line": "if CONFIG[\"MOZ_WIDGET_TOOLKIT\"] == \"gtk\":  # STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "gtest:StealthFcFontList.DeclareFontFile"
+ },
+ {
+  "file": "gfx/tests/gtest/moz.build",
+  "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
   "kind": "add",
   "form": "registration",
-  "line": "#include \"StealthWebGLReadback.h\"  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
-  "test": "wrapper:tests/test_webgl_noise_active.py::test_readpixels_of_a_partial_rectangle_projects_only_what_was_written"
+  "line": "    UNIFIED_SOURCES += [\"TestStealthFcFontList.cpp\"]  # STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "gtest:StealthFcFontList.DeclareFontFile"
  },
  {
-  "file": "dom/canvas/ClientWebGLContext.cpp",
-  "function": "UniquePtr<uint8_t[]> ClientWebGLContext::GetImageBuffer(",
+  "file": "gfx/tests/gtest/moz.build",
+  "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
   "kind": "add",
-  "form": "anchor",
-  "line": "  StealthWebGLProjectReaderSnapshot(*this, snapshot, any);  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
-  "test": "wrapper:tests/test_canvas_reads_as_drawn.py::test_a_non_premultiplied_webgl_canvas_reads_the_same_through_todataurl_and_toblob",
-  "anchor": "Mozilla's `if (!snapshot) return ...;` after `RefPtr<gfx::SourceSurface> snapshot = GetSurfaceSnapshot(&any);`",
-  "why": "replaces the surface Mozilla just obtained by the noise-projected one before Mozilla reads its data; `snapshot` is a local and `any` (the alpha type) is an out-parameter that the same GetSurfaceSnapshot call fills, so the initializer cannot be wrapped without passing `any`"
+  "form": "registration",
+  "line": "    UNIFIED_SOURCES += [\"TestStealthFontMetrics.cpp\"]  # STEALTH-HOOK(fingerprint/fonts/metrics)",
+  "test": "gtest:StealthFontMetrics.ClearTypeTakesTheOS2AverageUnrounded"
  },
  {
-  "file": "dom/canvas/ClientWebGLContext.cpp",
-  "function": "ClientWebGLContext::GetInputStream(",
+  "file": "gfx/tests/gtest/moz.build",
+  "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
   "kind": "add",
-  "form": "anchor",
-  "line": "  StealthWebGLProjectReaderSnapshot(*this, snapshot, any);  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
-  "test": "wrapper:tests/test_canvas_reads_as_drawn.py::test_a_non_premultiplied_webgl_canvas_reads_the_same_through_todataurl_and_toblob",
-  "anchor": "Mozilla's `if (!snapshot) return ...;` after `RefPtr<gfx::SourceSurface> snapshot = GetSurfaceSnapshot(&any);`",
-  "why": "replaces the surface Mozilla just obtained by the noise-projected one before Mozilla reads its data; `snapshot` is a local and `any` (the alpha type) is an out-parameter that the same GetSurfaceSnapshot call fills, so the initializer cannot be wrapped without passing `any`"
+  "form": "unknown",
+  "line": "    CXXFLAGS += CONFIG[\"CAIRO_FT_CFLAGS\"]  # STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "gtest:StealthFcFontList.DeclareFontFile"
  },
  {
-  "file": "dom/canvas/ClientWebGLContext.cpp",
-  "function": "void ClientWebGLContext::ReadPixels(GLint x, GLint y, GLsizei width,",
+  "file": "gfx/tests/gtest/moz.build",
+  "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
   "kind": "add",
-  "form": "anchor",
-  "line": "  StealthWebGLReadback::ProjectReadPixelsPbo(*this, desc, offset);  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
-  "test": "wrapper:tests/test_webgl_noise_active.py::test_readpixels_into_a_pixel_pack_buffer_reads_as_into_an_array",
-  "anchor": "Run<RPROC(ReadPixelsPbo)>(desc, static_cast<uint64_t>(offset));",
-  "why": "G30: it needs the read to have been sent and `desc`, which Mozilla builds from the validated parameters and the pack state; a post-step of a wrapper would run after the validation returns and would have to validate again; it is the last line of the function, the one exception of rule 5"
+  "form": "unknown",
+  "line": "if CONFIG[\"OS_TARGET\"] == \"WINNT\":  # STEALTH-HOOK(fingerprint/fonts/bundle)",
+  "test": "gtest:StealthBundledCollection.ContentProcessUnderBundleOnlyBuildsNone"
  },
  {
-  "file": "dom/canvas/ClientWebGLContext.cpp",
-  "function": "void ClientWebGLContext::ReadPixels(GLint x, GLint y, GLsizei width,",
-  "kind": "rewrite",
-  "form": "wrap-call",
-  "line": "    bool succeeded = StealthDoReadPixels(this, desc, *range);  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
-  "removed": "    bool succeeded = DoReadPixels(desc, *range);",
-  "test": "wrapper:tests/test_webgl_noise_active.py::test_readpixels_of_a_partial_rectangle_projects_only_what_was_written"
- },
- {
-  "file": "dom/canvas/ClientWebGLContext.cpp",
-  "function": "bool ClientWebGLContext::DoReadPixels(const webgl::ReadPixelsDesc& desc,",
+  "file": "gfx/tests/gtest/moz.build",
+  "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
   "kind": "add",
-  "form": "anchor",
-  "line": "  StealthWebGLReadback::NoteReadPixels(*this, subrect, byteStride);  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
-  "test": "wrapper:tests/test_webgl_noise_active.py::test_readpixels_of_a_partial_rectangle_projects_only_what_was_written",
-  "anchor": "the loop `for (const auto i : IntegerRange(subrect.height))` that copies the rows into the destination",
-  "why": "G5: subrect and byteStride are locals of Mozilla's body that the projection needs after the call returns; they go into the private field mStealthReadPixelsResult, and the signature of DoReadPixels is Mozilla's again; no zeroing before the call is needed on the readPixels(array) road: the field is written at the only `return true` and taken only after a success, on the same thread, with no event-loop turn in between"
+  "form": "registration",
+  "line": "    UNIFIED_SOURCES += [\"TestStealthBundledCollection.cpp\"]  # STEALTH-HOOK(fingerprint/fonts/bundle)",
+  "test": "gtest:StealthBundledCollection.ContentProcessUnderBundleOnlyBuildsNone"
  },
  {
-  "file": "dom/canvas/ClientWebGLContext.cpp",
-  "function": "ClientWebGLContext::DoReadPixelsAsync() {",
-  "kind": "rewrite",
-  "form": "wrap-expression",
-  "line": "        promise->Resolve(StealthWebGLProjectAsyncSnapshot(*self, std::move(sourceSurface)), __func__);  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
-  "removed": "        promise->Resolve(std::move(sourceSurface), __func__);",
-  "test": "wrapper:tests/test_webgl_noise_active.py::test_a_capturestream_frame_reads_as_todataurl"
+  "file": "gfx/tests/gtest/moz.build",
+  "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
+  "kind": "add",
+  "form": "registration",
+  "line": "    UNIFIED_SOURCES += [\"TestStealthTextQuality.cpp\"]  # STEALTH-HOOK(fingerprint/fonts/metrics)",
+  "test": "gtest:StealthTextQuality.TheDeclarationIsReadAndTheHostIsNot"
  }
 ]

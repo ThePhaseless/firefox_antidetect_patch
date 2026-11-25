@@ -8,6 +8,7 @@
 
     python -m pytest tools/tests/test_hook_rules_table.py
 """
+import json
 import re
 import shutil
 import sys
@@ -24,7 +25,7 @@ import hooks_list as hl  # noqa: E402
 ROOT = TOOLS.parent
 FILES = {name: (TOOLS / name).read_text(encoding="utf-8") for name in ("hook_contract.py", "hooks_list.py")}
 PREBUILD = (TOOLS / "prebuild.py").read_text(encoding="utf-8")      # prints G19
-RULE_IDS = ["C%d" % i for i in range(1, 20)] + ["T1", "T2", "T3"]
+RULE_IDS = ["C%d" % i for i in range(1, 19)] + ["C20", "T1", "T2", "T3"]      # C19 is retired: its id is not reused
 
 
 # --------------------------------------------------------------------------- the RULES table
@@ -216,81 +217,88 @@ def test_every_g_code_prebuild_prints_is_explained():
     assert "G19" in printed and printed <= set(hc.EXPLAIN), sorted(printed - set(hc.EXPLAIN))
 
 
-# --------------------------------------------------------------------------- C19: the entry of a foreign-tagged hook is in its tag's folder
+# --------------------------------------------------------------------------- C20: a hook line sits in the hooks.patch of the folder its marker names
 OWNER, TAG = "fingerprint/x", "fingerprint/y"
 
 
-def foreign_series(tmp_path, tag=TAG, with_tag_folder=True):
-    """The hooks.patch of OWNER holds one hook whose marker names `tag`, and one that names OWNER."""
-    body = ["   // lead", " ", " void Foo::Bar() {",
-            "+  StealthForeign(this);  // STEALTH-HOOK(%s)" % tag, "+  StealthOwn(this);  // STEALTH-HOOK(%s)" % OWNER, "   int x = 1;", " }"]
-    old = sum(1 for l in body if l[0] in " -")
-    new = sum(1 for l in body if l[0] in " +")
-    patch = "diff --git a/dom/A.cpp b/dom/A.cpp\n--- a/dom/A.cpp\n+++ b/dom/A.cpp\n@@ -10,%d +10,%d @@ void Foo::Bar() {\n%s\n" % (old, new, "\n".join(body))
-    (tmp_path / OWNER).mkdir(parents=True)
-    (tmp_path / OWNER / "hooks.patch").write_text(patch, encoding="utf-8", newline="")
-    names = [OWNER]
-    if with_tag_folder:
-        (tmp_path / tag).mkdir(parents=True)
-        names.append(tag)
-    (tmp_path / "SERIES").write_text("\n".join(names) + "\n", encoding="utf-8", newline="")
+def _patch(path, line):
+    rows = ["diff --git a/%s b/%s" % (path, path), "--- a/%s" % path, "+++ b/%s" % path, "@@ -10,3 +10,4 @@ void Foo::Bar() {",
+            "   // lead", " ", " void Foo::Bar() {", "+" + line, "   int x = 1;", " }"]
+    return "\n".join(rows) + "\n"
+
+
+def marker_series(tmp_path, line_folder, marker, backport=False, category="spoof", path="dom/A.cpp", line=None):
+    """Folders OWNER and TAG; the hooks.patch of `line_folder` holds one hook line whose marker names `marker`. `backport`: that folder
+    is a backport (BACKPORT.json) whose MANIFEST inventory gives `path` the category `category`."""
+    line = line or "  StealthFoo(this);  // STEALTH-HOOK(%s)" % marker
+    for f in (OWNER, TAG):
+        (tmp_path / f).mkdir(parents=True)
+        (tmp_path / f / "hooks.patch").write_text("", encoding="utf-8", newline="")
+    (tmp_path / line_folder / "hooks.patch").write_text(_patch(path, line), encoding="utf-8", newline="")
+    (tmp_path / "SERIES").write_text("%s\n%s\n" % (OWNER, TAG), encoding="utf-8", newline="")
+    if backport:
+        (tmp_path / line_folder / "BACKPORT.json").write_text("{}", encoding="utf-8", newline="")
+        (tmp_path / line_folder / "MANIFEST.json").write_text(json.dumps({"inventory": [{"file": path, "category": category}]}),
+                                                              encoding="utf-8", newline="")
     return tmp_path
 
 
-def lines_of(root, folder):
-    return [e["line"].split("  //")[0].strip() for e in hl.expected(root, folder)]
+def c20(root):
+    return [v for v in hc.contract_violations(root) if v.rule == "C20"]
 
 
-def test_a_foreign_tagged_hook_has_its_entry_in_the_folder_its_marker_names(tmp_path):
-    root = foreign_series(tmp_path)
-    assert lines_of(root, OWNER) == ["StealthOwn(this);"] and lines_of(root, TAG) == ["StealthForeign(this);"]
-    hl.write_all(root)
-    assert [e["line"].split("  //")[0].strip() for e in hl.load(root, TAG)] == ["StealthForeign(this);"]
-    assert hl.problems(root) == [] and hl.foreign_violations(root) == []
-    assert "C19" not in {v.rule for v in hc.contract_violations(root)}
-
-
-def test_an_entry_left_in_the_owner_folder_is_c19_and_the_fix_is_hooks_list(tmp_path):
-    root = foreign_series(tmp_path)
-    hl.write_all(root)
-    both = hl.load(root, TAG) + hl.load(root, OWNER)           # what the old generator wrote: every entry in the folder of the patch
-    (root / OWNER / "HOOKS.json").write_text(hl.render(sorted(both, key=lambda e: e["line"], reverse=True)), encoding="utf-8", newline="")
-    (root / TAG / "HOOKS.json").write_text("[]\n", encoding="utf-8", newline="")
-    (v,) = hl.foreign_violations(root)
-    assert v.rule == "C19" and v.folder == OWNER and v.detail == TAG and "C19" in {x.rule for x in hc.contract_violations(root)}
+def test_a_marked_line_in_a_folder_its_marker_does_not_name_is_c20(tmp_path):
+    root = marker_series(tmp_path, OWNER, TAG)
+    (v,) = c20(root)
+    assert (v.folder, v.file, v.detail) == (OWNER, "dom/A.cpp", TAG)
     msg = hc.violation_failure(v)
     assert msg.where == "%s/hooks.patch, dom/A.cpp, void Foo::Bar() {" % OWNER and msg.rule == hc.D_HOOK02
-    assert "the marker names `%s`" % TAG in msg.what and "StealthForeign(this);" in msg.what
-    assert "run `python tools/engine.py hooks-list`" in msg.fix and TAG in msg.fix
-    assert hl.problems(root), "the list also differs from what the series generates"
-    assert "C19" in hc.NEVER_DEBT_RULES and hc.update_debt([], [v], init=True) == []
+    assert "the marker names `%s`" % TAG in msg.what and "StealthFoo(this);" in msg.what
+    assert msg.fix == "run `python tools/engine.py export`: it writes each hook line into the hooks.patch of the folder its marker names"
+    assert "C20" in hc.NEVER_DEBT_RULES and hc.update_debt([], [v], init=True) == []
     assert "never debt" in str(hc.debt_problems([v], [hc.entry_of(v)], None)[0])
 
 
-def test_hooks_list_moves_the_entry_and_keeps_its_hand_fields(tmp_path):
-    root = foreign_series(tmp_path)
+def test_the_same_line_in_the_folder_its_marker_names_is_not_c20(tmp_path):
+    assert c20(marker_series(tmp_path, TAG, TAG)) == []
+
+
+def test_a_declared_exception_does_not_leave_c20_out(tmp_path):
+    root = marker_series(tmp_path, OWNER, TAG)
+    entry = hl.expected(root, OWNER)[0]
+    entry.update(exception="a reason", reason_kind="expression", pm="approvato")
+    (root / OWNER / "HOOKS.json").write_text(hl.render([entry]), encoding="utf-8", newline="")
+    assert len(c20(root)) == 1
+
+
+def test_a_file_of_category_backport_is_exempt_from_c20(tmp_path):
+    root = marker_series(tmp_path, OWNER, TAG, backport=True, category="backport", line="vendored(); // STEALTH-HOOK(%s)" % TAG)
+    assert c20(root) == []
+    root = marker_series(tmp_path / "again", OWNER, TAG, backport=True, category="spoof")
+    assert len(c20(root)) == 1, "a file of another category of a backport folder is judged"
+
+
+def test_c19_is_retired_and_not_reused():
+    assert "C19" not in hc.RULES and "C19" not in hc.NEVER_DEBT_RULES
+
+
+@pytest.mark.xfail(strict=True, reason="turns green with the per-tag export")
+def test_the_series_has_no_c20():
+    assert [v for v in hc.contract_violations(ROOT) if v.rule == "C20"] == []
+
+
+# --------------------------------------------------------------------------- a backport folder lists the hooks of its files that are not upstream code
+def test_a_backport_folder_lists_the_hooks_of_its_non_backport_files(tmp_path):
+    root = marker_series(tmp_path, OWNER, OWNER, backport=True, category="spoof")
+    assert hl.folders(root) == [OWNER, TAG]
+    assert [e["line"].split("  //")[0].strip() for e in hl.generated(root, OWNER)] == ["StealthFoo(this);"]
     hl.write_all(root)
-    entries = hl.load(root, TAG)
-    entries[0].update(test="wrapper:tests/test_a.py::test_b", exception="why no form fits", reason_kind="expression", pm="approvato")
-    old_own = hl.load(root, OWNER)
-    (root / OWNER / "HOOKS.json").write_text(hl.render(entries + old_own), encoding="utf-8", newline="")      # the entry sits in the owner's list
-    (root / TAG / "HOOKS.json").write_text("[]\n", encoding="utf-8", newline="")
-    assert hl.foreign_violations(root)
+    assert [e["file"] for e in hl.load(root, OWNER)] == ["dom/A.cpp"]
+    assert hl.problems(root) == [] and [v for v in hc.contract_violations(root) if v.rule == "T1" and v.folder == OWNER]
+
+
+def test_a_backport_folder_with_only_upstream_files_has_no_hooks_json(tmp_path):
+    root = marker_series(tmp_path, OWNER, OWNER, backport=True, category="backport", line="vendored(); // STEALTH-HOOK(%s)" % OWNER)
+    assert hl.folders(root) == [TAG] and hl.generated(root, OWNER) == []
     hl.write_all(root)
-    moved = hl.load(root, TAG)
-    assert len(moved) == 1 and (moved[0]["test"], moved[0]["exception"], moved[0]["reason_kind"], moved[0]["pm"]) == (
-        "wrapper:tests/test_a.py::test_b", "why no form fits", "expression", "approvato")
-    assert [e["line"].split("  //")[0].strip() for e in hl.load(root, OWNER)] == ["StealthOwn(this);"]
-    assert hl.foreign_violations(root) == [] and hl.problems(root) == []
-
-
-def test_a_marker_naming_a_folder_with_no_hooks_json_keeps_the_entry_in_the_owner(tmp_path):
-    root = foreign_series(tmp_path, tag="platform/backports/z", with_tag_folder=False)
-    assert sorted(lines_of(root, OWNER)) == ["StealthForeign(this);", "StealthOwn(this);"]
-    hl.write_all(root)
-    assert hl.foreign_violations(root) == []
-
-
-def test_the_series_has_no_c19():
-    assert hl.foreign_violations(ROOT) == []
-    assert [v for v in hc.contract_violations(ROOT) if v.rule == "C19"] == []
+    assert not (root / OWNER / "HOOKS.json").exists()

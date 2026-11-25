@@ -91,7 +91,8 @@ def test_a_deletion_and_a_rewrite_are_listed_too(tmp_path):
 def test_a_backport_folder_has_no_list(tmp_path):
     root = series(tmp_path, top(G1))
     (root / FOLDER / "BACKPORT.json").write_text("{}", encoding="utf-8")
-    assert hl.folders(root) == [] and hl.generated(root, FOLDER) == [] and hl.write_all(root) == {}
+    (root / FOLDER / "MANIFEST.json").write_text(json.dumps({"inventory": [{"file": "dom/A.cpp", "category": "backport"}]}), encoding="utf-8")
+    assert hl.folders(root) == [] and hl.generated(root, FOLDER) == [] and hl.write_all(root) == {}      # upstream code only: no list
 
 
 def test_a_folder_without_a_patch_has_an_empty_list(tmp_path):
@@ -343,13 +344,16 @@ def test_every_committed_list_is_what_the_series_generates():
         data = hl.list_path(engine.ROOT, folder).read_bytes()
         assert b"\r" not in data and data.endswith(b"\n"), folder
         assert data.decode("utf-8") == hl.render(hl.expected(engine.ROOT, folder)), folder
-    assert sum(len(hl.generated(engine.ROOT, f)) for f in names) == len(hc.series_hooks(engine.ROOT))
+    ported = sum(len(hl.generated(engine.ROOT, f)) for f in names if (engine.ROOT / f / "BACKPORT.json").exists())
+    assert sum(len(hl.generated(engine.ROOT, f)) for f in names) == len(hc.series_hooks(engine.ROOT)) + ported
 
 
-def test_a_backport_folder_of_the_series_has_no_list():
+def test_a_backport_folder_of_the_series_lists_only_the_hooks_of_files_that_are_not_upstream_code():
     for f in hl.series_names(engine.ROOT):
         if (engine.ROOT / f / "BACKPORT.json").exists():
-            assert not hl.list_path(engine.ROOT, f).exists(), f
+            assert hl.list_path(engine.ROOT, f).exists() == (f in hl.folders(engine.ROOT)), f
+            upstream = hc.backport_files(engine.ROOT, f)
+            assert not [e for e in (hl.load(engine.ROOT, f) or []) if e["file"] in upstream], f
 
 
 # --------------------------------------------------------------------------- G35: the declared exception
@@ -364,6 +368,7 @@ def _port06_is_not_under_test(monkeypatch):
     monkeypatch.setattr(hc, "locals_violations", lambda root, base=None: [])
     monkeypatch.setattr(hc, "namespace_violations", lambda root: [])
     monkeypatch.setattr(hc, "churn_violations", lambda root: [])         # C18 (port-07): the reasons of the band are another test's
+    monkeypatch.setattr(hc, "marker_violations", lambda root: [])        # C20: red until the export writes each line into its marker's folder
     monkeypatch.setattr(engine.folders, "problems", lambda root: [])      # series-02: the FOLDER.json of every folder has its own tests (test_folders.py)
 
 

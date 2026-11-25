@@ -8,24 +8,11 @@
   "test": "node:juggler/tests/explicit_size_flag_is_free.test.mjs#the C++ and the JS side use the same bit"
  },
  {
-  "file": "toolkit/components/windowwatcher/nsWindowWatcher.cpp",
-  "function": "",
+  "file": "toolkit/components/windowwatcher/moz.build",
+  "function": "UNIFIED_SOURCES += [",
   "kind": "add",
   "form": "registration",
-  "line": "#include \"JugglerWindowSize.h\"  // STEALTH-HOOK(automation/window-size)",
-  "test": "node:juggler/tests/explicit_size_flag_is_free.test.mjs#the C++ and the JS side use the same bit"
- },
- {
-  "file": "toolkit/components/windowwatcher/nsWindowWatcher.cpp",
-  "function": "uint32_t nsWindowWatcher::CalculateChromeFlagsForContent(",
-  "kind": "rewrite",
-  "form": "wrap-expression",
-  "line": "  return *aIsPopupRequested ? mozilla::JugglerPopupChromeFlags(aFeatures, nsIWebBrowserChrome::CHROME_MINIMAL_POPUP)  // STEALTH-HOOK(automation/window-size)",
-  "removed": "  return *aIsPopupRequested ? nsIWebBrowserChrome::CHROME_MINIMAL_POPUP",
-  "test": "node:juggler/tests/explicit_size_flag_is_free.test.mjs#the C++ and the JS side use the same bit",
-  "quiet_anchor_why": {
-   "kind": "only-place",
-   "why": "The value is born on this line: the hook rewrites Mozilla's return expression, so there is no other place where it can change what the function returns."
-  }
+  "line": "UNIFIED_SOURCES += [\"StealthWindowPlacement.cpp\"]  # STEALTH-HOOK(fingerprint/screen-window/popup-position)",
+  "test": "wrapper:tests/test_popup_geometry_is_the_declared_frame_e2e.py::test_a_popup_is_its_inner_size_plus_the_declared_frame"
  }
 ]

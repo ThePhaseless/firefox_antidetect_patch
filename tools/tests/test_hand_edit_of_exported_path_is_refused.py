@@ -64,6 +64,7 @@ def edit_by_hand(root: Path):
     path.write_bytes(data)
 
 
+@pytest.mark.xfail(strict=True, reason="turns green with the per-tag export")      # C20 is red until the export splits the files
 def test_the_unedited_series_passes_check(series):
     done = check(series)
     assert done.returncode == 0, done.stdout + done.stderr

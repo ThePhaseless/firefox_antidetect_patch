@@ -98,6 +98,15 @@
   "test": "py:modules/libpref/test/test_stealth_prefs_final_values.py::test_monospace_sizes_are_13_on_linux_and_windows"
  },
  {
+  "file": "modules/libpref/init/all.js",
+  "function": "pref(\"network.tcp.keepalive.idle_time\", 600); // seconds; 10 mins",
+  "kind": "rewrite",
+  "form": "declared-value",
+  "line": "  pref(\"geo.provider.network.url\", \"\");  // STEALTH-HOOK(fingerprint/geolocation/no-host-provider)",
+  "removed": "  pref(\"geo.provider.network.url\", \"https://www.googleapis.com/geolocation/v1/geolocate?key=%GOOGLE_LOCATION_SERVICE_API_KEY%&solution_channel=%OS%\");",
+  "test": "node:juggler/tests/geolocation_network_url_is_empty_by_default.test.mjs#the value is changed on Mozilla's own line, with the hook, and the line is one"
+ },
+ {
   "file": "modules/libpref/moz.build",
   "function": "pref_groups = [",
   "kind": "add",

@@ -23,30 +23,5 @@
   "form": "member",
   "line": "  friend struct StealthSocketTransportAccess;  // STEALTH-HOOK(network/ipv6-literal)",
   "test": "wrapper:tests/test_ipv6_literal_connect_e2e.py::test_a_direct_ipv6_literal_is_refused_and_one_behind_socks_is_left_to_the_proxy"
- },
- {
-  "file": "netwerk/socket/nsSOCKSIOLayer.cpp",
-  "function": "",
-  "kind": "add",
-  "form": "registration",
-  "line": "#include \"StealthIPv6Literal.h\"  // STEALTH-HOOK(network/ipv6-literal)",
-  "test": "gtest:StealthSessionUdpProxy.TheLayerConnectsToTheProxyOfThePeerConnection"
- },
- {
-  "file": "netwerk/socket/nsSOCKSIOLayer.cpp",
-  "function": "PRStatus nsSOCKSSocketInfo::ConnectToProxy(PRFileDesc* fd) {",
-  "kind": "rewrite",
-  "form": "wrap-expression",
-  "line": "    status = StealthHopConnect(this, fd->lower->methods->connect)(fd->lower, &prProxy, mTimeout);  // STEALTH-HOOK(network/ipv6-literal)",
-  "removed": "    status = fd->lower->methods->connect(fd->lower, &prProxy, mTimeout);",
-  "test": "gtest:StealthDeclaredNetwork.AnIPv4MappedAddressIsLeftAloneBehindAProxyAndOnTheProxyHop"
- },
- {
-  "file": "netwerk/base/moz.build",
-  "function": "UNIFIED_SOURCES += [",
-  "kind": "add",
-  "form": "registration",
-  "line": "UNIFIED_SOURCES += [\"StealthIPv6Literal.cpp\"]  # STEALTH-HOOK(network/ipv6-literal)",
-  "test": "gtest:StealthDeclaredNetwork.NothingIsBlockedWhileIPv6IsDeclared"
  }
 ]

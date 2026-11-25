@@ -66,7 +66,7 @@ Every rule of the contract is one entry of `RULES` in `tools/hook_contract.py`, 
 <!-- generated:hook-rules begin: written by `python tools/engine.py docs --write` from tools/hook_contract.py; do not edit -->
 | Decision | Rules |
 |---|---|
-| [hook-02](decisions/hook-02-shape-and-contract.md) | C1, C2, C3, C4, C5, C6, C7, C8, C9, C10, C16, C17, C19 |
+| [hook-02](decisions/hook-02-shape-and-contract.md) | C1, C2, C3, C4, C5, C6, C7, C8, C9, C10, C16, C17, C20 |
 | [hook-05](decisions/hook-05-no-values-in-mozilla-numbered-spaces.md) | C11 |
 | [port-06](decisions/port-06-hooks-only-add.md) | C12, C13, C14, C15 |
 | [port-07](decisions/port-07-quiet-anchors.md) | C18 |
@@ -101,7 +101,7 @@ A message of the hook tools may name a G code: a case the code accepts. Each one
 
 ## HOOKS.json
 
-One per folder without `BACKPORT.json`, beside `hooks.patch`, one entry per hook. The entry of a hook whose `STEALTH-HOOK(<folder>)` names another folder than the one whose `hooks.patch` holds it is in the HOOKS.json of the folder the marker names (rule C19; `hooks-list` writes it there). `check` fails when it differs from what the series generates: a hook lost in a merge does not pass silently.
+One per folder without `BACKPORT.json`, beside `hooks.patch`, one entry per hook; a backport folder has one for the hooks of its files that are not upstream code (category `backport`), and none for the upstream files. A hook's entry is in the HOOKS.json of the folder whose `hooks.patch` holds it, and that is the folder its marker `STEALTH-HOOK(<folder>)` names: a line whose marker names another folder is rule C20 (the export writes each line into the `hooks.patch` of its marker's folder). `check` fails when it differs from what the series generates: a hook lost in a merge does not pass silently.
 
 | Fields | Written by | Meaning |
 |---|---|---|

@@ -184,11 +184,30 @@
   "test": "wrapper:tests/test_webgpu_external_texture_e2e.py::test_importexternaltexture_exists_on_every_os_e2e"
  },
  {
-  "file": "gfx/tests/gtest/moz.build",
-  "function": "UNIFIED_SOURCES += [",
-  "kind": "add",
-  "form": "registration",
-  "line": "UNIFIED_SOURCES += [\"TestStealthWebGPUDeclaration.cpp\"]  # STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
-  "test": "gtest:StealthWebGPUDeclaration.EveryLimitIsSetFromTheDeclaration"
+  "file": "modules/libpref/init/StaticPrefList.yaml",
+  "function": "",
+  "kind": "rewrite",
+  "form": "declared-value",
+  "line": "  value: 0  # STEALTH-HOOK(network/proxy)",
+  "removed": "  value: 5",
+  "test": "node:juggler/tests/system_proxy_is_off_by_default.test.mjs#network.proxy.type defaults to 0 and the hook is on the value line"
+ },
+ {
+  "file": "modules/libpref/init/StaticPrefList.yaml",
+  "function": "",
+  "kind": "rewrite",
+  "form": "declared-value",
+  "line": "  value: 30000  # STEALTH-HOOK(network/doh)",
+  "removed": "  value: 1500",
+  "test": "node:juggler/tests/a_proxied_doh_lookup_has_the_trr_only_timeout.test.mjs#the hook is on the value line of the pref of Mozilla, which is declared nowhere else"
+ },
+ {
+  "file": "modules/libpref/init/StaticPrefList.yaml",
+  "function": "",
+  "kind": "rewrite",
+  "form": "declared-value",
+  "line": "  value: false  # STEALTH-HOOK(network/doh)",
+  "removed": "  value: true",
+  "test": "node:juggler/tests/etc_hosts_exclusion_is_off.test.mjs#with network.trr.exclude-etc-hosts=false the hosts file is never read"
  }
 ]

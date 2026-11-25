@@ -28,6 +28,22 @@
   "why": "regionalPrefsLocales is Mozilla's local, declared a few lines above and filled in place by the declaration; the line conditions Mozilla's untouched host query that follows it, so the host is not asked when a language is declared, and a guard at the head of the function would run before the local exists"
  },
  {
+  "file": "intl/locale/moz.build",
+  "function": "EXPORTS.mozilla.intl += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "EXPORTS.mozilla.intl += [\"StealthSessionPrefs.h\"]  # STEALTH-HOOK(fingerprint/locale-time/session-declaration)",
+  "test": "gtest:Intl_Locale_StealthSystemLocales.TheDeclaredLanguageIsTheRegionalLanguage"
+ },
+ {
+  "file": "intl/locale/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"StealthSessionPrefs.cpp\"]  # STEALTH-HOOK(fingerprint/locale-time/session-declaration)",
+  "test": "gtest:Intl_Locale_StealthSystemLocales.TheDeclaredLanguageIsTheRegionalLanguage"
+ },
+ {
   "file": "intl/locale/nsLanguageAtomService.cpp",
   "function": "",
   "kind": "add",
@@ -54,13 +70,5 @@
   "why": "",
   "exception": "mid-function branch inside Mozilla's lazy init under the write lock: no guard or wrap of the function expresses it without running Mozilla's init first (G31 analysed, G35 approved by the pm in PM-VERDICT)",
   "pm": "approvato"
- },
- {
-  "file": "intl/locale/tests/gtest/moz.build",
-  "function": "UNIFIED_SOURCES += [",
-  "kind": "add",
-  "form": "registration",
-  "line": "UNIFIED_SOURCES += [\"TestStealthRegionalLocales.cpp\"]  # STEALTH-HOOK(fingerprint/locale-time/language)",
-  "test": "gtest:Intl_Locale_StealthSystemLocales.TheDeclaredLanguageIsTheRegionalLanguage"
  }
 ]

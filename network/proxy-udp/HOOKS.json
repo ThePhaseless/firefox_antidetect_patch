@@ -45,6 +45,16 @@
   "why": "the decision needs the fall-through of the dispatch on the proxy type: a guard at the top would have to copy the list of proxy types"
  },
  {
+  "file": "dom/media/webrtc/transport/ipc/WebrtcTCPSocket.cpp",
+  "function": "void WebrtcTCPSocket::OpenWithoutHttpProxy(nsIProxyInfo* aSocksProxyInfo) {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  StealthTcpSocketBorn(this, &prAddr);  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "test": "gtest:StealthTcpProxyRoad.TheSocketIsBornWithItsBindAddressAndNoOtherCondition",
+  "anchor": "the `if (NS_WARN_IF(PR_SUCCESS != PR_StringToNetAddr(mLocalAddress.get(), &prAddr))) {...}` block of WebrtcTCPSocket::OpenWithoutHttpProxy",
+  "why": "prAddr is the intermediate value Mozilla Bind uses, and the transport must be given its attributes before it is bound"
+ },
+ {
   "file": "dom/media/webrtc/transport/ipc/WebrtcTCPSocket.h",
   "function": "class WebrtcTCPSocket : public nsIHttpUpgradeListener,",
   "kind": "add",
@@ -116,8 +126,26 @@
   "function": "nrappkit copyright:",
   "kind": "add",
   "form": "registration",
+  "line": "#include \"nr_stealth_network.h\"    // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "test": "gtest:StealthNrSocketBirth.ACreateThatFailsAtTheLastStepLeavesNoPortOfOursBehind"
+ },
+ {
+  "file": "dom/media/webrtc/transport/nr_socket_prsock.cpp",
+  "function": "nrappkit copyright:",
+  "kind": "add",
+  "form": "registration",
   "line": "#include \"nr_stealth_proxy_udp.h\"  // STEALTH-HOOK(network/proxy-udp)",
   "test": "gtest:StealthNrSocketBirth.ACreateThatFailsAtTheLastStepLeavesNoPortOfOursBehind"
+ },
+ {
+  "file": "dom/media/webrtc/transport/nr_socket_prsock.cpp",
+  "function": "int NrSocket::create(nr_transport_addr* addr) {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  if (StealthBindAddress(addr, &naddr)) ABORT(R_INTERNAL);  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "test": "gtest:StealthNrSocketBirth.ACreateThatFailsAtTheLastStepLeavesNoPortOfOursBehind",
+  "anchor": "if ((r = nr_transport_addr_to_praddr(addr, &naddr))) ABORT(r);",
+  "why": "naddr is the intermediate value that the family, the bind and the later GetSockName of Mozilla use"
  },
  {
   "file": "dom/media/webrtc/transport/nr_socket_prsock.cpp",
@@ -137,6 +165,73 @@
   "line": "  status = StealthPRBind(fd_, &naddr);  // STEALTH-HOOK(network/proxy-udp)",
   "removed": "  status = PR_Bind(fd_, &naddr);",
   "test": "gtest:StealthNrSocketBirth.AnAccessDeniedBindIsAlreadyAndThePortAfterItIsBorn"
+ },
+ {
+  "file": "dom/media/webrtc/transport/nr_socket_prsock.cpp",
+  "function": "int NrSocket::create(nr_transport_addr* addr) {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "    if (StealthBindPortNotAvailable()) ABORT(R_ALREADY);  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "test": "gtest:StealthNrSocketBirth.ACreateThatFailsAtTheLastStepLeavesNoPortOfOursBehind",
+  "anchor": "the `if (status != PR_SUCCESS) {` of the bind in NrSocket::create",
+  "why": "the condition is the NSPR error that Mozilla bind left, read before Mozilla logs and aborts"
+ },
+ {
+  "file": "dom/media/webrtc/transport/nr_socket_prsock.cpp",
+  "function": "int NrSocket::create(nr_transport_addr* addr) {",
+  "kind": "rewrite",
+  "form": "wrap-expression",
+  "line": "    if ((r = StealthDeclaredAddressKept(&my_addr_, addr, nr_praddr_to_transport_addr(&naddr, &my_addr_, addr->protocol, 1))))  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "removed": "    if ((r = nr_praddr_to_transport_addr(&naddr, &my_addr_, addr->protocol, 1)))",
+  "test": "gtest:StealthNrSocketBirth.ACreateThatFailsAtTheLastStepLeavesNoPortOfOursBehind"
+ },
+ {
+  "file": "dom/media/webrtc/transport/nr_socket_prsock.cpp",
+  "function": "int NrSocket::create(nr_transport_addr* addr) {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  if (StealthSocketAttachRefusedForTests(addr)) ABORT(R_INTERNAL);  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "test": "gtest:StealthNrSocketBirth.ACreateThatFailsAtTheLastStepLeavesNoPortOfOursBehind",
+  "anchor": "// Finally, register with the STS",
+  "why": "the position, right before the attach, is the point of the test"
+ },
+ {
+  "file": "dom/media/webrtc/transport/nr_socket_prsock.cpp",
+  "function": "int NrSocket::create(nr_transport_addr* addr) {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  StealthSocketAttached(&my_addr_, &stealth_own_port_, addr, rv);  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "test": "gtest:StealthNrSocketBirth.ACreateThatFailsAtTheLastStepLeavesNoPortOfOursBehind",
+  "anchor": "the `if (!NS_SUCCEEDED(rv)) {...}` block after stservice->AttachSocket in NrSocket::create",
+  "why": "a declared UDP host socket is registered as the last step, only after the attach worked"
+ },
+ {
+  "file": "dom/media/webrtc/transport/nr_socket_prsock.cpp",
+  "function": "int NrSocket::sendto(const void* msg, size_t len, int flags,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  to = StealthOwnPeerToKernel(&my_addr_, to);  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "test": "gtest:StealthNrSocketBirth.ACreateThatFailsAtTheLastStepLeavesNoPortOfOursBehind",
+  "anchor": "int32_t status; (the locals of NrSocket::sendto)",
+  "why": "the destination is the value Mozilla nr_transport_addr_to_praddr converts next"
+ },
+ {
+  "file": "dom/media/webrtc/transport/nr_socket_prsock.cpp",
+  "function": "int NrSocket::recvfrom(void* buf, size_t maxlen, size_t* len, int flags,",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  StealthOwnPeerFromKernel(&my_addr_, from);  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "test": "gtest:StealthNrSocketBirth.ACreateThatFailsAtTheLastStepLeavesNoPortOfOursBehind",
+  "anchor": "if ((r = nr_praddr_to_transport_addr(&nfrom, from, my_addr_.protocol, 0))) ABORT(r); in NrSocket::recvfrom",
+  "why": "the source address is the value Mozilla returns to the caller, rewritten once it is converted"
+ },
+ {
+  "file": "dom/media/webrtc/transport/nr_socket_prsock.cpp",
+  "function": "void NrSocket::close() {",
+  "kind": "add",
+  "form": "notice",
+  "line": "  StealthOwnPortReleased(&my_addr_, &stealth_own_port_);  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "test": "gtest:StealthNrSocketBirth.ACreateThatFailsAtTheLastStepLeavesNoPortOfOursBehind"
  },
  {
   "file": "dom/media/webrtc/transport/nr_socket_prsock.cpp",
@@ -189,6 +284,14 @@
   "form": "member",
   "line": "  friend struct StealthNrSocketAccess;  // STEALTH-HOOK(network/proxy-udp)",
   "test": "gtest:StealthUdpProxyBirth.TheLayerIsOnEverySocketOfAPeerConnectionWithAProxyAnswer"
+ },
+ {
+  "file": "dom/media/webrtc/transport/nr_socket_prsock.h",
+  "function": "class NrSocket : public NrSocketBase, public nsASocketHandler {",
+  "kind": "add",
+  "form": "member",
+  "line": "  uint16_t stealth_own_port_ = 0;  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "test": "gtest:StealthNrSocketBirth.ACreateThatFailsAtTheLastStepLeavesNoPortOfOursBehind"
  },
  {
   "file": "netwerk/base/nsIProxyInfo.idl",
@@ -284,6 +387,14 @@
  },
  {
   "file": "netwerk/ipc/PSocketProcess.ipdl",
+  "function": "parent:",
+  "kind": "add",
+  "form": "registration",
+  "line": "  async StealthProxyLookupOrigin(OriginAttributes? aOriginAttributes);  // STEALTH-HOOK(network/doh)",
+  "test": "gtest:TestStealthTRRContext.EachConstructorTakesTheMessageSentRightBeforeIt"
+ },
+ {
+  "file": "netwerk/ipc/PSocketProcess.ipdl",
   "function": "child:",
   "kind": "add",
   "form": "registration",
@@ -300,11 +411,27 @@
  },
  {
   "file": "netwerk/ipc/ProxyConfigLookup.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/net/StealthTRRContext.h\"  // STEALTH-HOOK(network/doh)",
+  "test": "wrapper:tests/test_webrtc_realness.py::test_a_gateway_with_coherent_udp_gives_the_page_a_srflx_born_through_its_relay"
+ },
+ {
+  "file": "netwerk/ipc/ProxyConfigLookup.cpp",
   "function": "nsresult ProxyConfigLookup::Create(",
   "kind": "add",
   "form": "notice",
   "line": "  StealthEnterLookupLoadInfo();  // STEALTH-HOOK(network/proxy-udp)",
   "test": "gtest:TestStealthLookupLoadInfo.TheLoadInfoOfALookupIsNotTheNextOnes"
+ },
+ {
+  "file": "netwerk/ipc/ProxyConfigLookup.cpp",
+  "function": "nsresult ProxyConfigLookup::Create(",
+  "kind": "add",
+  "form": "notice",
+  "line": "  StealthEnterTRRLookupContext();  // STEALTH-HOOK(network/doh)",
+  "test": "gtest:TestStealthTRRContext.TheContextOfALookupIsNotTheNextOnes"
  },
  {
   "file": "netwerk/ipc/ProxyConfigLookup.cpp",
@@ -317,6 +444,16 @@
   "why": "swaps the channel for the one made from the load info of the lookup and returns its failure; `channel` and `rv` are Mozilla's locals, and Mozilla's NS_NewChannel call stays whole, with no ternary arm"
  },
  {
+  "file": "netwerk/ipc/ProxyConfigLookup.cpp",
+  "function": "nsresult ProxyConfigLookup::DoProxyResolve(nsICancelable** aLookupCancellable) {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  if (StealthApplyTRRLookupContext(channel, &rv)) return rv;  // STEALTH-HOOK(network/doh)",
+  "test": "gtest:TestStealthTRRContext.TheStandInChannelTakesTheActiveContextOfTheLookup",
+  "anchor": "the check of Mozilla's `rv = NS_NewChannel(getter_AddRefs(channel), mURI, ...)`: `if (NS_FAILED(rv)) { return rv; }`, after the line of the swap",
+  "why": "applies the DoH context to the channel and returns its failure; `channel` and `rv` are Mozilla's locals, so the line can only follow Mozilla's own check of the channel creation, and Mozilla's NS_NewChannel call stays whole"
+ },
+ {
   "file": "netwerk/ipc/ProxyConfigLookupChild.cpp",
   "function": "",
   "kind": "add",
@@ -326,11 +463,29 @@
  },
  {
   "file": "netwerk/ipc/ProxyConfigLookupChild.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/net/StealthTRRContext.h\"  // STEALTH-HOOK(network/doh)",
+  "test": "gtest:TestStealthTRRContext.EachConstructorTakesTheMessageSentRightBeforeIt"
+ },
+ {
+  "file": "netwerk/ipc/ProxyConfigLookupChild.cpp",
   "function": "bool ProxyConfigLookupChild::Create(",
   "kind": "add",
   "form": "anchor",
   "line": "  StealthSendLookupLoadInfo(socketChild);  // STEALTH-HOOK(network/proxy-udp)",
   "test": "gtest:TestStealthLookupLoadInfo.EachConstructorTakesTheMessageSentRightBeforeIt",
+  "anchor": "the construction of Mozilla's `RefPtr<ProxyConfigLookupChild> child = new ProxyConfigLookupChild(std::move(aCallback));`, right before `return socketChild->SendPProxyConfigLookupConstructor(`",
+  "why": "the message is sent on the one path that sends the constructor, in the posting order the receiver relies on, so it sits on the line before the constructor and after Mozilla's check of `socketChild`, a local of Mozilla's function; a guard at the head would send it on the paths that return before the constructor"
+ },
+ {
+  "file": "netwerk/ipc/ProxyConfigLookupChild.cpp",
+  "function": "bool ProxyConfigLookupChild::Create(",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  StealthSendTRRLookupContext(socketChild);  // STEALTH-HOOK(network/doh)",
+  "test": "gtest:TestStealthTRRContext.EachConstructorTakesTheMessageSentRightBeforeIt",
   "anchor": "the construction of Mozilla's `RefPtr<ProxyConfigLookupChild> child = new ProxyConfigLookupChild(std::move(aCallback));`, right before `return socketChild->SendPProxyConfigLookupConstructor(`",
   "why": "the message is sent on the one path that sends the constructor, in the posting order the receiver relies on, so it sits on the line before the constructor and after Mozilla's check of `socketChild`, a local of Mozilla's function; a guard at the head would send it on the paths that return before the constructor"
  },
@@ -352,11 +507,27 @@
  },
  {
   "file": "netwerk/ipc/SocketProcessParent.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/net/StealthTRRContext.h\"  // STEALTH-HOOK(network/doh)",
+  "test": "gtest:TestStealthTRRContext.WithoutItsMessageAConstructorHasNoContext"
+ },
+ {
+  "file": "netwerk/ipc/SocketProcessParent.cpp",
   "function": "mozilla::ipc::IPCResult SocketProcessParent::RecvPProxyConfigLookupConstructor(",
   "kind": "add",
   "form": "notice",
   "line": "  StealthTakeParkedLookupLoadInfo(this);  // STEALTH-HOOK(network/proxy-udp)",
   "test": "gtest:TestStealthLookupLoadInfo.WithoutItsMessageAConstructorHasNoLoadInfo"
+ },
+ {
+  "file": "netwerk/ipc/SocketProcessParent.cpp",
+  "function": "mozilla::ipc::IPCResult SocketProcessParent::RecvPProxyConfigLookupConstructor(",
+  "kind": "add",
+  "form": "notice",
+  "line": "  StealthTakeParkedTRRLookupContext(this);  // STEALTH-HOOK(network/doh)",
+  "test": "gtest:TestStealthTRRContext.WithoutItsMessageAConstructorHasNoContext"
  },
  {
   "file": "netwerk/ipc/SocketProcessParent.h",
@@ -365,6 +536,14 @@
   "form": "member",
   "line": "  mozilla::ipc::IPCResult RecvStealthProxyLookupLoadInfo(const Maybe<LoadInfoArgs>& aLoadInfo);  // STEALTH-HOOK(network/proxy-udp)",
   "test": "gtest:TestStealthLookupLoadInfo.EachConstructorTakesTheMessageSentRightBeforeIt"
+ },
+ {
+  "file": "netwerk/ipc/SocketProcessParent.h",
+  "function": "class SocketProcessParent final",
+  "kind": "add",
+  "form": "member",
+  "line": "  mozilla::ipc::IPCResult RecvStealthProxyLookupOrigin(const Maybe<OriginAttributes>& aOriginAttributes);  // STEALTH-HOOK(network/doh)",
+  "test": "gtest:TestStealthTRRContext.EachConstructorTakesTheMessageSentRightBeforeIt"
  },
  {
   "file": "netwerk/ipc/moz.build",
@@ -376,10 +555,26 @@
  },
  {
   "file": "netwerk/ipc/moz.build",
+  "function": "EXPORTS.mozilla.net += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "EXPORTS.mozilla.net += [\"StealthTRRContext.h\"]  # STEALTH-HOOK(network/doh)",
+  "test": "wrapper:tests/test_webrtc_realness.py::test_a_gateway_with_coherent_udp_gives_the_page_a_srflx_born_through_its_relay"
+ },
+ {
+  "file": "netwerk/ipc/moz.build",
   "function": "UNIFIED_SOURCES += [",
   "kind": "add",
   "form": "registration",
   "line": "UNIFIED_SOURCES += [\"StealthDocumentChannel.cpp\"]  # STEALTH-HOOK(network/proxy-udp)",
+  "test": "wrapper:tests/test_webrtc_realness.py::test_a_gateway_with_coherent_udp_gives_the_page_a_srflx_born_through_its_relay"
+ },
+ {
+  "file": "netwerk/ipc/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"StealthTRRContext.cpp\"]  # STEALTH-HOOK(network/doh)",
   "test": "wrapper:tests/test_webrtc_realness.py::test_a_gateway_with_coherent_udp_gives_the_page_a_srflx_born_through_its_relay"
  },
  {
@@ -490,6 +685,14 @@
   "function": "UNIFIED_SOURCES += [",
   "kind": "add",
   "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"StealthInterception.cpp\"]  # STEALTH-HOOK(automation/network-interception)",
+  "test": "gtest:StealthHttp3Socks.ProxyAllowsHttp3"
+ },
+ {
+  "file": "netwerk/protocol/http/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
   "line": "UNIFIED_SOURCES += [\"StealthHttp3Socks.cpp\"]  # STEALTH-HOOK(network/proxy-udp)",
   "test": "gtest:StealthHttp3Socks.ProxyAllowsHttp3"
  },
@@ -514,8 +717,25 @@
   "function": "",
   "kind": "add",
   "form": "registration",
+  "line": "#include \"StealthIPv6Literal.h\"  // STEALTH-HOOK(network/ipv6-literal)",
+  "test": "gtest:StealthSessionUdpProxy.TheLayerConnectsToTheProxyOfThePeerConnection"
+ },
+ {
+  "file": "netwerk/socket/nsSOCKSIOLayer.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
   "line": "#include \"nsSOCKSUDPIOLayer.h\"  // STEALTH-HOOK(network/proxy-udp)",
   "test": "gtest:StealthSessionUdpProxy.TheLayerConnectsToTheProxyOfThePeerConnection"
+ },
+ {
+  "file": "netwerk/socket/nsSOCKSIOLayer.cpp",
+  "function": "PRStatus nsSOCKSSocketInfo::ConnectToProxy(PRFileDesc* fd) {",
+  "kind": "rewrite",
+  "form": "wrap-expression",
+  "line": "    status = StealthHopConnect(this, fd->lower->methods->connect)(fd->lower, &prProxy, mTimeout);  // STEALTH-HOOK(network/ipv6-literal)",
+  "removed": "    status = fd->lower->methods->connect(fd->lower, &prProxy, mTimeout);",
+  "test": "gtest:StealthDeclaredNetwork.AnIPv4MappedAddressIsLeftAloneBehindAProxyAndOnTheProxyHop"
  },
  {
   "file": "netwerk/socket/nsSOCKSIOLayer.cpp",
@@ -545,6 +765,14 @@
  },
  {
   "file": "toolkit/xre/nsAppRunner.cpp",
+  "function": "constinit std::unique_ptr<WaylandProxy> gWaylandProxy;",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthGfxFeatureStatus.h\"  // STEALTH-HOOK(platform/declaration-gate)",
+  "test": "gtest:StealthGfxFeatureStatus.NothingProbesTheHostBeforeTheProfilePrefsAreRead"
+ },
+ {
+  "file": "toolkit/xre/nsAppRunner.cpp",
   "function": "nsresult XREMain::XRE_mainRun() {",
   "kind": "add",
   "form": "anchor",
@@ -552,5 +780,25 @@
   "test": "py:modules/libpref/test/test_stealth_ice_prefs_locked.py::test_the_only_call_is_right_after_the_user_prefs_are_loaded",
   "anchor": "mDirProvider.InitializeUserPrefs();",
   "why": "the order after the load of the user prefs is the point: the lock has to see the user values"
+ },
+ {
+  "file": "toolkit/xre/nsAppRunner.cpp",
+  "function": "nsresult XREMain::XRE_mainRun() {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "    mozilla::gfx::StealthMarkUserPrefsRead();  // STEALTH-HOOK(platform/declaration-gate)",
+  "test": "gtest:StealthGfxFeatureStatus.NothingProbesTheHostBeforeTheProfilePrefsAreRead",
+  "anchor": "`StealthLockIcePrefs();` (network/proxy-udp), right after `mDirProvider.InitializeUserPrefs();` of XREMain::XRE_mainRun",
+  "why": "the signal says the profile's preferences, where the declaration arrives, have been read: it must come right after InitializeUserPrefs and before anything reads GfxInfo; nothing between them reads a preference of the declaration"
+ },
+ {
+  "file": "toolkit/xre/nsAppRunner.cpp",
+  "function": "nsresult XREMain::XRE_mainRun() {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "    mozilla::widget::StealthFireHostGLProbeIfStock();  // STEALTH-HOOK(platform/declaration-gate)",
+  "test": "gtest:StealthGfxFeatureStatus.TheHostProbeIsLaunchedAsSoonAsThePrefsAreReadWithTheEngineOff",
+  "anchor": "`mozilla::gfx::StealthMarkUserPrefsRead();` (platform/declaration-gate), right after `mDirProvider.InitializeUserPrefs();` of XREMain::XRE_mainRun",
+  "why": "Mozilla's early host GL probe of XRE_mainStartup comes before the profile's preferences, where the declaration cannot be read; this is the same fire as soon as they are read, so stock Firefox (engine off) probes at startup again"
  }
 ]

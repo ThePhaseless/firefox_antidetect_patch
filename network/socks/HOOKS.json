@@ -4,6 +4,22 @@
   "function": "UNIFIED_SOURCES += [",
   "kind": "add",
   "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"StealthIPv6Literal.cpp\"]  # STEALTH-HOOK(network/ipv6-literal)",
+  "test": "gtest:StealthDeclaredNetwork.NothingIsBlockedWhileIPv6IsDeclared"
+ },
+ {
+  "file": "netwerk/base/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"StealthLoadInfo.cpp\"]  # STEALTH-HOOK(automation/navigation)",
+  "test": "gtest:TestStealthLoadInfo.EveryCopyOfALoadInfoKeepsItsLoadIdentifier"
+ },
+ {
+  "file": "netwerk/base/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
   "line": "UNIFIED_SOURCES += [\"StealthSocksCredentials.cpp\"]  # STEALTH-HOOK(network/socks)",
   "test": "gtest:TestStealthSocksCredentials.PrefsChanged"
  },

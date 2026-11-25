@@ -117,8 +117,24 @@
   "function": "class gfxDWriteFontList final : public gfxPlatformFontList {",
   "kind": "add",
   "form": "member",
+  "line": "  void StealthAppendFamiliesFromCollection(IDWriteFontCollection* aCollection, nsTArray<mozilla::fontlist::Family::InitData>& aFamilies, const nsTArray<nsCString>* aForceClassicFams) MOZ_REQUIRES(mLock);  // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "wrapper:tests/test_the_font_list_is_the_bundle_e2e.py::test_the_font_list_is_the_bundle_and_nothing_else"
+ },
+ {
+  "file": "gfx/thebes/gfxDWriteFontList.h",
+  "function": "class gfxDWriteFontList final : public gfxPlatformFontList {",
+  "kind": "add",
+  "form": "member",
   "line": "  already_AddRefed<gfxFontEntry> CreateStealthBundleFontEntry(mozilla::fontlist::Face* aFace, const mozilla::fontlist::Family* aFamily);  // STEALTH-HOOK(fingerprint/fonts/bundle)",
   "test": "wrapper:tests/test_the_font_list_is_the_bundle_e2e.py::test_the_font_list_is_the_bundle_and_nothing_else"
+ },
+ {
+  "file": "gfx/thebes/gfxFcPlatformFontList.h",
+  "function": "struct default_delete<FcObjectSet> {",
+  "kind": "add",
+  "form": "member",
+  "line": "  friend struct StealthFcAccess;  // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "gtest:StealthFcFontList.PreferFileUnscaledFont"
  },
  {
   "file": "gfx/thebes/gfxFontEntry.h",
@@ -230,23 +246,31 @@
   "function": "USE_LIBS += [",
   "kind": "add",
   "form": "unknown",
+  "line": "include(\"StealthDeclarationGate.mozbuild\")  # STEALTH-HOOK(platform/declaration-gate)",
+  "test": "gtest:StealthGfxFeatureStatus.EveryLiveFeatureAnswersFromTheDeclaration"
+ },
+ {
+  "file": "gfx/thebes/moz.build",
+  "function": "USE_LIBS += [",
+  "kind": "add",
+  "form": "unknown",
   "line": "include(\"StealthBundleFontList.mozbuild\")  # STEALTH-HOOK(fingerprint/fonts/bundle)",
   "test": "wrapper:tests/test_the_font_list_is_the_bundle_e2e.py::test_the_font_list_is_the_bundle_and_nothing_else"
  },
  {
-  "file": "gfx/tests/gtest/moz.build",
-  "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
+  "file": "gfx/thebes/moz.build",
+  "function": "USE_LIBS += [",
   "kind": "add",
   "form": "unknown",
-  "line": "if CONFIG[\"OS_TARGET\"] == \"WINNT\":  # STEALTH-HOOK(fingerprint/fonts/bundle)",
-  "test": "gtest:StealthBundledCollection.ContentProcessUnderBundleOnlyBuildsNone"
+  "line": "include(\"StealthFcFontList.mozbuild\")  # STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "wrapper:tests/test_bundle_font_names_e2e.py::test_src_local_resolves_a_bundled_postscript_name_and_not_a_host_only_name"
  },
  {
-  "file": "gfx/tests/gtest/moz.build",
-  "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
+  "file": "gfx/thebes/moz.build",
+  "function": "USE_LIBS += [",
   "kind": "add",
-  "form": "registration",
-  "line": "    UNIFIED_SOURCES += [\"TestStealthBundledCollection.cpp\"]  # STEALTH-HOOK(fingerprint/fonts/bundle)",
-  "test": "gtest:StealthBundledCollection.ContentProcessUnderBundleOnlyBuildsNone"
+  "form": "unknown",
+  "line": "include(\"StealthDesignMetrics.mozbuild\")  # STEALTH-HOOK(fingerprint/fonts/metrics)",
+  "test": "gtest:StealthFontMetrics.DesignAdvanceAtAFractionalSize"
  }
 ]
