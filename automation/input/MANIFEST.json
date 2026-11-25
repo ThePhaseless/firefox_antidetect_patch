@@ -30,23 +30,23 @@
    "category": "juggler",
    "feature": "juggler-input-dispatch",
    "prefs": [],
-   "added": 8,
-   "removed": 2,
-   "hunks": 4,
+   "added": 6,
+   "removed": 1,
+   "hunks": 3,
    "inline_logic_lines": 80,
    "hookable": "movable",
-   "anchor": "nsDOMWindowUtils::JugglerSendMouseEvent (new); nsDOMWindowUtils::JugglerSendDragEvent (new); nsDOMWindowUtils::SendWheelEvent; CanvasToDataSourceSurface",
+   "anchor": "nsDOMWindowUtils::JugglerSendMouseEvent (new); nsDOMWindowUtils::JugglerSendDragEvent (new); nsDOMWindowUtils::SendWheelEvent",
    "evidence": [
     "+  *aJugglerEventId = ++sJugglerEventId;",
     "+  event.mInputSource = dom::MouseEvent_Binding::MOZ_SOURCE_MOUSE;",
     "+    wheelEvent.mTimeStamp = nsContentUtils::InputEventBirth(aLatency);"
    ],
-   "notes": "Four pieces in one file. (1) juggler: JugglerSendMouseEvent (new, about 45 lines) with a plain static counter sJugglerEventId. (2) juggler: JugglerSendDragEvent (new, about 60 lines) dispatches WidgetDragEvent directly and sets the drag session action from the modifier keys (B212). (3) spoof, input-event-birth: SendWheelEvent gets aLatency and sets mTimeStamp (same hunk as the signature change). (4) spoof, feature canvas-noise-as-drawn: CanvasToDataSourceSurface now passes SFE_AS_DRAWN (our flag, layout/base/nsLayoutUtils.h:2392, handled at nsLayoutUtils.cpp:7452) so the browser's own reader gets the canvas without the canvas noise; it belongs with the nsLayoutUtils change, not with the Juggler input feature (call site now at nsDOMWindowUtils.cpp:1539). The two new methods can move wholesale to our file, leaving one-line XPCOM methods. JugglerSendMouseEvent's last input (aLatency) replaced aDisablePointerEvent, per the comment in the diff.",
+   "notes": "Three pieces in one file. (1) juggler: JugglerSendMouseEvent (new, about 45 lines) with a plain static counter sJugglerEventId. (2) juggler: JugglerSendDragEvent (new, about 60 lines) dispatches WidgetDragEvent directly and sets the drag session action from the modifier keys (B212). (3) spoof, input-event-birth: SendWheelEvent gets aLatency and sets mTimeStamp (same hunk as the signature change). The two new methods can move wholesale to our file, leaving one-line XPCOM methods. JugglerSendMouseEvent's last input (aLatency) replaced aDisablePointerEvent, per the comment in the diff.",
    "verifier": {
     "changed": [
      "notes"
     ],
-    "why": "The unverified claim about SFE_AS_DRAWN is resolved: it is our canvas-noise bypass flag."
+    "why": "The canvas read of CompareCanvases is Mozilla's again."
    }
   },
   {
