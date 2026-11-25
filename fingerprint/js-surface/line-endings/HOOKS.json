@@ -11,7 +11,7 @@
   "file": "dom/file/BlobSet.cpp",
   "function": "nsresult BlobSet::AppendUTF8String(const nsACString& aUTF8String,",
   "kind": "rewrite",
-  "form": "unknown",
+  "form": "excepted",
   "line": "#if STEALTH_NATIVE_EOL_IS_CRLF  // STEALTH-HOOK(fingerprint/js-surface/line-endings)",
   "removed": "#ifdef XP_WIN",
   "test": "wrapper:tests/test_native_line_endings_are_windows_e2e.py::test_native_line_endings_are_windows",

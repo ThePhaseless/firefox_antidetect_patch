@@ -19,7 +19,7 @@
   "file": "dom/canvas/ClientWebGLContext.cpp",
   "function": "void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,",
   "kind": "add",
-  "form": "unknown",
+  "form": "anchor",
   "line": "  const StealthWebGLParameterAnswer stealthAnswer(*this, cx, pname, retval, rv);  // STEALTH-HOOK(fingerprint/webgl/parameters)",
   "test": "wrapper:tests/test_webgl_declared_parameters_e2e.py::test_declared_numeric_parameters_replace_the_hosts_and_webgl2_only_names_stay_null_on_webgl1",
   "anchor": "`const auto& state = State();` of ClientWebGLContext::GetParameter",

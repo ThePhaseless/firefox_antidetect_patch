@@ -11,7 +11,7 @@
   "file": "gfx/thebes/moz.build",
   "function": "USE_LIBS += [",
   "kind": "add",
-  "form": "unknown",
+  "form": "registration",
   "line": "include(\"StealthDeclarationGate.mozbuild\")  # STEALTH-HOOK(platform/declaration-gate)",
   "test": "gtest:StealthGfxFeatureStatus.EveryLiveFeatureAnswersFromTheDeclaration"
  },

@@ -99,7 +99,7 @@
   "file": "dom/media/webrtc/transport/nr_socket_proxy_config.h",
   "function": "",
   "kind": "add",
-  "form": "unknown",
+  "form": "registration",
   "line": "namespace net { class PcUdpProxy; }  // STEALTH-HOOK(network/proxy-udp)",
   "test": "gtest:StealthPcUdpProxyKinds.ASocks5ProxyMeasuredCoherentIsTheRoadOfTheUdpWithItsCredentials"
  },
@@ -236,7 +236,7 @@
   "file": "netwerk/base/nsUDPSocket.cpp",
   "function": "nsUDPSocket::InitWithAddress(const NetAddr* aAddr, nsIPrincipal* aPrincipal,",
   "kind": "add",
-  "form": "unknown",
+  "form": "anchor",
   "line": "  if (StealthSocksUdpLayerFailed(mFD, mSocksProxy)) goto fail;  // STEALTH-HOOK(network/proxy-udp)",
   "test": "gtest:StealthSocksUdpLayer.ASocketWithNoProxyIsLeftPlainAndALayerThatCannotBePushedFailsTheSocket",
   "anchor": "the `if (!mFD) {...}` check of the socket just opened in nsUDPSocket::InitWithAddress",

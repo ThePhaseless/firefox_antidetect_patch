@@ -53,7 +53,7 @@
    "added": 1,
    "removed": 0,
    "hunks": 1,
-   "inline_logic_lines": 1,
+   "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "include lines after include(\"/ipc/chromium/chromium-config.mozbuild\") (StealthDeclarationGate.mozbuild)",
    "notes": "One include line of StealthDeclarationGate.mozbuild, which exports StealthDeclarationGate.h and StealthGfxFeatureStatus.h and lists their .cpp files."

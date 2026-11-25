@@ -83,7 +83,7 @@
    "added": 1,
    "removed": 0,
    "hunks": 1,
-   "inline_logic_lines": 1,
+   "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "the module list after RawString",
    "notes": "Declares our module with the function the gtest StealthWebGPUExternalTexture calls; the module is ours.",

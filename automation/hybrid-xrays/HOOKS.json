@@ -88,7 +88,7 @@
   "file": "js/xpconnect/src/xpcprivate.h",
   "function": "class CompartmentPrivate {",
   "kind": "add",
-  "form": "unknown",
+  "form": "member",
   "line": "  bool StealthIsHybrid() const { return hybridXrays; }  // STEALTH-HOOK(automation/hybrid-xrays)",
   "test": "wrapper:tests/test_the_callers_code_is_not_counted_e2e.py::test_the_token_field_is_found_without_the_page_counting"
  },
@@ -114,7 +114,7 @@
   "file": "js/xpconnect/tests/unit/xpcshell.toml",
   "function": "head = \"head_ongc.js\"",
   "kind": "add",
-  "form": "unknown",
+  "form": "registration",
   "line": "[\"test_stealth_hybrid_xrays_options.js\"]  # STEALTH-HOOK(automation/hybrid-xrays)",
   "test": "xpcshell:js/xpconnect/tests/unit/test_stealth_hybrid_xrays_options.js#run_test"
  },
