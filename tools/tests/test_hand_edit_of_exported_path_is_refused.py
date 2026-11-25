@@ -64,7 +64,6 @@ def edit_by_hand(root: Path):
     path.write_bytes(data)
 
 
-@pytest.mark.xfail(strict=True, reason="turns green when the inventory records the export derived have their hand text")      # `check` refuses their empty anchor and notes
 def test_the_unedited_series_passes_check(series):
     done = check(series)
     assert done.returncode == 0, done.stdout + done.stderr

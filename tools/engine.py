@@ -94,7 +94,7 @@ check    needs no Firefox: SERIES lists exactly the folders that exist, every fo
          must equal the replay of the commits on the revision the tag vendors (tools/backport_replay.py).
          Every STEALTH-HOOK(<folder>) tag in a hooks.patch names a folder of SERIES, and the added, removed and hunk
          counts of each inventory record are those of its file in the hooks.patch of its folder (`export` writes them; a hand edit fails
-         and the message names `export`); the CLI check also refuses a record whose anchor or notes is empty. An inventory record has no `evidence` field: the lines are the hooks.patch itself (repo-07). The MANIFEST of a folder has the sha256 of every file under its src/, and each file has those bytes.
+         and the message names `export`); a record whose anchor or notes is empty, or whose hookable is none of the three values, fails too. An inventory record has no `evidence` field: the lines are the hooks.patch itself (repo-07). The MANIFEST of a folder has the sha256 of every file under its src/, and each file has those bytes.
          tools/gtest-suites.json is what `gtest-list --write` writes. A C++ file of ours has no control character (a carriage return inside a
          string literal ended the literal and broke the build of a test) and no byte outside ASCII inside a
          string or character literal: write them as escapes. No file of ours has a carriage return: not under
@@ -1629,6 +1629,7 @@ def problems() -> list:
         if patch.exists():
             diffs.update({(path, f): d for path, d in _diffs_of(patch).items()})
     found += record_count_problems(records, diffs)
+    found += inventory_hand_problems(records, diffs)      # the text a hand writes in a record the export derived: every caller of problems() sees it
     found += own_cxx_problems()
     found += own_cr_problems()
     for f in present:
@@ -1881,7 +1882,6 @@ def check(source: Path | None = None, tag: str | None = None, against_main: bool
     found = problems()
     found += folders.problems(ROOT)       # series-02: every folder states its relation to Mozilla (tools/folders.py)
     if against_main:      # the CLI does; it needs git and origin/main, problems() and the tests' fakes do not
-        found += inventory_hand_problems(inventory_records(), folder_diffs())      # the text a hand writes in a record the export derived
         main_hook, main_removed = load_main_budgets()
         main_raises = load_main_raises()
         raises = json.loads(RAISES.read_text(encoding="utf-8")) if RAISES.is_file() else []

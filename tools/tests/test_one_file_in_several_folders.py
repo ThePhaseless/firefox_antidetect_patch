@@ -164,6 +164,20 @@ def test_check_refuses_the_empty_text_of_a_derived_record_and_says_where_what_ho
     assert all(". Fix: write `" in f and ". Rule: docs/decisions/repo-07-one-fact-one-place.md" in f for f in found)
 
 
+def test_an_empty_anchor_is_red_through_problems_and_check_not_only_the_cli(world, capsys):
+    export(world)
+    mine = "tools/inventory.json, the record of mozilla.txt in network/b: its `%s` is empty"
+    found = engine.problems()
+    assert [f for f in found if mine % "anchor" in f] and [f for f in found if mine % "notes" in f], found
+    assert engine.check() != 0 and mine % "anchor" in capsys.readouterr().out
+    records = json.loads(engine.INVENTORY.read_text(encoding="utf-8"))
+    for r in records:
+        if layout.feature_folder(r["feature"]) == B:
+            r["anchor"], r["notes"] = "by hand: the anchor", "by hand: the notes"
+    engine.write_json(engine.INVENTORY, records)
+    assert not [f for f in engine.problems() if "its `anchor` is empty" in f or "its `notes` is empty" in f]
+
+
 def test_a_record_whose_folder_owns_no_line_any_more_moves_with_its_hand_text_to_the_folder_that_does(world, capsys):
     src, series = world
     run(src, "checkout", "-q", "-B", "only-b", "TAG")
@@ -192,7 +206,7 @@ def test_the_budgets_are_per_file_and_folder_at_the_counted_value_and_the_slack_
 def test_the_checks_of_the_series_pass_on_what_export_wrote_but_the_text_of_the_new_record(world, monkeypatch):
     export(world)
     found = engine.problems()
-    assert not [p for p in found if "budget" in p or "hooks.patch" in p or "patched by" in p], found
+    assert not [p for p in found if "is empty" not in p and ("budget" in p or "hooks.patch" in p or "patched by" in p)], found
 
 
 # ------------------------------------------------------------------------------------------------ the reds
