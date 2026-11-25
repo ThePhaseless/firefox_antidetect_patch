@@ -21,7 +21,7 @@ Read this first; open a decision only when your change touches it.
 | [product-02](decisions/product-02-same-seed-same-bytes.md) | The same seed gives the same bytes on every machine (Windows and Linux x86_64): text, canvas, WebGL, audio, media. |
 | [product-03](decisions/product-03-windows-retail-is-the-reference.md) | The reference is retail Firefox on Windows; Linux converges to Windows, never the reverse. |
 | [hook-01](decisions/hook-01-own-code-first.md) | Logic lives in our own `Stealth*` files; a Mozilla file carries only hooks, and a hook comes after a pref, a declared value or a build option. |
-| [hook-02](decisions/hook-02-shape-and-contract.md) | A hook is one line of a fixed form that calls our function, with `STEALTH-HOOK(<folder>)` on the line; Mozilla's lines stay as Mozilla wrote them. |
+| [hook-02](decisions/hook-02-shape-and-contract.md) | A hook is one line of a fixed form that calls our function, with `STEALTH-HOOK(<folder>)` on the line; Mozilla's lines stay as Mozilla wrote them; no hook has the form `unknown` (C21): a line takes a form or is `excepted` with its complete exception row. |
 | [hook-03](decisions/hook-03-budgets-and-debt-only-go-down.md) | Per-file budgets and the hook debt only go down against `origin/main`; a new Mozilla file gets at most 5 hook lines and 5 removed. |
 | [hook-04](decisions/hook-04-one-test-per-hook.md) | Every hook names in `HOOKS.json` a behaviour test with a negative control. |
 | [hook-05](decisions/hook-05-no-values-in-mozilla-numbered-spaces.md) | Our constants never take a value in a Mozilla numbered space (flag bits, enums, IDL constants). |

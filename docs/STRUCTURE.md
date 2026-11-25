@@ -47,16 +47,20 @@ The value of `form` in `HOOKS.json`. Any other shape is a contract violation. Th
 <!-- generated:hook-forms begin: written by `python tools/engine.py docs --write` from tools/hook_contract.py; do not edit -->
 | Form | Where | Looks like |
 |---|---|---|
-| `guard` | First statement of a function | `if (StealthX(this, aArg, &rv)) return rv;`; with a value to return (G15) the guard returns it |
-| `notice` | First statement of a function | `StealthX(this, aArg);` |
+| `guard` | First statement of a function | `if (StealthX(this, aArg, &rv)) return rv;`; with a value to return (G15) the guard returns it; in JavaScript `if (stealthX(this, aArg)) { return; }` (G66); it may leave by `goto <label>;` of Mozilla's own cleanup (G67) |
+| `notice` | First statement of a function | `StealthX(this, aArg);`, in JavaScript `stealthX(this, aArg);`: one call and nothing else (a `try { ... } catch {}` around it is more than the call and is no notice) |
 | `wrap-expression` | The line where the value is born | Mozilla's expression, unchanged, inside our call (the whole expression, or a sub-expression of the line, with our extra leading arguments such as `this, `): `return StealthX(<expression>);`; over several lines (G53) one line of ours opens the call with the marker on it, Mozilla's lines between stay unchanged, and the closing line is Mozilla's plus our `)` and the marker |
 | `wrap-function` | The signature line | Mozilla's `Foo` becomes `Foo_Mozilla` (G1) or another suffix such as `FooAsDrawn`; our `Foo` calls it and treats the result, and the one-line declarations and the internal calls take the same new name (G2); or the called function is replaced and exactly one plain argument of ours is added (G29, G9) |
 | `wrap-call` | The line of a call | The called identifier `Foo` becomes `StealthFoo`, same arguments (G29); or one argument of ours, a Stealth call, is added to a call of Mozilla's line (G9) |
-| `declared-value` | The line that gives a default | The value on Mozilla's line is replaced: a literal in place of a literal, or one STEALTH_ macro in place of one literal or one macro of Mozilla's |
-| `registration` | Includes, build files, declarative files | `#include "StealthX.h"` in a block of ours after Mozilla's; `VAR += ["StealthX.cpp"]` after the closing `]` of a `moz.build`; one line in `.ipdl`, `.webidl`, `components.conf`, `jar.mn`; a forward declaration `class X;` or a file-scope declaration of a function of ours (G40) |
-| `member` | A Mozilla class | One declaration after an existing member, never the last in the block |
+| `declared-value` | The line that gives a default | The value on Mozilla's line is replaced: a literal in place of a literal (in any language: a Python line too), or one STEALTH_ macro in place of one literal or one macro of Mozilla's |
+| `registration` | Includes, build files, declarative files | `#include "StealthX.h"` in a block of ours after Mozilla's; `VAR += ["StealthX.cpp"]` after the closing `]` of a `moz.build`; one line in `.ipdl`, `.webidl`, `components.conf`, `jar.mn`; a forward declaration `class X;` or a file-scope declaration of a function of ours (G40); and, of ours (G64): a moz.build `include("StealthX.mozbuild")` or `include("stealth.build")`, a line of a test manifest `.toml` that names a test of ours (`["test_stealth_x.js"]`), a Rust module declaration of ours (`pub mod stealth_x;`, `#[path = "stealth_x.rs"] mod stealth_x;`, `#[cfg(test)] mod stealth_tests;`), one line of a `.md` that imports or links our own file (`@STEALTH_X.md`, `[text](STEALTH_X.md)`) |
+| `member` | A Mozilla class | One declaration after an existing member, never the last in the block; of ours (G65): a data member of a Stealth type or named `mStealth...`, whose initializer, if any, is only a call of ours (`StealthX mStealth;`, `uint32_t mStealthId = StealthId();`), a Rust field of ours with its initializer (`stealth_x: T,` and `stealth_x: T::empty(),`, both in the file), a one-line accessor of ours (`bool StealthIsX() const { return mX; }`) |
 | `shadow` | Top of a function | `const auto GetX = StealthGetX;` (G21: our value under a Mozilla name) |
+| `scope` | First statement of a function | One local of a Stealth-named type, built by its arguments, that lives to the end of the function: `StealthXScope s(this, aArg);`, `const StealthXAnswer a(*this, aArg);` (G60); mid-function the same line is an anchor |
+| `rewire` | A new line after the line where the value is born | One line of ours that passes a variable through one call of ours and assigns it back: `x = StealthX(this, x);`, `out = stealth_long_path(out)` (G61); a line that replaces a Mozilla line is no rewire, it is a rewrite (C12) |
+| `parameter` | A declaration of a chain: definition, declaration, `.idl`, `.webidl` | Exactly one trailing parameter of ours added to Mozilla's parameter list on its line (`(nsIPrincipal& aSubject)`, `, double aLatency`), or the extended attribute `[NeedsSubjectPrincipal]` that makes the binding add it (G62); the recogniser is the one of rule C15, and the rewrite is judged by C12 and C15 as before |
 | `anchor` | Right after a named Mozilla statement, mid-function (last resort) | `StealthX(this, &locale);` or `if (StealthX(this)) return rv;`; as the last line of a block or of a JS module (G30, G33) it carries its `anchor` and `why` in HOOKS.json |
+| `excepted` | A line that no other form takes | The line has no form and its HOOKS.json entry has the complete exception row: `exception` (why), `reason_kind` (expression, declaration, macro or skip) and `pm` (G63, G35); with the row incomplete the form is `unknown` (rule C21) |
 <!-- generated:hook-forms end -->
 
 ## Hook rules
@@ -66,7 +70,7 @@ Every rule of the contract is one entry of `RULES` in `tools/hook_contract.py`, 
 <!-- generated:hook-rules begin: written by `python tools/engine.py docs --write` from tools/hook_contract.py; do not edit -->
 | Decision | Rules |
 |---|---|
-| [hook-02](decisions/hook-02-shape-and-contract.md) | C1, C2, C3, C4, C5, C6, C7, C8, C9, C10, C16, C17, C20 |
+| [hook-02](decisions/hook-02-shape-and-contract.md) | C1, C2, C3, C4, C5, C6, C7, C8, C9, C10, C16, C17, C20, C21 |
 | [hook-05](decisions/hook-05-no-values-in-mozilla-numbered-spaces.md) | C11 |
 | [port-06](decisions/port-06-hooks-only-add.md) | C12, C13, C14, C15 |
 | [port-07](decisions/port-07-quiet-anchors.md) | C18 |
@@ -92,11 +96,19 @@ A message of the hook tools may name a G code: a case the code accepts. Each one
 | G30 | An anchor may be the last line of a block; it carries its `anchor` and `why` in HOOKS.json (rule T2). |
 | G33 | An anchor may be the last line of a JS module; it carries its `anchor` and `why` in HOOKS.json (rule T2). |
 | G35 | A declared exception: a HOOKS.json entry with the hand fields `exception` (the reason) and `pm: "approvato"` is a rewritten line no form can express; its violations of C1..C11, T1, T2 and T3 are left out and counted. |
-| G40 | A forward declaration `class X;` or a file-scope declaration of a function of ours is a registration. |
+| G40 | A forward declaration `class X;` (alone, or inside one namespace on one line: `namespace net { class X; }`) or a file-scope declaration of a function of ours is a registration. |
 | G41 | tools/hook-names.json lists the functions that existed when rule C10 came; a hook may call them without the Stealth prefix, and a new function takes a Stealth name. |
 | G50 | In a preprocessed pref file or a JSON file, where a trailing comment is impossible, a marker comment alone on the line before a directive is the marker of the directive: one hook. |
 | G51 | Per Mozilla file, the lines the head removes or rewrites (the `-` lines of the diff against the tag) are not more than the base's, unless a HOOKS.json entry of the file carries `replaces` (one rewritten line standing for several hooks); prebuild check 8. |
 | G53 | A wrap-expression over several lines: one line of ours opens the call (marker on it), Mozilla's lines between stay unchanged, the closing line is Mozilla's plus our `)` and the marker. |
+| G60 | A scope: the first statement of a function is one local of a Stealth-named type built by its arguments (`StealthXScope s(this, aArg);`); the same line mid-function is an anchor (it carries its `anchor` and `why`, rule T2). |
+| G61 | A rewire: an added line of ours (never a rewrite of a Mozilla line) that assigns a variable the result of one call of ours that takes the variable itself (`x = StealthX(this, x);`, `out = stealth_long_path(out)`); it names the variable it reassigns, so rule C16 does not read it as a local passed by a hook. |
+| G62 | A parameter: one trailing parameter of ours is added to Mozilla's parameter list on its line, or the extended attribute `NeedsSubjectPrincipal` is added to a WebIDL member; rule C15 finds the parameter (the same insertion), and C12 and C15 judge the rewrite as before, so it still needs its exception row. |
+| G63 | An excepted line: a line that no form takes and whose HOOKS.json entry has `exception`, `reason_kind` (one of expression, declaration, macro, skip) and `pm: "approvato"`; the form is written `excepted` by the tool, and C12 to C15 judge the exception itself. |
+| G64 | Registrations of ours: a moz.build `include()` of a file named stealth (`.mozbuild` or `.build`), a test manifest `.toml` line that names a test with stealth in its name, a Rust module declaration of a module named stealth_*, and one `.md` line that imports or links a file named STEALTH_*. |
+| G65 | Members of ours: a data member of a Stealth-named type, or named `mStealth...`, whose initializer is only a call of ours; a Rust field `stealth_x:` that has its initializer in the same file (and the initializer that has its field); a one-line accessor of ours `T StealthX() const { return mY; }` in a header. |
+| G66 | A guard in JavaScript: `if (stealthX(this, aArg)) { return; }`, the call named stealth<What> or Stealth<What> and a block holding only the return. |
+| G67 | A guard may leave by `goto <label>;` of Mozilla's own cleanup of the function instead of a return. |
 <!-- generated:message-codes end -->
 
 ## HOOKS.json
@@ -110,7 +122,7 @@ One per folder without `BACKPORT.json`, beside `hooks.patch`, one entry per hook
 | `anchor`, `why` | Hand | Form `anchor` only: the Mozilla statement it follows, and why a guard or a wrap is not enough (debt T2) |
 | `own_function`, `renamed`, `calls_mozilla` | Hand | Read by `prebuild`: our functions to link-check besides `Stealth*`, a renamed Mozilla body besides `*_Mozilla`, a direct call of a renamed body that is allowed |
 | `quiet_anchor_why` | Hand | A hook in the churn band of `tools/churn.py`: `{kind: only-place, why}` or `{kind: deferred, quieter}`, why no quieter anchor serves (rule C18, [port-07](decisions/port-07-quiet-anchors.md)) |
-| `exception`, `untestable`, `replaces` | Hand | A declared exception to the contract, a hook that cannot be tested, one rewritten line standing for several hooks; the first two count only together with the `pm` field |
+| `exception`, `reason_kind`, `untestable`, `replaces` | Hand | A declared exception to the contract with the kind of its reason (`expression`, `declaration`, `macro`, `skip`), a hook that cannot be tested, one rewritten line standing for several hooks; the first three count only together with the `pm` field. A line that no form takes and whose entry has `exception`, `reason_kind` and `pm` is written with the form `excepted`; with one of them missing its form stays `unknown` and is rule C21 |
 
 A hook is identified by file, function, kind and normalized text. A hook whose text changes loses its hand fields and `check` asks for them again.
 
