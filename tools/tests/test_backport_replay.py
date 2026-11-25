@@ -340,7 +340,7 @@ def test_a_src_file_that_differs_from_what_the_commits_create_fails(world):
     write_folder(world)
     (world["folder"] / "src" / "third_party/rust/wgpu-a/src/new.rs").write_bytes(b"pub fn new() { /* edited */ }\n")
     found = br.folder_problems(br.replay(world["source"], "T1", world["folder"]), world["folder"], world["record"])
-    assert any("src/third_party/rust/wgpu-a/src/new.rs differs" in p for p in found), found
+    assert any("src/third_party/rust/wgpu-a/src/new.rs: the file differs" in p for p in found), found
 
 
 def test_a_tag_that_vendors_another_revision_needs_the_record_updated(world):
@@ -348,7 +348,7 @@ def test_a_tag_that_vendors_another_revision_needs_the_record_updated(world):
     result = br.replay(world["source"], "T2", world["folder"])
     found = br.folder_problems(result, world["folder"], world["record"])
     assert any("vendored is %s, the tag T2 vendors %s" % (R1, R2) in p for p in found), found
-    assert any("already contains" in p and "record contained_in" in p for p in found), found
+    assert any("already contains" in p and "which sets contained_in" in p for p in found), found
 
 
 def test_a_conflict_is_a_problem_naming_the_commit_and_the_file(world):
@@ -386,7 +386,7 @@ def test_a_commit_file_that_is_missing_or_unlisted_fails(world):
     (world["folder"] / "commits" / "0009-extra.patch").write_bytes(b"x")
     found = br.record_problems(world["folder"], world["record"])
     assert any("0004-test.patch is not in the folder" in p for p in found), found
-    assert any("0009-extra.patch is in no entry" in p for p in found), found
+    assert any("0009-extra.patch: the file is in no entry" in p for p in found), found
 
 
 def test_the_old_record_with_strings_and_a_clone_fails(world):
@@ -472,7 +472,9 @@ def test_a_port_reports_the_commit_that_does_not_apply_on_the_new_tag(series, ca
     checksummed(series["source"], "wgpu-a")
     commit_tag(series["source"], "T5")
     assert engine.port(series["source"], "T1", "T5", "port/T5", force=False) == 1
-    assert "CONFLICT fingerprint/synthetic (replay of its commits): the replay has conflicts" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "CONFLICT fingerprint/synthetic (replay of its commits): FAIL " in out and ": the replay has conflicts: " in out
+    assert ". Fix: rebase the commit onto the revision Mozilla vendors" in out and "Rule: docs/decisions/port-04-backport-as-commits.md" in out
 
 
 def test_a_commit_is_contained_only_by_a_reverse_apply_with_full_context(world):
@@ -643,7 +645,7 @@ def test_the_vendored_crate_of_a_record_has_its_shape(crate_world):
     for bad in ("glean-a", {"name": "glean-a"}, {"name": "glean-a", "version": "1.0.0", "tag": "v1.0.0"}, {"name": 3, "version": "1"}):
         record = json.loads(json.dumps(crate_world["record"]))
         record["vendored_crate"] = bad
-        assert any("vendored_crate is {name, version, tag_prefix}" in p for p in br.record_problems(crate_world["folder"], record)), bad
+        assert any("vendored_crate is not {name, version, tag_prefix}" in p for p in br.record_problems(crate_world["folder"], record)), bad
 
 
 def test_check_does_not_ask_a_crate_released_to_show_its_revision_in_the_patch(crate_world, monkeypatch):
@@ -660,3 +662,45 @@ def test_check_does_not_ask_a_crate_released_to_show_its_revision_in_the_patch(c
     del record["vendored_crate"]
     (crate_world["folder"] / "BACKPORT.json").write_text(json.dumps(record), encoding="utf-8")
     assert any("says the vendored revision is %s" % V1 in p for p in engine.backport_problems(folder, code, patch))
+# ------------------------------------------------------------------------ repo-04: every stop and problem is a fail() with its fix
+@pytest.mark.parametrize("call", [
+    lambda: br.toml_stanza("x", {"version": "1"}, {"x": {"version": "1"}}),
+    lambda: br.toml_stanza("x", {"workspace": True}, {}),
+    lambda: br.toml_stanza("x", {"workspace": True, "path": "p"}, {"x": {"version": "1"}}),
+    lambda: br.toml_additions(b"diff --git a/c/Cargo.toml b/c/Cargo.toml\n@@ -1,1 +1,1 @@\n-a = 1\n+a = 2\n"),
+    lambda: br.add_stanza("[package]\r\n", "dependencies", "x", []),
+    lambda: br.add_stanza("[package]\n", "dependencies", "x", []),
+    lambda: br.lock_additions(b"diff --git a/Cargo.lock b/Cargo.lock\n@@ -1,1 +1,1 @@ name = \"a\"\n-x\n"),
+    lambda: br.add_lock_dependency("[[package]]\nname = \"a\"\n", "nobody", ' "b",', "r"),
+    lambda: br.vendored_revision("nothing"),
+])
+def test_a_stop_says_where_what_fix_and_rule_whole(call):
+    with pytest.raises(br.Stop) as stop:
+        call()
+    text = stop.value.text
+    assert str(stop.value) == text and text == str(stop.value.failure)
+    assert text.startswith("FAIL ") and ". Fix: " in text and text.endswith("Rule: docs/decisions/port-04-backport-as-commits.md")
+    assert len(text.split(". Fix: ")[1].split(". Rule: ")[0]) > 30, "a fix that says something"
+
+
+def test_a_missing_object_names_the_source_and_the_fetch(world, tmp_path):
+    scratch = br.Scratch(world["source"], tmp_path)
+    with pytest.raises(br.Stop) as stop:
+        scratch.blobs(["0" * 40])
+    assert ("object " + "0" * 40 + " is missing") in stop.value.text and "git -C" in stop.value.text and "Fix: fetch the Mozilla tag whole" in stop.value.text
+
+
+def test_a_conflict_of_the_replay_is_a_fail_line_with_the_rebase_fix(world):
+    write_folder(world)
+    write(world["source"], "third_party/rust/wgpu-a/src/lib.rs", LIB_A.replace("{ 2 }", "{ 2000 }"))
+    checksummed(world["source"], "wgpu-a")
+    commit_tag(world["source"], "T9")
+    found = br.folder_problems(br.replay(world["source"], "T9", world["folder"]), world["folder"], world["record"])
+    conflicts = [p for p in found if "does not apply" in p]
+    assert conflicts and all(". Fix: rebase the commit onto the revision Mozilla vendors" in p and p.startswith("FAIL ") for p in conflicts)
+
+
+def test_no_problem_text_is_cut():
+    long_path = "/" + "x" * 200
+    found = br.record_problems(Path("synthetic-folder"), {"commits": [{"file": "commits/a.patch"}], "vendored": "x", "somewhere": long_path})
+    assert any(long_path in p for p in found), "the whole value of the path is printed, not its first 60 characters"

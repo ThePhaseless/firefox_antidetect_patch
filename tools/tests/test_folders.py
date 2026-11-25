@@ -8,6 +8,7 @@ the shapes that do not.
     python -m pytest tools/tests/test_folders.py
 """
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -26,7 +27,7 @@ TAG = "FIREFOX_159_0_RELEASE"
 BUG = "https://bugzilla.mozilla.org/show_bug.cgi?id=1234567"
 PRODUCT = {"relation": "product"}
 DEFECT = {"relation": "defect", "upstream": "not-filed"}
-RULE = "rule: docs/decisions/series-02-every-folder-states-its-relation-to-mozilla.md"
+RULE = "docs/decisions/series-02-every-folder-states-its-relation-to-mozilla.md"
 REAL = Path(__file__).resolve().parents[2]
 
 
@@ -56,8 +57,10 @@ def one(tmp_path, value, **kw):
 
 def said(problem):
     """Each problem says where, what, fix and rule, in that order."""
-    where_what, fix, rule = problem.split("\n")
-    assert fix.startswith("fix: ") and rule == RULE and "FOLDER.json" in where_what and ": " in where_what
+    found = re.fullmatch(r"FAIL (.+?)\. Fix: (.+)\. Rule: (.+)", problem, re.S)
+    assert found, problem
+    where_what, fix, rule = found.groups()
+    assert fix.strip() and rule == RULE and "FOLDER.json" in where_what and ": " in where_what
     return where_what
 
 
@@ -101,7 +104,7 @@ def test_a_folder_json_in_a_backport_folder_is_red(tmp_path):
     root = series(tmp_path, {"platform/backports/x": "backport"})
     (root / "platform/backports/x/FOLDER.json").write_text(json.dumps(PRODUCT), encoding="utf-8")
     found = folders.problems(root)
-    assert len(found) == 1 and "it is a backport, and its relation is derived from that file" in said(found[0]) and "fix: delete FOLDER.json" in found[0]
+    assert len(found) == 1 and "it is a backport, and its relation is derived from that file" in said(found[0]) and "Fix: delete FOLDER.json" in found[0]
 
 
 def test_an_extra_key_is_red(tmp_path):
@@ -316,3 +319,11 @@ def test_export_never_writes_or_deletes_a_folder_json(world, tmp_path, monkeypat
     engine.export(world, "TAG", "more")
     assert (root / "fingerprint" / "n" / "MANIFEST.json").is_file() and not (root / "fingerprint" / "n" / "FOLDER.json").exists()
     assert sorted(p.relative_to(root).as_posix() for p in root.rglob("FOLDER.json")) == ["fingerprint/a/FOLDER.json", "platform/b/FOLDER.json"]   # rglob has no order: NTFS gives the sorted one, ext4 does not
+
+
+def test_the_command_prints_each_problem_as_one_fail_line_of_four_parts(tmp_path, capsys):
+    root = series(tmp_path, {"fingerprint/a": None})
+    assert folders.main([str(root)]) == 1
+    lines = capsys.readouterr().out.splitlines()
+    assert len(lines) == 1 and lines[0].startswith("FAIL fingerprint/a/FOLDER.json: ") and lines[0].count("FAIL ") == 1
+    assert said(lines[0]) and " Fix: " in lines[0] and lines[0].endswith("Rule: " + RULE)

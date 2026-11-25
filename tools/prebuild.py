@@ -50,6 +50,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import hook_contract as hc  # noqa: E402
+from failure import fail  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 C_EXT = {"cpp", "cc", "cxx", "c", "h", "hpp", "mm", "m"}
@@ -61,22 +62,41 @@ KEYWORDS = {"return", "else", "new", "delete", "case", "throw", "co_return", "co
             "sizeof", "and", "or", "not", "typeof", "do", "if", "while", "for", "switch", "using", "typedef"}
 FAIL, WARN = "FAIL", "WARN"
 
+# The decision each check enforces (repo-04: a FAIL names its rule).
+RULE_LINK = "hook-02-shape-and-contract"                    # checks 1 and 2: a hook calls a function of ours that is declared, defined, built
+RULE_ADD = "port-06-hooks-only-add"                         # checks 3 and 5: Mozilla's lines are not rewritten, a restored file is the tag's
+RULE_OWN = "hook-01-own-code-first"                         # check 6: every source of ours is built or shipped, no two share a basename
+RULE_GTEST = "ci-07-every-check-runs-before-the-merge"      # check 7: every gtest suite of ours is run by the default filter
+RULE_REMOVED = "hook-03-budgets-and-debt-only-go-down"      # check 8: the Mozilla lines the head removes do not grow
+RULE_TOOL = "repo-04-every-failure-says-where-what-fix-rule"    # the tool itself: a bad call, a git error
+
 
 @dataclass
 class Finding:
+    """One result of a check. A FAIL carries the `fail()` that says where, what, fix and rule (`Finding.failed`); a WARN is a note, not a
+    failure: the check could not tell, the exit code does not change, and it has no fix and no rule."""
     level: str
     check: int
     where: str
     what: str
     fix: str = ""
+    failure: object = None
+
+    @classmethod
+    def failed(cls, check: int, failure) -> "Finding":
+        return cls(FAIL, check, failure.where, failure.what, failure.fix, failure)
 
     def line(self) -> str:
         if self.level == WARN:
             return "WARN %s: cannot tell: %s" % (self.where, self.what)
-        return "FAIL %s: %s; %s" % (self.where, self.what, self.fix) if self.fix else "FAIL %s: %s" % (self.where, self.what)
+        if self.failure is None:
+            raise TypeError(str(fail("tools/prebuild.py Finding", "a FAIL finding of check %d (%s) was built without a fail()" % (self.check, self.where),
+                                     "build it with Finding.failed(check, fail(where, what, fix, rule))", RULE_TOOL)))
+        return str(self.failure)
 
     def as_dict(self) -> dict:
-        return {"level": self.level, "check": self.check, "where": self.where, "what": self.what, "fix": self.fix}
+        return {"level": self.level, "check": self.check, "where": self.where, "what": self.what, "fix": self.fix,
+                "rule": self.failure.rule if self.failure is not None else ""}
 
 
 def ext_of(path: str) -> str:
@@ -197,7 +217,10 @@ class GitTree(Tree):
     def git(self, *args) -> bytes:
         r = subprocess.run(["git", "-C", self.source, "-c", "core.quotepath=off", *args], capture_output=True)
         if r.returncode:
-            raise SystemExit("git %s failed: %s" % (" ".join(args[:3]), r.stderr.decode("utf-8", "replace")[:300]))
+            raise SystemExit(str(fail("git %s in %s" % (" ".join(args), self.source), "git exited with %d: %s"
+                                      % (r.returncode, r.stderr.decode("utf-8", "replace").strip()),
+                                      "run the same git command by hand in that repository and read its error; --source must be the Firefox "
+                                      "repository and --head, --base and the tag must be refs it has", RULE_TOOL)))
         return r.stdout
 
 
@@ -378,7 +401,9 @@ def folder_scope(series: Path, folders: list) -> set:
     for f in folders:
         m = Path(series) / f / "MANIFEST.json"
         if not m.is_file():
-            raise SystemExit("--folder %s: no %s" % (f, m))
+            raise SystemExit(str(fail("--folder %s" % f, "the folder has no %s" % m,
+                                      "name a folder listed in SERIES of the --series repository (python tools/engine.py export writes its MANIFEST.json)",
+                                      RULE_TOOL)))
         data = json.loads(m.read_text(encoding="utf-8"))
         scope.update(data.get("modified", []))
         scope.update(data.get("added", {}))
@@ -1001,28 +1026,28 @@ def _link_one(proj, idx, graph, builds, s: Site) -> list:
     classes = [d for d in decls if d.kind in ("class", "macro")]
     declarations = [d for d in funcs if not d.qual or not d.is_def or d.file == s.host]
     if not decls:
-        out.append(Finding(FAIL, 1, where, "%s is called and no declaration of it exists in a header or source of ours" % s.name,
-                           "declare it in a header of ours and include the header in the host file, or fix the name"))
+        out.append(Finding.failed(1, fail(where, "%s is called and no declaration of it exists in a header or source of ours" % s.name,
+                           "declare it in a header of ours and include the header in the host file, or fix the name", RULE_LINK)))
         return out
     if classes and not funcs:
         return out                      # a class or macro of that name: constructor or expansion, not checked further
     if not declarations:
-        out.append(Finding(FAIL, 1, where, "%s has a definition (%s) and no declaration: Mozilla's file cannot see it" % (s.name, os_path(funcs[0])),
-                           "declare it in a header of ours and include the header in the host file"))
+        out.append(Finding.failed(1, fail(where, "%s has a definition (%s) and no declaration: Mozilla's file cannot see it" % (s.name, os_path(funcs[0])),
+                           "declare it in a header of ours and include the header in the host file", RULE_LINK)))
         return out
     # (b) the host reaches a declaration (a member call reaches its class through the object)
     if not s.member:
         files = sorted({d.file for d in declarations})
         if s.host not in files:
             if not graph.reaches(s.host, files):
-                out.append(Finding(FAIL, 1, where, "%s is declared in %s and the host file does not include it (directly, or through a header it includes)"
-                                   % (s.name, ", ".join(files[:3])),
-                                   'add `#include "%s"  // STEALTH-HOOK(<folder>)` to the host file' % base_of(files[0])))
+                out.append(Finding.failed(1, fail(where, "%s is declared in %s and the host file does not include it (directly, or through a header it includes)"
+                                   % (s.name, ", ".join(files)),
+                                   'add `#include "%s"  // STEALTH-HOOK(<folder>)` to the host file' % base_of(files[0]), RULE_LINK)))
     # (c) a definition, built
     defs = [d for d in funcs if d.is_def]
     if not defs:
-        out.append(Finding(FAIL, 1, where, "%s has a declaration but no body in a file of ours" % s.name,
-                           "write the body in a .cpp of ours or inline in its header"))
+        out.append(Finding.failed(1, fail(where, "%s has a declaration but no body in a file of ours" % s.name,
+                           "write the body in a .cpp of ours or inline in its header", RULE_LINK)))
     else:
         ok = False
         unbuilt = []
@@ -1037,8 +1062,8 @@ def _link_one(proj, idx, graph, builds, s: Site) -> list:
             else:
                 ok = True
         if not ok:
-            out.append(Finding(FAIL, 1, where, "%s is defined only in %s, which no moz.build names" % (s.name, ", ".join(sorted(set(unbuilt))[:3])),
-                               "add the file to SOURCES or UNIFIED_SOURCES of its directory's moz.build"))
+            out.append(Finding.failed(1, fail(where, "%s is defined only in %s, which no moz.build names" % (s.name, ", ".join(sorted(set(unbuilt)))),
+                               "add the file to SOURCES or UNIFIED_SOURCES of its directory's moz.build", RULE_LINK)))
     # (d) the argument count
     if s.argc is None:
         out.append(Finding(WARN, 1, where, "the arguments of %s do not close (unbalanced parentheses in the text)" % s.name))
@@ -1047,8 +1072,8 @@ def _link_one(proj, idx, graph, builds, s: Site) -> list:
         okc = any(d.nmin <= argc and (d.nmax is None or argc <= d.nmax) for d in funcs)
         if not okc:
             sig = "; ".join(sorted({"%s takes %s" % (os_path(d), _rng(d)) for d in funcs}))
-            out.append(Finding(FAIL, 1, where, "%s is called with %d argument(s) and no declaration takes that many (%s)" % (s.name, argc, sig),
-                               "fix the call or the declaration"))
+            out.append(Finding.failed(1, fail(where, "%s is called with %d argument(s) and no declaration takes that many (%s)" % (s.name, argc, sig),
+                               "fix the call or the declaration", RULE_LINK)))
     # (e) the namespace
     if not s.member and funcs:
         scan = proj.cscan(s.host)
@@ -1060,8 +1085,8 @@ def _link_one(proj, idx, graph, builds, s: Site) -> list:
                 out.append(Finding(WARN, 1, where, "%s lives in %s, which the call site neither names, encloses nor opens; argument-dependent lookup may still find it"
                                    % (s.name, where_decl)))
             else:
-                out.append(Finding(FAIL, 1, where, "%s lives in %s, which the call site neither names, encloses nor opens with `using`" % (s.name, where_decl),
-                                   "qualify the call (%s::%s) or open the namespace" % (where_decl, s.name)))
+                out.append(Finding.failed(1, fail(where, "%s lives in %s, which the call site neither names, encloses nor opens with `using`" % (s.name, where_decl),
+                                   "qualify the call (%s::%s) or open the namespace" % (where_decl, s.name), RULE_LINK)))
     return out
 
 
@@ -1106,8 +1131,8 @@ def _check_added_includes(proj: Project, hosts: list, graph: IncludeGraph) -> li
             if not re.match(r"(?:nr_)?[Ss]tealth|Test[Ss]tealth", base_of(inc)) and base_of(inc) not in graph.by_base:
                 continue
             if not graph.resolve(p, inc) and not proj.head.exists(inc):
-                out.append(Finding(FAIL, 1, "%s:%d" % (p, ln), 'the added include "%s" names no file of ours in the head' % inc,
-                                   "add the header or fix the include path"))
+                out.append(Finding.failed(1, fail("%s:%d" % (p, ln), 'the added include "%s" names no file of ours in the head' % inc,
+                                   "add the header or fix the include path", RULE_LINK)))
     return out
 
 
@@ -1140,15 +1165,15 @@ def _check_js_links(proj: Project, hosts: list, extra: set) -> list:
                 local = js_decls(p, text, {n})
                 imported = re.search(r"(?<![\w$])%s\b(?!\s*\()" % re.escape(n), re.sub(r"\n", " ", clean[:a] + " " + clean[b:])) is not None
                 if not decls and not local:
-                    out.append(Finding(FAIL, 1, where, "%s is called and no module of ours declares it" % n, "declare and export it in a module of ours"))
+                    out.append(Finding.failed(1, fail(where, "%s is called and no module of ours declares it" % n, "declare and export it in a module of ours", RULE_LINK)))
                     continue
                 if not local and not imported:
-                    out.append(Finding(FAIL, 1, where, "%s is called and the host module neither imports nor declares it" % n,
-                                       "import it (import { %s } or ChromeUtils.importESModule) in the host module" % n))
+                    out.append(Finding.failed(1, fail(where, "%s is called and the host module neither imports nor declares it" % n,
+                                       "import it (import { %s } or ChromeUtils.importESModule) in the host module" % n, RULE_LINK)))
                 allds = decls + local
                 if argc is not None and not any(d.kind == "class" or (d.nmin <= argc and (d.nmax is None or argc <= d.nmax)) for d in allds):
-                    out.append(Finding(FAIL, 1, where, "%s is called with %d argument(s) and no declaration takes that many" % (n, argc),
-                                       "fix the call or the declaration"))
+                    out.append(Finding.failed(1, fail(where, "%s is called with %d argument(s) and no declaration takes that many" % (n, argc),
+                                       "fix the call or the declaration", RULE_LINK)))
             for m in rxm.finditer(clean, a, b):
                 n = m.group("n")
                 if not any(js_decls(q, proj.read(q) or "", {n}) for q in own_js):
@@ -1243,8 +1268,8 @@ def check_rename(proj: Project) -> list:
     for p, ln, n, text in calls:
         if (p, hc.norm(text)) in allow:
             continue
-        out.append(Finding(FAIL, 2, "%s:%d" % (p, ln), "%s, the renamed body of a Mozilla function, is called from a Mozilla file" % n,
-                           "call the original name (ours wraps it), or record the exception in HOOKS.json (`calls_mozilla`)"))
+        out.append(Finding.failed(2, fail("%s:%d" % (p, ln), "%s, the renamed body of a Mozilla function, is called from a Mozilla file" % n,
+                           "call the original name (ours wraps it), or record the exception in HOOKS.json (`calls_mozilla`)", RULE_LINK)))
     own_index = DeclIndex(proj, {d.name[:-len("_Mozilla")] if d.name.endswith("_Mozilla") else d.name for d in defs + decls})
     headers = [q for q in proj.mozilla if ext_of(q) in HEADER_EXT]
     for d in defs:
@@ -1261,19 +1286,19 @@ def check_rename(proj: Project) -> list:
                         if hd.scope and hd.scope[-1] == cls:
                             found = True
             if not found:
-                out.append(Finding(FAIL, 2, where, "%s::%s is defined and no changed Mozilla header declares %s in class %s" % (cls, d.name, d.name, cls),
-                                   "rename the declaration in the class header too (and declare %s there once, for ours)" % orig))
+                out.append(Finding.failed(2, fail(where, "%s::%s is defined and no changed Mozilla header declares %s in class %s" % (cls, d.name, d.name, cls),
+                                   "rename the declaration in the class header too (and declare %s there once, for ours)" % orig, RULE_LINK)))
         # (b) ours defines the original name with the same parameters
         cands = [x for x in own_index.get(orig) if x.kind == "func" and (not cls or (x.qual and x.qual[-1] == cls) or (x.scope and x.scope[-1] == cls))
                  and x.file not in proj.mozilla]
         if not cands:
-            out.append(Finding(FAIL, 2, where, "%s is renamed %s and no file of ours defines %s%s" % (orig, d.name, (cls + "::") if cls else "", orig),
-                               "define %s in a file of ours with the parameters of the Mozilla body" % orig))
+            out.append(Finding.failed(2, fail(where, "%s is renamed %s and no file of ours defines %s%s" % (orig, d.name, (cls + "::") if cls else "", orig),
+                               "define %s in a file of ours with the parameters of the Mozilla body" % orig, RULE_LINK)))
         elif not any(_params_same(d, x) for x in cands):
-            out.append(Finding(FAIL, 2, where, "%s(%s)%s differs from ours %s(%s)%s (%s)" % (
+            out.append(Finding.failed(2, fail(where, "%s(%s)%s differs from ours %s(%s)%s (%s)" % (
                 d.name, re.sub(r"\s+", " ", d.params).strip(), (" " + d.tail) if d.tail else "", orig,
                 re.sub(r"\s+", " ", cands[0].params).strip(), (" " + cands[0].tail) if cands[0].tail else "", os_path(cands[0])),
-                "make the parameter list and the trailing const/noexcept of ours equal to Mozilla's"))
+                "make the parameter list and the trailing const/noexcept of ours equal to Mozilla's", RULE_LINK)))
     return out
 
 
@@ -1363,11 +1388,11 @@ def check_mozilla_tokens(proj: Project):
         where = "%s:%d" % (c["file"], c["old_line"])
         if c["allowed"] == "exception":
             if not re.search(r"\bpm\b", c["exception"], re.I):
-                out.append(Finding(FAIL, 3, where, "the exception on this line does not say the pm approved it (`%s`)" % c["exception"][:60],
-                                   "write the approval into the `exception` field of HOOKS.json"))
+                out.append(Finding.failed(3, fail(where, "the exception on this line does not say the pm approved it (`%s`)" % c["exception"],
+                                   "write the approval into the `exception` field of HOOKS.json", RULE_ADD)))
             continue
-        out.append(Finding(FAIL, 3, where, "Mozilla line changed or removed: %s" % c["text"][:100],
-                           "keep Mozilla's line as it is and put the hook beside it (wrap-expression, wrap-function or declared-value), or record an exception with the pm's approval"))
+        out.append(Finding.failed(3, fail(where, "Mozilla line changed or removed: %s" % c["text"],
+                           "keep Mozilla's line as it is and put the hook beside it (wrap-expression, wrap-function or declared-value), or record an exception with the pm's approval", RULE_ADD)))
     return out, changes
 
 
@@ -1511,9 +1536,9 @@ def check_restored(proj: Project) -> list:
         if any(pat.search(texts[q]) for q in files if q in own):
             continue                      # a file of ours defines it: the old hunk's declaration is no longer needed
         for q in files:
-            out.append(Finding(FAIL, 5, q, "uses `%s`, which only the old hunk of %s introduced; that file is the tag's again and no file of ours defines `%s`"
-                               % (n, ", ".join(introduced[n][:2]), n),
-                               "define it in a file of ours, or remove the use"))
+            out.append(Finding.failed(5, fail(q, "uses `%s`, which only the old hunk of %s introduced; that file is the tag's again and no file of ours defines `%s`"
+                               % (n, ", ".join(introduced[n]), n),
+                               "define it in a file of ours, or remove the use", RULE_ADD)))
     return out
 
 
@@ -1533,7 +1558,7 @@ def check_our_files(proj: Project, tree_path: str | None = None) -> list:
         in_tests = any(x in ("tests", "test", "gtest", "testing") for x in parts[:-1])
         if e in C_SOURCE_EXT:
             if not builds.compiled(p):
-                out.append(Finding(FAIL, 6, p, "no moz.build names this source and nothing of ours #includes it", "add it to SOURCES or UNIFIED_SOURCES in the moz.build of its directory"))
+                out.append(Finding.failed(6, fail(p, "no moz.build names this source and nothing of ours #includes it", "add it to SOURCES or UNIFIED_SOURCES in the moz.build of its directory", RULE_OWN)))
         elif e == "rs":
             if base_of(p) in ("lib.rs", "main.rs", "build.rs") or builds.named_by(p):
                 continue
@@ -1542,12 +1567,12 @@ def check_our_files(proj: Project, tree_path: str | None = None) -> list:
             parent_mod = (dir_of(p) + ".rs") if dir_of(p) else ""
             cands = sibs + ([parent_mod] if parent_mod else [])
             if not any(re.search(r"\bmod\s+%s\s*;" % re.escape(stem), blank_for(q, proj.read(q) or "")) for q in cands):
-                out.append(Finding(FAIL, 6, p, "no `mod %s;` in a file next to it and no moz.build names it" % stem, "declare the module in lib.rs or mod.rs"))
+                out.append(Finding.failed(6, fail(p, "no `mod %s;` in a file next to it and no moz.build names it" % stem, "declare the module in lib.rs or mod.rs", RULE_OWN)))
         elif e in ("mjs", "js", "jsm", "jsx"):
             if in_tests or base_of(p).endswith((".test.mjs", ".test.js")):
                 continue
             if not builds.compiled(p):
-                out.append(Finding(FAIL, 6, p, "no moz.build or jar.mn ships this module and no file #includes it", "list it in EXTRA_JS_MODULES, FINAL_TARGET_FILES or the jar.mn of its directory"))
+                out.append(Finding.failed(6, fail(p, "no moz.build or jar.mn ships this module and no file #includes it", "list it in EXTRA_JS_MODULES, FINAL_TARGET_FILES or the jar.mn of its directory", RULE_OWN)))
     # rule G19: no two files of ours share a basename
     by: dict = {}
     for p in own:
@@ -1555,7 +1580,7 @@ def check_our_files(proj: Project, tree_path: str | None = None) -> list:
             by.setdefault(base_of(p), []).append(p)
     for b, ps in sorted(by.items()):
         if len(ps) > 1 and any(proj.in_scope(p) for p in ps):
-            out.append(Finding(FAIL, 6, ps[0], "rule G19: %d files of ours are named %s (%s)" % (len(ps), b, ", ".join(ps[1:3])), "rename one of them"))
+            out.append(Finding.failed(6, fail(ps[0], "rule G19: %d files of ours are named %s (%s)" % (len(ps), b, ", ".join(ps[1:])), "rename one of them", RULE_OWN)))
     # the in-tree checker overlaps the build-list part
     if tree_path:
         script = Path(tree_path) / "build" / "stealth_check_build_files.py"
@@ -1563,7 +1588,7 @@ def check_our_files(proj: Project, tree_path: str | None = None) -> list:
             r = subprocess.run([sys.executable, str(script)], capture_output=True, text=True, cwd=str(tree_path))
             for ln in (r.stdout + r.stderr).splitlines():
                 if ln.strip() and r.returncode:
-                    out.append(Finding(FAIL, 6, "build/stealth_check_build_files.py", ln.strip()[:200], "see the script"))
+                    out.append(Finding.failed(6, fail("build/stealth_check_build_files.py", ln.strip(), "see the script", RULE_OWN)))
     return out
 
 
@@ -1601,7 +1626,7 @@ def check_gtest_filter(proj: Project) -> list:
         wf = p.read_text(encoding="utf-8") if p.is_file() else None
     flt = default_gtest_filter(wf) if wf else None
     if flt is None:
-        return [Finding(FAIL, 7, ".github/workflows/release.yml", "no default of the gtest_filter input found", "keep the long default under `gtest_filter: default:`")]
+        return [Finding.failed(7, fail(".github/workflows/release.yml", "no default of the gtest_filter input found", "keep the long default under `gtest_filter: default:`", RULE_GTEST))]
     suites: dict = {}
     proj.stats[7] = "filter of %d patterns" % (flt.count(":") + 1)
     for p in proj.own:
@@ -1615,12 +1640,12 @@ def check_gtest_filter(proj: Project) -> list:
     for s, tests in sorted(suites.items()):
         hits = [n for n, _ in tests if gtest_matches(flt, "%s.%s" % (s, n))]
         if not hits:
-            out.append(Finding(FAIL, 7, tests[0][1], "gtest suite %s (%d tests) is matched by no pattern of the default gtest_filter of release.yml" % (s, len(tests)),
-                               "add `%s.*` to the default of gtest_filter in the workflow's source" % s))
+            out.append(Finding.failed(7, fail(tests[0][1], "gtest suite %s (%d tests) is matched by no pattern of the default gtest_filter of release.yml" % (s, len(tests)),
+                               "add `%s.*` to the default of gtest_filter in the workflow's source" % s, RULE_GTEST)))
         elif len(hits) < len(tests):
             miss = [n for n, _ in tests if n not in hits]
-            out.append(Finding(FAIL, 7, tests[0][1], "gtest suite %s: the filter runs %d of %d tests (misses %s)" % (s, len(hits), len(tests), ", ".join(miss[:3])),
-                               "make the pattern `%s.*`" % s))
+            out.append(Finding.failed(7, fail(tests[0][1], "gtest suite %s: the filter runs %d of %d tests (misses %s)" % (s, len(hits), len(tests), ", ".join(miss)),
+                               "make the pattern `%s.*`" % s, RULE_GTEST)))
     return out
 
 
@@ -1671,8 +1696,8 @@ def check_removed_lines(proj: Project) -> list:
     out = []
     for p, b, h, rep in removed_rows(proj):
         if h > b and not rep:
-            out.append(Finding(FAIL, 8, p, "Mozilla lines rewritten or removed grew: %d on the base, %d on the head" % (b, h),
-                               "rewrite no more Mozilla lines than the base does, or record in HOOKS.json the entry of this file with `replaces` listing the hooks one rewritten line stands for"))
+            out.append(Finding.failed(8, fail(p, "Mozilla lines rewritten or removed grew: %d on the base, %d on the head" % (b, h),
+                               "rewrite no more Mozilla lines than the base does, or record in HOOKS.json the entry of this file with `replaces` listing the hooks one rewritten line stands for", RULE_REMOVED)))
     return out
 
 
@@ -1768,7 +1793,8 @@ def main(argv=None) -> int:
     ap.add_argument("--json", type=Path, help="write the findings, the Mozilla lines and the per-file classes here")
     a = ap.parse_args(argv)
     if not a.source:
-        raise SystemExit("prebuild needs the source repository: pass --source <path> or set FIREFOX_SOURCE")
+        raise SystemExit(str(fail("python tools/prebuild.py", "the source repository is not given",
+                                  "pass --source <path of the Firefox repository> or set FIREFOX_SOURCE", RULE_TOOL)))
     tag = a.tag or up["mozilla_tag"]
     checks = tuple(int(x) for x in a.checks.split(","))
     t0 = time.time()

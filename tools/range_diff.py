@@ -42,20 +42,21 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import churn  # noqa: E402
 import folders  # noqa: E402
+from failure import fail  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = "ports/range-diff.txt"
-SHOWN = 12             # lines of a stale file's difference that are named
 ABBREV = "12"          # digits of a commit id in the file: fixed, not the repository's own count of objects
-RULE = folders.RULE
+RULE_ID = "series-02-every-folder-states-its-relation-to-mozilla"
 
 
 class RangeDiffError(Exception):
     """Something the caller can fix: a missing tag, a missing file, a series that does not apply."""
 
 
-def say(where: str, what: str, fix: str) -> str:
-    return folders.say(where, what, fix)
+def failed(where: str, what: str, fix: str) -> str:
+    """One problem of the range-diff as the text of a fail(): FAIL where: what. Fix: fix. Rule: path."""
+    return str(fail(where, what, fix, RULE_ID))
 
 
 class Series:
@@ -66,11 +67,11 @@ class Series:
         try:
             up = json.loads((self.root / "UPSTREAM.json").read_text(encoding="utf-8"))
         except (OSError, ValueError) as exc:
-            raise RangeDiffError(say("%s UPSTREAM.json" % label, "it cannot be read (%s)" % exc, "restore it: the series names its tag there"))
+            raise RangeDiffError(failed("%s UPSTREAM.json" % label, "it cannot be read (%s)" % exc, "restore it: the series names its tag there"))
         self.tag, self.tree = up.get("mozilla_tag"), up.get("exported_tree")
         self.url = up.get("mozilla_repository")
         if folders.release_version(self.tag) is None or not self.tree:
-            raise RangeDiffError(say("%s UPSTREAM.json" % label, "mozilla_tag and exported_tree are both needed (%r, %r)" % (self.tag, self.tree),
+            raise RangeDiffError(failed("%s UPSTREAM.json" % label, "mozilla_tag and exported_tree are both needed (%r, %r)" % (self.tag, self.tree),
                                      "run python tools/engine.py export: it writes exported_tree"))
         self.folders = folders.series_folders(self.root)
 
@@ -92,7 +93,7 @@ class Series:
 def _git(root, *args, input_bytes=None) -> bytes:
     done = subprocess.run(["git", "-C", str(root), *args], capture_output=True, input=input_bytes)
     if done.returncode:
-        raise RangeDiffError(say("git %s" % " ".join(args[:2]), done.stderr.decode(errors="replace").strip() or "it failed",
+        raise RangeDiffError(failed("git %s" % " ".join(args), done.stderr.decode(errors="replace").strip() or "it failed",
                                  "give --old-series a ref this repository has (git fetch --depth=1 origin +refs/heads/main:refs/remotes/origin/main)"))
     return done.stdout
 
@@ -135,7 +136,7 @@ def fetch(source, series: "Series", old: "Series", url=None, say_=lambda m: prin
     without file content, then the files `Series.paths` names at their tag. What is there is not fetched."""
     url = url or series.url
     if (Path(source) / ".git").exists():
-        raise RangeDiffError(say("%s" % source, "--fetch would make a working repository a partial clone of Mozilla's",
+        raise RangeDiffError(failed("%s" % source, "--fetch would make a working repository a partial clone of Mozilla's",
                                  "give --fetch a directory of its own (a bare repository is made there); a repository that already has the tags needs no --fetch"))
     churn.partial_clone(source, url)
     for side in (old, series):
@@ -167,14 +168,14 @@ def require_content(source, side: "Series") -> None:
     """The tag is in `source`, and every file the stack reads at it has its content: where / what / fix / rule."""
     where = "%s (%s)" % (source, side.label)
     if churn.commit_of(source, side.tag) is None:
-        raise RangeDiffError(say(where, "the repository lacks the tag %s" % side.tag,
+        raise RangeDiffError(failed(where, "the repository lacks the tag %s" % side.tag,
                                  "python tools/engine.py range-diff --source %s --fetch --old-series <ref> (it fetches both tags, one commit deep, "
                                  "and the files the two series patch)" % source))
     blobs = churn.tree_blobs(source, [side.tag], side.paths())
     gone = churn.missing_blobs(source, blobs.values())
     lost = sorted(p for (_, p), sha in blobs.items() if sha in gone)
     if lost:
-        raise RangeDiffError(say(where, "%d file(s) of %s have no content in the repository (first: %s): it was fetched for another set of files"
+        raise RangeDiffError(failed(where, "%d file(s) of %s have no content in the repository (first: %s): it was fetched for another set of files"
                                  % (len(lost), side.tag, lost[0]),
                                  "python tools/engine.py range-diff --source %s --fetch (it fetches the content of every file the series patch)" % source))
 
@@ -187,14 +188,14 @@ def stack(source, side: "Series", build_stack) -> tuple:
         with no_lazy_fetch():
             layers = build_stack(Path(source), side.tag, root=side.root, missing_ok=True)
     except SystemExit as exc:
-        raise RangeDiffError(say("%s of %s" % (side.label, side.tag), str(exc.code).strip(),
+        raise RangeDiffError(failed("%s of %s" % (side.label, side.tag), str(exc.code).strip(),
                                  "the series does not apply on that tag: it is not the release it was exported on, or an object is missing "
                                  "(--fetch)"))
     except subprocess.CalledProcessError as exc:
-        raise RangeDiffError(say("%s of %s" % (side.label, side.tag), (exc.stderr or b"").decode(errors="replace").strip() or str(exc),
+        raise RangeDiffError(failed("%s of %s" % (side.label, side.tag), (exc.stderr or b"").decode(errors="replace").strip() or str(exc),
                                  "an object the stack reads is not in the repository: python tools/engine.py range-diff --source %s --fetch" % source))
     if layers[-1][2] != side.tree:
-        raise RangeDiffError(say("%s UPSTREAM.json of %s" % (side.label, side.tag),
+        raise RangeDiffError(failed("%s UPSTREAM.json of %s" % (side.label, side.tag),
                                  "the series applied on the tag %s of %s gives the tree %s, UPSTREAM.json declares %s"
                                  % (side.tag, source, layers[-1][2], side.tree),
                                  "the repository's tag is not the release the series was exported on (a retag, another repository), or the "
@@ -212,7 +213,7 @@ def git_range_diff(source, old_tag: str, old_head: str, new_tag: str, new_head: 
     done = subprocess.run(["git", "-C", str(source), *GIT_FIXED, "range-diff", "--no-color", "%s..%s" % (old_tag, old_head),
                            "%s..%s" % (new_tag, new_head)], capture_output=True, env=env)
     if done.returncode:
-        raise RangeDiffError(say("git range-diff in %s" % source, done.stderr.decode(errors="replace").strip()[-400:] or "it failed",
+        raise RangeDiffError(failed("git range-diff in %s" % source, done.stderr.decode(errors="replace").strip() or "it failed",
                                  "an object a layer needs is not in the repository: python tools/engine.py range-diff --source %s --fetch" % source))
     return done.stdout
 
@@ -240,13 +241,13 @@ def check(root, expected: bytes, old_tag: str, new_tag: str) -> list:
     """The problems of the committed ports/range-diff.txt against what the two series give now (`expected`); [] when it is that, byte for byte."""
     path = Path(root) / OUT
     if not path.is_file():
-        return [say(OUT, "the file is missing: a port carries the range-diff of the series",
+        return [failed(OUT, "the file is missing: a port carries the range-diff of the series",
                     "python tools/engine.py range-diff --source <repo> --old-series origin/main --write, and commit it")]
     have = path.read_bytes()
     want_first = first_line(old_tag, new_tag)
     head = have.split(b"\n", 1)[0].decode("utf-8", "replace").rstrip("\r")
     if head != want_first:
-        return [say(OUT, "its first line is %r, the pair of tags of this port is %r (main's tag, this series' tag)" % (head, want_first),
+        return [failed(OUT, "its first line is %r, the pair of tags of this port is %r (main's tag, this series' tag)" % (head, want_first),
                     "python tools/engine.py range-diff --source <repo> --old-series origin/main --write: the file is replaced at every port")]
     if have == expected:
         return []
@@ -254,10 +255,9 @@ def check(root, expected: bytes, old_tag: str, new_tag: str) -> list:
     differ = [i for i in range(max(len(old_lines), len(new_lines)))
               if (old_lines[i] if i < len(old_lines) else None) != (new_lines[i] if i < len(new_lines) else None)]
     shown = ["  line %d: committed %r, now %r" % (i + 1, old_lines[i] if i < len(old_lines) else None, new_lines[i] if i < len(new_lines) else None)
-             for i in differ[:SHOWN]]
-    return [say(OUT, "the file is stale: it is not what the two series give now (%d lines differ, the first below)\n%s"
-                % (len(differ), "\n".join(shown)),
-                "python tools/engine.py range-diff --source <repo> --old-series origin/main --write, and commit it")]
+             for i in differ]
+    return [failed(OUT, "the file is stale: it is not what the two series give now (%d lines differ, all below)\n%s" % (len(differ), "\n".join(shown)),
+                   "python tools/engine.py range-diff --source <repo> --old-series origin/main --write, and commit it")]
 
 
 def main(argv, build_stack) -> int:
@@ -279,7 +279,9 @@ def main(argv, build_stack) -> int:
             print("decision=%s" % why)
             return 0
         if a.source is None:
-            ap.error("--source is needed")
+            print(fail("python tools/engine.py range-diff", "--source is not given",
+                       "add --source <repo>, a repository that has the two Mozilla tags (--fetch makes it)", RULE_ID), file=sys.stderr)
+            return 2
         import tempfile
         with tempfile.TemporaryDirectory() as tmp:
             old_root = extract_ref(a.series, a.old_series, Path(tmp) / "old")
@@ -290,7 +292,7 @@ def main(argv, build_stack) -> int:
         if a.check:
             found = check(a.series, data, old.tag, series.tag)
             for p in found:
-                print("FAIL " + p, file=sys.stderr)
+                print(p, file=sys.stderr)
             if not found:
                 print("ok: %s is the range-diff of %s" % (OUT, first_line(old.tag, series.tag)))
             return 1 if found else 0

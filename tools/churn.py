@@ -47,8 +47,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import hook_contract  # noqa: E402
+from failure import fail  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
+RULE_ID = "port-07-quiet-anchors"
 OUTPUT = ROOT / "tools" / "churn.json"
 PAD = 3                  # lines of Mozilla's code either side of a hunk that count as "near" it
 WINDOW = 8               # releases (intervals) looked back from the base
@@ -58,12 +60,19 @@ HUNK_HEADER = re.compile(rb"@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@ ?(.*)$")
 TAG = re.compile(r"^FIREFOX_(\d+(?:_\d+)*)_RELEASE$")
 PATH_BATCH = 24000       # bytes of paths on one command line
 FETCH_WAITS = (5, 15, 45)   # seconds before each new try of a fetch from Mozilla's repository
-SHOWN = 25               # differing hunks `--check` names; the rest is counted
 BLOB_BATCH = 300         # files asked for in one fetch
 
 
 class ChurnError(Exception):
-    """Something the caller can fix: a missing tag, a patch that does not apply."""
+    """Something the caller can fix: a missing tag, a patch that does not apply. Its text is the text of a fail()."""
+
+
+def failed(where: str, what: str, fix: str) -> str:
+    """One problem of the churn as the text of a fail(): FAIL where: what. Fix: fix. Rule: path.
+
+    The lines `say(...)` of the fetch (`the fetch of the files failed, again in 5 s`) and the `warning:` lines of --check are WARN-level
+    progress and notes: the run goes on after each, so they are not failures and are not built here."""
+    return str(fail(where, what, fix, RULE_ID))
 
 
 # --------------------------------------------------------------------------- tags
@@ -82,7 +91,8 @@ def default_releases(base: str) -> list:
     """The chain of the eight releases before `base`, base last: FIREFOX_151_0_RELEASE .. FIREFOX_159_0_RELEASE."""
     m = re.match(r"^FIREFOX_(\d+)_0_RELEASE$", base)
     if not m:
-        raise ChurnError("cannot derive the earlier releases of %s: pass --releases" % base)
+        raise ChurnError(failed("tools/churn.py --base %s" % base, "the earlier releases of %s cannot be derived: it is not FIREFOX_<N>_0_RELEASE" % base,
+                                "pass --releases <tag,...>, the chain of release tags oldest first, ending with the base"))
     n = int(m.group(1))
     return ["FIREFOX_%d_0_RELEASE" % i for i in range(n - WINDOW, n + 1)]
 
@@ -93,7 +103,10 @@ def git(source, *args, check=True, input_bytes=None) -> subprocess.CompletedProc
     done = subprocess.run(["git", "--literal-pathspecs", "-C", str(source), "-c", "core.quotepath=off",
                            *args], capture_output=True, input=input_bytes, env=dict(os.environ, GIT_NO_LAZY_FETCH="1"))
     if check and done.returncode:
-        raise ChurnError("git %s: %s" % (" ".join(args[:3]), done.stderr.decode(errors="replace").strip()))
+        raise ChurnError(failed("git %s in %s" % (" ".join(args), source), "git exited with %d: %s"
+                                % (done.returncode, done.stderr.decode(errors="replace").strip()),
+                                "run the same git command by hand in that repository and read its error; if an object is missing, python "
+                                "tools/churn.py --source %s --fetch fetches the tags and the files the churn reads" % source))
     return done
 
 
@@ -110,8 +123,9 @@ def check_tags(source, tags: list) -> None:
                if git(source, "rev-parse", "-q", "--verify", "refs/tags/%s^{commit}" % t, check=False).returncode]
     if missing:
         url = mozilla_repository()
-        raise ChurnError("the source repository lacks the tags: %s\nfetch each with: git -C <source> fetch --depth=1 %s %s"
-                         % (", ".join(missing), url, "refs/tags/<tag>:refs/tags/<tag>"))
+        raise ChurnError(failed(str(source), "the source repository lacks the tags: %s" % ", ".join(missing),
+                                "fetch each with: git -C %s fetch --depth=1 %s refs/tags/<tag>:refs/tags/<tag>, or python tools/churn.py --source %s "
+                                "--fetch (a directory of its own) for all of them" % (source, url, source)))
 
 
 def commit_of(source, tag: str):
@@ -126,8 +140,10 @@ def check_commits(source, expected: dict) -> None:
     found = {t: commit_of(source, t) for t in expected}
     wrong = [(t, c, found[t]) for t, c in expected.items() if found[t] not in (None, c)]
     if wrong:
-        raise ChurnError("the tags of the source are not the releases tools/churn.json recorded:\n%s"
-                         % "\n".join("  %s is %s in the source, %s in tools/churn.json" % (t, got, c) for t, c, got in wrong))
+        raise ChurnError(failed("tools/churn.json", "the tags of the source are not the releases it recorded: %s"
+                                % "; ".join("%s is %s in the source, %s in tools/churn.json" % (t, got, c) for t, c, got in wrong),
+                                "use a --source that is a clone of the Mozilla repository the series names (a tag does not move: another commit is another "
+                                "repository or a retagged release), and never --write over it"))
 
 
 def recorded(data: dict) -> dict:
@@ -135,7 +151,8 @@ def recorded(data: dict) -> dict:
     try:
         return {r["tag"]: r["commit"] for r in data["releases"]}
     except (TypeError, KeyError):
-        raise ChurnError("the `releases` of tools/churn.json is not a list of {tag, commit}: python tools/churn.py --write")
+        raise ChurnError(failed("tools/churn.json", "the `releases` is not a list of {tag, commit}",
+                                "python tools/churn.py --source <repo with the tags> --write, and commit the file"))
 
 
 def load_committed(path=None):
@@ -144,9 +161,10 @@ def load_committed(path=None):
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except OSError:
-        raise ChurnError("tools/churn.json is missing: python tools/churn.py --source <repo> --base <tag> --write")
+        raise ChurnError(failed("tools/churn.json", "the file is missing", "python tools/churn.py --source <repo> --base <tag> --write, and commit it"))
     except ValueError as exc:
-        raise ChurnError("tools/churn.json is not JSON: %s" % exc)
+        raise ChurnError(failed("tools/churn.json", "the file is not JSON (%s)" % exc,
+                                "python tools/churn.py --source <repo with the tags> --write rewrites it, and commit the file"))
 
 
 def series_paths(root) -> list:
@@ -207,9 +225,15 @@ def require_present(source, blobs: dict) -> None:
     gone = set(missing_blobs(source, blobs.values()))
     lost = sorted("%s:%s" % k for k, sha in blobs.items() if sha in gone)
     if lost:
-        raise ChurnError("%s: %d file(s) of the Mozilla tags have no content in the repository (first: %s): the repository was fetched for "
-                         "another set of files\nfix: python tools/churn.py --source %s --fetch (it fetches the content of every file the "
-                         "series patches)\nrule: docs/decisions/port-07-quiet-anchors.md" % (source, len(lost), lost[0], source))
+        raise ChurnError(failed(str(source), "%d file(s) of the Mozilla tags have no content in the repository (first: %s): the repository was fetched "
+                                "for another set of files" % (len(lost), lost[0]),
+                                "python tools/churn.py --source %s --fetch (it fetches the content of every file the series patches)" % source))
+
+
+def batches(items: list, size: int):
+    """`items` in lists of at most `size`."""
+    for i in range(0, len(items), size):
+        yield items[i:i + size]
 
 
 REMOTE = "mozilla"       # the remote of the repository of the tags: a partial clone of it (promisor), so that a file can be asked for by its sha
@@ -233,15 +257,17 @@ def fetch_blobs(source, tags: list, paths: list, say=print, sleep=time.sleep) ->
     blobs = tree_blobs(source, tags, paths)
     need = missing_blobs(source, blobs.values())
     began = time.monotonic()
-    for i in range(0, len(need), BLOB_BATCH):
-        batch = need[i:i + BLOB_BATCH]
+    for batch in batches(need, BLOB_BATCH):
         for attempt in range(len(FETCH_WAITS) + 1):
             done = git(source, "-c", "fetch.negotiationAlgorithm=noop", "fetch", "-q", REMOTE, "--no-tags", "--no-write-fetch-head",
                        "--recurse-submodules=no", "--filter=blob:none", "--stdin", check=False, input_bytes=("\n".join(batch) + "\n").encode())
             if done.returncode == 0:
                 break
             if attempt == len(FETCH_WAITS):
-                raise ChurnError("git fetch %s <%d files>: %s" % (REMOTE, len(batch), done.stderr.decode(errors="replace").strip()[-300:]))
+                raise ChurnError(failed("git fetch %s in %s" % (REMOTE, source), "the fetch of %d files failed after %d tries: %s"
+                                        % (len(batch), len(FETCH_WAITS) + 1, done.stderr.decode(errors="replace").strip()),
+                                        "check the network and the mozilla_repository of UPSTREAM.json, then run python tools/churn.py --source %s "
+                                        "--fetch again (what is already fetched is kept)" % source))
             say("the fetch of the files failed, again in %d s" % FETCH_WAITS[attempt])
             sleep(FETCH_WAITS[attempt])
     require_present(source, blobs)
@@ -259,7 +285,10 @@ def fetch_tag(source, tag: str, url: str, say=print, sleep=time.sleep) -> None:
         if done.returncode == 0:
             return
         if attempt == len(FETCH_WAITS):
-            raise ChurnError("git fetch %s %s: %s" % (url, tag, done.stderr.decode(errors="replace").strip()[-300:]))
+            raise ChurnError(failed("git fetch %s %s" % (url, tag), "the fetch of the tag failed after %d tries: %s"
+                                    % (len(FETCH_WAITS) + 1, done.stderr.decode(errors="replace").strip()),
+                                    "check the network and the mozilla_repository of UPSTREAM.json, then run python tools/churn.py --source %s "
+                                    "--fetch again (what is already fetched is kept)" % source))
         say("%s: the fetch failed, again in %d s" % (tag, FETCH_WAITS[attempt]))
         sleep(FETCH_WAITS[attempt])
 
@@ -278,12 +307,16 @@ def fetch(source, data: dict, paths: list, url=None, say=print, sleep=time.sleep
             say("%s: in the repository" % tag)
             continue
         if have is not None:
-            raise ChurnError("%s is %s in %s, tools/churn.json recorded %s" % (tag, have, source, commit))
+            raise ChurnError(failed(str(source), "%s is %s there, tools/churn.json recorded %s" % (tag, have, commit),
+                                    "use a --source directory of its own for --fetch (a repository whose tag is another commit cannot be reused), "
+                                    "or restore tools/churn.json if Mozilla's release is the one in the repository"))
         began = time.monotonic()
         fetch_tag(source, tag, url, say, sleep)
         got = commit_of(source, tag)
         if got != commit:
-            raise ChurnError("%s is %s in %s, tools/churn.json recorded %s" % (tag, got, url, commit))
+            raise ChurnError(failed(url, "%s is %s there, tools/churn.json recorded %s" % (tag, got, commit),
+                                    "the mozilla_repository of UPSTREAM.json is not the repository the churn was written from (a retag, another "
+                                    "repository): point it at the right one, or rewrite tools/churn.json from the right one with --write"))
         say("%s: fetched in %.0f s" % (tag, time.monotonic() - began))
     fetch_blobs(source, list(recorded(data)), paths, say, sleep)
 
@@ -652,9 +685,11 @@ def compute(root, source, base: str, releases: list | None = None, warn=None, ex
     commits the tags must resolve to (check_commits); the commits found are recorded in the result."""
     releases = list(releases) if releases else default_releases(base)
     if releases[-1] != base:
-        raise ChurnError("the chain of releases must end with the base %s (it ends with %s)" % (base, releases[-1]))
+        raise ChurnError(failed("tools/churn.py --releases", "the chain of releases must end with the base %s and it ends with %s" % (base, releases[-1]),
+                                "pass --releases <tag,...> oldest first, ending with %s, or leave it out for the eight releases before the base" % base))
     if len(set(releases)) != len(releases) or len(releases) < 2:
-        raise ChurnError("the releases are not a chain of distinct tags: %s" % ", ".join(releases))
+        raise ChurnError(failed("tools/churn.py --releases", "the releases are not a chain of at least two distinct tags: %s" % ", ".join(releases),
+                                "pass --releases <tag,...>, distinct tags oldest first, ending with the base"))
     check_tags(source, releases)
     check_commits(source, {t: c for t, c in (expected or {}).items() if t in releases})
     warn = warn if warn is not None else []
@@ -701,32 +736,25 @@ def describe(h: dict) -> str:
 
 
 def differences(old: dict, new: dict) -> list:
-    """What differs between a committed churn.json and the one computed now, one sentence each, the hunks by name."""
+    """What differs between a committed churn.json and the one computed now, one failure each, the hunks by name."""
     out = []
+    fix = "python tools/churn.py --source <repo with the tags> --write, and commit the file"
     for field in ("base", "band"):
         if old.get(field) != new[field]:
-            out.append("%s: %r in tools/churn.json, %r now" % (field, old.get(field), new[field]))
+            out.append(failed("tools/churn.json", "%s is %r in the file, %r now" % (field, old.get(field), new[field]), fix))
     if old.get("releases") != new["releases"]:
-        out.append("releases: the tags or their commits differ")
+        out.append(failed("tools/churn.json", "releases: the tags or their commits differ", fix))
     before = {h["key"]: h for h in old.get("hooks", [])}
     now = {h["key"]: h for h in new["hooks"]}
     for key in sorted(set(before) - set(now)):
-        out.append("%s: in tools/churn.json (churn %s), no longer in the series" % (describe(before[key]), before[key].get("churn")))
+        out.append(failed(describe(before[key]), "in tools/churn.json (churn %s), no longer in the series" % before[key].get("churn"), fix))
     for key in sorted(set(now) - set(before)):
-        out.append("%s: in the series (churn %d), not in tools/churn.json" % (describe(now[key]), now[key]["churn"]))
+        out.append(failed(describe(now[key]), "in the series (churn %d), not in tools/churn.json" % now[key]["churn"], fix))
     for key in sorted(set(now) & set(before)):
         o, n = before[key], now[key]
         if o != n:
-            out.append("%s: churn %s %s in tools/churn.json, churn %d %s now" % (describe(n), o.get("churn"), o.get("which"), n["churn"], n["which"]))
+            out.append(failed(describe(n), "churn %s %s in tools/churn.json, churn %d %s now" % (o.get("churn"), o.get("which"), n["churn"], n["which"]), fix))
     return out
-
-
-def stale_message(found: list) -> str:
-    head = "tools/churn.json is not what the series gives now: %d difference(s)" % len(found)
-    shown = found[:SHOWN] + (["... and %d more" % (len(found) - SHOWN)] if len(found) > SHOWN else [])
-    return "\n".join([head] + ["  " + f for f in shown] +
-                     ["fix: python tools/churn.py --source <repo with the tags> --write, and commit the file",
-                      "rule: docs/decisions/port-07-quiet-anchors.md"])
 
 
 def check(series: Path, source: Path, warn=None) -> list:
@@ -740,10 +768,12 @@ def check(series: Path, source: Path, warn=None) -> list:
     except (OSError, ValueError):
         pinned = None
     if pinned and committed.get("base") != pinned:
-        found.append("base: tools/churn.json is for %s, the series is on %s" % (committed.get("base"), pinned))
+        found.append(failed("tools/churn.json", "base: the file is for %s, the series is on %s" % (committed.get("base"), pinned),
+                            "python tools/churn.py --source <repo with the tags> --write, and commit the file (a port rewrites it)"))
     found += differences(committed, data)
     if not found and render(data) != path.read_bytes():
-        found.append("the bytes differ and no hunk does: the file was not written by tools/churn.py")
+        found.append(failed("tools/churn.json", "the bytes differ and no hunk does: the file was not written by tools/churn.py",
+                            "python tools/churn.py --source <repo with the tags> --write, and commit the file; do not edit it by hand"))
     return found
 
 
@@ -765,7 +795,9 @@ def main(argv=None) -> int:
             print(cache_key(load_committed(out_path), series_paths(a.series)))
             return 0
         if a.source is None:
-            ap.error("--source is needed")
+            print(failed("python tools/churn.py", "--source is not given", "add --source <repo>, a repository that has the Mozilla release tags (--fetch fills it)"),
+                  file=sys.stderr)
+            return 2
         if a.fetch:
             fetch(a.source, load_committed(out_path), series_paths(a.series), mozilla_repository(a.series))
             return 0
@@ -774,7 +806,7 @@ def main(argv=None) -> int:
             for w in warn:
                 print("warning: " + w, file=sys.stderr)
             if found:
-                print(stale_message(found), file=sys.stderr)
+                print("\n".join(found), file=sys.stderr)
                 return 1
             print("ok: tools/churn.json is what the series gives now")
             return 0

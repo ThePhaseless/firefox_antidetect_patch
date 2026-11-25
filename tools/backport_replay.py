@@ -42,9 +42,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import regen_checksums  # noqa: E402
+from failure import fail  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 BACKPORT = "BACKPORT.json"
+RULE_ID = "port-04-backport-as-commits"
 VENDORED_DIR = "third_party/rust/"
 LOCK = "Cargo.lock"
 KINDS = ("upstream", "ours", "test")
@@ -56,7 +58,28 @@ DEPENDENCY_TABLES = ("dependencies", "dev-dependencies", "build-dependencies")
 
 
 class Stop(Exception):
-    """A step that only a hand could do: the replay stops there instead of inventing it."""
+    """A step that only a hand could do: the replay stops there instead of inventing it. It carries a fail(): `failure` is the Failure
+    (where, what, fix, rule) and `text` its whole text, which is also str(stop)."""
+
+    def __init__(self, failure):
+        self.failure = failure
+        self.text = str(failure)
+        super().__init__(self.text)
+
+
+def failed(where: str, what: str, fix: str) -> str:
+    """One problem of the backport replay as the text of a fail(): FAIL where: what. Fix: fix. Rule: path.
+
+    Not failures, and not built here: the summary lines of `report` (what each commit did) and the `skipped:` and `glue:` lines."""
+    return str(fail(where, what, fix, RULE_ID))
+
+
+REBASE = ("rebase the commit onto the revision Mozilla vendors in a clone of the upstream repository (git rebase, then git format-patch), "
+          "replace its patch file in commits/ and update its sha256 in BACKPORT.json; the replay never guesses and hooks.patch is never edited by hand")
+GLUE_FIX = ("write the step in the form the replay produces (an added `name = { workspace = true }` dependency in a Cargo.toml, an added "
+            "dependency entry of a package in Cargo.lock), or rebase the commit so it does not need the step; a step is never carried as text")
+EXPECT = ("run python tools/backport_replay.py expect --source <repo> --tag %s --folder %s --out <dir> and take the hooks.patch and src/ it writes "
+          "(the vendored part is produced by the replay, never edited or merged by hand)")
 
 
 def in_scope(path: str) -> bool:
@@ -111,7 +134,9 @@ class Scratch:
             end = data.index(b"\n", pos)
             head = data[pos:end].split()
             if len(head) != 3:
-                raise Stop("object %s is missing" % oid)
+                raise Stop(fail("scratch repository borrowing %s" % self.source, "object %s is missing" % oid,
+                                "fetch the Mozilla tag whole into the source repository (git -C %s fetch <mozilla repository> "
+                                "refs/tags/<tag>:refs/tags/<tag>, without a blob filter), then run the command again" % self.source, RULE_ID))
             size = int(head[2])
             found[oid] = data[end + 1:end + 1 + size]
             pos = end + 1 + size + 1
@@ -152,19 +177,29 @@ SECTION = re.compile(rb"(?m)^diff --git a/(.*?) b/(.*)$")
 
 
 def split_sections(data: bytes) -> list:
-    """[(path, bytes)]: each file's diff from its `diff --git` line to the next; a mail trailer after the last is cut."""
+    """[(path, bytes)]: each file's diff from its `diff --git` line to the next; a mail trailer after the last is dropped."""
     marks = list(SECTION.finditer(data))
-    found = []
+    parts = []
     for i, m in enumerate(marks):
         end = marks[i + 1].start() if i + 1 < len(marks) else len(data)
-        found.append((m.group(2).decode("utf-8"), data[m.start():end]))
-    if found:
-        path, last = found[-1]
+        parts.append((m.group(2).decode("utf-8"), data[m.start():end]))
+    if parts:
+        path, last = parts[-1]
         lines = last.split(b"\n")
         while lines and (lines[-1] == b"" or lines[-1] == b"-- " or re.fullmatch(rb"\d+(\.\d+)+", lines[-1])):
             lines.pop()
-        found[-1] = (path, b"\n".join(lines) + b"\n")
-    return found
+        parts[-1] = (path, b"\n".join(lines) + b"\n")
+    return parts
+
+
+def body(line: str) -> str:
+    """A diff line without its leading + - or space."""
+    return line[1:] if line[:1] in "+- " else line
+
+
+def relative(path: str, prefix: str) -> str:
+    """`path` below `prefix`."""
+    return path[len(prefix):]
 
 
 def rewrite(section: bytes, old: str, new: str) -> bytes:
@@ -183,13 +218,13 @@ def rewrite(section: bytes, old: str, new: str) -> bytes:
 
 def hunks(section: bytes) -> list:
     """[(header text after the second @@, [lines])] of a section."""
-    found = []
+    blocks = []
     for line in section.decode("utf-8", errors="replace").split("\n"):
         if line.startswith("@@"):
-            found.append((line.split("@@")[-1].strip(), []))
-        elif found:
-            found[-1][1].append(line)
-    return found
+            blocks.append((line.split("@@")[-1].strip(), []))
+        elif blocks:
+            blocks[-1][1].append(line)
+    return blocks
 
 
 # ---------------------------------------------------------------------------------------------------- the glue
@@ -197,14 +232,15 @@ def hunks(section: bytes) -> list:
 def toml_stanza(name: str, spec: dict, workspace: dict) -> list:
     """The lines `cargo vendor` writes for a dependency whose source line is `name = { workspace = true, ... }`."""
     if spec.get("workspace") is not True:
-        raise Stop("Cargo.toml: %s is not a workspace dependency: only that form is produced by rule" % name)
+        raise Stop(fail("Cargo.toml", "%s is not a workspace dependency: only that form is produced by rule" % name, GLUE_FIX, RULE_ID))
     base = workspace.get(name)
     if not base:
-        raise Stop("Cargo.toml: BACKPORT.json workspace_dependencies has no %s (upstream's workspace table says "
-                   "its version and features)" % name)
+        raise Stop(fail("Cargo.toml", "BACKPORT.json workspace_dependencies has no %s (upstream's workspace table says its version and features)" % name,
+                        "add %s to workspace_dependencies in the folder's BACKPORT.json with the version and features of upstream's workspace "
+                        "Cargo.toml" % name, RULE_ID))
     unknown = set(spec) - {"workspace", "features", "optional"}
     if unknown:
-        raise Stop("Cargo.toml: %s sets %s: not produced by rule" % (name, ", ".join(sorted(unknown))))
+        raise Stop(fail("Cargo.toml", "%s sets %s: not produced by rule" % (name, ", ".join(sorted(unknown))), GLUE_FIX, RULE_ID))
     features = list(base.get("features", []))
     features += [f for f in spec.get("features", []) if f not in features]
     lines = ["version = %s" % json.dumps(base["version"])]
@@ -225,22 +261,24 @@ def toml_additions(section: bytes) -> list:
     for _head, lines in hunks(section):
         table = None
         for line in lines:
-            text = line[1:] if line[:1] in "+- " else line
+            text = body(line)
             header = re.fullmatch(r"\[(.+)\]\s*", text)
             if header and line[:1] != "-":
                 table = header.group(1)
             if line.startswith("-"):
-                raise Stop("Cargo.toml: the commit removes or changes the line %r: only added dependencies are produced "
-                           "by rule" % text)
+                raise Stop(fail("Cargo.toml", "the commit removes or changes the line %r: only added dependencies are produced by rule" % text,
+                                GLUE_FIX, RULE_ID))
             if not line.startswith("+") or not text.strip():
                 continue
             if table not in DEPENDENCY_TABLES:
-                raise Stop("Cargo.toml: the commit adds %r in %s: only added dependencies are produced by rule"
-                           % (text, "table %r" % table if table else "an unknown table"))
+                raise Stop(fail("Cargo.toml", "the commit adds %r in %s: only added dependencies are produced by rule"
+                                % (text, "table %r" % table if table else "an unknown table"), GLUE_FIX, RULE_ID))
             try:
                 parsed = tomllib.loads(text)
             except tomllib.TOMLDecodeError as exc:
-                raise Stop("Cargo.toml: cannot read the added line %r (%s)" % (text, exc))
+                raise Stop(fail("Cargo.toml", "the added line %r cannot be read (%s)" % (text, exc),
+                                "write the added line as valid TOML (a dependency `name = { workspace = true }`) in the commit and replace its patch file",
+                                RULE_ID))
             for name, spec in parsed.items():
                 found.append((table, name, spec if isinstance(spec, dict) else {"version": spec}))
     return found
@@ -250,7 +288,9 @@ def add_stanza(text: str, table: str, name: str, stanza: list):
     """`text` (a vendored Cargo.toml) with `[table.name]` added where `cargo vendor` puts it (the tables of that kind
     are in alphabetical order); None when it is already there."""
     if "\r" in text:
-        raise Stop("Cargo.toml has carriage returns: not produced by rule")
+        raise Stop(fail("Cargo.toml", "the vendored file has carriage returns: not produced by rule",
+                        "the vendored Cargo.toml of the tag must have LF line endings: check the source repository's line-ending settings "
+                        "(core.autocrlf=false) and fetch the tag again", RULE_ID))
     lines = text.split("\n")
     blocks = []
     for i, line in enumerate(lines):
@@ -260,7 +300,9 @@ def add_stanza(text: str, table: str, name: str, stanza: list):
     if any(n == name for _i, n in blocks):
         return None
     if not blocks:
-        raise Stop("Cargo.toml has no [%s.*] table to place %s next to" % (table, name))
+        raise Stop(fail("Cargo.toml", "the vendored file has no [%s.*] table to place %s next to" % (table, name),
+                        "put the dependency in a table kind the crate already has, or add the stanza in the commit as a hunk of the crate's own "
+                        "Cargo.toml that applies on the vendored file", RULE_ID))
     new = ["[%s.%s]" % (table, name)] + stanza + [""]
     after = next((i for i, n in blocks if n > name), None)
     if after is not None:
@@ -284,7 +326,7 @@ def lock_additions(section: bytes) -> list:
         first = next((l for l in lines if l.strip()), "")
         inside = bool(re.fullmatch(r' "[^"]+",', first[1:]))      # a hunk that opens inside the list
         for line in lines:
-            text = line[1:] if line[:1] in "+- " else line
+            text = body(line)
             m = re.fullmatch(r'name = "([^"]+)"', text)
             if m:
                 package, inside = m.group(1), False
@@ -293,11 +335,11 @@ def lock_additions(section: bytes) -> list:
             elif text == "]":
                 inside = False
             if line.startswith("-"):
-                raise Stop("Cargo.lock: the commit removes the line %r: not produced by rule" % text)
+                raise Stop(fail("Cargo.lock", "the commit removes the line %r: not produced by rule" % text, GLUE_FIX, RULE_ID))
             if line.startswith("+"):
                 entry = re.fullmatch(r' "([^"]+)",', text)
                 if not (entry and inside and package):
-                    raise Stop("Cargo.lock: the commit adds %r: only a dependency of a package is produced by rule" % text)
+                    raise Stop(fail("Cargo.lock", "the commit adds %r: only a dependency of a package is produced by rule" % text, GLUE_FIX, RULE_ID))
                 found.append((package, entry.group(1)))
     return found
 
@@ -305,22 +347,28 @@ def lock_additions(section: bytes) -> list:
 def add_lock_dependency(text: str, package: str, entry: str, revision: str) -> str | None:
     """Mozilla's Cargo.lock with `entry` among the dependencies of `package`; None when it is there already."""
     if "\r" in text:
-        raise Stop("Cargo.lock has carriage returns: not produced by rule")
+        raise Stop(fail("Cargo.lock", "Mozilla's file has carriage returns: not produced by rule",
+                        "Mozilla's Cargo.lock has LF line endings: check the source repository's line-ending settings (core.autocrlf=false) "
+                        "and fetch the tag again", RULE_ID))
     blocks = text.split("\n\n")
     named = [i for i, b in enumerate(blocks) if re.search(r'(?m)^name = "%s"$' % re.escape(package), b)]
     if len(named) > 1:
         named = [i for i in named if revision in blocks[i]]
     if len(named) != 1:
-        raise Stop("Cargo.lock: %d packages named %s match the vendored revision: not produced by rule" % (len(named), package))
+        raise Stop(fail("Cargo.lock", "%d packages named %s match the vendored revision: not produced by rule" % (len(named), package),
+                        "make the commit's Cargo.lock hunk name a package that Mozilla's lock has once for the vendored revision, or rebase the commit "
+                        "so it does not touch the lock", RULE_ID))
     name = entry.split(" ")[0]
     versions = [i for i, b in enumerate(blocks) if re.search(r'(?m)^name = "%s"$' % re.escape(name), b)]
     if len(versions) != 1:
-        raise Stop("Cargo.lock: %d packages are named %s, the entry %r would need a version Mozilla's lock decides: not "
-                   "produced by rule" % (len(versions), name, entry))
+        raise Stop(fail("Cargo.lock", "%d packages are named %s, the entry %r would need a version Mozilla's lock decides: not produced by rule"
+                        % (len(versions), name, entry),
+                        "depend on a package that Mozilla's lock has exactly once, or rebase the commit so it does not add the entry", RULE_ID))
     lines = blocks[named[0]].split("\n")
     start = next((i for i, l in enumerate(lines) if l == "dependencies = ["), None)
     if start is None:
-        raise Stop("Cargo.lock: the package %s has no dependencies list" % package)
+        raise Stop(fail("Cargo.lock", "the package %s has no dependencies list" % package,
+                        "rebase the commit so it adds the first dependency of the package as a hunk that applies on Mozilla's Cargo.lock", RULE_ID))
     end = lines.index("]", start)
     deps = lines[start + 1:end]
     if any(d.strip().strip(",").strip('"').split(" ")[0] == name for d in deps):
@@ -347,8 +395,10 @@ def sibling_problems(scratch: Scratch, name: str, base: dict) -> list:
             spec = table.get(name)
             if isinstance(spec, dict) and (spec.get("version") != base.get("version")
                                            or not set(base.get("features", [])) <= set(spec.get("features", []))):
-                found.append("%s: its %s is %s %s, workspace_dependencies says %s %s"
-                             % (path, name, spec.get("version"), spec.get("features"), base.get("version"), base.get("features")))
+                found.append(failed(path, "its %s is %s %s, workspace_dependencies says %s %s"
+                                    % (name, spec.get("version"), spec.get("features"), base.get("version"), base.get("features")),
+                                    "set workspace_dependencies[%r] in the folder's BACKPORT.json to the version and features the vendored wgpu and naga "
+                                    "crates of the tag have (the version equal, the features a superset)" % name))
     return found
 
 
@@ -363,6 +413,7 @@ class CommitResult:
     contained: list = field(default_factory=list)
     skipped: list = field(default_factory=list)
     conflicts: list = field(default_factory=list)      # [(path, why)]
+    fixes: dict = field(default_factory=dict)          # path -> the fix of a conflict that is not "rebase the commit"
     glue: list = field(default_factory=list)
 
 
@@ -373,7 +424,7 @@ class Replay:
     commits: list
     sections: dict               # path -> diff bytes, for the modified (or deleted) vendored paths
     added: dict                  # path -> (mode, bytes), the new files
-    notes: list = field(default_factory=list)
+    notes: list = field(default_factory=list)       # the text of a fail() each
     crate: str | None = None     # a crate vendored as a release: its name
     version: str | None = None   # and the version the tag vendors
 
@@ -421,7 +472,9 @@ class Replay:
 def vendored_revision(text: str) -> str:
     revs = set(re.findall(r'git = "https://github\.com/gfx-rs/wgpu"\nrev = "([0-9a-f]{40})"', text))
     if len(revs) != 1:
-        raise Stop("gfx/wgpu_bindings/Cargo.toml names %d wgpu revisions, one expected" % len(revs))
+        raise Stop(fail("gfx/wgpu_bindings/Cargo.toml", "it names %d wgpu revisions, one expected" % len(revs),
+                        "check that the tag is a Firefox release that vendors wgpu from one revision (git show <tag>:gfx/wgpu_bindings/Cargo.toml); "
+                        "if Mozilla changed how it names the revision, teach vendored_revision in tools/backport_replay.py the new form", RULE_ID))
     return revs.pop()
 
 
@@ -439,21 +492,25 @@ def vendored_crate(s: "Scratch", tag: str, spec: dict) -> tuple:
     from the .cargo_vcs_info.json that `cargo package` wrote in it (the git commit the release was made from)."""
     name = spec.get("name")
     if not isinstance(name, str) or not re.fullmatch(r"[A-Za-z0-9_.-]+", name):
-        raise Stop("BACKPORT.json %s.name is %r, a crate name is expected" % (CRATE, name))
+        raise Stop(fail("BACKPORT.json", "%s.name is %r, not a crate name" % (CRATE, name),
+                        "write the name of the crate Mozilla vendors as a release under %s" % VENDORED_DIR, RULE_ID))
 
     def read(file: str) -> str:
         path = "%s%s/%s" % (VENDORED_DIR, name, file)
         done = s.run("rev-parse", "%s:%s" % (tag, path), source=True, check=False)
         if done.returncode:
-            raise Stop("the tag %s has no %s: it does not vendor the crate %s as a release" % (tag, path, name))
+            raise Stop(fail("tag %s" % tag, "it has no %s: it does not vendor the crate %s as a release" % (path, name),
+                            "check %s.name, or carry the files as vendored code of the revision Mozilla vendors" % CRATE, RULE_ID))
         return s.blob(done.stdout.decode().strip()).decode("utf-8")
     try:
         version = tomllib.loads(read("Cargo.toml"))["package"]["version"]
         revision = json.loads(read(VCS_INFO))["git"]["sha1"]
     except (KeyError, ValueError, TypeError) as err:
-        raise Stop("%s%s: its version or its git revision cannot be read from the tag (%s)" % (VENDORED_DIR, name, err))
+        raise Stop(fail("%s%s" % (VENDORED_DIR, name), "its version or its git revision cannot be read from the tag (%s)" % err,
+                        "the crate must carry Cargo.toml and %s as `cargo package` wrote them" % VCS_INFO, RULE_ID))
     if not isinstance(version, str) or not HEX40.fullmatch(str(revision)):
-        raise Stop("%s%s: version %r and revision %r are not a version and a full revision" % (VENDORED_DIR, name, version, revision))
+        raise Stop(fail("%s%s" % (VENDORED_DIR, name), "version %r and revision %r are not a version and a full revision" % (version, revision),
+                        "the crate must carry Cargo.toml and %s as `cargo package` wrote them" % VCS_INFO, RULE_ID))
     return revision, version
 
 
@@ -553,7 +610,9 @@ def _replay(s: Scratch, tag: str, folder: Path, record: dict) -> Replay:
                     if name in workspace:
                         problems = sibling_problems(s, name, workspace[name])
                         if problems:
-                            raise Stop("Cargo.toml: workspace_dependencies for %s disagrees with the tag: %s" % (name, "; ".join(problems)))
+                            raise Stop(fail("Cargo.toml", "workspace_dependencies for %s disagrees with the tag: %s" % (name, "; ".join(problems)),
+                                            "set workspace_dependencies[%r] in the folder's BACKPORT.json to the version and features the vendored "
+                                            "crates named above have" % name, RULE_ID))
                     text = add_stanza(s.blob(":" + path).decode("utf-8"), table, name, toml_stanza(name, spec, workspace))
                     if text is not None:
                         s.set(path, text.encode("utf-8"))
@@ -565,7 +624,8 @@ def _replay(s: Scratch, tag: str, folder: Path, record: dict) -> Replay:
                         s.set(LOCK, text.encode("utf-8"))
                         result.glue.append("Cargo.lock: %s depends on %s" % (package, dep.split(" ")[0]))
         except Stop as stop:
-            result.conflicts.append(("glue", str(stop)))
+            result.conflicts.append(("glue", "%s: %s" % (stop.failure.where, stop.failure.what)))
+            result.fixes["glue"] = stop.failure.fix
             result.status = "conflict"
     # the checksum files of the touched crates
     after = s.out("write-tree")
@@ -577,11 +637,13 @@ def _replay(s: Scratch, tag: str, folder: Path, record: dict) -> Replay:
         old = s.blob(":" + path)
         before = s.entries(prefix)
         # the tag's own file must be what the tool writes for the tag's files, or the regeneration would carry its fault
-        base_files = {p[len(prefix):]: o for p, (_m, o) in _tree_entries(s, base, prefix).items() if not p.endswith(regen_checksums.CHECKSUM)}
+        base_files = {relative(p, prefix): o for p, (_m, o) in _tree_entries(s, base, prefix).items() if not p.endswith(regen_checksums.CHECKSUM)}
         contents = s.blobs(sorted(set(base_files.values())))
         bad = regen_checksums.disagreements(old, {p: regen_checksums.sha256(contents[o]) for p, o in base_files.items()})
         if bad:
-            notes.append("the checksum file of %s disagrees with its files at the tag: %s" % (crate, "; ".join(bad[:5])))
+            notes.append(failed(path, "the checksum file of %s disagrees with its files at the tag: %s" % (crate, "; ".join(bad)),
+                                "the tag itself is inconsistent for that crate: take the crate's files and checksum file as the tag has them (git checkout "
+                                "<tag> -- %s) before the replay, and report the inconsistency upstream" % prefix))
         edits = {}
         for p, (status, _m, oid) in changes.items():
             if p.startswith(prefix):
@@ -648,57 +710,74 @@ def record_problems(folder: Path, record: dict) -> list:
             for i, v in enumerate(value):
                 walk(v, "%s[%d]" % (where, i))
         elif isinstance(value, str) and outside.search(value):
-            found.append("%s/%s: %s is a path outside the series (%s): everything a backport needs is in its folder"
-                         % (name, BACKPORT, where, value[:60]))
+            found.append(failed("%s/%s" % (name, BACKPORT), "%s is a path outside the series (%s): everything a backport needs is in its folder"
+                                % (where, value),
+                                "replace the path with a file of the folder (commits/<name>.patch for a commit, src/ for a file): nothing outside the "
+                                "series is read"))
     walk(record, "")
     if "ours_where" in record:
-        found.append("%s/%s: ours_where points to a clone outside the series: our commits are files of the folder (commits/)"
-                     % (name, BACKPORT))
+        found.append(failed("%s/%s" % (name, BACKPORT), "ours_where points to a clone outside the series: our commits are files of the folder (commits/)",
+                            "delete ours_where and store each of our commits as commits/<name>.patch, listed in `commits` with kind ours"))
     commits = record.get("commits")
     if not isinstance(commits, list) or not commits:
-        return found + ["%s/%s: commits is empty or not a list" % (name, BACKPORT)]
+        return found + [failed("%s/%s" % (name, BACKPORT), "commits is empty or not a list",
+                               "list the commits of the backport in `commits`, each {file, sha256, kind, upstream_sha, contained_in}, one patch file per "
+                               "commit in commits/")]
     if not HEX40.fullmatch(str(record.get("vendored", ""))):
-        found.append("%s/%s: vendored %r is not a full revision" % (name, BACKPORT, record.get("vendored")))
+        found.append(failed("%s/%s" % (name, BACKPORT), "vendored %r is not a full revision" % record.get("vendored"),
+                            "set vendored to the 40-hex revision the tag vendors: python tools/backport_replay.py record --source <repo> --tag <tag> "
+                            "--folder %s" % name))
     if CRATE in record:
         spec = crate_spec(record)
         if (spec is None or not isinstance(spec.get("name"), str) or not isinstance(spec.get("version"), str)
                 or not isinstance(spec.get("tag_prefix", ""), str) or set(spec) - {"name", "version", "tag_prefix"}):
-            found.append("%s/%s: %s is {name, version, tag_prefix}: the crate Mozilla vendors as a release, the version it "
-                         "vendors and the prefix of upstream's tag for it" % (name, BACKPORT, CRATE))
+            found.append(failed("%s/%s" % (name, BACKPORT), "%s is not {name, version, tag_prefix}" % CRATE,
+                                "write %s as the crate Mozilla vendors as a release, the version it vendors and the prefix of upstream's tag for it"
+                                % CRATE))
     listed = set()
     for i, c in enumerate(commits):
         if not isinstance(c, dict):
-            found.append("%s/%s: commits[%d] is %r, not {file, sha256, kind, upstream_sha, contained_in}: one patch file "
-                         "per commit, stored in the series" % (name, BACKPORT, i, c if isinstance(c, str) else type(c).__name__))
+            found.append(failed("%s/%s" % (name, BACKPORT), "commits[%d] is %r, not {file, sha256, kind, upstream_sha, contained_in}: one patch file "
+                                "per commit, stored in the series" % (i, c if isinstance(c, str) else type(c).__name__),
+                                "write commits[%d] as an object {file, sha256, kind, upstream_sha, contained_in} and store the patch in commits/" % i))
             continue
         where = "commits[%d]" % i
         if c.get("kind") not in KINDS:
-            found.append("%s/%s: %s kind %r is none of %s" % (name, BACKPORT, where, c.get("kind"), "/".join(KINDS)))
+            found.append(failed("%s/%s" % (name, BACKPORT), "%s kind %r is none of %s" % (where, c.get("kind"), "/".join(KINDS)),
+                                "set kind to upstream (a pick), ours or test"))
         if c.get("kind") == "upstream" and not HEX40.fullmatch(str(c.get("upstream_sha", ""))):
-            found.append("%s/%s: %s is an upstream pick with no full upstream_sha" % (name, BACKPORT, where))
+            found.append(failed("%s/%s" % (name, BACKPORT), "%s is an upstream pick with no full upstream_sha" % where,
+                                "set upstream_sha to the 40-hex id of the upstream commit the patch picks, or set kind to ours"))
         contained = c.get("contained_in")
         if "contained_in" not in c or (contained is not None and not HEX40.fullmatch(str(contained))):
-            found.append("%s/%s: %s contained_in is null or the full upstream revision that contains the commit" % (name, BACKPORT, where))
+            found.append(failed("%s/%s" % (name, BACKPORT), "%s has no contained_in, or one that is not a full revision" % where,
+                                "set contained_in to null, or to the 40-hex upstream revision that contains the commit (python tools/backport_replay.py "
+                                "record sets it for the commits the tag vendors)"))
         file = str(c.get("file", ""))
         if not re.fullmatch(r"commits/[A-Za-z0-9._-]+\.patch", file):
-            found.append("%s/%s: %s file %r is not commits/<name>.patch" % (name, BACKPORT, where, file))
+            found.append(failed("%s/%s" % (name, BACKPORT), "%s file %r is not commits/<name>.patch" % (where, file),
+                                "name the file commits/<name>.patch (letters, digits, dot, underscore, dash) and store it in the folder"))
             continue
         listed.add(file)
         path = Path(folder) / file
         if not path.is_file():
-            found.append("%s/%s: %s is not in the folder" % (name, BACKPORT, file))
+            found.append(failed("%s/%s" % (name, BACKPORT), "%s is not in the folder" % file,
+                                "store the patch at %s/%s, or delete its entry from `commits`" % (name, file)))
             continue
         data = path.read_bytes()
         if hashlib.sha256(data).hexdigest() != c.get("sha256"):
-            found.append("%s/%s: %s differs from the sha256 BACKPORT.json records: a commit of a backport is not edited, "
-                         "it is replaced by the commit it should be, with its new sha256" % (name, BACKPORT, file))
+            found.append(failed("%s/%s" % (name, BACKPORT), "%s differs from the sha256 BACKPORT.json records: a commit of a backport is not edited" % file,
+                                "restore the file from git, or replace it by the commit it should be (git format-patch) and write its new sha256 in "
+                                "BACKPORT.json"))
         if c.get("kind") == "upstream" and str(c.get("upstream_sha", "")).encode() not in data:
-            found.append("%s/%s: %s does not name upstream commit %s" % (name, BACKPORT, file, c.get("upstream_sha")))
+            found.append(failed("%s/%s" % (name, BACKPORT), "%s does not name upstream commit %s" % (file, c.get("upstream_sha")),
+                                "store the patch git format-patch makes of that upstream commit, or correct upstream_sha"))
     folder_commits = Path(folder) / "commits"
     if folder_commits.is_dir():
         for p in sorted(folder_commits.iterdir()):
             if "commits/%s" % p.name not in listed:
-                found.append("%s/commits/%s is in no entry of %s" % (name, p.name, BACKPORT))
+                found.append(failed("%s/commits/%s" % (name, p.name), "the file is in no entry of %s" % BACKPORT,
+                                    "list it in `commits` of %s/%s with its sha256 and kind, or delete the file" % (name, BACKPORT)))
     return found
 
 
@@ -708,25 +787,26 @@ def folder_problems(result: Replay, folder: Path, record: dict) -> list:
     name = label(folder)
     found = []
     if record.get("vendored") != result.revision:
-        found.append("%s/%s: vendored is %s, the tag %s vendors %s: record it (backport_replay.py record)"
-                     % (name, BACKPORT, record.get("vendored"), result.tag, result.revision))
+        found.append(failed("%s/%s" % (name, BACKPORT), "vendored is %s, the tag %s vendors %s" % (record.get("vendored"), result.tag, result.revision),
+                            "python tools/backport_replay.py record --source <repo> --tag %s --folder %s" % (result.tag, name)))
     if result.crate and (crate_spec(record) or {}).get("version") != result.version:
-        found.append("%s/%s: %s.version is %s, the tag %s vendors %s %s: record it (backport_replay.py record)"
-                     % (name, BACKPORT, CRATE, (crate_spec(record) or {}).get("version"), result.tag, result.crate, result.version))
+        found.append(failed("%s/%s" % (name, BACKPORT), "%s.version is %s, the tag %s vendors %s %s"
+                            % (CRATE, (crate_spec(record) or {}).get("version"), result.tag, result.crate, result.version),
+                            "python tools/backport_replay.py record --source <repo> --tag %s --folder %s" % (result.tag, name)))
     for c in result.commits:
         for path, why in c.conflicts:
-            found.append("%s: %s: %s: %s" % (name, c.file, path, why))
+            found.append(failed("%s/%s" % (name, c.file), "%s: %s" % (path, why), c.fixes.get(path, REBASE)))
     entries = {c["file"]: c for c in record["commits"]}
     for c in result.commits:
         contained = entries[c.file].get("contained_in")
         if c.status == "dropped" and contained is None:
-            found.append("%s/%s: the revision %s already contains %s: record contained_in (backport_replay.py record)"
-                         % (name, BACKPORT, result.revision[:10], c.file))
+            found.append(failed("%s/%s" % (name, BACKPORT), "the revision %s already contains %s and contained_in is null" % (result.revision, c.file),
+                                "python tools/backport_replay.py record --source <repo> --tag %s --folder %s, which sets contained_in" % (result.tag, name)))
         if c.status != "dropped" and contained == result.revision:
-            found.append("%s/%s: %s is recorded as contained in %s, which the replay does not find there"
-                         % (name, BACKPORT, c.file, result.revision[:10]))
-    for note in result.notes:
-        found.append("%s: %s" % (name, note))
+            found.append(failed("%s/%s" % (name, BACKPORT), "%s is recorded as contained in %s, which the replay does not find there" % (c.file, result.revision),
+                                "set its contained_in to null if the revision does not hold the commit, or rebase the patch onto the revision if it "
+                                "holds it with other lines next to the change"))
+    found.extend(result.notes)
     patch_path = folder / "hooks.patch"
     existing = patch_path.read_bytes() if patch_path.exists() else b""
     have = {p: sec for p, sec in own_sections(existing).items() if in_scope(p)}
@@ -736,27 +816,33 @@ def folder_problems(result: Replay, folder: Path, record: dict) -> list:
             continue
         if p.endswith(regen_checksums.CHECKSUM):
             names_wrong.append(p)
-            found.append("%s/hooks.patch: the line of %s is not the one the checksum tool produces for the replayed files "
-                         "(a checksum line is regenerated, never merged or edited by hand)" % (name, p))
+            found.append(failed("%s/hooks.patch" % name, "the line of %s is not the one the checksum tool produces for the replayed files" % p,
+                                EXPECT % (result.tag, name)))
         elif p not in result.sections:
-            found.append("%s/hooks.patch changes %s, which no commit of the backport touches" % (name, p))
+            found.append(failed("%s/hooks.patch" % name, "it changes %s, which no commit of the backport touches" % p,
+                                "move that change into a commit of the backport (commits/*.patch, listed in BACKPORT.json), or delete it from hooks.patch; "
+                                + EXPECT % (result.tag, name)))
         elif p not in have:
-            found.append("%s/hooks.patch lacks the change to %s that the commits make" % (name, p))
+            found.append(failed("%s/hooks.patch" % name, "it lacks the change to %s that the commits make" % p, EXPECT % (result.tag, name)))
         else:
-            found.append("%s/hooks.patch differs from the replay of the commits in %s" % (name, p))
+            found.append(failed("%s/hooks.patch" % name, "it differs from the replay of the commits in %s" % p, EXPECT % (result.tag, name)))
     if not found and existing != expected_patch(result, existing):
-        found.append("%s/hooks.patch holds the replayed sections in another order than git writes them" % name)
+        found.append(failed("%s/hooks.patch" % name, "it holds the replayed sections in another order than git writes them", EXPECT % (result.tag, name)))
     manifest = json.loads((folder / "MANIFEST.json").read_text(encoding="utf-8"))
     for p, (mode, data) in sorted(result.added.items()):
         stored = folder / "src" / p
         if manifest["added"].get(p) != mode:
-            found.append("%s/MANIFEST.json does not list %s (mode %s) as added: the commits create it" % (name, p, mode))
+            found.append(failed("%s/MANIFEST.json" % name, "it does not list %s (mode %s) as added: the commits create it" % (p, mode),
+                                "run python tools/engine.py export from the source branch that python tools/backport_replay.py apply made, which writes "
+                                "the MANIFEST"))
         elif not stored.is_file() or stored.read_bytes() != data:
-            found.append("%s/src/%s differs from the file the commits create" % (name, p))
+            found.append(failed("%s/src/%s" % (name, p), "the file differs from the one the commits create", EXPECT % (result.tag, name)))
     for p in sorted(manifest["added"]):
         if in_scope(p) and p not in result.added:
-            found.append("%s/MANIFEST.json lists %s as added, a vendored path no commit creates: upstream code in src/ is a "
-                         "commit, not a copy" % (name, p))
+            found.append(failed("%s/MANIFEST.json" % name, "it lists %s as added, a vendored path no commit creates: upstream code in src/ is a "
+                                "commit, not a copy" % p,
+                                "add the upstream commit that creates the file to `commits` of BACKPORT.json, or remove the copy: run python "
+                                "tools/engine.py export after the change"))
     return found
 
 
@@ -789,7 +875,7 @@ def check_folders(source: Path, tag: str, folders: list) -> list:
         try:
             found += folder_problems(replay(source, tag, folder, record), folder, record)
         except Stop as stop:
-            found.append("%s: %s" % (label(folder), stop))
+            found.append(stop.text)
     return found
 
 
@@ -821,7 +907,7 @@ def apply_to_commit(source: Path, tag: str, folder: Path, head: str, when: str |
         s = Scratch(source, Path(tmp))
         result = _replay(s, tag, folder, record)
         if result.conflicts:
-            raise Stop("the replay has conflicts: %s" % "; ".join("%s: %s" % (p, w) for _c, p, w in result.conflicts))
+            raise Stop(fail(label(folder), "the replay has conflicts: %s" % "; ".join("%s: %s" % (p, w) for _c, p, w in result.conflicts), REBASE, RULE_ID))
         manifest = json.loads((folder / "MANIFEST.json").read_text(encoding="utf-8"))
         paths = {p for p in manifest["modified"] if in_scope(p)} | set(result.sections) | set(result.added)
         paths |= {p for p in manifest["added"] if in_scope(p)}
@@ -875,22 +961,25 @@ def main(argv=None) -> int:
             folders = [a.folder] if a.folder else backport_folders()
             found = check_folders(a.source, tag, folders)
             for p in found:
-                print("FAIL", p)
+                print(p)
             if not found:
                 print("ok: %d backport folders equal the replay of their commits on %s" % (len(folders), tag))
             return 1 if found else 0
         if a.folder is None:
-            ap.error("%s needs --folder" % a.command)
+            print(failed("backport_replay.py %s" % a.command, "--folder is not given", "add --folder <the backport folder>"), file=sys.stderr)
+            return 2
         if a.command == "apply":
             if not a.branch:
-                ap.error("apply needs --branch")
+                print(failed("backport_replay.py apply", "--branch is not given", "add --branch <the branch of --source that gets the commit>"), file=sys.stderr)
+                return 2
             print(apply_to_branch(a.source, tag, a.folder, a.branch))
             return 0
         result = replay(a.source, tag, a.folder)
         print(result.summary())
         if a.command == "expect":
             if a.out is None:
-                ap.error("expect needs --out")
+                print(failed("backport_replay.py expect", "--out is not given", "add --out <the directory that gets hooks.patch and src/>"), file=sys.stderr)
+                return 2
             a.out.mkdir(parents=True, exist_ok=True)
             existing = (a.folder / "hooks.patch").read_bytes() if (a.folder / "hooks.patch").exists() else b""
             (a.out / "hooks.patch").write_bytes(expected_patch(result, existing))
@@ -901,7 +990,7 @@ def main(argv=None) -> int:
             record_drops(a.folder, result)
         return 1 if result.conflicts else 0
     except Stop as stop:
-        print("STOP:", stop)
+        print(stop.text)
         return 1
 
 

@@ -46,8 +46,13 @@ from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from failure import fail  # noqa: E402
+
 ROOT = Path(__file__).resolve().parent.parent
 LEDGER = ROOT / "tools" / "birth-ledger.json"
+RULE = "port-03-births-ledger"
+LEDGER_FILE = "tools/birth-ledger.json"
 VERDICTS = ("ok", "hooked", "accepted", "dead", "fix")
 YES_NO = ("yes", "no", "unknown")
 HOOK_TAG = "STEALTH-HOOK(%s)"
@@ -312,7 +317,10 @@ class Source:
     def _git(self, *args: str) -> str:
         done = subprocess.run(["git", "-C", str(self.repo), *args], capture_output=True)
         if done.returncode not in (0, 1):
-            raise SystemExit("git %s failed in %s: %s" % (" ".join(args[:2]), self.repo, done.stderr.decode(errors="replace")[:300]))
+            raise SystemExit(str(fail("git %s in %s" % (" ".join(args[:2]), self.repo),
+                                      "git exited with %d: %s" % (done.returncode, done.stderr.decode(errors="replace").strip()),
+                                      "run the same git command by hand in that directory, fix what it says (a wrong --rev, a missing repository), "
+                                      "then run python tools/births.py again", RULE)))
         return done.stdout.decode("utf-8", errors="replace")
 
     def candidates(self) -> list:
@@ -401,10 +409,15 @@ def load_ledger(path: Path = LEDGER) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def ledger_tag(root: Path = ROOT) -> str:
+    """The Mozilla tag the ledger was reviewed on: the `mozilla_tag` of UPSTREAM.json, never a field of the ledger (repo-06, repo-07)."""
+    return json.loads((Path(root) / "UPSTREAM.json").read_text(encoding="utf-8"))["mozilla_tag"]
+
+
 def save_ledger(ledger: dict, path: Path = LEDGER) -> None:
     ledger["entries"] = sorted(ledger["entries"], key=entry_sort_key)
     lines = ["{"]
-    for name in ("tag", "scanner", "excluded_note", "chrome_js_http"):
+    for name in ("scanner", "excluded_note", "chrome_js_http"):
         if name in ledger:
             lines.append(" %s: %s," % (json.dumps(name), json.dumps(ledger[name], ensure_ascii=False)))
     lines.append(' "entries": [')
@@ -423,54 +436,75 @@ def entry_sort_key(e: dict) -> tuple:
 
 
 def ledger_problems(ledger: dict, folders=None) -> list:
-    """What is wrong with the ledger as a file, with no tree: every entry decided and complete, sorted, unique, the hooks real. `folders` is SERIES."""
+    """What is wrong with the ledger as a file, with no tree: every entry decided and complete, sorted, unique, the hooks real. `folders` is SERIES.
+    Each problem is the text of a fail(); the list is empty when the ledger is sound."""
     found, seen, last = [], set(), None
+
+    def bad(where: str, what: str, fix: str) -> str:
+        return str(fail("%s entry %s" % (LEDGER_FILE, where), what, fix, RULE))
+
+    if "tag" in ledger:
+        found.append(str(fail(LEDGER_FILE, "the field `tag` is stored (%r) and the Mozilla tag is derived from UPSTREAM.json `mozilla_tag`" % ledger["tag"],
+                              "delete the `tag` line at the top of tools/birth-ledger.json; a port changes the tag in UPSTREAM.json only", RULE)))
     for e in ledger.get("entries", []):
         where = "%s: %s %s/%s #%d" % (e.get("file"), e.get("function"), e.get("kind"), e.get("call"), e.get("n", 0))
         for name in ("file", "function", "kind", "call", "n", "stmt_sha", "ctx_sig", "carries", "reach", "verdict", "reason"):
             if name not in e:
-                found.append("birth ledger: %s has no %r" % (where, name))
+                found.append(bad(where, "has no %r" % name,
+                                 "add %r to the entry (python tools/births.py --tree <dir> --skeleton prints the shape of an entry) and decide it" % name))
         if any(name not in e for name in ("file", "function", "kind", "call", "n")):
             continue
         key = entry_key(e)
         if key in seen:
-            found.append("birth ledger: %s is listed twice" % where)
+            found.append(bad(where, "is listed twice", "delete one of the two entries (keep the one whose verdict and reason were reviewed)"))
         seen.add(key)
         if last is not None and key < last:
-            found.append("birth ledger: %s is out of order (the file is sorted by file, function, kind, call, n)" % where)
+            found.append(bad(where, "is out of order: the file is sorted by file, function, kind, call, n",
+                             "move the entry to its place, or run python tools/births.py --tree <dir> --prune, which rewrites the file sorted"))
         last = key
         verdict, carries, reach = e.get("verdict"), e.get("carries"), e.get("reach")
         if verdict not in VERDICTS:
-            found.append("birth ledger: %s has verdict %r, not one of %s" % (where, verdict, "/".join(VERDICTS)))
+            found.append(bad(where, "has verdict %r, not one of %s" % (verdict, "/".join(VERDICTS)),
+                             "read the call and set verdict to one of %s (port-03 says what each means)" % "/".join(VERDICTS)))
             continue
         if carries not in YES_NO or reach not in YES_NO:
-            found.append("birth ledger: %s carries/reach must be yes, no or unknown" % where)
+            found.append(bad(where, "has carries %r and reach %r, and both must be yes, no or unknown" % (carries, reach),
+                             "set `carries` and `reach` to yes, no or unknown"))
         reason = (e.get("reason") or "").strip()
         if len(reason) < 20:
-            found.append("birth ledger: %s has no reason (20+ characters): say why" % where)
+            found.append(bad(where, "has no reason (20+ characters): it has %d" % len(reason),
+                             "write in `reason` why the verdict holds, naming the argument or the proof, in 20 characters or more"))
         if verdict == "ok" and carries != "yes":
-            found.append("birth ledger: %s is ok but carries %r: a site that does not carry the context is accepted, hooked or dead" % (where, carries))
+            found.append(bad(where, "is ok but carries %r: a site that does not carry the context is accepted, hooked or dead" % carries,
+                             "set verdict to accepted, hooked or dead with its reason, or set carries to yes if the call does carry the context"))
         if verdict == "hooked":
             hook = e.get("hook")
             if not hook:
-                found.append("birth ledger: %s is hooked and names no hook (a folder of SERIES)" % where)
+                found.append(bad(where, "is hooked and names no hook (a folder of SERIES)",
+                                 "set `hook` to the folder of SERIES whose STEALTH-HOOK(<folder>) is in the function"))
             elif folders is not None and hook not in folders:
-                found.append("birth ledger: %s names the hook %r, which is not a folder of SERIES" % (where, hook))
+                found.append(bad(where, "names the hook %r, which is not a folder of SERIES" % hook,
+                                 "set `hook` to a folder listed in SERIES, or restore the folder if it was removed by mistake"))
             at = e.get("hook_at")
             if at is not None and not (isinstance(at, dict) and at.get("file") and at.get("contains")):
-                found.append("birth ledger: %s has a hook_at that is not {file, contains}" % where)
+                found.append(bad(where, "has a hook_at that is not {file, contains}",
+                                 'write hook_at as {"file": <path of the file with the hook>, "contains": <text the hook line holds>}, or delete it'))
         if verdict == "dead":
             proof = e.get("proof") or ""
             if not re.match(r"^(pref-off:\S+|platform:\w+|no-caller:\S+|unreachable:.{10,})", proof):
-                found.append("birth ledger: %s is dead and its proof %r is none of pref-off:, platform:, no-caller:, unreachable:" % (where, proof))
+                found.append(bad(where, "is dead and its proof %r is none of pref-off:, platform:, no-caller:, unreachable:" % proof,
+                                 "start `proof` with pref-off:<pref>, platform:<os>, no-caller:<where checked> or unreachable:<10+ characters of why>"))
         if verdict == "accepted" and carries == "yes":
-            found.append("birth ledger: %s is accepted but carries the context: it is ok" % where)
+            found.append(bad(where, "is accepted but carries the context: it is ok",
+                             "set verdict to ok and name the argument that carries the context in `reason`"))
         if verdict == "fix":
             opened = e.get("open")
             if not (isinstance(opened, dict) and re.match(r"^\d{4}-\d\d-\d\d$", str(opened.get("since", ""))) and opened.get("item")):
-                found.append("birth ledger: %s is a fix and has no dated open state ({since: YYYY-MM-DD, item, owner})" % where)
+                found.append(bad(where, "is a fix and has no dated open state ({since: YYYY-MM-DD, item, owner})",
+                                 'add "open": {"since": "YYYY-MM-DD", "item": <the work item>, "owner": <who>} to the entry'))
         elif e.get("open"):
-            found.append("birth ledger: %s has an open state but its verdict is %s" % (where, verdict))
+            found.append(bad(where, "has an open state but its verdict is %s" % verdict,
+                             "delete the `open` state, or set verdict to fix if the hole is still open"))
     return found
 
 
@@ -510,12 +544,18 @@ def judge(ledger: dict, sites: list, read=None, folders=None) -> Report:
         matched.add(site.key)
         report.matched += 1
         what = []
+        where = "%s:%d %s %s/%s #%d (verdict %s)" % (site.file, site.line, site.function, site.kind, site.call, site.n, entry.get("verdict"))
+        accept = ("read the diff of this site against what the entry reviewed; if it still carries the context, run python tools/births.py --tree <dir> "
+                  "--accept-changed (it rewrites stmt_sha and ctx_sig of EVERY CHANGED entry, so read each one first), otherwise change the verdict "
+                  "and reason of the entry")
         if entry.get("stmt_sha") != site.stmt_sha:
-            what.append("the statement is not the one that was reviewed (%s -> %s): %s" % (entry.get("stmt_sha"), site.stmt_sha, site.stmt[:140]))
+            what.append(str(fail(where, "CHANGED: the statement is not the one that was reviewed (%s -> %s): %s"
+                                 % (entry.get("stmt_sha"), site.stmt_sha, site.stmt), accept, RULE)))
         if entry.get("ctx_sig") != site.ctx_sig:
-            what.append("the context signature of %s changed: %r -> %r" % (site.function, entry.get("ctx_sig"), site.ctx_sig))
+            what.append(str(fail(where, "CHANGED: the context signature of %s changed: %r -> %r" % (site.function, entry.get("ctx_sig"), site.ctx_sig),
+                                 accept, RULE)))
         if what:
-            report.changed.append((site, entry, "; ".join(what)))
+            report.changed.append((site, entry, "\n".join(what)))
         report.invalid += _entry_against_tree(entry, site, read)
         if entry.get("verdict") == "fix" and isinstance(entry.get("open"), dict):
             report.open.append(entry)
@@ -544,40 +584,59 @@ def _entry_against_tree(entry: dict, site: Site, read) -> list:
                 return out
             needle = marker.get("contains", tag)
             if tag not in text or needle not in text:
-                out.append("%s is hooked by %s and the hook is gone: %s has %s=%s, %s=%s"
-                           % (where, entry["hook"], at_file, repr(tag), tag in text, repr(needle), needle in text))
+                out.append(str(fail("%s entry %s" % (LEDGER_FILE, where),
+                                    "is hooked by %s and the hook is gone: %s has %s=%s, %s=%s"
+                                    % (entry["hook"], at_file, repr(tag), tag in text, repr(needle), needle in text),
+                                    "restore the %s line in the function (or at hook_at) from the folder %s, or, if the hook was removed on purpose, "
+                                    "change the verdict of the entry" % (tag, entry["hook"]), RULE)))
     return out
 
 
 def judge_chrome_js(ledger: dict, counts: dict) -> list:
     allowed = ledger.get("chrome_js_http", {})
-    return ["chrome JS HTTP clients in %s: %d, the ledger allows %d (each is a reader of user context 0: decide it, then raise the number)"
-            % (d, n, allowed.get(d, 0)) for d, n in sorted(counts.items()) if n > allowed.get(d, 0)]
+    return [str(fail("%s chrome_js_http %s" % (LEDGER_FILE, d),
+                     "chrome JS HTTP clients in %s: %d, the ledger allows %d (each is a reader of user context 0)" % (d, n, allowed.get(d, 0)),
+                     "read the new fetch, XMLHttpRequest or Request calls in that directory, decide each, then raise chrome_js_http[%r] to %d in "
+                     "tools/birth-ledger.json" % (d, n), RULE))
+            for d, n in sorted(counts.items()) if n > allowed.get(d, 0)]
 
 
 # -------------------------------------------------------------------------------------------------------------- the output
 def describe(site: Site) -> str:
-    return "%s:%d %s %s/%s #%d  %s" % (site.file, site.line, site.function, site.kind, site.call, site.n, site.stmt[:110])
+    return "%s:%d %s %s/%s #%d" % (site.file, site.line, site.function, site.kind, site.call, site.n)
 
 
 def print_report(report: Report, extra: list, title: str = "") -> None:
+    """Every NEW, MOVED, CHANGED, INVALID, GONE and OPEN line is the text of a fail(): the verdict of the scan does not depend on how it prints."""
     if title:
         print(title)
     for site in report.new:
-        print("NEW      %s\n         the text suggests carries=%s: %s" % ((describe(site),) + suggest(site)))
+        carries, why = suggest(site)
+        print(fail("%s:%d" % (site.file, site.line),
+                   "NEW: %s is a birth point the ledger does not have, the statement is %s, and the text suggests carries=%s: %s"
+                   % (describe(site), site.stmt, carries, why),
+                   "run python tools/births.py --tree <dir> --skeleton, which prints the entry for it; decide verdict, reach and reason by hand and add "
+                   "the entry to tools/birth-ledger.json", RULE))
     for site, entry in report.moved:
-        print("MOVED    %s\n         same statement and context signature as %s: %s (copy its verdict after reading it)"
-              % (describe(site), entry["file"], entry["function"]))
+        print(fail("%s:%d" % (site.file, site.line),
+                   "MOVED: %s has the same statement and context signature as %s: %s" % (describe(site), entry["file"], entry["function"]),
+                   "read the entry of %s: %s in tools/birth-ledger.json and change its file and function to this site, so its verdict is kept"
+                   % (entry["file"], entry["function"]), RULE))
     for site, entry, what in report.changed:
-        print("CHANGED  %s:%d %s %s/%s #%d (verdict %s): %s" % (site.file, site.line, site.function, site.kind, site.call, site.n,
-                                                                entry.get("verdict"), what))
+        print(what)
     for line in report.invalid + extra:
-        print("INVALID  %s" % line)
+        print(line)
     for e in report.gone:
-        print("GONE     %s: %s %s/%s #%d" % (e["file"], e["function"], e["kind"], e["call"], e["n"]))
+        print(fail("%s entry %s: %s %s/%s #%d" % (LEDGER_FILE, e["file"], e["function"], e["kind"], e["call"], e["n"]),
+                   "GONE: the tree has no such birth point any more",
+                   "run python tools/births.py --tree <dir> --prune, which drops every GONE entry (read the list first: a site that only moved to "
+                   "another function is NEW there)", RULE))
     for e in report.open:
         o = e["open"]
-        print("OPEN     since %s %s: %s (%s #%d) owner %s" % (o["since"], o["item"], e["file"], e["function"], e["n"], o.get("owner", "-")))
+        print(fail("%s entry %s: %s #%d" % (LEDGER_FILE, e["file"], e["function"], e["n"]),
+                   "OPEN since %s: %s (owner %s) is a known hole, red by design" % (o["since"], o["item"], o.get("owner", "-")),
+                   "fix the call so it carries the context, then change the verdict of the entry from fix to ok and delete its `open` state",
+                   RULE))
     print("births: %d sites, %d matched, NEW %d, CHANGED %d, MOVED %d, GONE %d, INVALID %d, OPEN %d -> %s"
           % (report.sites, report.matched, len(report.new), len(report.changed), len(report.moved), len(report.gone),
              len(report.invalid) + len(extra), len(report.open),
@@ -606,6 +665,7 @@ def run(source: Source, series_folders=None, ledger_path: Path = LEDGER, title: 
         accept_changed: bool = False, prune: bool = False, show_skeleton: bool = False) -> int:
     began = time.monotonic()
     ledger = load_ledger(ledger_path)
+    title = title or "birth points against the ledger (Mozilla tag of UPSTREAM.json: %s):" % ledger_tag()
     sites = scan(source)
     report = judge(ledger, sites, read=source.read, folders=set(series_folders) if series_folders is not None else None)
     counts = source.js_http_counts()
@@ -650,9 +710,11 @@ def main(argv=None) -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")   # a statement may hold any character
     if bool(a.tree) == bool(a.repo):
-        raise SystemExit("give --tree <dir>, or --repo <repo> --rev <ref>")
+        raise SystemExit(str(fail("tools/births.py arguments", "neither --tree nor --repo is given, or both are",
+                                  "give --tree <dir>, or --repo <repo> --rev <ref>", RULE)))
     if a.repo and not a.rev:
-        raise SystemExit("--repo needs --rev")
+        raise SystemExit(str(fail("tools/births.py arguments", "--repo is given without --rev",
+                                  "add --rev <ref>, the commit of the repository to scan", RULE)))
     source = Source(a.tree) if a.tree else Source(a.repo, a.rev)
     return run(source, series_folder_list(), a.ledger, tsv=a.tsv, accept_changed=a.accept_changed, prune=a.prune, show_skeleton=a.skeleton)
 

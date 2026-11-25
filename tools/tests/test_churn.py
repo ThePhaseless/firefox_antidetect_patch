@@ -339,13 +339,13 @@ def test_check_is_red_when_the_file_is_for_another_base(tmp_path, source, capsys
     write_churn(root, source)
     (root / "UPSTREAM.json").write_text(json.dumps({"mozilla_tag": "FIREFOX_155_0_RELEASE"}), encoding="utf-8")
     assert churn.main(["--source", str(source), "--check", "--series", str(root)]) == 1
-    assert "tools/churn.json is for %s, the series is on FIREFOX_155_0_RELEASE" % BASE in capsys.readouterr().err
+    assert "tools/churn.json: base: the file is for %s, the series is on FIREFOX_155_0_RELEASE" % BASE in capsys.readouterr().err
 
 
 def test_check_is_red_when_the_file_is_missing(tmp_path, source, capsys):
     root = one_hook_series(tmp_path)
     assert churn.main(["--source", str(source), "--check", "--series", str(root)]) == 2
-    assert "tools/churn.json is missing" in capsys.readouterr().err
+    assert "tools/churn.json: the file is missing" in capsys.readouterr().err
 
 
 def offer_partial_clone(source):
@@ -399,8 +399,8 @@ def test_a_file_the_repository_was_not_fetched_for_is_red_never_absent_never_zer
     assert churn.main(["--source", str(into), "--check", "--series", str(root)]) == 2
     err = capsys.readouterr().err
     assert "no content in the repository" in err and "d.txt" in err and TAGS[0] in err           # where and what: the files, the tag
-    assert "fix: python tools/churn.py --source" in err and "--fetch" in err                     # fix
-    assert "rule: docs/decisions/port-07-quiet-anchors.md" in err                                # rule
+    assert "Fix: python tools/churn.py --source" in err and "--fetch" in err                     # fix
+    assert "Rule: docs/decisions/port-07-quiet-anchors.md" in err                                # rule
     assert "a.txt" not in err.split("first:")[1].split("):")[0]
     with pytest.raises(churn.ChurnError):
         run(root, into)                                       # the compute too: no number is produced
@@ -479,3 +479,23 @@ def test_three_hunks_of_the_series_at_159_equal_the_first_measurement():
     committed = json.loads((churn.ROOT / "tools" / "churn.json").read_text(encoding="utf-8"))
     assert committed["base"] == data["base"] and committed["hooks"] == data["hooks"] and committed["releases"] == data["releases"]
     assert churn.check(churn.ROOT, SNAPSHOTS) == []
+
+
+# --------------------------------------------------------------------------- repo-04: every failure is a fail(), none is cut
+def test_every_difference_is_a_whole_fail_line_and_none_is_cut():
+    hooks = [{"key": "H|f|a|%d" % i, "folder": "network/b", "file": "d.txt", "hunk": i, "churn": 1, "which": ["152"]} for i in range(40)]
+    old = {"base": BASE, "band": 2, "releases": [], "hooks": hooks}
+    new = {"base": BASE, "band": 2, "releases": [], "hooks": []}
+    found = churn.differences(old, new)
+    assert len(found) == 40, "forty differences, forty lines: the old message named 25 and counted the rest"
+    for line in found:
+        assert line.startswith("FAIL network/b d.txt hunk ") and ". Fix: python tools/churn.py --source " in line
+        assert line.endswith("Rule: docs/decisions/port-07-quiet-anchors.md")
+
+
+def test_a_git_failure_names_the_whole_command_and_the_whole_error(tmp_path):
+    with pytest.raises(churn.ChurnError) as err:
+        churn.git(tmp_path / "nowhere", "rev-parse", "--verify", "refs/tags/x^{commit}", "--quiet", "--end-of-options")
+    text = str(err.value)
+    assert text.startswith("FAIL git ") and "--end-of-options" in text.split(". Fix: ")[0]
+    assert ". Fix: run the same git command by hand" in text and text.endswith("Rule: docs/decisions/port-07-quiet-anchors.md")

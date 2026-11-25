@@ -6,6 +6,8 @@ the text helpers they stand on.
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import prebuild as pb  # noqa: E402
 
@@ -616,9 +618,28 @@ def test_gtest_no_default_in_the_workflow_is_red():
 
 # ============================================================================================ the report
 def test_a_finding_prints_in_the_style_of_engine_check():
-    f = pb.Finding("FAIL", 1, "dom/F.cpp:3", "something is wrong", "do this")
-    assert f.line() == "FAIL dom/F.cpp:3: something is wrong; do this"
+    f = pb.Finding.failed(1, pb.fail("dom/F.cpp:3", "something is wrong", "do this", pb.RULE_LINK))
+    assert f.line() == "FAIL dom/F.cpp:3: something is wrong. Fix: do this. Rule: docs/decisions/hook-02-shape-and-contract.md"
+    assert (f.level, f.where, f.what, f.fix) == ("FAIL", "dom/F.cpp:3", "something is wrong", "do this")
+    assert f.as_dict()["rule"] == "hook-02-shape-and-contract"
+    # a WARN is a note, not a failure: it has no fix and no rule, and the run does not go red for it
     assert pb.Finding("WARN", 1, "dom/F.cpp:3", "the text does not say").line() == "WARN dom/F.cpp:3: cannot tell: the text does not say"
+
+
+def test_a_fail_finding_built_without_fail_is_refused_with_a_failure():
+    with pytest.raises(TypeError) as err:
+        pb.Finding("FAIL", 1, "dom/F.cpp:3", "something is wrong", "do this").line()
+    assert "built without a fail()" in str(err.value) and ". Fix: build it with Finding.failed" in str(err.value)
+
+
+def test_every_fail_of_the_checks_names_a_rule_and_a_fix_and_is_not_cut():
+    tag, head = fixture()
+    head["dom/StealthX.cpp"] = "// no body\n"
+    for f in pb.run(project(tag, head), checks=(1,))["findings"]:
+        if f.level == "FAIL":
+            text = f.line()
+            assert text.startswith("FAIL ") and ". Fix: " in text and text.endswith("Rule: docs/decisions/hook-02-shape-and-contract.md")
+            assert f.fix and f.failure.rule == "hook-02-shape-and-contract"
 
 
 def test_the_run_exit_code_follows_the_fails_and_not_the_warnings():
