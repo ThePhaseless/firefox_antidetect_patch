@@ -19,7 +19,7 @@
   "file": "browser/components/tests/unit/xpcshell.toml",
   "function": "run-if = [",
   "kind": "add",
-  "form": "unknown",
+  "form": "registration",
   "line": "[\"test_stealth_launch_counter.js\"]  # STEALTH-HOOK(platform/launch-counter)",
   "test": "wrapper:tests/test_the_launch_counter_is_one_plain_get_before_any_page_e2e.py::test_the_browser_sends_one_plain_get_to_the_counter_before_any_page"
  }

@@ -3,7 +3,7 @@
   "file": "CLAUDE.md",
   "function": "",
   "kind": "add",
-  "form": "unknown",
+  "form": "registration",
   "line": "@STEALTH_CLAUDE.md <!-- STEALTH-HOOK(platform/repo) -->",
   "test": "py:tools/tests/test_repo_files_are_ours.py::test_claude_md_is_the_tag_plus_one_line_naming_a_file_that_exists"
  },
@@ -11,7 +11,7 @@
   "file": "README.md",
   "function": "",
   "kind": "add",
-  "form": "unknown",
+  "form": "registration",
   "line": "[Notes of this fork, the anonymous launch counter and where to report bugs: STEALTH_README.md](STEALTH_README.md) <!-- STEALTH-HOOK(platform/repo) -->",
   "test": "py:tools/tests/test_repo_files_are_ours.py::test_readme_md_is_the_tag_plus_one_line_naming_a_file_that_exists"
  }

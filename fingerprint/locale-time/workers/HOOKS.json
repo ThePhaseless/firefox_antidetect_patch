@@ -3,7 +3,7 @@
   "file": "dom/base/test/browser.toml",
   "function": "skip-if = [",
   "kind": "add",
-  "form": "unknown",
+  "form": "registration",
   "line": "[\"browser_stealth_language_workers.js\"]  # STEALTH-HOOK(fingerprint/locale-time/workers)",
   "test": "wrapper:tests/test_context_locale_e2e.py::test_a_context_locale_reaches_navigator_intl_and_the_header"
  },

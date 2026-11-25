@@ -29,7 +29,7 @@
   "file": "toolkit/components/urlformatter/URLFormatter.sys.mjs",
   "function": "nsURLFormatterService.prototype = {",
   "kind": "add",
-  "form": "unknown",
+  "form": "rewire",
   "line": "    aMsg = StealthTrimApiKeys(aMsg);  // STEALTH-HOOK(stillborn/api-keys)",
   "test": "xpcshell:toolkit/components/urlformatter/tests/unit/test_stealth_apikeys.js#test_declared_keys"
  },

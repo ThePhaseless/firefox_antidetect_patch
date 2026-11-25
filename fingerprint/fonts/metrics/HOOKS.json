@@ -191,7 +191,7 @@
   "file": "gfx/thebes/moz.build",
   "function": "include(\"/ipc/chromium/chromium-config.mozbuild\")",
   "kind": "add",
-  "form": "unknown",
+  "form": "registration",
   "line": "include(\"StealthDesignMetrics.mozbuild\")  # STEALTH-HOOK(fingerprint/fonts/metrics)",
   "test": "gtest:StealthFontMetrics.DesignAdvanceAtAFractionalSize"
  }

@@ -27,7 +27,7 @@
   "file": "netwerk/base/nsProtocolProxyService.cpp",
   "function": "nsresult nsProtocolProxyService::Resolve_Internal(nsIChannel* channel,",
   "kind": "rewrite",
-  "form": "unknown",
+  "form": "excepted",
   "line": "    rv = NewProxyInfo_Internal(type, *host, port, \"\"_ns, mSOCKSProxyUsername, mSOCKSProxyPassword, \"\"_ns,  // STEALTH-HOOK(network/socks)",
   "removed": "    rv = NewProxyInfo_Internal(type, *host, port, \"\"_ns, \"\"_ns, \"\"_ns, \"\"_ns,",
   "test": "gtest:TestStealthSocksCredentials.ReachResolvedProxyInfo",
@@ -56,7 +56,7 @@
   "file": "netwerk/test/gtest/moz.build",
   "function": "SOURCES += [",
   "kind": "add",
-  "form": "unknown",
+  "form": "registration",
   "line": "include(\"stealth.build\")  # STEALTH-HOOK(network/socks)",
   "test": "gtest:TestStealthSocksCredentials.PrefsChanged",
   "quiet_anchor_why": {

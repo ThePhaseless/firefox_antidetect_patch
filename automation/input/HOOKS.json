@@ -137,7 +137,7 @@
   "file": "layout/base/PresShell.cpp",
   "function": "nsresult PresShell::HandleEvent(nsIFrame* aFrameForPresShell,",
   "kind": "add",
-  "form": "unknown",
+  "form": "scope",
   "line": "  StealthJugglerMouseAck jugglerMouseAck(aGUIEvent);  // STEALTH-HOOK(automation/input)",
   "test": "gtest:StealthJugglerMouseAck.AnEventWithAnIdIsAckedOnceWhenTheScopeEnds"
  },

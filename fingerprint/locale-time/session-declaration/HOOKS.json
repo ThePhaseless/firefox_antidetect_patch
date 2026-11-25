@@ -27,7 +27,7 @@
   "file": "dom/base/nsGlobalWindowOuter.cpp",
   "function": "static nsresult CreateNativeGlobalForInner(",
   "kind": "rewrite",
-  "form": "unknown",
+  "form": "excepted",
   "line": "      GetDeclaredRealmLanguage(aDocument), GetDeclaredRealmTimezone(aDocument));  // STEALTH-HOOK(fingerprint/locale-time/session-declaration)",
   "removed": "      aDocument->GetBrowsingContext()->Top()->GetLanguageOverride(),\n      aDocument->GetBrowsingContext()->Top()->GetTimezoneOverride());",
   "test": "wrapper:tests/test_context_locale_e2e.py::test_intl_in_the_page_realm_follows_the_language_and_zone_of_its_context",

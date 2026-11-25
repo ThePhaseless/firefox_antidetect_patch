@@ -65,7 +65,7 @@
   "file": "dom/media/webaudio/DynamicsCompressorNode.h",
   "function": "class DynamicsCompressorNode final : public AudioNode {",
   "kind": "add",
-  "form": "member",
+  "form": "rewire",
   "line": "    aReduction = StealthPerturbCompressorReduction(aReduction);  // STEALTH-HOOK(fingerprint/audio/noise)",
   "test": "gtest:StealthAudioNoise.CompressorMatchesReferenceBitForBit"
  },
