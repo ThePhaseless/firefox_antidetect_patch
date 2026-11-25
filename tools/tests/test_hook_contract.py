@@ -111,6 +111,17 @@ def test_c8_our_include_is_a_block_after_mozillas_separated_by_a_blank_line():
     assert "C8" in rules(before)
 
 
+def test_c8_an_include_of_another_folders_hook_in_the_context_is_not_mozillas():
+    # the second folder of a file split by marker: the first folder's include is context of its hunk, and carries its marker
+    ours = " #include \"StealthFirst.h\"  // STEALTH-HOOK(automation/y)"
+    split = patch("dom/Foo.cpp", [" #include \"a.h\"", " #include \"b.h\"", " ", "+#include \"StealthX.h\"" + MARK, ours, " ", " using namespace mozilla;",
+                                  " ", " namespace x {"], section="")
+    assert rules(split) == []
+    mozillas = ours.replace("  // STEALTH-HOOK(automation/y)", "")
+    assert "C8" in rules(patch("dom/Foo.cpp", [" #include \"a.h\"", " #include \"b.h\"", " ", "+#include \"StealthX.h\"" + MARK, mozillas, " ",
+                                               " using namespace mozilla;", " ", " namespace x {"], section=""))
+
+
 def test_c9_not_inside_a_list_nor_the_last_line_of_a_block():
     last = patch("dom/Foo.cpp", ["   // lead", " ", " " + FN, "   int x = 1;", "   DoIt(x);",
                                  "+  mState = StealthState();" + MARK, " }", " ", " void Next() {}", " void More() {}"])

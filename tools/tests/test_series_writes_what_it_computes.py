@@ -77,7 +77,7 @@ def test_every_record_as_committed_is_what_export_writes():
     for folder in engine.existing_folders():
         patch = engine.ROOT / folder / "hooks.patch"
         if patch.exists():
-            diffs.update(engine._diffs_of(patch))
+            diffs.update({(path, folder): d for path, d in engine._diffs_of(patch).items()})
     assert engine.record_count_problems(records, diffs) == []
     assert records and not any("evidence" in r for r in records), "the lines are the hooks.patch itself"
 
@@ -108,21 +108,21 @@ def test_export_writes_the_budget_of_a_file_new_to_the_series_and_leaves_the_oth
     world, root, inventory, budget, removed = exported
     budget.write_text(json.dumps({"other.txt": 4}), encoding="utf-8")       # an entry that is there is not touched
     engine.export(world, "TAG", "series")
-    assert json.loads(budget.read_text(encoding="utf-8")) == {"mozilla.txt": 1, "other.txt": 4}
+    assert json.loads(budget.read_text(encoding="utf-8")) == {"mozilla.txt|fingerprint/a": 1, "other.txt": 4}
     assert json.loads(removed.read_text(encoding="utf-8")) == {}, "nothing of Mozilla's is removed: no entry"
-    budget.write_text(json.dumps({"mozilla.txt": 3}), encoding="utf-8")     # a budget above the count stays: shrink-budget lowers it
+    budget.write_text(json.dumps({"mozilla.txt|fingerprint/a": 3}), encoding="utf-8")     # a budget above the count stays: shrink-budget lowers it
     engine.export(world, "TAG", "series")
-    assert json.loads(budget.read_text(encoding="utf-8")) == {"mozilla.txt": 3}
+    assert json.loads(budget.read_text(encoding="utf-8")) == {"mozilla.txt|fingerprint/a": 3}
 
 
 def test_export_writes_the_removed_budget_of_a_new_file_that_loses_mozillas_lines(exported):
     world, root, inventory, budget, removed = exported
     run(world, "checkout", "-q", "-B", "more", "series")
-    (world / "mozilla.txt").write_bytes(b"one\nhook();\nTWO\n")
+    (world / "mozilla.txt").write_bytes(b"one\nhook(); // STEALTH-HOOK(fingerprint/a)\nTWO // STEALTH-HOOK(fingerprint/a)\n")
     run(world, "commit", "-qam", "rewrites a line of Mozilla's")
     engine.export(world, "TAG", "more")
-    assert json.loads(removed.read_text(encoding="utf-8")) == {"mozilla.txt": 1}
-    assert json.loads(budget.read_text(encoding="utf-8")) == {"mozilla.txt": 2}
+    assert json.loads(removed.read_text(encoding="utf-8")) == {"mozilla.txt|fingerprint/a": 1}
+    assert json.loads(budget.read_text(encoding="utf-8")) == {"mozilla.txt|fingerprint/a": 2}
 
 
 def test_export_writes_the_counts_of_the_record_and_keeps_the_hand_fields(exported):

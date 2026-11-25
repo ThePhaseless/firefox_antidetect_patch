@@ -1204,7 +1204,7 @@ def _analyse_patch(folder: str, text: str):
                             at = b["ns"] + i
                             before = new_side[at - 1] if at >= 1 else None
                             after = new_side[at + 1] if at + 1 < len(new_side) else None
-                            if (before and before[0] == " " and is_include(before[1])) or                                (after and after[0] == " " and is_include(after[1])):
+                            if (before and before[0] == " " and is_include(before[1]) and not MARKER_RE.search(before[1])) or                                (after and after[0] == " " and is_include(after[1]) and not MARKER_RE.search(after[1])):
                                 violate("C8", path, section, x, hooks=[hk])
                     forms += [f_ for f_, _ in run_forms]
                     if len(run) > 1 and not multi_ok:

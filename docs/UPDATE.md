@@ -38,7 +38,7 @@ git -C <source> fetch --depth 1 <mozilla_repository> refs/tags/$NEW:refs/tags/$N
 python tools/engine.py drift --to $NEW --source <source>
 ```
 
-It prints one line per file we patch that Mozilla changed between the two tags (`changed`, `DELETED by Mozilla`, `added`), then `N of our M patched Mozilla files changed between OLD and NEW`. Only those files can conflict. It reads `tools/inventory.json`, so it does not see a Mozilla function our own code calls: step 6 does.
+It prints one line per file we patch that Mozilla changed between the two tags (`changed`, `DELETED by Mozilla`, `added`; the folders that patch it in parentheses), then `N of our M patched Mozilla files changed between OLD and NEW`. Only those files can conflict. It reads `tools/inventory.json`, so it does not see a Mozilla function our own code calls: step 6 does.
 
 ## 3. Port: one run, every conflict
 

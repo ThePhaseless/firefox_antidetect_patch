@@ -282,7 +282,6 @@ def test_c19_is_retired_and_not_reused():
     assert "C19" not in hc.RULES and "C19" not in hc.NEVER_DEBT_RULES
 
 
-@pytest.mark.xfail(strict=True, reason="turns green with the per-tag export")
 def test_the_series_has_no_c20():
     assert [v for v in hc.contract_violations(ROOT) if v.rule == "C20"] == []
 

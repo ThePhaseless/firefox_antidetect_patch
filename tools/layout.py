@@ -59,6 +59,7 @@ FEATURES = {
     # network
     "ipv6-literal-connect": "network/ipv6-literal",
     "proxy-udp-egress": "network/proxy-udp",
+    "system-proxy-default-off": "network/proxy",
     "socks-credentials": "network/socks",
     "doh-trr-context": "network/doh",
     "geolocation-no-host-provider": "fingerprint/geolocation/no-host-provider",

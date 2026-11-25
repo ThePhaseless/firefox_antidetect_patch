@@ -1,13 +1,13 @@
 # hook-03: budgets and debt only go down
 
 **Rule.** Three files only shrink, each compared with `origin/main`, never with the branch:
-- `tools/hook-budget.json`: our lines per Mozilla file. A budget above main's fails.
-- `tools/removed-budget.json`: Mozilla lines removed or rewritten per file; a missing file counts 0. A value above main's fails.
+- `tools/hook-budget.json`: our lines per Mozilla file and folder, key `<file>|<folder>`. A budget above main's fails; while main's budget is still per file, the keys of a file are compared as a sum with main's ceiling of the file, so splitting a file by folder never loosens one.
+- `tools/removed-budget.json`: Mozilla lines removed or rewritten per file and folder, same keys; a missing key counts 0. A value above main's fails, by the same sum while main's is per file.
 - `tools/hook-debt.json`: each place that breaks the contract today. `check` refuses a violation not in the list, an entry that no longer occurs, and an entry main's list does not have.
 
-A Mozilla file new to the series gets at most 5 hook lines and 5 removed lines. After logic moves into our files, `python tools/engine.py shrink-budget` lowers the budgets. `python tools/engine.py hook-debt` removes the entries that no longer occur and adds none (`--summary` counts them; `--init` rewrites the list from every violation of now, and the comparison with main still refuses the entries main does not have).
+A (file, folder) new to the series gets at most 5 hook lines and 5 removed lines. After logic moves into our files, `python tools/engine.py shrink-budget` lowers the budgets. `python tools/engine.py hook-debt` removes the entries that no longer occur and adds none (`--summary` counts them; `--init` rewrites the list from every violation of now, and the comparison with main still refuses the entries main does not have).
 
-A budget rises above main's only when the branch adds a row to `tools/hook-budget-raises.json`: a register that only grows, one row per file and branch, with `file`, `from` (main's budget), `to`, `folder`, `reason`, `decided_by`, `date` and `test`. A row that raises nothing, or one for a file main does not patch, fails. The removed budget goes above main's the same way: a row with `budget: "removed"`, `from` main's removed budget (0 when it has none), one row per file and budget.
+A budget rises above main's only when the branch adds a row to `tools/hook-budget-raises.json`: a register that only grows, one row per key (the file, while main's budget is per file) and branch, with `file`, `from` (main's budget), `to`, `folder`, `reason`, `decided_by`, `date` and `test`. A row that raises nothing, or one for a file main does not patch, fails. The removed budget goes above main's the same way: a row with `budget: "removed"`, `from` main's removed budget (0 when it has none), one row per file and budget.
 
 **Why.** A hook line is a place that can conflict at each tag, so the total only buys more risk when it grows. Fixing the ceiling per file forces the next change to move logic into our files instead of adding lines. Comparing with main stops a branch from raising its own limit.
 

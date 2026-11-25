@@ -105,7 +105,7 @@ def _header_path(line: str) -> str:
         end = 1
         while rest[end] != '"':
             end += 2 if rest[end] == "\\" else 1
-        text = re.sub(r"\(.)", lambda m: {"t": "\t", "n": "\n"}.get(m.group(1), m.group(1)), rest[1:end])
+        text = re.sub(r"\\(.)", lambda m: {"t": "\t", "n": "\n"}.get(m.group(1), m.group(1)), rest[1:end])
         return text[2:]
     return rest[2:2 + (len(rest) - 5) // 2]
 
