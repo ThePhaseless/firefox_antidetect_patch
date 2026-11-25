@@ -1608,7 +1608,7 @@ def group_closure():
         except t.NodeError as exc:
             late = str(exc)
         out.append(("prepare: what the steps between up and prepare spent counts against the one deadline: past it, an error, the node deleted, "
-                    "nothing run on it", "within 2400 s" in late and api.deleted == ["dpl_x"] and "bash -s" not in [c for c, _ in ssh.calls]))
+                    "nothing run on it", ("within %d s" % t.PROVISION_DEADLINE_S) in late and api.deleted == ["dpl_x"] and "bash -s" not in [c for c, _ in ssh.calls]))
         api.nodes = listed()
         try:
             quiet(t.prepare, latitude, github, 5, 1, lambda host, port: ssh, tmp / "elsewhere", closure, clock, clock.sleep, wall=clock)
@@ -1630,6 +1630,23 @@ def group_closure():
     out.append(("prepare: a closure the node could not take: an error, the node deleted, the bootstrap never run",
                 got is None and "tar: short read" in error and api.deleted == ["dpl_x"] and "bash -s" not in [c for c, _ in ssh.calls] and gh.jits == []))
     return out
+
+
+def release_node_job() -> dict:
+    """The node job of release.yml, as written."""
+    import yaml
+    return yaml.safe_load((HERE.parent.parent / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8"))["jobs"]["node"]
+
+
+def longest_full_hold_s() -> float:
+    """The longest hold of a node by a full run, in seconds, as latitude_node.py writes it in the comment of CAPACITY_WAIT_CAP_S (`<run id> <minutes>` pairs after
+    "A full"), so the cap is held to what was measured and not to a number written twice."""
+    source = (HERE / "latitude_node.py").read_text(encoding="utf-8")
+    comment = source[:source.index("CAPACITY_WAIT_CAP_S = ")]
+    full = comment[comment.rindex("A full"):]
+    minutes = [float(m) for m in re.findall(r"\b\d{11} (\d+\.\d)\b", full)]
+    assert len(minutes) >= 7, minutes
+    return max(minutes) * 60
 
 
 def group_node_job():
@@ -2840,9 +2857,11 @@ def group_capacity_wait():
         found, error, said, state, latitude = bring_up_crowded(api, clock, tmp)
         out.append(("capacity wait: freed in the last poll of the cap, the node still has the reserve of the deadline left for the bootstrap and the runners",
                     found is not None and state["deadline_at"] - (WALL0 + clock.now) >= t.PROVISION_RESERVE_S))
-    out.append(("capacity wait: the cap and the reserve fit in the deadline, which fits in the node job; the poll is shorter than the shortest hold measured",
-                t.CAPACITY_WAIT_CAP_S + t.PROVISION_RESERVE_S <= t.PROVISION_DEADLINE_S and t.PROVISION_DEADLINE_S + 5 * 60 <= 45 * 60
-                and t.CAPACITY_POLL_S * 30 <= 18.5 * 60))
+    node_limit_s = release_node_job()["timeout-minutes"] * 60
+    out.append(("capacity wait: the cap and the reserve are the deadline, which with 5 minutes for the node job's own steps fits in that job's timeout (release.yml); "
+                "the cap is the longest hold of a full run written in the comment of the cap (plus margin); the poll is shorter than the shortest hold measured",
+                t.CAPACITY_WAIT_CAP_S + t.PROVISION_RESERVE_S == t.PROVISION_DEADLINE_S and t.PROVISION_DEADLINE_S + 5 * 60 <= node_limit_s
+                and t.CAPACITY_WAIT_CAP_S >= longest_full_hold_s() and t.CAPACITY_POLL_S * 30 <= 18.5 * 60))
     # --- a refusal the list contradicts waits a poll, it does not spin ---
     with tempfile.TemporaryDirectory() as tmp:
         clock = Clock()
@@ -2936,8 +2955,9 @@ def group_node_hardening():
                 "recheck=0 if a.if_legs_done else OFF_RECHECK_S" in inspect.getsource(t.run_off)))
 
     # --- one deadline for up and prepare ---------------------------------------------------------------------------------------------------------------
-    out.append(("deadline: up and prepare have 40 minutes in all, inside the node job's 45 (release.yml), with room for the delete",
-                t.PROVISION_DEADLINE_S == 2400 and t.PROVISION_DEADLINE_S + 5 * 60 <= 45 * 60))
+    out.append(("deadline: up and prepare have the cap and the reserve in all, inside the node job's timeout (release.yml), with 5 minutes for the delete and the steps around",
+                t.PROVISION_DEADLINE_S == t.CAPACITY_WAIT_CAP_S + t.PROVISION_RESERVE_S
+                and t.PROVISION_DEADLINE_S + 5 * 60 <= release_node_job()["timeout-minutes"] * 60))
     clock = Clock()
     try:
         t.remaining(clock() - 1, clock)
@@ -2945,7 +2965,7 @@ def group_node_hardening():
     except t.NodeError as exc:
         left_error = str(exc)
     out.append(("deadline: a phase with nothing left fails by itself, saying so (the node is then deleted by the script, not by the kill)",
-                "within 2400 s" in left_error and t.remaining(None, clock) is None and t.remaining(clock() + 5, clock) == 5))
+                ("within %d s" % t.PROVISION_DEADLINE_S) in left_error and t.remaining(None, clock) is None and t.remaining(clock() + 5, clock) == 5))
 
     bad_gateway = (100, "", "E: Failed to fetch http://x/InRelease  502  Bad Gateway")
     clock = Clock()
@@ -2974,7 +2994,7 @@ def group_node_hardening():
         late_error = ""
     except t.NodeError as exc:
         late_error = str(exc)
-    out.append(("deadline: a bootstrap that starts past the deadline is not run at all", "within 2400 s" in late_error and stuck.bootstraps == 0))
+    out.append(("deadline: a bootstrap that starts past the deadline is not run at all", ("within %d s" % t.PROVISION_DEADLINE_S) in late_error and stuck.bootstraps == 0))
 
     class SlowUp:
         """A node whose address never comes: wait_up gives up at what is left of the deadline, not at its own 900 s."""

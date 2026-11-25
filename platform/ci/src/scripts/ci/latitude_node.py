@@ -96,14 +96,6 @@ UP_LIMIT_S = 900
 # Measured from a hosted runner to a node: 1440 and below carry everything. Kept lower, for paths not measured.
 PATH_MTU = 1200
 BOOTSTRAP_LIMIT_S = 1200
-# ONE deadline for up() and prepare() together, from the start of up to the last runner online (up writes it into its state file, prepare reads it, the
-# steps between them spend from it): the node job has 45 minutes (release.yml) and GitHub kills a job past them
-# without letting its script delete anything. wait_up (900), the bootstrap with its retries (900 + one attempt of up to 1200) and the runners (2 x 300) add
-# up to more; each phase gets what is left of these 40 minutes and a phase with nothing left fails, so the node is deleted by this script and the
-# job never reaches the kill. The wait for the team's capacity (CAPACITY_WAIT_CAP_S) spends from this same deadline, not from a second one on top of it
-# (the node job's 45 minutes would not hold two): the deadline starts with up(), before the create, so what the wait spends is already out of the 40
-# minutes when wait_up and the bootstrap ask what is left, and PROVISION_RESERVE_S is what the wait never takes from them.
-PROVISION_DEADLINE_S = 2400
 # measured: the node job, from its start to its end, took 45-69 s in 30 of the 32 that succeeded among the last 60 runs of release.yml, and 88 s and 149 s in
 # the other two (runs 45442807307 and 45462862941); three of the 32 resolved the closure on a cache miss, for 9-11 s. The longest is 149 s. 600 s is four times
 # that: the checkout, wait_up, the closure, the bootstrap and the runners, with room for one retry of the bootstrap (BOOTSTRAP_RETRY_PAUSE_S), after the wait ends.
@@ -111,12 +103,22 @@ PROVISION_RESERVE_S = 600
 # measured: how long a run holds its node, from the end of `up` to the end of stop-node. A candidate that compiles and stops: 18.5-26.3 min in 8 runs
 # (45529968367 19.8, 45529164808 18.7, 45494298250 18.5, 45442807307 26.3, 45409794902 20.9, 45462862941 21.1, 45227681543 21.3, 45056789566 20.9). A full
 # run: 62.3-66.8 min in 7 (45470348805 63.2, 45499190667 66.8, 45381665911 64.8, 45348928499 62.3, 45234838742 63.5, 45077433049 63.3, 45060573559 62.3).
-# 1800 s is the longest wait the deadline allows (2400 - PROVISION_RESERVE_S): it covers every compile-only hold measured with 3.7 minutes to spare. A slot
-# held by a full run (up to 67 minutes) does not fit in the node job's 45: a wait behind two of them ends red naming them, and waiting for those would
-# take a longer node job (release.yml's timeout-minutes), not a longer wait here.
-CAPACITY_WAIT_CAP_S = 1800
-# measured: the shortest hold above is 1110 s (18.5 min), so a poll every 30 s finds a freed slot within 3% of it and costs 60 reads of the server list
-# (one GET each) in the whole cap; the watch reads the same API every 60 s for hours.
+# 4200 s (70 min) is the longest full hold measured (66.8 min, run 45499190667) plus 3.2 minutes of margin: a run behind a full run waits for its node to be
+# freed, and a run behind a compile-only hold (26.3 min at most) waits far less. A waiting run holds no node, only runner minutes. Behind two full runs
+# the wait may still end at the cap, red naming the holders: the cap is a bound, not a promise.
+CAPACITY_WAIT_CAP_S = 4200
+# ONE deadline for up() and prepare() together, from the start of up to the last runner online (up writes it into its state file, prepare reads it, the
+# steps between them spend from it): the node job has 85 minutes (release.yml) and GitHub kills a job past them
+# without letting its script delete anything. The wait for the team's capacity (CAPACITY_WAIT_CAP_S) and the phases after it (wait_up 900, the bootstrap with its
+# retries 900 + one attempt of up to 1200, the runners 2 x 300) spend from this one deadline, not from a second one on top of it: each phase gets what is left of
+# it and a phase with nothing left fails, so the node is deleted by this script and the job never reaches the kill. The deadline starts with up(), before the
+# create, so what the wait spends is already out of it when wait_up and the bootstrap ask what is left, and PROVISION_RESERVE_S is what the wait never takes
+# from them. The deadline is the cap plus the reserve, and release.yml's node job holds it with 5 minutes for its own steps (the checkout, the closure, the delete).
+# measured: the longest hold of a node by a full run is 66.8 min (run 45499190667), so a run that waits behind a full run needs 4200 s (70 min, with margin) and
+# its deadline is the cap plus the reserve: 4200 + 600 = 4800 s (80 min).
+PROVISION_DEADLINE_S = CAPACITY_WAIT_CAP_S + PROVISION_RESERVE_S
+# measured: the shortest hold above is 1110 s (18.5 min), so a poll every 30 s finds a freed slot within 3% of it and costs 140 reads of the server list
+# (one GET each) in the whole cap of 70 minutes; the watch reads the same API every 60 s for hours.
 CAPACITY_POLL_S = 30
 # When `off` is asked about a run whose node job did not succeed (a cancel or a kill, perhaps in the middle of the create), the first list of the API may be
 # empty a few seconds before a server it was asked to make appears in it: look again once, this long after.
