@@ -1,4 +1,4 @@
-"""tools/prebuild.py: each of its eight checks shown red on a synthetic tree and green on the fixed one, and
+"""tools/prebuild.py: each of its checks (1 to 11) shown red on a synthetic tree and green on the fixed one, and
 the text helpers they stand on.
 
     python -m pytest -q tools/tests/test_prebuild.py
@@ -700,3 +700,240 @@ def test_removed_lines_needs_a_base_and_run_reports_check_8():
     res = pb.run(g51(G51_HEAD_MORE), (8,))
     assert [f.check for f in res["findings"]] == [8]
     assert "prebuild 8 removed lines not more than the base: 1 FAIL" in pb.report(res, g51(G51_HEAD_MORE), (8,))
+
+
+# ============================================================================================ 9. binding headers
+# Every fixture of checks 9 to 11 goes through run(): a prebuild without the check returns no finding of that number, so each red case fails on it.
+def only(project_, n):
+    return [f for f in pb.run(project_, checks=(n,))["findings"] if f.check == n]
+
+
+WEBGL_IDL = """\
+[Exposed=(Window,Worker)]
+interface WebGLRenderingContext {
+};
+
+[Exposed=(Window,Worker), LegacyNoInterfaceObject]
+interface WEBGL_debug_renderer_info {
+  const GLenum UNMASKED_VENDOR_WEBGL = 0x9245;
+};
+
+partial interface Navigator {
+};
+"""
+
+
+def binding_fixture(include_line, hook_line=None):
+    """A tag with some webidl files and a head with a file of ours (and, with hook_line, a Mozilla file) that includes a Binding header."""
+    tag = {"dom/webidl/WebGLRenderingContext.webidl": WEBGL_IDL, "dom/webidl/Navigator.webidl": "interface Navigator {};\n",
+           "dom/webidl/moz.build": 'GENERATED_WEBIDL_FILES = [\n    "CSSStyleProperties.webidl",\n]\nGENERATED_EVENTS_WEBIDL_FILES = [\n    "AddonEvent",\n]\n',
+           "dom/Host.cpp": "int a;\nint b;\n"}
+    head = dict(tag)
+    head["gfx/StealthGl.cpp"] = "%s\nint StealthGl() { return 1; }\n" % include_line
+    if hook_line:
+        head["dom/Host.cpp"] = "int a;\n%s\nint b;\n" % hook_line
+    return project(tag, head)
+
+
+def test_binding_header_of_an_interface_declared_inside_another_webidl_is_red_and_names_the_header_that_exists():
+    found = only(binding_fixture('#include "mozilla/dom/WEBGL_debug_renderer_infoBinding.h"'), 9)
+    assert [(f.level, f.where) for f in found] == [("FAIL", "gfx/StealthGl.cpp:1")], texts(found)
+    assert "does not exist" in found[0].what and "mozilla/dom/WebGLRenderingContextBinding.h" in found[0].fix
+    assert found[0].failure.rule == "hook-02-shape-and-contract"
+
+
+def test_binding_header_that_a_webidl_file_generates_is_green():
+    for name in ("WebGLRenderingContext", "Navigator", "CSSStyleProperties", "AddonEvent"):
+        assert only(binding_fixture('#include "mozilla/dom/%sBinding.h"' % name), 9) == [], name
+    assert only(binding_fixture("#include <mozilla/dom/NavigatorBinding.h>"), 9) == []
+
+
+def test_binding_header_no_webidl_declares_is_red_and_says_so():
+    found = only(binding_fixture('#include "mozilla/dom/NoSuchThingBinding.h"'), 9)
+    assert len(found) == 1 and "no .webidl file of the tree declares NoSuchThing" in found[0].fix
+
+
+def test_binding_header_a_partial_interface_does_not_generate_the_header_of_its_name():
+    found = only(binding_fixture('#include "mozilla/dom/Navigator2Binding.h"'), 9)
+    assert len(found) == 1 and "no .webidl file" in found[0].fix
+
+
+def test_binding_header_on_a_hook_line_is_checked_too_and_a_comment_is_not():
+    red = only(binding_fixture("// nothing", '#include "mozilla/dom/WEBGL_debug_renderer_infoBinding.h"  // STEALTH-HOOK(a/b)'), 9)
+    assert [(f.level, f.where) for f in red] == [("FAIL", "dom/Host.cpp:2")], texts(red)
+    assert only(binding_fixture('// #include "mozilla/dom/NoSuchThingBinding.h"'), 9) == []
+
+
+# ============================================================================================ 10. this from a const member
+CONST_TAG = """\
+namespace mozilla {
+
+bool ClientWebGLContext::ReadPixels(const A& aDesc, B& aRange) const {
+  const auto& range = aRange;
+  return true;
+}
+
+}  // namespace mozilla
+"""
+CONST_HOOK = "  bool succeeded = StealthDoReadPixels(this, aDesc, *range);  // STEALTH-HOOK(a/b)"
+CONST_DECL = """\
+namespace mozilla {
+class ClientWebGLContext;
+bool StealthDoReadPixels(%s aThis, const A& aDesc, const B& aRange);
+}  // namespace mozilla
+"""
+
+
+def const_fixture(const=True, param="ClientWebGLContext*", hook=CONST_HOOK, decl=None):
+    """A const (or not) member function of Mozilla's with a hook line at line 5, and our declaration of the function it calls."""
+    tag = {"dom/Host.cpp": CONST_TAG if const else CONST_TAG.replace(") const {", ") {")}
+    line_before = "  const auto& range = aRange;\n"
+    head = {"dom/Host.cpp": tag["dom/Host.cpp"].replace(line_before, line_before + hook + "\n"),
+            "dom/StealthRead.h": decl if decl is not None else CONST_DECL % param}
+    return project(tag, head)
+
+
+def test_this_passed_from_a_const_member_to_a_non_const_pointer_is_red():
+    found = only(const_fixture(), 10)
+    assert [(f.level, f.where) for f in found] == [("FAIL", "dom/Host.cpp:5")], texts(found)
+    assert "const member function ClientWebGLContext::ReadPixels" in found[0].what and "parameter 1" in found[0].what
+    assert "`const ClientWebGLContext*`" in found[0].fix
+    assert found[0].failure.rule == "hook-02-shape-and-contract"
+
+
+def test_this_passed_from_a_const_member_to_a_const_parameter_is_green():
+    assert only(const_fixture(param="const ClientWebGLContext*"), 10) == []
+    assert only(const_fixture(param="ClientWebGLContext const*"), 10) == []
+
+
+def test_this_passed_from_a_non_const_member_is_green():
+    assert only(const_fixture(const=False), 10) == []
+
+
+def test_star_this_into_a_non_const_reference_is_red_and_into_a_const_reference_or_a_copy_is_green():
+    hook = "  bool succeeded = StealthDoReadPixels(*this, aDesc, *range);  // STEALTH-HOOK(a/b)"
+    assert [f.level for f in only(const_fixture(hook=hook, param="ClientWebGLContext&"), 10)] == ["FAIL"]
+    assert only(const_fixture(hook=hook, param="const ClientWebGLContext&"), 10) == []
+    assert only(const_fixture(hook=hook, param="ClientWebGLContext"), 10) == []
+
+
+def test_this_check_an_unreadable_case_is_a_note_that_names_the_hook_and_never_a_pass():
+    note = only(const_fixture(decl="// no declaration of ours\n"), 10)
+    assert [(f.level, f.where) for f in note] == [("NOTE", "dom/Host.cpp:5")], texts(note)
+    assert "StealthDoReadPixels" in note[0].what and note[0].line().startswith("NOTE dom/Host.cpp:5: cannot tell: ")
+    smart = only(const_fixture(param="RefPtr<ClientWebGLContext>"), 10)
+    assert [f.level for f in smart] == ["NOTE"], texts(smart)
+    template = ("namespace mozilla {\ntemplate <typename T>\nbool StealthDoReadPixels(T* aThis, const A& aDesc, const B& aRange);\n}\n")
+    assert [f.level for f in only(const_fixture(decl=template), 10)] == ["NOTE"]
+
+
+def test_this_check_a_hook_inside_a_macro_is_a_note():
+    hook = "#define STEALTH_READ() StealthDoReadPixels(this, aDesc, *range) /* STEALTH-HOOK(a/b) */"
+    note = only(const_fixture(hook=hook), 10)
+    assert [f.level for f in note] == ["NOTE"] and "inside a macro" in note[0].what, texts(note)
+
+
+def test_this_check_a_note_does_not_change_the_exit_code_and_the_report_counts_it():
+    p = const_fixture(decl="// none\n")
+    res = pb.run(p, checks=(10,))
+    assert not any(f.level == "FAIL" for f in res["findings"])
+    assert "prebuild 10 this from a const member: 0 FAIL, 0 WARN, 1 NOTE" in pb.report(res, p, (10,))
+
+
+# ============================================================================================ 11. refcounted class on the stack
+MODULE_RECORD_H = """\
+namespace mozilla {
+class ModuleRecord final {
+ public:
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(ModuleRecord)
+  explicit ModuleRecord(const wchar_t* aPath);
+
+ private:
+  ~ModuleRecord() = default;
+};
+class Plain {
+ public:
+  explicit Plain(int a);
+  ~Plain();
+};
+class Hidden {
+ public:
+  explicit Hidden(int a);
+ protected:
+  ~Hidden() = default;
+};
+struct Open {
+  Open();
+};
+}  // namespace mozilla
+"""
+
+
+def stack_fixture(body):
+    tag = {"toolkit/xre/dllservices/UntrustedModulesData.h": MODULE_RECORD_H}
+    head = dict(tag)
+    head["toolkit/xre/gtest/TestStealthNt.cpp"] = '#include "UntrustedModulesData.h"\nTEST(StealthNt, A) {\n%s\n}\n' % body
+    return project(tag, head)
+
+
+def test_refcounted_class_built_on_the_stack_is_red_and_the_fix_builds_it_on_the_heap():
+    found = only(stack_fixture("  mozilla::ModuleRecord control(ntdllNt);"), 11)
+    assert [(f.level, f.where) for f in found] == [("FAIL", "toolkit/xre/gtest/TestStealthNt.cpp:3")], texts(found)
+    assert "NS_INLINE_DECL_THREADSAFE_REFCOUNTING" in found[0].what and "private destructor" in found[0].what
+    assert "RefPtr<ModuleRecord> control = new ModuleRecord(ntdllNt);" in found[0].fix and "MakeRefPtr<ModuleRecord>(ntdllNt)" in found[0].fix
+    assert found[0].failure.rule == "hook-02-shape-and-contract"
+
+
+def test_refcounted_class_on_the_stack_every_shape_of_the_declaration_is_found():
+    for body in ("  ModuleRecord control(ntdllNt);", "  const mozilla::ModuleRecord control{ntdllNt};", "  mozilla::Hidden h(1);", "  mozilla::Hidden h;"):
+        assert len(only(stack_fixture(body), 11)) == 1, body
+
+
+def test_refcounted_class_on_the_heap_or_an_ordinary_class_on_the_stack_is_green():
+    for body in ("  RefPtr<mozilla::ModuleRecord> control = new mozilla::ModuleRecord(ntdllNt);",
+                 "  RefPtr<mozilla::ModuleRecord> control = MakeRefPtr<mozilla::ModuleRecord>(ntdllNt);",
+                 "  mozilla::ModuleRecord* control = nullptr;", "  mozilla::Plain p(1);", "  mozilla::Open o;", "  int x;", "  return;",
+                 "  other::ModuleRecord control(ntdllNt);"):
+        assert only(stack_fixture(body), 11) == [], body
+
+
+def test_refcounted_class_on_the_stack_in_a_comment_or_a_string_is_not_one():
+    assert only(stack_fixture('  // mozilla::ModuleRecord control(ntdllNt);\n  const char* s = "ModuleRecord control(x);";'), 11) == []
+
+
+# ============================================================================================ the three checks in the run
+def test_the_default_run_and_the_report_name_checks_9_to_11():
+    assert pb.CHECK_NAMES[9] and pb.CHECK_NAMES[10] and pb.CHECK_NAMES[11]
+    tag, head = fixture()
+    res = pb.run(project(tag, head))
+    assert {9, 10, 11} <= set(res["times"])
+
+
+def test_refcounted_class_with_the_name_of_a_class_in_a_source_file_or_defined_in_the_file_itself_is_the_one_the_file_means():
+    # the real near miss: our test defines its own plain FakeChannel while another test's source file defines a refcounted one
+    other = {"uriloader/preload/gtest/TestFetchPreloader.cpp": "class FakeChannel : public nsIChannel {\n NS_DECL_ISUPPORTS\n private:\n ~FakeChannel() = default;\n};\n"}
+    own = '#include "UntrustedModulesData.h"\nstruct FakeChannel {\n  int x;\n};\nTEST(StealthNt, A) {\n  FakeChannel channel;\n}\n'
+
+    def build(own_text, tag_extra):
+        tag = {"toolkit/xre/dllservices/UntrustedModulesData.h": MODULE_RECORD_H, **tag_extra}
+        return project(tag, {**tag, "toolkit/xre/gtest/TestStealthNt.cpp": own_text})
+
+    assert only(build(own, other), 11) == []                                                    # defined here, not refcounted
+    assert only(build(own.replace("int x;", "NS_INLINE_DECL_REFCOUNTING(FakeChannel)"), other), 11)[0].level == "FAIL"   # defined here, refcounted
+    elsewhere = own.replace("struct FakeChannel {\n  int x;\n};\n", "")
+    assert only(build(elsewhere, other), 11) == []                                              # a class of a source file is not seen from another file
+
+
+def test_refcounted_class_two_headers_of_one_name_that_disagree_are_told_apart_by_the_includes_or_are_a_note():
+    plain = {"dom/a/Thing.h": "class Thing { public: Thing(); };\n"}
+    counted = {"dom/b/Thing.h": "class Thing { public: NS_INLINE_DECL_REFCOUNTING(Thing) private: ~Thing(); };\n"}
+
+    def build(include):
+        tag = {**plain, **counted}
+        body = '%s\nTEST(StealthNt, A) {\n  Thing t;\n}\n' % include
+        return project(tag, {**tag, "dom/gtest/TestStealthThing.cpp": body})
+
+    assert [f.level for f in only(build('#include "dom/b/Thing.h"'), 11)] == ["FAIL"]
+    assert only(build('#include "dom/a/Thing.h"'), 11) == []
+    note = only(build('// no include'), 11)
+    assert [f.level for f in note] == ["NOTE"] and "does not say which it means" in note[0].what

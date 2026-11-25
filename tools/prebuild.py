@@ -10,6 +10,7 @@ objects of the source repository. A line per problem, the style of `engine.py ch
 
     FAIL <where>: <what>; <how to fix>
     WARN <where>: cannot tell: <what>          (does not change the exit code)
+    NOTE <where>: cannot tell: <what>          (checks 10 and 11: a case the text does not show; does not change the exit code)
 
 Exit code 1 when any FAIL. "Ours" is every file of the head the tag does not have; "Mozilla's" is every file
 the head changes. HOOKS.json (the series, --series, default this repository) is read for its hand fields:
@@ -30,6 +31,12 @@ renamed body that is allowed).
     8  REMOVED LINES    (--base) rule G51: per Mozilla file, the lines the head removes or rewrites (`-` lines of the
                         diff against the tag) are not more than the base's, unless a HOOKS.json entry of the file
                         carries `"replaces": [...]` (one rewritten line standing for several hooks)
+    9  BINDING HEADER   a `#include "mozilla/dom/<X>Binding.h"` in a file of ours or on a hook line where no .webidl file of the
+                        tree generates `<X>Binding.h`; the fix names the header of the webidl that declares the interface
+    10 CONST THIS       a hook line inside a const member function passes `this` (or `*this`) to a function of ours whose
+                        matching parameter is a non-const pointer (or reference); a case the text does not show is a NOTE
+    11 STACK REFCOUNTED a refcounted class (NS_INLINE_DECL_REFCOUNTING, NS_DECL_ISUPPORTS or a private or protected
+                        destructor) built on the stack (`T x(...);`, `T x;`) in a file of ours or a test of ours
 
 The checks are textual (no preprocessor, no templates, no overload resolution): where the text does not
 decide, the check says WARN and does not guess.
@@ -60,20 +67,23 @@ RS_EXT = {"rs"}
 HEADER_EXT = {"h", "hpp"}
 KEYWORDS = {"return", "else", "new", "delete", "case", "throw", "co_return", "co_yield", "co_await", "goto",
             "sizeof", "and", "or", "not", "typeof", "do", "if", "while", "for", "switch", "using", "typedef"}
-FAIL, WARN = "FAIL", "WARN"
+FAIL, WARN, NOTE = "FAIL", "WARN", "NOTE"
 
 # The decision each check enforces (repo-04: a FAIL names its rule).
-RULE_LINK = "hook-02-shape-and-contract"                    # checks 1 and 2: a hook calls a function of ours that is declared, defined, built
+RULE_LINK = "hook-02-shape-and-contract"                    # checks 1 and 2 (and 9 to 11 below): a hook calls a function of ours that is declared, defined, built
 RULE_ADD = "port-06-hooks-only-add"                         # checks 3 and 5: Mozilla's lines are not rewritten, a restored file is the tag's
 RULE_OWN = "hook-01-own-code-first"                         # check 6: every source of ours is built or shipped, no two share a basename
 RULE_GTEST = "ci-07-every-check-runs-before-the-merge"      # check 7: every gtest suite of ours is run by the default filter
 RULE_REMOVED = "hook-03-budgets-and-debt-only-go-down"      # check 8: the Mozilla lines the head removes do not grow
+RULE_BINDING = "hook-02-shape-and-contract"                 # check 9: an include of ours names a header that exists (the link of a hook)
+RULE_CONST_THIS = "hook-02-shape-and-contract"              # check 10: the call a hook makes must compile from where the hook stands
+RULE_STACK = "hook-02-shape-and-contract"                   # check 11: a class of Mozilla's is used the way its header allows
 RULE_TOOL = "repo-04-every-failure-says-where-what-fix-rule"    # the tool itself: a bad call, a git error
 
 
 @dataclass
 class Finding:
-    """One result of a check. A FAIL carries the `fail()` that says where, what, fix and rule (`Finding.failed`); a WARN is a note, not a
+    """One result of a check. A FAIL carries the `fail()` that says where, what, fix and rule (`Finding.failed`); a WARN or a NOTE is not a
     failure: the check could not tell, the exit code does not change, and it has no fix and no rule."""
     level: str
     check: int
@@ -87,8 +97,8 @@ class Finding:
         return cls(FAIL, check, failure.where, failure.what, failure.fix, failure)
 
     def line(self) -> str:
-        if self.level == WARN:
-            return "WARN %s: cannot tell: %s" % (self.where, self.what)
+        if self.level in (WARN, NOTE):
+            return "%s %s: cannot tell: %s" % (self.level, self.where, self.what)
         if self.failure is None:
             raise TypeError(str(fail("tools/prebuild.py Finding", "a FAIL finding of check %d (%s) was built without a fail()" % (self.check, self.where),
                                      "build it with Finding.failed(check, fail(where, what, fix, rule))", RULE_TOOL)))
@@ -134,6 +144,11 @@ class Tree:
 
     def all_paths(self) -> list:
         raise NotImplementedError
+
+    def paths_with(self, pattern: str, exts) -> list:
+        """The files of the tree with extension in `exts` whose text matches `pattern` (a regular expression that git's `-E` reads too)."""
+        rx = re.compile(pattern)
+        return [q for q in self.all_paths() if ext_of(q) in exts and rx.search(self.read(q) or "")]
 
     def contains_names(self, names) -> set:
         """The names of `names` that some source file of this tree contains as a whole word."""
@@ -204,6 +219,12 @@ class GitTree(Tree):
         names = sorted(set(names))
         with ThreadPoolExecutor(max_workers=4) as pool:
             return {n for n, ok in zip(names, pool.map(has, names)) if ok}
+
+    def paths_with(self, pattern: str, exts) -> list:
+        r = subprocess.run(["git", "-C", self.source, "grep", "-l", "-E", "-e", pattern, self.ref, "--", *["*.%s" % e for e in sorted(exts)]],
+                           capture_output=True)
+        pre = self.ref + ":"
+        return [x[len(pre):] if x.startswith(pre) else x for x in r.stdout.decode("utf-8", "replace").splitlines() if x]
 
     def close(self):
         if self._proc is not None:
@@ -1701,12 +1722,358 @@ def check_removed_lines(proj: Project) -> list:
     return out
 
 
+# ============================================================================================ files of ours and hook lines
+def _own_c_files(proj: Project) -> list:
+    """The C and C++ files of ours (sources, headers, tests) inside the scope."""
+    return [p for p in proj.own if ext_of(p) in C_EXT and proj.in_scope(p)]
+
+
+def _hook_hosts(proj: Project) -> list:
+    """The Mozilla C and C++ files the head changes, inside the scope: the files that carry hook lines."""
+    return [p for p in proj.mozilla if proj.in_scope(p) and ext_of(p) in C_EXT]
+
+
+def _close_of(s: str, open_idx: int):
+    """s[open_idx] opens a ( [ or {: the index of its closing character, or None."""
+    d = 0
+    for j in range(open_idx, len(s)):
+        if s[j] in "([{":
+            d += 1
+        elif s[j] in ")]}":
+            d -= 1
+            if d == 0:
+                return j
+    return None
+
+
+# ============================================================================================ 9. binding headers
+BINDING_INCLUDE = re.compile(r'^[ \t]*#[ \t]*include[ \t]*["<]mozilla/dom/(\w+)Binding\.h[">]')
+WEBIDL_LIST = re.compile(r"\b\w*WEBIDL_FILES\s*\+?=\s*\[(.*?)\]", re.S)
+# `partial interface X` does not match: `partial` stands where this expects the keyword.
+WEBIDL_DECL = re.compile(r"^[ \t]*(?:\[[^\]]*\]\s*)?(?:callback\s+)?(?:interface|dictionary|namespace|enum)\s+(?:mixin\s+)?(\w+)", re.M)
+
+
+def webidl_stems(proj: Project) -> set:
+    """The names X for which the head generates `<X>Binding.h`: every `X.webidl` file, and every name a moz.build lists in a *WEBIDL_FILES
+    variable (a generated file has no `.webidl` in the tree)."""
+    stems, dirs = set(), {"dom/webidl", "dom/chrome-webidl"}
+    for q in proj.head.all_paths():
+        if q.endswith(".webidl"):
+            stems.add(base_of(q)[:-len(".webidl")])
+            dirs.add(dir_of(q))
+    for d in sorted(dirs):
+        for m in WEBIDL_LIST.finditer(proj.head.read(d + "/moz.build") or ""):
+            stems.update(re.sub(r"\.webidl$", "", x) for x in re.findall(r"""["']([\w.]+)["']""", m.group(1)))
+    return stems
+
+
+def webidl_declaring(proj: Project, name: str) -> list:
+    """The `.webidl` files of the head that declare `name` as an interface, dictionary, namespace or enum (not as a `partial` one)."""
+    out = []
+    for q in proj.head.all_paths():
+        if q.endswith(".webidl"):
+            t = proj.head.read(q) or ""
+            if name in t and any(m.group(1) == name for m in WEBIDL_DECL.finditer(t)):
+                out.append(q)
+    return out
+
+
+def check_binding_headers(proj: Project) -> list:
+    """Check 9: a `mozilla/dom/<X>Binding.h` include of ours or of a hook line names a header the head generates."""
+    out, uses = [], []                          # uses: (where, X)
+    for p in _own_c_files(proj):
+        for i, line in enumerate((proj.read(p) or "").split("\n"), 1):
+            m = BINDING_INCLUDE.match(line)
+            if m:
+                uses.append(("%s:%d" % (p, i), m.group(1)))
+    for p in _hook_hosts(proj):
+        for ln, t in proj.added_lines(p):
+            m = BINDING_INCLUDE.match(t)
+            if m:
+                uses.append(("%s:%d" % (p, ln), m.group(1)))
+    proj.stats[9] = "%d Binding.h includes of ours" % len(uses)
+    if not uses:
+        return out
+    stems = webidl_stems(proj)
+    for where, x in uses:
+        if x in stems:
+            continue
+        decl = webidl_declaring(proj, x)
+        if decl:
+            stem = base_of(decl[0])[:-len(".webidl")]
+            fix = "include `mozilla/dom/%sBinding.h`: %s declares %s, and the header of a webidl file holds every binding the file declares" % (stem, base_of(decl[0]), x)
+        else:
+            fix = ("no .webidl file of the tree declares %s: fix the name, or find the file that declares the interface (grep `interface %s` in the .webidl "
+                   "files) and include the Binding.h of that file" % (x, x))
+        out.append(Finding.failed(9, fail(where, "`mozilla/dom/%sBinding.h` does not exist: no %s.webidl file of the tree generates it" % (x, x),
+                                          fix, RULE_BINDING)))
+    return out
+
+
+# ============================================================================================ 10. this from a const member
+PRIMITIVE_TYPES = {"bool", "int", "long", "short", "char", "float", "double", "unsigned", "signed", "size_t", "ssize_t", "uintptr_t", "intptr_t",
+                   "uint8_t", "uint16_t", "uint32_t", "uint64_t", "int8_t", "int16_t", "int32_t", "int64_t", "ptrdiff_t", "nsresult"}
+
+
+def enclosing_member(scan: CppScan, off: int):
+    """(name, const, why) of the function whose body holds off, read from the signature before the body. const is True or False, or None when
+    the signature cannot be read (why says why)."""
+    b = scan.body_at(off)
+    if not b:
+        return "", None, "the line is not inside a function body"
+    sig = _label_re.sub("", scan.clean[scan.stmt_start(b[0]):b[0]]).strip()
+    sig = re.sub(r"noexcept\s*\([^()]*\)", "noexcept", sig)
+    if "(" not in sig or ")" not in sig:
+        return "", None, "the signature before the body is not readable"
+    if re.search(r"\]\s*\(", sig):
+        return "", None, "the body is a lambda"
+    m = re.search(r"\)\s*const\b[^()]*$", sig)
+    close = m.start() if m else sig.rfind(")")
+    d, j = 0, close
+    while j >= 0:                               # back from the closing parenthesis of the parameters to its opening one
+        if sig[j] == ")":
+            d += 1
+        elif sig[j] == "(":
+            d -= 1
+            if d == 0:
+                break
+        j -= 1
+    nm = re.search(r"([\w:~]+)\s*$", sig[:j]) if j > 0 else None
+    return (nm.group(1) if nm else ""), bool(m), ""
+
+
+def param_takes_const_this(param: str, star: bool) -> str:
+    """Can a const `this` (star False) or `*this` (star True) be passed for this parameter? -> 'ok' | 'bad' | 'unknown'."""
+    k = _default_at(param)
+    t = re.sub(r"\s+", " ", param[:k] if k is not None else param).strip()
+    if "<" in t or "..." in t or not t:
+        return "unknown"
+    if star:
+        if "&&" in t or ("*" in t and "&" not in t):
+            return "unknown"
+        if "&" in t:
+            return "ok" if re.search(r"\bconst\b", t.split("&")[0]) else "bad"
+        return "ok"                              # by value: a copy
+    if "*" in t:
+        return "ok" if re.search(r"\bconst\b", t.split("*")[0]) else "bad"
+    if "&" in t:
+        return "unknown"
+    base = re.sub(r"\s*\b\w+$", "", t) if re.search(r"\w\s+\w+$", t) else t      # the type, without the parameter's name
+    words = set(re.findall(r"\w+", base)) - {"const", "volatile", "struct", "class", "enum"}
+    return "ok" if words and words <= PRIMITIVE_TYPES else "unknown"
+
+
+def _declared_in_template(proj: Project, d: Decl) -> bool:
+    scan = proj.cscan(d.file)
+    if scan is None:
+        return False
+    a, b = scan.offset_of(d.line)
+    k = scan.clean.find(d.name, a, b)
+    return "template" in scan.prefix_at(k if k >= 0 else a)
+
+
+def check_const_this(proj: Project) -> list:
+    """Check 10: a hook line in a const member function that passes `this` to a function of ours with a non-const pointer or reference there."""
+    out, cands = [], []                         # cands: (site, index of the argument, is it *this)
+    rx = call_regex(proj.own_function_names())
+    for host in _hook_hosts(proj):
+        scan = proj.cscan(host)
+        seen = set()
+        for s in collect_sites(proj, host, rx):
+            if s.kind != "call":
+                continue
+            seen.add(s.line)
+            for i, a in enumerate(split_args(_args_text(proj, s))):
+                if re.fullmatch(r"(?:\*\s*)?this", a.strip()):
+                    cands.append((s, i, a.strip().startswith("*")))
+        for ln, raw in proj.added_lines(host):
+            if ln not in seen and rx.search(raw) and re.search(r"\bthis\b", raw):      # a hook the text does not show: inside a macro
+                a, b = scan.offset_of(ln)
+                if not rx.search(scan.clean[a:b]):
+                    out.append(Finding(NOTE, 10, "%s:%d" % (host, ln), "the hook line passes `this` to a function of ours and is inside a macro: "
+                                       "the text does not show whether the enclosing member is const"))
+    proj.stats[10] = "%d hook calls pass `this`" % len(cands)
+    if not cands:
+        return out
+    idx = DeclIndex(proj, {s.name for s, _, _ in cands})
+    for host in {s.host for s, _, _ in cands}:      # the declarations the hook lines themselves add
+        lines = {ln for ln, _ in proj.added_lines(host)}
+        for d in find_decls(proj.cscan(host), {s.name for s, _, _ in cands if s.host == host}, only_lines=lines):
+            idx.add(d)
+    done = set()
+    for s, i, star in cands:
+        where = "%s:%d" % (s.host, s.line)
+        if (where, s.name, i) in done:
+            continue
+        done.add((where, s.name, i))
+        shown = "*this" if star else "this"
+        fn, const, why = enclosing_member(proj.cscan(s.host), s.off)
+        if const is False:
+            continue
+        if const is None:
+            out.append(Finding(NOTE, 10, where, "the hook passes `%s` to %s and the check cannot tell whether the enclosing member is const: %s" % (shown, s.name, why)))
+            continue
+        argc = 0 if s.argc == 1 and _empty_args(proj, s) else s.argc
+        funcs = [d for d in idx.get(s.name) if d.kind == "func" and (argc is None or (d.nmin <= argc and (d.nmax is None or argc <= d.nmax)))]
+        if not funcs:
+            out.append(Finding(NOTE, 10, where, "the hook passes `%s` to %s from the const member %s and the check found no declaration of %s with %s arguments in our files"
+                               % (shown, s.name, fn or "?", s.name, s.argc)))
+            continue
+        verdicts = []
+        for d in funcs:
+            ps = split_args(d.params)
+            if _declared_in_template(proj, d) or i >= len(ps):
+                verdicts.append(("unknown", d, ""))
+            else:
+                verdicts.append((param_takes_const_this(ps[i], star), d, ps[i]))
+        kinds = {v for v, _, _ in verdicts}
+        if "ok" in kinds:
+            continue
+        if kinds == {"bad"}:
+            _, d, ptxt = verdicts[0]
+            k = _default_at(ptxt)
+            written = re.sub(r"\s+", " ", ptxt[:k] if k is not None else ptxt).strip()
+            pointee = re.sub(r"\s*\b\w+$", "", written) if re.search(r"[*&]\s*\w+$", written) else written
+            out.append(Finding.failed(10, fail(where, "%s(%s, ...) is called inside the const member function %s, where `this` is const, and parameter %d of %s (%s:%d) is `%s`, "
+                                                      "which does not take a const object" % (s.name, shown, fn or "?", i + 1, s.name, d.file, d.line, written),
+                                               "declare the parameter `const %s` in the header and the definition of ours when the function only reads the object (the usual case); "
+                                               "when it must change the object, change a member that is `mutable` or reach the state through a pointer the class already holds"
+                                               % pointee, RULE_CONST_THIS)))
+        else:
+            out.append(Finding(NOTE, 10, where, "the hook passes `%s` to %s from the const member %s and the check cannot read parameter %d of %s "
+                               "(a template, a smart pointer, a typedef or a variadic list)" % (shown, s.name, fn or "?", i + 1, s.name)))
+    return out
+
+
+# ============================================================================================ 11. refcounted class on the stack
+REFCOUNT_MACRO = re.compile(r"\bNS_(?:INLINE_)?DECL_\w*?(?:REFCOUNTING|ISUPPORTS)\w*")
+NOT_A_TYPE = KEYWORDS | {"class", "struct", "union", "enum", "namespace", "typename", "template", "extern", "static_assert", "friend", "public",
+                         "private", "protected", "default", "operator", "auto", "typedef"}
+STACK_DECL = re.compile(r"(?<![\w$.>:])(?P<q>(?:::)?(?:\w+\s*::\s*)*)(?P<t>[A-Za-z_]\w*)[ \t\n]+(?P<v>[A-Za-z_]\w*)\s*(?P<k>[({;])")
+STACK_PREFIX = re.compile(r"^(?:(?:const|static|volatile|thread_local|constexpr|constinit|register)\s+)*$")
+
+
+@dataclass
+class StackUse:
+    file: str
+    line: int
+    qual: list
+    type: str
+    var: str
+    args: str
+
+
+def stack_uses(proj: Project, path: str) -> list:
+    """The `T x(...);`, `T x{...};` and `T x;` statements in the function bodies of a file of ours."""
+    scan = proj.cscan(path)
+    if scan is None:
+        return []
+    c, out = scan.clean, []
+    for b0, b1 in scan.bodies:
+        for m in STACK_DECL.finditer(c, b0 + 1, b1):
+            if m.group("t") in NOT_A_TYPE or m.group("v") in NOT_A_TYPE:
+                continue
+            before = _label_re.sub("", c[scan.stmt_start(m.start()):m.start()]).strip()
+            if before and not STACK_PREFIX.match(before + " "):
+                continue
+            args = ""
+            if m.group("k") in "({":
+                e = _close_of(c, m.end("k") - 1)
+                args = re.sub(r"\s+", " ", scan.text[m.end("k"):e]).strip() if e is not None else ""
+            out.append(StackUse(path, scan.line_of(m.start("t")), [x for x in split_qual(m.group("q")) if x != "::"], m.group("t"), m.group("v"), args))
+    return out
+
+
+def class_definitions(proj: Project, names: set) -> dict:
+    """{name: [(file, line, scope, why)]}: every definition (not a forward declaration) of a class or struct with one of `names` in the head.
+    `why` lists what makes the class refcounted or only destroyable by itself (a refcounting macro, a private or protected destructor);
+    it is empty for an ordinary class."""
+    out: dict = {}
+    if not names:
+        return out
+    alt = "|".join(sorted(names))
+    pat = r"\b(class|struct)[ \t]+[^;{(]*\b(%s)\b" % alt
+    rx = re.compile(r"\b(class|struct)\s+(?:[\w:]+(?:\([^)]*\))?\s+)*?(%s)\s*(?:final\s*)?(?::[^{;]*)?\{" % alt)
+    for q in proj.head.paths_with(pat, HEADER_EXT | {"cpp", "cc"}):
+        scan = proj.cscan(q)
+        if scan is None:
+            continue
+        for m in rx.finditer(scan.clean):
+            n = m.group(2)
+            o = m.end() - 1
+            e = _close_of(scan.clean, o)
+            if e is None:
+                continue
+            top, d = [], 0                      # the body without what lies inside nested braces
+            for ch in scan.clean[o + 1:e]:
+                if ch == "{":
+                    d += 1
+                top.append(ch if d == 0 and ch != "}" else ("\n" if ch == "\n" else " "))
+                if ch == "}":
+                    d -= 1
+            top = "".join(top)
+            why = sorted(set(REFCOUNT_MACRO.findall(top)))
+            dm = re.search(r"(?<![\w:])~%s\s*\(" % re.escape(n), top)
+            if dm:
+                labels = list(re.finditer(r"\b(public|private|protected)\s*:", top[:dm.start()]))
+                access = labels[-1].group(1) if labels else ("public" if m.group(1) == "struct" else "private")
+                if access != "public":
+                    why.append("%s destructor" % access)
+            out.setdefault(n, []).append((q, scan.line_of(m.start(2)), scan.scope_at(m.start(2)), why))
+    return out
+
+
+def resolve_class(proj: Project, u: StackUse, defs: list):
+    """(definition, None) of the class a stack declaration builds, or (None, reason): a class defined in the file itself is the one it names; else
+    one defined in a header (a class defined in a source file is private to it); two headers that disagree are told apart by the headers the file
+    includes."""
+    defs = [d for d in defs if not u.qual or d[2][-len(u.qual):] == u.qual]
+    local = [d for d in defs if d[0] == u.file]
+    defs = local or [d for d in defs if ext_of(d[0]) in HEADER_EXT]
+    if not defs:
+        return None, None
+    if len({bool(d[3]) for d in defs}) > 1:
+        scan = proj.cscan(u.file)
+        incs = scan.includes if scan else []
+        by_path = [d for d in defs if any(d[0] == i or d[0].endswith("/" + i) for i in incs)]      # the path the include names
+        defs = by_path or [d for d in defs if any(base_of(d[0]) == base_of(i) for i in incs)] or defs     # an exported path: the name only
+        if len({bool(d[3]) for d in defs}) > 1:
+            return None, "%d classes named %s (%s) and the file does not say which it means" % (len(defs), u.type, ", ".join(sorted({d[0] for d in defs})))
+    return (defs[0] if defs[0][3] else None), None
+
+
+def check_stack_refcounted(proj: Project) -> list:
+    """Check 11: a refcounted class built on the stack in a file of ours."""
+    uses = []
+    for p in _own_c_files(proj):
+        uses += stack_uses(proj, p)
+    proj.stats[11] = "%d stack declarations in files of ours" % len(uses)
+    classes = class_definitions(proj, {u.type for u in uses})
+    out, seen = [], set()
+    for u in uses:
+        if (u.file, u.line, u.var) in seen or u.type not in classes:
+            continue
+        seen.add((u.file, u.line, u.var))
+        d, why_not = resolve_class(proj, u, classes[u.type])
+        where = "%s:%d" % (u.file, u.line)
+        if why_not:
+            out.append(Finding(NOTE, 11, where, "%s %s is built on the stack and the check cannot tell whether the class is refcounted: %s" % (u.type, u.var, why_not)))
+        elif d:
+            q, ln, _, why = d
+            out.append(Finding.failed(11, fail(where, "%s %s is built on the stack, and %s is refcounted or has a destructor only the class may call (%s, in %s:%d)"
+                                               % ("::".join(u.qual + [u.type]), u.var, u.type, ", ".join(why), q, ln),
+                                               "build it on the heap and hold it in a smart pointer: `RefPtr<%s> %s = new %s(%s);` or `RefPtr<%s> %s = MakeRefPtr<%s>(%s);`"
+                                               % (u.type, u.var, u.type, u.args, u.type, u.var, u.type, u.args), RULE_STACK)))
+    return out
+
+
 # ============================================================================================ run
 CHECK_NAMES = {1: "hook link", 2: "rename consistency", 3: "Mozilla tokens untouched", 4: "mechanical equivalence",
-               5: "restored files", 6: "our files built and unique", 7: "gtest filter", 8: "removed lines not more than the base"}
+               5: "restored files", 6: "our files built and unique", 7: "gtest filter", 8: "removed lines not more than the base",
+               9: "binding headers exist", 10: "this from a const member", 11: "refcounted class on the stack"}
 
 
-def run(proj: Project, checks=(1, 2, 3, 4, 5, 6, 7), tree_path: str | None = None) -> dict:
+def run(proj: Project, checks=(1, 2, 3, 4, 5, 6, 7, 9, 10, 11), tree_path: str | None = None) -> dict:
     res = {"findings": [], "times": {}, "equivalence": [], "mozilla_lines": None}
     for n in checks:
         t0 = time.time()
@@ -1733,6 +2100,12 @@ def run(proj: Project, checks=(1, 2, 3, 4, 5, 6, 7), tree_path: str | None = Non
             f = check_our_files(proj, tree_path)
         elif n == 8:
             f = check_removed_lines(proj) if proj.base is not None else []
+        elif n == 9:
+            f = check_binding_headers(proj)
+        elif n == 10:
+            f = check_const_this(proj)
+        elif n == 11:
+            f = check_stack_refcounted(proj)
         else:
             f = check_gtest_filter(proj)
         res["findings"] += f
@@ -1767,8 +2140,10 @@ def report(res: dict, proj: Project, checks) -> str:
         if n in (5, 8) and proj.base is None:
             lines.append("prebuild %d %s: skipped (needs --base)" % (n, CHECK_NAMES[n]))
             continue
-        lines.append("prebuild %d %s: %d FAIL, %d WARN%s (%.1fs)" % (
-            n, CHECK_NAMES[n], sum(1 for f in fs if f.level == FAIL), sum(1 for f in fs if f.level == WARN), extra, res["times"].get(n, 0)))
+        notes = sum(1 for f in fs if f.level == NOTE)
+        lines.append("prebuild %d %s: %d FAIL, %d WARN%s%s (%.1fs)" % (
+            n, CHECK_NAMES[n], sum(1 for f in fs if f.level == FAIL), sum(1 for f in fs if f.level == WARN),
+            ", %d NOTE" % notes if notes else "", extra, res["times"].get(n, 0)))
     if 4 in checks and proj.base is not None and res["equivalence"]:
         lines.append("")
         lines.append("%-14s %-8s %5s  %s" % ("class", "owner", "runs", "file"))
@@ -1789,7 +2164,7 @@ def main(argv=None) -> int:
     ap.add_argument("--series", type=Path, default=ROOT, help="the series repository whose HOOKS.json and MANIFEST.json to read")
     ap.add_argument("--folder", action="append", default=[], help="only the files of this series folder (repeatable)")
     ap.add_argument("--tree", help="a full checkout: also run its build/stealth_check_build_files.py (check 6)")
-    ap.add_argument("--checks", default="1,2,3,4,5,6,7", help="which checks, e.g. 1,3 (8 is only run when asked for)")
+    ap.add_argument("--checks", default="1,2,3,4,5,6,7,9,10,11", help="which checks, e.g. 1,3 (8 is only run when asked for)")
     ap.add_argument("--json", type=Path, help="write the findings, the Mozilla lines and the per-file classes here")
     a = ap.parse_args(argv)
     if not a.source:
@@ -1804,8 +2179,8 @@ def main(argv=None) -> int:
     res = run(proj, checks, a.tree)
     text = report(res, proj, checks)
     elapsed = time.time() - t0
-    text += "prebuild: %d FAIL, %d WARN in %.1fs\n" % (sum(1 for f in res["findings"] if f.level == FAIL),
-                                                       sum(1 for f in res["findings"] if f.level == WARN), elapsed)
+    count = {lv: sum(1 for f in res["findings"] if f.level == lv) for lv in (FAIL, WARN, NOTE)}
+    text += "prebuild: %d FAIL, %d WARN, %d NOTE in %.1fs\n" % (count[FAIL], count[WARN], count[NOTE], elapsed)
     _out(text)
     if a.json:
         data = {"head": a.head, "base": a.base, "tag": tag, "findings": [f.as_dict() for f in res["findings"]],
