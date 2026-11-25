@@ -11,7 +11,7 @@ test on both platforms):
   * the preprocessor: the test sits between `#ifdef XP_WIN` (or `#if defined(XP_LINUX) && ...`) and its `#endif`, in the file of ours that
     holds it under a folder's src/;
   * moz.build: the file that holds the test is listed under `if CONFIG["OS_TARGET"] == "WINNT":` (or OS_ARCH, or MOZ_WIDGET_TOOLKIT, `==`
-    or `!=`), in a moz.build of ours under src/ or in the lines a hooks.patch adds to a Mozilla moz.build.
+    or `!=`), in a moz.build, a `*.mozbuild` or a `*.build` of ours under src/ or in the lines a hooks.patch adds to a Mozilla moz.build.
 
 A suite is judged by every test of it that the series defines, not only by the ones a hook names. The consumers (the candidate workflow's
 filter, the release plan, the gtest runner) read the file; they do not list suites by hand.
@@ -52,6 +52,7 @@ CONFIG_VALUES = {   # moz.build: CONFIG key -> value per platform
 }
 CONFIG_IF = re.compile(r"""^if\s+CONFIG\[["'](\w+)["']\]\s*(==|!=)\s*["']([^"']*)["']\s*:""")
 TOKEN = re.compile(r"\s*(defined|&&|\|\||!|\(|\)|[A-Za-z_]\w*|\d+)")
+BUILD_FILES = ("moz.build", "*.mozbuild", "*.build")      # the build files of ours under src/: moz.build, and the files a moz.build includes
 PATCH_FILE = re.compile(r"^diff --git a/(\S+) b/")
 
 
@@ -190,14 +191,15 @@ def guarded_lines(text: str) -> list:
 
 
 def build_listings(root: Path) -> dict:
-    """File name (as moz.build writes it) -> list of sets of platforms: one per place a moz.build lists it, read from the moz.build files
-    of ours under src/ and from the lines a hooks.patch adds to a Mozilla moz.build (its context lines come with them)."""
+    """File name (as moz.build writes it) -> list of sets of platforms: one per place a moz.build lists it, read from the moz.build, *.mozbuild
+    and *.build files of ours under src/ and from the lines a hooks.patch adds to a Mozilla moz.build (its context lines come with them)."""
     texts = []
     for folder in hooks_list.series_names(root):
         d = Path(root) / folder
         src = d / "src"
         if src.is_dir():
-            texts += [p.read_text(encoding="utf-8", errors="replace") for p in sorted(src.rglob("moz.build"))]
+            found = {p for pattern in BUILD_FILES for p in src.rglob(pattern) if p.is_file()}
+            texts += [p.read_text(encoding="utf-8", errors="replace") for p in sorted(found)]
         patch = d / "hooks.patch"
         if patch.is_file():
             current = None

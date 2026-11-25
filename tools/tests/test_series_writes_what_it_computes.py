@@ -321,6 +321,18 @@ def test_a_suite_is_listed_sorted_and_marked_where_its_tests_are_built(tmp_path)
     assert gtest_list.suites(root) == [{"suite": "StealthA", "windows_only": False, "linux_only": False}], "one test on both: the suite is on both"
 
 
+def test_a_suite_registered_in_a_mozbuild_file_of_ours_keeps_its_platform(tmp_path):
+    source = "TEST(StealthA, One) {}\n"
+    cond = 'if CONFIG["OS_TARGET"] == "WINNT":\n    SOURCES += ["TestStealthA.cpp"]\n'
+    for name in ("StealthATests.mozbuild", "StealthATests.build"):
+        root = _series_with_a_gtest(tmp_path / name, source)
+        (root / "fingerprint" / "a" / "src" / "dom" / name).write_text(cond, encoding="utf-8")
+        assert gtest_list.suites(root) == [{"suite": "StealthA", "windows_only": True, "linux_only": False}], name
+    root = _series_with_a_gtest(tmp_path / "none", source)
+    (root / "fingerprint" / "a" / "src" / "dom" / "Other.txt").write_text(cond, encoding="utf-8")
+    assert gtest_list.suites(root) == [{"suite": "StealthA", "windows_only": False, "linux_only": False}], "only build files are read"
+
+
 def test_a_stale_gtest_list_fails_and_the_message_names_gtest_list_write(tmp_path):
     root = _series_with_a_gtest(tmp_path, "TEST(StealthA, One) {}\n")
     found = gtest_list.problems(root)
