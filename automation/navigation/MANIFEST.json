@@ -58,8 +58,8 @@
    "hunks": 1,
    "inline_logic_lines": 0,
    "hookable": "already-hook",
-   "anchor": "",
-   "notes": ""
+   "anchor": "UNIFIED_SOURCES of docshell/base (StealthNavigation.cpp, after the StealthDocShellAttrs.cpp line)",
+   "notes": "Registers StealthNavigation.cpp, our file that sends the navigation notifications (an observer topic with the load identifier as a decimal string payload), in the UNIFIED_SOURCES of docshell/base."
   },
   {
    "file": "docshell/base/nsDocShell.cpp",
@@ -141,8 +141,8 @@
    "hunks": 1,
    "inline_logic_lines": 0,
    "hookable": "already-hook",
-   "anchor": "",
-   "notes": ""
+   "anchor": "UNIFIED_SOURCES of netwerk/base (StealthLoadInfo.cpp, after the StealthIPv6Literal.cpp line)",
+   "notes": "Registers StealthLoadInfo.cpp, which holds the load info side of the navigation identifier (the copy of the load identifier between load infos) and the setter of the origin attributes of TRRLoadInfo."
   },
   {
    "file": "netwerk/base/nsILoadInfo.idl",

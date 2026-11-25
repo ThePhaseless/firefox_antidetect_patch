@@ -22,8 +22,8 @@
    "hunks": 1,
    "inline_logic_lines": 0,
    "hookable": "already-hook",
-   "anchor": "",
-   "notes": ""
+   "anchor": "Document::InitCSP, after the early checks and before tCspHeaderValue is declared",
+   "notes": "Guard: when the automation asked the document's docshell to ignore the page's policies (CSP_IsBypassedFor, our function), InitCSP returns NS_OK before it reads any policy of the response headers. A guard because Mozilla's function has to stop at this point."
   },
   {
    "file": "dom/security/moz.build",

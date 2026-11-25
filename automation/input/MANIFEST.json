@@ -49,8 +49,8 @@
    "hunks": 3,
    "inline_logic_lines": 0,
    "hookable": "already-hook",
-   "anchor": "",
-   "notes": ""
+   "anchor": "include of StealthJugglerEventId.h; nsContentUtils::SynthesizeMouseEvent (after mButton is set; before DispatchInputEvent)",
+   "notes": "Two one-line hooks in SynthesizeMouseEvent: StealthSetJugglerId copies the Juggler event id of the synthesized mouse data onto the event, and StealthJugglerNotAsyncSynthesized clears the async-synthesized flag of an event that carries a Juggler id, just before it is dispatched on the asynchronous route."
   },
   {
    "file": "dom/base/nsDOMWindowUtils.cpp",
@@ -225,8 +225,8 @@
    "hunks": 1,
    "inline_logic_lines": 0,
    "hookable": "already-hook",
-   "anchor": "",
-   "notes": ""
+   "anchor": "EXPORTS.ipc (StealthMouseEventIPC.h, after the list with nsGUIEventIPC.h)",
+   "notes": "Exports StealthMouseEventIPC.h, which holds the read of the Juggler event id in the deserialisation of a mouse event (StealthReadJugglerEventId, the last link of the read chain)."
   },
   {
    "file": "widget/nsGUIEventIPC.h",

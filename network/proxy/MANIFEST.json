@@ -19,8 +19,8 @@
    "hunks": 1,
    "inline_logic_lines": 0,
    "hookable": "already-hook",
-   "anchor": "",
-   "notes": ""
+   "anchor": "network.proxy.type",
+   "notes": "The default of network.proxy.type is 0 (direct) in place of 5 (the system proxy settings), on Mozilla's own line; the pref is declared nowhere else."
   }
  ]
 }

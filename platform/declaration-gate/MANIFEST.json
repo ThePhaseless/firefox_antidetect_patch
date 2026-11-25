@@ -42,8 +42,8 @@
    "hunks": 1,
    "inline_logic_lines": 0,
    "hookable": "already-hook",
-   "anchor": "",
-   "notes": ""
+   "anchor": "EXPORTS.mozilla.gfx (StealthRefuse.h, after the StealthCanvasProjection and StealthRecordedProjection lines)",
+   "notes": "Exports StealthRefuse.h, the header-only function by which the engine refuses to run (a declaration missing or malformed): the sentence goes to stderr first, then into the crash."
   },
   {
    "file": "gfx/thebes/moz.build",
@@ -54,9 +54,9 @@
    "removed": 0,
    "hunks": 1,
    "inline_logic_lines": 1,
-   "hookable": "",
-   "anchor": "",
-   "notes": ""
+   "hookable": "already-hook",
+   "anchor": "include lines after include(\"/ipc/chromium/chromium-config.mozbuild\") (StealthDeclarationGate.mozbuild)",
+   "notes": "One include line of StealthDeclarationGate.mozbuild, which exports StealthDeclarationGate.h and StealthGfxFeatureStatus.h and lists their .cpp files."
   },
   {
    "file": "toolkit/xre/nsAppRunner.cpp",
@@ -68,8 +68,8 @@
    "hunks": 2,
    "inline_logic_lines": 0,
    "hookable": "already-hook",
-   "anchor": "",
-   "notes": ""
+   "anchor": "include of StealthGfxFeatureStatus.h; XREMain::XRE_mainRun (right after InitializeUserPrefs)",
+   "notes": "Two notices after the profile's preferences are read: StealthMarkUserPrefsRead records that the declaration has arrived, and StealthFireHostGLProbeIfStock fires Mozilla's host GL probe only for a launch with no declaration."
   },
   {
    "file": "widget/GfxInfoBase.cpp",
@@ -119,8 +119,8 @@
    "hunks": 1,
    "inline_logic_lines": 0,
    "hookable": "already-hook",
-   "anchor": "",
-   "notes": ""
+   "anchor": "SOURCES of widget/gtk (StealthHostGLProbe.cpp, after the list that ends with nsWindow.cpp)",
+   "notes": "Registers StealthHostGLProbe.cpp, which fires Mozilla's host GL probe right after the profile's preferences are read; with the engine on it launches nothing and reads nothing from the host."
   }
  ]
 }

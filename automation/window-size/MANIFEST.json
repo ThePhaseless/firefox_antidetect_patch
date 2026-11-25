@@ -39,8 +39,8 @@
    "hunks": 2,
    "inline_logic_lines": 0,
    "hookable": "already-hook",
-   "anchor": "",
-   "notes": ""
+   "anchor": "include of JugglerWindowSize.h; nsWindowWatcher::CalculateChromeFlagsForContent (the popup branch)",
+   "notes": "On the popup branch the chrome flags come from mozilla::JugglerPopupChromeFlags(aFeatures, CHROME_MINIMAL_POPUP): CHROME_MINIMAL_POPUP, plus one flag of ours when the features give a size. Mozilla's constant stays inside our call."
   }
  ]
 }

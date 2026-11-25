@@ -46,8 +46,8 @@
    "hunks": 2,
    "inline_logic_lines": 0,
    "hookable": "already-hook",
-   "anchor": "",
-   "notes": ""
+   "anchor": "EXPORTS.mozilla.gfx and UNIFIED_SOURCES of gfx/2d (StealthGlyphCoverage.h and .cpp)",
+   "notes": "Exports StealthGlyphCoverage.h and builds StealthGlyphCoverage.cpp. The header declares one free function and includes nothing, because vendored Skia's SkScalerContext.cpp includes it."
   },
   {
    "file": "gfx/skia/skia/src/core/SkScalerContext.cpp",
@@ -78,8 +78,8 @@
    "hunks": 1,
    "inline_logic_lines": 0,
    "hookable": "already-hook",
-   "anchor": "",
-   "notes": ""
+   "anchor": "the gtk block (TestStealthFontMetrics.cpp) and the WINNT block (TestStealthTextQuality.cpp)",
+   "notes": "Registers two gtests inside blocks of other folders: TestStealthFontMetrics.cpp (the average character width on the FreeType path is the one DirectWrite computes) in the gtk block, and TestStealthTextQuality.cpp (the Windows text quality and ClearType parameters come from the declaration) in the WINNT block."
   },
   {
    "file": "gfx/thebes/gfxDWriteFonts.cpp",
@@ -198,9 +198,9 @@
    "removed": 0,
    "hunks": 1,
    "inline_logic_lines": 1,
-   "hookable": "",
-   "anchor": "",
-   "notes": ""
+   "hookable": "already-hook",
+   "anchor": "include lines after include(\"/ipc/chromium/chromium-config.mozbuild\") (StealthDesignMetrics.mozbuild)",
+   "notes": "One include line of StealthDesignMetrics.mozbuild, which lists StealthDesignMetrics.cpp in SOURCES."
   }
  ]
 }

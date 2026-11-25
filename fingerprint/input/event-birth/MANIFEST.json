@@ -64,8 +64,8 @@
    "hunks": 1,
    "inline_logic_lines": 0,
    "hookable": "already-hook",
-   "anchor": "",
-   "notes": ""
+   "anchor": "UNIFIED_SOURCES of dom/base (StealthInputEventBirth.cpp, after the closing bracket of the list)",
+   "notes": "Registers StealthInputEventBirth.cpp, which defines nsITextInputProcessor.setNextKeyLatency (TextInputProcessor::SetNextKeyLatency, chrome only): the latency and the page of the next key are stored in the processor."
   },
   {
    "file": "dom/base/nsContentUtils.cpp",
@@ -93,9 +93,9 @@
    "removed": 1,
    "hunks": 3,
    "inline_logic_lines": 2,
-   "hookable": "",
-   "anchor": "",
-   "notes": ""
+   "hookable": "already-hook",
+   "anchor": "include of StealthInputEventBirth.h; nsDOMWindowUtils::SendWheelEvent (signature; before the GetPresContext call)",
+   "notes": "SendWheelEvent takes a new last parameter aLatency and calls StealthSetInputEventBirth, which stamps the time of the wheel event with the birth for that latency when one is declared (0 or less leaves the stamp the event got at construction). The signature line and the call carry the marker; the rule is in our header."
   },
   {
    "file": "dom/base/test/gtest/moz.build",
@@ -123,9 +123,9 @@
    "removed": 1,
    "hunks": 1,
    "inline_logic_lines": 2,
-   "hookable": "",
-   "anchor": "",
-   "notes": ""
+   "hookable": "already-hook",
+   "anchor": "nsIDOMWindowUtils: sendWheelEvent (last parameter)",
+   "notes": "sendWheelEvent takes a new optional last parameter, in double aLatency, the value the C++ SendWheelEvent passes to StealthSetInputEventBirth. Declaration only: the callback parameter line gets a comma and the new line follows."
   },
   {
    "file": "dom/interfaces/base/nsITextInputProcessor.idl",

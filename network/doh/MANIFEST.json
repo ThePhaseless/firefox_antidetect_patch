@@ -123,8 +123,8 @@
    "hunks": 1,
    "inline_logic_lines": 0,
    "hookable": "already-hook",
-   "anchor": "",
-   "notes": ""
+   "anchor": "transport_lcppsrcs (StealthIceResolverContext.cpp, after the closing bracket, before transport_cppsrcs)",
+   "notes": "Registers StealthIceResolverContext.cpp, which gives the lookup of an ICE server name the browser context of the PeerConnection, so the DNS-over-HTTPS request leaves by that context's proxy."
   },
   {
    "file": "dom/media/webrtc/transport/nriceresolver.cpp",
@@ -170,8 +170,8 @@
    "hunks": 2,
    "inline_logic_lines": 0,
    "hookable": "already-hook",
-   "anchor": "",
-   "notes": ""
+   "anchor": "network.trr.request_timeout_ms; network.trr.exclude-etc-hosts",
+   "notes": "Two values changed in place, each on its own line (the prefs are declared nowhere else): the single TRR request timeout is 30000 ms in place of 1500, and network.trr.exclude-etc-hosts is false in place of true."
   },
   {
    "file": "netwerk/base/TRRLoadInfo.cpp",
@@ -183,8 +183,8 @@
    "hunks": 3,
    "inline_logic_lines": 9,
    "hookable": "movable",
-   "anchor": "TRRLoadInfo::GetJugglerLoadIdentifier / TRRLoadInfo::SetJugglerLoadIdentifier (end of file)",
-   "notes": "Stubs required because TRRLoadInfo implements nsILoadInfo. Risk 'infallible attribute returns NS_ERROR_NOT_IMPLEMENTED': REFUTED as a new problem. Upstream TRRLoadInfo.cpp:132-155 already returns NS_ERROR_NOT_IMPLEMENTED for the [infallible] attributes securityMode, isInThirdPartyContext and isThirdPartyContextToTopWindow (nsILoadInfo.idl:490, 637, 649); the new stubs follow the same pattern. Also (feature doh-trr-context, network/doh): the TRR load info keeps the origin attributes of the lookup's context, also in its clone, so the proxy filters see the context.",
+   "anchor": "include of StealthLoadInfo.h; TRRLoadInfo::Clone (after the new TRRLoadInfo); TRRLoadInfo::SetOriginAttributes (first statement)",
+   "notes": "The TRR load info keeps the origin attributes of the lookup's context, so the proxy filters see it: Clone copies them to the new TRRLoadInfo, and SetOriginAttributes, which Mozilla answers with NS_ERROR_NOT_IMPLEMENTED, stores them through StealthTRRSetOriginAttributes (a guard that returns its result). The Juggler load identifier accessors are in StealthLoadInfo.cpp, not in this file.",
    "verifier": {
     "changed": [
      "notes"
@@ -253,8 +253,8 @@
    "hunks": 1,
    "inline_logic_lines": 0,
    "hookable": "already-hook",
-   "anchor": "",
-   "notes": ""
+   "anchor": "parent: block of PSocketProcess (after the PProxyConfigLookup constructor)",
+   "notes": "One message line, StealthProxyLookupOrigin(OriginAttributes?), sent by the socket process right before the PProxyConfigLookup constructor: it carries the origin attributes of the DoH context to the parent, which keeps them for that lookup (SocketProcessParent::RecvStealthProxyLookupOrigin, StealthTakeParkedTRRLookupContext)."
   },
   {
    "file": "netwerk/ipc/ProxyConfigLookup.cpp",
@@ -266,8 +266,8 @@
    "hunks": 3,
    "inline_logic_lines": 0,
    "hookable": "already-hook",
-   "anchor": "",
-   "notes": ""
+   "anchor": "include of StealthTRRContext.h; ProxyConfigLookup::Create (first statement); ProxyConfigLookup::DoProxyResolve (after the stand-in channel is made)",
+   "notes": "The context of the DoH request that caused a proxy lookup reaches the lookup: Create takes it (StealthEnterTRRLookupContext, a notice) and DoProxyResolve gives it to the stand-in channel (StealthApplyTRRLookupContext, a guard that returns its error), so the proxy filter sees that context."
   },
   {
    "file": "netwerk/ipc/ProxyConfigLookupChild.cpp",
@@ -279,8 +279,8 @@
    "hunks": 2,
    "inline_logic_lines": 0,
    "hookable": "already-hook",
-   "anchor": "",
-   "notes": ""
+   "anchor": "include of StealthTRRContext.h; ProxyConfigLookupChild::Create (before SendPProxyConfigLookupConstructor)",
+   "notes": "In the socket process the context of the lookup is sent to the parent (StealthSendTRRLookupContext, a notice) in a message right before the constructor of PProxyConfigLookup."
   },
   {
    "file": "netwerk/ipc/SocketProcessParent.cpp",
@@ -292,8 +292,8 @@
    "hunks": 2,
    "inline_logic_lines": 0,
    "hookable": "already-hook",
-   "anchor": "",
-   "notes": ""
+   "anchor": "include of StealthTRRContext.h; SocketProcessParent::RecvPProxyConfigLookupConstructor (first statement)",
+   "notes": "The constructor of a proxy lookup takes the context the socket process parked just before it (StealthTakeParkedTRRLookupContext, a notice), so the lookup carries the context of its DoH request."
   },
   {
    "file": "netwerk/ipc/SocketProcessParent.h",
@@ -305,8 +305,8 @@
    "hunks": 1,
    "inline_logic_lines": 0,
    "hookable": "already-hook",
-   "anchor": "",
-   "notes": ""
+   "anchor": "SocketProcessParent (members, after RecvPProxyConfigLookupConstructor)",
+   "notes": "Declares RecvStealthProxyLookupOrigin, the receiver of the message that PSocketProcess gains for the context of a DoH lookup; it is defined in our file."
   },
   {
    "file": "netwerk/ipc/moz.build",
@@ -318,8 +318,8 @@
    "hunks": 2,
    "inline_logic_lines": 0,
    "hookable": "already-hook",
-   "anchor": "",
-   "notes": ""
+   "anchor": "EXPORTS.mozilla.net and UNIFIED_SOURCES of netwerk/ipc (StealthTRRContext.h and .cpp)",
+   "notes": "Exports StealthTRRContext.h and builds StealthTRRContext.cpp, the carrying of the DoH request's browser context to the proxy lookup it causes."
   },
   {
    "file": "netwerk/protocol/http/TLSTransportLayer.cpp",

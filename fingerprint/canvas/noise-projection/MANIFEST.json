@@ -53,8 +53,8 @@
    "hunks": 7,
    "inline_logic_lines": 0,
    "hookable": "already-hook",
-   "anchor": "",
-   "notes": ""
+   "anchor": "include of StealthWebGLReadback.h; ClientWebGLContext::GetImageBuffer; GetInputStream; ReadPixels (the pixel-pack-buffer overload and the array overload); DoReadPixels; DoReadPixelsAsync",
+   "notes": "The canvas noise on every road by which a page reads the pixels of a WebGL canvas: toDataURL and toBlob (GetImageBuffer, GetInputStream), readPixels into a pixel-pack buffer and into an array (StealthDoReadPixels replaces the call, NoteReadPixels records the read), and the async snapshot of captureStream. Each hook is one line calling StealthWebGLReadback or a Stealth function; GetSurfaceSnapshot itself is left alone."
   },
   {
    "file": "dom/canvas/ClientWebGLContext.h",

@@ -79,8 +79,8 @@
    "hunks": 1,
    "inline_logic_lines": 0,
    "hookable": "already-hook",
-   "anchor": "",
-   "notes": ""
+   "anchor": "pref geo.provider.network.url (the !ANDROID and !XP_WIN block of the Geolocation prefs)",
+   "notes": "Declared value: the default of geo.provider.network.url is the empty string in place of the URL of the network location service, on Mozilla's own line, so the pref is declared nowhere else."
   },
   {
    "file": "toolkit/components/geolocation/GeolocationService.cpp",

@@ -107,8 +107,8 @@
    "hunks": 1,
    "inline_logic_lines": 0,
    "hookable": "already-hook",
-   "anchor": "",
-   "notes": ""
+   "anchor": "WebrtcTCPSocket::OpenWithoutHttpProxy (after the local address is parsed, before mTransport->Bind)",
+   "notes": "Before the bind of a plain TCP socket of a PeerConnection, StealthTcpSocketBorn gives the socket's transport the context of its name lookup and makes the bind address the wildcard of the declared address's family on port 0."
   },
   {
    "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
@@ -153,9 +153,9 @@
    "removed": 1,
    "hunks": 9,
    "inline_logic_lines": 1,
-   "hookable": "",
-   "anchor": "",
-   "notes": ""
+   "hookable": "already-hook",
+   "anchor": "include of nr_stealth_network.h; NrSocket::create (after the address is converted, the bind failure, the declared address kept, the attach to the socket transport service); NrSocket::sendto; NrSocket::recvfrom; NrSocket::close",
+   "notes": "The host UDP socket of a declared address: it binds the wildcard of the address's family on the candidate's port, keeps the declared address (with that port) as its own, and records the port in the set of this process's own ports until close. A datagram to another socket of this process goes on the kernel's loopback (sendto and recvfrom rewrite the peer address), a bind refused for a port in use or not allowed answers R_ALREADY so ICE takes the next port, and a test switch can refuse the attach."
   },
   {
    "file": "dom/media/webrtc/transport/nr_socket_prsock.h",
@@ -167,8 +167,8 @@
    "hunks": 1,
    "inline_logic_lines": 0,
    "hookable": "already-hook",
-   "anchor": "",
-   "notes": ""
+   "anchor": "class NrSocket (private members, after the friend of StealthNrSocketAccess)",
+   "notes": "Member stealth_own_port_: the port this socket recorded in the set of this process's own ports (0 when none). StealthSocketAttached sets it and StealthOwnPortReleased clears it at close."
   },
   {
    "file": "dom/media/webrtc/transport/nricectx.cpp",

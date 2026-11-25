@@ -397,8 +397,8 @@
   "hunks": 1,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
-  "anchor": "",
-  "notes": ""
+  "anchor": "UNIFIED_SOURCES of docshell/base (StealthNavigation.cpp, after the StealthDocShellAttrs.cpp line)",
+  "notes": "Registers StealthNavigation.cpp, our file that sends the navigation notifications (an observer topic with the load identifier as a decimal string payload), in the UNIFIED_SOURCES of docshell/base."
  },
  {
   "file": "docshell/base/nsDocShell.cpp",
@@ -484,8 +484,8 @@
   "hunks": 1,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
-  "anchor": "",
-  "notes": ""
+  "anchor": "Document::InitCSP, after the early checks and before tCspHeaderValue is declared",
+  "notes": "Guard: when the automation asked the document's docshell to ignore the page's policies (CSP_IsBypassedFor, our function), InitCSP returns NS_OK before it reads any policy of the response headers. A guard because Mozilla's function has to stop at this point."
  },
  {
   "file": "dom/base/Document.h",
@@ -593,8 +593,8 @@
   "hunks": 1,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
-  "anchor": "",
-  "notes": ""
+  "anchor": "UNIFIED_SOURCES of dom/base (StealthInputEventBirth.cpp, after the closing bracket of the list)",
+  "notes": "Registers StealthInputEventBirth.cpp, which defines nsITextInputProcessor.setNextKeyLatency (TextInputProcessor::SetNextKeyLatency, chrome only): the latency and the page of the next key are stored in the processor."
  },
  {
   "file": "dom/base/nsContentUtils.cpp",
@@ -623,8 +623,8 @@
   "hunks": 3,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
-  "anchor": "",
-  "notes": ""
+  "anchor": "include of StealthJugglerEventId.h; nsContentUtils::SynthesizeMouseEvent (after mButton is set; before DispatchInputEvent)",
+  "notes": "Two one-line hooks in SynthesizeMouseEvent: StealthSetJugglerId copies the Juggler event id of the synthesized mouse data onto the event, and StealthJugglerNotAsyncSynthesized clears the async-synthesized flag of an event that carries a Juggler id, just before it is dispatched on the asynchronous route."
  },
  {
   "file": "dom/base/nsDOMWindowUtils.cpp",
@@ -654,9 +654,9 @@
   "removed": 1,
   "hunks": 3,
   "inline_logic_lines": 2,
-  "hookable": "",
-  "anchor": "",
-  "notes": ""
+  "hookable": "already-hook",
+  "anchor": "include of StealthInputEventBirth.h; nsDOMWindowUtils::SendWheelEvent (signature; before the GetPresContext call)",
+  "notes": "SendWheelEvent takes a new last parameter aLatency and calls StealthSetInputEventBirth, which stamps the time of the wheel event with the birth for that latency when one is declared (0 or less leaves the stamp the event got at construction). The signature line and the call carry the marker; the rule is in our header."
  },
  {
   "file": "dom/base/nsGlobalWindowOuter.cpp",
@@ -684,9 +684,9 @@
   "removed": 2,
   "hunks": 2,
   "inline_logic_lines": 1,
-  "hookable": "",
-  "anchor": "",
-  "notes": ""
+  "hookable": "already-hook",
+  "anchor": "include of StealthSessionDeclaration.h; CreateNativeGlobalForInner (the language and timezone arguments of the realm options)",
+  "notes": "The realm of a new global takes its language and timezone from the declaration (GetDeclaredRealmLanguage and GetDeclaredRealmTimezone: the context's, else the session's) in place of the top browsing context's two overrides. Mozilla's two argument lines are replaced by one line of two calls."
  },
  {
   "file": "dom/base/nsScreen.cpp",
@@ -757,8 +757,8 @@
   "hunks": 1,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
-  "anchor": "",
-  "notes": ""
+  "anchor": "UNIFIED_SOURCES of dom/base/test/gtest (TestStealthCallerObject.cpp, after the closing bracket of the list)",
+  "notes": "Registers the gtest TestStealthCallerObject.cpp: the decision, the state and the read of the branch of Rewrap that hands the page a caller's object."
  },
  {
   "file": "dom/base/test/gtest/moz.build",
@@ -770,8 +770,8 @@
   "hunks": 1,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
-  "anchor": "",
-  "notes": ""
+  "anchor": "UNIFIED_SOURCES of dom/base/test/gtest (TestStealthStackFrames.cpp, after the lines of the other folders)",
+  "notes": "Registers the gtest TestStealthStackFrames.cpp: a stack string a page reads has no frame of Juggler's scripts."
  },
  {
   "file": "dom/base/test/gtest/moz.build",
@@ -783,8 +783,8 @@
   "hunks": 1,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
-  "anchor": "",
-  "notes": ""
+  "anchor": "UNIFIED_SOURCES of dom/base/test/gtest (TestStealthDocumentLanguage.cpp, after the TestStealthCallerObject.cpp line)",
+  "notes": "Registers the gtest TestStealthDocumentLanguage.cpp: the language of a document's text that declares none is the language its context declares."
  },
  {
   "file": "dom/base/test/gtest/moz.build",
@@ -796,8 +796,8 @@
   "hunks": 1,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
-  "anchor": "",
-  "notes": ""
+  "anchor": "UNIFIED_SOURCES of dom/base/test/gtest (TestStealthTimezone.cpp, after the lines of the other folders)",
+  "notes": "Registers the gtest TestStealthTimezone.cpp: the functions the timezone and language hooks call answer the declared time and language, not the host's."
  },
  {
   "file": "dom/canvas/CanvasRenderingContext2D.cpp",
@@ -876,8 +876,8 @@
   "hunks": 7,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
-  "anchor": "",
-  "notes": ""
+  "anchor": "include of StealthWebGLReadback.h; ClientWebGLContext::GetImageBuffer; GetInputStream; ReadPixels (the pixel-pack-buffer overload and the array overload); DoReadPixels; DoReadPixelsAsync",
+  "notes": "The canvas noise on every road by which a page reads the pixels of a WebGL canvas: toDataURL and toBlob (GetImageBuffer, GetInputStream), readPixels into a pixel-pack buffer and into an array (StealthDoReadPixels replaces the call, NoteReadPixels records the read), and the async snapshot of captureStream. Each hook is one line calling StealthWebGLReadback or a Stealth function; GetSurfaceSnapshot itself is left alone."
  },
  {
   "file": "dom/canvas/ClientWebGLContext.h",
@@ -1103,8 +1103,8 @@
   "hunks": 1,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
-  "anchor": "",
-  "notes": ""
+  "anchor": "UNIFIED_SOURCES of dom/canvas (StealthWebGLParams.cpp, after the closing bracket of the list)",
+  "notes": "Registers StealthWebGLParams.cpp, which holds the getParameter overrides read from the declared \"ENUM|VALUE\" pref entries."
  },
  {
   "file": "dom/canvas/moz.build",
@@ -1116,8 +1116,8 @@
   "hunks": 1,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
-  "anchor": "",
-  "notes": ""
+  "anchor": "UNIFIED_SOURCES of dom/canvas (StealthWebGLShaderLanguage.cpp, after the StealthWebGLParams.cpp line)",
+  "notes": "Registers StealthWebGLShaderLanguage.cpp, which renders the shader a page asks to see (getTranslatedShaderSource) in the declared output language."
  },
  {
   "file": "dom/events/Event.cpp",
@@ -1235,8 +1235,8 @@
   "hunks": 1,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
-  "anchor": "",
-  "notes": ""
+  "anchor": "class HTMLCanvasElement (members, after the declaration of the snapshot function above it, before SurfaceSnapshotPromise)",
+  "notes": "Declares the member StealthGetSurfaceSnapshot(aSurfaceFlags, aOutAlphaType, aTarget), defined inline in our StealthSurfaceFlags.h: it takes the canvas as drawn when the caller set kStealthSfeAsDrawn, else Mozilla's GetSurfaceSnapshot, with the same arguments."
  },
  {
   "file": "dom/html/HTMLInputElement.cpp",
@@ -1302,9 +1302,9 @@
   "removed": 1,
   "hunks": 1,
   "inline_logic_lines": 2,
-  "hookable": "",
-  "anchor": "",
-  "notes": ""
+  "hookable": "already-hook",
+  "anchor": "nsIDOMWindowUtils: sendWheelEvent (last parameter)",
+  "notes": "sendWheelEvent takes a new optional last parameter, in double aLatency, the value the C++ SendWheelEvent passes to StealthSetInputEventBirth. Declaration only: the callback parameter line gets a comma and the new line follows."
  },
  {
   "file": "dom/ipc/CoalescedMouseData.cpp",
@@ -1393,8 +1393,8 @@
   "hunks": 1,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
-  "anchor": "",
-  "notes": ""
+  "anchor": "UNIFIED_SOURCES of dom/media/gtest (TestStealthMediaDeclaration.cpp, after the TestStealthAudioNoise.cpp line)",
+  "notes": "Registers the gtest TestStealthMediaDeclaration.cpp: both query roads of PDMFactory (Supports and SupportsAsync) answer from the declared decode support."
  },
  {
   "file": "dom/media/gtest/moz.build",
@@ -1406,8 +1406,8 @@
   "hunks": 1,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
-  "anchor": "",
-  "notes": ""
+  "anchor": "UNIFIED_SOURCES of dom/media/gtest (TestStealthMediaEnumeration.cpp, after the TestStealthMediaDeclaration.cpp line)",
+  "notes": "Registers the gtest TestStealthMediaEnumeration.cpp: the resolve callback of the device enumeration runs with the same value whether the declared delay is 0 or above."
  },
  {
   "file": "dom/media/mediacapabilities/MediaCapabilities.cpp",
@@ -1593,8 +1593,8 @@
   "hunks": 1,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
-  "anchor": "",
-  "notes": ""
+  "anchor": "transport_lcppsrcs (StealthIceResolverContext.cpp, after the closing bracket, before transport_cppsrcs)",
+  "notes": "Registers StealthIceResolverContext.cpp, which gives the lookup of an ICE server name the browser context of the PeerConnection, so the DNS-over-HTTPS request leaves by that context's proxy."
  },
  {
   "file": "dom/media/webrtc/transport/nr_socket_prsock.cpp",
@@ -1622,9 +1622,9 @@
   "removed": 1,
   "hunks": 9,
   "inline_logic_lines": 1,
-  "hookable": "",
-  "anchor": "",
-  "notes": ""
+  "hookable": "already-hook",
+  "anchor": "include of nr_stealth_network.h; NrSocket::create (after the address is converted, the bind failure, the declared address kept, the attach to the socket transport service); NrSocket::sendto; NrSocket::recvfrom; NrSocket::close",
+  "notes": "The host UDP socket of a declared address: it binds the wildcard of the address's family on the candidate's port, keeps the declared address (with that port) as its own, and records the port in the set of this process's own ports until close. A datagram to another socket of this process goes on the kernel's loopback (sendto and recvfrom rewrite the peer address), a bind refused for a port in use or not allowed answers R_ALREADY so ICE takes the next port, and a test switch can refuse the attach."
  },
  {
   "file": "dom/media/webrtc/transport/third_party/nICEr/src/ice/ice_ctx.cpp",
@@ -2201,8 +2201,8 @@
   "hunks": 1,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
-  "anchor": "",
-  "notes": ""
+  "anchor": "EXPORTS.mozilla.gfx (StealthRefuse.h, after the StealthCanvasProjection and StealthRecordedProjection lines)",
+  "notes": "Exports StealthRefuse.h, the header-only function by which the engine refuses to run (a declaration missing or malformed): the sentence goes to stderr first, then into the crash."
  },
  {
   "file": "gfx/2d/moz.build",
@@ -2214,8 +2214,8 @@
   "hunks": 2,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
-  "anchor": "",
-  "notes": ""
+  "anchor": "EXPORTS.mozilla.gfx and UNIFIED_SOURCES of gfx/2d (StealthGlyphCoverage.h and .cpp)",
+  "notes": "Exports StealthGlyphCoverage.h and builds StealthGlyphCoverage.cpp. The header declares one free function and includes nothing, because vendored Skia's SkScalerContext.cpp includes it."
  },
  {
   "file": "gfx/skia/skia/src/core/SkScalerContext.cpp",
@@ -2262,9 +2262,9 @@
   "removed": 0,
   "hunks": 1,
   "inline_logic_lines": 1,
-  "hookable": "",
-  "anchor": "",
-  "notes": ""
+  "hookable": "movable",
+  "anchor": "if block for OS_TARGET WINNT (before the Darwin block)",
+  "notes": "A WINNT-only block that registers TestStealthBundledCollection.cpp, the gtest of the bundled font collection of the bundle-only font list. The condition and the registration are both inline in Mozilla's file; both could sit in a .build file of ours behind one include line."
  },
  {
   "file": "gfx/tests/gtest/moz.build",
@@ -2275,9 +2275,9 @@
   "removed": 0,
   "hunks": 1,
   "inline_logic_lines": 2,
-  "hookable": "",
-  "anchor": "",
-  "notes": ""
+  "hookable": "movable",
+  "anchor": "if block for MOZ_WIDGET_TOOLKIT gtk (before the WINNT block)",
+  "notes": "A gtk-only block that registers TestStealthFcFontList.cpp, the fontconfig half of the bundle-only font list, and adds CAIRO_FT_CFLAGS to CXXFLAGS for it. The condition and two lines are inline in Mozilla's file; they could sit in a .build file of ours behind one include line."
  },
  {
   "file": "gfx/tests/gtest/moz.build",
@@ -2289,8 +2289,8 @@
   "hunks": 1,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
-  "anchor": "",
-  "notes": ""
+  "anchor": "the gtk block (TestStealthFontMetrics.cpp) and the WINNT block (TestStealthTextQuality.cpp)",
+  "notes": "Registers two gtests inside blocks of other folders: TestStealthFontMetrics.cpp (the average character width on the FreeType path is the one DirectWrite computes) in the gtk block, and TestStealthTextQuality.cpp (the Windows text quality and ClearType parameters come from the declaration) in the WINNT block."
  },
  {
   "file": "gfx/tests/gtest/moz.build",
@@ -2302,8 +2302,8 @@
   "hunks": 1,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
-  "anchor": "",
-  "notes": ""
+  "anchor": "UNIFIED_SOURCES of gfx/tests/gtest (TestStealthWebGPUDeclaration.cpp, after the TestStealthCanvasProjection.cpp line)",
+  "notes": "Registers the gtest TestStealthWebGPUDeclaration.cpp: the parsers of the declared WebGPU adapter refuse a declaration that leaves a limit out or names something Firefox does not have."
  },
  {
   "file": "gfx/tests/gtest/moz.build",
@@ -2315,8 +2315,8 @@
   "hunks": 1,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
-  "anchor": "",
-  "notes": ""
+  "anchor": "UNIFIED_SOURCES of gfx/tests/gtest (TestStealthWebGPUExternalTexture.cpp, after the TestStealthWebGPUDeclaration.cpp line)",
+  "notes": "Registers the gtest TestStealthWebGPUExternalTexture.cpp: the shader side of external textures on Vulkan compiles."
  },
  {
   "file": "gfx/thebes/gfxDWriteFontList.cpp",
@@ -2364,8 +2364,8 @@
   "hunks": 1,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
-  "anchor": "",
-  "notes": ""
+  "anchor": "class gfxDWriteFontList (members, after the declaration of AppendFamiliesFromCollection)",
+  "notes": "Declares the member StealthAppendFamiliesFromCollection, with the parameters of Mozilla's AppendFamiliesFromCollection, which the hook in gfxDWriteFontList.cpp calls for the family list of the shared font list: under bundle-only it assigns the manifest's list and never enumerates the host's system collection, in any other list it is Mozilla's call."
  },
  {
   "file": "gfx/thebes/gfxDWriteFonts.cpp",
@@ -2438,8 +2438,8 @@
   "hunks": 1,
   "inline_logic_lines": 2,
   "hookable": "already-hook",
-  "anchor": "gfxFontconfigFontEntry::gfxFontconfigFontEntry (explicit constructor for data fonts)",
-  "notes": "Adds defaulted aFile and aIndex arguments, so upstream data-font callers compile unchanged. The bundle path passes both. Comment cross-references [B154].",
+  "anchor": "gfxFontconfigFontEntry (class head, after friend class gfxFcPlatformFontList)",
+  "notes": "Declares our struct StealthFcAccess a friend of gfxFontconfigFontEntry, so StealthFcFontList.cpp can reach gfxFontEntry::InitializeFrom, which is protected. One declaration after an existing friend.",
   "verifier": {
    "changed": [],
    "why": "Checked category, feature, prefs, anchor, evidence and notes against the diff; no correction needed."
@@ -2669,9 +2669,9 @@
   "removed": 0,
   "hunks": 1,
   "inline_logic_lines": 1,
-  "hookable": "",
-  "anchor": "",
-  "notes": ""
+  "hookable": "already-hook",
+  "anchor": "include lines after include(\"/ipc/chromium/chromium-config.mozbuild\") (StealthDeclarationGate.mozbuild)",
+  "notes": "One include line of StealthDeclarationGate.mozbuild, which exports StealthDeclarationGate.h and StealthGfxFeatureStatus.h and lists their .cpp files."
  },
  {
   "file": "gfx/thebes/moz.build",
@@ -2682,9 +2682,9 @@
   "removed": 0,
   "hunks": 1,
   "inline_logic_lines": 1,
-  "hookable": "",
-  "anchor": "",
-  "notes": ""
+  "hookable": "already-hook",
+  "anchor": "include lines after include(\"/ipc/chromium/chromium-config.mozbuild\") (StealthFcFontList.mozbuild)",
+  "notes": "One include line of StealthFcFontList.mozbuild, which lists StealthFontListHooks.cpp and, for gtk, StealthFcFontList.cpp."
  },
  {
   "file": "gfx/thebes/moz.build",
@@ -2695,9 +2695,9 @@
   "removed": 0,
   "hunks": 1,
   "inline_logic_lines": 1,
-  "hookable": "",
-  "anchor": "",
-  "notes": ""
+  "hookable": "already-hook",
+  "anchor": "include lines after include(\"/ipc/chromium/chromium-config.mozbuild\") (StealthDesignMetrics.mozbuild)",
+  "notes": "One include line of StealthDesignMetrics.mozbuild, which lists StealthDesignMetrics.cpp in SOURCES."
  },
  {
   "file": "intl/locale/LocaleService.cpp",
@@ -2802,8 +2802,8 @@
   "hunks": 1,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
-  "anchor": "",
-  "notes": ""
+  "anchor": "UNIFIED_SOURCES of intl/locale/tests/gtest (TestStealthRegionalLocales.cpp, after the list of Mozilla tests)",
+  "notes": "Registers the gtest TestStealthRegionalLocales.cpp: LocaleService::GetRegionalPrefsLocales answers from the declared session language, and keeps Mozilla's rule that the regional language is used only when it matches the app locale."
  },
  {
   "file": "js/src/debugger/Debugger.cpp",
@@ -2939,8 +2939,8 @@
   "hunks": 2,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
-  "anchor": "",
-  "notes": ""
+  "anchor": "include of mozilla/intl/StealthSessionPrefs.h; xpc::CreateSandboxObject (the locale override of the realm options)",
+  "notes": "The locale override of a sandbox realm is the primary tag of the language override (mozilla::intl::StealthPrimaryLanguageTag, which cuts a list to its first tag) in place of the whole list. Mozilla's expression stays inside our call."
  },
  {
   "file": "js/xpconnect/src/nsXPConnect.cpp",
@@ -3378,8 +3378,8 @@
   "hunks": 1,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
-  "anchor": "",
-  "notes": ""
+  "anchor": "pref geo.provider.network.url (the !ANDROID and !XP_WIN block of the Geolocation prefs)",
+  "notes": "Declared value: the default of geo.provider.network.url is the empty string in place of the URL of the network location service, on Mozilla's own line, so the pref is declared nowhere else."
  },
  {
   "file": "modules/libpref/moz.build",
@@ -3442,8 +3442,8 @@
   "hunks": 3,
   "inline_logic_lines": 9,
   "hookable": "movable",
-  "anchor": "TRRLoadInfo::GetJugglerLoadIdentifier / TRRLoadInfo::SetJugglerLoadIdentifier (end of file)",
-  "notes": "Stubs required because TRRLoadInfo implements nsILoadInfo. Risk 'infallible attribute returns NS_ERROR_NOT_IMPLEMENTED': REFUTED as a new problem. Upstream TRRLoadInfo.cpp:132-155 already returns NS_ERROR_NOT_IMPLEMENTED for the [infallible] attributes securityMode, isInThirdPartyContext and isThirdPartyContextToTopWindow (nsILoadInfo.idl:490, 637, 649); the new stubs follow the same pattern. Also (feature doh-trr-context, network/doh): the TRR load info keeps the origin attributes of the lookup's context, also in its clone, so the proxy filters see the context.",
+  "anchor": "include of StealthLoadInfo.h; TRRLoadInfo::Clone (after the new TRRLoadInfo); TRRLoadInfo::SetOriginAttributes (first statement)",
+  "notes": "The TRR load info keeps the origin attributes of the lookup's context, so the proxy filters see it: Clone copies them to the new TRRLoadInfo, and SetOriginAttributes, which Mozilla answers with NS_ERROR_NOT_IMPLEMENTED, stores them through StealthTRRSetOriginAttributes (a guard that returns its result). The Juggler load identifier accessors are in StealthLoadInfo.cpp, not in this file.",
   "verifier": {
    "changed": [
     "notes"
@@ -3478,8 +3478,8 @@
   "hunks": 1,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
-  "anchor": "",
-  "notes": ""
+  "anchor": "UNIFIED_SOURCES of netwerk/base (StealthIPv6Literal.cpp, after the TRRLoadInfo.cpp line that ends the list)",
+  "notes": "Registers StealthIPv6Literal.cpp, which holds the rule that a connect to an IPv6 literal fails as on a host with no IPv6 route when IPv6 is disabled."
  },
  {
   "file": "netwerk/base/moz.build",
@@ -3491,8 +3491,8 @@
   "hunks": 1,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
-  "anchor": "",
-  "notes": ""
+  "anchor": "UNIFIED_SOURCES of netwerk/base (StealthLoadInfo.cpp, after the StealthIPv6Literal.cpp line)",
+  "notes": "Registers StealthLoadInfo.cpp, which holds the load info side of the navigation identifier (the copy of the load identifier between load infos) and the setter of the origin attributes of TRRLoadInfo."
  },
  {
   "file": "netwerk/base/nsILoadInfo.idl",
@@ -3632,8 +3632,8 @@
   "hunks": 1,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
-  "anchor": "",
-  "notes": ""
+  "anchor": "parent: block of PSocketProcess (after the PProxyConfigLookup constructor)",
+  "notes": "One message line, StealthProxyLookupOrigin(OriginAttributes?), sent by the socket process right before the PProxyConfigLookup constructor: it carries the origin attributes of the DoH context to the parent, which keeps them for that lookup (SocketProcessParent::RecvStealthProxyLookupOrigin, StealthTakeParkedTRRLookupContext)."
  },
  {
   "file": "netwerk/protocol/http/AlternateServices.cpp",
@@ -3751,8 +3751,8 @@
   "hunks": 1,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
-  "anchor": "",
-  "notes": ""
+  "anchor": "UNIFIED_SOURCES of netwerk/protocol/http (StealthInterception.cpp, after the closing bracket of the list)",
+  "notes": "Registers StealthInterception.cpp, which holds what the automation driver needs from an intercepted channel that a service worker may or may not answer."
  },
  {
   "file": "netwerk/protocol/http/nsHttpHandler.cpp",
@@ -4189,8 +4189,8 @@
   "hunks": 1,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
-  "anchor": "",
-  "notes": ""
+  "anchor": "UNIFIED_SOURCES of toolkit/components/windowwatcher (StealthWindowPlacement.cpp, after the JugglerWindowSize.cpp line)",
+  "notes": "Registers StealthWindowPlacement.cpp, which places a window a page opens without left and top at the declared default position (StealthPlacePopupAtDefault)."
  },
  {
   "file": "toolkit/components/windowwatcher/nsWindowWatcher.cpp",
@@ -4221,8 +4221,8 @@
   "hunks": 2,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
-  "anchor": "",
-  "notes": ""
+  "anchor": "include of JugglerWindowSize.h; nsWindowWatcher::CalculateChromeFlagsForContent (the popup branch)",
+  "notes": "On the popup branch the chrome flags come from mozilla::JugglerPopupChromeFlags(aFeatures, CHROME_MINIMAL_POPUP): CHROME_MINIMAL_POPUP, plus one flag of ours when the features give a size. Mozilla's constant stays inside our call."
  },
  {
   "file": "toolkit/toolkit.mozbuild",
@@ -4425,8 +4425,8 @@
   "hunks": 1,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
-  "anchor": "",
-  "notes": ""
+  "anchor": "nsWindow::MakeFullScreen (the branch for an X11 display whose window manager does not support fullscreen, before NS_ERROR_NOT_AVAILABLE)",
+  "notes": "Guard in the branch where Mozilla refuses fullscreen for lack of a window manager: StealthMakeFullScreenWithoutWM resizes the X window to the declared screen and answers true, as Windows and the headless widget decide fullscreen themselves. With the engine off, or on a kiosk monitor, it answers false and Mozilla's return runs."
  },
  {
   "file": "widget/nsBaseDragService.cpp",
@@ -4704,8 +4704,8 @@
   "hunks": 2,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
-  "anchor": "",
-  "notes": ""
+  "anchor": "network.trr.request_timeout_ms; network.trr.exclude-etc-hosts",
+  "notes": "Two values changed in place, each on its own line (the prefs are declared nowhere else): the single TRR request timeout is 30000 ms in place of 1500, and network.trr.exclude-etc-hosts is false in place of true."
  },
  {
   "file": "modules/libpref/init/StaticPrefList.yaml",
@@ -4717,8 +4717,8 @@
   "hunks": 1,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
-  "anchor": "",
-  "notes": ""
+  "anchor": "network.proxy.type",
+  "notes": "The default of network.proxy.type is 0 (direct) in place of 5 (the system proxy settings), on Mozilla's own line; the pref is declared nowhere else."
  },
  {
   "file": "Cargo.lock",
@@ -5458,8 +5458,8 @@
   "hunks": 1,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
-  "anchor": "",
-  "notes": ""
+  "anchor": "UNIFIED_SOURCES of dom/canvas/gtest (TestStealthCanvasPageSnapshot.cpp, after the list that ends with TestWebGLTextureUploadInit.cpp)",
+  "notes": "Registers the gtest TestStealthCanvasPageSnapshot.cpp: createPattern from a canvas takes the snapshot a page reads, and never the snapshot of the context itself when the context has an element."
  },
  {
   "file": "dom/events/test/gtest/moz.build",
@@ -5528,8 +5528,8 @@
   "hunks": 1,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
-  "anchor": "",
-  "notes": ""
+  "anchor": "EXPORTS.ipc (StealthMouseEventIPC.h, after the list with nsGUIEventIPC.h)",
+  "notes": "Exports StealthMouseEventIPC.h, which holds the read of the Juggler event id in the deserialisation of a mouse event (StealthReadJugglerEventId, the last link of the read chain)."
  },
  {
   "file": "widget/gtk/nsWindow.h",
@@ -5581,8 +5581,8 @@
   "hunks": 1,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
-  "anchor": "",
-  "notes": ""
+  "anchor": "SOURCES of widget/gtk (StealthHostGLProbe.cpp, after the list that ends with nsWindow.cpp)",
+  "notes": "Registers StealthHostGLProbe.cpp, which fires Mozilla's host GL probe right after the profile's preferences are read; with the engine on it launches nothing and reads nothing from the host."
  },
  {
   "file": "widget/tests/gtest/moz.build",
@@ -6056,8 +6056,8 @@
   "hunks": 1,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
-  "anchor": "",
-  "notes": ""
+  "anchor": "WebrtcTCPSocket::OpenWithoutHttpProxy (after the local address is parsed, before mTransport->Bind)",
+  "notes": "Before the bind of a plain TCP socket of a PeerConnection, StealthTcpSocketBorn gives the socket's transport the context of its name lookup and makes the bind address the wildcard of the declared address's family on port 0."
  },
  {
   "file": "dom/media/webrtc/transport/nr_socket_proxy_config.h",
@@ -6120,8 +6120,8 @@
   "hunks": 1,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
-  "anchor": "",
-  "notes": ""
+  "anchor": "class NrSocket (private members, after the friend of StealthNrSocketAccess)",
+  "notes": "Member stealth_own_port_: the port this socket recorded in the set of this process's own ports (0 when none). StealthSocketAttached sets it and StealthOwnPortReleased clears it at close."
  },
  {
   "file": "netwerk/base/nsIUDPSocket.idl",
@@ -6218,8 +6218,8 @@
   "hunks": 3,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
-  "anchor": "",
-  "notes": ""
+  "anchor": "include of StealthTRRContext.h; ProxyConfigLookup::Create (first statement); ProxyConfigLookup::DoProxyResolve (after the stand-in channel is made)",
+  "notes": "The context of the DoH request that caused a proxy lookup reaches the lookup: Create takes it (StealthEnterTRRLookupContext, a notice) and DoProxyResolve gives it to the stand-in channel (StealthApplyTRRLookupContext, a guard that returns its error), so the proxy filter sees that context."
  },
  {
   "file": "netwerk/ipc/ProxyConfigLookupChild.h",
@@ -6265,8 +6265,8 @@
   "hunks": 2,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
-  "anchor": "",
-  "notes": ""
+  "anchor": "include of StealthTRRContext.h; ProxyConfigLookupChild::Create (before SendPProxyConfigLookupConstructor)",
+  "notes": "In the socket process the context of the lookup is sent to the parent (StealthSendTRRLookupContext, a notice) in a message right before the constructor of PProxyConfigLookup."
  },
  {
   "file": "netwerk/ipc/ProxyConfigLookupParent.h",
@@ -6329,8 +6329,8 @@
   "hunks": 1,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
-  "anchor": "",
-  "notes": ""
+  "anchor": "SocketProcessParent (members, after RecvPProxyConfigLookupConstructor)",
+  "notes": "Declares RecvStealthProxyLookupOrigin, the receiver of the message that PSocketProcess gains for the context of a DoH lookup; it is defined in our file."
  },
  {
   "file": "netwerk/ipc/SocketProcessParent.cpp",
@@ -6359,8 +6359,8 @@
   "hunks": 2,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
-  "anchor": "",
-  "notes": ""
+  "anchor": "include of StealthTRRContext.h; SocketProcessParent::RecvPProxyConfigLookupConstructor (first statement)",
+  "notes": "The constructor of a proxy lookup takes the context the socket process parked just before it (StealthTakeParkedTRRLookupContext, a notice), so the lookup carries the context of its DoH request."
  },
  {
   "file": "netwerk/ipc/moz.build",
@@ -6389,8 +6389,8 @@
   "hunks": 2,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
-  "anchor": "",
-  "notes": ""
+  "anchor": "EXPORTS.mozilla.net and UNIFIED_SOURCES of netwerk/ipc (StealthTRRContext.h and .cpp)",
+  "notes": "Exports StealthTRRContext.h and builds StealthTRRContext.cpp, the carrying of the DoH request's browser context to the proxy lookup it causes."
  },
  {
   "file": "netwerk/protocol/http/HttpConnectionUDP.cpp",
@@ -6436,8 +6436,8 @@
   "hunks": 2,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
-  "anchor": "",
-  "notes": ""
+  "anchor": "include of StealthIPv6Literal.h; nsSOCKSSocketInfo::ConnectToProxy (the connect to the proxy)",
+  "notes": "The layer's connect to its proxy goes through StealthHopConnect, which sends nothing and fails as a failed connect when the route rule refuses the hop, and otherwise is the layer's own connect. Mozilla's sub-expression and arguments stay inside our call."
  },
  {
   "file": "dom/media/webrtc/transport/build/moz.build",
@@ -6883,8 +6883,8 @@
   "hunks": 2,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
-  "anchor": "",
-  "notes": ""
+  "anchor": "include of StealthGfxFeatureStatus.h; XREMain::XRE_mainRun (right after InitializeUserPrefs)",
+  "notes": "Two notices after the profile's preferences are read: StealthMarkUserPrefsRead records that the declaration has arrived, and StealthFireHostGLProbeIfStock fires Mozilla's host GL probe only for a launch with no declaration."
  },
  {
   "file": "toolkit/components/geolocation/GeolocationService.cpp",
@@ -6987,8 +6987,8 @@
   "hunks": 1,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
-  "anchor": "",
-  "notes": ""
+  "anchor": "UNIFIED_SOURCES of layout/base/gtest (TestStealthSurfaceFlags.cpp, after the TestStealthJugglerMouseAck.cpp line)",
+  "notes": "Registers the gtest TestStealthSurfaceFlags.cpp: the as-drawn flag is on no bit of Mozilla's SFE flags and is wanted for itself and nothing else."
  },
  {
   "file": "docshell/base/test/gtest/moz.build",

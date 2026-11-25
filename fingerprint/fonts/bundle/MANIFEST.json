@@ -330,9 +330,9 @@
    "removed": 0,
    "hunks": 1,
    "inline_logic_lines": 1,
-   "hookable": "",
-   "anchor": "",
-   "notes": ""
+   "hookable": "movable",
+   "anchor": "if block for OS_TARGET WINNT (before the Darwin block)",
+   "notes": "A WINNT-only block that registers TestStealthBundledCollection.cpp, the gtest of the bundled font collection of the bundle-only font list. The condition and the registration are both inline in Mozilla's file; both could sit in a .build file of ours behind one include line."
   },
   {
    "file": "gfx/thebes/FontData.h",
