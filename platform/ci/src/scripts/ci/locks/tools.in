@@ -1,0 +1,6 @@
+# Input of the tools lock; `python scripts/ci/py_deps.py lock tools` writes tools.txt from it.
+# python-version: 3.11
+# exclude-newer: 2026-11-25T00:00:00Z
+fonttools==4.51.0
+pytest
+pyyaml

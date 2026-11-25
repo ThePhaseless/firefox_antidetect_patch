@@ -1,0 +1,4 @@
+# Input of the wheel-build lock; `python scripts/ci/py_deps.py lock wheel-build` writes wheel-build.txt from it.
+# python-version: 3.11
+# exclude-newer: 2026-11-25T00:00:00Z
+hatchling

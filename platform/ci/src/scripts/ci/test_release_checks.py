@@ -15,6 +15,7 @@ Three things, each red on the workflow as it was:
 """
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
@@ -50,6 +51,109 @@ def pattern_downloads(doc):
             with_ = step.get("with") or {}
             if "actions/download-artifact" in str(step.get("uses", "")) and "pattern" in with_ and ("run-id" in with_ or "github-token" in with_):
                 found.append("%s / %s" % (job_name, step.get("name", step.get("id", "?"))))
+    return found
+
+#: Workflows that are Mozilla's, not ours: on no branch of ours, never run (test_release_builder.py), so they are not ours to annotate.
+UPSTREAM_WORKFLOWS = ("pr-handler.yml",)
+#: What makes a step a test or a judge, read from its `run` (comment lines left out) and its `uses`: a failure of it is a red, never hidden by `continue-on-error`.
+TEST_OR_JUDGE = re.compile(r"pytest|node --test|\btest_\w+\.py|cargo test|cargo_oracles|cargo_junit|ci_verdict|hook_tests_judge|py_junit|gtest|xpcshell|verdict")
+#: The line right above every `continue-on-error`: its reason, which is not a test.
+COE_REASON = re.compile(r"^\s*# continue-on-error: \S.*$")
+
+
+def is_test_or_judge(step_or_job) -> bool:
+    """Whether a step (or a job: all its steps) runs a test or a judge, by `TEST_OR_JUDGE` on the commands and the actions it uses."""
+    steps = step_or_job.get("steps") or [step_or_job]
+    text = []
+    for step in steps:
+        run = "\n".join(l for l in str(step.get("run", "")).splitlines() if not l.strip().startswith("#"))
+        text += [run, str(step.get("uses", ""))]
+    text.append(str(step_or_job.get("uses", "")))
+    return TEST_OR_JUDGE.search("\n".join(text)) is not None
+
+
+def continue_on_error_violations(name: str, text: str) -> list:
+    """Every `continue-on-error` of a workflow's text that breaks the rule, as "<file> / <job> / <step>: <why>".
+
+    The rule (ci-04, one judge per suite): no `continue-on-error` on a step that runs tests or a judge, and every other one has a comment `# continue-on-error:
+    <reason, not a test>` on the line right above it. Read from the text, because YAML drops comments."""
+    import textwrap
+
+    import yaml
+
+    lines, found, job, step_at = text.splitlines(), [], None, None
+    for i, line in enumerate(lines):
+        if re.match(r"^\S", line):
+            job, step_at = None, None
+        elif re.match(r"^  [\w.-]+:\s*$", line) and any(l.startswith("jobs:") for l in lines[:i]):
+            job, step_at = line.strip().rstrip(":"), None
+        elif re.match(r"^      - ", line) and job:
+            step_at = i
+        if re.match(r"^\s*continue-on-error:", line) and job:
+            indent = len(line) - len(line.lstrip())
+            if indent == 8 and step_at is not None:
+                end = next((j for j in range(i + 1, len(lines)) if re.match(r"^(      - |  \S|\S)", lines[j])), len(lines))
+                step = yaml.safe_load(textwrap.dedent("\n".join(lines[step_at:end])).replace("- ", "  ", 1))
+                what = "%s / %s / %s" % (name, job, step.get("name", step.get("id", "?")))
+                test = is_test_or_judge(step)
+            elif indent == 4:
+                start = next(j for j in range(i, -1, -1) if re.match(r"^  [\w.-]+:\s*$", lines[j]))
+                end = next((j for j in range(i + 1, len(lines)) if re.match(r"^(  \S|\S)", lines[j])), len(lines))
+                body = yaml.safe_load("\n".join(lines[start:end])) or {}
+                what = "%s / %s / (the job)" % (name, job)
+                test = is_test_or_judge(next(iter(body.values())) or {})
+            else:
+                found.append("%s / %s: a continue-on-error at an indent this check does not read" % (name, job))
+                continue
+            if test:
+                found.append("%s: continue-on-error on a step that runs a test or a judge" % what)
+            if not COE_REASON.match(lines[i - 1]):
+                found.append("%s: no `# continue-on-error: <reason>` on the line right above" % what)
+    return found
+
+
+def count_continue_on_error(text: str) -> int:
+    """How many `continue-on-error` KEYS (not comments) a workflow's text has, to prove that `continue_on_error_violations` read every one."""
+    return len(re.findall(r"^\s*continue-on-error:", text, re.M))
+
+
+#: ci-03 (a list of packages is resolved once per state, by one job; the legs install from its result, offline, by name; no leg reads a mirror). The jobs it is
+#: held over so far, by file: every job of checks.yml and package-ab.yml, and the Linux gtest job of release.yml. The rule over every workflow comes with the
+#: conversion of gate.yml and of the node.
+CI03_SCOPE = {"checks.yml": None, "package-ab.yml": None, "release.yml": ("gtest-linux",)}
+PIP_COMMAND = re.compile(r"\bpip3?\s+(install|download|wheel)\b|\buv\s+pip\b")
+APT_INSTALL = re.compile(r"\bapt(-get)?\b[^\n|;&]*\binstall\b")
+APT_UPDATE = re.compile(r"\bapt(-get)?\b[^\n|;&]*\bupdate\b")
+
+
+def ci03_problems(docs: dict, scope: dict = CI03_SCOPE) -> list:
+    """Every place in the jobs of `scope` where a leg reads a mirror, as "<file> / <job>: <what>": a `pip install` (or download, wheel, uv pip) without --no-index
+    and --find-links, a pip job that does not need a call of py-deps.yml and download its wheelhouse, an `apt-get install` without --no-download, an `apt-get update`
+    that is not on the run's local repository ($APT)."""
+    found = []
+    for name, jobs_wanted in scope.items():
+        for job_name, job in (docs[name].get("jobs") or {}).items():
+            if jobs_wanted is not None and job_name not in jobs_wanted:
+                continue
+            need = job.get("needs")
+            need = [need] if isinstance(need, str) else list(need or [])
+            deps = [n for n in need if str(docs[name]["jobs"].get(n, {}).get("uses", "")) == "./.github/workflows/py-deps.yml"]
+            fetched = [st for st in job.get("steps") or [] if str(st.get("uses", "")).startswith("actions/download-artifact")
+                       and str((st.get("with") or {}).get("name", "")).startswith("py-deps-")]
+            pips = 0
+            for step in job.get("steps") or []:
+                run = re.sub(r"\\\n\s*", " ", str(step.get("run", "")))   # a line continued with a backslash is one command
+                for line in (l.strip() for l in run.splitlines() if not l.strip().startswith("#")):
+                    if PIP_COMMAND.search(line):
+                        pips += 1
+                        if "--no-index" not in line or "--find-links" not in line:
+                            found.append("%s / %s: `%s` reads the index (no --no-index --find-links)" % (name, job_name, line))
+                    if APT_INSTALL.search(line) and "--no-download" not in line:
+                        found.append("%s / %s: `%s` can fetch from a mirror (no --no-download)" % (name, job_name, line))
+                    if APT_UPDATE.search(line) and "$APT" not in line:
+                        found.append("%s / %s: `%s` reads a mirror's lists (not on the local repository)" % (name, job_name, line))
+            if pips and not (deps and fetched):
+                found.append("%s / %s: it installs packages but does not need a py-deps.yml call and download its wheelhouse" % (name, job_name))
     return found
 
 
@@ -91,13 +195,16 @@ def _cases() -> list:
     out.append(("checks: the plan's own tests moved from the plan to the job `tree`: there, once each; in the plan, none (it plans, `scripts/ci matrix` stays)",
                 all(("python3 " + t) in text for t in plans) and not any(t in plan_text for t in plans) and 'scripts/ci matrix' in plan_text))
     out.append(("checks: the tree is materialized from the series before they run, on a GitHub runner",
-                "engine.py materialize --into ." in tree["steps"][1]["run"] and tree["runs-on"] == "ubuntu-24.04" and names.index(CHECKS[0]) > 1))
+                "engine.py materialize --into ." in str(next(st for st in tree["steps"] if "engine.py materialize" in str(st.get("run", ""))).get("run"))
+                and tree["runs-on"] == "ubuntu-24.04"
+                and names.index(CHECKS[0]) > names.index("The source tree, the Mozilla tag with our series applied (tools/engine.py)")))
     out.append(("checks: no secret and no environment in any job of checks.yml (the node job alone has them), and a token that only reads",
                 "secrets." not in str(called) and not any("environment" in j for j in called["jobs"].values()) and called["permissions"] == {"contents": "read"}
                 and not any("permissions" in j for j in called["jobs"].values())))
     out.append(("checks: the job `tree` has a limit", 0 < tree.get("timeout-minutes", 0) <= 30))
-    out.append(("checks: the jobs the two rounds share, by name: rules, rebuilds, noreply-identity, tree",
-                list(called["jobs"]) == ["rules", "rebuilds", "noreply-identity", "tree"]))
+    out.append(("checks: the jobs the two rounds share, by name: rules, rebuilds, noreply-identity, tree, and the three that give them their packages (ci-03): "
+                "py-deps-tools, core-ref, py-deps-core",
+                list(called["jobs"]) == ["py-deps-tools", "core-ref", "py-deps-core", "rules", "rebuilds", "noreply-identity", "tree"]))
     gnames = [s.get("name") for s in guard_job["steps"]]
     out.append(("guard: a job `still-head` of release.yml, after the checks (it needs nothing else), with the token that may cancel this very run and read; "
                 "the guard that a newer push has not replaced the run is its LAST step, the one that can cancel",
@@ -281,6 +388,67 @@ def _cases() -> list:
     out.append(("linux-deps.yml: the archive is read only when the entry of this image and list is missing",
                 all(st.get("if") == "steps.restore.outputs.cache-hit != 'true'" for st in deps_steps
                     if "apt-get" in str(st.get("run", "")) or str(st.get("uses", "")).startswith("actions/cache/save"))))
+
+    # --- ci-03, for the files converted so far (checks.yml, package-ab.yml, and the gtest-linux job of release.yml): no leg reads a mirror --------------------------
+    real = {n: load(n) for n in CI03_SCOPE}
+    bad_pip = {"jobs": {"j": {"steps": [{"run": "pip install pytest pyyaml"}]}}}
+    bad_pip2 = {"jobs": {"j": {"steps": [{"run": 'python -m pip install --quiet --no-index -r "$RUNNER_TEMP/py-deps/lock.txt"'}]}}}
+    bad_apt = {"jobs": {"j": {"steps": [{"run": "sudo apt-get update\nsudo apt-get install -y xvfb gdb"}]}}}
+    bad_needs = {"jobs": {"j": {"steps": [{"run": 'pip install --no-index --find-links "$RUNNER_TEMP/py-deps" -r lock.txt'}]}}}
+    good = {"jobs": {"deps": {"uses": "./.github/workflows/py-deps.yml"},
+                     "j": {"needs": "deps", "steps": [{"uses": "actions/download-artifact@x", "with": {"name": "py-deps-tools-linux", "path": "w"}},
+                                                      {"run": 'python -m pip install --no-index --find-links "$RUNNER_TEMP/py-deps" --require-hashes -r "$RUNNER_TEMP/py-deps/lock.txt"\n'
+                                                              'sudo apt-get $APT update\nsudo apt-get $APT install -y --no-download xvfb'}]}}}
+    scope_x = {"x.yml": None}
+    out.append(("ci-03 in checks.yml, package-ab.yml and release.yml's gtest-linux: every `pip install` carries --no-index and --find-links and its job needs a py-deps.yml call and "
+                "downloads its wheelhouse; every `apt-get install` carries --no-download and every `apt-get update` is on the local repository (%s)"
+                % ("; ".join(ci03_problems(real)) or "none does otherwise"),
+                ci03_problems(real) == []
+                and any("reads the index" in p for p in ci03_problems({"x.yml": bad_pip}, scope_x))
+                and any("reads the index" in p for p in ci03_problems({"x.yml": bad_pip2}, scope_x))
+                and any("no --no-download" in p for p in ci03_problems({"x.yml": bad_apt}, scope_x))
+                and any("reads a mirror's lists" in p for p in ci03_problems({"x.yml": bad_apt}, scope_x))
+                and any("does not need a py-deps.yml call" in p for p in ci03_problems({"x.yml": bad_needs}, scope_x))
+                and ci03_problems({"x.yml": good}, scope_x) == []
+                and set(real["release.yml"]["jobs"]) >= {"gtest-linux", "linux-deps-gtest"}
+                and all(real[n]["jobs"].get(j) for n, js in CI03_SCOPE.items() for j in (js or ()))))
+    out.append(("ci-03: the jobs that install Python packages in those files are the ones that need a py-deps.yml call: rules, rebuilds and tree (checks.yml), package-ab (package-ab.yml)",
+                all(any(str(real[f]["jobs"][d].get("uses", "")) == "./.github/workflows/py-deps.yml"
+                        for d in ([real[f]["jobs"][j]["needs"]] if isinstance(real[f]["jobs"][j]["needs"], str) else real[f]["jobs"][j]["needs"]))
+                    for f, j in (("checks.yml", "rules"), ("checks.yml", "rebuilds"), ("checks.yml", "tree"), ("package-ab.yml", "package-ab")))))
+
+    # --- no `continue-on-error` on a test or a judge (ci-04): the rule, over every workflow of ours --------------------------------------------------
+    import yaml
+
+    bad_coe, total_coe, parsed_coe = [], 0, 0
+    for path in sorted(WORKFLOWS.glob("*.yml")):
+        if path.name in UPSTREAM_WORKFLOWS:
+            continue
+        body = path.read_text(encoding="utf-8")
+        bad_coe += continue_on_error_violations(path.name, body)
+        total_coe += count_continue_on_error(body)
+        for job in (yaml.safe_load(body).get("jobs") or {}).values():
+            parsed_coe += sum(1 for item in [job] + list(job.get("steps") or []) if "continue-on-error" in item)
+    out.append(("no workflow has a continue-on-error on a step that runs tests or a judge, and each has `# continue-on-error: <reason>` right above it%s"
+                % ("" if not bad_coe else ": " + "; ".join(bad_coe)), not bad_coe and total_coe > 0))
+    old_text = ("jobs:\n  tree:\n    steps:\n"
+                "      - name: Our python tests of the tree, as junit\n        continue-on-error: true\n        run: python3 -m pytest scripts -q\n"
+                "      - name: Both legs' junit\n        continue-on-error: true\n        run: python3 scripts/ci/cargo_junit.py a.log --out o\n"
+                "      - name: The verdict\n        # continue-on-error: it is only a verdict\n        continue-on-error: true\n        run: python3 scripts/ci/ci_verdict.py\n")
+    old = continue_on_error_violations("old.yml", old_text)
+    out.append(("the rule is red on the old files: a pytest step, a junit converter and a verdict with continue-on-error are named, the first two with the missing reason too",
+                len(old) == 5 and "old.yml / tree / Our python tests of the tree, as junit: continue-on-error on a step that runs a test or a judge" in old
+                and "old.yml / tree / Our python tests of the tree, as junit: no `# continue-on-error: <reason>` on the line right above" in old
+                and "old.yml / tree / Both legs' junit: continue-on-error on a step that runs a test or a judge" in old
+                and "old.yml / tree / The verdict: continue-on-error on a step that runs a test or a judge" in old))
+    fine = ("jobs:\n  junit:\n    steps:\n      - name: Both legs' junit\n        # continue-on-error: an optional download, not a test\n        continue-on-error: true\n"
+            "        uses: actions/download-artifact@v4\n        with:\n          pattern: junitpart-cargo-*\n"
+            "      - name: Compile\n        # continue-on-error: a compile step, not a test\n        continue-on-error: ${{ needs.plan.outputs.x != 'objects' }}\n"
+            "        run: |\n          # the gtests' links, said in a comment\n          python3 scripts/ci objects\n")
+    out.append(("the rule is green on a download and a compile step with their reason above (an expression too); a gtest named only in a comment is not a test",
+                continue_on_error_violations("new.yml", fine) == [] and count_continue_on_error(fine) == 2))
+    out.append(("the rule reads every continue-on-error key: as many in the text as the YAML parser finds (pr-handler.yml aside: Mozilla's, on no branch of ours)",
+                total_coe == parsed_coe))
     return out
 
 

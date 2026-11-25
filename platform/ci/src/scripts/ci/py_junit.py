@@ -4,7 +4,7 @@
 The tree the job materializes holds Mozilla's python tests (marionette, mach, ...) and ours; only ours are run. Ours are the files the series ADDS: the
 `test_*.py` of `<group>/<folder>/src/<path in the tree>`. Left out, on purpose: scripts/ci/ (the plan job's cases, run by test_ci.py, with their own runners)
 and scripts/tests/ (smoke tests that need a browser and the wrapper). A file with no `def test_` / `class Test` has nothing for pytest to collect (its checks
-run in `__main__`, as `python3 scripts/test_make_seal.py` does in the same job), so it is not listed: a hook cannot name a test it does not have.
+run in `__main__`), so it is not listed: a hook cannot name a test it does not have.
 
     python3 scripts/ci/py_junit.py list --series .series --tree .
 

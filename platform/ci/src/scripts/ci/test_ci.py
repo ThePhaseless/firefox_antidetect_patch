@@ -114,40 +114,6 @@ def phase_case(tmp: Path, argv, memwatch=""):
     events = [json.loads(l) for l in (tmp / "events.jsonl").read_text(encoding="utf-8").splitlines()]
     return code, events, (tmp / "summary.md").read_text(encoding="utf-8")
 
-
-def zram_case(run: str, find_ok: bool, hot_add_ok: bool) -> tuple:
-    """The swap step's zram block (release.yml, "Free disk + 32G swap") run by
-    bash -e, as the runner does, with sudo, modprobe and zramctl faked:
-    `zramctl --find` succeeds or exits 1, /sys/class/zram-control/hot_add
-    answers 3 or fails. Returns (the shell went on, the step summary)."""
-    lines = run.splitlines()
-    start = min(i for i, l in enumerate(lines) if "zram_swap() {" in l or "modprobe zram" in l)
-    end = next(i for i in range(start, len(lines))
-               if lines[i].strip() == "fi" and any("the disk file alone" in l for l in lines[start:i]))
-    block = "\n".join(lines[start:end + 1])
-    find = ("echo /dev/zram0; exit 0" if find_ok else
-            "echo 'zramctl: /dev/zram0: failed to reset: Device or resource busy' >&2; exit 1")
-    fake_sudo = "\n".join([
-        "#!/bin/bash",
-        'case "$1" in',
-        '  zramctl) for a; do [ "$a" = --find ] && { %s; }; done; exit 0 ;;' % find,
-        "  cat) %s ;;" % ("echo 3" if hot_add_ok else "exit 1"),
-        "  *) exit 0 ;;",
-        "esac", ""])
-    with tempfile.TemporaryDirectory() as tmp:
-        tmp = Path(tmp)
-        sudo = tmp / "sudo"
-        sudo.write_text(fake_sudo, newline="\n")
-        sudo.chmod(0o755)
-        summary = tmp / "summary"
-        summary.write_text("")
-        env = dict(os.environ, PATH="%s%s%s" % (tmp, os.pathsep, os.environ.get("PATH", "")),
-                   GITHUB_STEP_SUMMARY=str(summary))
-        out = subprocess.run(["bash", "-e", "-c", block + "\necho WENT-ON"], env=env,
-                             capture_output=True, text=True)
-        return "WENT-ON" in out.stdout, summary.read_text()
-
-
 def main() -> int:
     cases = []
     names = {l.leg: l.asset("157.0.1") for l in legs.LEGS}
@@ -504,10 +470,10 @@ def main() -> int:
                       "steps.cache-restore.outputs.cache-matched-key == ''" in again.get("if", "")
                       and again.get("with", {}).get("restore-keys") == "sccache-${{ matrix.leg }}-"
                       and "builds cold" in said.get("run", "") and "GITHUB_STEP_SUMMARY" in said.get("run", "")))
-        cases.append(("gtests: an input, off by default, on every leg, as a phase",
-                      gt_input["type"] == "boolean" and gt_input["default"] is False and len(gt_step) == 1
-                      and gt_step[0]["if"] == "needs.plan.outputs.gtests == 'true' && runner.environment == 'github-hosted'"
-                      and "matrix" not in gt_step[0]["if"] and "phase gtest -- " in gt_step[0]["run"]))
+        cases.append(("gtests: an input, off by default; the build job has no gtest step of its own (both legs compile on the node, which only builds them: a step gated to a "
+                      "GitHub runner could never run), the gtests run in the jobs gtest-linux and gtest-cross",
+                      gt_input["type"] == "boolean" and gt_input["default"] is False and not gt_step
+                      and all(j in doc["jobs"] for j in ("gtest-linux", "gtest-cross"))))
         # A cross-compiled leg's runner cannot execute what it builds (run 41232307511:
         # "Exec format error" on firefox.exe): its gtests are built there and run by a
         # job on the target's OS, which downloads exactly that leg's dist/bin.
@@ -524,28 +490,14 @@ def main() -> int:
                         and all("needs.plan.outputs.gtests == 'true'" in st.get("if", "") for st in ran[0]["steps"]))
         kept = steps.get("The node - keep them", {})
         built = steps.get("The node - its gtest binaries, for a job on GitHub's runners", {})
-        cross_ok = (cross_ok and "recurse_gtest" in built.get("run", "") and "matrix.target" not in gt_step[0]["run"]
+        cross_ok = (cross_ok and "recurse_gtest" in built.get("run", "")
                     and kept.get("with", {}).get("name") == "gtest-bin-${{ matrix.leg }}")
         cases.append(("gtests: a cross-compiled leg's run on its target's OS (run 41232307511)", cross_ok))
-        # apt has no network timeout: a stalled mirror held run 41248997155's
-        # linux-x86_64 leg in `apt-get update` for 5h40, until the job's limit.
+        # The build job reads no apt mirror (run 41248997155 lost a leg to `apt-get update` for 5h40, until the job's limit): both legs run on the node, whose
+        # packages its bootstrap installs from a repository kept by image state (test_release_builder.py), and no step of the job is for a GitHub runner.
         build_steps = doc["jobs"]["build"]["steps"]
         net = [i for i, st in enumerate(build_steps) if "80-ci-network" in st.get("run", "")]
         apt_at = [i for i, st in enumerate(build_steps) if "apt-get" in st.get("run", "")]
-        conf = build_steps[net[0]]["run"] if net else ""
-        # zram is best-effort: run 41325666566's win-x86_64 leg died in the swap
-        # step on "zramctl: /dev/zram0: failed to reset: Device or resource busy".
-        # It runs the step's own shell with a fake sudo: Linux only, where the
-        # CI runs it (a Windows host's "bash" may be WSL's, without our PATH).
-        swap = steps.get("Free disk + 32G swap (Linux runners)", {}).get("run", "")
-        if sys.platform.startswith("linux"):
-            busy, busy_summary = zram_case(swap, find_ok=False, hot_add_ok=False)
-            fresh, fresh_summary = zram_case(swap, find_ok=False, hot_add_ok=True)
-            cases.append(("swap: a runner whose zram is taken gets a new device, or goes on with the disk file alone (run 41325666566)",
-                          busy and "NO usable zram" in busy_summary
-                          and fresh and "zram /dev/zram3" in fresh_summary))
-        else:
-            print("skip  swap: zram case runs on Linux only")
         # WebGPU on Linux: our lavapipe, built before the gtests and the package
         # and shipped with it (without one requestAdapter() answered null).
         names = [st.get("name", "") for st in build_steps]
@@ -561,7 +513,7 @@ def main() -> int:
                       and "lavapipe_build.py --out" in lvp.get("run", "")
                       and "obj-rel/dist/bin/lavapipe" in steps.get("WebGPU's Vulkan driver (linux-x86_64) - done", {}).get("run", "")
                       and 0 <= lvp_at < names.index("Package + validate")
-                      and lvp_at < min(i for i, n in enumerate(names) if n.startswith("Engine gtests"))
+                      and lvp_at < min(i for i, n in enumerate(names) if n.startswith("The node - its gtest binaries"))
                       and "lavapipe_build.py --key" in key.get("run", "")
                       and len(kept) == 2 and all("compile_cache == 'gha'" in st.get("if", "") for st in kept)
                       and '"$STAGING/lavapipe/"' in pkg and "linux-x86_64" in pkg
@@ -687,11 +639,8 @@ def main() -> int:
                       and "+  files('dri_target.c', 'dri_glibc_floor.c'),\n" in gl_floor
                       and "-Wl,-z,nodelete" in gl_floor
                       and '+__attribute__((visibility("hidden"))) int\n+__cxa_thread_atexit_impl(' in gl_floor))
-        install = steps.get("Install Linux build tools", {})
-        cases.append(("apt: timeouts and retries before every apt-get, and the install step has a limit (run 41248997155)",
-                      len(net) == 1 and bool(apt_at) and net[0] < min(apt_at)
-                      and all(k in conf for k in ('Acquire::http::Timeout', 'Acquire::https::Timeout', 'Acquire::Retries'))
-                      and 0 < install.get("timeout-minutes", 0) <= 30))
+        cases.append(("apt: the build job has no apt-get, no apt timeouts file and no install of build tools (the node's bootstrap has them: run 41248997155)",
+                      not net and not apt_at and "Install Linux build tools" not in steps))
         # The repository holds the patch series only: a job that needs the source makes
         # it with tools/engine.py materialize (the Mozilla tag + the series), and no
         # checkout names a branch of Firefox's tree any more.
@@ -725,6 +674,7 @@ def main() -> int:
     import test_cargo_junit
     import test_junit_legs
     import test_py_junit
+    import test_py_deps
     import test_hook_tests_judge_job
     parts = {"test_latitude_node": test_latitude_node.cases(), "test_link_pin": test_link_pin.cases(), "test_cache_rules": test_cache_rules.cases(),
              "test_release_builder": test_release_builder.cases(), "test_release_path": test_release_path.cases(),
@@ -736,13 +686,13 @@ def main() -> int:
              "test_ab_package": test_ab_package.cases(),
              "test_ab_package": test_ab_package.cases(),
              "test_xpcshell_run": test_xpcshell_run.cases(),
-             "test_cargo_junit": test_cargo_junit.cases(), "test_junit_legs": test_junit_legs.cases(), "test_py_junit": test_py_junit.cases(),
+             "test_cargo_junit": test_cargo_junit.cases(), "test_junit_legs": test_junit_legs.cases(), "test_py_junit": test_py_junit.cases(), "test_py_deps": test_py_deps.cases(),
              "test_gate_windows_temp": test_gate_windows_temp.cases(), "test_gate_legs": test_gate_legs.cases(), "test_hook_tests_judge_job": test_hook_tests_judge_job.cases()}
     for found in parts.values():
         cases += found
     # A floor per module: one that returns fewer cases than it had (an emptied list, a stopped import) is red, not a shorter green. Raise a floor by
     # hand when a case is added; lower it never.
-    floors = {"test_release_checks": 79, "test_gate_geoip": 5, "test_gate_security_state": 10, "test_gate_protocol_mirror": 4, "test_workflow_steps_bind": 18, "test_gate_windows_temp": 21, "test_gate_legs": 73, "test_latitude_node": 342, "test_xpcshell_run": 132, "test_ab_package": 47, "test_cargo_junit": 12, "test_junit_legs": 25, "test_py_junit": 11, "test_hook_tests_judge_job": 16}
+    floors = {"test_release_checks": 89, "test_gate_geoip": 5, "test_gate_security_state": 10, "test_gate_protocol_mirror": 4, "test_workflow_steps_bind": 18, "test_gate_windows_temp": 21, "test_gate_legs": 73, "test_latitude_node": 342, "test_xpcshell_run": 132, "test_ab_package": 47, "test_cargo_junit": 12, "test_junit_legs": 25, "test_py_junit": 11, "test_py_deps": 53, "test_hook_tests_judge_job": 16}
     short = {name: (len(parts[name]), floor) for name, floor in floors.items() if len(parts[name]) < floor}
     cases.append(("the modules this file runs still bring their cases (a floor each)%s" % ("" if not short else ": fewer than the floor: %s" % short), not short))
 

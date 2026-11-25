@@ -1,0 +1,36 @@
+{
+ "changeset": "5add844c26613d7e4d84c799d6e23cf987b1240d",
+ "legs": {
+  "linux-x86_64": {
+   "build_task": "WU8GJA6hTAO6VrkaZgP6Tg",
+   "pgo": {
+    "sha256": "900cf7ba54d9ddd2c6489b5239315ef3bb7314932cc2b4a17de34e94bf173911",
+    "size": 19053704,
+    "task": "UKqb36XTQgO0jyxyO2zhcg",
+    "url": "https://firefox-ci-tc.services.mozilla.com/api/queue/v1/task/UKqb36XTQgO0jyxyO2zhcg/artifacts/public/build/profdata.tar.xz"
+   },
+   "rust_task": "XFqMrkvxSDG0RjIdqM09RA",
+   "rust_version": "1.95.0"
+  },
+  "win-x86_64": {
+   "build_task": "ZFpxeFKSR96GCgGEEF84VQ",
+   "pgo": {
+    "sha256": "ea01a667e9b249ac1bfd436520762207a8b8c4db9ecf75ccec24c6d42b4eaf25",
+    "size": 20016116,
+    "task": "aZ7AQSw9T6KPef0zvOv9EQ",
+    "url": "https://firefox-ci-tc.services.mozilla.com/api/queue/v1/task/aZ7AQSw9T6KPef0zvOv9EQ/artifacts/public/build/profdata.tar.xz"
+   },
+   "rust_task": "aEnhCamVRbi_EctHKYQS0g",
+   "rust_version": "1.95.0"
+  }
+ },
+ "mozilla_tag": "FIREFOX_159_0_RELEASE",
+ "records": {
+  "build_record": {
+   "sha256": "c749f17672ee42359b8c3bf35300087987835a284244b557dabd126b737f3bc1",
+   "url": "https://archive.mozilla.org/pub/firefox/candidates/159.0-candidates/build1/linux-x86_64/en-US/firefox-159.0.json"
+  }
+ },
+ "repo": "https://hg.mozilla.org/releases/mozilla-release",
+ "version": "159.0"
+}

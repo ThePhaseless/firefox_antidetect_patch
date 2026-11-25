@@ -116,10 +116,10 @@ def group_gate(doc) -> list:
     red_gate = outcome(jobs, {"gate": "failure"})
     out.append(("gate: a red gate stops the publish", red_gate["publish"] == "skipped"))
     out.append(("gate: the graph: the gate needs the build and no gtest job, the publish needs the gate and both gtest jobs, each gtest job "
-                "needs the plan and the build",
+                "needs the plan and the build (gtest-linux also the job that holds its Ubuntu packages)",
                 "build" in jobs["gate"]["needs"] and not any(j in jobs["gate"]["needs"] for j in GTEST_JOBS)
                 and "gate" in jobs["publish"]["needs"] and all(j in jobs["publish"]["needs"] for j in GTEST_JOBS)
-                and all(jobs[j]["needs"] == ["plan", "build"] for j in GTEST_JOBS)))
+                and jobs["gtest-cross"]["needs"] == ["plan", "build"] and jobs["gtest-linux"]["needs"] == ["plan", "build", "linux-deps-gtest"]))
     red_gate_green_gtests = outcome(jobs, {"gate": "failure"})
     out.append(("gate: a red gate leaves the gtests as they are (two verdicts: the run is red if either is)",
                 red_gate_green_gtests["gtest-linux"] == "success" and red_gate_green_gtests["gtest-cross"] == "success"))
@@ -242,7 +242,7 @@ def group_gtest(doc) -> list:
     for suite in ("StealthFrameCrash", "StealthJugglerEventId"):
         out.append(("gtests: the suite %s has tests and the default filter runs it" % suite,
                     ("TEST(%s," % suite) in sources and (suite + ".*") in inputs["gtest_filter"]["default"].split(":")))
-    # four readers: the two gtest jobs, the build job's own gtest step, and the step that records the filter in `source-commit` for the reuse
+    # three readers: the two gtest jobs and the step that records the filter in `source-commit` for the reuse
     # (a run that reuses these bytes must have run the gtests it would run: scripts/ci/reuse_run.py). None of them falls back on `*`.
     values = []
     build_steps = {s.get("name", ""): s for s in jobs["build"]["steps"]}
@@ -253,7 +253,7 @@ def group_gtest(doc) -> list:
                 if key.startswith("GTEST_FILTER"):
                     values.append((job, str(value)))
     out.append(("gtests: an empty filter never turns into *: no job falls back on its own (%d read it)" % len(values),
-                len(values) == 4 and all(e.render(v, context(gtest_filter="")) == "" for _, v in values)
+                len(values) == 3 and all(e.render(v, context(gtest_filter="")) == "" for _, v in values)
                 and all(e.render(v, context()) == GREEN_FILTER for _, v in values)))
     linux = jobs["gtest-linux"]
     steps = {s.get("name", ""): s for s in linux["steps"]}
@@ -272,13 +272,18 @@ def group_gtest(doc) -> list:
                 "xvfb-run -a python3 " in run and script and (HERE / script.group(1)).is_file()
                 and "actions/checkout" in steps["The series (this repository, this commit)"]["uses"]))
     names = list(steps)
-    apt = steps["apt - network timeouts and retries"]
     display = steps["A display"]["run"]
-    out.append(("gtests: the protected apt path: the same timeouts, an update, a limit, before the gtests",
-                apt["run"].strip() == build_steps["apt - network timeouts and retries"]["run"].strip()
-                and display.index("apt-get update") < display.index("apt-get install -y xvfb")
+    deps = jobs.get("linux-deps-gtest", {})
+    fetched = steps.get("The Linux packages (the run's linux-deps-gtest job, no mirror)", {})
+    out.append(("gtests: Linux reads no mirror: its packages come from the run's linux-deps-gtest repository (xvfb and gdb), by name with --no-download, after a download of that "
+                "artifact and before the gtests; no apt line of its own, no timeouts file to protect one",
+                deps.get("uses") == "./.github/workflows/linux-deps.yml" and deps.get("with") == {"name": "gtest", "packages": "xvfb gdb"} and "needs" not in deps and "if" not in deps
+                and str(fetched.get("uses", "")).startswith("actions/download-artifact") and fetched["with"] == {"name": "${{ needs.linux-deps-gtest.outputs.artifact }}", "path": "/tmp/linux-deps"}
+                and "apt - network timeouts and retries" not in steps
+                and [l.strip() for l in display.splitlines() if "apt-get" in l] == ["sudo apt-get $APT update",
+                                                                                  "sudo apt-get $APT install -y --no-download --no-install-recommends $(cat /tmp/linux-deps/roots.txt)"]
                 and steps["A display"]["timeout-minutes"] == 20
-                and names.index("apt - network timeouts and retries") < names.index("A display") < names.index("Engine gtests (gtests=true only)")))
+                and names.index("The Linux packages (the run's linux-deps-gtest job, no mirror)") < names.index("A display") < names.index("Engine gtests (gtests=true only)")))
     with tempfile.TemporaryDirectory() as tmp:
         tree = Path(tmp)
         (tree / "obj-rel" / "dist" / "bin").mkdir(parents=True)
@@ -403,7 +408,7 @@ def group_gtest(doc) -> list:
                     gtest_run.signal_name(-11) == "SIGSEGV" and gtest_run.signal_name(-200) == "signal 200"))
         cores_run = steps["Engine gtests (gtests=true only)"]["run"]
         out.append(("gtests: Linux installs gdb with the display, points core_pattern at the job, and hands gtest_run the directory",
-                    "apt-get install -y xvfb gdb" in display
+                    deps.get("with", {}).get("packages") == "xvfb gdb" and "$(cat /tmp/linux-deps/roots.txt)" in display
                     and cores_run.index("mkdir -p gtest-cores") < cores_run.index('kernel.core_pattern="$PWD/gtest-cores/core.%p"')
                     < cores_run.index("--cores gtest-cores")))
         (root / "bin" / "firefox").rename(root / "bin" / "firefox.exe")

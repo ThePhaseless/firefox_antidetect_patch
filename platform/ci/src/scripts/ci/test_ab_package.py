@@ -701,7 +701,8 @@ def test_an_explicit_build_run_id_wins_and_a_call_without_one_reads_its_own_run(
     """A call (the gate's) names its run and that run's artifacts are read as before; a call that names none reads this run's own (github.run_id), never a literal."""
     pab = _workflow("package-ab.yml")["jobs"]["package-ab"]
     assert pab["env"]["BUILD_RUN_ID"] == "${{ inputs.build_run_id || github.run_id }}"
-    down = [s for s in pab["steps"] if str(s.get("uses", "")).startswith("actions/download-artifact")]
+    # the candidate's artifacts (the wheelhouse of the job's py-deps call is this run's own, with no run-id)
+    down = [s for s in pab["steps"] if str(s.get("uses", "")).startswith("actions/download-artifact") and "run-id" in s["with"]]
     assert len(down) == 3 and all(s["with"]["run-id"] == "${{ env.BUILD_RUN_ID }}" and "github.run_id" in s["with"]["github-token"] for s in down)
     xp = _workflow("xpcshell.yml")
     on = xp.get(True) or xp["on"]
@@ -736,7 +737,7 @@ def test_a_push_or_a_dispatch_with_no_run_takes_the_archives_of_the_latest_publi
     # ... which is the path of a release as the candidate, checked against its seal and checksums.txt, the run's artifacts skipped
     rel = [s for s in steps if s.get("id") == "candidate_release"]
     assert len(rel) == 1 and rel[0]["if"] == "env.CAND_TAG != ''" and "sha256sum -c checksums.txt" in rel[0]["run"] and "seal-check candidate-release" in rel[0]["run"]
-    assert all(s["if"] == "env.CAND_TAG == ''" for s in steps if str(s.get("uses", "")).startswith("actions/download-artifact"))
+    assert all(s["if"] == "env.CAND_TAG == ''" for s in steps if str(s.get("uses", "")).startswith("actions/download-artifact") and "run-id" in s["with"])
     assert steps.index(resolver[0]) < steps.index(rel[0])
     # the A/A of a push's tag leg is the latest with itself, and only a push or the gate's call without candidate_tag gets it
     assert '[ "$MODE" = tag ] && [ -z "$CANDIDATE_TAG" ]' in run
