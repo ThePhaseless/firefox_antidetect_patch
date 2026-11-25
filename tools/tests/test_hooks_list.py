@@ -249,6 +249,17 @@ def test_a_node_reference_must_exist_with_its_title(tmp_path):
     assert hl.problems(root) == []
 
 
+def test_a_node_title_with_an_escaped_quote_resolves(tmp_path):
+    root = series(tmp_path, top(G1))
+    d = root / FOLDER / "src" / "juggler" / "tests"
+    d.mkdir(parents=True)
+    (d / "q.test.mjs").write_text("test('the last line of Marionette\\'s module', () => {});\ntest(\"say \\\"hi\\\" once\", () => {});\n", encoding="utf-8")
+    for ref, ok in (("node:juggler/tests/q.test.mjs#the last line of Marionette's module", True),
+                    ('node:juggler/tests/q.test.mjs#say "hi" once', True),
+                    ("node:juggler/tests/q.test.mjs#the last line of Marionette's other module", False)):
+        assert (hl.reference_problem(root, ref) is None) == ok, ref
+
+
 def test_a_py_reference_and_a_wrapper_reference(tmp_path):
     root = series(tmp_path, top(G1))
     d = root / FOLDER / "src" / "modules" / "test"

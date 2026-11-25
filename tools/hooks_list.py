@@ -323,6 +323,11 @@ def _ref_failure(where: str, ref: str, why: str, fix: str) -> Failure:
     return fail(where, "the test `%s` does not resolve: %s" % (ref, why), fix, D_HOOK04)
 
 
+def _title_in(text: str, title: str) -> bool:
+    """The title of a node test is in the file: as it is, or as a JavaScript string literal writes it (a quote of its own quote kind escaped)."""
+    return any(c in text for c in (title, title.replace("'", "\\'"), title.replace('"', '\\"'), title.replace("`", "\\`")))
+
+
 def reference_problem(root: Path, ref: str, index: _Index | None = None, where: str | None = None) -> Failure | None:
     """None if the test reference resolves, else the failure that says why it does not (grammar in the module docstring);
     `where` is the hook's place in HOOKS.json (`_where`)."""
@@ -345,7 +350,7 @@ def reference_problem(root: Path, ref: str, index: _Index | None = None, where: 
         p = index.src_file(path)
         if p is None:
             return _ref_failure(where, ref, "%s is in no folder's src/" % path, "name a path that exists as <folder>/src/%s, or write the test there" % path)
-        if title and title not in p.read_text(encoding="utf-8", errors="replace"):
+        if title and not _title_in(p.read_text(encoding="utf-8", errors="replace"), title):
             return _ref_failure(where, ref, "the title %r is not in %s" % (title, path), "name a title that the file has, or add the test with that title")
         return None
     if kind == "py":
