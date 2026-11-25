@@ -24,9 +24,6 @@
    "inline_logic_lines": 1,
    "hookable": "already-hook",
    "anchor": "SafeBrowsing.init() (line 354)",
-   "evidence": [
-    "+    Services.prefs.addObserver(\"zoom.stealth.apikey\", this);"
-   ],
    "notes": "The observed name is a branch, not one key. observe() calls readPrefs() (checked in the Mozilla base at line 495), which re-reads the key, so a late declaration enables the provider. The added comment block is about 12 lines in Italian and should be trimmed or moved out of the Mozilla file.",
    "verifier": {
     "changed": [],
@@ -48,11 +45,6 @@
    "inline_logic_lines": 22,
    "hookable": "movable",
    "anchor": "module scope helpers (hunk 1); nsURLFormatterService.prototype getter table (hunk 2, line 121); nsURLFormatterService.prototype.trimSensitiveURLs (hunk 3, line 180)",
-   "evidence": [
-    "+function stealthDeclaredApiKey(pref) {",
-    "-    MOZILLA_API_KEY: () => AppConstants.MOZ_MOZILLA_API_KEY,",
-    "+    MOZILLA_API_KEY: () => stealthDeclaredApiKey(PREF_APIKEY_MOZILLA),"
-   ],
    "notes": "Keys move from build-time AppConstants to prefs declared by the core, read through one reader. An undeclared key gives an empty string plus a console error, so the request is not sent. The three pref names are literal constants on purpose (a grep gate). trimSensitiveURLs now reads the same prefs for log redaction. The helper functions (hunk 1) belong in our own file. Pref names contain a vendor name (google_*): check against the no-vendor-names rule.",
    "verifier": {
     "changed": [],
@@ -70,7 +62,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "hook added by the 2026-10-29 move to our files",
-   "evidence": [],
    "notes": "Hook registering or calling our own code.",
    "verifier": {
     "changed": [],

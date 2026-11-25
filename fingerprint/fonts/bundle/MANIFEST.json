@@ -153,10 +153,6 @@
    "inline_logic_lines": 1,
    "hookable": "already-hook",
    "anchor": "(top level of browser/fonts/moz.build)",
-   "evidence": [
-    "-if CONFIG[\"MOZ_WIDGET_TOOLKIT\"] in (\"windows\", \"gtk\"):",
-    "+if CONFIG[\"MOZ_WIDGET_TOOLKIT\"] in (\"windows\", \"gtk\", \"cocoa\"):"
-   ],
    "notes": "One include() of our StealthFonts.mozbuild, which lists the bundled font files.",
    "verifier": {
     "changed": [],
@@ -174,10 +170,6 @@
    "inline_logic_lines": 5,
    "hookable": "already-hook",
    "anchor": "UnscaledFontDWrite::GetFontDescriptor",
-   "evidence": [
-    "+  if (!mPercorsoDichiarato.empty()) {",
-    "+    aCb(reinterpret_cast<const uint8_t*>(mPercorsoDichiarato.c_str()),"
-   ],
    "notes": "Returns the declared file path (UTF-16 with NUL terminator, same convention as the Mozilla file-name path) when one was passed to the constructor. Otherwise it falls through to Mozilla's own `if (!mFont) return false;` guard, which is left unchanged. The comment reports 65.9 MB sent to WebRender as bytes instead of a path ([B154]). Category is other, not spoof: the change alters what gfx passes to WebRender, not a value a page can read.",
    "verifier": {
     "changed": [],
@@ -195,10 +187,6 @@
    "inline_logic_lines": 4,
    "hookable": "already-hook",
    "anchor": "UnscaledFontDWrite constructor and member list (class UnscaledFontDWrite final : public UnscaledFont)",
-   "evidence": [
-    "-      : mFontFace(aFontFace), mFont(aFont) {}",
-    "+                     const std::wstring& aFilePath = std::wstring())"
-   ],
    "notes": "Adds an optional aFilePath argument with an empty default, so existing callers keep the upstream behaviour. Adds member mPercorsoDichiarato (std::wstring, ours) and the <string> include. Comment cross-references [B154].",
    "verifier": {
     "changed": [],
@@ -216,11 +204,6 @@
    "inline_logic_lines": 2,
    "hookable": "already-hook",
    "anchor": "class FontData (Borrowed constructor, destructor, member mBorrowed)",
-   "evidence": [
-    "+  FontData(const uint8_t* aData, uint32_t aLength, Borrowed)",
-    "+    if (!mBorrowed) {  // STEALTH-HOOK(fingerprint/fonts/bundle)",
-    "+  bool const mBorrowed = false;  // STEALTH-HOOK(fingerprint/fonts/bundle)"
-   ],
    "notes": "Category is other rather than spoof: it lends the bundled font bytes (owned by StealthBundleFontList) to each face instead of copying the file per face, and no page-observable value changes. A borrowed FontData does not free its bytes; they must outlive every face, which holds only because the bundle cache is immortal (StealthBundleFontList leaks the list on purpose). Moved here from FTUserFontData in gfx/2d/2D.h and its CloneFace in gfx/2d/Factory.cpp on 2026-10-29: Firefox 159 removes FTUserFontData, while FontData.h is unchanged from 157 to 159.",
    "verifier": {
     "changed": [],
@@ -238,10 +221,6 @@
    "inline_logic_lines": 2,
    "hookable": "already-hook",
    "anchor": "gfxDWriteFontEntry (class members mBundleFaceIndex and mBundleFilePath)",
-   "evidence": [
-    "+  uint16_t mBundleFaceIndex = 0;",
-    "+  std::wstring mBundleFilePath;"
-   ],
    "notes": "Two members: mBundleFaceIndex (feature font-ttc-face-index, index inside a .ttc) and mBundleFilePath (feature font-bundle-file-path, the path given to WebRender). Only the path member is in this file's primary feature. Adds the <string> include.",
    "verifier": {
     "changed": [],
@@ -259,10 +238,6 @@
    "inline_logic_lines": 2,
    "hookable": "already-hook",
    "anchor": "gfxFontconfigFontEntry::gfxFontconfigFontEntry (explicit constructor for data fonts)",
-   "evidence": [
-    "+                                  const char* aFile = nullptr, int aIndex = 0);",
-    "-                                  RefPtr<mozilla::gfx::SharedFTFace>&& aFace);"
-   ],
    "notes": "Adds defaulted aFile and aIndex arguments, so upstream data-font callers compile unchanged. The bundle path passes both. Comment cross-references [B154].",
    "verifier": {
     "changed": [],
@@ -280,10 +255,6 @@
    "inline_logic_lines": 3,
    "hookable": "already-hook",
    "anchor": "gfxFontEntry::AutoHBFace (conversion operator); gfxFontEntry (class, new ShouldPublishCharacterMap declaration)",
-   "evidence": [
-    "-    operator hb_face_t*() const { return mFace; }",
-    "+    operator hb_face_t*() const&& = delete;"
-   ],
    "notes": "Primary feature hb-face-lifetime: the conversion operator is ref-qualified (const&, and const&& deleted), so binding the result of GetHBFace() to a raw pointer becomes a compile error. This fixes a dangling pointer in the stealth GetDesignFont (gfxHarfBuzzShaper.cpp), not a Firefox upstream problem; the comment reports crashes before the fix. Also adds the ShouldPublishCharacterMap declaration (feature font-cmap-publish). The change alters the type of a Mozilla class, so it is not a hook; keep it inline or upstream the fix. Verifier: the dangling-pointer fix is confirmed in the tree (gfxHarfBuzzShaper.cpp:791 uses const auto face(...)); every other GetHBFace() caller found in gfx/ binds an lvalue (gfxFont.cpp:1394,2810,2849,5197; gfxFontEntry.cpp:257,795,852,927; gfxHarfBuzzShaper.cpp:1373; FontPaletteCache.cpp:25), so the deleted const&& conversion does not break them.",
    "verifier": {
     "changed": [
@@ -303,11 +274,6 @@
    "inline_logic_lines": 22,
    "hookable": "movable",
    "anchor": "gfxFontUtils::FindSfntOffset (new static); gfxFontUtils::FindTableDirEntry; gfxFontUtils::GetTableFromFontData",
-   "evidence": [
-    "+  if (sfnt->sfntVersion == 0x74746366u) {  // 'ttcf'",
-    "-  const SFNTHeader* header = reinterpret_cast<const SFNTHeader*>(aFontData);",
-    "+  const TableDirEntry* dir = FindTableDirEntry(aFontData, aTableTag, aFaceIndex);"
-   ],
    "notes": "Generic .ttc support: table lookup and table blob now resolve through the requested face's offset inside the collection. Before this change the lookup read the file header only, so only the first face could be read. The default aFaceIndex = 0 keeps old callers unchanged. Not stealth-specific in principle; it is needed for the bundle's .ttc files. Movable: FindSfntOffset can move to our own file.",
    "verifier": {
     "changed": [],
@@ -325,9 +291,6 @@
    "inline_logic_lines": 5,
    "hookable": "already-hook",
    "anchor": "gfxFontUtils (static declarations FindSfntOffset, FindTableDirEntry, GetTableFromFontData)",
-   "evidence": [
-    "+  static const void* FindSfntOffset(const void* aFontData, uint32_t aFaceIndex);"
-   ],
    "notes": "Declarations match gfxFontUtils.cpp. aFaceIndex defaults to 0 on the two existing functions.",
    "verifier": {
     "changed": [],
@@ -345,10 +308,6 @@
    "inline_logic_lines": 6,
    "hookable": "movable",
    "anchor": "gfxPlatformGtk::GetCommonFallbackFonts",
-   "evidence": [
-    "+  aFontList.AppendElement(\"Segoe UI Symbol\");",
-    "+  aFontList.AppendElement(\"Arial\");"
-   ],
    "notes": "Puts the Windows persona fallback names first (Segoe UI Emoji when colour is preferred, then Arial, Segoe UI, Segoe UI Symbol, Cambria Math), before the upstream Linux names, which are not in the bundle. The order is stated in the comment as a measured requirement. Since CommonFontFallback now takes names from the manifest first, this list is only reached when the manifest returns nothing. Movable: the names can move to StealthBundleFontList.",
    "verifier": {
     "changed": [],
@@ -366,10 +325,6 @@
    "inline_logic_lines": 1,
    "hookable": "already-hook",
    "anchor": "gfxFontGroup::FindFallbackFaceForChar",
-   "evidence": [
-    "-  if (!aFamily->IsFullyInitialized() &&",
-    "+  if (!aFamily->IsFullyInitialized() && pfl->MayDeferCmapLoading()) {"
-   ],
    "notes": "The async-fallback condition is replaced by pfl->MayDeferCmapLoading(), the same predicate GlobalFontFallback uses. Comment: this site was missing the bundle-only condition before. Feature gfx.font_rendering.fallback.async is read through that predicate.",
    "verifier": {
     "changed": [],
@@ -387,9 +342,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "four include lines after include(\"/ipc/chromium/chromium-config.mozbuild\")",
-   "evidence": [
-    "+include(\"StealthBundleFontList.mozbuild\")  # STEALTH-HOOK(fingerprint/fonts/bundle)"
-   ],
    "notes": "One include line per folder of ours (declaration-gate, fonts/bundle, fonts/font-list, fonts/metrics); each StealthX.mozbuild lists that folder's EXPORTS and non-unified SOURCES. Until 2026-10-29 the files were listed in four places of this moz.build, one of them a SOURCES block between two UNIFIED_SOURCES blocks that Firefox 159 merges. The lists mozbuild reads are identical on Windows, Linux and macOS.",
    "verifier": {
     "changed": [],

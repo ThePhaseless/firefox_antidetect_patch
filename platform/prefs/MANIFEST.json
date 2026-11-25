@@ -57,7 +57,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "values changed in place on 2026-10-29",
-   "evidence": [],
    "notes": "Terms-of-use values changed on their lines; the two translations enable lines become a marker.",
    "pref_groups": [
     {
@@ -130,9 +129,6 @@
    "inline_logic_lines": 1,
    "hookable": "already-hook",
    "anchor": "sDynamicPrefOverrideList (static array)",
-   "evidence": [
-    "+    PREF_LIST_ENTRY(\"zoom.stealth.\"),  // Stealth: allow string prefs in content processes"
-   ],
    "notes": "Adds a zoom.stealth. entry to the override list so string prefs of that family reach content processes. Any future zoom.stealth.* string pref becomes visible in content processes automatically. Not a pref default, hence not category prefs.",
    "verifier": {
     "changed": [],
@@ -179,7 +175,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "hook moved off the end of the pref files on 2026-10-29",
-   "evidence": [],
    "notes": "Includes our StealthPrefs.js right after all.js, so our defaults win.",
    "pref_groups": [
     {
@@ -279,7 +274,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "values changed in place on 2026-10-29",
-   "evidence": [],
    "notes": "Six monospace sizes and the data-submission notification changed on their own lines, marked.",
    "pref_groups": [
     {
@@ -350,9 +344,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "pref_groups list",
-   "evidence": [
-    "+    \"juggler\","
-   ],
    "notes": "Registers the juggler pref group and adds our StealthPrefList.yaml as a second input of the static pref generator.",
    "verifier": {
     "changed": [],
@@ -370,7 +361,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "hook added by the 2026-11 hook rework (registration of our own file)",
-   "evidence": [],
    "notes": "Hook registering our own code (minimal record added by the final-line integration).",
    "verifier": {
     "changed": [],

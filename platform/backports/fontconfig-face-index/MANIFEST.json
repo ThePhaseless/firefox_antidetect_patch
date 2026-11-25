@@ -15,11 +15,6 @@
    "inline_logic_lines": 0,
    "hookable": "hard",
    "anchor": "UnscaledFontFontconfig::CreateFromFontDescriptor, the block after FcFontMatch",
-   "evidence": [
-    "+  // Get the file that fontconfig returned.",
-    "+    result = FcPatternGetInteger(match, FC_INDEX, 0, &index);",
-    "+      aIndex = index & 0xffff;"
-   ],
    "notes": "Mozilla bug 2077661 (mozilla-central 53aca1462bf3, 2026-10-13), carried as its diff before the tag has it: the face index asked for is kept, and the one of FcFontMatch is read only when it answers with another path. Not ours: no budget; BACKPORT.json of its folder binds it to the commit.",
    "verifier": {
     "changed": [],

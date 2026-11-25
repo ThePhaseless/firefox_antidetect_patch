@@ -23,11 +23,6 @@
    "inline_logic_lines": 41,
    "hookable": "movable",
    "anchor": "new file-scope StealthDeclaredDecodingInfoFor (hunk @@ -233) and the promise lambda in MediaCapabilities::CreateNonWebRTCDecodingInfo (hunk @@ -1159)",
-   "evidence": [
-    "+static bool StealthDeclaredDecodingInfoFor(",
-    "+  if (DecoderTraits::CanHandleContainerType(*container, nullptr) == CANPLAY_NO) {",
-    "+                   promise->MaybeResolve(std::move(declaredInfo));"
-   ],
    "notes": "The helper loops over codecs and calls StealthDeclaredDecodingInfo (StealthMediaDeclaration.*, not in this group). Move the helper to StealthMediaDeclaration.cpp; the Mozilla file keeps the include and one call in the lambda that returns early. The declared answer overrides on both resolve branches, not only on reject. Comments are long measurement narratives (2026-08-08) and belong in docs. Audio is excluded on purpose per the comment. Counts are approximate (non-comment, non-include, non-brace added lines).",
    "verifier": {
     "changed": [
@@ -47,10 +42,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "EXPORTS += [...] and UNIFIED_SOURCES += [...] in dom/media/moz.build",
-   "evidence": [
-    "+    \"StealthMediaDeclaration.h\",",
-    "+    \"StealthMediaDeclaration.cpp\","
-   ],
    "notes": "",
    "verifier": {
     "changed": [],
@@ -68,11 +59,6 @@
    "inline_logic_lines": 8,
    "hookable": "movable",
    "anchor": "PDMFactory::Supports(const SupportDecoderParams&, DecoderDoctorDiagnostics*) const",
-   "evidence": [
-    "+    if (StealthDeclaredDecodeSupport(aParams.MimeType(), sw, hw)) {",
-    "+      DecodeSupportSet declared{};",
-    "+      return declared;"
-   ],
    "notes": "The block maps two bools to a DecodeSupportSet inside Mozilla code. Movable: one hook such as an if-let on a StealthDecodeSupport(aParams) result, with the bit mapping in our file. The hook returns before the mEMEPDM->Supports branch, so declared answers also override EME answers when EME is present. Verify that is intended. [verified: CONFIRMED that the hook precedes the EME branch, PDMFactory.cpp:487 vs :500; whether it is intended is unverified.] Comment says query paths only (MP4Decoder, MatroskaDecoder, WebMDecoder, MediaCapabilities, MFMediaEngineDecoderModule) and decoder creation is untouched.",
    "verifier": {
     "changed": [
@@ -95,9 +81,6 @@
    "inline_logic_lines": 1,
    "hookable": "already-hook",
    "anchor": "the heads of SoftwareH264EnabledStatic and SendingH264PacketizationModeZeroSupportedStatic",
-   "evidence": [
-    "+  if (auto d = StealthDeclaredSoftwareH264()) return *d;  // STEALTH-HOOK(fingerprint/media/decode-declaration)"
-   ],
    "notes": "When both declared tables name video/avc, the H.264 WebRTC gate answers from the declaration (sw flag): the OpenH264 plugin and the GPU blocklist no longer decide. Otherwise Mozilla's logic runs.",
    "verifier": {
     "changed": [],
@@ -118,9 +101,6 @@
    "inline_logic_lines": 1,
    "hookable": "already-hook",
    "anchor": "the head of WebrtcVideoEncoderFactory::SupportsCodec",
-   "evidence": [
-    "+  if (auto declared = StealthDeclaredWebrtcEncodeSupport(aConfig)) return declared;"
-   ],
    "notes": "A declared codec answers the encode support set from zoom.stealth.media.encode_support instead of the plugin or the host's encoders; an undeclared one runs Mozilla's code.",
    "verifier": {
     "changed": [],

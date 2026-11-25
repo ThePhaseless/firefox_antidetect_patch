@@ -31,11 +31,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "includes; AdapterInfo::IsFallbackAdapter; a forward declaration of ToJsKey; Adapter::Adapter after the feature loop; Adapter::RequestDevice before wgpu_client_request_device",
-   "evidence": [
-    "+  if (const auto declared = StealthWebGPUDeclaredIsFallback(mParent.get())) {",
-    "+  StealthWebGPUDeclareAdapter(this, aParent, aInfo->id, mFeatures,",
-    "+    StealthWebGPUClampToReal(ffiDesc, *mInfoInner, ToJsKey);"
-   ],
    "notes": "Calls only: the declared features, limits and fallback answer, and the clamp of what is sent to wgpu, all in dom/webgpu/StealthWebGPUDeclaration.cpp. ToJsKey is Adapter.cpp's own static; it is forward-declared so the declaration is keyed by the names the page reads."
   },
   {
@@ -53,10 +48,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "includes; Instance::RequestAdapter before and after wgpu_client_request_adapter",
-   "evidence": [
-    "+  if (StealthWebGPUNoAdapter()) {",
-    "+  StealthWebGPUNoteRequest(this, adapter_id, aOptions.mForceFallbackAdapter);"
-   ],
    "notes": "A declared GPU without Direct3D 12 resolves requestAdapter with null; otherwise the request notes forceFallbackAdapter for the adapter's isFallbackAdapter."
   },
   {
@@ -72,9 +63,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "top of wgpu_parent_get_compositor_device_luid",
-   "evidence": [
-    "+  *aOutLuid = {};  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)"
-   ],
    "notes": "The LUID out parameter is zeroed before Mozilla's code fills it: a missing compositor device reads as no match, not uninitialised memory.",
    "verifier": {
     "changed": [],
@@ -96,10 +84,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "after UNIFIED_SOURCES of h_and_cpp",
-   "evidence": [
-    "+EXPORTS.mozilla.webgpu += [\"StealthWebGPUDeclaration.h\"]",
-    "+SOURCES += [\"StealthWebGPUDeclaration.cpp\"]"
-   ],
    "notes": "Registers our file on lines of its own, outside Mozilla's list; non-unified because it has file-static helpers with short names."
   },
   {
@@ -116,10 +100,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "after #include \"gfxPlatform.h\"; gfxPlatform::InitWebGPUConfig, before the WEBGPU_EXTERNAL_TEXTURE force-disable",
-   "evidence": [
-    "+  mozilla::webgpu::StealthWebGPUPlatformInit();  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration): Linux's Vulkan driver is ours; external textures are on as on Windows",
-    "+#if !defined(XP_WIN) && !defined(XP_MACOSX) && 0"
-   ],
    "notes": "StealthWebGPUPlatformInit maps the bundled lavapipe (<exe dir>/lavapipe/libvulkan_lvp.so) under the Vulkan loader's name before wgpu opens it, and turns WebGPU off when it cannot (fail closed, never a host driver). The force-disable of WebGPU external textures off Windows and macOS is compiled out: the engine presents Windows on every OS, where the feature is on, and the import runs on the shared-memory buffer path."
   },
   {
@@ -135,10 +115,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "after the instance_flags statement of wgpu_server_new (with_env), and after the Windows compositor-LUID block of Message::RequestAdapter; each line declares, in its own block, the path module it calls",
-   "evidence": [
-    "+    #[path = \"stealth_webgpu_env.rs\"] mod stealth_webgpu_env; stealth_webgpu_env::without_host_env(&mut instance_flags); // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
-    "+            #[path = \"stealth_webgpu_adapter.rs\"] mod stealth_webgpu_adapter; stealth_webgpu_adapter::settle(global, &desc, adapter_id, &mut result); // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)"
-   ],
    "notes": "With the engine on, the instance flags are the ones built with no WGPU_* variable set (stealth_webgpu_env::without_host_env), and a compositor search that found no D3D12 adapter takes the software one (WARP) instead of answering null (stealth_webgpu_adapter::settle).",
    "verifier": {
     "changed": [],
@@ -158,9 +134,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "dom.webgpu.external-texture.enabled, the non-Windows value",
-   "evidence": [
-    "+  value: true  # STEALTH-HOOK(fingerprint/webgpu/adapter-declaration): Windows' value on every OS"
-   ],
    "notes": "Mozilla's value changed on its own line, as the prefs-declared-once rule asks: the pref is declared nowhere else. Also (the hook of network/proxy, which owns only the test: a file has one owner): network.proxy.type defaults to 0 (direct) on Mozilla's own line, so the engine never creates the object that reads the host's proxy settings (STEALTH-HOOK(network/proxy)); test juggler/tests/system_proxy_is_off_by_default.test.mjs."
   }
  ]

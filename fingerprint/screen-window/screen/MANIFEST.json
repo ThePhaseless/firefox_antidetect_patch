@@ -23,11 +23,6 @@
    "inline_logic_lines": 12,
    "hookable": "movable",
    "anchor": "nsScreen::PixelDepth; nsScreen::GetRect; nsScreen::GetAvailRect",
-   "evidence": [
-    "+    const int32_t declared = StaticPrefs::zoom_stealth_screen_color_depth();",
-    "+    int32_t w = mozilla::StaticPrefs::zoom_stealth_screen_width();",
-    "+              h - mozilla::StaticPrefs::zoom_stealth_screen_taskbar_px()};"
-   ],
    "notes": "Declared color depth, screen rect and avail rect from prefs; avail height is reduced by zoom.stealth.screen_taskbar_px. GetAvailRect has about 6 logic lines and reads StaticPrefs directly, so it is movable behind one call. The file adds #include mozilla/StaticPrefs_zoom.h twice (hunk 1 and again at the end of the include block); remove one. Comments mention the core and a document outside the repo; they are project references, not code. VERIFIED: duplicate #include mozilla/StaticPrefs_zoom.h confirmed at dom/base/nsScreen.cpp:9 and :23.",
    "verifier": {
     "changed": [
@@ -48,10 +43,6 @@
    "inline_logic_lines": 2,
    "hookable": "already-hook",
    "anchor": "nsPresContext::UpdateInnerSizeSpoofedForRFP",
-   "evidence": [
-    "+  if ((!mDocument->ShouldResistFingerprinting(RFPTarget::WindowOuterSize) &&",
-    "+       !mozilla::gfx::StealthEngineActive()) ||"
-   ],
    "notes": "The synced top-level inner size is now also filled when the stealth engine is active, not only under RFP. The comment's claim that every other reader of the field gates on RFP is MOSTLY CONFIRMED: nsScreen.cpp:100 and :161 (via GetTopWindowInnerRectForRFP, nsScreen.cpp:271), nsGlobalWindowInner.cpp:7584-7586, ScreenOrientation.cpp:706-771 and nsGlobalWindowOuter.cpp:3531-3535 all sit behind ShouldResistFingerprinting. One reader does not: dom/base/nsGlobalWindowOuter.cpp:3570 reads it under IsInStealthPopup (the intended consumer, gated on the stealth engine, not on RFP). Uses gfx::StealthEngineActive from StealthDeclarationGate.h (included here). Comment cites 70-known-bugs.md B258.",
    "verifier": {
     "changed": [

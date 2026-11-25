@@ -1,7 +1,7 @@
 # repo-06: what a tool can write, a tool writes
 
 **Rule.** A derived fact is written by a tool and never by hand:
-- the inventory counts (added, removed, hunks), the evidence and the budget entry of a new file: `export` writes them, the budget at the counted value (only a raise above main needs a row, [hook-03](hook-03-budgets-and-debt-only-go-down.md));
+- the inventory counts (added, removed, hunks) and the budget entry of a new file: `export` writes them, the budget at the counted value (only a raise above main needs a row, [hook-03](hook-03-budgets-and-debt-only-go-down.md));
 - the `MANIFEST.json` sha256 of every file `export` writes;
 - `layout.OWN_FILES`, derived from each folder's `src/` tree;
 - the gtest suites in `tools/gtest-suites.json`, written by `python tools/engine.py gtest-list --write` and read by every consumer;

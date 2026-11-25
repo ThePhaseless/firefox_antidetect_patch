@@ -154,7 +154,7 @@ Rule: [hook-03](decisions/hook-03-budgets-and-debt-only-go-down.md).
 |---|---|
 | `tools/engine.py` | The commands: `export`, `verify`, `check`, `port` and the rest |
 | `tools/layout.py` | `GROUP_ORDER`; `FEATURES`: inventory feature name to folder; the owner of a file of ours, read from the `src/` trees (no table) |
-| `tools/inventory.json` | One record per Mozilla file we modify: file, category, feature, prefs, anchor, notes (by hand); added / removed / hunk counts and evidence (written by `export` from `hooks.patch`; `check` refuses a different value) |
+| `tools/inventory.json` | One record per Mozilla file we modify: file, category, feature, prefs, anchor, notes (by hand); added / removed / hunk counts (written by `export` from `hooks.patch`; `check` refuses a different value, and an `evidence` field: the lines are `hooks.patch` itself) |
 | `tools/gtest-suites.json` | The gtest suites the `HOOKS.json` files name, sorted, each marked windows-only or linux-only where its tests are built on one platform; written by `gtest-list --write` |
 | `tools/hook_contract.py`, `tools/hooks_list.py` | The contract and the `HOOKS.json` generator |
 | `tools/folders.py`, `tools/range_diff.py` | The `FOLDER.json` check; the range-diff of a port |
@@ -166,7 +166,7 @@ Rule: [hook-03](decisions/hook-03-budgets-and-debt-only-go-down.md).
 | File | Written by |
 |---|---|
 | `<folder>/hooks.patch`, `<folder>/src/`, `<folder>/MANIFEST.json` (with the `sha256` of every file under `src/`) | `export` |
-| `tools/inventory.json`: `added`, `removed`, `hunks`, `evidence` of each record | `export` (from `hooks.patch`) |
+| `tools/inventory.json`: `added`, `removed`, `hunks` of each record | `export` (from `hooks.patch`) |
 | `tools/hook-budget.json`, `tools/removed-budget.json`: the entry of a Mozilla file patched for the first time | `export`, at the counted value |
 | `tools/gtest-suites.json` | `gtest-list --write`, and `export` |
 | A folder that owns nothing any more | `export` removes it |

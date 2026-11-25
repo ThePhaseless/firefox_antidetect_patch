@@ -43,7 +43,7 @@ export   writes one folder per feature (tools/layout.py says which):
                           (test, anchor, why) of the committed file are kept
          SERIES, the order the folders are applied in, and UPSTREAM.json's
          "exported_from". A folder that no longer owns anything is removed.
-         It also writes what it can compute (repo-06): the `added`, `removed`, `hunks` and `evidence` of every record of
+         It also writes what it can compute (repo-06): the `added`, `removed` and `hunks` of every record of
          tools/inventory.json from the hooks.patch (the hand fields stay), the entry of tools/hook-budget.json and tools/removed-budget.json
          of a Mozilla file patched for the first time, at the counted value, and tools/gtest-suites.json. The owner of a file of ours is the
          folder that holds it under src/; a new file that no folder holds is placed once with `--own <path>=<folder>`.
@@ -89,10 +89,9 @@ check    needs no Firefox: SERIES lists exactly the folders that exist, every fo
          record, the sha256 of every commit file and the absence of any path outside the series are checked
          offline; with --against <tag> the vendored part of hooks.patch, its checksum lines and the new files
          must equal the replay of the commits on the revision the tag vendors (tools/backport_replay.py).
-         Every STEALTH-HOOK(<folder>) tag, in a hooks.patch and in the
-         evidence of an inventory record, names a folder of SERIES, and the added, removed and hunk
-         counts and the evidence of each inventory record are those of its file in the hooks.patch (`export` writes them; a hand edit fails
-         and the message names `export`). The MANIFEST of a folder has the sha256 of every file under its src/, and each file has those bytes.
+         Every STEALTH-HOOK(<folder>) tag in a hooks.patch names a folder of SERIES, and the added, removed and hunk
+         counts of each inventory record are those of its file in the hooks.patch (`export` writes them; a hand edit fails
+         and the message names `export`). An inventory record has no `evidence` field: the lines are the hooks.patch itself (repo-07). The MANIFEST of a folder has the sha256 of every file under its src/, and each file has those bytes.
          tools/gtest-suites.json is what `gtest-list --write` writes. A C++ file of ours has no control character (a carriage return inside a
          string literal ended the literal and broke the build of a test) and no byte outside ASCII inside a
          string or character literal: write them as escapes. No file of ours has a carriage return: not under
@@ -132,7 +131,6 @@ UPSTREAM = ROOT / "UPSTREAM.json"
 BUDGET = ROOT / "tools" / "hook-budget.json"
 REMOVED_BUDGET = ROOT / "tools" / "removed-budget.json"
 HOOK_DEBT = ROOT / "tools" / "hook-debt.json"
-REALIGN = ROOT / "tools" / "budget-realign-69.json"
 # Declared raises of a hook budget above main's (a hook that is a wanted growth, decided by the pm):
 # the register only grows, and a branch raises a budget only with the row it adds (budget_raise_problems).
 RAISES = ROOT / "tools" / "hook-budget-raises.json"
@@ -152,6 +150,7 @@ R_VENDORED = "port-04-backport-as-commits"
 R_BACKPORT = "backport-01-upstream-code-as-is"
 R_HOOK = "hook-02-shape-and-contract"
 R_BUDGET = "hook-03-budgets-and-debt-only-go-down"
+R_ONE_FACT = "repo-07-one-fact-one-place"
 R_BUILD = "ci-01-builds-from-main-or-latitude-branches"
 
 
@@ -223,7 +222,7 @@ def owners(source: Path, base: str, head: str, declared: dict | None = None):
                 if path not in records:
                     raise SystemExit(halt(fail(
                         "tools/inventory.json", "the modified file %s is not in the inventory" % path,
-                        "add its record to %s (feature, category, anchor, hookable, notes), then run the export again; export writes its counts and evidence" % INVENTORY.name,
+                        "add its record to %s (feature, category, anchor, hookable, notes), then run the export again; export writes its counts" % INVENTORY.name,
                         R_SERIES), again))
                 plan[layout.feature_folder(records[path]["feature"])]["modified"].append(path)
             elif status == "A":
@@ -277,7 +276,7 @@ def new_budgets(diffs: dict, records: dict) -> tuple:
 
 def export(source: Path, base: str, head: str, declared: dict | None = None) -> None:
     """Writes the series from the head. What a tool can write, a tool writes (repo-06): besides the folders, SERIES and UPSTREAM.json, it
-    writes the `added`, `removed`, `hunks` and `evidence` of every inventory record from its hooks.patch (the hand fields stay), the budget
+    writes the `added`, `removed` and `hunks` of every inventory record from its hooks.patch (the hand fields stay), the budget
     entries of the Mozilla files patched for the first time, and the sha256 of every file under src/ in the folder's MANIFEST.json.
     `declared` is `--own`: {path or dir/: folder} for the new files no folder holds yet."""
     require_descends(source, base, head)
@@ -850,22 +849,19 @@ PATCH_FILE = re.compile(r"^diff --git a/(\S+) b/")
 
 
 def file_diffs(patch_text: str) -> dict:
-    """Mozilla file -> {"added", "removed", "hunks", "evidence"} of its diff in a hooks.patch. Counted only inside hunks, so the ---/+++
-    header is never a line, and a line that itself starts with -- or ++ is. `evidence` is every line the hunks add or remove, verbatim with
-    its sign, the blank ones left out: it is what the inventory quotes, and `export` writes it from here."""
+    """Mozilla file -> {"added", "removed", "hunks"} of its diff in a hooks.patch. Counted only inside hunks, so the ---/+++
+    header is never a line, and a line that itself starts with -- or ++ is."""
     out, current, in_hunk = {}, None, False
     for line in patch_text.splitlines():
         m = PATCH_FILE.match(line)
         if m:
             current, in_hunk = m.group(1), False
-            out[current] = {"added": 0, "removed": 0, "hunks": 0, "evidence": []}
+            out[current] = {"added": 0, "removed": 0, "hunks": 0}
         elif line.startswith("@@") and current:
             in_hunk = True
             out[current]["hunks"] += 1
         elif current and in_hunk and line[:1] in ("+", "-"):
             out[current]["added" if line[0] == "+" else "removed"] += 1
-            if line[1:].strip():
-                out[current]["evidence"].append(line)
     return out
 
 
@@ -888,35 +884,27 @@ def hunk_counts(patch: Path) -> dict:
     return {path: d["hunks"] for path, d in _diffs_of(patch).items()}
 
 
-RECORD_ORDER = ("file", "category", "feature", "prefs", "added", "removed", "hunks", "inline_logic_lines", "hookable", "anchor", "evidence",
+RECORD_ORDER = ("file", "category", "feature", "prefs", "added", "removed", "hunks", "inline_logic_lines", "hookable", "anchor",
                 "notes", "verifier")
 
 
 def computed_record(record: dict, diff: dict) -> dict:
-    """The record with the four fields of its hooks.patch (`added`, `removed`, `hunks`, `evidence`) as the diff has them. The hand fields
-    (feature, category, anchor, hookable, notes, verifier, ...) are the record's own. A backport (upstream code, category `backport`) quotes
-    no evidence: its diff is Mozilla's commit, named by the BACKPORT.json beside it. Keys are in RECORD_ORDER, the rest after them."""
-    fresh = dict(record, added=diff["added"], removed=diff["removed"], hunks=diff["hunks"],
-                 evidence=[] if record.get("category") == "backport" else list(diff["evidence"]))
+    """The record with the three fields of its hooks.patch (`added`, `removed`, `hunks`) as the diff has them. The hand fields
+    (feature, category, anchor, hookable, notes, verifier, ...) are the record's own. It never has an `evidence` field: the lines are the
+    hooks.patch itself (repo-07), so one that comes in with the record is dropped. Keys are in RECORD_ORDER, the rest after them."""
+    fresh = {k: v for k, v in record.items() if k != "evidence"}
+    fresh.update(added=diff["added"], removed=diff["removed"], hunks=diff["hunks"])
     return {**{k: fresh[k] for k in RECORD_ORDER if k in fresh}, **{k: v for k, v in fresh.items() if k not in RECORD_ORDER}}
 
 
 HOOK_TAG = re.compile(r"STEALTH-HOOK\(([^)]*)\)")
 
 
-def hook_tag_problems(folders: set, records: list, patches: dict) -> list:
+def hook_tag_problems(folders: set, patches: dict) -> list:
     """A STEALTH-HOOK(<folder>) tag names the folder that owns the hook; one that names
     nothing in SERIES (a folder deleted or renamed since) sends whoever greps it to a place
-    that is not there. Looked at: the evidence of every inventory record, and every line of
-    every hooks.patch (`patches`: folder -> text)."""
+    that is not there. Looked at: every line of every hooks.patch (`patches`: folder -> text)."""
     found = []
-    for r in records:
-        for line in r.get("evidence") or []:
-            for tag in HOOK_TAG.findall(line):
-                if tag not in folders:
-                    found.append(fail(
-                        "tools/inventory.json", "the evidence of %s quotes STEALTH-HOOK(%s), and %s is not a folder of SERIES" % (r["file"], tag, tag),
-                        "regenerate the record from the code, with the folder that owns the hook in the tag", R_HOOK))
     for folder, text in sorted(patches.items()):
         for tag in sorted(set(HOOK_TAG.findall(text))):
             if tag not in folders:
@@ -927,10 +915,10 @@ def hook_tag_problems(folders: set, records: list, patches: dict) -> list:
 
 
 def record_count_problems(records: list, diffs: dict) -> list:
-    """Each inventory record says how many lines of ours (added), of Mozilla's (removed) and how many hunks its file has, and quotes
-    the lines (evidence): those of its file in the hooks.patch (`diffs`: file -> file_diffs entry). The four fields are written by `export`
-    (computed_record); one that differs was edited by hand or not refreshed, and reads as truth to whoever sizes a hook from it."""
-    found = []
+    """Each inventory record says how many lines of ours (added), of Mozilla's (removed) and how many hunks its file has: those of its
+    file in the hooks.patch (`diffs`: file -> file_diffs entry). The three fields are written by `export` (computed_record); one that
+    differs was edited by hand or not refreshed, and reads as truth to whoever sizes a hook from it. A record has no `evidence`."""
+    found = evidence_problems("tools/inventory.json", records)
     for r in records:
         diff = diffs.get(r["file"])
         if diff is None:
@@ -942,12 +930,16 @@ def record_count_problems(records: list, diffs: dict) -> list:
             found.append(fail(
                 "tools/inventory.json", "the record of %s says added %s, removed %s, hunks %s; its hooks.patch has %d, %d, %d"
                 % ((r["file"],) + have + real),
-                "do not edit a count: `%s` writes added, removed, hunks and evidence of every record from its hooks.patch" % again, R_SERIES))
-        if r.get("evidence") != computed_record(r, diff)["evidence"]:
-            found.append(fail(
-                "tools/inventory.json", "the evidence of %s is not the lines its hooks.patch adds and removes" % r["file"],
-                "do not edit the evidence: `%s` writes it from the hooks.patch" % again, R_SERIES))
+                "do not edit a count: `%s` writes added, removed and hunks of every record from its hooks.patch" % again, R_SERIES))
     return found
+
+
+def evidence_problems(where: str, records: list) -> list:
+    """repo-07: an inventory record (in tools/inventory.json or in the `inventory` of a MANIFEST.json) has no `evidence` field. The lines it
+    quoted are the lines of the hooks.patch of its folder, which is the one place that has them."""
+    return [fail("%s, the record of %s" % (where, r.get("file")), "it has an `evidence` field, a second copy of the lines its hooks.patch adds and removes",
+                 "delete the field: the lines are the hooks.patch itself (`git diff` shows them; `%s` writes the record without it)" % command("export", "--source", "<source>"),
+                 R_ONE_FACT) for r in records if "evidence" in r]
 
 
 def manifest_hash_problems(folder: str, d: Path, manifest: dict) -> list:
@@ -1373,6 +1365,7 @@ def problems() -> list:
                 found.append(fail("%s/src/%s" % (folder, extra), "it is not in the MANIFEST of its folder",
                                       "export the series again: the manifest lists every file under src/", R_SERIES))
         found += manifest_hash_problems(folder, d, manifest)
+        found += evidence_problems("%s/MANIFEST.json" % folder, manifest.get("inventory", []))
         patch = d / "hooks.patch"
         touched = added_lines(patch) if patch.exists() else {}
         removed = removed_lines(patch) if patch.exists() else {}
@@ -1411,7 +1404,7 @@ def problems() -> list:
     patches = {f: (ROOT / f / "hooks.patch").read_text(encoding="utf-8", errors="replace")
                for f in present if (ROOT / f / "hooks.patch").exists()}
     records = json.loads(INVENTORY.read_text(encoding="utf-8"))
-    found += hook_tag_problems(set(listed), records, patches)
+    found += hook_tag_problems(set(listed), patches)
     diffs = {}
     for f in present:
         patch = ROOT / f / "hooks.patch"
@@ -1478,36 +1471,6 @@ def load_main_debt() -> list | None:
     return json.loads(text) if text is not None else None
 
 
-def load_main_realign() -> list | None:
-    """The one-time realignment list as origin/main has it (never the branch's); None while main has
-    none yet. Call after load_main_budgets, which makes sure origin/main is there."""
-    text = main_budget_text("budget-realign-69.json")
-    return json.loads(text) if text is not None else None
-
-
-def realign_limits(rows) -> dict:
-    """{(file, kind): line} of the rows of a realignment list."""
-    return {(r["file"], r["kind"]): r["line"] for r in rows or ()}
-
-
-def realign_list_problems(rows: list, main_rows: list | None) -> list:
-    """The realignment list only shrinks: against main's list, a row added or a value raised fails.
-    While main has no list yet (main_rows is None) the list is being introduced and is main's to review."""
-    if main_rows is None:
-        return []
-    found = []
-    now = realign_limits(main_rows)
-    for r in rows:
-        key = (r["file"], r["kind"])
-        if key not in now:
-            found.append(fail("%s in tools/budget-realign-69.json" % r["file"], "the row (%s) is one that main's list does not have" % r["kind"],
-                                  "delete the row: the list only shrinks", R_BUDGET))
-        elif r["line"] > now[key]:
-            found.append(fail("%s in tools/budget-realign-69.json" % r["file"], "%s value %d is above main's %d" % (r["kind"], r["line"], now[key]),
-                                  "set it to main's value or lower: the list only shrinks", R_BUDGET))
-    return found
-
-
 RAISE_FIELDS = ("file", "from", "to", "folder", "reason", "decided_by", "date", "test")
 RAISE_BUDGETS = ("hook", "removed")              # what a row raises: our lines (the default) or the removed lines of Mozilla's
 RAISE_TEXT_FIELDS = ("reason", "decided_by")      # free text: may be reworded; every other field of a row is fixed
@@ -1571,16 +1534,13 @@ def new_raise_rows(rows: list, main_rows: list | None) -> list:
 
 
 def budget_raise_problems(hook: dict, removed: dict, main_hook: dict, main_removed: dict,
-                          realign: list | None = None, raises: list | None = None) -> list:
+                          raises: list | None = None) -> list:
     """Budgets only go down: a value above main's, or a new file's hook above 5 lines, is a failure.
-    realign is MAIN's one-time realignment list: a file in it may reach its `line` value, no more; once
-    main's own budget has reached that value the row has been consumed and main's value is the limit.
     raises are the rows the branch ADDS to tools/hook-budget-raises.json (new_raise_rows): a hook budget
     of a file main patches may go above main's only with one such row, `from` main's budget and `to` the
     branch's; a row that raises nothing, or one of a file main does not patch, is a failure too. A row with
     `budget: "removed"` does the same for the removed budget: `from` main's removed budget (0 when it has none),
     `to` the branch's; one raise per file and budget."""
-    limits = realign_limits(realign)
     found = []
     declared = {}
     declared_removed = {}
@@ -1610,8 +1570,6 @@ def budget_raise_problems(hook: dict, removed: dict, main_hook: dict, main_remov
             limit, what = main_hook[path], "main's %d" % main_hook[path]
         else:
             limit, what = 5, "5"
-        if (path, "hook") in limits and limits[(path, "hook")] > limit:
-            limit, what = limits[(path, "hook")], "the realigned %d" % limits[(path, "hook")]
         if n > limit and path in declared:
             continue          # declared: its row is judged above
         if n > limit:
@@ -1626,8 +1584,6 @@ def budget_raise_problems(hook: dict, removed: dict, main_hook: dict, main_remov
             limit, what = main_removed.get(path, 0), "main's %d" % main_removed.get(path, 0)
         else:
             limit, what = 5, "5"
-        if (path, "removed") in limits and limits[(path, "removed")] > limit:
-            limit, what = limits[(path, "removed")], "the realigned %d" % limits[(path, "removed")]
         if n > limit and path in declared_removed:
             continue          # declared: its row is judged above
         if n > limit:
@@ -1675,15 +1631,12 @@ def check(source: Path | None = None, tag: str | None = None, against_main: bool
     found += folders.problems(ROOT)       # series-02: every folder states its relation to Mozilla (tools/folders.py)
     if against_main:      # the CLI does; it needs git and origin/main, problems() and the tests' fakes do not
         main_hook, main_removed = load_main_budgets()
-        main_realign = load_main_realign()
         main_raises = load_main_raises()
         raises = json.loads(RAISES.read_text(encoding="utf-8")) if RAISES.is_file() else []
         found += raises_list_problems(raises, main_raises)
         found += budget_raise_problems(json.loads(BUDGET.read_text(encoding="utf-8")),
                                        json.loads(REMOVED_BUDGET.read_text(encoding="utf-8")),
-                                       main_hook, main_removed, main_realign, new_raise_rows(raises, main_raises))
-        found += realign_list_problems(json.loads(REALIGN.read_text(encoding="utf-8")) if REALIGN.is_file() else [],
-                                       main_realign)
+                                       main_hook, main_removed, new_raise_rows(raises, main_raises))
     base = hook_contract.git_base_reader(source, tag) if source is not None and tag else None
     contract, n_hooks, n_violations = (contract_problems(against_main, base) if base is not None
                                        else contract_problems(against_main))

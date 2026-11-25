@@ -24,10 +24,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "EXPORTS.mozilla.dom and UNIFIED_SOURCES lists",
-   "evidence": [
-    "+    \"StealthSessionDeclaration.h\",",
-    "+    \"StealthSessionDeclaration.cpp\","
-   ],
    "notes": "Registers two list entries (not logic, so inline count is 0). StealthSessionDeclaration.h and .cpp are new files that are not in the inventory list. StealthDeclarationGate.h is included by several changed files but is not registered in this hunk; its registration was not checked. VERIFIED: StealthDeclarationGate.h/.cpp are registered in gfx/thebes/moz.build:68 and :245, so nothing is missing here.",
    "verifier": {
     "changed": [
@@ -47,10 +43,6 @@
    "inline_logic_lines": 2,
    "hookable": "already-hook",
    "anchor": "include list; OSPreferences::GetSystemLocales and GetSystemLocale, first line of each",
-   "evidence": [
-    "+  if (SessionSystemLocales(aRetVal)) return NS_OK;",
-    "+  if (SessionSystemLocale(aRetVal)) return NS_OK;"
-   ],
    "notes": "The languages of the machine (what the OS preferences say) are the session declaration: both getters first ask SessionSystemLocales / SessionSystemLocale (intl/locale/StealthSessionPrefs.cpp, ours) and return its answer when a declaration is set. Two calls at the head of two functions plus the include; no logic inline.",
    "verifier": {
     "changed": [],
@@ -68,7 +60,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "UNIFIED_SOURCES after the list of Mozilla tests",
-   "evidence": [],
    "notes": "Hook registering our own gtest (TestStealthSystemLocales.cpp).",
    "verifier": {
     "changed": [],

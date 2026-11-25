@@ -99,9 +99,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "before TEST_DIRS",
-   "evidence": [
-    "+DIRS += [\"idwr\"]  # STEALTH-HOOK(fingerprint/fonts/idwr)"
-   ],
    "notes": "Builds gfx/idwr (our DirectWrite rasterizer) into libxul, on a line of its own outside Mozilla's DIRS list."
   }
  ]

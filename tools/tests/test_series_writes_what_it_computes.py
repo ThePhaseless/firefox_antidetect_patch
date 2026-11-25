@@ -1,7 +1,7 @@
 """repo-06 (docs/decisions/repo-06-what-a-tool-can-write-a-tool-writes.md): a derived fact is written by a tool, and `check` refuses a hand-written
 one that differs from what the tool computes, naming the command that writes it.
 
-  * the inventory counts and the evidence of a record: `export` writes them from the folder's hooks.patch;
+  * the inventory counts of a record (and no evidence field, repo-07): `export` writes them from the folder's hooks.patch;
   * the budget entry of a Mozilla file the series patches for the first time: `export` writes it at the counted value;
   * the sha256 of every file under a folder's src/: `export` writes it in the folder's MANIFEST.json;
   * the owner of a file of ours: the folder that holds it under src/, no table in tools/layout.py;
@@ -36,20 +36,18 @@ DIFF = ("diff --git a/a.cpp b/a.cpp\n--- a/a.cpp\n+++ b/a.cpp\n@@ -1,2 +1,3 @@\n
         "@@ -9,1 +10,2 @@\n z\n+more  // STEALTH-HOOK(platform/f)\n")
 
 
-def test_file_diffs_counts_and_quotes_the_lines_of_the_hunks_without_the_blank_ones():
+def test_file_diffs_counts_the_lines_of_the_hunks_and_quotes_none():
     d = engine.file_diffs(DIFF)["a.cpp"]
-    assert (d["added"], d["removed"], d["hunks"]) == (3, 1, 2)
-    assert d["evidence"] == ["-old", "+new  // STEALTH-HOOK(platform/f)", "+more  // STEALTH-HOOK(platform/f)"]
+    assert d == {"added": 3, "removed": 1, "hunks": 2}
 
 
-def test_the_record_keeps_its_hand_fields_and_takes_the_four_computed_ones():
+def test_the_record_keeps_its_hand_fields_and_takes_the_three_computed_ones_and_drops_evidence():
     record = {"file": "a.cpp", "category": "hook", "feature": "x", "added": 99, "removed": 99, "hunks": 99, "evidence": ["+stale"], "notes": "mine",
               "verifier": {"why": "checked"}, "anchor": "a", "hookable": "yes"}
     fresh = engine.computed_record(record, engine.file_diffs(DIFF)["a.cpp"])
-    assert (fresh["added"], fresh["removed"], fresh["hunks"]) == (3, 1, 2) and fresh["evidence"][0] == "-old"
+    assert (fresh["added"], fresh["removed"], fresh["hunks"]) == (3, 1, 2) and "evidence" not in fresh
     assert (fresh["notes"], fresh["verifier"], fresh["anchor"], fresh["feature"]) == ("mine", {"why": "checked"}, "a", "x")
     assert list(fresh)[:5] == ["file", "category", "feature", "added", "removed"], "keys keep the order of the inventory"
-    assert engine.computed_record(dict(record, category="backport"), engine.file_diffs(DIFF)["a.cpp"])["evidence"] == [], "upstream code quotes no evidence"
 
 
 def test_a_count_edited_by_hand_fails_and_the_message_names_export():
@@ -62,11 +60,15 @@ def test_a_count_edited_by_hand_fails_and_the_message_names_export():
         assert "Rule: docs/decisions/series-01" in found[0]
 
 
-def test_evidence_edited_by_hand_fails_and_the_message_names_export():
+def test_an_evidence_field_fails_and_the_message_says_where_the_fix_and_the_rule():
     diffs = engine.file_diffs(DIFF)
     good = engine.computed_record({"file": "a.cpp", "category": "hook"}, diffs["a.cpp"])
-    found = engine.record_count_problems([dict(good, evidence=good["evidence"][:1])], diffs)
-    assert len(found) == 1 and "evidence" in found[0] and EXPORT in found[0], found
+    found = engine.record_count_problems([dict(good, evidence=["-old"])], diffs)
+    assert len(found) == 1 and "a.cpp" in found[0] and "evidence" in found[0] and "delete the field" in found[0], found
+    assert "Rule: docs/decisions/repo-07-one-fact-one-place.md" in found[0], found
+    # the same record inside a MANIFEST.json is refused with its own where
+    found = engine.evidence_problems("x/y/MANIFEST.json", [dict(good, evidence=[])])
+    assert len(found) == 1 and "x/y/MANIFEST.json" in found[0], found
 
 
 def test_every_record_as_committed_is_what_export_writes():
@@ -77,7 +79,7 @@ def test_every_record_as_committed_is_what_export_writes():
         if patch.exists():
             diffs.update(engine._diffs_of(patch))
     assert engine.record_count_problems(records, diffs) == []
-    assert any(r["evidence"] for r in records), "the committed records quote the lines of their patch"
+    assert records and not any("evidence" in r for r in records), "the lines are the hooks.patch itself"
 
 
 # ------------------------------------------------------------------------------------------------------ export writes the new things
@@ -123,11 +125,11 @@ def test_export_writes_the_removed_budget_of_a_new_file_that_loses_mozillas_line
     assert json.loads(budget.read_text(encoding="utf-8")) == {"mozilla.txt": 2}
 
 
-def test_export_writes_the_counts_and_the_evidence_of_the_record_and_keeps_the_hand_fields(exported):
+def test_export_writes_the_counts_of_the_record_and_keeps_the_hand_fields(exported):
     world, root, inventory, budget, removed = exported
     engine.export(world, "TAG", "series")
     record = json.loads(inventory.read_text(encoding="utf-8"))[0]
-    assert (record["added"], record["removed"], record["hunks"], record["evidence"]) == (1, 0, 1, ["+hook();"])
+    assert (record["added"], record["removed"], record["hunks"]) == (1, 0, 1) and "evidence" not in record
     assert record["notes"] == "mine" and record["feature"] == "x"
     manifest = json.loads((root / "fingerprint" / "a" / "MANIFEST.json").read_text(encoding="utf-8"))
     assert manifest["inventory"] == [record], "the manifest quotes the record export wrote"

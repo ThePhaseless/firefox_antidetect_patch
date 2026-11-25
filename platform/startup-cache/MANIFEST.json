@@ -20,7 +20,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "StartupCache::MaybeWriteOffMainThread",
-   "evidence": [],
    "notes": "Fix of a 157 priority inversion (commit 044fdc985f): StartupCache writes no longer take nsAutoLowPriorityIO, whose THREAD_MODE_BACKGROUND_BEGIN starved the writer while it held mTableLock and so the main thread in GetBuffer() (7-27 s stalls with eleven browsers). 151 had no lowered priority here."
   },
   {
@@ -34,7 +33,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "hook added by the 2026-11 hook rework (registration of our own file)",
-   "evidence": [],
    "notes": "Hook registering our own code (minimal record added by the final-line integration).",
    "verifier": {
     "changed": [],
@@ -52,7 +50,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "hook added by the 2026-11 hook rework (registration of our own file)",
-   "evidence": [],
    "notes": "Hook registering our own code (minimal record added by the final-line integration).",
    "verifier": {
     "changed": [],

@@ -20,9 +20,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "after the closing ] of EXPORTS.mozilla.media.webrtc, before the chromium-config include",
-   "evidence": [
-    "+TEST_DIRS += [\"tests/gtest\"]  # STEALTH-HOOK(platform/hidden-desktop)"
-   ],
    "notes": "Registers the Windows gtest of the hidden-desktop capture rule (dom/media/webrtc/tests/gtest, which has sources only when OS_TARGET is WINNT).",
    "verifier": {
     "changed": [],
@@ -40,10 +37,6 @@
    "inline_logic_lines": 2,
    "hookable": "already-hook",
    "anchor": "CroppingWindowCapturerWin::ShouldUseScreenCapturer",
-   "evidence": [
-    "+  if (!window_capture_helper_.IsWindowOnInputDesktop(selected)) {",
-    "+    return false;"
-   ],
    "notes": "Vendored libwebrtc file. The hook is 2 logic lines; most of the 13 added lines are a comment block that can be shortened or moved to the commit message. Depends on IsWindowOnInputDesktop (window_capture_utils.h in this group). The comment carries a measurement date; keep that in the commit, not the code.",
    "verifier": {
     "changed": [],

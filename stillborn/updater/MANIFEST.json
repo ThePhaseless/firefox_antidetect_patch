@@ -28,7 +28,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "app.update.interval, promptWaitTime, url.manual, url.details, checkInstallTime.days, badgeWaitTime lines",
-   "evidence": [],
    "notes": "The unofficial branding we build with carries Nightly-like update timings; each line holds the official branding's release value, so the update check runs on the retail's cadence (no extra check at startup for a build older than 2 days).",
    "verifier": {
     "changed": [],
@@ -46,7 +45,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "module imports; BackgroundUpdate._registerBackgroundUpdateTask head",
-   "evidence": [],
    "notes": "The import and refusesHostTask(): Mozilla's checks and the prefs it records run as written, only the Windows scheduled task is not created.",
    "verifier": {
     "changed": [],
@@ -64,7 +62,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "module imports; CheckerService #updateCheck after #parseUpdates; UpdateService #downloadUpdate head",
-   "evidence": [],
    "notes": "Three hooks: the import of our StealthUpdate.sys.mjs, StealthNoneOffered() right after Mozilla parses the server's answer (every consumer then takes the no-update path), refusesDownload() at the one door of every download (backstop).",
    "verifier": {
     "changed": [],
@@ -82,7 +79,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "after EXTRA_JS_MODULES list",
-   "evidence": [],
    "notes": "Hook registering our StealthUpdate.sys.mjs.",
    "verifier": {
     "changed": [],

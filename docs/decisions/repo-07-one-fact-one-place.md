@@ -5,8 +5,9 @@
 - The Mozilla tag: only `UPSTREAM.json`.
 - The gtest suites: only `tools/gtest-suites.json` ([repo-06](repo-06-what-a-tool-can-write-a-tool-writes.md)).
 - Ceilings: one budget file per kind of ceiling; a one-off realignment file does not stay.
+- The lines a hook adds or removes: only the folder's `hooks.patch`; an inventory record has no `evidence` field.
 
-**Enforced by.** `python tools/engine.py docs --check` fails when a generated section differs from the generator's output (`docs --write` rewrites it). A test fails when the Mozilla tag appears in a file other than `UPSTREAM.json`, or when two budget files carry the same kind of ceiling.
+**Enforced by.** `python tools/engine.py docs --check` fails when a generated section differs from the generator's output (`docs --write` rewrites it). A test fails when the Mozilla tag appears in a file other than `UPSTREAM.json`, when two budget files carry the same kind of ceiling, or when an inventory record (in `tools/inventory.json` or a `MANIFEST.json`) has an `evidence` field.
 
 **Why.** In the measurement, the gtest list was in about 5 places, the budgets in four files, the Mozilla tag was typed by hand in two, and the hook rules were written in five places that had already diverged. A reader could not tell which copy was true.
 

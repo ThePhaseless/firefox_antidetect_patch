@@ -19,10 +19,6 @@
    "inline_logic_lines": 10,
    "hookable": "movable",
    "anchor": "LocaleService::GetRegionalPrefsLocales; new static helper MachineRegionalPrefsLocales",
-   "evidence": [
-    "+  if (!declared.IsEmpty()) {",
-    "+    if (NS_SUCCEEDED(MachineRegionalPrefsLocales(aRetVal))) {"
-   ],
    "notes": "Regional locales (which feed web-exposed locales and date/time formatting) now take the declared session language first, then the OS. The ~10-line helper body (new static MachineRegionalPrefsLocales plus the two call-site edits) can move into StealthSessionPrefs.cpp, leaving two call sites here. Input-only change per the comment; upstream's en-US rule is kept. The language comes from intl::SessionLanguageTag (intl/locale/StealthSessionPrefs.cpp), which reads juggler.locale.override via StaticPrefs::juggler_locale_override (StealthSessionPrefs.cpp:16, CONFIRMED indirect read; the pref is not named in the added lines).",
    "verifier": {
     "changed": [
@@ -44,10 +40,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "(moz.build EXPORTS and UNIFIED_SOURCES lists)",
-   "evidence": [
-    "+    \"StealthSessionPrefs.h\",",
-    "+    \"StealthSessionPrefs.cpp\","
-   ],
    "notes": "Registers our own StealthSessionPrefs files; the .cpp is added to UNIFIED_SOURCES.",
    "verifier": {
     "changed": [],
@@ -65,10 +57,6 @@
    "inline_logic_lines": 6,
    "hookable": "movable",
    "anchor": "nsLanguageAtomService::GetLocaleLanguage (inside the write lock, before the regional-prefs lookup)",
-   "evidence": [
-    "+    intl::SessionLanguageTag(declared);",
-    "+      mLocaleLanguage = NS_Atomize(declared);"
-   ],
    "notes": "The fallback language atom (used for text without lang, hence font language group) now comes from the declared session language before the OS lookup. The ~6-line early-return branch can become one call into StealthSessionPrefs. Comment says per process. Reached from workers too (OffscreenCanvas per the StaticPrefList comment); thread-safety concern REFUTED: the pref is read through intl/locale/StealthSessionPrefs.cpp:16 as a DataMutexString static pref (locked, mirror: always, per the juggler.locale.override entry in StaticPrefList.yaml). juggler.locale.override is read indirectly, not in the added lines.",
    "verifier": {
     "changed": [

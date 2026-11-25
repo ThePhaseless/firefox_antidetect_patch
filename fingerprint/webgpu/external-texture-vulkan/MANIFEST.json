@@ -50,9 +50,6 @@
    "inline_logic_lines": 0,
    "hookable": "hard",
    "anchor": "the naga-types package's dependencies",
-   "evidence": [
-    "+ \"bytemuck\","
-   ],
    "notes": "naga-types depends on bytemuck from upstream wgpu 66e992c3a (ExternalTextureTransferFunction moved there); the lock says what the vendored Cargo.toml says.",
    "verifier": {
     "changed": [],
@@ -70,9 +67,6 @@
    "inline_logic_lines": 1,
    "hookable": "already-hook",
    "anchor": "the module list after RawString",
-   "evidence": [
-    "+pub mod stealth_external_texture; // STEALTH-HOOK(fingerprint/webgpu/external-texture-vulkan)"
-   ],
    "notes": "Declares our module with the function the gtest StealthWebGPUExternalTexture calls; the module is ours.",
    "verifier": {
     "changed": [],
@@ -90,7 +84,6 @@
    "inline_logic_lines": 0,
    "hookable": "hard",
    "anchor": "the hashes of the files the backport changes",
-   "evidence": [],
    "notes": "Cargo verifies vendored crates against these hashes; each changed or added file of the crate has its new sha256.",
    "verifier": {
     "changed": [],
@@ -108,7 +101,6 @@
    "inline_logic_lines": 0,
    "hookable": "hard",
    "anchor": "upstream wgpu code (see BACKPORT.json)",
-   "evidence": [],
    "notes": "Upstream wgpu's Vulkan external-texture code, as BACKPORT.json lists it, on the vendored 4f4dc63.",
    "verifier": {
     "changed": [],
@@ -126,7 +118,6 @@
    "inline_logic_lines": 0,
    "hookable": "hard",
    "anchor": "upstream wgpu code (see BACKPORT.json)",
-   "evidence": [],
    "notes": "Upstream wgpu's Vulkan external-texture code, as BACKPORT.json lists it, on the vendored 4f4dc63.",
    "verifier": {
     "changed": [],
@@ -144,7 +135,6 @@
    "inline_logic_lines": 0,
    "hookable": "hard",
    "anchor": "upstream wgpu code (see BACKPORT.json)",
-   "evidence": [],
    "notes": "Upstream wgpu's Vulkan external-texture code, as BACKPORT.json lists it, on the vendored 4f4dc63.",
    "verifier": {
     "changed": [],
@@ -162,7 +152,6 @@
    "inline_logic_lines": 0,
    "hookable": "hard",
    "anchor": "the hashes of the files the backport changes",
-   "evidence": [],
    "notes": "Cargo verifies vendored crates against these hashes; each changed or added file of the crate has its new sha256.",
    "verifier": {
     "changed": [],
@@ -180,7 +169,6 @@
    "inline_logic_lines": 0,
    "hookable": "hard",
    "anchor": "upstream wgpu code (see BACKPORT.json)",
-   "evidence": [],
    "notes": "Upstream wgpu's Vulkan external-texture code, as BACKPORT.json lists it, on the vendored 4f4dc63.",
    "verifier": {
     "changed": [],
@@ -198,7 +186,6 @@
    "inline_logic_lines": 0,
    "hookable": "hard",
    "anchor": "upstream wgpu code (see BACKPORT.json)",
-   "evidence": [],
    "notes": "Upstream wgpu's Vulkan external-texture code, as BACKPORT.json lists it, on the vendored 4f4dc63.",
    "verifier": {
     "changed": [],
@@ -216,7 +203,6 @@
    "inline_logic_lines": 0,
    "hookable": "hard",
    "anchor": "upstream wgpu code (see BACKPORT.json)",
-   "evidence": [],
    "notes": "Upstream wgpu's Vulkan external-texture code, as BACKPORT.json lists it, on the vendored 4f4dc63.",
    "verifier": {
     "changed": [],
@@ -234,7 +220,6 @@
    "inline_logic_lines": 0,
    "hookable": "hard",
    "anchor": "upstream wgpu code (see BACKPORT.json)",
-   "evidence": [],
    "notes": "Upstream wgpu's Vulkan external-texture code, as BACKPORT.json lists it, on the vendored 4f4dc63.",
    "verifier": {
     "changed": [],
@@ -252,7 +237,6 @@
    "inline_logic_lines": 0,
    "hookable": "hard",
    "anchor": "upstream wgpu code (see BACKPORT.json)",
-   "evidence": [],
    "notes": "Upstream wgpu's Vulkan external-texture code, as BACKPORT.json lists it, on the vendored 4f4dc63.",
    "verifier": {
     "changed": [],
@@ -270,7 +254,6 @@
    "inline_logic_lines": 0,
    "hookable": "hard",
    "anchor": "upstream wgpu code (see BACKPORT.json)",
-   "evidence": [],
    "notes": "Upstream wgpu's Vulkan external-texture code, as BACKPORT.json lists it, on the vendored 4f4dc63.",
    "verifier": {
     "changed": [],
@@ -288,7 +271,6 @@
    "inline_logic_lines": 0,
    "hookable": "hard",
    "anchor": "upstream wgpu code (see BACKPORT.json)",
-   "evidence": [],
    "notes": "Upstream wgpu's Vulkan external-texture code, as BACKPORT.json lists it, on the vendored 4f4dc63.",
    "verifier": {
     "changed": [],
@@ -306,7 +288,6 @@
    "inline_logic_lines": 0,
    "hookable": "hard",
    "anchor": "upstream wgpu code (see BACKPORT.json)",
-   "evidence": [],
    "notes": "Upstream wgpu's Vulkan external-texture code, as BACKPORT.json lists it, on the vendored 4f4dc63.",
    "verifier": {
     "changed": [],
@@ -324,7 +305,6 @@
    "inline_logic_lines": 0,
    "hookable": "hard",
    "anchor": "upstream wgpu code (see BACKPORT.json)",
-   "evidence": [],
    "notes": "Upstream wgpu's Vulkan external-texture code, as BACKPORT.json lists it, on the vendored 4f4dc63.",
    "verifier": {
     "changed": [],
@@ -342,7 +322,6 @@
    "inline_logic_lines": 0,
    "hookable": "hard",
    "anchor": "upstream wgpu code (see BACKPORT.json)",
-   "evidence": [],
    "notes": "Upstream wgpu's Vulkan external-texture code, as BACKPORT.json lists it, on the vendored 4f4dc63.",
    "verifier": {
     "changed": [],
@@ -360,7 +339,6 @@
    "inline_logic_lines": 0,
    "hookable": "hard",
    "anchor": "upstream wgpu code (see BACKPORT.json)",
-   "evidence": [],
    "notes": "Upstream wgpu's Vulkan external-texture code, as BACKPORT.json lists it, on the vendored 4f4dc63.",
    "verifier": {
     "changed": [],
@@ -378,7 +356,6 @@
    "inline_logic_lines": 0,
    "hookable": "hard",
    "anchor": "upstream wgpu code (see BACKPORT.json)",
-   "evidence": [],
    "notes": "Upstream wgpu's Vulkan external-texture code, as BACKPORT.json lists it, on the vendored 4f4dc63.",
    "verifier": {
     "changed": [],
@@ -396,7 +373,6 @@
    "inline_logic_lines": 0,
    "hookable": "hard",
    "anchor": "upstream wgpu code (see BACKPORT.json)",
-   "evidence": [],
    "notes": "Upstream wgpu's Vulkan external-texture code, as BACKPORT.json lists it, on the vendored 4f4dc63.",
    "verifier": {
     "changed": [],
@@ -414,7 +390,6 @@
    "inline_logic_lines": 0,
    "hookable": "hard",
    "anchor": "upstream wgpu code (see BACKPORT.json)",
-   "evidence": [],
    "notes": "Upstream wgpu's Vulkan external-texture code, as BACKPORT.json lists it, on the vendored 4f4dc63.",
    "verifier": {
     "changed": [],
@@ -432,7 +407,6 @@
    "inline_logic_lines": 0,
    "hookable": "hard",
    "anchor": "upstream wgpu code (see BACKPORT.json)",
-   "evidence": [],
    "notes": "Upstream wgpu's Vulkan external-texture code, as BACKPORT.json lists it, on the vendored 4f4dc63.",
    "verifier": {
     "changed": [],
@@ -450,7 +424,6 @@
    "inline_logic_lines": 0,
    "hookable": "hard",
    "anchor": "upstream wgpu code (see BACKPORT.json)",
-   "evidence": [],
    "notes": "Upstream wgpu's Vulkan external-texture code, as BACKPORT.json lists it, on the vendored 4f4dc63.",
    "verifier": {
     "changed": [],
@@ -468,7 +441,6 @@
    "inline_logic_lines": 0,
    "hookable": "hard",
    "anchor": "the hashes of the files the backport changes",
-   "evidence": [],
    "notes": "Cargo verifies vendored crates against these hashes; each changed or added file of the crate has its new sha256.",
    "verifier": {
     "changed": [],
@@ -486,7 +458,6 @@
    "inline_logic_lines": 0,
    "hookable": "hard",
    "anchor": "upstream wgpu code (see BACKPORT.json)",
-   "evidence": [],
    "notes": "Upstream wgpu's Vulkan external-texture code, as BACKPORT.json lists it, on the vendored 4f4dc63.",
    "verifier": {
     "changed": [],
@@ -504,7 +475,6 @@
    "inline_logic_lines": 0,
    "hookable": "hard",
    "anchor": "the hashes of the files the backport changes",
-   "evidence": [],
    "notes": "Cargo verifies vendored crates against these hashes; each changed or added file of the crate has its new sha256.",
    "verifier": {
     "changed": [],
@@ -522,7 +492,6 @@
    "inline_logic_lines": 0,
    "hookable": "hard",
    "anchor": "upstream wgpu code (see BACKPORT.json)",
-   "evidence": [],
    "notes": "Upstream wgpu's Vulkan external-texture code, as BACKPORT.json lists it, on the vendored 4f4dc63.",
    "verifier": {
     "changed": [],
@@ -540,7 +509,6 @@
    "inline_logic_lines": 0,
    "hookable": "hard",
    "anchor": "upstream wgpu code (see BACKPORT.json)",
-   "evidence": [],
    "notes": "Upstream wgpu's Vulkan external-texture code, as BACKPORT.json lists it, on the vendored 4f4dc63.",
    "verifier": {
     "changed": [],
@@ -558,7 +526,6 @@
    "inline_logic_lines": 0,
    "hookable": "hard",
    "anchor": "upstream wgpu code (see BACKPORT.json)",
-   "evidence": [],
    "notes": "Upstream wgpu's Vulkan external-texture code, as BACKPORT.json lists it, on the vendored 4f4dc63.",
    "verifier": {
     "changed": [],
@@ -576,7 +543,6 @@
    "inline_logic_lines": 0,
    "hookable": "hard",
    "anchor": "upstream wgpu code (see BACKPORT.json)",
-   "evidence": [],
    "notes": "Upstream wgpu's Vulkan external-texture code, as BACKPORT.json lists it, on the vendored 4f4dc63.",
    "verifier": {
     "changed": [],
@@ -594,7 +560,6 @@
    "inline_logic_lines": 0,
    "hookable": "hard",
    "anchor": "the hashes of the files the backport changes",
-   "evidence": [],
    "notes": "Cargo verifies vendored crates against these hashes; each changed or added file of the crate has its new sha256.",
    "verifier": {
     "changed": [],
@@ -612,7 +577,6 @@
    "inline_logic_lines": 0,
    "hookable": "hard",
    "anchor": "upstream wgpu code (see BACKPORT.json)",
-   "evidence": [],
    "notes": "Upstream wgpu's Vulkan external-texture code, as BACKPORT.json lists it, on the vendored 4f4dc63.",
    "verifier": {
     "changed": [],
