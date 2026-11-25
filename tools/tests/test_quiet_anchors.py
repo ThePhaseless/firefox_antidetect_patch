@@ -87,9 +87,10 @@ def test_a_hook_in_the_band_without_a_reason_is_red(tmp_path):
     (v,) = c18(tmp_path)
     assert v.rule == "C18" and (v.folder, v.file) == (FOLDER, "a.cpp")
     # where / what / fix / rule: the hook and its hunk, the churn, the field to write or the move, the decision
-    assert "StealthX(x)" in v.detail and "hunk 1" in v.detail and "churn %d" % BAND in v.detail
-    assert "BAND_MIN_CHURN" in v.detail and "quiet_anchor_why" in v.detail and "move the hook" in v.detail
-    assert "docs/decisions/port-07-quiet-anchors.md" in v.detail
+    message = str(hc.violation_failure(v))
+    assert "StealthX(x)" in message and "hunk 1" in message and "churn %d" % BAND in message
+    assert "BAND_MIN_CHURN" in message and "quiet_anchor_why" in message and "move the hook" in message
+    assert "Rule: docs/decisions/port-07-quiet-anchors.md" in message and message.startswith("FAIL %s/hooks.patch, a.cpp" % FOLDER)
 
 
 def test_a_hook_below_the_band_needs_no_reason(tmp_path):
@@ -121,8 +122,9 @@ def test_deferred_is_red_when_the_base_changed(tmp_path):
     # the next port: UPSTREAM.json names the new tag, churn.json is written again for it, and the hook is still where it was
     build(tmp_path, churn_n=BAND, reason=DEFERRED, base="FIREFOX_160_0_RELEASE")
     (v,) = c18(tmp_path)
-    assert "deferred" in v.detail and "FIREFOX_160_0_RELEASE" in v.detail and TAG in v.detail
-    assert "a.cpp:int a = 1;" in v.detail and "only-place" in v.detail and "docs/decisions/port-07-quiet-anchors.md" in v.detail
+    message = str(hc.violation_failure(v))
+    assert "deferred" in message and "FIREFOX_160_0_RELEASE" in message and TAG in message
+    assert "a.cpp:int a = 1;" in message and "only-place" in message and "docs/decisions/port-07-quiet-anchors.md" in message
 
 
 def test_only_place_survives_a_new_base(tmp_path):
@@ -140,14 +142,16 @@ def test_a_hook_missing_from_churn_json_is_red(tmp_path):
     moved = PATCH.replace("StealthX(x)", "StealthY(x)")       # the file was written for another text: this hook is new to it
     build(tmp_path, churn_n=BAND, reason=ONLY, churn_text=moved)
     (v,) = c18(tmp_path)
-    assert "a new or moved hook has no churn: run" in v.detail and "churn.py" in v.detail and "--write" in v.detail
-    assert "docs/decisions/port-07-quiet-anchors.md" in v.detail
+    message = str(hc.violation_failure(v))
+    assert "has no churn row in tools/churn.json" in message and "churn.py" in message and "--write" in message
+    assert "docs/decisions/port-07-quiet-anchors.md" in message
 
 
 def test_a_missing_churn_json_is_red(tmp_path):
     build(tmp_path, churn_file=False)
     (v,) = c18(tmp_path)
-    assert "tools/churn.json is missing" in v.detail and "churn.py" in v.detail and "--write" in v.detail
+    message = str(hc.violation_failure(v))
+    assert "tools/churn.json is missing" in message and "churn.py" in message and "--write" in message
 
 
 def test_a_churn_json_that_is_not_json_is_red(tmp_path):
@@ -188,7 +192,7 @@ BAD = [
 def test_a_reason_of_the_wrong_shape_is_red(tmp_path, name, value):
     build(tmp_path, churn_n=BAND, reason=value)
     (v,) = c18(tmp_path)
-    assert "quiet_anchor_why is wrong" in v.detail and "docs/decisions/port-07-quiet-anchors.md" in v.detail
+    assert "`quiet_anchor_why` is wrong" in v.detail and "docs/decisions/port-07-quiet-anchors.md" in str(hc.violation_failure(v))
 
 
 def test_a_reason_of_the_wrong_shape_is_red_below_the_band_too(tmp_path):
@@ -201,10 +205,10 @@ def test_c18_is_a_rule_that_is_never_debt():
     assert "C18" in hc.RULES and "C18" in hc.PORT07_RULES and "C18" in hc.NEVER_DEBT_RULES
     assert set(hc.PORT06_RULES) <= set(hc.NEVER_DEBT_RULES)
     v = hc.Violation("C18", FOLDER, "a.cpp", "", "x", hc._key("C18", FOLDER, "a.cpp", "", "x"), "d")
-    assert "never debt" in hc.debt_problems([v], [hc.entry_of(v)], None)[0]
+    assert "never debt" in str(hc.debt_problems([v], [hc.entry_of(v)], None)[0])
     assert hc.update_debt([], [v], init=True) == []
     again = hc.debt_problems([v], [], None)
-    assert len(again) == 1 and again[0].startswith("%s/hooks.patch, a.cpp: C18" % FOLDER)
+    assert len(again) == 1 and str(again[0]).startswith("FAIL %s/hooks.patch, a.cpp: C18" % FOLDER)
 
 
 def test_hooks_list_keeps_the_field_through_the_export(tmp_path):
@@ -224,10 +228,10 @@ def test_check_runs_c18(monkeypatch):
     extra = hc.Violation("C18", FOLDER, "a.cpp", "", "x", hc._key("C18", FOLDER, "a.cpp", "", "x"), "no quieter anchor named")
     monkeypatch.setattr(hc, "churn_violations", lambda root: [extra])
     found, _, _ = engine.contract_problems()
-    assert any("C18" in p and "no quieter anchor named" in p for p in found)
+    assert any("C18" in str(p) and "no quieter anchor named" in str(p) for p in found)
     monkeypatch.setattr(hc, "churn_violations", lambda root: [])
     found, _, _ = engine.contract_problems()
-    assert not any("C18" in p for p in found)
+    assert not any("C18" in str(p) for p in found)
 
 
 def test_every_hook_of_the_series_has_its_churn():

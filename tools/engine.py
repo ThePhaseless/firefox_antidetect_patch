@@ -1518,6 +1518,7 @@ SOURCE_COMMANDS = ("status", "apply", "export", "verify", "drift", "port", "hook
 
 
 def main() -> int:
+    if sys.argv[1:2] == ["docs"]: return hook_contract.docs_main(ROOT, sys.argv[2:])      # --write | --check: the sections the tables generate
     if len(sys.argv) > 1 and sys.argv[1] == "births":
         return births.main(sys.argv[2:])      # its own options: --tree, --repo/--rev, --skeleton, --accept-changed, --prune, --tsv
     if len(sys.argv) > 1 and sys.argv[1] == "prebuild":

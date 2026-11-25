@@ -105,7 +105,7 @@ def test_a_folder_without_a_patch_has_an_empty_list(tmp_path):
 # --------------------------------------------------------------------------- the check: the list and the series coincide
 def test_the_list_as_generated_is_clean(tmp_path):
     root = series(tmp_path, pair(G1, G2))
-    assert any("HOOKS.json is missing" in p and FOLDER in p for p in hl.problems(root))      # red: no file yet
+    assert any("/HOOKS.json: it is missing" in p and FOLDER in p for p in map(str, hl.problems(root)))      # red: no file yet
     hl.write_all(root)
     assert hl.problems(root) == []                                                            # green
 
@@ -114,7 +114,7 @@ def test_a_hook_lost_from_the_patch_while_the_list_has_it_fails(tmp_path):
     root = series(tmp_path, pair(G1, G2))
     hl.write_all(root)
     set_patch(root, top(G1))                       # a merge lost the second hook; HOOKS.json still lists it
-    found = hl.problems(root)
+    found = [str(f) for f in hl.problems(root)]
     assert len(found) == 1 and FOLDER in found[0] and "StealthTwo" in found[0] and "no longer has" in found[0], found
     hl.write_all(root)                             # the regeneration repairs it
     assert hl.problems(root) == []
@@ -124,7 +124,7 @@ def test_a_hook_added_to_the_patch_but_not_to_the_list_fails(tmp_path):
     root = series(tmp_path, top(G1))
     hl.write_all(root)
     set_patch(root, pair(G1, G2))
-    found = hl.problems(root)
+    found = [str(f) for f in hl.problems(root)]
     assert len(found) == 1 and FOLDER in found[0] and "StealthTwo" in found[0] and "lacks the hook" in found[0], found
     hl.write_all(root)
     assert hl.problems(root) == []
@@ -136,7 +136,7 @@ def test_a_field_changed_in_the_list_fails(tmp_path):
     entries = read_list(root)
     entries[0]["form"] = "anchor"
     commit_list(root, entries)
-    found = hl.problems(root)
+    found = [str(f) for f in hl.problems(root)]
     assert len(found) == 1 and "form" in found[0] and "StealthOne" in found[0], found
 
 
@@ -144,7 +144,7 @@ def test_the_order_of_the_list_is_the_order_of_the_patch(tmp_path):
     root = series(tmp_path, pair(G1, G2))
     hl.write_all(root)
     commit_list(root, read_list(root)[::-1])
-    assert any("order" in p for p in hl.problems(root))
+    assert any("order" in p for p in map(str, hl.problems(root)))
 
 
 # --------------------------------------------------------------------------- the hand fields
@@ -182,7 +182,7 @@ def test_a_changed_hook_text_drops_its_hand_fields_and_asks_again(tmp_path):
     assert len([v for v in hl.missing_test_violations(root) if v.rule == "T1"]) == 1     # only the first hook lacks one
     set_patch(root, pair(G1, G2_CHANGED))
     assert [e["test"] for e in hl.expected(root, FOLDER)] == ["", ""]               # the hand field went with the old text
-    assert any(FOLDER in p and "StealthTwoB" in p for p in hl.problems(root))      # the list lacks the new text
+    assert any(FOLDER in p and "StealthTwoB" in p for p in map(str, hl.problems(root)))      # the list lacks the new text
     assert len([v for v in hl.missing_test_violations(root) if v.rule == "T1"]) == 2   # check asks for the test again
 
 
@@ -206,7 +206,7 @@ def test_a_gtest_reference_must_exist(tmp_path):
     entries = hl.expected(root, FOLDER)
     entries[0]["test"] = "gtest:FooSuite.Nope"
     commit_list(root, entries)
-    assert any("FooSuite.Nope" in p and "does not exist" in p and FOLDER in p for p in hl.problems(root))
+    assert any("FooSuite.Nope" in p and "does not resolve" in p and FOLDER in p for p in map(str, hl.problems(root)))
     entries[0]["test"] = "gtest:FooSuite.Does"
     commit_list(root, entries)
     assert hl.problems(root) == []
@@ -237,7 +237,7 @@ def test_a_node_reference_must_exist_with_its_title(tmp_path):
     entries = hl.expected(root, FOLDER)
     entries[0]["test"] = "node:juggler/tests/missing.test.mjs"
     commit_list(root, entries)
-    assert any("missing.test.mjs" in p and "does not exist" in p for p in hl.problems(root))
+    assert any("missing.test.mjs" in p and "does not resolve" in p for p in map(str, hl.problems(root)))
     entries[0]["test"] = "node:juggler/tests/x.test.mjs#hello world"
     commit_list(root, entries)
     assert hl.problems(root) == []
@@ -306,9 +306,9 @@ def test_a_rule_main_does_not_know_yet_may_enter_the_debt_once():
     t1, t1b, c2 = _viol("T1", "one();"), _viol("T1", "b();"), _viol("C2", "two();")
     e = hc.entry_of
     assert hc.debt_problems([t1, c2], [e(t1), e(c2)], [e(c2)]) == []                  # T1 is new on main's side: allowed
-    grown = hc.debt_problems([t1, c2], [e(t1), e(c2)], [e(t1)])                        # C2 is not exempt
+    grown = [str(x) for x in hc.debt_problems([t1, c2], [e(t1), e(c2)], [e(t1)])]                        # C2 is not exempt
     assert len(grown) == 1 and c2.key in grown[0]
-    more = hc.debt_problems([t1, t1b, c2], [e(t1), e(t1b), e(c2)], [e(t1), e(c2)])     # main has T1: it only shrinks
+    more = [str(x) for x in hc.debt_problems([t1, t1b, c2], [e(t1), e(t1b), e(c2)], [e(t1), e(c2)])]     # main has T1: it only shrinks
     assert len(more) == 1 and t1b.key in more[0]
 
 
@@ -326,12 +326,12 @@ def test_export_and_the_command_write_the_same_list(tmp_path, monkeypatch, capsy
 
 
 def test_check_reports_a_hook_lost_in_a_merge(monkeypatch):
-    assert not any("HOOKS.json" in p for p in engine.problems())
+    assert not any("HOOKS.json" in p for p in map(str, engine.problems()))
     victim = next(f for f in hl.folders(engine.ROOT) if len(hl.generated(engine.ROOT, f)) >= 2)
     real_load = hl.load
     monkeypatch.setattr(hl, "load", lambda root, folder: real_load(root, folder)[1:] if folder == victim else real_load(root, folder))
-    got = [p for p in engine.problems() if "HOOKS.json" in p]
-    assert len(got) == 1 and got[0].startswith(victim + "/HOOKS.json lacks the hook"), got
+    got = [str(p) for p in engine.problems() if "HOOKS.json" in str(p)]
+    assert len(got) == 1 and got[0].startswith("FAIL " + victim + "/HOOKS.json, ") and "lacks the hook" in got[0], got
 
 
 # --------------------------------------------------------------------------- the real series

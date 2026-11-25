@@ -149,7 +149,7 @@ def test_c16_is_in_the_contract_never_debt_and_not_left_out_by_an_exception(tmp_
     assert "C16" in hc.PORT06_RULES and "C16" in hc.RULES
     v = [x for x in hc.contract_violations(root) if x.rule == "C16"][0]
     assert hc.update_debt([], [v], init=True) == []
-    assert "never debt" in hc.debt_problems([v], [hc.entry_of(v)], None)[0]
+    assert "never debt" in str(hc.debt_problems([v], [hc.entry_of(v)], None)[0])
 
 
 def test_the_check_reads_the_base_when_it_is_given_a_source_and_a_tag(monkeypatch):

@@ -1,77 +1,39 @@
 """The hook contract of the series: what a hooks.patch may add to a Mozilla file, and the debt list.
 
-STRUCTURE (coord/portabilita-69/STRUCTURE.md, sections 3 and 4): a Mozilla file carries only
-hooks, each ONE line with the marker `// STEALTH-HOOK(<folder>)` on it and nothing else in the
-comment, in one of these forms:
-
-    guard             if (StealthX(this, aArg, &rv)) return rv;      first statement of a function
-    notice            StealthX(this, aArg);                          first statement of a function
-    wrap-expression   Mozilla's expression, unchanged, inside our call (one Mozilla line rewritten): the whole
-                      expression, or a sub-expression of the line, with our extra leading arguments (`this, `)
-                      G53: or a multi-line expression: one line of ours added to open our call (marker on it), Mozilla's lines
-                      in between unchanged, the closing line Mozilla's plus our `)` and the marker
-    wrap-call         G29: the one called identifier `Foo` of Mozilla's line becomes `StealthFoo`, same arguments;
-                      G9: or one argument of ours (a Stealth call) is added to a call of Mozilla's line
-    wrap-function     G1/G2: the signature or macro `Foo` renamed `Foo_Mozilla` (or by another suffix, `FooAsDrawn`),
-                      one line rewritten; the one-line declarations and the internal calls rewritten to the same new name
-                      G29/G9: or the called function replaced and exactly one plain argument of ours added (`this`, a member),
-                      or one plain argument added in front of the closing line of a call that spans lines
-    declared-value    one Mozilla line rewritten with our value (a pref default: a literal in place of a literal, or one
-                      STEALTH_ macro in place of one literal or one macro of Mozilla's)
-    registration      `#include "StealthX.h"` in a block of ours after Mozilla's, a moz.build
-                      `VAR += [...]` after the closing `]`, one line in .ipdl/.webidl/components.conf/jar.mn,
-                      G40: a forward declaration `class X;` or a file-scope declaration of a function of ours
-    member            one line in a Mozilla class, after an existing member
-    shadow            G21: `const auto GetX = StealthGetX;` at the top of a function (our value for a Mozilla name)
-    anchor            a call right after a named Mozilla statement, mid-function (last resort); G30/G33: it
-                      may be the last line of a block or of a JS module, with its `anchor` and `why` in HOOKS.json
-    unknown           anything else
+A Mozilla file carries only hooks: each ONE line with the marker `// STEALTH-HOOK(<folder>)` on it and nothing else in the
+comment, in one of the forms of FORMS_TABLE. Each rule the contract enforces is one entry of the RULES table below (its id, its
+text, its fix and the decision it belongs to); each G code that this file or tools/hooks_list.py prints or accepts is one entry of
+EXPLAIN. Nothing else restates them: docs/STRUCTURE.md and docs/decisions/hook-02-shape-and-contract.md carry them as generated
+sections, written by `python tools/engine.py docs --write` and compared by `python tools/engine.py docs --check`.
 
 Public API (stable: the HOOKS.json generator reads it):
 
     series_hooks(root)         -> list[Hook]        every added line / rewrite of every non-backport hooks.patch
     contract_violations(root)  -> list[Violation]   every rule the series breaks now, with a stable key
     analyse_patch(folder, text) -> (hooks, violations)   the same for one hooks.patch text
+    violation_failure(v)       -> Failure           the one message of a violation (where, what, fix, rule: tools/failure.py)
     load_debt(path) / write_debt(path, violations) / debt_problems(violations, debt, main_debt)
     debt_summary(entries)      -> text
+    docs_main(root, argv)      -> int               `engine.py docs --write | --check`
 
-Rules (the id is in the key; C12..C15 are port-06, C18 is port-07, below): C1 a hook of more than one line (two adjacent lines are two hooks when each is a complete statement or declaration
-with its own marker: C1 is a line of ours without a marker in a run, or one statement over several lines); C2 marker missing; C3 the marker
-comment carries more than the marker; C4 a comment line added; C5 logic in the hook (&&, ||,
-ternary, arithmetic); C6 Mozilla lines removed or changed outside the three rewriting forms;
-C7 a whole Mozilla file deleted or replaced; C8 an include of ours inside Mozilla's include block;
-C9 inside a Mozilla list or the last line of a block (an anchor there is G30/G33: not C9, T2 asks for
-its `anchor` and `why`); C10 the called function is not Stealth<What> and is not an existing function (G41: tools/hook-names.json, the
-called names of the hooks that existed when the rule came; a new function takes a Stealth name); C11 a value of ours in a numbered
-space (IDL const/enum); T1 a hook whose HOOKS.json entry has no `test`; T2 an anchor hook whose entry has
-no `anchor` and `why`; T3 a hook whose `test` no round runs (tools/hooks_list.py: the debt list holds
-every hook without a test until it has one).
+The key of a violation is rule|folder|file|function|sha1(normalized text)[:12]: no line number, so a hook that only moved keeps its
+key. Folders with a BACKPORT.json are exempt (upstream code). The anchor form is classified here and not refused: the HOOKS.json
+step requires its declaration.
 
-G35, declared exception: a HOOKS.json entry with the hand fields `exception` (the reason) and `pm:
-"approvato"` is a rewritten line no form can express; contract_violations leaves out every violation of
-such a hook (C1..C11, T1, T2, T3), and `check` counts them: "declared exceptions: N". The rules C12..C15 (port-06) are the
-opposite: they judge the exception itself, by its `reason_kind` (see the port-06 section below).
-Port-06 (docs/decisions/port-06-hooks-only-add.md): a hunk that removes Mozilla lines passes only as one of the rewriting forms
-(wrap-expression, wrap-call, wrap-function, declared-value, shadow) or as a declared exception with `reason_kind` expression,
-declaration, macro or skip. C12: neither. C13: a skip whose removed lines are not all kept verbatim among the added lines. C14: the
-rewrite fits wrap-expression (Mozilla's expression intact inside our line, or `||` `&&` `?:` added around it). C15: a parameter
-added to a C++ signature or call (an IDL one is a declaration). C12..C15 are never in the debt list and a declared exception does
-not leave them out.
-Forms the pm ruled in (coord/portabilita-69/design/PM-DECISIONS.md): G1/G2 renames, G15 guards with a
-value, G21 shadow, G29 call wrap, G30/G33 anchors at the end, G40 forward declarations. A multi-line Mozilla
-expression wrapped (two Mozilla lines, the marker on the first) stays a violation: the pm decides case by case.
-
-The key of a violation is rule|folder|file|function|sha1(normalized text)[:12]: no line number, so a
-hook that only moved keeps its key. Folders with a BACKPORT.json are exempt (upstream code).
-The anchor form is classified here and not refused: the HOOKS.json step requires its declaration.
+Two things about the rules that the table cannot say. A HOOKS.json entry with the hand fields `exception` and `pm: "approvato"` is
+a declared exception (G35): contract_violations leaves out every violation of such a hook (C1..C11, T1, T2, T3), and `check`
+counts them ("declared exceptions: N"); C12..C15 (port-06) are the opposite: they judge the exception itself, by its `reason_kind`.
+C12..C18 never enter the debt list, and a declared exception does not leave them out.
 """
 from __future__ import annotations
 
 import hashlib
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+
+from failure import Failure, fail
 
 HUNK_RE = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@ ?(.*)$")
 MARKER_RE = re.compile(r"STEALTH-HOOK\(([^)]*)\)")
@@ -79,29 +41,108 @@ REWRITE_FORMS = ("wrap-expression", "wrap-call", "wrap-function", "declared-valu
 REASON_KINDS = ("expression", "declaration", "macro", "skip")
 FORMS = ("guard", "notice", "wrap-expression", "wrap-call", "wrap-function", "declared-value", "registration",
          "member", "shadow", "anchor", "unknown")
-RULES = {
-    "C1": "a hook of more than one line",
-    "C2": "marker STEALTH-HOOK missing",
-    "C3": "the marker comment carries more than the marker",
-    "C4": "a comment line added",
-    "C5": "logic in the hook (&&, ||, ternary, arithmetic)",
-    "C6": "Mozilla lines removed or changed outside the three rewriting forms",
-    "C7": "a whole Mozilla file deleted or replaced",
-    "C8": "an include of ours inside Mozilla's include block",
-    "C9": "inside a Mozilla list or the last line of a block",
-    "C10": "the called function is not named Stealth<What> and is not an existing function (tools/hook-names.json)",
-    "C11": "a value of ours in a numbered space of Mozilla",
-    "C12": "a rewrite of Mozilla lines that is none of the rewriting forms and has no exception with an allowed reason_kind (port-06)",
-    "C13": "a `skip` rewrite whose removed Mozilla lines are not all kept verbatim among the added lines (port-06)",
-    "C14": "a rewrite that fits wrap-expression: Mozilla's expression survives intact in our line, or the change adds ||, && or ?: around it (port-06)",
-    "C15": "a parameter threaded through a C++ signature or call: carry it by side state, or declare it with reason_kind declaration and say why no side state can (port-06)",
-    "C16": "a hook passes a local of Mozilla's function as an argument outside an anchor (hook-02 point 3; read from the lines the hunks show)",
-    "C17": "a Stealth-named function in the top-level namespace of someone else (JS::, js::, xpc::, a library's): ours live in `mozilla` or the global namespace",
-    "C18": "a hook in the churn band of tools/churn.py with no reason why no quieter anchor serves, or whose hunk has no churn (port-07)",
-    "T1": "a hook with no test (the `test` of its HOOKS.json entry is empty)",
-    "T2": "an anchor hook without its `anchor` and `why` in HOOKS.json",
-    "T3": "a hook whose test no round runs (gtest filter of the candidate, node job, python step)",
-}
+
+# The decisions the rules belong to (the id of a file in docs/decisions/, without .md).
+D_HOOK02 = "hook-02-shape-and-contract"
+D_HOOK03 = "hook-03-budgets-and-debt-only-go-down"
+D_HOOK04 = "hook-04-one-test-per-hook"
+D_HOOK05 = "hook-05-no-values-in-mozilla-numbered-spaces"
+D_PORT06 = "port-06-hooks-only-add"
+D_PORT07 = "port-07-quiet-anchors"
+D_TABLES = "hook-02-shape-and-contract"     # the decision of the tables themselves (RULES, FORMS_TABLE, EXPLAIN) and of the generated sections
+
+_FORMS_LIST = ", ".join(REWRITE_FORMS)
+_KINDS_LIST = "/".join(REASON_KINDS)
+
+
+@dataclass(frozen=True)
+class Rule:
+    """One rule of the contract. `text` is the broken state in a few words; `fix` is the next step, a template (str.format) that
+    may use {folder}, {file} and {detail}; `decision` is the id of the decision it belongs to; `shows` is the template of the
+    sentence that names the detail of one violation (the called function of C10, the test of T3), if it has one."""
+    id: str
+    text: str
+    fix: str
+    decision: str
+    shows: str = ""
+
+
+def _rules(*rows: Rule) -> dict:
+    return {r.id: r for r in rows}
+
+
+RULES = _rules(
+    Rule("C1", "a hook is more than one line (a run of added lines where a line has no marker of its own, or one statement over several lines)",
+         "write the hook as one line with its own marker `STEALTH-HOOK({folder})`, or move the code into a function of ours in {folder}/src and call it from one line",
+         D_HOOK02, "the run has {detail}"),
+    Rule("C2", "the marker STEALTH-HOOK(<folder>) is missing on the hook line",
+         "add the marker `STEALTH-HOOK({folder})` on the same line, in the file's comment syntax, with nothing else in the comment",
+         D_HOOK02),
+    Rule("C3", "the marker comment carries more than the marker",
+         "delete the extra text from the comment: it holds `STEALTH-HOOK({folder})` and nothing else",
+         D_HOOK02, "the comment also says `{detail}`"),
+    Rule("C4", "a comment line is added to a Mozilla file besides the marker",
+         "delete the comment line; the explanation goes in our own file, in FEATURE.md or in HOOKS.json",
+         D_HOOK02),
+    Rule("C5", "the hook has logic (&&, ||, a ternary or arithmetic)",
+         "move the condition into the function of ours that the hook calls; the hook keeps the call and, in a guard, the return",
+         D_HOOK02),
+    Rule("C6", "Mozilla lines are removed or changed, and the change is none of the rewriting forms (%s)" % _FORMS_LIST,
+         "keep Mozilla's lines as Mozilla wrote them and add our one line beside them, or write the change as one of the forms (%s: "
+         "docs/STRUCTURE.md, hook forms); Mozilla code that must not run stays in the tree behind a guard at its only entry" % _FORMS_LIST,
+         D_HOOK02, "the hunk has {detail}"),
+    Rule("C7", "a whole Mozilla file is deleted or replaced",
+         "restore the Mozilla file and make its code unreachable by a guard at its only entry, proven by a test",
+         D_HOOK02, "the file is {detail}"),
+    Rule("C8", "an include of ours is inside Mozilla's include block",
+         "move `#include \"Stealth...h\"` to a block of ours after Mozilla's block, with a blank line between them",
+         D_HOOK02),
+    Rule("C9", "the hook is inside a Mozilla list or on the last line of a block",
+         "move the hook one line up, so one untouched Mozilla line stays between our line and what Mozilla appends at each release; "
+         "an anchor on the last statement of a block or of a JS module declares `anchor` and `why` in HOOKS.json (G30, G33)",
+         D_HOOK02, "its place is {detail}"),
+    Rule("C10", "the called function is not named Stealth<What> and is not an existing function (G41: tools/hook-names.json)",
+         "rename `{detail}` to Stealth<What> and define it in a file of ours in {folder}; tools/hook-names.json is closed: a new "
+         "function takes a Stealth name and never joins the list",
+         D_HOOK02, "it calls `{detail}`"),
+    Rule("C11", "a value of ours is in a numbered space of Mozilla (an IDL const or enum)",
+         "take the number out of Mozilla's IDL: our constants live in our own files, outside the numbered spaces Mozilla owns",
+         D_HOOK05),
+    Rule("C12", "a rewrite of Mozilla lines is none of the rewriting forms and has no declared exception with an allowed reason_kind",
+         "write it as one of the forms (%s), or declare it in HOOKS.json (`exception`, `reason_kind` in %s, `pm`)" % (_FORMS_LIST, _KINDS_LIST),
+         D_PORT06),
+    Rule("C13", "a `skip` rewrite whose removed Mozilla lines are not all kept verbatim among the added lines",
+         "keep each removed Mozilla line verbatim among the added lines, inside our guard",
+         D_PORT06),
+    Rule("C14", "a rewrite fits wrap-expression: Mozilla's expression survives intact in our line, or the change adds ||, && or ?: around it",
+         "write it as a wrap-expression: Mozilla's expression unchanged inside our call (extra leading arguments and our call go around it)",
+         D_PORT06),
+    Rule("C15", "a parameter is threaded through a C++ signature or call",
+         "carry it by our own state set by a guard at the entry (a thread-local, or a member of our side object); otherwise declare "
+         "it with reason_kind declaration and an exception that says why no side state can carry it",
+         D_PORT06),
+    Rule("C16", "a hook passes a local of Mozilla's function as an argument outside an anchor (read from the lines the hunks show, or with --against from the whole function)",
+         "pass `this`, a parameter of the function or the wrapped expression instead of the local, or make the hook an anchor (`anchor` and `why` in HOOKS.json)",
+         D_HOOK02, "it passes a local of Mozilla's function (at {detail})"),
+    Rule("C17", "a Stealth-named function sits in the top-level namespace of someone else (JS::, js::, xpc::, a library's): ours live in `mozilla` or the global namespace",
+         "define the function in `mozilla` (or a namespace nested in it, or as a member of a class of ours) and call it as `mozilla::StealthFoo(` or `StealthFoo(`; "
+         "a rewrite may replace Mozilla's `JS::Foo(` by `mozilla::StealthFoo(` (G29)",
+         D_HOOK02, "{detail}"),
+    Rule("C18", "a hook sits in the churn band of tools/churn.py with no reason why no quieter anchor serves, or its hunk has no churn",
+         "move the hook to a quieter anchor, or name why none serves in the `quiet_anchor_why` of its HOOKS.json entry, or run "
+         "`python tools/churn.py --source <repo with the tags> --write` and commit tools/churn.json",
+         D_PORT07),
+    Rule("T1", "a hook has no test (the `test` of its HOOKS.json entry is empty)",
+         "write the test, with a negative control, and name it in the `test` field of the HOOKS.json entry of this hook (grammar: docs/STRUCTURE.md, test references)",
+         D_HOOK04),
+    Rule("T2", "an anchor hook has no `anchor` and `why` in HOOKS.json",
+         "fill `anchor` (the Mozilla statement the hook follows) and `why` (why a guard, a wrap-function and a wrap-expression are not enough) in its HOOKS.json entry",
+         D_HOOK04),
+    Rule("T3", "a hook names a test that no round runs (the gtest filter of the candidate, a node job, a python step, a cargo step)",
+         "make a round run `{detail}` (the default of `gtest_filter` in the candidate workflow, a `node --test` line, a workflow step that runs the python file, "
+         "a `cargo test` step), or name a test that a round already runs",
+         D_HOOK04, "it names the test `{detail}`"),
+)
 # Rules added after main's debt list was written: main's list has no entry of them yet, so the entries
 # they add to the list are not "entries main does not have" (tools/hooks_list.py; remove this once main has them).
 INTRODUCED_RULES = {"T1", "T2", "T3"}
@@ -109,8 +150,55 @@ INTRODUCED_RULES = {"T1", "T2", "T3"}
 PORT06_RULES = ("C12", "C13", "C14", "C15", "C16", "C17")      # C16 and C17 are hook-02 rules: fixed by the hook, never by the debt
 PORT07_RULES = ("C18",)         # port-07: fixed by moving the hook or by its reason in HOOKS.json, never by the debt
 NEVER_DEBT_RULES = PORT06_RULES + PORT07_RULES
-PORT07_DECISION = "docs/decisions/port-07-quiet-anchors.md"
 QUIET_KINDS = ("only-place", "deferred")        # the two forms of the HOOKS.json hand field `quiet_anchor_why`
+
+# The forms of a hook line, in the order of STRUCTURE.md: (form, where, looks like). The one table of the forms.
+FORMS_TABLE = (
+    ("guard", "First statement of a function", "`if (StealthX(this, aArg, &rv)) return rv;`; with a value to return (G15) the guard returns it"),
+    ("notice", "First statement of a function", "`StealthX(this, aArg);`"),
+    ("wrap-expression", "The line where the value is born",
+     "Mozilla's expression, unchanged, inside our call (the whole expression, or a sub-expression of the line, with our extra leading "
+     "arguments such as `this, `): `return StealthX(<expression>);`; over several lines (G53) one line of ours opens the call with the "
+     "marker on it, Mozilla's lines between stay unchanged, and the closing line is Mozilla's plus our `)` and the marker"),
+    ("wrap-function", "The signature line",
+     "Mozilla's `Foo` becomes `Foo_Mozilla` (G1) or another suffix such as `FooAsDrawn`; our `Foo` calls it and treats the result, and the "
+     "one-line declarations and the internal calls take the same new name (G2); or the called function is replaced and exactly one "
+     "plain argument of ours is added (G29, G9)"),
+    ("wrap-call", "The line of a call",
+     "The called identifier `Foo` becomes `StealthFoo`, same arguments (G29); or one argument of ours, a Stealth call, is added to a "
+     "call of Mozilla's line (G9)"),
+    ("declared-value", "The line that gives a default",
+     "The value on Mozilla's line is replaced: a literal in place of a literal, or one STEALTH_ macro in place of one literal or one macro of Mozilla's"),
+    ("registration", "Includes, build files, declarative files",
+     "`#include \"StealthX.h\"` in a block of ours after Mozilla's; `VAR += [\"StealthX.cpp\"]` after the closing `]` of a `moz.build`; one "
+     "line in `.ipdl`, `.webidl`, `components.conf`, `jar.mn`; a forward declaration `class X;` or a file-scope declaration of a function of ours (G40)"),
+    ("member", "A Mozilla class", "One declaration after an existing member, never the last in the block"),
+    ("shadow", "Top of a function", "`const auto GetX = StealthGetX;` (G21: our value under a Mozilla name)"),
+    ("anchor", "Right after a named Mozilla statement, mid-function (last resort)",
+     "`StealthX(this, &locale);` or `if (StealthX(this)) return rv;`; as the last line of a block or of a JS module (G30, G33) it "
+     "carries its `anchor` and `why` in HOOKS.json"),
+)
+
+# What each G code means, in words. A G code is a case that the code accepts or prints; the code itself is all the
+# repository says of it, so every G code that tools/hook_contract.py or tools/hooks_list.py names is explained here and nowhere else.
+EXPLAIN = {
+    "G1": "A function signature or a macro of Mozilla's is renamed on one line, `Foo` to `Foo_Mozilla` or to another suffix (wrap-function).",
+    "G2": "The one-line declarations and the internal calls of a renamed `Foo` are rewritten to the same new name as part of the same wrap.",
+    "G9": "One plain argument of ours, a Stealth call, is added to a call on Mozilla's line (wrap-call, wrap-function).",
+    "G15": "A guard with a value: `if (StealthX(this, aArg, &rv)) return rv;`, the guard returns the value our function computed.",
+    "G20": "A test must also be run by a round: the candidate workflow's gtest filter, a node job, a python step or a cargo step runs it (rule T3).",
+    "G21": "A shadow: `const auto GetX = StealthGetX;` at the top of a function gives Mozilla's name our value.",
+    "G23": "An anchor on the last statement of a block, declared with its `anchor` and `why`, is not a C9.",
+    "G29": "A call wrap: the called identifier `Foo` of Mozilla's line becomes `StealthFoo` with the same arguments; the qualifier may change only when the new last component is Stealth-named.",
+    "G30": "An anchor may be the last line of a block; it carries its `anchor` and `why` in HOOKS.json (rule T2).",
+    "G33": "An anchor may be the last line of a JS module; it carries its `anchor` and `why` in HOOKS.json (rule T2).",
+    "G35": "A declared exception: a HOOKS.json entry with the hand fields `exception` (the reason) and `pm: \"approvato\"` is a rewritten line no form can express; its violations of C1..C11, T1, T2 and T3 are left out and counted.",
+    "G40": "A forward declaration `class X;` or a file-scope declaration of a function of ours is a registration.",
+    "G41": "tools/hook-names.json lists the functions that existed when rule C10 came; a hook may call them without the Stealth prefix, and a new function takes a Stealth name.",
+    "G50": "In a preprocessed pref file or a JSON file, where a trailing comment is impossible, a marker comment alone on the line before a directive is the marker of the directive: one hook.",
+    "G53": "A wrap-expression over several lines: one line of ours opens the call (marker on it), Mozilla's lines between stay unchanged, the closing line is Mozilla's plus our `)` and the marker.",
+}
+
 
 HASH_COMMENT = {"py", "yaml", "yml", "toml", "build", "configure", "sh", "txt", "in", "ini",
                 "cfg", "cmake", "gitignore", "mk", "conf", "lock"}
@@ -175,8 +263,37 @@ class Violation:
     function: str
     text: str
     key: str
-    detail: str = ""
+    detail: str = ""       # the fact the rule names (the called function of C10, the test of T3), not a sentence
     ids: tuple = ()        # the identity (hook_identity) of every hook the violation concerns: a declared exception looks here
+    failure: Failure | None = field(default=None, compare=False)    # the message, when the rule that judged it built it whole (C12..C15, C18)
+
+
+# --------------------------------------------------------------------------- the messages (repo-04)
+def hook_where(folder: str, file: str, function: str = "") -> str:
+    """Where a hook is: the folder's hooks.patch, the Mozilla file and the host function."""
+    return "%s/hooks.patch, %s%s" % (folder, file, ", " + _squeeze(function) if function and function.strip() else "")
+
+
+def rule_failure(rule_id: str, where: str, what: str, fix: str) -> Failure:
+    """A failure of the rule `rule_id` of RULES: its decision is the rule's own (data, so it is built by Failure, which refuses a
+    decision with no file; tools/tests/test_failure_messages.py reads only a literal in a call of fail())."""
+    return Failure(where, what, fix, RULES[rule_id].decision)
+
+
+def rule_fix(rule_id: str, folder: str = "<folder>", file: str = "<file>", detail: str = "") -> str:
+    """The fix template of a rule, filled in."""
+    return RULES[rule_id].fix.format(folder=folder, file=file, detail=detail)
+
+
+def violation_failure(v: Violation) -> Failure:
+    """The one message of a violation: where the hook is, what is broken (the rule's text, the fact it names, the hook line whole),
+    the fix of the rule, the decision the rule belongs to. A violation whose rule built its message whole (C12..C15, C18) carries it."""
+    if v.failure is not None:
+        return v.failure
+    rule = RULES[v.rule]
+    named = ("; " + rule.shows.format(detail=v.detail)) if rule.shows and v.detail else (("; " + v.detail) if v.detail else "")
+    what = "%s: %s%s; the hook is `%s`" % (v.rule, rule.text, named, _squeeze(v.text))
+    return rule_failure(v.rule, hook_where(v.folder, v.file, v.function), what, rule_fix(v.rule, v.folder, v.file, v.detail))
 
 
 # --------------------------------------------------------------------------- reading a hooks.patch
@@ -998,9 +1115,10 @@ def _analyse_patch(folder: str, text: str):
     """-> (hooks, violations, rewrites): the same, and every block that removes Mozilla lines (port-06)."""
     hooks, found, rewrites = [], [], []
 
-    def violate(rule, file, function, txt, detail="", hs=()):
-        found.append(Violation(rule, folder, file, function, txt, _key(rule, folder, file, function, txt), detail,
-                               tuple(hook_identity(h) for h in hs)))
+    def violate(rule, file, function, txt, *, hooks=(), fact=""):
+        """`fact` is data (a count, a name, a place); the message is violation_failure's, built from RULES."""
+        found.append(Violation(rule, folder, file, function, txt, _key(rule, folder, file, function, txt), fact,
+                               tuple(hook_identity(h) for h in hooks)))
 
     parsed = parse_patch(text)
     renames = _renames(parsed)
@@ -1010,7 +1128,7 @@ def _analyse_patch(folder: str, text: str):
         whole = _whole_file(f)
         if whole:
             hooks.append(Hook(folder, path, "", "unknown", "", "<%s file>" % whole, "file", "unknown"))
-            violate("C7", path, "", "<%s>" % whole, whole, hooks[-1:])
+            violate("C7", path, "", "<%s>" % whole, hooks=hooks[-1:], fact=whole)
             continue
         file_blocks = [_blocks(h["lines"]) for h in f["hunks"]]
         file_roles = _wrap_roles(ft, file_blocks)
@@ -1035,7 +1153,7 @@ def _analyse_patch(folder: str, text: str):
                 if kind == "delete":
                     hooks.append(Hook(folder, path, section, "unknown", "", "\n".join(rem), "delete", placement, 0, 0, None, hno))
                     violate("C6", path, section, "-" + "\n-".join(x.strip() for x in rem),
-                            "%d Mozilla lines removed" % len(rem), hooks[-1:])
+                            hooks=hooks[-1:], fact="%d Mozilla lines removed" % len(rem))
                     rewrites.append(Rewrite(folder, path, hno, section, tuple(rem), (), tuple(x for t, x in lines if t == "+"),
                                             False, tuple(hooks[-1:])))
                     continue
@@ -1069,32 +1187,32 @@ def _analyse_patch(folder: str, text: str):
                         run_hooks.append(hk)
                         block_hooks.append(hk)
                         if mk is not None and extra:
-                            violate("C3", path, section, x, extra, [hk])
+                            violate("C3", path, section, x, hooks=[hk], fact=extra)
                         if is_comment_line(x, ft):
-                            violate("C4", path, section, x, "", [hk])
+                            violate("C4", path, section, x, hooks=[hk])
                         if ft in IDL and NUMBERED.search(x) and not is_comment_line(x, ft) and not (
                                 ft == "webidl" and not CONST_LINE.match(x)):   # a dictionary member's default is no numbered space
-                            violate("C11", path, section, x, "", [hk])
+                            violate("C11", path, section, x, hooks=[hk])
                         if kind == "add" and is_include(code):
                             at = b["ns"] + i
                             before = new_side[at - 1] if at >= 1 else None
                             after = new_side[at + 1] if at + 1 < len(new_side) else None
                             if (before and before[0] == " " and is_include(before[1])) or                                (after and after[0] == " " and is_include(after[1])):
-                                violate("C8", path, section, x, "", [hk])
+                                violate("C8", path, section, x, hooks=[hk])
                     forms += [f_ for f_, _ in run_forms]
                     if len(run) > 1 and not multi_ok:
-                        violate("C1", path, section, run_text, "%d lines" % len(run), run_hooks)
+                        violate("C1", path, section, run_text, hooks=run_hooks, fact="%d lines" % len(run))
                     if not any(mk is not None for _, mk, _ in codes) and not all(is_include(c) for c, _, _ in codes):
-                        violate("C2", path, section, run_text, "", run_hooks)
+                        violate("C2", path, section, run_text, hooks=run_hooks)
                     for (form, remainder), hk, (_, x) in zip(run_forms, run_hooks, run) if multi_ok else ():
                         if (form in ("guard", "notice", "anchor", "wrap-expression", "declared-value")
                                 or (form == "unknown" and any(is_stealth_chain(c) for c in calls(remainder))))                                 and has_logic(remainder, ft):
-                            violate("C5", path, section, x, "", [hk])
+                            violate("C5", path, section, x, hooks=[hk])
                         if form in ("guard", "notice", "anchor", "wrap-expression"):
                             # C10 is about the function of ours a hook calls: Mozilla's own macros and APIs are not read as it
                             cs = [c for c in calls(remainder) if c not in MOZILLA_CALLS]
                             if cs and not is_stealth_chain(cs[0]) and not is_known_name(cs[0]):
-                                violate("C10", path, section, x, cs[0], [hk])
+                                violate("C10", path, section, x, hooks=[hk], fact=cs[0])
                 add_text = "\n".join(x for _, x in nonblank)
                 if rem:
                     is_form = bool(single_pair and forms and forms[0] in REWRITE_FORMS)
@@ -1102,7 +1220,7 @@ def _analyse_patch(folder: str, text: str):
                                             tuple(x for t, x in lines if t == "+"), is_form, tuple(block_hooks)))
                     if not is_form:
                         violate("C6", path, section, "-" + "\n-".join(x.strip() for x in rem) + "\n" + add_text,
-                                "%d Mozilla lines removed, %d added" % (len(rem), len(nonblank)), block_hooks)
+                                hooks=block_hooks, fact="%d Mozilla lines removed, %d added" % (len(rem), len(nonblank)))
                 elif nonblank:
                     all_inc = all(is_include(marker_split(x)[0]) for _, x in nonblank)
                     # G30/G33: an anchor on the last line of a block or of a JS module is allowed (T2 asks for its why)
@@ -1110,7 +1228,7 @@ def _analyse_patch(folder: str, text: str):
                     if not role and not all_inc and not end_anchor and not all(f_ == "wrap-function" for f_ in forms) and (
                             placement in ("list_entry", "end_of_block")
                             or (at_end and placement not in ("include_block", "build_file"))):
-                        violate("C9", path, section, add_text, "placement=%s at_block_end=%s" % (placement, at_end), block_hooks)
+                        violate("C9", path, section, add_text, hooks=block_hooks, fact="placement=%s at_block_end=%s" % (placement, at_end))
     return hooks, _unique(found), rewrites
 
 
@@ -1120,7 +1238,8 @@ def _unique(found: list) -> list:
     for v in found:
         n = seen.get(v.key, 0) + 1
         seen[v.key] = n
-        out.append(v if n == 1 else Violation(v.rule, v.folder, v.file, v.function, v.text, "%s#%d" % (v.key, n), v.detail, v.ids))
+        out.append(v if n == 1 else Violation(v.rule, v.folder, v.file, v.function, v.text, "%s#%d" % (v.key, n), v.detail, v.ids,
+                                              v.failure))
     return out
 
 
@@ -1245,29 +1364,35 @@ def _own_line_kept(r: Rewrite) -> bool:
     return bool(real) and all(norm(x) in kept for x in real)
 
 
-def rule_c12(r: Rewrite, entry, problem: str = ""):
-    """C12: the rewrite is none of the forms and no declared exception with an allowed reason_kind covers it. -> detail or None."""
+def _rewrite_failure(r: Rewrite, rule_id: str, what: str, fix: str | None = None) -> Failure:
+    """The message of a port-06 rule about one rewrite: the hook's place, the rule's id before what is broken."""
+    return rule_failure(rule_id, hook_where(r.folder, r.file, r.function), "%s: %s" % (rule_id, what),
+                        fix if fix is not None else rule_fix(rule_id, r.folder, r.file))
+
+
+def rule_c12(r: Rewrite, entry, problem: Failure | None = None):
+    """C12: the rewrite is none of the forms and no declared exception with an allowed reason_kind covers it. -> Failure or None."""
     if r.is_form or entry is not None:
         return None
-    return problem or ("a rewrite of Mozilla lines with no exception: write it as one of the forms, or declare it in HOOKS.json "
-                       "(`exception`, `reason_kind` in %s, `pm`)" % "/".join(REASON_KINDS))
+    return problem or _rewrite_failure(r, "C12", "the rewrite of the Mozilla lines `%s` is none of the forms and has no declared exception"
+                                       % _squeeze(" ".join(r.rem)))
 
 
 def rule_c13(r: Rewrite, entry):
-    """C13: a `skip` keeps every removed Mozilla line verbatim (whitespace aside) among the lines of its hunk. -> detail or None."""
+    """C13: a `skip` keeps every removed Mozilla line verbatim (whitespace aside) among the lines of its hunk. -> Failure or None."""
     if r.is_form or entry is None or entry.get("reason_kind") != "skip":
         return None
     kept = _verbatim_lines(r)
     lost = [x.strip() for x in r.rem if x.strip() and norm(x) not in kept]
     if lost:
-        return "skip: the Mozilla line `%s` is not kept verbatim among the added lines: keep it, inside our guard" % _squeeze(lost[0])[:100]
+        return _rewrite_failure(r, "C13", "the `skip` does not keep the Mozilla line `%s` verbatim among the added lines" % _squeeze(lost[0]))
     return None
 
 
 def rule_c14(r: Rewrite, entry):
     """C14: the rewrite fits wrap-expression: (i) Mozilla's expression survives intact inside one of our lines, so it is a wrap
     and is declared as one; (ii) the change adds `||`, `&&` or `?:` around Mozilla's expression. A skip is neither (it keeps
-    Mozilla's text as whole lines, not evaluated), and a preprocessor line cannot be wrapped. -> detail or None."""
+    Mozilla's text as whole lines, not evaluated), and a preprocessor line cannot be wrapped. -> Failure or None."""
     if (r.is_form or (entry or {}).get("reason_kind") == "skip" or not r.add or _preprocessor_only(r.rem)
             or file_type_of(r.file) in IDL):         # `Foo?` and `[A, B]` of an IDL are not expressions
         return None
@@ -1278,25 +1403,25 @@ def rule_c14(r: Rewrite, entry):
     # the lines of the block read as one: the recogniser of the one-line forms, on a block that spans several lines
     form, _ = line_form(file_type_of(r.file), r.file.rsplit("/", 1)[-1], " ".join(_code_of(x).strip() for x in r.add),
                         " ".join(x.strip() for x in r.rem), "rewrite", "mid_function", True)
+    def survives(kind):
+        return "(i) Mozilla's expression `%s` survives intact inside our line, so the rewrite is a %s" % (_squeeze(" ".join(r.rem)), kind)
     if form in ("wrap-expression", "wrap-call") and not _own_line_kept(r):
-        return ("(i) Mozilla's expression `%s` survives intact inside our line: it is a %s, declare it as one (the "
-                "extra leading arguments and our call go around it)" % (_squeeze(" ".join(r.rem))[:90], form))
+        return _rewrite_failure(r, "C14", survives(form))
     k = _find_run(sig, add_t)
     if k >= 0 and not _own_line_kept(r) and calls(" ".join(add_t[:k] + add_t[k + len(sig):])):
-        return ("(i) Mozilla's expression `%s` survives intact inside our line: it is a wrap-expression, declare it as one (the "
-                "extra leading arguments and our call go around it)" % _squeeze(" ".join(r.rem))[:90])
+        return _rewrite_failure(r, "C14", survives("wrap-expression"))
     ins = _insertions(sig, add_t)
     if ins is not None:
         ops = sorted({o for prev, seg, nxt in ins if not _depth0_comma(seg) for o in _logic_ops(seg, prev, nxt)})
         if ops:
-            return ("(ii) the change adds `%s` around Mozilla's expression: wrap-expression fits, our call decides inside the "
-                    "expression" % "`, `".join(ops))
+            return _rewrite_failure(r, "C14", "(ii) the change adds `%s` around Mozilla's expression, which is a wrap-expression: our call "
+                                    "decides inside the expression" % "`, `".join(ops))
     return None
 
 
 def rule_c15(r: Rewrite, entry):
     """C15: (iii) a parameter added to a C++ signature or call that is not IDL, IPDL or WebIDL: parameter threading. It is
-    refused unless reason_kind is `declaration` and the exception names why no side state can carry it. -> detail or None."""
+    refused unless reason_kind is `declaration` and the exception names why no side state can carry it. -> Failure or None."""
     if r.is_form or (entry or {}).get("reason_kind") == "skip" or not r.add or _preprocessor_only(r.rem):
         return None
     if file_type_of(r.file) not in C_FAMILY:
@@ -1312,28 +1437,30 @@ def rule_c15(r: Rewrite, entry):
         return None
     if (entry or {}).get("reason_kind") == "declaration" and SIDE_STATE.search(entry.get("exception", "")):
         return None
-    return ("(iii) a parameter is added to a C++ signature or call: carry it by our own state set by a guard at the entry "
-            "(a thread-local, or a member of our side object); otherwise declare it with reason_kind declaration and an "
-            "exception that says why no side state can carry it")
+    return _rewrite_failure(r, "C15", "(iii) a parameter is added to a C++ signature or call: `%s` becomes `%s`"
+                            % (_squeeze(" ".join(r.rem)), _squeeze(" ".join(r.add))))
 
 
 def _exception_of(r: Rewrite, by_identity: dict):
-    """-> (entry or None, problem): the declared exception of the hooks of the block with an allowed reason_kind."""
+    """-> (entry or None, problem): the declared exception of the hooks of the block with an allowed reason_kind; the problem
+    is a Failure (C12) when the exception names none, or one that does not fit the lines, else None."""
     declared = []
     for hk in r.hooks:
         for e in by_identity.get(hook_identity(hk), ()):
             if _is_exception_entry(e):
                 declared.append(e)
     if not declared:
-        return None, ""
+        return None, None
     for e in declared:
         if e.get("reason_kind") in REASON_KINDS:
             if e["reason_kind"] == "macro" and not (_preprocessor_only(r.rem) or any(x.rstrip().endswith("\\") for x in r.rem)):
-                return None, ("reason_kind macro, but no removed line is a preprocessor line or a macro line: a value inside an "
-                              "expression is `expression`")
-            return e, ""
-    return None, ("the exception has no `reason_kind`, or not one of %s (got %r)"
-                  % ("/".join(REASON_KINDS), declared[0].get("reason_kind")))
+                return None, _rewrite_failure(r, "C12", "the exception says reason_kind macro, but no removed line is a preprocessor line "
+                                              "or a macro line", "change the `reason_kind` of its HOOKS.json entry: a value inside an "
+                                              "expression is `expression`")
+            return e, None
+    return None, _rewrite_failure(r, "C12", "the exception has no `reason_kind`, or not one of %s (got %r)"
+                                  % (_KINDS_LIST, declared[0].get("reason_kind")),
+                                  "set `reason_kind` in its HOOKS.json entry to one of %s" % _KINDS_LIST)
 
 
 def analyse_rewrites(folder: str, text: str, entries=()) -> list:
@@ -1350,11 +1477,11 @@ def analyse_rewrites(folder: str, text: str, entries=()) -> list:
             continue
         entry, problem = _exception_of(r, by_identity)
         txt = "-" + "\n-".join(x.strip() for x in r.rem) + "\n" + "\n".join(x for x in r.add)
-        for rule, detail in (("C12", rule_c12(r, entry, problem)), ("C13", rule_c13(r, entry)),
-                             ("C14", rule_c14(r, entry)), ("C15", rule_c15(r, entry))):
-            if detail:
-                found.append(Violation(rule, folder, r.file, r.function, txt, _key(rule, folder, r.file, r.function, txt), detail,
-                                       tuple(hook_identity(h) for h in r.hooks)))
+        for rule, why in (("C12", rule_c12(r, entry, problem)), ("C13", rule_c13(r, entry)),
+                          ("C14", rule_c14(r, entry)), ("C15", rule_c15(r, entry))):
+            if why:
+                found.append(Violation(rule, folder, r.file, r.function, txt, _key(rule, folder, r.file, r.function, txt), why.what,
+                                       tuple(hook_identity(h) for h in r.hooks), why))
     return _unique(found)
 
 
@@ -1651,8 +1778,7 @@ def analyse_namespaces(folder: str, text: str, own=None) -> list:
         for m in QUALIFIED_STEALTH.finditer(code):
             first = m.group(1).split("::")[0]
             if not _our_qualifier_ok(first):
-                why = ("%s%s is in the namespace %s, which is not ours: `mozilla` (or a namespace nested in it), a class, or the "
-                       "global namespace" % (m.group(1), m.group(2), first))
+                why = "%s%s is in the namespace %s" % (m.group(1), m.group(2), first)
                 break
         if not why and own:
             for m in UNQUALIFIED_STEALTH.finditer(code):
@@ -1660,7 +1786,7 @@ def analyse_namespaces(folder: str, text: str, own=None) -> list:
                     continue
                 bad = sorted(n for n in own.get(m.group(1), ()) if n and n != "mozilla")
                 if bad:
-                    why = "%s is declared in our sources inside the namespace %s, which is not ours" % (m.group(1), bad[0])
+                    why = "%s is declared in our sources inside the namespace %s" % (m.group(1), bad[0])
                     break
         if why:
             txt = h.line.strip()
@@ -1687,25 +1813,39 @@ def namespace_violations(root, unqualified: bool = False) -> list:
 # `deferred` holds only while tools/churn.json is for the tag the series is on (UPSTREAM.json `mozilla_tag`): the next port makes every
 # one of them red until the hook is moved or given an `only-place` reason. A hook whose hunk is not in tools/churn.json (a new hook, a
 # hook that moved or changed) is red: python tools/churn.py --write. Offline: only tools/churn.json and UPSTREAM.json are read. Never debt.
-def quiet_anchor_problem(value) -> str:
-    """Why a `quiet_anchor_why` is not one of the two forms ('' when it is)."""
+def _quiet_failure(where: str, about: str, what: str, fix: str) -> Failure:
+    return fail(where, "C18: %s: the `quiet_anchor_why` is wrong: %s" % (about, what), fix, D_PORT07)
+
+
+def quiet_anchor_problem(value, where: str, about: str) -> Failure | None:
+    """Why a `quiet_anchor_why` is not one of the two forms (None when it is); `where` is the hook's place, `about` names the hook."""
+    forms = "{kind: only-place, why: <words>} or {kind: deferred, quieter: <mozilla file>:<anchor text>}"
     if not isinstance(value, dict):
-        return "it is not an object: write {kind: only-place, why: <words>} or {kind: deferred, quieter: <mozilla file>:<anchor text>}"
+        return _quiet_failure(where, about, "it is not an object", "write %s" % forms)
     kind = value.get("kind")
     if kind not in QUIET_KINDS:
-        return "its kind %r is not one of %s" % (kind, "/".join(QUIET_KINDS))
-    field = "why" if kind == "only-place" else "quieter"
-    extra = sorted(set(value) - {"kind", field})
+        return _quiet_failure(where, about, "its kind %r is not one of %s" % (kind, "/".join(QUIET_KINDS)),
+                              "set `kind` to one of %s: %s" % ("/".join(QUIET_KINDS), forms))
+    field_name = "why" if kind == "only-place" else "quieter"
+    extra = sorted(set(value) - {"kind", field_name})
     if extra:
-        return "a %s has the keys kind and %s, not %s" % (kind, field, "/".join(extra))
-    text = value.get(field)
+        return _quiet_failure(where, about, "a %s has the keys kind and %s, not %s" % (kind, field_name, "/".join(extra)),
+                              "delete %s: keep `kind` and `%s`" % ("/".join(extra), field_name))
+    text = value.get(field_name)
     if not (isinstance(text, str) and text.strip()):
-        return "a %s has a non-empty `%s`" % (kind, field)
+        return _quiet_failure(where, about, "a %s has no non-empty `%s`" % (kind, field_name), "write the `%s` in words" % field_name)
     if kind == "deferred":
-        where, sep, anchor = text.partition(":")
-        if not (sep and where.strip() and anchor.strip() and not re.search(r"\s", where.strip())):
-            return "`quieter` is <mozilla file>:<anchor text>, the file with no space and the text of the quieter anchor after the colon"
-    return ""
+        file_part, sep, anchor = text.partition(":")
+        if not (sep and file_part.strip() and anchor.strip() and not re.search(r"\s", file_part.strip())):
+            return _quiet_failure(where, about, "`quieter` is %r, not <mozilla file>:<anchor text>" % text,
+                                  "write the file with no space, a colon, then the text of the quieter anchor")
+    return None
+
+
+def _c18(folder: str, h: Hook, text: str, why: Failure) -> Violation:
+    """The violation of rule C18 for hook `h`, carrying the message `why` (built by the rule that judged it)."""
+    return Violation("C18", folder, h.file, h.function, text, _key("C18", folder, h.file, h.function, text), why.what,
+                     (hook_identity(h),), why)
 
 
 def churn_violations(root) -> list:
@@ -1717,59 +1857,62 @@ def churn_violations(root) -> list:
     problem, data = "", None
     try:
         data = json.loads((root / "tools" / "churn.json").read_text(encoding="utf-8"))
-        if not isinstance(data.get("hooks"), list):
-            raise ValueError("no list of hooks")
     except OSError:
         problem = "tools/churn.json is missing"
     except ValueError as exc:
         problem = "tools/churn.json is not what tools/churn.py writes (%s)" % exc
+    if not problem and not (isinstance(data, dict) and isinstance(data.get("hooks"), list)):
+        problem = "tools/churn.json is not what tools/churn.py writes (no list of hooks)"
     try:
         tag = json.loads((root / "UPSTREAM.json").read_text(encoding="utf-8")).get("mozilla_tag")
     except (OSError, ValueError):
         tag = None
-    by_key = {h["key"]: h for h in (data or {}).get("hooks", []) if isinstance(h, dict) and "key" in h}
+    by_key = {h["key"]: h for h in (data or {}).get("hooks", []) if isinstance(h, dict) and "key" in h} if not problem else {}
     keys = churn.hunk_keys(root) if not problem else {}
-    fix = "run `python tools/churn.py --source <repo with the tags> --write` and commit tools/churn.json"
-    fix_missing = "a new or moved hook has no churn: " + fix
+    fix_churn = "run `python tools/churn.py --source <repo with the tags> --write` and commit tools/churn.json"
     out = []
     for folder in _folders(root):
         hooks, _ = analyse_patch(folder, (root / folder / "hooks.patch").read_text(encoding="utf-8", errors="replace"))
         entries = hooks_list.expected(root, folder)
         for h, e in zip(hooks, entries):
-            text = h.line.strip() or "<%s> %s" % (h.kind, _squeeze(h.removed)[:80])
-            mine = lambda detail: Violation("C18", folder, h.file, h.function, text, _key("C18", folder, h.file, h.function, text),
-                                            detail, (hook_identity(h),))
+            text = h.line.strip() or "<%s> %s" % (h.kind, _squeeze(h.removed))
+            where = hook_where(folder, h.file, h.function)
             if h.hunk:
                 rows = [by_key.get(keys.get((folder, h.file, h.hunk)))]
             else:               # a whole file deleted or replaced: its hunks are its churn
                 rows = [by_key.get(k) for (f, p, _), k in keys.items() if (f, p) == (folder, h.file)]
             rows = [r for r in rows if r]
             if not rows:
-                out.append(mine("`%s`, %s%s (rule: %s)" % (_squeeze(text)[:60], "hunk %d: " % h.hunk if h.hunk else "",
-                                                          "%s: %s" % (problem, fix) if problem else fix_missing, PORT07_DECISION)))
+                out.append(_c18(folder, h, text, fail(
+                    where, "C18: the hook `%s`%s has no churn row in tools/churn.json%s"
+                    % (text, ", hunk %d," % h.hunk if h.hunk else "", " (%s)" % problem if problem else ""),
+                    fix_churn, D_PORT07)))
                 continue
             row = max(rows, key=lambda r: r["churn"])
             value = e.get("quiet_anchor_why")
-            shape = quiet_anchor_problem(value) if "quiet_anchor_why" in e else ""
-            where = "`%s`, hunk %d, churn %d (releases %s)" % (_squeeze(text)[:60], row["hunk"], row["churn"], ", ".join(row["which"]))
+            about = "the hook `%s`, hunk %d, churn %d (releases %s)" % (text, row["hunk"], row["churn"], ", ".join(row["which"]))
+            shape = quiet_anchor_problem(value, where, about) if "quiet_anchor_why" in e else None
             if shape:
-                out.append(mine("%s: quiet_anchor_why is wrong: %s (rule: %s)" % (where, shape, PORT07_DECISION)))
+                out.append(_c18(folder, h, text, shape))
             elif row["churn"] >= churn.BAND_MIN_CHURN and not value:
-                out.append(mine("%s is at or above BAND_MIN_CHURN of tools/churn.py: name why no quieter anchor serves with the hand field "
-                                "`quiet_anchor_why` of its HOOKS.json entry ({kind: only-place, why} or {kind: deferred, quieter}), or move "
-                                "the hook to a quieter anchor (rule: %s)" % (where, PORT07_DECISION)))
+                out.append(_c18(folder, h, text, fail(
+                    where, "C18: %s is at or above BAND_MIN_CHURN of tools/churn.py and has no `quiet_anchor_why`" % about,
+                    "name why no quieter anchor serves with the hand field `quiet_anchor_why` of its HOOKS.json entry "
+                    "({kind: only-place, why} or {kind: deferred, quieter}), or move the hook to a quieter anchor", D_PORT07)))
             elif row["churn"] >= churn.BAND_MIN_CHURN and value["kind"] == "deferred" and (data or {}).get("base") != tag:
-                out.append(mine("%s: a `deferred` reason holds only for the port that wrote it (tools/churn.json is for %s, the series is on %s): "
-                                "move the hook to %s, or give it an `only-place` reason (rule: %s)"
-                                % (where, (data or {}).get("base"), tag, value["quieter"], PORT07_DECISION)))
+                out.append(_c18(folder, h, text, fail(
+                    where, "C18: %s has a `deferred` reason, which holds only for the port that wrote it (tools/churn.json is for %s, "
+                    "the series is on %s)" % (about, (data or {}).get("base"), tag),
+                    "move the hook to %s, or give it an `only-place` reason" % value["quieter"], D_PORT07)))
     # a backport folder has no hooks, but its hunks are in tools/churn.json too (churn.py --check compares every hunk of every
     # hooks.patch): a hunk with no row is as red here as it is in the churn job, so `check` finds it before a pull request does
     for folder in _backport_folders(root):
         for (f, path, no), key in sorted(keys.items()):
-            if f == folder and key not in by_key and not problem:
+            if f == folder and key not in by_key:
                 text = "a hunk of the backport's patch"
-                out.append(Violation("C18", folder, path, "", text, _key("C18", folder, path, "", text),
-                                     "`%s`, hunk %d: a hunk of a backport has no churn row in tools/churn.json: %s (rule: %s)" % (path, no, fix, PORT07_DECISION), ()))
+                why = fail(hook_where(folder, path), "C18: the hook `%s`, hunk %d, has no churn row in tools/churn.json" % (text, no),
+                           fix_churn, D_PORT07)
+                out.append(Violation("C18", folder, path, "", text, _key("C18", folder, path, "", text), why.what, (), why))
     return _unique(out)
 
 
@@ -1848,29 +1991,28 @@ def update_debt(entries: list, violations: list, init: bool = False) -> list:
 
 
 def debt_problems(violations: list, debt: list, main_debt: list | None) -> list:
-    """The check: a violation not in the debt, an entry that no longer occurs, an entry main does not
-    have (the list only shrinks against main; main_debt None: main has no list yet)."""
+    """The check, as a list of Failure: a violation not in the debt (the fix is the rule's: the list never adds), an entry that no
+    longer occurs, an entry main does not have (the list only shrinks against main; main_debt None: main has no list yet)."""
     found = []
     now = {v.key: v for v in violations}
     listed = {e["key"] for e in debt}
     for key in sorted(k for k in listed if k.split("|", 1)[0] in NEVER_DEBT_RULES):
-        found.append("tools/hook-debt.json lists %s: the rules %s are never debt (port-06, port-07): fix the rewrite by an engine change or "
-                     "by its HOOKS.json exception, a C18 by moving the hook or by its `quiet_anchor_why`" % (key, "/".join(NEVER_DEBT_RULES)))
+        found.append(fail("tools/hook-debt.json",
+                          "it lists %s, and the rules %s are never debt" % (key, "/".join(NEVER_DEBT_RULES)),
+                          "delete the entry (`python tools/engine.py hook-debt` drops it) and fix the hook: a C12 to C17 by an engine change "
+                          "or by its HOOKS.json exception, a C18 by moving the hook or by its `quiet_anchor_why`", D_HOOK03))
     for key in sorted(set(now) - listed):
-        v = now[key]
-        if v.rule in NEVER_DEBT_RULES:
-            found.append("%s/hooks.patch, %s: %s (%s): %s" % (v.folder, v.file, v.rule, RULES[v.rule], v.detail or _squeeze(v.text)[:100]))
-            continue
-        found.append("%s/hooks.patch, %s: %s (%s): a hook breaks the contract and is not in the debt list "
-                     "(tools/hook-debt.json): %s" % (v.folder, v.file, v.rule, RULES[v.rule], _squeeze(v.text)[:100]))
+        found.append(violation_failure(now[key]))
     for key in sorted(listed - set(now)):
-        found.append("tools/hook-debt.json lists %s, which no longer occurs: remove it: python tools/engine.py hook-debt" % key)
+        found.append(fail("tools/hook-debt.json", "it lists %s, which no longer occurs in the series" % key,
+                          "run `python tools/engine.py hook-debt`: it drops the entries that are gone", D_HOOK03))
     if main_debt is not None:
         main_keys = {e["key"] for e in main_debt}
         main_rules = {e["rule"] for e in main_debt}
         for key in sorted(k for k in listed - main_keys
                           if not (k.split("|", 1)[0] in INTRODUCED_RULES and k.split("|", 1)[0] not in main_rules)):
-            found.append("tools/hook-debt.json has %s, which main's list does not have: the debt only shrinks" % key)
+            found.append(fail("tools/hook-debt.json", "it has %s, which main's list does not have: the debt only shrinks" % key,
+                              "delete the entry from the list and fix the hook (`hook-debt` never adds one)", D_HOOK03))
     return found
 
 
@@ -1881,8 +2023,122 @@ def debt_summary(entries: list, top: int = 15) -> str:
         by_folder[e["folder"]] = by_folder.get(e["folder"], 0) + 1
     out = ["%d violations in the debt list" % len(entries), "per rule:"]
     for r in sorted(by_rule):
-        out.append("  %-4s %4d  %s" % (r, by_rule[r], RULES[r]))
+        out.append("  %-4s %4d  %s" % (r, by_rule[r], RULES[r].text))
     out.append("per folder (%d of %d):" % (min(top, len(by_folder)), len(by_folder)))
     for f, n in sorted(by_folder.items(), key=lambda x: (-x[1], x[0]))[:top]:
         out.append("  %4d  %s" % (n, f))
     return "\n".join(out)
+
+
+# --------------------------------------------------------------------------- the docs generated from the tables
+# `python tools/engine.py docs --write` writes, `--check` compares: a section between a begin and an end marker of a doc is the
+# output of one function below, so a doc never restates a rule, a form or a G code that the tables above state.
+GENERATED = {}          # doc path (from the repository root) -> ((section name, function that returns the section's text), ...)
+
+
+def _cell(text: str) -> str:
+    return text.replace("|", "\\|").replace("\n", " ")
+
+
+def forms_section() -> str:
+    """The table of the hook forms (FORMS_TABLE)."""
+    rows = ["| Form | Where | Looks like |", "|---|---|---|"]
+    rows += ["| `%s` | %s | %s |" % (form, _cell(where), _cell(looks)) for form, where, looks in FORMS_TABLE]
+    return "\n".join(rows) + "\n"
+
+
+def rules_section(decision: str) -> str:
+    """The rules of RULES that belong to `decision`: id, the broken state, the fix."""
+    rows = ["| Rule | Broken state | Fix |", "|---|---|---|"]
+    rows += ["| %s | %s | %s |" % (r.id, _cell(r.text), _cell(r.fix.replace("{folder}", "<folder>").replace("{file}", "<file>")
+                                                           .replace("{detail}", "<detail>")))
+             for r in RULES.values() if r.decision == decision]
+    return "\n".join(rows) + "\n"
+
+
+def rules_index_section() -> str:
+    """Which decision each rule belongs to."""
+    by_decision = {}
+    for r in RULES.values():
+        by_decision.setdefault(r.decision, []).append(r.id)
+    rows = ["| Decision | Rules |", "|---|---|"]
+    rows += ["| [%s](decisions/%s.md) | %s |" % (d.split("-", 2)[0] + "-" + d.split("-", 2)[1], d, ", ".join(ids))
+             for d, ids in by_decision.items()]
+    return "\n".join(rows) + "\n"
+
+
+def codes_section() -> str:
+    """The G codes that the messages and the code of the hook tools name, in words (EXPLAIN)."""
+    rows = ["| Code | Meaning |", "|---|---|"]
+    rows += ["| %s | %s |" % (code, _cell(text)) for code, text in sorted(EXPLAIN.items(), key=lambda x: int(x[0][1:]))]
+    return "\n".join(rows) + "\n"
+
+
+def _hook02_rules_section() -> str:
+    return rules_section(D_HOOK02)
+
+
+GENERATED["docs/STRUCTURE.md"] = (("hook-forms", forms_section), ("hook-rules", rules_index_section), ("message-codes", codes_section))
+GENERATED["docs/decisions/hook-02-shape-and-contract.md"] = (("hook-02-rules", _hook02_rules_section),)
+
+
+def _markers(name: str) -> tuple:
+    return ("<!-- generated:%s begin: written by `python tools/engine.py docs --write` from tools/hook_contract.py; do not edit -->\n" % name,
+            "<!-- generated:%s end -->" % name)
+
+
+def _read(path: Path) -> str:
+    with open(path, encoding="utf-8", newline="") as f:
+        return f.read()
+
+
+def generated_docs(root) -> tuple:
+    """-> (new texts by doc path, failures): each doc with its generated sections rewritten from the tables, and a Failure for a
+    doc that is missing or has no markers for a section."""
+    root, texts, found = Path(root), {}, []
+    for rel, sections in GENERATED.items():
+        path = root / rel
+        if not path.is_file():
+            found.append(fail(rel, "the doc is missing, and it holds generated sections (%s)" % ", ".join(n for n, _ in sections),
+                              "restore the file from git", D_TABLES))
+            continue
+        text = _read(path)
+        for name, make in sections:
+            begin, end = _markers(name)
+            start = text.find("<!-- generated:%s begin" % name)
+            stop = text.find(end)
+            if start < 0 or stop < start:
+                found.append(fail(rel, "the section `%s` has no begin and end markers" % name,
+                                  "add the two lines `%s` and `%s` where the section goes, then run `python tools/engine.py docs --write`"
+                                  % (begin.strip(), end), D_TABLES))
+                continue
+            text = text[:start] + begin + make() + text[stop:]
+        texts[rel] = text
+    return texts, found
+
+
+def docs_main(root, argv: list) -> int:
+    """`engine.py docs --write` writes the generated sections of the docs; `--check` fails when one differs from the tables."""
+    root = Path(root)
+    if argv not in (["--write"], ["--check"]):
+        print(fail("python tools/engine.py docs", "the arguments are %r, not --write or --check" % " ".join(argv),
+                   "run `python tools/engine.py docs --write` to write the sections or `docs --check` to compare them", D_TABLES))
+        return 2
+    texts, found = generated_docs(root)
+    for rel, text in sorted(texts.items()):
+        path = root / rel
+        now = _read(path)
+        if now == text:
+            continue
+        if argv == ["--write"]:
+            path.write_text(text, encoding="utf-8", newline="")
+            print("wrote %s" % rel)
+        else:
+            found.append(fail(rel, "a generated section differs from what tools/hook_contract.py generates",
+                              "run `python tools/engine.py docs --write` and commit the doc; never edit a generated section: "
+                              "edit RULES, FORMS_TABLE or EXPLAIN in tools/hook_contract.py", D_TABLES))
+    for f in found:
+        print(f)
+    if not found:
+        print("ok: the generated sections of %d docs are current" % len(GENERATED))
+    return 1 if found else 0

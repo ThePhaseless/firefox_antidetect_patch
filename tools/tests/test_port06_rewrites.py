@@ -110,7 +110,8 @@ def test_c15_a_parameter_added_to_a_cpp_signature_is_threading():
     assert "C15" in rules_of(SIG, **exc("declaration", "the binding passes it"))       # a declaration that names no side state
     assert rules_of(SIG, **exc("declaration", "no side state can carry it: the caller's principal is known only here")) == []
     v = [x for x in found(SIG, **exc("expression")) if x.rule == "C15"][0]
-    assert "side object" in v.detail and "thread-local" in v.detail
+    message = str(hc.violation_failure(v))
+    assert "side object" in message and "thread-local" in message and "Rule: docs/decisions/port-06-hooks-only-add.md" in message
 
 
 def test_c15_a_parameter_added_to_a_call_is_threading_too():
@@ -259,24 +260,24 @@ def test_reason_kind_is_a_hand_field_kept_by_the_export(tmp_path):
     again = hl.expected(root, FOLDER)
     assert all(e["reason_kind"] == "expression" for e in again)
     assert hl.render(again) == (root / FOLDER / "HOOKS.json").read_text(encoding="utf-8")
-    assert hl.problems(root) == [] or all("reason_kind" not in p for p in hl.problems(root))
+    assert hl.problems(root) == [] or all("reason_kind" not in str(p) for p in hl.problems(root))
 
 
 def test_check_refuses_a_reason_kind_that_is_not_allowed_or_has_no_exception(tmp_path):
     bad = _series(tmp_path, EXPR, dict(exception="why", reason_kind="whatever", pm="approvato"))
-    assert any("reason_kind" in p and "whatever" in p for p in hl.problems(bad))
+    assert any("reason_kind" in p and "whatever" in p for p in map(str, hl.problems(bad)))
     other = tmp_path / "other"
     other.mkdir()
     lone = _series(other, EXPR, dict(reason_kind="skip"))
-    assert any("reason_kind" in p and "no exception" in p for p in hl.problems(lone))
+    assert any("reason_kind" in p and "no exception" in p for p in map(str, hl.problems(lone)))
 
 
 def test_the_debt_never_holds_a_port06_rule():
     v = hc.Violation("C12", "f/x", "a.cpp", "void F() {", "-a\n+b", hc._key("C12", "f/x", "a.cpp", "void F() {", "-a\n+b"), "no exception")
     assert hc.update_debt([], [v], init=True) == []
-    msgs = hc.debt_problems([v], [], None)
+    msgs = [str(x) for x in hc.debt_problems([v], [], None)]
     assert len(msgs) == 1 and "C12" in msgs[0] and "no exception" in msgs[0] and "debt list" not in msgs[0].split(":")[-1]
-    listed = hc.debt_problems([v], [hc.entry_of(v)], None)
+    listed = [str(x) for x in hc.debt_problems([v], [hc.entry_of(v)], None)]
     assert len(listed) == 1 and "never debt" in listed[0]
 
 

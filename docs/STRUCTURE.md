@@ -42,22 +42,60 @@ Rules: [hook-01](decisions/hook-01-own-code-first.md), [hook-02](decisions/hook-
 
 ## Hook forms
 
-The value of `form` in `HOOKS.json`. Any other shape is a contract violation.
+The value of `form` in `HOOKS.json`. Any other shape is a contract violation. The table is written from `FORMS_TABLE` in `tools/hook_contract.py` by `python tools/engine.py docs --write`.
 
+<!-- generated:hook-forms begin: written by `python tools/engine.py docs --write` from tools/hook_contract.py; do not edit -->
 | Form | Where | Looks like |
 |---|---|---|
-| `guard` | First statement of a function | `if (StealthX(this, aArg, &rv)) return rv;` |
+| `guard` | First statement of a function | `if (StealthX(this, aArg, &rv)) return rv;`; with a value to return (G15) the guard returns it |
 | `notice` | First statement of a function | `StealthX(this, aArg);` |
-| `wrap-expression` | The line where the value is born | Mozilla's expression, unchanged, inside our call: `return StealthX(<expression>);` |
-| `wrap-function` | The signature line | Mozilla's `Foo` becomes `Foo_Mozilla`; our `Foo` calls it and treats the result |
-| `wrap-call` | The line of a call | The called `Foo` becomes `StealthFoo`, same arguments; or one argument of ours is added |
-| `declared-value` | The line that gives a default | The value on Mozilla's line is replaced |
-| `registration` | Includes, build files, declarative files | `#include "StealthX.h"` in a block of ours after Mozilla's; `VAR += ["StealthX.cpp"]` after the closing `]` of a `moz.build`; one line in `.ipdl`, `.webidl`, `components.conf`, `jar.mn` |
+| `wrap-expression` | The line where the value is born | Mozilla's expression, unchanged, inside our call (the whole expression, or a sub-expression of the line, with our extra leading arguments such as `this, `): `return StealthX(<expression>);`; over several lines (G53) one line of ours opens the call with the marker on it, Mozilla's lines between stay unchanged, and the closing line is Mozilla's plus our `)` and the marker |
+| `wrap-function` | The signature line | Mozilla's `Foo` becomes `Foo_Mozilla` (G1) or another suffix such as `FooAsDrawn`; our `Foo` calls it and treats the result, and the one-line declarations and the internal calls take the same new name (G2); or the called function is replaced and exactly one plain argument of ours is added (G29, G9) |
+| `wrap-call` | The line of a call | The called identifier `Foo` becomes `StealthFoo`, same arguments (G29); or one argument of ours, a Stealth call, is added to a call of Mozilla's line (G9) |
+| `declared-value` | The line that gives a default | The value on Mozilla's line is replaced: a literal in place of a literal, or one STEALTH_ macro in place of one literal or one macro of Mozilla's |
+| `registration` | Includes, build files, declarative files | `#include "StealthX.h"` in a block of ours after Mozilla's; `VAR += ["StealthX.cpp"]` after the closing `]` of a `moz.build`; one line in `.ipdl`, `.webidl`, `components.conf`, `jar.mn`; a forward declaration `class X;` or a file-scope declaration of a function of ours (G40) |
 | `member` | A Mozilla class | One declaration after an existing member, never the last in the block |
-| `shadow` | Top of a function | `const auto GetX = StealthGetX;` |
-| `anchor` | Right after a named Mozilla statement | `StealthX(this, &locale);` or `if (StealthX(this)) return rv;` |
+| `shadow` | Top of a function | `const auto GetX = StealthGetX;` (G21: our value under a Mozilla name) |
+| `anchor` | Right after a named Mozilla statement, mid-function (last resort) | `StealthX(this, &locale);` or `if (StealthX(this)) return rv;`; as the last line of a block or of a JS module (G30, G33) it carries its `anchor` and `why` in HOOKS.json |
+<!-- generated:hook-forms end -->
 
-The numbered rules C1-C11 are in [hook-02](decisions/hook-02-shape-and-contract.md); `tools/hook_contract.py` enforces them.
+## Hook rules
+
+Every rule of the contract is one entry of `RULES` in `tools/hook_contract.py`, with its broken state, its fix and the decision it belongs to; the decision's file holds it. This table says which decision holds which rules.
+
+<!-- generated:hook-rules begin: written by `python tools/engine.py docs --write` from tools/hook_contract.py; do not edit -->
+| Decision | Rules |
+|---|---|
+| [hook-02](decisions/hook-02-shape-and-contract.md) | C1, C2, C3, C4, C5, C6, C7, C8, C9, C10, C16, C17 |
+| [hook-05](decisions/hook-05-no-values-in-mozilla-numbered-spaces.md) | C11 |
+| [port-06](decisions/port-06-hooks-only-add.md) | C12, C13, C14, C15 |
+| [port-07](decisions/port-07-quiet-anchors.md) | C18 |
+| [hook-04](decisions/hook-04-one-test-per-hook.md) | T1, T2, T3 |
+<!-- generated:hook-rules end -->
+
+## Message codes
+
+A message of the hook tools may name a G code: a case the code accepts. Each one is explained here and nowhere else (`EXPLAIN` in `tools/hook_contract.py`).
+
+<!-- generated:message-codes begin: written by `python tools/engine.py docs --write` from tools/hook_contract.py; do not edit -->
+| Code | Meaning |
+|---|---|
+| G1 | A function signature or a macro of Mozilla's is renamed on one line, `Foo` to `Foo_Mozilla` or to another suffix (wrap-function). |
+| G2 | The one-line declarations and the internal calls of a renamed `Foo` are rewritten to the same new name as part of the same wrap. |
+| G9 | One plain argument of ours, a Stealth call, is added to a call on Mozilla's line (wrap-call, wrap-function). |
+| G15 | A guard with a value: `if (StealthX(this, aArg, &rv)) return rv;`, the guard returns the value our function computed. |
+| G20 | A test must also be run by a round: the candidate workflow's gtest filter, a node job, a python step or a cargo step runs it (rule T3). |
+| G21 | A shadow: `const auto GetX = StealthGetX;` at the top of a function gives Mozilla's name our value. |
+| G23 | An anchor on the last statement of a block, declared with its `anchor` and `why`, is not a C9. |
+| G29 | A call wrap: the called identifier `Foo` of Mozilla's line becomes `StealthFoo` with the same arguments; the qualifier may change only when the new last component is Stealth-named. |
+| G30 | An anchor may be the last line of a block; it carries its `anchor` and `why` in HOOKS.json (rule T2). |
+| G33 | An anchor may be the last line of a JS module; it carries its `anchor` and `why` in HOOKS.json (rule T2). |
+| G35 | A declared exception: a HOOKS.json entry with the hand fields `exception` (the reason) and `pm: "approvato"` is a rewritten line no form can express; its violations of C1..C11, T1, T2 and T3 are left out and counted. |
+| G40 | A forward declaration `class X;` or a file-scope declaration of a function of ours is a registration. |
+| G41 | tools/hook-names.json lists the functions that existed when rule C10 came; a hook may call them without the Stealth prefix, and a new function takes a Stealth name. |
+| G50 | In a preprocessed pref file or a JSON file, where a trailing comment is impossible, a marker comment alone on the line before a directive is the marker of the directive: one hook. |
+| G53 | A wrap-expression over several lines: one line of ours opens the call (marker on it), Mozilla's lines between stay unchanged, the closing line is Mozilla's plus our `)` and the marker. |
+<!-- generated:message-codes end -->
 
 ## HOOKS.json
 
