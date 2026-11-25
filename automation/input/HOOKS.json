@@ -247,7 +247,7 @@
   "form": "wrap-expression",
   "line": "           StealthReadJugglerEventId(aReader, aResult, ReadParam(aReader, &aResult->mInputSource));  // STEALTH-HOOK(automation/input)",
   "removed": "           ReadParam(aReader, &aResult->mInputSource);",
-  "test": "gtest:StealthMouseEventIPC.TheIdIsReadOnlyWhenTheFieldBeforeItWasRead"
+  "test": "gtest:StealthMouseEventIPC.TheIdSurvivesTheMessage"
  },
  {
   "file": "xpcom/reflect/xptinfo/xptinfo.h",
