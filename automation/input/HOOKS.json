@@ -4,14 +4,6 @@
   "function": "",
   "kind": "add",
   "form": "registration",
-  "line": "#include \"StealthCanvasAsDrawn.h\"  // STEALTH-HOOK(fingerprint/canvas/as-drawn)",
-  "test": "wrapper:tests/test_canvas_reads_as_drawn.py::test_random_pixels_read_back_as_drawn"
- },
- {
-  "file": "dom/base/nsDOMWindowUtils.cpp",
-  "function": "",
-  "kind": "add",
-  "form": "registration",
   "line": "#include \"StealthInputEventBirth.h\"  // STEALTH-HOOK(fingerprint/input/event-birth)",
   "test": "wrapper:tests/test_input_is_born_before_the_page_sees_it_e2e.py::test_every_key_and_move_is_born_before_its_handler_runs"
  },
@@ -55,15 +47,6 @@
   "test": "wrapper:tests/test_input_is_born_before_the_page_sees_it_e2e.py::test_every_key_and_move_is_born_before_its_handler_runs",
   "anchor": "wheelEvent.mFlags.mIsSynthesizedForTests = true;",
   "why": "the hook stamps the local wheelEvent, which exists only inside SendWheelEvent: a guard at the top has nothing to stamp, a function wrap cannot reach a local, and the event is a constructor declaration, not an expression to wrap; GetDocument() is a protected member of this, so the template cannot take this"
- },
- {
-  "file": "dom/base/nsDOMWindowUtils.cpp",
-  "function": "static already_AddRefed<DataSourceSurface> CanvasToDataSourceSurface(",
-  "kind": "rewrite",
-  "form": "wrap-call",
-  "line": "  SurfaceFromElementResult result = nsLayoutUtils::StealthSurfaceFromElementAsDrawn(aCanvas);  // STEALTH-HOOK(fingerprint/canvas/as-drawn)",
-  "removed": "  SurfaceFromElementResult result = nsLayoutUtils::SurfaceFromElement(aCanvas);",
-  "test": "wrapper:tests/test_canvas_reads_as_drawn.py::test_random_pixels_read_back_as_drawn"
  },
  {
   "file": "dom/events/EventStateManager.cpp",

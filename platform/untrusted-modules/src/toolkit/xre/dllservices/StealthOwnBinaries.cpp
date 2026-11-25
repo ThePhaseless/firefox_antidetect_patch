@@ -8,6 +8,7 @@
 #include <windows.h>
 
 #include "ModuleVersionInfo.h"
+#include "mozilla/Atomics.h"
 #include "mozilla/UntrustedModulesData.h"
 #include "nsString.h"
 #include "nsUnicharUtils.h"
@@ -57,6 +58,12 @@ bool StealthSkipsSignatureLookup(const nsAString& aPath,
                                  bool aHasVersion) {
   return aHasVersion && IsOwnUnsignedBinary(aPath, aVerInfo);
 }
+
+static Atomic<uint32_t> sOwnBinarySkips(0);
+
+uint32_t StealthOwnBinarySkips() { return sOwnBinarySkips; }
+
+void StealthNoteOwnBinarySkip() { ++sOwnBinarySkips; }
 
 bool StealthSkipsSignatureLookupOf(const nsAString& aPath) {
   ModuleVersionInfo verInfo;

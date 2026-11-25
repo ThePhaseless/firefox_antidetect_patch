@@ -129,7 +129,15 @@ export function StealthRoutedProcess(process) {
       child.init(exe);
       child.startHidden = true;
       child.noShell = true;
-      const args = [...own, ...params];
+      // When Mozilla's own choice is already the background task (the pref
+      // toolkit.telemetry.shutdownPingSender.backgroundtask.enabled or the Nimbus
+      // variable pingsender.backgroundTaskEnabled), its parameters start with
+      // the pair `--backgroundtask pingsender`: it is ours once, not twice.
+      const own2 = own.length;
+      const rest = own.every((p, i) => params[i] === p)
+        ? params.slice(own2)
+        : params;
+      const args = [...own, ...rest];
       Services.env.set(PINGSENDER_ROUTE_ENV, JSON.stringify(route));
       try {
         child.runAsync(args, args.length, observer);

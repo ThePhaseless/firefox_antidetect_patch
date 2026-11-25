@@ -7,7 +7,6 @@
   "widget/windows/TaskbarPreview.cpp"
  ],
  "added": {
-  "dom/base/StealthCanvasAsDrawn.h": "100644",
   "layout/base/StealthSurfaceFlags.h": "100644",
   "layout/base/gtest/TestStealthSurfaceFlags.cpp": "100644"
  },
