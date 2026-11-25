@@ -56,3 +56,54 @@ def test_a_sha_with_its_version_and_a_local_workflow_are_accepted():
     assert problems("x.yml", good) == []
     bare = "on: push\njobs:\n  j:\n    runs-on: ubuntu-24.04\n    steps:\n      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262\n"
     assert any("no trailing comment" in p for p in problems("x.yml", bare))
+
+
+# A reusable workflow of another repository runs its own `uses:` inside our run: pinning the caller is not enough if the file at that commit still
+# calls a tag. Each one is vendored here, byte for byte, at the commit our caller pins, with its git blob id (what
+# `gh api repos/<owner>/<repo>/contents/<path>?ref=<commit> --jq .sha` returns), and the same rule is applied to it.
+VENDORED = Path(__file__).resolve().parent / "pinned"
+REUSABLE = {
+    # uses (without @)                                  -> (commit our caller pins,                  git blob id of the file there,              vendored copy)
+    "oss-invisible/core/.github/workflows/noreply-identity.yml": ("db3b67efd8d52924ecfe4c69e6daa33cdac58e8c", "3c3066500c32869347087e08ef69c6bc72c7f858",
+                                                                  "core-noreply-identity.yml"),
+}
+
+
+def _blob_id(data):
+    import hashlib
+    data = data.replace(b"\r\n", b"\n")
+    return hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest()
+
+
+def reusable_problems():
+    out = []
+    for wf in sorted(WORKFLOWS.glob("*.yml")):
+        for job_name, job in ((yaml.safe_load(wf.read_text(encoding="utf-8")) or {}).get("jobs") or {}).items():
+            uses = str(job.get("uses") or "")
+            if not uses or uses.startswith("./"):
+                continue
+            target, _, commit = uses.partition("@")
+            if target not in REUSABLE:
+                out.append("FAIL %s / %s: `uses: %s` is a reusable workflow of another repository with no vendored copy. Fix: vendor the file at that "
+                           "commit in tools/tests/pinned/ and add it to REUSABLE with its blob id. Rule: %s" % (wf.name, job_name, uses, RULE))
+                continue
+            pinned, blob, copy = REUSABLE[target]
+            if commit != pinned:
+                out.append("FAIL %s / %s: calls %s at %s but the vendored copy is of %s. Fix: vendor the file at the new commit and update REUSABLE. "
+                           "Rule: %s" % (wf.name, job_name, target, commit, pinned, RULE))
+            data = (VENDORED / copy).read_bytes()
+            if _blob_id(data) != blob:
+                out.append("FAIL tools/tests/pinned/%s: its blob id is %s, not %s, the file at %s. Fix: copy it again byte for byte from that commit. "
+                           "Rule: %s" % (copy, _blob_id(data), blob, pinned, RULE))
+            out += problems("%s@%s" % (target, pinned[:10]), data.decode("utf-8"))
+    return out
+
+
+def test_every_reusable_workflow_we_call_pins_what_it_uses_at_the_commit_we_call():
+    found = reusable_problems()
+    assert not found, "\n".join(found)
+
+
+def test_a_reusable_workflow_that_calls_a_tag_inside_is_refused():
+    inside = "on: workflow_call\njobs:\n  j:\n    runs-on: ubuntu-24.04\n    steps:\n      - uses: actions/checkout@v4\n"
+    assert problems("core-noreply-identity.yml", inside)
