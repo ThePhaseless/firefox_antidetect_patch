@@ -1608,7 +1608,7 @@ def group_closure():
         except t.NodeError as exc:
             late = str(exc)
         out.append(("prepare: what the steps between up and prepare spent counts against the one deadline: past it, an error, the node deleted, "
-                    "nothing run on it", "within 2400 s" in late and api.deleted == ["dpl_x"] and "bash -s" not in [c for c, _ in ssh.calls]))
+                    "nothing run on it", ("within %d s" % t.PROVISION_DEADLINE_S) in late and api.deleted == ["dpl_x"] and "bash -s" not in [c for c, _ in ssh.calls]))
         api.nodes = listed()
         try:
             quiet(t.prepare, latitude, github, 5, 1, lambda host, port: ssh, tmp / "elsewhere", closure, clock, clock.sleep, wall=clock)
@@ -1630,6 +1630,23 @@ def group_closure():
     out.append(("prepare: a closure the node could not take: an error, the node deleted, the bootstrap never run",
                 got is None and "tar: short read" in error and api.deleted == ["dpl_x"] and "bash -s" not in [c for c, _ in ssh.calls] and gh.jits == []))
     return out
+
+
+def release_node_job() -> dict:
+    """The node job of release.yml, as written."""
+    import yaml
+    return yaml.safe_load((HERE.parent.parent / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8"))["jobs"]["node"]
+
+
+def longest_full_hold_s() -> float:
+    """The longest hold of a node by a full run, in seconds, as latitude_node.py writes it in the comment of CAPACITY_WAIT_CAP_S (`<run id> <minutes>` pairs after
+    "A full"), so the cap is held to what was measured and not to a number written twice."""
+    source = (HERE / "latitude_node.py").read_text(encoding="utf-8")
+    comment = source[:source.index("CAPACITY_WAIT_CAP_S = ")]
+    full = comment[comment.rindex("A full"):]
+    minutes = [float(m) for m in re.findall(r"\b\d{11} (\d+\.\d)\b", full)]
+    assert len(minutes) >= 7, minutes
+    return max(minutes) * 60
 
 
 def group_node_job():
@@ -2740,6 +2757,166 @@ def group_bootstrap_retry():
     return out
 
 
+CAPACITY_BODY = (b'{"errors":[{"code":"DEPLOYMENT_ERROR","status":"unprocessable_entity","title":"Deployment Error","detail":"Your team can deploy only %d '
+                 b'bare metal servers. If you require additional deployments, please contact sales.","meta":{}}]}')
+#: The wall clock of the capacity cases: any day, and the simulated clock counts on from it.
+WALL0 = 1795000000
+
+
+def iso_at(epoch) -> str:
+    import time as _time
+    return _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime(epoch))
+
+
+class Crowded(FakeLatitude):
+    """The API as run 45536415264 met it: the team may deploy `capacity` servers, and while it holds that many every POST /servers, in any location, is
+    the same 422. `held` are other runs' nodes (they appear in the project's list), each freed at its simulated time (`frees`: id -> seconds, never when
+    absent); `hidden` slots are held by something the project does not list until the time given."""
+
+    def __init__(self, clock, held, capacity=2, frees=None, hidden=0, hidden_until=0, **kw):
+        super().__init__(**kw)
+        self.clock, self.capacity, self.frees = clock, capacity, dict(frees or {})
+        self.hidden, self.hidden_until = hidden, hidden_until
+        self.nodes = list(held)
+        self.refusals = 0
+
+    def __call__(self, method, url, headers, body):
+        path = url.split("api.latitude.sh", 1)[1]
+        self.nodes = [n for n in self.nodes if self.frees.get(n["id"], 10 ** 9) > self.clock.now]
+        if path == "/servers" and method == "POST":
+            hidden = self.hidden if self.clock.now < self.hidden_until else 0
+            if len(self.nodes) + hidden >= self.capacity:
+                self.refusals += 1
+                return 422, CAPACITY_BODY % self.capacity
+        return super().__call__(method, url, headers, body)
+
+
+def other_runs(*runs, age_s=600):
+    return [{"id": "dpl_run%s" % r, "name": "ci%sa1x" % r, "status": t.RUNNING, "created_at": iso_at(WALL0 - age_s)} for r in runs]
+
+
+def bring_up_crowded(api, clock, tmp):
+    """bring_up of run 5 against `api`, as `up` calls it, the wall clock following the simulated one: (found, error text, what it said, state, latitude)."""
+    fake = FakeGitHub()
+    fake.run_status = {"77": "in_progress", "78": "in_progress", "79": "in_progress"}
+    gh = t.GitHub("o/r", "TOKEN", "ADMIN", fake, clock.sleep)
+    latitude = t.Latitude(PROJECT, KEY, api, clock.sleep)
+    tmp = Path(tmp)
+    key = tmp / "node_key"
+    key.write_text("private", encoding="utf-8")
+    Path(str(key) + ".pub").write_text("ssh-ed25519 AAAA ci-node\n", encoding="utf-8")
+    try:
+        found, said = quiet(t.bring_up, latitude, gh, 5, 1, lambda host, port: FakeSsh(), lambda: key, tmp / "work", clock, clock.sleep, lambda: WALL0 + clock.now)
+        error = ""
+    except t.NodeError as exc:
+        found, said, error = None, "", str(exc)
+    state_file = tmp / "work" / t.STATE_FILE
+    return found, error, said, json.loads(state_file.read_text(encoding="utf-8")) if state_file.exists() else None, latitude
+
+
+def group_capacity_wait():
+    """The team's capacity: a 422 that every location gives alike is a wait for another run's node to end, not a refusal of each location in turn (run
+    45536415264 failed at the node job with the account's two servers held by other runs)."""
+    out = []
+    # --- the capacity refusal is read, never guessed, and is not the next-site 422 ---
+    out.append(("capacity: the number is read from the message (2, 3, 10), and any other answer, a 422 about a location included, has none",
+                [t.capacity_of("POST /servers: HTTP 422 " + (CAPACITY_BODY % n).decode()) for n in (2, 3, 10)] == [2, 3, 10]
+                and t.capacity_of('POST /servers: HTTP 422 {"errors":[{"detail":"not available"}]}') is None
+                and t.capacity_of("POST /servers: HTTP 409 Your team can deploy only 2 bare metal servers") is None and t.capacity_of("") is None))
+    # --- red on the old create: the API refuses while 2 are held, then one ends ---
+    with tempfile.TemporaryDirectory() as tmp:
+        clock = Clock()
+        api = Crowded(clock, other_runs(77, 78), frees={"dpl_run77": 100})
+        found, error, said, state, latitude = bring_up_crowded(api, clock, tmp)
+        out.append(("capacity wait: refused at once with two servers held, then one ends: it waits (on the injected sleep), orders again and the node comes up "
+                    "(the old create asked every location and said no location took the order)",
+                    found is not None and not error and [n["name"] for n in api.nodes] == ["ci78a1x", "ci5a1x"] and 100 <= clock.now < 100 + 2 * t.CAPACITY_POLL_S
+                    and "no location took the order" not in error))
+        out.append(("capacity wait: ONE refusal ends the round, the other locations are not asked (not the next-site path), and the number it learned is kept",
+                    api.refusals == 1 and len(api.created) == 1 and latitude.capacity == 2))
+        out.append(("capacity wait: each look says who holds the servers: the hostnames, the run ids they carry and their age",
+                    "ci77a1x (run 77 attempt 1" in said and "ci78a1x (run 78 attempt 1" in said and "10 min old" in said
+                    and "the team may deploy 2 bare metal servers and 2 are held" in said and "polling every %d s" % t.CAPACITY_POLL_S in said))
+        out.append(("capacity wait: the servers of other runs are never touched", api.deleted == []))
+    # --- the cap: red, naming the holders ---
+    with tempfile.TemporaryDirectory() as tmp:
+        clock = Clock()
+        api = Crowded(clock, other_runs(77, 78))
+        found, error, said, state, latitude = bring_up_crowded(api, clock, tmp)
+        out.append(("capacity wait: both held past the cap: red, with the holders by name and run, the number the account allows and how long it waited; the cap "
+                    "is never overrun",
+                    found is None and "ci77a1x (run 77" in error and "ci78a1x (run 78" in error and "only 2 bare metal servers" in error
+                    and t.CAPACITY_WAIT_CAP_S - t.CAPACITY_POLL_S <= clock.now <= t.CAPACITY_WAIT_CAP_S and "no location took the order" not in error))
+        out.append(("capacity wait: ended at the cap, nothing was ordered that succeeded, and what this run had is off; the holders stay",
+                    [n["name"] for n in api.nodes] == ["ci77a1x", "ci78a1x"] and api.deleted == [] and api.refusals == 1))
+    # --- the wait takes nothing from what comes after it ---
+    with tempfile.TemporaryDirectory() as tmp:
+        clock = Clock()
+        last = t.CAPACITY_WAIT_CAP_S - 2 * t.CAPACITY_POLL_S
+        api = Crowded(clock, other_runs(77, 78), frees={"dpl_run78": last})
+        found, error, said, state, latitude = bring_up_crowded(api, clock, tmp)
+        out.append(("capacity wait: freed in the last poll of the cap, the node still has the reserve of the deadline left for the bootstrap and the runners",
+                    found is not None and state["deadline_at"] - (WALL0 + clock.now) >= t.PROVISION_RESERVE_S))
+    node_limit_s = release_node_job()["timeout-minutes"] * 60
+    out.append(("capacity wait: the cap and the reserve are the deadline, which with 5 minutes for the node job's own steps fits in that job's timeout (release.yml); "
+                "the cap is the longest hold of a full run written in the comment of the cap (plus margin); the poll is shorter than the shortest hold measured",
+                t.CAPACITY_WAIT_CAP_S + t.PROVISION_RESERVE_S == t.PROVISION_DEADLINE_S and t.PROVISION_DEADLINE_S + 5 * 60 <= node_limit_s
+                and t.CAPACITY_WAIT_CAP_S >= longest_full_hold_s() and t.CAPACITY_POLL_S * 30 <= 18.5 * 60))
+    # --- a refusal the list contradicts waits a poll, it does not spin ---
+    with tempfile.TemporaryDirectory() as tmp:
+        clock = Clock()
+        api = Crowded(clock, other_runs(77), hidden=1, hidden_until=100)
+        found, error, said, state, latitude = bring_up_crowded(api, clock, tmp)
+        out.append(("capacity wait: refused with one of two listed (another project's slot): one poll each time, never asked again at once, ordered when it ends",
+                    found is not None and api.refusals >= 2 and 100 <= clock.now <= 100 + 2 * t.CAPACITY_POLL_S and "another project's" in said))
+    # --- any other 422 is the next location, as before ---
+    clock = Clock()
+    api = FakeLatitude(refuse_sites=("DAL",))
+    latitude = t.Latitude(PROJECT, KEY, api, clock.sleep)
+    created = latitude.create("ci5a1x", "k", clock, clock.sleep)
+    out.append(("capacity wait: a 422 about a location (not the capacity) is still the next location, with no waiting",
+                created == "dpl_x" and [c["site"] for c in api.created] == ["DAL", "NYC"] and clock.now == 0))
+    clock = Clock()
+    api = FakeLatitude(refuse_sites=("DAL", "NYC", "AMS", "MEX2"))
+    try:
+        t.Latitude(PROJECT, KEY, api, clock.sleep).create("ci5a1x", "k", clock, clock.sleep)
+        said = "no error"
+    except t.NodeError as exc:
+        said = str(exc)
+    out.append(("capacity wait: every location refusing for its own reason is still `no location took the order`, at once", "no location took the order" in said and clock.now == 0))
+    # --- the 422 of the capacity is not in the path of the others ---
+    source = (HERE / "latitude_node.py").read_text(encoding="utf-8")
+    body = source[source.index("    def create("):source.index("    def delete(")]
+    out.append(("capacity wait: in create the capacity refusal is read before TRY_NEXT_SITE, and leaves the loop of locations",
+                body.index("capacity_of(str(exc))") < body.index("TRY_NEXT_SITE") and "full = capacity_of(str(exc))" in body))
+    # --- every number is a measurement, said where it is ---
+    lines = source.splitlines()
+    unmeasured = []
+    for name in ("PROVISION_RESERVE_S", "CAPACITY_WAIT_CAP_S", "CAPACITY_POLL_S"):
+        row = next(i for i, l in enumerate(lines) if l.startswith(name + " = "))
+        above = []
+        while row and lines[row - 1].startswith("#"):
+            row -= 1
+            above.append(lines[row])
+        if not above or not above[-1].startswith("# measured:") or not re.search(r"\d{8,}", " ".join(above)) and name != "CAPACITY_POLL_S":
+            unmeasured.append(name)
+    out.append(("capacity wait: the reserve, the cap and the poll each have `# measured:` above them (the first two with the ids of the runs measured)", not unmeasured))
+    # --- the API's failure to list is a look that said nothing ---
+    with tempfile.TemporaryDirectory() as tmp:
+        clock = Clock()
+        api = Crowded(clock, other_runs(77, 78), frees={"dpl_run77": 100})
+        flaky = {"n": 0}
+
+        def lists_badly(method, url, headers, body):
+            if "/servers?" in url and 40 <= clock.now < 70:
+                flaky["n"] += 1
+                return 503, b"busy"
+            return api(method, url, headers, body)
+        found, error, said, state, latitude = bring_up_crowded(lists_badly, clock, tmp)
+        out.append(("capacity wait: a list the API does not answer for a minute is not a free slot nor an end of the wait", found is not None and flaky["n"] > 0 and clock.now >= 100))
+    return out
+
+
 def group_node_hardening():
     """Three things that keep a node from staying on when a run is cut: a second look in `off` for a node job that did not succeed, a deadline
     of up and prepare together shorter than the node job's own, and a sweeper that runs when a release run ends."""
@@ -2778,8 +2955,9 @@ def group_node_hardening():
                 "recheck=0 if a.if_legs_done else OFF_RECHECK_S" in inspect.getsource(t.run_off)))
 
     # --- one deadline for up and prepare ---------------------------------------------------------------------------------------------------------------
-    out.append(("deadline: up and prepare have 40 minutes in all, inside the node job's 45 (release.yml), with room for the delete",
-                t.PROVISION_DEADLINE_S == 2400 and t.PROVISION_DEADLINE_S + 5 * 60 <= 45 * 60))
+    out.append(("deadline: up and prepare have the cap and the reserve in all, inside the node job's timeout (release.yml), with 5 minutes for the delete and the steps around",
+                t.PROVISION_DEADLINE_S == t.CAPACITY_WAIT_CAP_S + t.PROVISION_RESERVE_S
+                and t.PROVISION_DEADLINE_S + 5 * 60 <= release_node_job()["timeout-minutes"] * 60))
     clock = Clock()
     try:
         t.remaining(clock() - 1, clock)
@@ -2787,7 +2965,7 @@ def group_node_hardening():
     except t.NodeError as exc:
         left_error = str(exc)
     out.append(("deadline: a phase with nothing left fails by itself, saying so (the node is then deleted by the script, not by the kill)",
-                "within 2400 s" in left_error and t.remaining(None, clock) is None and t.remaining(clock() + 5, clock) == 5))
+                ("within %d s" % t.PROVISION_DEADLINE_S) in left_error and t.remaining(None, clock) is None and t.remaining(clock() + 5, clock) == 5))
 
     bad_gateway = (100, "", "E: Failed to fetch http://x/InRelease  502  Bad Gateway")
     clock = Clock()
@@ -2816,7 +2994,7 @@ def group_node_hardening():
         late_error = ""
     except t.NodeError as exc:
         late_error = str(exc)
-    out.append(("deadline: a bootstrap that starts past the deadline is not run at all", "within 2400 s" in late_error and stuck.bootstraps == 0))
+    out.append(("deadline: a bootstrap that starts past the deadline is not run at all", ("within %d s" % t.PROVISION_DEADLINE_S) in late_error and stuck.bootstraps == 0))
 
     class SlowUp:
         """A node whose address never comes: wait_up gives up at what is left of the deadline, not at its own 900 s."""
@@ -2851,7 +3029,7 @@ GROUPS = [group_prefetch, group_node_deps, group_node_bootstrap_closure, group_c
           group_lost_either_order, group_two_legs, group_relaunch, group_stuck, group_watch_stages, group_sweep, group_secrets,
           group_probe, group_runner, group_cancelled_by_hand, group_runner_clock, group_same_code,
           group_workflow_steps, group_any_shape, group_clear_verdicts, group_dispatch_once, group_lingering_and_silence,
-          group_refused_job, group_address, group_host_key, group_deployment_id, group_bootstrap_retry, group_node_hardening]
+          group_refused_job, group_address, group_host_key, group_deployment_id, group_bootstrap_retry, group_node_hardening, group_capacity_wait]
 
 
 def cases() -> list:

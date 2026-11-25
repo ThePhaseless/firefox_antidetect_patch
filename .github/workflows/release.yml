@@ -327,7 +327,10 @@ jobs:
     if: needs.plan.outputs.attempt == github.run_attempt && needs.plan.outputs.reuse_run_id == ''
     runs-on: ubuntu-24.04
     environment: latitude-builder
-    timeout-minutes: 45
+    # 85 minutes = latitude_node.PROVISION_DEADLINE_S (4800 s: the capacity wait of 4200 s, which is the longest hold of a node by a full run measured, 66.8 min in run
+    # 45499190667, with margin, plus the 600 s reserve) + 5 minutes for the steps of this job around it. A run waiting for a node holds none: only these runner minutes.
+    # test_latitude_node.py holds the relation between this number and the constants.
+    timeout-minutes: 85
     permissions: { actions: read, contents: read }
     steps:
       - name: The series (this repository, this commit)
