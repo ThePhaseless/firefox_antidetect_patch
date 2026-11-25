@@ -247,7 +247,7 @@ def test_port_stops_before_it_merges_when_a_fix_is_in_the_new_tag(world, capsys)
     assert stop.value.code not in (0, None) and isinstance(stop.value.code, str), "a non-zero exit with the message"
     assert "port stopped before it merged anything: 1 folder(s) say Mozilla ships their fix in FIREFOX_160_0_RELEASE or before" in message
     assert "  fingerprint/a: fixed_in FIREFOX_160_0_RELEASE" in message and "platform/b" not in message
-    assert "next: python tools/engine.py port --to FIREFOX_160_0_RELEASE --source <source>" in message and "export" in message and RULE in message
+    assert "next: python tools/engine.py port --to FIREFOX_160_0_RELEASE --source <source>" in message and "export" in message and RULE.replace("rule:", "Rule:") in message
     assert subprocess.run(["git", "-C", str(world), "rev-parse", "-q", "--verify", "refs/heads/port/x"], capture_output=True).returncode != 0, "nothing merged"
     assert capsys.readouterr().out == "", "it stopped, it did not print and go on"
 

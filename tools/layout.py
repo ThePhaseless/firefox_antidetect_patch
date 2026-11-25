@@ -18,6 +18,13 @@ to Firefox's tree, by path, to the folder that owns them.
 from __future__ import annotations
 
 import re
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from failure import fail  # noqa: E402
+
+RULE = "series-01-export-is-the-only-writer"      # layout.py is one of the files edited by hand; the export stops until it names the owner
 
 GROUP_ORDER = ["platform", "stillborn", "network", "automation", "fingerprint", "port"]
 
@@ -394,14 +401,18 @@ def own_file_folder(path: str) -> str:
     for pattern, folder in OWN_FILES:
         if re.search(pattern, path):
             return folder
-    raise KeyError("no folder owns our file %s: add it to OWN_FILES" % path)
+    raise KeyError(str(fail(
+        "tools/layout.py OWN_FILES", "no folder owns our file %s" % path,
+        "add a pattern for it to OWN_FILES in tools/layout.py (the folder that owns the feature), then export again", RULE)))
 
 
 def feature_folder(feature: str) -> str:
     try:
         return FEATURES[feature]
     except KeyError:
-        raise KeyError("feature %r has no folder: add it to FEATURES" % feature) from None
+        raise KeyError(str(fail(
+            "tools/layout.py FEATURES", "the feature %r has no folder" % feature,
+            "add it to FEATURES in tools/layout.py with the folder that owns it, then export again", RULE))) from None
 
 
 def folder_sort_key(folder: str):

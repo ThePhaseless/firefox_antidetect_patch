@@ -52,7 +52,9 @@ def test_a_failing_node_test_is_named(monkeypatch, tmp_path):
         stderr = ""
 
     monkeypatch.setattr(export_gate.subprocess, "run", lambda *a, **k: Done())
-    assert export_gate.run_node_tests(tmp_path, "node") == ["the flag has a bit of its own"]
+    got = export_gate.run_node_tests(tmp_path, "node")
+    assert len(got) == 1 and got[0].startswith("FAIL ") and "a node test is red: the flag has a bit of its own" in got[0], got
+    assert "Fix: " in got[0] and "Rule: docs/decisions/series-01-export-is-the-only-writer.md" in got[0]
 
 
 def test_a_tree_that_is_not_whole_is_refused(monkeypatch, tmp_path):
