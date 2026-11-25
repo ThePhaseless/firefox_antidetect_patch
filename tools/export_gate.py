@@ -79,7 +79,10 @@ def git(*args: str, cwd: Path | None = None) -> str:
     if done.returncode:
         raise SystemExit(str(fail(
             "git %s" % " ".join(args), "export refused: git failed: %s" % done.stderr.strip(),
-            "read the git message: the source repository, the commit to export or the path of ENGINE_NODE_GATE_TREE is wrong", RULE)))
+            "run `git %s` by hand (in %s) to see git's message, then by case: `not a git repository` means --source (or FIREFOX_SOURCE) is not the Firefox "
+            "repository: pass the folder that holds its .git; `unknown revision` or `bad object` means the commit or branch to export is missing: run "
+            "`git -C <source> fetch`, or pass --head with a branch it has; a path error naming the gate tree means ENGINE_NODE_GATE_TREE points at a "
+            "folder that does not exist: set it to an existing tree or unset it" % (" ".join(args), cwd or "the current folder"), RULE)))
     return done.stdout.strip()
 
 

@@ -317,7 +317,7 @@ class Source:
     def _git(self, *args: str) -> str:
         done = subprocess.run(["git", "-C", str(self.repo), *args], capture_output=True)
         if done.returncode not in (0, 1):
-            raise SystemExit(str(fail("git %s in %s" % (" ".join(args[:2]), self.repo),
+            raise SystemExit(str(fail("git %s in %s" % (" ".join(args), self.repo),
                                       "git exited with %d: %s" % (done.returncode, done.stderr.decode(errors="replace").strip()),
                                       "run the same git command by hand in that directory, fix what it says (a wrong --rev, a missing repository), "
                                       "then run python tools/births.py again", RULE)))

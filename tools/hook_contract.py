@@ -186,6 +186,7 @@ EXPLAIN = {
     "G2": "The one-line declarations and the internal calls of a renamed `Foo` are rewritten to the same new name as part of the same wrap.",
     "G9": "One plain argument of ours, a Stealth call, is added to a call on Mozilla's line (wrap-call, wrap-function).",
     "G15": "A guard with a value: `if (StealthX(this, aArg, &rv)) return rv;`, the guard returns the value our function computed.",
+    "G19": "No two files of ours share a basename: among the C, C++, JavaScript and Rust files of ours (but lib.rs, mod.rs, main.rs and build.rs), two with the same name in any folders fail prebuild, as soon as one of them is in scope.",
     "G20": "A test must also be run by a round: the candidate workflow's gtest filter, a node job, a python step or a cargo step runs it (rule T3).",
     "G21": "A shadow: `const auto GetX = StealthGetX;` at the top of a function gives Mozilla's name our value.",
     "G23": "An anchor on the last statement of a block, declared with its `anchor` and `why`, is not a C9.",
@@ -196,6 +197,7 @@ EXPLAIN = {
     "G40": "A forward declaration `class X;` or a file-scope declaration of a function of ours is a registration.",
     "G41": "tools/hook-names.json lists the functions that existed when rule C10 came; a hook may call them without the Stealth prefix, and a new function takes a Stealth name.",
     "G50": "In a preprocessed pref file or a JSON file, where a trailing comment is impossible, a marker comment alone on the line before a directive is the marker of the directive: one hook.",
+    "G51": "Per Mozilla file, the lines the head removes or rewrites (the `-` lines of the diff against the tag) are not more than the base's, unless a HOOKS.json entry of the file carries `replaces` (one rewritten line standing for several hooks); prebuild check 8.",
     "G53": "A wrap-expression over several lines: one line of ours opens the call (marker on it), Mozilla's lines between stay unchanged, the closing line is Mozilla's plus our `)` and the marker.",
 }
 

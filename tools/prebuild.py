@@ -1601,7 +1601,8 @@ def check_our_files(proj: Project, tree_path: str | None = None) -> list:
             by.setdefault(base_of(p), []).append(p)
     for b, ps in sorted(by.items()):
         if len(ps) > 1 and any(proj.in_scope(p) for p in ps):
-            out.append(Finding.failed(6, fail(ps[0], "rule G19: %d files of ours are named %s (%s)" % (len(ps), b, ", ".join(ps[1:])), "rename one of them", RULE_OWN)))
+            out.append(Finding.failed(6, fail(ps[0], "rule G19: %d files of ours are named %s (%s)" % (len(ps), b, ", ".join(ps[1:])), "keep %s and rename each of the others (%s): `git mv` the file, under the same src/ directory, to a basename that no other file of ours has "
+                 "(its directory's name in front of it), then change the moz.build, jar.mn, `mod` or #include line that names it" % (ps[0], ", ".join(ps[1:])), RULE_OWN)))
     # the in-tree checker overlaps the build-list part
     if tree_path:
         script = Path(tree_path) / "build" / "stealth_check_build_files.py"

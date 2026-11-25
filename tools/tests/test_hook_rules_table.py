@@ -23,6 +23,7 @@ import hooks_list as hl  # noqa: E402
 
 ROOT = TOOLS.parent
 FILES = {name: (TOOLS / name).read_text(encoding="utf-8") for name in ("hook_contract.py", "hooks_list.py")}
+PREBUILD = (TOOLS / "prebuild.py").read_text(encoding="utf-8")      # prints G19
 RULE_IDS = ["C%d" % i for i in range(1, 19)] + ["T1", "T2", "T3"]
 
 
@@ -198,9 +199,18 @@ def test_every_g_code_a_file_names_is_explained_and_every_explained_code_is_name
         named |= set(re.findall(r"\bG\d+\b", text))
     assert named <= set(hc.EXPLAIN), sorted(named - set(hc.EXPLAIN))
     for code in hc.EXPLAIN:
-        uses = sum(len(re.findall(r"\b%s\b" % code, text)) for text in FILES.values())
+        uses = sum(len(re.findall(r"\b%s\b" % code, text)) for text in list(FILES.values()) + [PREBUILD])
         assert uses >= 2, "%s is explained but no code names it" % code      # its own key counts once
     for text in (hc.forms_section(), "\n".join(str(hc.violation_failure(violation(r, "d"))) for r in hc.RULES)):
         assert set(re.findall(r"\bG\d+\b", text)) <= set(hc.EXPLAIN)
     for code, meaning in hc.EXPLAIN.items():
         assert re.fullmatch(r"G\d+", code) and meaning.strip().endswith(".")
+
+
+def test_every_g_code_prebuild_prints_is_explained():
+    import ast
+    printed = set()
+    for node in ast.walk(ast.parse(PREBUILD)):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            printed |= set(re.findall(r"\bG\d+\b", node.value))
+    assert "G19" in printed and printed <= set(hc.EXPLAIN), sorted(printed - set(hc.EXPLAIN))

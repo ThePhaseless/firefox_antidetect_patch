@@ -169,6 +169,8 @@ def halt(failure, next_command: str) -> str:
 def stop_if_not_marked(error: SystemExit, next_command: str) -> SystemExit:
     """The SystemExit of a stop that names no next step yet gets one (a message built by a helper that does not know the command)."""
     code = error.code
+    # Only a message that is already a failure gets the line: every SystemExit with text in these tools is raised as str(fail(...)) or
+    # halt(fail(...)), with its own rule (the scan of tools/tests/test_failure_messages.py finds any other); this adds `next:`, no message.
     if isinstance(code, str) and "\nnext: " not in code:
         return SystemExit("%s\nnext: %s" % (code, next_command))
     return error
@@ -1045,7 +1047,8 @@ def mozilla_backport_problems(folder: str, files: list, data: dict, patch: Path)
         theirs = normalized_diff(file_section(stored.read_bytes(), path))
         if not theirs:
             found.append(fail("%s/%s" % (folder, entry["diff"]), "it does not hold a diff of %s" % path,
-                                  "store the diff of the commit for that file", R_BACKPORT))
+                                  "store the diff of the commit for that file: run `git show --format= %s -- %s` in a clone of %s and save its output as %s/%s"
+                                  % (data["commit"], path, MOZILLA_REPO, folder, entry["diff"]), R_BACKPORT))
         elif hashlib.sha256(theirs).hexdigest() != entry["sha256"]:
             found.append(fail("%s/%s" % (folder, entry["diff"]),
                                   "it is not the diff that BACKPORT.json declares for %s (sha256 differs)" % path,
@@ -1500,7 +1503,7 @@ def raises_list_problems(rows: list, main_rows: list | None) -> list:
         name = r.get("file") if isinstance(r, dict) else None
         if not isinstance(r, dict) or set(r) not in (set(RAISE_FIELDS), set(RAISE_FIELDS) | {"budget"}):
             found.append(fail("tools/hook-budget-raises.json", "a row of %s does not have exactly the fields %s (and, to raise the removed budget, `budget`)"
-                                  % (name or "no file", ", ".join(RAISE_FIELDS)), "give the row exactly those fields", R_BUDGET))
+                                  % (name or "no file", ", ".join(RAISE_FIELDS)), "give the row exactly the fields %s, and `budget` only to raise the removed budget" % ", ".join(RAISE_FIELDS), R_BUDGET))
             continue
         if r.get("budget", "hook") not in RAISE_BUDGETS:
             found.append(fail("tools/hook-budget-raises.json", "the row of %s has the budget %r" % (name, r["budget"]),
@@ -1721,7 +1724,7 @@ def status(source: Path, head: str) -> int:
         return 0
     behind = git(source, "log", "--oneline", "%s..%s" % (up["exported_from"], head)).decode()
     print(fail("%s in the source repository" % head,
-               "it is %s, the series was exported from %s; the source moved:\n%s" % (now[:10], up["exported_from"][:10], behind.rstrip()),
+               "it is %s, the series was exported from %s; the source moved:\n%s" % (now, up["exported_from"], behind.rstrip()),
                "run export, then verify", R_SERIES))
     print("next: %s" % command("export", "--source", "<source>", "--head", head))
     return 1
@@ -1858,7 +1861,10 @@ def entry() -> int:
         raise SystemExit(halt(fail(
             "git %s" % " ".join(str(x) for x in exc.cmd[1:]),
             "it exited %s: %s" % (exc.returncode, (exc.stderr or b"").decode(errors="replace").strip() or "no message"),
-            "read the git message: a source that is not the Firefox repository, a branch or tag it does not have, or a repository that is locked; repair it, then run the command again",
+            "run `%s` by hand to see git's message, then by case: `not a git repository` means --source (or FIREFOX_SOURCE) is not the Firefox repository: "
+            "pass the folder that holds its .git; `unknown revision` or `bad object` means the branch or tag is missing: run `git -C <source> fetch --tags origin`, "
+            "or pass --head with a branch it has; `index.lock` exists means an earlier git run left it: delete that file once no git process is running; "
+            "then run the command again" % " ".join(str(x) for x in exc.cmd),
             R_SERIES), again)) from None
 
 
