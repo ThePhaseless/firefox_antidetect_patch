@@ -149,7 +149,7 @@
   "kind": "add",
   "form": "anchor",
   "line": "  mozilla::StealthNoteCallerObject(origin, target, targetIsChrome, targetSubsumesOrigin);  // STEALTH-HOOK(automation/hybrid-xrays)",
-  "test": "node:juggler/tests/caller_object_decision_is_written_before_its_branch_reads_it.test.mjs#no path reaches the branch without passing the anchor, and the anchor writes before the branch reads",
+  "test": "wrapper:tests/test_the_callers_code_is_not_counted_e2e.py::test_what_the_caller_hands_the_page_has_the_pages_own_prototypes",
   "anchor": "bool sameOrigin = targetSubsumesOrigin && originSubsumesTarget;",
   "why": "the decision is made from origin, target, targetIsChrome and targetSubsumesOrigin, locals that Rewrap computes in the lines above and that cannot be recomputed without copying Mozilla's subsumption logic; it must be written after them and before the branch that reads it, so a guard at the head of Rewrap has none of them"
  },
@@ -168,7 +168,7 @@
   "kind": "add",
   "form": "unknown",
   "line": "  else if (mozilla::StealthCallerObjectApplies()) wrapper = mozilla::StealthCallerObjectWrapper();  // STEALTH-HOOK(automation/hybrid-xrays)",
-  "test": "gtest:StealthCallerObject.TheDecisionIsTheCallersWorldReadByThePageItSubsumes"
+  "test": "wrapper:tests/test_the_callers_code_is_not_counted_e2e.py::test_what_the_caller_hands_the_page_has_the_pages_own_prototypes"
  },
  {
   "file": "js/xpconnect/wrappers/WrapperFactory.cpp",

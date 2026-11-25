@@ -87,7 +87,7 @@
   "reason": "port-06 (design-70): a rewrite of Mozilla text converted to an add-only form",
   "decided_by": "pm",
   "date": "2026-11-25",
-  "test": "gtest:StealthDeclaredNetwork.TheResponderStartsOnTheLoopbackWhateverListMozillaBuilt"
+  "test": "wrapper:tests/test_declared_host_network_e2e.py::test_two_connections_on_one_page_connect_in_the_time_of_retail"
  },
  {
   "file": "dom/xslt/xslt/txEXSLTFunctions.cpp",
@@ -157,7 +157,7 @@
   "reason": "port-06: registration of the gtest/declaration that tests the reshaped hook",
   "decided_by": "pm",
   "date": "2026-11-25",
-  "test": "gtest:StealthMouseEventIPC.TheIdIsReadOnlyWhenTheFieldBeforeItWasRead"
+  "test": "gtest:StealthMouseEventIPC.TheIdSurvivesTheMessage"
  },
  {
   "file": "dom/media/webrtc/jsapi/PeerConnectionImpl.cpp",
