@@ -347,7 +347,7 @@ def main(argv=None) -> int:
     p.add_argument("--out", required=True)
     for opt in ("--core", "--wrapper", "--core-extras", "--wrapper-extras"):
         p.add_argument(opt, default="")
-    p.set_defaults(fn=lambda a: Path(a.out).write_text(spec_text(Path(a.lock), a.core, a.wrapper, a.core_extras, a.wrapper_extras), encoding="utf-8", newline="\n") or 0)
+    p.set_defaults(fn=cmd_spec)
     p = sub.add_parser("build")
     p.add_argument("--lock", required=True)
     p.add_argument("--house", required=True)

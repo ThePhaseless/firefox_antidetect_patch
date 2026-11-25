@@ -216,6 +216,23 @@ def cases() -> list:
                                                                                           for c in flat[1:]) and flat[1].endswith("invisible_core") and flat[2].endswith("invisible_playwright"))
         add("consumer: pip's own version check (a read of the index) is off", all("--disable-pip-version-check" in c for c in flat))
 
+    # ── the exit status of a command: the workflow's `set -e` step reads it (the first run, 45528380482, died with 116 and 158 and printed nothing: `spec` exited with the
+    # number of characters it wrote, `Path.write_text(...) or 0`, taken mod 256)
+    import subprocess
+    with tempfile.TemporaryDirectory() as tmp:
+        out_file = Path(tmp) / "spec.txt"
+        done = subprocess.run([sys.executable, str(HERE / "py_deps.py"), "spec", "--lock", str(pd.LOCKS / "tools.txt"), "--core", "", "--wrapper", "", "--core-extras", "",
+                               "--wrapper-extras", "", "--out", str(out_file)], capture_output=True, text=True)
+        written = out_file.read_text(encoding="utf-8") if out_file.exists() else ""
+        old_form = Path(tmp) / "old.txt"
+        old_status = old_form.write_text(written, encoding="utf-8") or 0
+        add("spec exits 0 when it wrote the spec (not the number of characters, which a `set -e` step reads as a failure); the old form `write_text(...) or 0` exits %d on the same text"
+            % (old_status % 256), done.returncode == 0 and len(written) > 255 and old_status % 256 != 0
+            and pd.main(["spec", "--lock", str(pd.LOCKS / "tools.txt"), "--out", str(out_file)]) == 0)
+        add("every subcommand's function returns 0 or 1: spec, check, build and install are bound to a cmd_ function, not to a lambda",
+            all(name in pd.__dict__ for name in ("cmd_spec", "cmd_check", "cmd_build", "cmd_install", "cmd_lock"))
+            and "lambda" not in (HERE / "py_deps.py").read_text(encoding="utf-8").split("def main(", 1)[1])
+
     # ── the workflow: the committed file passes, a known-bad copy of each rule does not
     text = WORKFLOW.read_text(encoding="utf-8")
     add("py-deps.yml: the committed workflow follows the rule%s" % ("" if not workflow_problems(text) else ": " + "; ".join(workflow_problems(text))), not workflow_problems(text))
