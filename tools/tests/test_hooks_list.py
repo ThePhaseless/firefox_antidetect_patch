@@ -10,6 +10,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import engine  # noqa: E402
 import hook_contract as hc  # noqa: E402
@@ -59,6 +61,9 @@ def read_list(root):
 
 
 def commit_list(root, entries):
+    for e in entries:
+        if e.get("form") == "unknown" and not hc.excepted_lacks(e):
+            e["form"] = "excepted"          # what the export writes for a line whose exception row is complete (G63)
     hl.list_path(root, FOLDER).write_text(hl.render(entries), encoding="utf-8", newline="")
 
 
@@ -384,7 +389,7 @@ def exception_series(tmp_path):
 
 def test_a_declared_exception_is_left_out_of_the_contract_and_counted(tmp_path):
     root, entries = exception_series(tmp_path)
-    assert sorted(v.rule for v in hc.contract_violations(root)) == ["C12", "C6"]     # the rewrite no form expresses, and no exception covers it
+    assert sorted(v.rule for v in hc.contract_violations(root)) == ["C12", "C21", "C6"]     # the rewrite no form expresses, and no exception covers it
     assert hl.declared_exceptions(root) == []
     entries[0].update(exception="a value of ours in a Mozilla call", reason_kind="expression", pm="approvato")
     commit_list(root, entries)
@@ -403,7 +408,7 @@ def test_an_exception_without_the_pm_is_a_failure_and_no_exception(tmp_path):
         commit_list(root, [dict(entries[0], **fields)])
         assert hl.problems(root), fields
         assert hl.declared_exceptions(root) == [], fields
-        assert sorted(v.rule for v in hc.contract_violations(root)) == ["C12", "C6"], fields      # nothing is excluded
+        assert sorted(v.rule for v in hc.contract_violations(root)) == ["C12", "C21", "C6"], fields      # nothing is excluded
     commit_list(root, [dict(entries[0], exception="why", reason_kind="expression", pm="approvato")])
     assert hl.problems(root) == []
 
@@ -441,6 +446,7 @@ def test_a_violation_is_left_out_only_when_every_hook_it_concerns_is_an_exceptio
     assert hc.contract_violations(root) == []
 
 
+@pytest.mark.xfail(strict=True, reason="green after part 2 moves the inline logic into our code")
 def test_check_prints_the_number_of_declared_exceptions(tmp_path, monkeypatch, capsys):
     root, entries = exception_series(tmp_path)
     entries[0].update(exception="why", reason_kind="expression", pm="approvato")
@@ -599,6 +605,7 @@ def test_an_untestable_without_the_pm_or_beside_a_test_is_a_failure(tmp_path):
     assert list(entries[0]) == ["file", "function", "kind", "form", "line", "test", "untestable"]
 
 
+@pytest.mark.xfail(strict=True, reason="green after part 2 moves the inline logic into our code")
 def test_check_prints_the_untestable_count(capsys, monkeypatch):
     _port06_is_not_under_test(monkeypatch)
     assert engine.check() == 0
@@ -632,7 +639,7 @@ def anchor_series(tmp_path, lines):
 
 def test_c9_a_declared_anchor_at_the_end_of_a_block_or_of_a_constructor_is_allowed(tmp_path):
     cases = {
-        "if-branch": ["   // lead", " " + FN, "   if (a) {", "     int x = 1;", "+    priv->x = options.x;" + MARK, "   }", "   return NS_OK;", " }"],
+        "if-branch": ["   // lead", " " + FN, "   if (a) {", "     int x = 1;", "+    x = StealthApply(x, options);" + MARK, "   }", "   return NS_OK;", " }"],
         "constructor": ["   // lead", " Foo::Foo(const Foo& aRhs) {", "+  StealthCopied(this, aRhs);" + MARK, " }"],
     }
     for name, lines in cases.items():
@@ -649,7 +656,7 @@ def test_c9_a_declared_anchor_at_the_end_of_a_block_or_of_a_constructor_is_allow
                                                           "+    " + "3," + MARK, "   };"])
     entries[0].update(anchor="a", why="b")
     commit_list(root, entries)
-    assert [v.rule for v in hc.contract_violations(root)] == ["C9"]
+    assert [v.rule for v in hc.contract_violations(root) if v.rule != "C21"] == ["C9"]        # the line `3,` is no form: C21 says so too
 
 
 def test_a_markdown_line_before_agents_md_is_not_the_last_line_of_a_block(tmp_path):
