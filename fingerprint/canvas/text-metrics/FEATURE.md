@@ -2,7 +2,7 @@
 
 Category: spoof
 Prefs: none read directly (the engine gate `StealthEngineActive()` reads `zoom.stealth.fpp.hw_seed`)
-Test: wrapper `tests/test_canvas_measure_text_metrics_e2e.py::test_measure_text_vertical_metrics_are_whole_and_retail`, `tests/test_canvas_create_pattern_projection_e2e.py::test_create_pattern_from_a_webgl_canvas_carries_the_projection`, `tests/test_canvas_create_pattern_projection_e2e.py::test_create_pattern_from_an_offscreen_webgl_canvas_carries_the_projection` (to be written, green on firefox-68 first), gtest `StealthCanvasPageSnapshot.TheSnapshotOfTheContextIsNotTakenWhenItHasAnElement` (counts the calls: the element's snapshot is taken, never the context's own; the context without an element is the control); history: measureText additivity (the sum of the parts equals the whole)
+Test: wrapper `tests/test_canvas_measure_text_metrics_e2e.py::test_measure_text_vertical_metrics_are_whole_and_retail`, `tests/test_canvas_create_pattern_projection_e2e.py::test_create_pattern_from_a_webgl_canvas_carries_the_projection`, `tests/test_canvas_create_pattern_projection_e2e.py::test_create_pattern_from_an_offscreen_webgl_canvas_carries_the_projection`, gtest `StealthCanvasPageSnapshot.TheSnapshotOfTheContextIsNotTakenWhenItHasAnElement` (counts the calls: the element's snapshot is taken, never the context's own; the context without an element is the control); history: measureText additivity (the sum of the parts equals the whole)
 
 ## What it does
 

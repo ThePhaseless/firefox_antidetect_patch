@@ -41,7 +41,7 @@
   "kind": "add",
   "form": "guard",
   "line": "  if (StealthWebGLParameter(*this, cx, pname, retval, rv, debug)) return;  // STEALTH-HOOK(fingerprint/webgl/parameters)",
-  "test": "gtest:StealthWebGLParams.TheDeclaredRendererAndVendorAnswerTheirPnames"
+  "test": "wrapper:tests/test_webgl_declared_parameters_e2e.py::test_declared_renderer_and_vendor_are_read_in_every_form"
  },
  {
   "file": "dom/canvas/ClientWebGLContext.cpp",

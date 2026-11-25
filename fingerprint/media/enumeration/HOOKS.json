@@ -49,7 +49,7 @@
   "kind": "add",
   "form": "wrap-expression",
   "line": "          StealthDeclaredEnumeration(  // STEALTH-HOOK(fingerprint/media/enumeration)",
-  "test": "gtest:StealthMediaEnumeration.WithADeclarationTheCallbackRunsLaterWithTheSameValue"
+  "test": "wrapper:tests/test_the_device_enumeration_takes_the_declared_time_e2e.py::test_the_first_enumeration_takes_the_declared_time"
  },
  {
   "file": "dom/media/MediaManager.cpp",
@@ -58,6 +58,6 @@
   "form": "wrap-expression",
   "line": "          }),  // STEALTH-HOOK(fingerprint/media/enumeration)",
   "removed": "          },",
-  "test": "gtest:StealthMediaEnumeration.WithADeclarationTheCallbackRunsLaterWithTheSameValue"
+  "test": "wrapper:tests/test_the_device_enumeration_takes_the_declared_time_e2e.py::test_the_first_enumeration_takes_the_declared_time"
  }
 ]

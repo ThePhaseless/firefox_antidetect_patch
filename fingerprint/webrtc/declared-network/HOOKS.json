@@ -38,7 +38,7 @@
   "form": "wrap-expression",
   "line": "    if (StealthMdnsResponderWanted(!addrstring.empty())) {  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
   "removed": "    if (!addrstring.empty()) {",
-  "test": "gtest:StealthDeclaredNetwork.TheResponderStartsOnTheLoopbackWhateverListMozillaBuilt"
+  "test": "wrapper:tests/test_declared_host_network_e2e.py::test_two_connections_on_one_page_connect_in_the_time_of_retail"
  },
  {
   "file": "dom/media/webrtc/transport/ipc/StunAddrsRequestParent.cpp",
@@ -47,7 +47,7 @@
   "form": "wrap-expression",
   "line": "    : mAddrsString(StealthMdnsInterfaces(aAddrsString)) {}  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
   "removed": "    : mAddrsString(aAddrsString) {}",
-  "test": "gtest:StealthDeclaredNetwork.TheResponderStartsOnTheLoopbackWhateverListMozillaBuilt"
+  "test": "wrapper:tests/test_declared_host_network_e2e.py::test_two_connections_on_one_page_connect_in_the_time_of_retail"
  },
  {
   "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",

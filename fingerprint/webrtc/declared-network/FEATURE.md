@@ -2,7 +2,7 @@
 
 Category: build, other, spoof
 Prefs: none (the declaration is the environment variable STEALTHFOX_WEBRTC_NETWORK, read where the interfaces are enumerated)
-Test: StealthDeclaredNetwork.* (dom/media/webrtc/transport/test/gtest/TestStealthDeclaredNetwork.cpp and TestStealthDeclaredNetworkBirth.cpp
+Test: StealthDeclaredNetwork.* (dom/media/webrtc/transport/test/gtest/TestStealthDeclaredNetwork.cpp and TestStealthDeclaredNetworkBirth.cpp; wrapper:tests/test_declared_host_network_e2e.py::test_two_connections_on_one_page_connect_in_the_time_of_retail (two connections on one page connect in under the responder's first retry: the hooks of `StunAddrsRequestParent.cpp` and `lib.rs` make the responder start on the loopback and hear itself)
 (the default address with no socket made; the host ports of a connection through nr_socket_local_create; the responder starts on the loopback
 whatever list Mozilla built: TheResponderStartsOnTheLoopbackWhateverListMozillaBuilt), in the default gtest filter of
 the candidate); the cargo test mdns_service::stealth_tests::stealth_responder_on_the_loopback_hears_its_own_query; the mtransport unit tests gather on a declared adapter (test/gtest_utils.h, test/nr_stealth_test_network.h); the node tests
