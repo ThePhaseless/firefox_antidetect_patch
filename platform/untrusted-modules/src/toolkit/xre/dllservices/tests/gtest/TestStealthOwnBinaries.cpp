@@ -10,6 +10,7 @@
 
 #include <iterator>
 #include <windows.h>
+#include <psapi.h>
 
 #include "gtest/gtest.h"
 
@@ -80,4 +81,56 @@ TEST(StealthOwnBinaries, TheSignatureLookupIsMadeOnlyForAModuleThatIsNotOurOwn)
   lookups = 0;
   mozilla::StealthSignatureLookupUnlessOwn(exe, lookup);
   EXPECT_EQ(lookups, 0);
+}
+
+namespace {
+
+// The path of a module of this process as the loader records it (the name of its mapped section, \Device\...): the form
+// ModuleRecord takes.
+nsString NtPathOfModule(HMODULE aModule) {
+  wchar_t mapped[MAX_PATH + 1] = {};
+  if (!::GetMappedFileNameW(::GetCurrentProcess(), aModule, mapped, std::size(mapped))) {
+    return nsString();
+  }
+  return nsString(mapped);
+}
+
+}  // namespace
+
+// hook-04 for the line in Mozilla's file: the test goes through Mozilla's own ModuleRecord, whose constructor runs
+// GetVersionAndVendorInfo, and so the hook line of untrusted-modules there (the signature lookup handed to
+// StealthSignatureLookupUnlessOwn). For the running executable's own file the lookup is skipped: the counter of our file goes
+// up by exactly one and the vendor, when there is one, comes from the version resource and not from a signature. For a module
+// of the system (the control) the lookup is made and the counter does not move. Without the hook line Mozilla's statement does
+// not call our function, the counter stays at 0 and the test fails.
+TEST(StealthOwnBinaries, ModuleRecordSkipsTheSignatureLookupOfTheRunningExecutableOnly)
+{
+  const nsString exeNt = NtPathOfModule(nullptr);
+  ASSERT_FALSE(exeNt.IsEmpty());
+  wchar_t exePath[MAX_PATH * 4];
+  const DWORD exeLen = ::GetModuleFileNameW(nullptr, exePath, std::size(exePath));
+  ASSERT_TRUE(exeLen > 0 && exeLen < std::size(exePath));
+  if (!mozilla::StealthSkipsSignatureLookupOf(nsDependentString(exePath, exeLen))) {
+    GTEST_SKIP() << "the test process has no version resource of its own";
+  }
+
+  // The control: a module of the system. Its signature is looked up, so our counter does not move.
+  const nsString ntdllNt = NtPathOfModule(::GetModuleHandleW(L"ntdll.dll"));
+  ASSERT_FALSE(ntdllNt.IsEmpty());
+  const uint32_t beforeControl = mozilla::StealthOwnBinarySkips();
+  {
+    mozilla::ModuleRecord control(ntdllNt);
+    EXPECT_NE(control.mResolvedDosName.get(), nullptr);
+  }
+  EXPECT_EQ(mozilla::StealthOwnBinarySkips(), beforeControl);
+
+  // The running executable: the lookup is skipped, once.
+  const uint32_t before = mozilla::StealthOwnBinarySkips();
+  mozilla::ModuleRecord own(exeNt);
+  ASSERT_NE(own.mResolvedDosName.get(), nullptr);
+  EXPECT_EQ(mozilla::StealthOwnBinarySkips(), before + 1);
+  if (own.mVendorInfo.isSome()) {
+    EXPECT_TRUE(own.mVendorInfo->mSource == mozilla::VendorInfo::Source::VersionInfo)
+        << "the vendor of a module whose signature was not looked up came from a signature";
+  }
 }

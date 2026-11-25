@@ -23,8 +23,7 @@
 constexpr uint32_t kStealthSfeAsDrawn = 1u << 31;
 
 // Who asks for it: nsImageRenderer::PrepareImage, because -moz-element SHOWS
-// the element, like the screen, so a canvas is shown as drawn; and the
-// chrome-only compareCanvases test hook (nsDOMWindowUtils.cpp). Both call
+// the element, like the screen, so a canvas is shown as drawn. It calls
 // nsLayoutUtils::StealthSurfaceFromElementAsDrawn.
 
 // Whether a caller of nsLayoutUtils::SurfaceFromElement asked for the canvas as

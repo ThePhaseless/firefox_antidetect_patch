@@ -229,7 +229,6 @@ OWN_FILES = [
     (r"^js/xpconnect/wrappers/StealthHybridXray\.", "automation/hybrid-xrays"),
     (r"^dom/canvas/StealthOffscreenSnapshot\.", "fingerprint/canvas/noise-projection"),
     (r"^dom/base/test/gtest/TestStealthInputEventBirth\.", "fingerprint/input/event-birth"),
-    (r"^dom/base/StealthCanvasAsDrawn\.", "fingerprint/canvas/as-drawn"),
     (r"^layout/base/StealthSurfaceFlags\.", "fingerprint/canvas/as-drawn"),
     (r"^dom/base/StealthJugglerInput\.", "automation/input"),
     (r"^dom/base/StealthJugglerEventId\.", "automation/input"),

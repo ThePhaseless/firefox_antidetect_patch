@@ -1,19 +1,18 @@
 diff --git a/dom/base/nsDOMWindowUtils.cpp b/dom/base/nsDOMWindowUtils.cpp
-index b39212b1c9710b3530502c8a39932f0523f46875..a1070711fa37b103fd07c6a5c87b47f08c2bdada 100644
+index b39212b1c9710b3530502c8a39932f0523f46875..d315ffa27c8bc083972ad7651ab69977d1c4c79e 100644
 --- a/dom/base/nsDOMWindowUtils.cpp
 +++ b/dom/base/nsDOMWindowUtils.cpp
-@@ -145,6 +145,10 @@
+@@ -145,6 +145,9 @@
  #  undef GetClassName
  #endif
  
-+#include "StealthCanvasAsDrawn.h"  // STEALTH-HOOK(fingerprint/canvas/as-drawn)
 +#include "StealthInputEventBirth.h"  // STEALTH-HOOK(fingerprint/input/event-birth)
 +#include "StealthJugglerInput.h"  // STEALTH-HOOK(automation/input)
 +
  using namespace mozilla;
  using namespace mozilla::dom;
  using namespace mozilla::ipc;
-@@ -723,7 +727,8 @@ nsDOMWindowUtils::SendWheelEvent(float aX, float aY, double aDeltaX,
+@@ -723,7 +726,8 @@ nsDOMWindowUtils::SendWheelEvent(float aX, float aY, double aDeltaX,
                                   uint32_t aDeltaMode, int32_t aModifiers,
                                   int32_t aLineOrPageDeltaX,
                                   int32_t aLineOrPageDeltaY, uint32_t aOptions,
@@ -23,7 +22,7 @@ index b39212b1c9710b3530502c8a39932f0523f46875..a1070711fa37b103fd07c6a5c87b47f0
    if (XRE_IsContentProcess() && aCallback &&
        ((aOptions & WHEEL_EVENT_ASYNC_ENABLED) ||
         StaticPrefs::test_events_async_enabled())) {
-@@ -758,6 +763,7 @@ nsDOMWindowUtils::SendWheelEvent(float aX, float aY, double aDeltaX,
+@@ -758,6 +762,7 @@ nsDOMWindowUtils::SendWheelEvent(float aX, float aY, double aDeltaX,
    wheelEvent.mCallbackId = notifier.SaveCallback();
    wheelEvent.mFlags.mIsSynthesizedForTests = true;
  
@@ -31,15 +30,6 @@ index b39212b1c9710b3530502c8a39932f0523f46875..a1070711fa37b103fd07c6a5c87b47f0
    nsPresContext* presContext = GetPresContext();
    NS_ENSURE_TRUE(presContext, NS_ERROR_FAILURE);
  
-@@ -1403,7 +1409,7 @@ nsDOMWindowUtils::NodesFromRect(float aX, float aY, float aTopSize,
- static already_AddRefed<DataSourceSurface> CanvasToDataSourceSurface(
-     HTMLCanvasElement* aCanvas) {
-   MOZ_ASSERT(aCanvas);
--  SurfaceFromElementResult result = nsLayoutUtils::SurfaceFromElement(aCanvas);
-+  SurfaceFromElementResult result = nsLayoutUtils::StealthSurfaceFromElementAsDrawn(aCanvas);  // STEALTH-HOOK(fingerprint/canvas/as-drawn)
-   const RefPtr<SourceSurface> surf = result.GetSourceSurface();
-   if (!surf) {
-     return nullptr;
 diff --git a/dom/events/EventStateManager.cpp b/dom/events/EventStateManager.cpp
 index 294b486e9666fce45bcb2bc13231441ede997784..bde71517f79693408dcf86d76c89cf5d564d8fbb 100644
 --- a/dom/events/EventStateManager.cpp

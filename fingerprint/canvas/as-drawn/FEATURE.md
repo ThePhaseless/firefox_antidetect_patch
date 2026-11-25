@@ -6,7 +6,7 @@ Test: wrapper:tests/test_moz_element_paints_a_webgl_canvas_as_drawn_e2e.py::test
 
 ## What it does
 
-The browser's own readers that SHOW a canvas (`-moz-element` painting, the drag image, the Windows taskbar preview, the chrome-only compareCanvases hook) read its pixels as drawn, without the noise projection that a page's read-back gets (`GetSurfaceSnapshot` applies it for WebGL/WebGPU contexts, `GetSurfaceSnapshotAsDrawn` skips it; both are owned by fingerprint/canvas/noise-projection). Every other caller of `nsLayoutUtils::SurfaceFromElement` is a page reading or drawing with the canvas and gets the noised snapshot, as Mozilla's code calls it. The flag `kStealthSfeAsDrawn` tells the two apart; the readers that show a canvas ask for it through `nsLayoutUtils::StealthSurfaceFromElementAsDrawn`.
+The browser's own readers that SHOW a canvas (`-moz-element` painting, the drag image, the Windows taskbar preview) read its pixels as drawn, without the noise projection that a page's read-back gets (`GetSurfaceSnapshot` applies it for WebGL/WebGPU contexts, `GetSurfaceSnapshotAsDrawn` skips it; both are owned by fingerprint/canvas/noise-projection). Every other caller of `nsLayoutUtils::SurfaceFromElement` is a page reading or drawing with the canvas and gets the noised snapshot, as Mozilla's code calls it. The flag `kStealthSfeAsDrawn` tells the two apart; the readers that show a canvas ask for it through `nsLayoutUtils::StealthSurfaceFromElementAsDrawn`.
 
 ## Hooks in Mozilla files
 
@@ -22,7 +22,7 @@ The last two are not spoof: a page cannot read either; they keep the host's own 
 
 A canvas as DRAWN, without the canvas noise: for the browser's own
 readers that show it and never hand its bytes to a page (-moz-element,
-nsDOMWindowUtils). Every other caller is a page reading the canvas or
+the drag image, the taskbar preview). Every other caller is a page reading the canvas or
 drawing with it, and gets what HTMLCanvasElement::GetSurfaceSnapshot
 and OffscreenCanvas::GetSurfaceSnapshot give a page.
 
@@ -32,6 +32,6 @@ conflict. It is on bit 31 (Mozilla's end at bit 8 in 157 and 159), marked
 STEALTH-FLAG-SPACE(layout/base/nsLayoutUtils.h, SFE_), and
 build/stealth_check_sources.py fails if an SFE_ flag takes it.
 
-`HTMLCanvasElement::StealthGetSurfaceSnapshot` takes the arguments as Mozilla's `GetSurfaceSnapshot` does (the alpha type pointer and the draw target pointer), so the call passes exactly what Mozilla's line passed. The chrome-only compareCanvases hook (dom/base/StealthCanvasAsDrawn.h) asks for the canvases as drawn through the same template, `StealthSurfaceFromElementAsDrawn`.
+`HTMLCanvasElement::StealthGetSurfaceSnapshot` takes the arguments as Mozilla's `GetSurfaceSnapshot` does (the alpha type pointer and the draw target pointer), so the call passes exactly what Mozilla's line passed.
 
 The method names `GetSurfaceSnapshotAsDrawn` (HTMLCanvasElement, OffscreenCanvas) belong to fingerprint/canvas/noise-projection (G1); this folder only calls them.

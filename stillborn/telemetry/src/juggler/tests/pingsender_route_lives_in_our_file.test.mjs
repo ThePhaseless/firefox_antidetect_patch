@@ -202,3 +202,31 @@ test("negative control: a start that goes back to Mozilla's process is seen by t
   m.StealthRoutedProcess({ runAsync: () => ran.push('runAsync') }).runAsync(['u', 'p'], 2, {});
   assert.deepEqual(ran, ['runAsync']);
 });
+
+// ---- Mozilla's own choice is already the background task ----
+// With toolkit.telemetry.shutdownPingSender.backgroundtask.enabled (or the Nimbus variable) true, Mozilla's params start with
+// `--backgroundtask pingsender`. The child is `firefox --backgroundtask pingsender <urls and paths>` in both states: the pair
+// is not given twice (BackgroundTask_pingsender would read the second one as an endpoint and reject the task).
+
+const childArgs = params => {
+  const s = stubs();
+  load('win', s.globals).StealthRoutedProcess({ runAsync() {} }).runAsync(params, params.length, {});
+  return JSON.parse(s.log.find(e => e[0] === 'run')[1]);
+};
+
+test('pref off: Mozilla\'s params are the urls and paths, the child gets our pair once', () => {
+  assert.deepEqual(childArgs(['u1', 'p1', 'u2', 'p2']),
+    ['--backgroundtask', 'pingsender', 'u1', 'p1', 'u2', 'p2']);
+});
+
+test('pref on: Mozilla\'s params already start with the pair, the child still gets it once', () => {
+  assert.deepEqual(childArgs(['--backgroundtask', 'pingsender', 'u1', 'p1']),
+    ['--backgroundtask', 'pingsender', 'u1', 'p1']);
+  // The same child in both states.
+  assert.deepEqual(childArgs(['--backgroundtask', 'pingsender', 'u1', 'p1']), childArgs(['u1', 'p1']));
+});
+
+test('a url or path that looks like the pair later in the list is left alone', () => {
+  assert.deepEqual(childArgs(['u1', '--backgroundtask', 'pingsender']),
+    ['--backgroundtask', 'pingsender', 'u1', '--backgroundtask', 'pingsender']);
+});
