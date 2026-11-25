@@ -83,19 +83,41 @@ GITHUB_API = "https://api.github.com"
 # Its dearest location was $1.48 an hour when read, and the plan is billed by the started hour.
 MAX_PRICE_USD_HOUR = 1.50
 # What the API answers when a location no longer has what it listed a moment ago, or
-# refuses that location: the next cheapest is asked. Anything else is final.
+# refuses that location: the next cheapest is asked. Anything else is final. The one 422 that is
+# not about a location, the team's capacity (CAPACITY_REFUSAL), never takes this path: it is a wait.
 TRY_NEXT_SITE = ("HTTP 400", "HTTP 409", "HTTP 422")
+# The team holds as many bare metal servers as its account allows, and every location refuses the
+# same way (run 45536415264: "HTTP 422 DEPLOYMENT_ERROR: Your team can deploy only 2 bare metal servers",
+# from every location in turn). It says nothing of a location, so asking the next one is no answer: the
+# servers are other runs' nodes, which end by themselves. The number is read from the message, never written here.
+CAPACITY_REFUSAL = re.compile(r"HTTP 422\b.*?can deploy only (\d+) bare metal servers?", re.S)
 # Measured: 21 s, from a pool of ready machines. A real install takes longer.
 UP_LIMIT_S = 900
 # Measured from a hosted runner to a node: 1440 and below carry everything. Kept lower, for paths not measured.
 PATH_MTU = 1200
 BOOTSTRAP_LIMIT_S = 1200
-# ONE deadline for up() and prepare() together, from the create to the last runner online (up writes it into its state file, prepare reads it, the
+# ONE deadline for up() and prepare() together, from the start of up to the last runner online (up writes it into its state file, prepare reads it, the
 # steps between them spend from it): the node job has 45 minutes (release.yml) and GitHub kills a job past them
 # without letting its script delete anything. wait_up (900), the bootstrap with its retries (900 + one attempt of up to 1200) and the runners (2 x 300) add
 # up to more; each phase gets what is left of these 40 minutes and a phase with nothing left fails, so the node is deleted by this script and the
-# job never reaches the kill.
+# job never reaches the kill. The wait for the team's capacity (CAPACITY_WAIT_CAP_S) spends from this same deadline, not from a second one on top of it
+# (the node job's 45 minutes would not hold two): the deadline starts with up(), before the create, so what the wait spends is already out of the 40
+# minutes when wait_up and the bootstrap ask what is left, and PROVISION_RESERVE_S is what the wait never takes from them.
 PROVISION_DEADLINE_S = 2400
+# measured: the node job, from its start to its end, took 45-69 s in 30 of the 32 that succeeded among the last 60 runs of release.yml, and 88 s and 149 s in
+# the other two (runs 45442807307 and 45462862941); three of the 32 resolved the closure on a cache miss, for 9-11 s. The longest is 149 s. 600 s is four times
+# that: the checkout, wait_up, the closure, the bootstrap and the runners, with room for one retry of the bootstrap (BOOTSTRAP_RETRY_PAUSE_S), after the wait ends.
+PROVISION_RESERVE_S = 600
+# measured: how long a run holds its node, from the end of `up` to the end of stop-node. A candidate that compiles and stops: 18.5-26.3 min in 8 runs
+# (45529968367 19.8, 45529164808 18.7, 45494298250 18.5, 45442807307 26.3, 45409794902 20.9, 45462862941 21.1, 45227681543 21.3, 45056789566 20.9). A full
+# run: 62.3-66.8 min in 7 (45470348805 63.2, 45499190667 66.8, 45381665911 64.8, 45348928499 62.3, 45234838742 63.5, 45077433049 63.3, 45060573559 62.3).
+# 1800 s is the longest wait the deadline allows (2400 - PROVISION_RESERVE_S): it covers every compile-only hold measured with 3.7 minutes to spare. A slot
+# held by a full run (up to 67 minutes) does not fit in the node job's 45: a wait behind two of them ends red naming them, and waiting for those would
+# take a longer node job (release.yml's timeout-minutes), not a longer wait here.
+CAPACITY_WAIT_CAP_S = 1800
+# measured: the shortest hold above is 1110 s (18.5 min), so a poll every 30 s finds a freed slot within 3% of it and costs 60 reads of the server list
+# (one GET each) in the whole cap; the watch reads the same API every 60 s for hours.
+CAPACITY_POLL_S = 30
 # When `off` is asked about a run whose node job did not succeed (a cancel or a kill, perhaps in the middle of the create), the first list of the API may be
 # empty a few seconds before a server it was asked to make appears in it: look again once, this long after.
 OFF_RECHECK_S = 45
@@ -181,6 +203,24 @@ def urllib_transport(method, url, headers, body):
         return e.code, e.read()
 
 
+def capacity_of(text):
+    """The number of bare metal servers the team may deploy, read from the API's capacity refusal; None for any other answer."""
+    found = CAPACITY_REFUSAL.search(text or "")
+    return int(found.group(1)) if found else None
+
+
+def holders_text(listed, wall=time.time) -> str:
+    """Who holds the team's servers, from the project's list: each hostname, the run and attempt it carries (ci<run>a<attempt>x), its status and its age."""
+    out = []
+    for node in listed:
+        name = node.get("name") or "?"
+        mine = NAME.match(name)
+        created = parse_time(node.get("created_at"))
+        out.append("%s (%s, %s, %s)" % (name, "run %s attempt %s" % mine.group(1, 2) if mine else "not a run's node", node.get("status") or "no status",
+                                       "%d min old" % ((wall() - created) // 60) if created is not None else "age unknown"))
+    return ", ".join(out) or "nothing listed"
+
+
 class Client:
     """JSON over HTTP. Reads retry; a create or a delete is the caller's to judge,
     because the request may have happened when the answer was lost."""
@@ -230,6 +270,8 @@ class Latitude:
         # died or crawled there, while San Jose, at the same price, ran at full speed.
         # A knob of the environment, so that it goes without a change of code.
         self.exclude = {s.strip().upper() for s in exclude if s.strip()}
+        # The number of servers the team may deploy, once a refusal has said so (capacity_of); None until then.
+        self.capacity = None
         self.http = Client(API, {"Authorization": "Bearer %s" % key, "Accept": "application/json",
                                  "Content-Type": "application/json", "User-Agent": "firefox-ci"},
                            [project, key], transport, sleep)
@@ -266,35 +308,93 @@ class Latitude:
                         found.append((float(price), region.get("name") != "United States", site))
         return [(price, site) for price, _, site in sorted(found)]
 
-    def create(self, name, public_key):
+    def wait_for_room(self, capacity, until, clock=time.monotonic, sleep=None, wall=time.time):
+        """Return when the project lists fewer servers than the team may deploy (every server listed counts: it holds its slot until the API stops
+        listing it, which is also how turn_off reads a delete). Each look says who holds them. A refusal that the list contradicts (the slots are
+        held by something this project does not list, or a delete is still going) is waited one poll, never asked again at once. NodeError naming
+        the holders when `until` (a time of `clock`) comes first. A look the API does not answer is a look that said nothing."""
+        sleep = sleep or self.http.sleep
+        self.capacity = capacity
+        start = clock()
+        first = True
+        held = "unknown: the API did not list them"
+        while True:
+            try:
+                listed = self.nodes()
+            except NoAnswer as exc:
+                listed = None
+                say("capacity wait: the API did not list the servers: %s" % exc)
+            room = listed is not None and len(listed) < capacity
+            if room and not first:
+                say("capacity wait: %d of %d servers listed after %.0f s: ordering again" % (len(listed), capacity, clock() - start))
+                return
+            if listed is not None:
+                held = holders_text(listed, wall)
+                if room:
+                    say("capacity wait: refused with %d of %d servers listed (another project's, or a delete still going): asking again in %d s"
+                        % (len(listed), capacity, CAPACITY_POLL_S))
+                else:
+                    say("capacity wait: the team may deploy %d bare metal servers and %d are held, by %s; %.0f s waited, polling every %d s"
+                        % (capacity, len(listed), held, clock() - start, CAPACITY_POLL_S))
+            if clock() + CAPACITY_POLL_S > until:
+                raise NodeError("the team may deploy only %d bare metal servers and they stayed held for the %.0f s this run could wait: held by %s"
+                                % (capacity, clock() - start, held))
+            sleep(CAPACITY_POLL_S)
+            first = False
+            if room:
+                return
+
+    def create(self, name, public_key, clock=time.monotonic, sleep=None, wall=time.time, until=None):
         """A server in the cheapest location that takes the order. A lost answer may mean
-        one exists: it goes up, and the delete goes by name."""
+        one exists: it goes up, and the delete goes by name. When the team is at the number of
+        servers it may deploy (CAPACITY_REFUSAL: every location says so) this waits, polling the
+        list and saying who holds them, until `until` (a time of `clock`, CAPACITY_WAIT_CAP_S from
+        now when None), then orders again; past it, NodeError naming the holders."""
+        until = clock() + CAPACITY_WAIT_CAP_S if until is None else until
         sites = self.sites()
         if not sites:
             raise NodeError("no location has the plan %s now" % PLAN)
         body, _ = self.http.call("POST", "/projects/%s/ssh_keys" % self.project, {
             "data": {"type": "ssh_keys", "attributes": {"name": name, "public_key": public_key}}})
         key_id = body["data"]["id"]
-        refused = []
-        for price, site in sites:
-            if price > MAX_PRICE_USD_HOUR:
-                refused.append("%s costs $%.2f an hour, above the ceiling of $%.2f" % (site, price, MAX_PRICE_USD_HOUR))
-                break
-            try:
-                body, _ = self.http.call("POST", "/servers", {"data": {"type": "servers", "attributes": {
-                    "project": self.project, "plan": PLAN, "site": site, "operating_system": OPERATING_SYSTEM,
-                    "hostname": name, "ssh_keys": [key_id], "billing": "hourly"}}})
-            except NoAnswer:
-                raise
-            except NodeError as exc:
-                if not any(code in str(exc) for code in TRY_NEXT_SITE):
+        while True:
+            refused, full = [], None
+            for price, site in sites:
+                if price > MAX_PRICE_USD_HOUR:
+                    refused.append("%s costs $%.2f an hour, above the ceiling of $%.2f" % (site, price, MAX_PRICE_USD_HOUR))
+                    break
+                if self.capacity is not None:
+                    # the number is known from an earlier refusal: count before ordering
+                    try:
+                        crowded = len(self.nodes()) >= self.capacity
+                    except NoAnswer:
+                        crowded = False
+                    if crowded:
+                        full = self.capacity
+                        break
+                try:
+                    body, _ = self.http.call("POST", "/servers", {"data": {"type": "servers", "attributes": {
+                        "project": self.project, "plan": PLAN, "site": site, "operating_system": OPERATING_SYSTEM,
+                        "hostname": name, "ssh_keys": [key_id], "billing": "hourly"}}})
+                except NoAnswer:
                     raise
-                refused.append("%s: %s" % (site, exc))
-                continue
-            self.keep_quiet_about(body["data"]["id"])
-            say("%s: at %s, $%.2f an hour" % (name, site, price))
-            return body["data"]["id"]
-        raise NodeError("no location took the order for %s: %s" % (PLAN, "; ".join(refused)))
+                except NodeError as exc:
+                    if capacity_of(str(exc)) is not None:
+                        full = capacity_of(str(exc))
+                        break
+                    if not any(code in str(exc) for code in TRY_NEXT_SITE):
+                        raise
+                    refused.append("%s: %s" % (site, exc))
+                    continue
+                self.keep_quiet_about(body["data"]["id"])
+                say("%s: at %s, $%.2f an hour" % (name, site, price))
+                return body["data"]["id"]
+            if full is None:
+                raise NodeError("no location took the order for %s: %s" % (PLAN, "; ".join(refused)))
+            self.wait_for_room(full, until, clock, sleep, wall)
+            sites = self.sites()
+            if not sites:
+                raise NodeError("no location has the plan %s now" % PLAN)
 
     def delete(self, node_id):
         self.keep_quiet_about(node_id)
@@ -800,7 +900,7 @@ def bring_up(latitude, github, run, attempt, make_ssh, make_key, work, clock=tim
     # The create inside the try: a lost answer can mean a node exists, and the
     # delete goes by name.
     try:
-        node_id = latitude.create(name, public_key)
+        node_id = latitude.create(name, public_key, clock, sleep, wall, until=min(clock() + CAPACITY_WAIT_CAP_S, deadline - PROVISION_RESERVE_S))
         ssh = wait_up(latitude, node_id, make_ssh, clock, sleep, limit=min(UP_LIMIT_S, remaining(deadline, clock)))
         drop_key_of(latitude, name)
         status = node_status(ssh)

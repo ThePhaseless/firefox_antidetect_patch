@@ -610,10 +610,82 @@ def _reuse_cases(doc) -> list:
     return out
 
 
+#: What orders or touches a Latitude server, read from a step's commands (comment lines left out): the API's address, its command line, a server order, or a
+#: call of latitude_node's own functions from a snippet. Only `latitude_node.py up` may order a node, and it is the one that waits for the team's capacity.
+LATITUDE_CALL = re.compile(r"api\.latitude\.sh|latitude\.sh/|\blatitude\s+servers\b|\bservers\s+create\b|\bLATITUDE_API_KEY\b.*\bcurl\b|\bcurl\b.*\bLATITUDE_API_KEY\b|"
+                           r"\bimport\s+latitude_node\b|\bfrom\s+latitude_node\b|\blatitude_node\.(?:Latitude|bring_up|create)\b")
+NODE_COMMAND = re.compile(r"latitude_node\.py\s+([a-z-]+)")
+#: The subcommands of latitude_node.py a workflow may run; of them `up` alone orders a server.
+NODE_COMMANDS = ("up", "prepare", "watch", "off", "sweep", "status")
+#: Files outside latitude_node.py that may name the API's address: its cases.
+LATITUDE_API_FILES = ("latitude_node.py", "test_latitude_node.py", "test_release_checks.py")
+
+
+def node_provisioning_problems(docs: dict, scripts: dict) -> list:
+    """Every place that orders a Latitude node outside `latitude_node.py up`, as "<file> / <job> / <step>: <why>". `docs` are the parsed workflows by file name,
+    `scripts` the text of the scripts the workflows may call, by path. The rule (a run cannot fail for a third party's reason): the node job gets its server
+    only through `up`, which waits for the team's capacity instead of asking every location in turn; a step that orders one another way (the API from curl, a
+    CLI, a snippet that imports the module) would fail the run the day another run holds the account's servers."""
+    found = []
+    for name, doc in docs.items():
+        for job_name, job in (doc.get("jobs") or {}).items():
+            for step in job.get("steps") or []:
+                where = "%s / %s / %s" % (name, job_name, step.get("name", step.get("id", "?")))
+                run = re.sub(r"\\\n\s*", " ", str(step.get("run", "")))
+                text = "\n".join(l for l in run.splitlines() if not l.strip().startswith("#"))
+                for command in NODE_COMMAND.findall(text):
+                    if command not in NODE_COMMANDS:
+                        found.append("%s: `latitude_node.py %s` is no command of it" % (where, command))
+                if LATITUDE_CALL.search(text):
+                    found.append("%s: it reaches Latitude other than through `latitude_node.py`: a server ordered there does not wait for the team's capacity" % where)
+                if "latitude" in str(step.get("uses", "")).lower():
+                    found.append("%s: it uses an action of Latitude's: a server ordered there does not wait for the team's capacity" % where)
+    for path, text in scripts.items():
+        if Path(path).name not in LATITUDE_API_FILES and re.search(r"api\.latitude\.sh|latitude_node\.(?:Latitude|bring_up|create)\b", text):
+            found.append("%s: it reaches Latitude other than through `latitude_node.py`" % path)
+    return found
+
+
+def node_orders_only_through_up(docs: dict) -> list:
+    """The jobs of `docs` whose steps run `latitude_node.py up`, as "<file> / <job>": the ones that provision."""
+    return ["%s / %s" % (name, job_name) for name, doc in docs.items() for job_name, job in (doc.get("jobs") or {}).items()
+            if any(re.search(r"latitude_node\.py\s+up\b", str(step.get("run", ""))) for step in job.get("steps") or [])]
+
+
+def _provisioning_cases() -> list:
+    import yaml
+
+    out = []
+    docs = {p.name: yaml.safe_load(p.read_text(encoding="utf-8")) for p in sorted(WORKFLOWS.glob("*.yml"))}
+    scripts = {str(p.relative_to(HERE.parent.parent)): p.read_text(encoding="utf-8", errors="replace")
+               for pattern in ("*.py", "*.sh") for folder in (HERE, HERE.parent) for p in sorted(folder.glob(pattern))}
+    out.append(("provisioning: no workflow step and no script orders a Latitude node except through `latitude_node.py up` (the capacity wait); every command of it a workflow runs exists",
+                node_provisioning_problems(docs, scripts) == []))
+    out.append(("provisioning: the node job of release.yml is the one that provisions, through `up`, and the scan has read the workflows (not an empty rule)",
+                node_orders_only_through_up(docs) == ["release.yml / node"] and len(docs) >= 10 and len(scripts) >= 20))
+    bypass = {"bad.yml": {"jobs": {"node": {"steps": [
+        {"name": "order", "run": "curl -s -X POST https://api.latitude.sh/servers -H \"Authorization: Bearer $LATITUDE_API_KEY\" -d @server.json"},
+        {"name": "snippet", "run": "python3 -c \"import latitude_node; latitude_node.Latitude('p', 'k').create('n', 'k')\""},
+        {"name": "cli", "run": "latitude servers create --plan f4-metal-small"},
+        {"name": "action", "uses": "someone/latitude-server@v1"},
+        {"name": "typo", "run": "python3 scripts/ci/latitude_node.py create --run 1 --attempt 1"}]}}}}
+    problems = node_provisioning_problems(bypass, {})
+    out.append(("provisioning: red on a step that orders a node by the API's address, a snippet, a CLI, an action or a command `latitude_node.py` does not have: one problem each",
+                len(problems) == 5 and all(p.startswith("bad.yml / node / ") for p in problems)))
+    fine = {"ok.yml": {"jobs": {"node": {"steps": [
+        {"name": "up", "run": "python3 .series/scripts/ci/latitude_node.py up \\\n  --run \"$GITHUB_RUN_ID\" --attempt 1 --work w"},
+        {"name": "a comment about the API", "run": "# curl https://api.latitude.sh/servers is not run\npython3 scripts/ci/latitude_node.py off --run 1 --attempt 1"}]}}}}
+    out.append(("provisioning: green on `up` (a line continued with a backslash too), `off` and a comment that names the API", node_provisioning_problems(fine, {}) == []))
+    out.append(("provisioning: a script that reaches the API outside latitude_node.py is found",
+                node_provisioning_problems({}, {"scripts/ci/order.py": "import urllib.request\nurllib.request.urlopen('https://api.latitude.sh/servers')"})
+                == ["scripts/ci/order.py: it reaches Latitude other than through `latitude_node.py`"]))
+    return out
+
+
 def cases() -> list:
     """The cases; a workflow that does not have what they read is a FAIL that names it, not a crash of the caller."""
     try:
-        return _cases()
+        return _cases() + _provisioning_cases()
     except (KeyError, IndexError, TypeError, AttributeError, StopIteration) as exc:
         return [("release checks: stopped on %s: %s (the workflow lacks what these cases read)" % (type(exc).__name__, exc), False)]
 
