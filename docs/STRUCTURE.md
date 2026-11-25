@@ -8,7 +8,7 @@ Where each kind of change goes. The engine is Firefox as a patch series on a Moz
 |---|---|---|---|
 | Our own files | `Stealth*` code and its tests, stored byte for byte | `<folder>/src/<tree path>` | `layout.OWN_FILES` (first match wins) |
 | Hooks | One-line changes to Mozilla files, each with `STEALTH-HOOK(<folder>)` on the line | `<folder>/hooks.patch` | `tools/inventory.json` (one record per Mozilla file) and `layout.FEATURES` |
-| Backports | Upstream code carried until the tag has it | `platform/backports/<name>/` (a Mozilla commit); vendored code under `third_party/rust/` in the folder that needs it | `BACKPORT.json` in the folder |
+| Backports | Upstream code carried until the tag has it | `platform/backports/<name>/` (a Mozilla commit, or the upstream commits of a vendored crate that no feature of ours needs); vendored code under `third_party/rust/` in the folder that needs it | `BACKPORT.json` in the folder |
 
 A folder holds `hooks.patch`, `src/`, `MANIFEST.json`, `FEATURE.md` and `HOOKS.json`; a folder with a `BACKPORT.json` has no `HOOKS.json`. Rule: [backport-01](decisions/backport-01-upstream-code-as-is.md).
 

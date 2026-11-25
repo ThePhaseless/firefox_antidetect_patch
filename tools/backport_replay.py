@@ -4,7 +4,10 @@ The folder of a backport (BACKPORT.json, commits/, hooks.patch, MANIFEST.json, s
 of commits it needs: upstream's own, ours, and tests. This tool replays them on the vendored crates of a Mozilla
 tag and says what the folder's vendored part has to be, so that nobody merges it by hand:
 
-  1. The revision is read from the tag (gfx/wgpu_bindings/Cargo.toml), the crates from third_party/rust/ of the tag.
+  1. The revision is read from the tag, the crates from third_party/rust/ of the tag. Mozilla vendors a crate from a
+     git revision (wgpu and naga: gfx/wgpu_bindings/Cargo.toml) or as a crates.io release (glean-core): a record of the
+     second kind carries `vendored_crate` {name, version, tag_prefix}, and the revision is the one cargo wrote in the
+     crate's own .cargo_vcs_info.json, the version the one of its Cargo.toml, both read from the tag.
   2. Each commit, in order, is cut into the files Mozilla vendors (a crate's src/ and the files its checksum file
      lists); the others (tests, upstream's own Cargo.lock) are skipped and reported. A commit whose files apply in
      reverse, with its full context, is already in the revision: it is dropped and reported. A file that applies neither
@@ -371,6 +374,8 @@ class Replay:
     sections: dict               # path -> diff bytes, for the modified (or deleted) vendored paths
     added: dict                  # path -> (mode, bytes), the new files
     notes: list = field(default_factory=list)
+    crate: str | None = None     # a crate vendored as a release: its name
+    version: str | None = None   # and the version the tag vendors
 
     @property
     def conflicts(self) -> list:
@@ -384,8 +389,15 @@ class Replay:
     def patch(self) -> bytes:
         return b"".join(self.sections[p] for p in sorted(self.sections, key=lambda p: p.encode()))
 
+    def vendors(self, short: bool = False) -> str:
+        """What the tag vendors, as the report says it."""
+        revision = self.revision[:10] if short else self.revision
+        if self.crate:
+            return "%s %s (revision %s)" % (self.crate, self.version, revision)
+        return "wgpu %s" % revision
+
     def summary(self) -> str:
-        lines = ["tag %s vendors wgpu %s" % (self.tag, self.revision)]
+        lines = ["tag %s vendors %s" % (self.tag, self.vendors())]
         for c in self.commits:
             extra = ""
             if c.status == "dropped":
@@ -413,6 +425,38 @@ def vendored_revision(text: str) -> str:
     return revs.pop()
 
 
+CRATE = "vendored_crate"
+VCS_INFO = ".cargo_vcs_info.json"
+
+
+def crate_spec(record: dict) -> dict | None:
+    """The `vendored_crate` of a record (a crate Mozilla vendors as a release), or None for the wgpu form."""
+    return record.get(CRATE) if isinstance(record.get(CRATE), dict) else None
+
+
+def vendored_crate(s: "Scratch", tag: str, spec: dict) -> tuple:
+    """(revision, version) of a crate the tag vendors as a crates.io release: the version from its Cargo.toml, the revision
+    from the .cargo_vcs_info.json that `cargo package` wrote in it (the git commit the release was made from)."""
+    name = spec.get("name")
+    if not isinstance(name, str) or not re.fullmatch(r"[A-Za-z0-9_.-]+", name):
+        raise Stop("BACKPORT.json %s.name is %r, a crate name is expected" % (CRATE, name))
+
+    def read(file: str) -> str:
+        path = "%s%s/%s" % (VENDORED_DIR, name, file)
+        done = s.run("rev-parse", "%s:%s" % (tag, path), source=True, check=False)
+        if done.returncode:
+            raise Stop("the tag %s has no %s: it does not vendor the crate %s as a release" % (tag, path, name))
+        return s.blob(done.stdout.decode().strip()).decode("utf-8")
+    try:
+        version = tomllib.loads(read("Cargo.toml"))["package"]["version"]
+        revision = json.loads(read(VCS_INFO))["git"]["sha1"]
+    except (KeyError, ValueError, TypeError) as err:
+        raise Stop("%s%s: its version or its git revision cannot be read from the tag (%s)" % (VENDORED_DIR, name, err))
+    if not isinstance(version, str) or not HEX40.fullmatch(str(revision)):
+        raise Stop("%s%s: version %r and revision %r are not a version and a full revision" % (VENDORED_DIR, name, version, revision))
+    return revision, version
+
+
 def load_record(folder: Path) -> dict:
     return json.loads((Path(folder) / BACKPORT).read_text(encoding="utf-8"))
 
@@ -428,7 +472,11 @@ def replay(source: Path, tag: str, folder: Path, record: dict | None = None) -> 
 def _replay(s: Scratch, tag: str, folder: Path, record: dict) -> Replay:
     rev_tree = s.out("rev-parse", "%s:third_party/rust" % tag, source=True)
     lock_oid = s.out("rev-parse", "%s:%s" % (tag, LOCK), source=True)
-    revision = vendored_revision(s.blob(s.out("rev-parse", "%s:gfx/wgpu_bindings/Cargo.toml" % tag, source=True)).decode("utf-8"))
+    release = crate_spec(record)
+    if release:
+        revision, version = vendored_crate(s, tag, release)
+    else:
+        revision, version = vendored_revision(s.blob(s.out("rev-parse", "%s:gfx/wgpu_bindings/Cargo.toml" % tag, source=True)).decode("utf-8")), None
     s.load_tree(rev_tree, VENDORED_DIR)
     s.run("update-index", "--add", "--cacheinfo", "100644,%s,%s" % (lock_oid, LOCK))
     base = s.out("write-tree")
@@ -547,7 +595,7 @@ def _replay(s: Scratch, tag: str, folder: Path, record: dict) -> Replay:
         diff = s.run("diff", "--binary", "--full-index", "--no-renames", base, final, "--", *modified).stdout
         sections = {path: sec for path, sec in split_sections(diff)}
     added = {p: (mode, s.blob(oid)) for p, (status, mode, oid) in changes.items() if status == "A"}
-    return Replay(tag, revision, results, sections, added, notes)
+    return Replay(tag, revision, results, sections, added, notes, release["name"] if release else None, version)
 
 
 def _raw_diff(s: Scratch, base: str, other: str) -> dict:
@@ -611,6 +659,12 @@ def record_problems(folder: Path, record: dict) -> list:
         return found + ["%s/%s: commits is empty or not a list" % (name, BACKPORT)]
     if not HEX40.fullmatch(str(record.get("vendored", ""))):
         found.append("%s/%s: vendored %r is not a full revision" % (name, BACKPORT, record.get("vendored")))
+    if CRATE in record:
+        spec = crate_spec(record)
+        if (spec is None or not isinstance(spec.get("name"), str) or not isinstance(spec.get("version"), str)
+                or not isinstance(spec.get("tag_prefix", ""), str) or set(spec) - {"name", "version", "tag_prefix"}):
+            found.append("%s/%s: %s is {name, version, tag_prefix}: the crate Mozilla vendors as a release, the version it "
+                         "vendors and the prefix of upstream's tag for it" % (name, BACKPORT, CRATE))
     listed = set()
     for i, c in enumerate(commits):
         if not isinstance(c, dict):
@@ -656,6 +710,9 @@ def folder_problems(result: Replay, folder: Path, record: dict) -> list:
     if record.get("vendored") != result.revision:
         found.append("%s/%s: vendored is %s, the tag %s vendors %s: record it (backport_replay.py record)"
                      % (name, BACKPORT, record.get("vendored"), result.tag, result.revision))
+    if result.crate and (crate_spec(record) or {}).get("version") != result.version:
+        found.append("%s/%s: %s.version is %s, the tag %s vendors %s %s: record it (backport_replay.py record)"
+                     % (name, BACKPORT, CRATE, (crate_spec(record) or {}).get("version"), result.tag, result.crate, result.version))
     for c in result.commits:
         for path, why in c.conflicts:
             found.append("%s: %s: %s: %s" % (name, c.file, path, why))
@@ -743,6 +800,8 @@ def record_drops(folder: Path, result: Replay) -> bool:
     `contained_in` set to it (an entry already set stays). The one thing about the record the tool writes."""
     record = load_record(folder)
     record["vendored"] = result.revision
+    if result.crate and crate_spec(record):
+        crate_spec(record)["version"] = result.version
     names = {c.file for c in result.dropped}
     for c in record["commits"]:
         if c["file"] in names and c.get("contained_in") is None:

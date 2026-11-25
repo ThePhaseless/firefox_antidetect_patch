@@ -401,8 +401,8 @@ def port(source: Path, old: str, new: str, branch: str, force: bool, check_birth
             continue
         # what the merge left in conflict among the vendored paths the replay has just written is resolved
         report = [(f, [c for c in cs if not backport_replay.in_scope(c)] if f == name else cs) for f, cs in report]
-        print("REPLAY %s: wgpu %s, %d commits already in the revision (python tools/backport_replay.py record writes "
-              "them to BACKPORT.json)" % (name, replayed.revision[:10], len(replayed.dropped)))
+        print("REPLAY %s: %s, %d commits already in the revision (python tools/backport_replay.py record writes "
+              "them to BACKPORT.json)" % (name, replayed.vendors(short=True), len(replayed.dropped)))
     git(source, "update-ref", ref, current)
     bad = [(f, c) for f, c in report if c]
     for folder, conflicts in bad + replay_bad:
@@ -850,7 +850,10 @@ def backport_problems(folder: str, upstream_code: set, patch: Path) -> list:
         missing = [k for k in ("upstream", "vendored", "commits", "drop_when") if not data.get(k)]
         if missing:
             return found + ["%s/%s lacks %s" % (folder, BACKPORT, ", ".join(missing))]
-        if data["vendored"] not in patch.read_text(encoding="utf-8", errors="replace"):
+        # A crate vendored as a release (`vendored_crate`) has its revision in the crate's own .cargo_vcs_info.json, which the
+        # hooks.patch does not touch: there `check --against <tag>` compares it with the tag's (backport_replay.folder_problems).
+        if (not backport_replay.crate_spec(data)
+                and data["vendored"] not in patch.read_text(encoding="utf-8", errors="replace")):
             found.append("%s/%s says the vendored revision is %s, which its hooks.patch does not "
                          "patch: Mozilla vendors another one now, so drop what upstream has and "
                          "pick the rest again" % (folder, BACKPORT, data["vendored"]))
