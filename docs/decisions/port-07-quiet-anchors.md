@@ -6,8 +6,8 @@
 
 **Enforced by.**
 - `check` (rule C18 of `tools/hook_contract.py`, offline: it reads `tools/churn.json` and `UPSTREAM.json`, and is never debt): a hook whose hunk is in the band without a valid `quiet_anchor_why` fails; a hook whose hunk is not in `tools/churn.json` fails ("a new or moved hook has no churn: run `churn.py --write`"); a `deferred` reason at another base fails; a field of another shape fails.
-- Churn is recomputed at every port (`python tools/churn.py --source <repo with the tags> --write`, commit the file). `python tools/churn.py --source <repo> --check` recomputes it and compares with the committed file byte for byte; the job `churn` of `checks.yml` runs it on every pull request and every candidate, on the tags of the file fetched one commit deep and each checked against the commit `tools/churn.json` records for it (a tag that resolves to another commit is red).
-- Tests: `tools/tests/test_quiet_anchors.py` (C18 on one-hook series), `tools/tests/test_churn.py` (the churn, `--check`, the recorded commits, `--fetch`, the real series), `tools/tests/test_churn_job.py` (the job).
+- Churn is recomputed at every port (`python tools/churn.py --source <repo with the tags> --write`, commit the file). `python tools/churn.py --source <repo> --check` recomputes it and compares with the committed file byte for byte; the job `churn` of `checks.yml` runs it on every pull request and every candidate, on a small partial clone of the tags: each of the nine tags fetched one commit deep without file content and checked against the commit `tools/churn.json` records for it (a tag that resolves to another commit is red), then only the content of the files the series patches (every file of every `hooks.patch` and of `tools/churn.json`), by the shas the trees give, tens of megabytes where whole tags are 1.6 GB (the cache entry must not evict the repository's other caches). The cache key is the commits and that set of files, so a new hook file makes another entry. A file of the series whose content the repository lacks is red with where, what, fix and rule: never read as absent, never a churn of 0.
+- Tests: `tools/tests/test_quiet_anchors.py` (C18 on one-hook series), `tools/tests/test_churn.py` (the churn, `--check`, the recorded commits, `--fetch`, the files not fetched, the real series), `tools/tests/test_churn_job.py` (the job).
 
 **Why.** Hunks untouched in 8 releases conflicted 1.0% of the time, the others 3.6%.
 
@@ -16,6 +16,7 @@
 **Don't.**
 - Put a hook where its form allows a quieter place only because the nearby lines are easier to write: read the churn of the candidates and take the quietest.
 - Write the threshold as a number in a message, a document or a test: cite `BAND_MIN_CHURN`.
+- Fetch the tags whole for the check, or let the repository be fetched for fewer files than the series patches: a missing file is red, and the fix is `churn.py --fetch`.
 - Edit `tools/churn.json` by hand, or keep it from an older base: it is written by `churn.py --write` for the base of `UPSTREAM.json`.
 - Leave a `deferred` reason through a port: move the hook, or say in `only-place` why it cannot move.
 - Put a C18 in the debt list, or fetch the tags for the check with anything but `churn.py --fetch`: a tag that is not the recorded commit would make every number meaningless.

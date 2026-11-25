@@ -9,7 +9,7 @@
 #   rules             the series' own rules: tools/tests (hence the workflow rule tests) and `engine.py check` (folders, manifests, hook
 #                     contract, budgets against main's, workflow copies).
 #   churn             port-07 (docs/decisions/port-07-quiet-anchors.md): tools/churn.json is what the series gives now. No tree: the Mozilla tags of the
-#                     last eight releases and the base, one commit deep, in a repository of their own (a cache of this job), each checked against the
+#                     last eight releases and the base, one commit deep and with only the files the series patches, in a repository of their own (a small cache of this job), each checked against the
 #                     commit tools/churn.json records; `churn.py --check`, and the real-series test of tools/tests/test_churn.py.
 #   rebuilds          the Mozilla tag + the series = the tree declared in UPSTREAM.json (`engine.py materialize` stops when it is another
 #                     tree: this is the CI form of `engine.py verify`, which needs the source repository), the birth points against the ledger, and
@@ -121,17 +121,20 @@ jobs:
         run: python tools/engine.py check
 
   # port-07: tools/churn.json (the churn of every hunk over the eight releases before the base) is what the series and the tags give now, and the real
-  # series gives the numbers of the first measurement. It reads the tags, not the tree: nine tags (the base and the eight before it) one commit deep,
-  # from the Mozilla repository of UPSTREAM.json, in a bare repository of their own that `actions/cache` keeps; the key is the commits tools/churn.json
-  # records (`churn.py --cache-key`), never the names of the tags, and every tag is checked against its recorded commit (a cache entry too: `--fetch`
-  # requires the commit it recorded, and fetches nothing that is already there). A moved tag or another repository is red here, before a number is read.
-  # TIMING (an estimate: the coordinator measures it on the first pull request and puts the numbers here). Measured on a development PC: the first tag
-  # is a pack of 1.0 GB (about 30 s on a fast link, 558 s on a slow one), each next tag only the objects the one before lacks, about 70 MB (18 s on the
-  # slow link), so the entry is about 1.6 GB. Cold cache: the wheelhouse and Python 40 s, the first tag 30 s, the eight after it about 10 s each, the check
-  # 15 s and the tests 60 s: about 4 minutes in all. Warm cache: 40 s of wheelhouse, about 40 s to restore the entry, nothing to fetch, the check and
-  # the tests 75 s: about 3 minutes. The job runs beside `rules` and `rebuilds`, never behind them, so a cold cache keeps the round within 8 minutes. A
-  # red that needs no binary shows within the first 3 minutes: from `rules` (`engine.py check` runs rule C18 offline, from the committed file) and, for
-  # this job's own reds (a stale file, a moved tag), at the end of the fetch: about 2 minutes warm, about 3 cold.
+  # series gives the numbers of the first measurement. It reads the tags, not the tree, and of the tags only what the walk reads: the commit and the
+  # trees of the nine tags (the base and the eight before it), one commit deep and without file content (`--filter=blob:none`), and the content of the
+  # files the series patches (every file of every hooks.patch, and every file tools/churn.json lists), by the shas the trees give: a partial clone,
+  # tens of megabytes where nine whole tags are 1.6 GB. It lives in a bare repository of its own that `actions/cache` keeps (a larger entry would
+  # evict the rest of the repository's cache). The key is made by `churn.py --cache-key` from the commits tools/churn.json records and the set of
+  # files: never the names of the tags, and a new hook file is another key. Every tag is checked against its recorded commit (a cache entry too: `--fetch`
+  # requires the commit it recorded, and fetches nothing that is already there). A moved tag or another repository is red here, before a number is
+  # read; so is a file of the series whose content the repository does not have (it is never read as absent, and never as a churn of 0).
+  # TIMING (to be measured on the pull request, cold and warm, and the numbers written here). Measured on a development PC over a slow link, cold:
+  # 72 s and 78 MB (the nine tags 4 s each after the first, 13 s, then 1505 files in 27 s). Estimate on a runner: cold cache, the wheelhouse and Python
+  # 40 s, the fetch about 45 s, the check 15 s and the tests 60 s, about 2.5 minutes in all; warm cache, 40 s of wheelhouse, 5 s to restore the entry,
+  # the check and the tests 75 s, about 2 minutes. The job runs beside `rules` and `rebuilds`, never behind them, so a cold cache keeps the round
+  # within 8 minutes. A red that needs no binary shows within the first 3 minutes: from `rules` (`engine.py check` runs rule C18 offline, from the
+  # committed file) and, for this job's own reds (a stale file, a moved tag, a missing file), at the end of the fetch, about 1.5 minutes.
   churn:
     needs: py-deps-tools
     runs-on: ubuntu-24.04

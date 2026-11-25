@@ -10,12 +10,15 @@ as changed in the interval where it appears. The churn of a hunk is the number o
 
     python tools/churn.py --source <firefox repo> --base FIREFOX_159_0_RELEASE [--releases <tag,...>] [--write]
     python tools/churn.py --source <firefox repo> --check          the committed tools/churn.json is what the series gives now
-    python tools/churn.py --source <repo> --fetch                  the tags tools/churn.json lists, one commit deep, into <repo>
-    python tools/churn.py --cache-key                              the key of the commits tools/churn.json lists (a cache's)
+    python tools/churn.py --source <repo> --fetch                  what the churn reads, into <repo>: the nine tags one commit deep without file
+                                                                   content, then the content of the files the series patches (tens of megabytes)
+    python tools/churn.py --cache-key                              the key of the commits and of those files (a cache's)
 
 --releases is the chain of release tags, oldest first, ending with the base: eight intervals are nine tags
 (default: the eight releases before the base, `FIREFOX_<N>_0_RELEASE`). The tags must exist in --source; a
-missing one is named with the command that fetches it, nothing is fetched by the compute (`--fetch` does it).
+missing one is named with the command that fetches it, nothing is fetched by the compute (`--fetch` does it). The compute reads the trees of
+the tags and the content of the files the series patches, nothing else; a file that is in a tag's tree and whose content the repository lacks is an
+error, never an absent file and never a churn of 0 (the repository was fetched for another set of files: `--fetch`).
 Every tag is also a commit: tools/churn.json records it, and a tag of the source that resolves to another commit
 (a moved tag, another repository) is red, in the compute, in `--check` and in `--fetch`.
 
@@ -34,6 +37,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
@@ -55,6 +59,7 @@ TAG = re.compile(r"^FIREFOX_(\d+(?:_\d+)*)_RELEASE$")
 PATH_BATCH = 24000       # bytes of paths on one command line
 FETCH_WAITS = (5, 15, 45)   # seconds before each new try of a fetch from Mozilla's repository
 SHOWN = 25               # differing hunks `--check` names; the rest is counted
+BLOB_BATCH = 300         # files asked for in one fetch
 
 
 class ChurnError(Exception):
@@ -83,8 +88,10 @@ def default_releases(base: str) -> list:
 
 
 def git(source, *args, check=True, input_bytes=None) -> subprocess.CompletedProcess:
+    # GIT_NO_LAZY_FETCH: the repository of the tags holds the commits and trees of the nine tags and the files the series patches, nothing
+    # else; an object it lacks is an error here, never a silent fetch (and never a file that reads as absent).
     done = subprocess.run(["git", "--literal-pathspecs", "-C", str(source), "-c", "core.quotepath=off",
-                           *args], capture_output=True, input=input_bytes)
+                           *args], capture_output=True, input=input_bytes, env=dict(os.environ, GIT_NO_LAZY_FETCH="1"))
     if check and done.returncode:
         raise ChurnError("git %s: %s" % (" ".join(args[:3]), done.stderr.decode(errors="replace").strip()))
     return done
@@ -142,20 +149,114 @@ def load_committed(path=None):
         raise ChurnError("tools/churn.json is not JSON: %s" % exc)
 
 
-def cache_key(data: dict) -> str:
-    """A key for what the tags are: the commits, in the order of the chain, not the names of the tags."""
-    return hashlib.sha256("\n".join(r["commit"] for r in data["releases"]).encode()).hexdigest()[:32]
+def series_paths(root) -> list:
+    """The Mozilla files whose content the churn reads: every file of every hooks.patch of SERIES (so a new hook file is covered) and
+    every file tools/churn.json lists (so is one a hook left)."""
+    root, paths = Path(root), set()
+    for folder in series_folders(root):
+        patch = root / folder / "hooks.patch"
+        if patch.is_file():
+            paths.update(fd["path"] for fd in parse_patch(patch.read_bytes()))
+    try:
+        paths.update(h["file"] for h in json.loads((root / "tools" / "churn.json").read_text(encoding="utf-8"))["hooks"])
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    return sorted(paths)
 
 
-def fetch(source, data: dict, url=None, say=print, sleep=time.sleep) -> None:
-    """Puts every release tag of `data` into `source` (a repository, made bare when it is not one yet), one commit deep, from
-    `url` (default: the Mozilla repository of UPSTREAM.json), and requires each to be the commit recorded. A tag already there is
-    not fetched: a restored cache costs a `rev-parse` per tag."""
+def cache_key(data: dict, paths: list) -> str:
+    """A key for what the repository of the tags holds: the commits, in the order of the chain (not the names of the tags), and the
+    set of files whose content it has: a new hook file is another key."""
+    text = "\n".join(r["commit"] for r in data["releases"]) + "\n--\n" + "\n".join(sorted(set(paths)))
+    return hashlib.sha256(text.encode()).hexdigest()[:32]
+
+
+def tree_blobs(source, tags: list, paths: list) -> dict:
+    """(tag, path) -> blob sha of every file of `paths` that is in the tree of the tag: from the trees alone, no content."""
+    out = {}
+    paths = sorted(set(paths))
+    for tag in tags:
+        batch, size = [], 0
+        for p in paths + [None]:
+            if p is None or size + len(p) + 1 > PATH_BATCH:
+                if batch:
+                    for rec in git(source, "ls-tree", "-r", "-z", tag, "--", *batch).stdout.split(b"\0"):
+                        meta, _, name = rec.partition(b"\t")
+                        parts = meta.split()
+                        if len(parts) == 3 and parts[1] == b"blob":
+                            out[(tag, name.decode("utf-8", "replace"))] = parts[2].decode()
+                batch, size = [], 0
+            if p is not None:
+                batch.append(p)
+                size += len(p) + 1
+    return out
+
+
+def missing_blobs(source, shas) -> list:
+    """The shas, of those given, whose object the repository does not have."""
+    shas = sorted(set(shas))
+    if not shas:
+        return []
+    rows = git(source, "cat-file", "--batch-check", input_bytes=("\n".join(shas) + "\n").encode()).stdout.decode().splitlines()
+    return [sha for sha, row in zip(shas, rows) if row.endswith(" missing")]
+
+
+def require_present(source, blobs: dict) -> None:
+    """Every file of the tags the churn reads has its content in the repository: where / what / fix / rule. A file whose content is
+    absent must never read as 'not there' (it would count as a change and give a churn that is not Mozilla's)."""
+    gone = set(missing_blobs(source, blobs.values()))
+    lost = sorted("%s:%s" % k for k, sha in blobs.items() if sha in gone)
+    if lost:
+        raise ChurnError("%s: %d file(s) of the Mozilla tags have no content in the repository (first: %s): the repository was fetched for "
+                         "another set of files\nfix: python tools/churn.py --source %s --fetch (it fetches the content of every file the "
+                         "series patches)\nrule: docs/decisions/port-07-quiet-anchors.md" % (source, len(lost), lost[0], source))
+
+
+REMOTE = "mozilla"       # the remote of the repository of the tags: a partial clone of it (promisor), so that a file can be asked for by its sha
+
+
+def partial_clone(source, url: str) -> None:
+    """Makes `source` a partial clone of `url` (made bare when it is not a repository yet): git accepts the objects it asks for by sha
+    (`fetch --stdin`) only from a promisor remote. Idempotent."""
     source = Path(source)
     if not (source / "objects").is_dir() and not (source / ".git").exists():
         source.mkdir(parents=True, exist_ok=True)
         subprocess.run(["git", "init", "-q", "--bare", str(source)], check=True)
+    for key, value in (("core.repositoryformatversion", "1"), ("extensions.partialclone", REMOTE), ("remote.%s.url" % REMOTE, url),
+                       ("remote.%s.promisor" % REMOTE, "true"), ("remote.%s.partialclonefilter" % REMOTE, "blob:none"),
+                       ("remote.%s.fetch" % REMOTE, "+refs/heads/*:refs/remotes/%s/*" % REMOTE)):
+        git(source, "config", key, value)
+
+
+def fetch_blobs(source, tags: list, paths: list, say=print, sleep=time.sleep) -> None:
+    """The content of `paths` at every tag, by the shas the trees give, from the remote; what is there is not fetched."""
+    blobs = tree_blobs(source, tags, paths)
+    need = missing_blobs(source, blobs.values())
+    began = time.monotonic()
+    for i in range(0, len(need), BLOB_BATCH):
+        batch = need[i:i + BLOB_BATCH]
+        for attempt in range(len(FETCH_WAITS) + 1):
+            done = git(source, "-c", "fetch.negotiationAlgorithm=noop", "fetch", "-q", REMOTE, "--no-tags", "--no-write-fetch-head",
+                       "--recurse-submodules=no", "--filter=blob:none", "--stdin", check=False, input_bytes=("\n".join(batch) + "\n").encode())
+            if done.returncode == 0:
+                break
+            if attempt == len(FETCH_WAITS):
+                raise ChurnError("git fetch %s <%d files>: %s" % (REMOTE, len(batch), done.stderr.decode(errors="replace").strip()[-300:]))
+            say("the fetch of the files failed, again in %d s" % FETCH_WAITS[attempt])
+            sleep(FETCH_WAITS[attempt])
+    require_present(source, blobs)
+    say("%d files of %d tags: %d fetched in %.0f s, %d were there" % (len({v for v in blobs.values()}), len(tags), len(need), time.monotonic() - began,
+                                                                  len(set(blobs.values())) - len(need)))
+
+
+def fetch(source, data: dict, paths: list, url=None, say=print, sleep=time.sleep) -> None:
+    """Fills `source` (a repository, made bare when it is not one yet) with what the churn reads, from `url` (default: the Mozilla
+    repository of UPSTREAM.json): every release tag of `data` as a commit and its trees, one commit deep and without file content, each
+    required to be the commit recorded; then the content of `paths` at every tag, and nothing else (a few tens of megabytes, not the
+    gigabyte of a whole tree). What is already there is not fetched: a restored cache costs a `rev-parse` per tag and a `cat-file`."""
+    source = Path(source)
     url = url or mozilla_repository()
+    partial_clone(source, url)
     for tag, commit in recorded(data).items():
         have = commit_of(source, tag)
         if have == commit:
@@ -165,7 +266,8 @@ def fetch(source, data: dict, url=None, say=print, sleep=time.sleep) -> None:
             raise ChurnError("%s is %s in %s, tools/churn.json recorded %s" % (tag, have, source, commit))
         began = time.monotonic()
         for attempt in range(len(FETCH_WAITS) + 1):
-            done = git(source, "fetch", "-q", "--depth=1", "--no-tags", url, "refs/tags/%s:refs/tags/%s" % (tag, tag), check=False)
+            done = git(source, "fetch", "-q", "--depth=1", "--no-tags", "--filter=blob:none", REMOTE,
+                       "refs/tags/%s:refs/tags/%s" % (tag, tag), check=False)
             if done.returncode == 0:
                 break
             if attempt == len(FETCH_WAITS):
@@ -176,6 +278,7 @@ def fetch(source, data: dict, url=None, say=print, sleep=time.sleep) -> None:
         if got != commit:
             raise ChurnError("%s is %s in %s, tools/churn.json recorded %s" % (tag, got, url, commit))
         say("%s: fetched in %.0f s" % (tag, time.monotonic() - began))
+    fetch_blobs(source, list(recorded(data)), paths, say, sleep)
 
 
 # --------------------------------------------------------------------------- reading a hooks.patch
@@ -431,13 +534,11 @@ class Releases:
         self.source, self.tags = source, tags
         self._exists, self._diff, self._rename = {}, {}, {}
         paths = sorted(set(paths))
-        query = "".join("%s:%s\n" % (t, p) for t in tags for p in paths).encode()
-        rows = git(source, "cat-file", "--batch-check", input_bytes=query).stdout.decode("utf-8", "replace").splitlines() if paths else []
-        i = 0
+        blobs = tree_blobs(source, tags, paths)
+        require_present(source, blobs)          # a file that is in a tag and whose content is not here is red, never 'absent'
         for t in tags:
             for p in paths:
-                self._exists[(t, p)] = not rows[i].endswith(" missing")
-                i += 1
+                self._exists[(t, p)] = (t, p) in blobs
         self.paths = paths
 
     def exists(self, k: int, path: str) -> bool:
@@ -501,10 +602,11 @@ class Releases:
         return hs
 
     def renamed_from(self, k: int, new_path: str):
-        """The path in tags[k] of a file that is `new_path` in tags[k+1] (git -M50%), or None."""
+        """The path in tags[k] of a file that is `new_path` in tags[k+1] and has the same content under another name (git -M100%: the
+        trees' shas alone, no content is read), or None."""
         if k not in self._rename:
             names = {}
-            for row in git(self.source, "diff", "--name-status", "-M50%", self.tags[k], self.tags[k + 1]).stdout.decode("utf-8", "replace").splitlines():
+            for row in git(self.source, "diff", "--name-status", "-M100%", self.tags[k], self.tags[k + 1]).stdout.decode("utf-8", "replace").splitlines():
                 parts = row.split("\t")
                 if parts[0].startswith("R") and len(parts) == 3:
                     names[parts[2]] = parts[1]
@@ -653,12 +755,12 @@ def main(argv=None) -> int:
     warn = []
     try:
         if a.cache_key:
-            print(cache_key(load_committed(out_path)))
+            print(cache_key(load_committed(out_path), series_paths(a.series)))
             return 0
         if a.source is None:
             ap.error("--source is needed")
         if a.fetch:
-            fetch(a.source, load_committed(out_path), mozilla_repository(a.series))
+            fetch(a.source, load_committed(out_path), series_paths(a.series), mozilla_repository(a.series))
             return 0
         if a.check:
             found = check(a.series, a.source, warn)

@@ -113,7 +113,7 @@ def test_the_two_copies_of_the_workflow_are_the_same_file():
 def test_the_timing_is_a_comment_of_the_workflow():
     text = SOURCE.read_text(encoding="utf-8")
     comment = "\n".join(l for l in text.splitlines() if l.lstrip().startswith("#"))
-    assert "TIMING" in comment and "8 minutes" in comment and "first 3 minutes" in comment
+    assert "TIMING" in comment and "to be measured on the pull request" in comment and "8 minutes" in comment and "first 3 minutes" in comment
     assert "cold cache" in comment.lower() and "warm cache" in comment.lower()
 
 

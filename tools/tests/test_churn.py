@@ -10,7 +10,9 @@ Mozilla's releases are four tags of a few files; the series is one or two folder
   * the band is the churn the constant says, and the file says which;
   * every release tag is recorded with its commit, and a tag of the source that resolves to another commit is red (compute, --check, --fetch);
   * `--check` is red unless the committed file is what the series gives now, byte for byte, and names the hunks that differ;
-  * `--fetch` puts the tags a file lists into a repository, one commit deep, and the cache key is the commits, not the names;
+  * `--fetch` puts the tags a file lists into a repository, one commit deep and without file content, then the content of the files the series
+    patches and nothing else; the cache key is the commits and the set of files, not the names of the tags;
+  * a file of the series that the repository was not fetched for is red (where / what / fix / rule), never absent and never a churn of 0;
   * the numbers of three hunks of the real series at the base 159 equal the ones measured with the first tool, and the committed file is what the
     series gives (skipped when the release tags are not in the repository named by CHURN_TAGS_REPO; with CHURN_REQUIRE_TAGS=1, the round that
     runs it, their absence is a failure, not a skip).
@@ -346,7 +348,14 @@ def test_check_is_red_when_the_file_is_missing(tmp_path, source, capsys):
     assert "tools/churn.json is missing" in capsys.readouterr().err
 
 
+def offer_partial_clone(source):
+    """What Mozilla's repository does (GitHub): serve a filter and a file asked for by its sha."""
+    git(source, "config", "uploadpack.allowFilter", "true")
+    git(source, "config", "uploadpack.allowAnySHA1InWant", "true")
+
+
 def test_fetch_puts_the_listed_tags_into_a_repository_and_checks_each_commit(tmp_path, source, capsys):
+    offer_partial_clone(source)
     root = one_hook_series(tmp_path)
     path = write_churn(root, source)
     (root / "UPSTREAM.json").write_text(json.dumps({"mozilla_tag": BASE, "mozilla_repository": source.as_uri()}), encoding="utf-8")
@@ -354,10 +363,16 @@ def test_fetch_puts_the_listed_tags_into_a_repository_and_checks_each_commit(tmp
     capsys.readouterr()
     assert churn.main(["--source", str(into), "--fetch", "--series", str(root)]) == 0
     assert all(churn.commit_of(into, t) == git(source, "rev-parse", t + "^{commit}").decode().strip() for t in TAGS)
-    assert capsys.readouterr().out.count("fetched in") == len(TAGS)
+    assert capsys.readouterr().out.count("fetched in") == len(TAGS) + 1        # the nine tags (here four), then the files
+    # the content of the files the series patches is there, the content of the others is not: the repository stays small
+    patched = {"a.txt", "d.txt"}
+    wanted = {sha for (tag, name), sha in churn.tree_blobs(into, TAGS, ["a.txt", "b.txt", "c.txt", "d.txt"]).items() if name in patched}
+    others = {sha for (tag, name), sha in churn.tree_blobs(into, TAGS, ["a.txt", "b.txt", "c.txt", "d.txt"]).items() if name not in patched}
+    assert wanted and others and churn.missing_blobs(into, wanted) == [] and set(churn.missing_blobs(into, others)) == others
     # a second run (a restored cache) fetches nothing, and the repository is the one the check reads
     assert churn.main(["--source", str(into), "--fetch", "--series", str(root)]) == 0
-    assert capsys.readouterr().out.count("in the repository") == len(TAGS)
+    again = capsys.readouterr().out
+    assert again.count("in the repository") == len(TAGS) and "0 fetched" in again
     assert churn.main(["--source", str(into), "--check", "--series", str(root)]) == 0
     # a file that records another commit: the fetch fetches the tag and refuses it
     data = json.loads(path.read_text(encoding="utf-8"))
@@ -370,19 +385,61 @@ def test_fetch_puts_the_listed_tags_into_a_repository_and_checks_each_commit(tmp
     assert churn.main(["--source", str(into), "--fetch", "--series", str(root)]) == 2
 
 
-def test_the_cache_key_is_the_commits_not_the_names_of_the_tags(tmp_path, source, capsys):
+def test_a_file_the_repository_was_not_fetched_for_is_red_never_absent_never_zero(tmp_path, source, capsys):
+    """The files the series patches are the set the repository is fetched for. A hook file outside that set (the repository was
+    fetched before the hook was added) has its tree entry and no content: the churn must stop and say so, where / what / fix / rule,
+    and not read it as a file that is not there (a change in every release) nor as a file that never changed (churn 0)."""
+    offer_partial_clone(source)
+    root = one_hook_series(tmp_path)
+    path = write_churn(root, source)
+    (root / "UPSTREAM.json").write_text(json.dumps({"mozilla_tag": BASE, "mozilla_repository": source.as_uri()}), encoding="utf-8")
+    into = tmp_path / "old-cache.git"
+    churn.fetch(into, json.loads(path.read_text(encoding="utf-8")), ["a.txt"], source.as_uri(), say=lambda *_: None)       # d.txt was not a hook file then
+    capsys.readouterr()
+    assert churn.main(["--source", str(into), "--check", "--series", str(root)]) == 2
+    err = capsys.readouterr().err
+    assert "no content in the repository" in err and "d.txt" in err and TAGS[0] in err           # where and what: the files, the tag
+    assert "fix: python tools/churn.py --source" in err and "--fetch" in err                     # fix
+    assert "rule: docs/decisions/port-07-quiet-anchors.md" in err                                # rule
+    assert "a.txt" not in err.split("first:")[1].split("):")[0]
+    with pytest.raises(churn.ChurnError):
+        run(root, into)                                       # the compute too: no number is produced
+    with pytest.raises(churn.ChurnError):
+        churn.Releases(into, TAGS, ["a.txt", "d.txt"])
+    # the fetch for the right set repairs it, and the numbers are the ones of the whole repository
+    assert churn.main(["--source", str(into), "--fetch", "--series", str(root)]) == 0
+    assert churn.main(["--source", str(into), "--check", "--series", str(root)]) == 0
+
+
+def test_the_cache_key_is_the_commits_and_the_files_not_the_names_of_the_tags(tmp_path, source, capsys):
     data = run(one_hook_series(tmp_path), source)
+    files = ["a.txt", "d.txt"]
     renamed = json.loads(json.dumps(data))
     for r in renamed["releases"]:
         r["tag"] = r["tag"].lower()
     other = json.loads(json.dumps(data))
     other["releases"][0]["commit"] = "d" * 40
-    assert churn.cache_key(data) == churn.cache_key(renamed) != churn.cache_key(other)
+    key = churn.cache_key(data, files)
+    assert key == churn.cache_key(renamed, files) == churn.cache_key(data, list(reversed(files)))
+    assert key != churn.cache_key(other, files)
+    assert key != churn.cache_key(data, files + ["gfx/new/Hook.cpp"])          # a new hook file is another key: the cache is made again
     root = one_hook_series(tmp_path / "again")
     write_churn(root, source)
     capsys.readouterr()
     assert churn.main(["--cache-key", "--series", str(root)]) == 0
-    assert capsys.readouterr().out.strip() == churn.cache_key(data)
+    assert capsys.readouterr().out.strip() == key
+    # a new file in a hooks.patch changes the key the job computes
+    (root / "network" / "b" / "hooks.patch").write_text(
+        patch_text("d.txt", D4, edit(D4, 11, "x")) + patch_text("a.txt", A4, edit(A4, 5, "y")), encoding="utf-8", newline="")
+    assert churn.series_paths(root) == files
+    (root / "network" / "c").mkdir()
+    (root / "network" / "c" / "hooks.patch").write_text(patch_text("c.txt", releases()[3]["c.txt"], ["x"] + releases()[3]["c.txt"][1:]),
+                                                       encoding="utf-8", newline="")
+    (root / "SERIES").write_text((root / "SERIES").read_text(encoding="utf-8") + "network/c\n", encoding="utf-8")
+    assert churn.series_paths(root) == ["a.txt", "c.txt", "d.txt"]
+    capsys.readouterr()
+    assert churn.main(["--cache-key", "--series", str(root)]) == 0
+    assert capsys.readouterr().out.strip() == churn.cache_key(data, files + ["c.txt"]) != key
 
 
 # --------------------------------------------------------------------------- the real series
