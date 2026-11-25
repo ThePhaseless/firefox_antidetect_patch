@@ -1,18 +1,29 @@
+diff --git a/dom/base/test/gtest/moz.build b/dom/base/test/gtest/moz.build
+index aaf31169b44149bd6042cea4eb2e08c87c1378e7..3efdf2f5dc5616f1902d165f0c3520f7d2e22f18 100644
+--- a/dom/base/test/gtest/moz.build
++++ b/dom/base/test/gtest/moz.build
+@@ -13,6 +13,7 @@ UNIFIED_SOURCES += [
+     "TestXMLSerializerNoBreakLink.cpp",
+     "TestXPathGenerator.cpp",
+ ]
++UNIFIED_SOURCES += ["TestStealthCallerObject.cpp"]  # STEALTH-HOOK(automation/hybrid-xrays)
+ 
+ LOCAL_INCLUDES += ["/dom/base"]
+ 
 diff --git a/js/xpconnect/src/Sandbox.cpp b/js/xpconnect/src/Sandbox.cpp
-index 34e0724f35b69447027d0791ee3755719f8a9803..b633b619fbd708874f0ce96a4e53f4ece5a0135c 100644
+index 34e0724f35b69447027d0791ee3755719f8a9803..ab61b42f1ff09bb7793f400e68adeb9be5756f7b 100644
 --- a/js/xpconnect/src/Sandbox.cpp
 +++ b/js/xpconnect/src/Sandbox.cpp
-@@ -112,6 +112,9 @@
+@@ -112,6 +112,8 @@
  #include "mozilla/ResultExtensions.h"
  #include "mozilla/StaticPrefs_extensions.h"
  
-+#include "mozilla/intl/StealthSessionPrefs.h"  // STEALTH-HOOK(fingerprint/locale-time/timezone)
 +#include "StealthSandbox.h"  // STEALTH-HOOK(automation/hybrid-xrays)
 +
  using namespace mozilla;
  using namespace mozilla::dom;
  using namespace JS;
-@@ -824,7 +827,7 @@ bool SandboxProxyHandler::getPropertyDescriptorImpl(
+@@ -824,7 +826,7 @@ bool SandboxProxyHandler::getPropertyDescriptorImpl(
      }
    } else {
      Rooted<JSObject*> holder(cx);
@@ -21,7 +32,7 @@ index 34e0724f35b69447027d0791ee3755719f8a9803..b633b619fbd708874f0ce96a4e53f4ec
        return false;
      }
    }
-@@ -1326,6 +1329,7 @@ nsresult xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp,
+@@ -1326,6 +1328,7 @@ nsresult xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp,
    auto& creationOptions = realmOptions.creationOptions();
  
    bool isSystemPrincipal = principal->IsSystemPrincipal();
@@ -29,16 +40,7 @@ index 34e0724f35b69447027d0791ee3755719f8a9803..b633b619fbd708874f0ce96a4e53f4ec
  
    if (isSystemPrincipal) {
      options.forceSecureContext = true;
-@@ -1385,7 +1389,7 @@ nsresult xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp,
-           window->GetBrowsingContext()->Top()->GetLanguageOverride();
-       if (!localeOverride.IsEmpty()) {
-         realmOptions.behaviors().setLocaleOverride(
--            PromiseFlatCString(localeOverride).get());
-+            mozilla::intl::StealthPrimaryLanguageTag(PromiseFlatCString(localeOverride)).get());  // STEALTH-HOOK(fingerprint/locale-time/timezone)
-       }
- 
-       const nsAString& timezoneOverride =
-@@ -1430,6 +1434,7 @@ nsresult xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp,
+@@ -1430,6 +1433,7 @@ nsresult xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp,
      MOZ_RELEASE_ASSERT(priv->isUAWidgetCompartment == options.isUAWidgetScope);
      MOZ_RELEASE_ASSERT(priv->hasExclusiveExpandos == hasExclusiveExpandos);
      MOZ_RELEASE_ASSERT(priv->wantXrays == wantXrays);
@@ -46,7 +48,7 @@ index 34e0724f35b69447027d0791ee3755719f8a9803..b633b619fbd708874f0ce96a4e53f4ec
    } else {
      CompartmentPrivate* priv = CompartmentPrivate::Get(sandbox);
      priv->allowWaivers = options.allowWaivers;
-@@ -1437,6 +1442,7 @@ nsresult xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp,
+@@ -1437,6 +1441,7 @@ nsresult xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp,
      priv->isUAWidgetCompartment = options.isUAWidgetScope;
      priv->hasExclusiveExpandos = hasExclusiveExpandos;
      priv->wantXrays = wantXrays;
@@ -54,7 +56,7 @@ index 34e0724f35b69447027d0791ee3755719f8a9803..b633b619fbd708874f0ce96a4e53f4ec
    }
  
    {
-@@ -2040,6 +2046,8 @@ bool SandboxOptions::Parse() {
+@@ -2040,6 +2045,8 @@ bool SandboxOptions::Parse() {
    bool ok = ParseObject("sandboxPrototype", &proto) &&
              ParseObject("associatedWindow", &associatedWindow) &&
              ParseBoolean("wantXrays", &wantXrays) &&

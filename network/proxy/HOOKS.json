@@ -1,1 +1,11 @@
-[]
+[
+ {
+  "file": "modules/libpref/init/StaticPrefList.yaml",
+  "function": "",
+  "kind": "rewrite",
+  "form": "declared-value",
+  "line": "  value: 0  # STEALTH-HOOK(network/proxy)",
+  "removed": "  value: 5",
+  "test": "node:juggler/tests/system_proxy_is_off_by_default.test.mjs#network.proxy.type defaults to 0 and the hook is on the value line"
+ }
+]

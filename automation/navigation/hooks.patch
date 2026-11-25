@@ -27,6 +27,18 @@ index 86b2939a83873627e79ec19b87d13008e2e2109d..6ef207fb4a9a5ec3a85e5068c925f747
    LoadURI(loadState, true);
  }
  
+diff --git a/docshell/base/moz.build b/docshell/base/moz.build
+index 20bb1e1a0a5022fa28b753c9c7d6ef6d0354e700..ad4e0ce200ecc5cf0407de06c5fbf63e2830477e 100644
+--- a/docshell/base/moz.build
++++ b/docshell/base/moz.build
+@@ -100,6 +100,7 @@ UNIFIED_SOURCES += [
+     "WindowContext.cpp",
+ ]
+ UNIFIED_SOURCES += ["StealthDocShellAttrs.cpp"]  # STEALTH-HOOK(automation/docshell-attrs)
++UNIFIED_SOURCES += ["StealthNavigation.cpp"]  # STEALTH-HOOK(automation/navigation)
+ 
+ TEST_DIRS += ["test/gtest"]
+ 
 diff --git a/docshell/base/nsDocShell.cpp b/docshell/base/nsDocShell.cpp
 index 9890b717e687329386006642e8c536f4dd094bd9..0e42c150bf10b9b03f5430dded6a46571d1fd112 100644
 --- a/docshell/base/nsDocShell.cpp
@@ -137,35 +149,18 @@ index a6a44ac715a637ddf1cc5c23ff0dd8440dd45eaf..c484cfb3a4ac79deac613c8c711b8b71
  
    bool mSkipHTTPSUpgrade = false;
  };
-diff --git a/netwerk/base/TRRLoadInfo.cpp b/netwerk/base/TRRLoadInfo.cpp
-index 0cba54550072adc8a0ad11b1c9a502ff97a7bd7e..5990180a7c1941856e09046861cb55411861c2af 100644
---- a/netwerk/base/TRRLoadInfo.cpp
-+++ b/netwerk/base/TRRLoadInfo.cpp
-@@ -11,6 +11,8 @@
- #include "nsContentUtils.h"
- #include "nsIRedirectHistoryEntry.h"
+diff --git a/netwerk/base/moz.build b/netwerk/base/moz.build
+index 55fd5a35e3ca508fe805649f39f2cea47239fa6a..30e745c90cfcaf80d9469bb02dd07ee1b641be1f 100644
+--- a/netwerk/base/moz.build
++++ b/netwerk/base/moz.build
+@@ -258,6 +258,7 @@ UNIFIED_SOURCES += [
+     "TRRLoadInfo.cpp",
+ ]
+ UNIFIED_SOURCES += ["StealthIPv6Literal.cpp"]  # STEALTH-HOOK(network/ipv6-literal)
++UNIFIED_SOURCES += ["StealthLoadInfo.cpp"]  # STEALTH-HOOK(automation/navigation)
+ UNIFIED_SOURCES += ["StealthSocksCredentials.cpp"]  # STEALTH-HOOK(network/socks)
  
-+#include "StealthLoadInfo.h"  // STEALTH-HOOK(network/doh)
-+
- using namespace mozilla::dom;
- 
- namespace mozilla {
-@@ -26,6 +28,7 @@ TRRLoadInfo::TRRLoadInfo(nsIURI* aResultPrincipalURI,
- already_AddRefed<nsILoadInfo> TRRLoadInfo::Clone() const {
-   nsCOMPtr<nsILoadInfo> loadInfo =
-       new TRRLoadInfo(mResultPrincipalURI, mInternalContentPolicyType);
-+  static_cast<TRRLoadInfo*>(loadInfo.get())->mOriginAttributes = mOriginAttributes;  // STEALTH-HOOK(network/doh)
- 
-   return loadInfo.forget();
- }
-@@ -302,6 +305,7 @@ nsresult TRRLoadInfo::GetOriginAttributes(
- 
- nsresult TRRLoadInfo::SetOriginAttributes(
-     const mozilla::OriginAttributes& aOriginAttributes) {
-+  if (nsresult rv; StealthTRRSetOriginAttributes(mOriginAttributes, aOriginAttributes, &rv)) return rv;  // STEALTH-HOOK(network/doh)
-   return NS_ERROR_NOT_IMPLEMENTED;
- }
- 
+ if CONFIG["FUZZING"]:
 diff --git a/netwerk/base/nsILoadInfo.idl b/netwerk/base/nsILoadInfo.idl
 index a3e7384515b976681d9e12318cbc1156415a9a50..58ff528d032b9da7fd40c0031e06a306b3786f87 100644
 --- a/netwerk/base/nsILoadInfo.idl

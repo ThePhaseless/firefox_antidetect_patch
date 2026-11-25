@@ -27,26 +27,6 @@ index 49a16861cc18b88fdcd67260c62d0e4bed2be43b..501de6487882a6f7d199fe46dbbd9141
    if (NS_FAILED(OSPreferences::GetInstance()->GetRegionalPrefsLocales(
            regionalPrefsLocales))) {
      GetAppLocalesAsBCP47(aRetVal);
-diff --git a/intl/locale/moz.build b/intl/locale/moz.build
-index 4d6ff0428de7faaa6f6c6570708f7f5690e0e4df..d26b374eba597ef4982743711ae4bc1ae7fdbcb8 100644
---- a/intl/locale/moz.build
-+++ b/intl/locale/moz.build
-@@ -40,6 +40,7 @@ EXPORTS.mozilla.intl += [
-     "OSPreferences.h",
-     "Quotes.h",
- ]
-+EXPORTS.mozilla.intl += ["StealthSessionPrefs.h"]  # STEALTH-HOOK(fingerprint/locale-time/session-declaration)
- 
- UNIFIED_SOURCES += [
-     "AppCollator.cpp",
-@@ -51,6 +52,7 @@ UNIFIED_SOURCES += [
-     "OSPreferences.cpp",
-     "Quotes.cpp",
- ]
-+UNIFIED_SOURCES += ["StealthSessionPrefs.cpp"]  # STEALTH-HOOK(fingerprint/locale-time/session-declaration)
- 
- MOZ_SRC_FILES += [
-     "LangPackMatcher.sys.mjs",
 diff --git a/intl/locale/nsLanguageAtomService.cpp b/intl/locale/nsLanguageAtomService.cpp
 index 1761b528e4acb2eecf440a65f67d17175266eeb3..f6f90a549b9e6f5bb7f086b60c3c2ee73dc489a3 100644
 --- a/intl/locale/nsLanguageAtomService.cpp
@@ -76,3 +56,14 @@ index 1761b528e4acb2eecf440a65f67d17175266eeb3..f6f90a549b9e6f5bb7f086b60c3c2ee7
      AutoTArray<nsCString, 10> regionalPrefsLocales;
      // XXX Are the OSPreferences calls here safe to call from any thread?
      // In practice GetLocaleLanguage will be called early on the main thread
+diff --git a/intl/locale/tests/gtest/moz.build b/intl/locale/tests/gtest/moz.build
+index 65c43ebab8704671225f9a29f9b12f6445450b4e..7d33342db9d1806eea737680d87b490491446fa9 100644
+--- a/intl/locale/tests/gtest/moz.build
++++ b/intl/locale/tests/gtest/moz.build
+@@ -8,5 +8,6 @@ UNIFIED_SOURCES += [
+     "TestLocaleServiceNegotiate.cpp",
+     "TestOSPreferences.cpp",
+ ]
++UNIFIED_SOURCES += ["TestStealthRegionalLocales.cpp"]  # STEALTH-HOOK(fingerprint/locale-time/language)
+ 
+ FINAL_LIBRARY = "xul-gtest"

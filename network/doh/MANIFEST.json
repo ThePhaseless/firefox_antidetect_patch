@@ -1,11 +1,20 @@
 {
  "modified": [
   "dom/media/webrtc/jsapi/MediaTransportHandler.cpp",
+  "dom/media/webrtc/transport/common.build",
   "dom/media/webrtc/transport/nriceresolver.cpp",
   "dom/media/webrtc/transport/nriceresolver.h",
+  "modules/libpref/init/StaticPrefList.yaml",
+  "netwerk/base/TRRLoadInfo.cpp",
   "netwerk/dns/TRR.cpp",
   "netwerk/dns/moz.build",
   "netwerk/dns/nsHostResolver.cpp",
+  "netwerk/ipc/PSocketProcess.ipdl",
+  "netwerk/ipc/ProxyConfigLookup.cpp",
+  "netwerk/ipc/ProxyConfigLookupChild.cpp",
+  "netwerk/ipc/SocketProcessParent.cpp",
+  "netwerk/ipc/SocketProcessParent.h",
+  "netwerk/ipc/moz.build",
   "netwerk/protocol/http/TLSTransportLayer.cpp",
   "netwerk/protocol/http/TRRServiceChannel.cpp",
   "netwerk/protocol/http/nsHttpChannel.cpp",
@@ -105,6 +114,19 @@
    }
   },
   {
+   "file": "dom/media/webrtc/transport/common.build",
+   "category": "build",
+   "feature": "doh-trr-context",
+   "prefs": [],
+   "added": 1,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "",
+   "notes": ""
+  },
+  {
    "file": "dom/media/webrtc/transport/nriceresolver.cpp",
    "category": "other",
    "feature": "doh-trr-context",
@@ -136,6 +158,38 @@
    "verifier": {
     "changed": [],
     "why": "Written from the diff against the tag."
+   }
+  },
+  {
+   "file": "modules/libpref/init/StaticPrefList.yaml",
+   "category": "spoof",
+   "feature": "doh-trr-context",
+   "prefs": [],
+   "added": 2,
+   "removed": 2,
+   "hunks": 2,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "",
+   "notes": ""
+  },
+  {
+   "file": "netwerk/base/TRRLoadInfo.cpp",
+   "category": "juggler",
+   "feature": "doh-trr-context",
+   "prefs": [],
+   "added": 4,
+   "removed": 0,
+   "hunks": 3,
+   "inline_logic_lines": 9,
+   "hookable": "movable",
+   "anchor": "TRRLoadInfo::GetJugglerLoadIdentifier / TRRLoadInfo::SetJugglerLoadIdentifier (end of file)",
+   "notes": "Stubs required because TRRLoadInfo implements nsILoadInfo. Risk 'infallible attribute returns NS_ERROR_NOT_IMPLEMENTED': REFUTED as a new problem. Upstream TRRLoadInfo.cpp:132-155 already returns NS_ERROR_NOT_IMPLEMENTED for the [infallible] attributes securityMode, isInThirdPartyContext and isThirdPartyContextToTopWindow (nsILoadInfo.idl:490, 637, 649); the new stubs follow the same pattern. Also (feature doh-trr-context, network/doh): the TRR load info keeps the origin attributes of the lookup's context, also in its clone, so the proxy filters see the context.",
+   "verifier": {
+    "changed": [
+     "notes"
+    ],
+    "why": "The infallible-stub risk is refuted: upstream TRRLoadInfo already does this for other infallible attributes."
    }
   },
   {
@@ -188,6 +242,84 @@
     "changed": [],
     "why": "Written from the diff against the tag."
    }
+  },
+  {
+   "file": "netwerk/ipc/PSocketProcess.ipdl",
+   "category": "other",
+   "feature": "doh-trr-context",
+   "prefs": [],
+   "added": 1,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "",
+   "notes": ""
+  },
+  {
+   "file": "netwerk/ipc/ProxyConfigLookup.cpp",
+   "category": "other",
+   "feature": "doh-trr-context",
+   "prefs": [],
+   "added": 4,
+   "removed": 0,
+   "hunks": 3,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "",
+   "notes": ""
+  },
+  {
+   "file": "netwerk/ipc/ProxyConfigLookupChild.cpp",
+   "category": "other",
+   "feature": "doh-trr-context",
+   "prefs": [],
+   "added": 3,
+   "removed": 0,
+   "hunks": 2,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "",
+   "notes": ""
+  },
+  {
+   "file": "netwerk/ipc/SocketProcessParent.cpp",
+   "category": "other",
+   "feature": "doh-trr-context",
+   "prefs": [],
+   "added": 3,
+   "removed": 0,
+   "hunks": 2,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "",
+   "notes": ""
+  },
+  {
+   "file": "netwerk/ipc/SocketProcessParent.h",
+   "category": "other",
+   "feature": "doh-trr-context",
+   "prefs": [],
+   "added": 1,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "",
+   "notes": ""
+  },
+  {
+   "file": "netwerk/ipc/moz.build",
+   "category": "other",
+   "feature": "doh-trr-context",
+   "prefs": [],
+   "added": 2,
+   "removed": 0,
+   "hunks": 2,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "",
+   "notes": ""
   },
   {
    "file": "netwerk/protocol/http/TLSTransportLayer.cpp",

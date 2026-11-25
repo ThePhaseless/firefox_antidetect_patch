@@ -1,5 +1,13 @@
 [
  {
+  "file": "dom/media/gtest/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"TestStealthMediaDeclaration.cpp\"]  # STEALTH-HOOK(fingerprint/media/decode-declaration)",
+  "test": "gtest:StealthMediaDeclaration.SupportsAsyncAnswersFromTheDeclaration"
+ },
+ {
   "file": "dom/media/mediacapabilities/MediaCapabilities.cpp",
   "function": "",
   "kind": "add",

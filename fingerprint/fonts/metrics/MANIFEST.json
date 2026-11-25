@@ -1,12 +1,15 @@
 {
  "modified": [
+  "gfx/2d/moz.build",
   "gfx/skia/skia/src/core/SkScalerContext.cpp",
+  "gfx/tests/gtest/moz.build",
   "gfx/thebes/gfxDWriteFonts.cpp",
   "gfx/thebes/gfxFT2FontBase.cpp",
   "gfx/thebes/gfxFont.cpp",
   "gfx/thebes/gfxFont.h",
   "gfx/thebes/gfxHarfBuzzShaper.cpp",
-  "gfx/thebes/gfxHarfBuzzShaper.h"
+  "gfx/thebes/gfxHarfBuzzShaper.h",
+  "gfx/thebes/moz.build"
  ],
  "added": {
   "gfx/2d/StealthGlyphCoverage.cpp": "100644",
@@ -34,6 +37,19 @@
  },
  "inventory": [
   {
+   "file": "gfx/2d/moz.build",
+   "category": "build",
+   "feature": "font-design-metrics",
+   "prefs": [],
+   "added": 2,
+   "removed": 0,
+   "hunks": 2,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "",
+   "notes": ""
+  },
+  {
    "file": "gfx/skia/skia/src/core/SkScalerContext.cpp",
    "category": "spoof",
    "feature": "glyph-coverage-quantise",
@@ -51,6 +67,19 @@
     ],
     "why": "The claim that this is the only Mozilla header in Skia is false (SkMemory_mozalloc.cpp, SkASAN.h, SkMacros.h, SkTypeface_win_dw.h include mozilla headers); it holds only for this file."
    }
+  },
+  {
+   "file": "gfx/tests/gtest/moz.build",
+   "category": "build",
+   "feature": "font-design-metrics",
+   "prefs": [],
+   "added": 3,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "",
+   "notes": ""
   },
   {
    "file": "gfx/thebes/gfxDWriteFonts.cpp",
@@ -159,6 +188,19 @@
     "changed": [],
     "why": "Checked category, feature, prefs, anchor, evidence and notes against the diff; no correction needed."
    }
+  },
+  {
+   "file": "gfx/thebes/moz.build",
+   "category": "build",
+   "feature": "font-design-metrics",
+   "prefs": [],
+   "added": 1,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 1,
+   "hookable": "",
+   "anchor": "",
+   "notes": ""
   }
  ]
 }

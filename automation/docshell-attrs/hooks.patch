@@ -1,13 +1,12 @@
 diff --git a/docshell/base/moz.build b/docshell/base/moz.build
-index 72a86ad9f248aa366dee072569d35c8509944b84..ad4e0ce200ecc5cf0407de06c5fbf63e2830477e 100644
+index 72a86ad9f248aa366dee072569d35c8509944b84..20bb1e1a0a5022fa28b753c9c7d6ef6d0354e700 100644
 --- a/docshell/base/moz.build
 +++ b/docshell/base/moz.build
-@@ -99,6 +99,8 @@ UNIFIED_SOURCES += [
+@@ -99,6 +99,7 @@ UNIFIED_SOURCES += [
      "SerializedLoadContext.cpp",
      "WindowContext.cpp",
  ]
 +UNIFIED_SOURCES += ["StealthDocShellAttrs.cpp"]  # STEALTH-HOOK(automation/docshell-attrs)
-+UNIFIED_SOURCES += ["StealthNavigation.cpp"]  # STEALTH-HOOK(automation/navigation)
  
  TEST_DIRS += ["test/gtest"]
  

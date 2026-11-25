@@ -63,29 +63,31 @@ index 60bb55efedebd29c2944cbce2b44e5aed5d7fdbd..dc8a57d8adc7860c3a7ce13a556abf06
  
    bool mForTests;
  };
+diff --git a/dom/base/moz.build b/dom/base/moz.build
+index f94e5a88fcbd5d22d9cbce9d308c01bfadaa10f3..222e26b30adee294e42d6bcabff2268bba20234b 100644
+--- a/dom/base/moz.build
++++ b/dom/base/moz.build
+@@ -521,6 +521,7 @@ UNIFIED_SOURCES += [
+     "WindowNamedPropertiesHandler.cpp",
+     "XPathGenerator.cpp",
+ ]
++UNIFIED_SOURCES += ["StealthInputEventBirth.cpp"]  # STEALTH-HOOK(fingerprint/input/event-birth)
+ 
+ if CONFIG["FUZZING"]:
+     UNIFIED_SOURCES += [
 diff --git a/dom/base/nsContentUtils.cpp b/dom/base/nsContentUtils.cpp
-index 7929fcdeb59c47dbd2bee9e8d8bfd7ef2e8db87b..ff2d17735369d2b63043b28430e6a99519a3cd0b 100644
+index fca6a70aa2d18b644ca4c2c11154d7b2c95bfec7..ff2d17735369d2b63043b28430e6a99519a3cd0b 100644
 --- a/dom/base/nsContentUtils.cpp
 +++ b/dom/base/nsContentUtils.cpp
-@@ -425,6 +425,9 @@
+@@ -425,6 +425,7 @@
  #include "xpcprivate.h"
  #include "xpcpublic.h"
  
 +#include "StealthInputEventBirth.h"  // STEALTH-HOOK(fingerprint/input/event-birth)
-+#include "StealthJugglerEventId.h"  // STEALTH-HOOK(automation/input)
-+
+ #include "StealthJugglerEventId.h"  // STEALTH-HOOK(automation/input)
+ 
  #if defined(XP_WIN)
- // Undefine LoadImage to prevent naming conflict with Windows.
- #  undef LoadImage
-@@ -10508,6 +10511,7 @@ Result<bool, nsresult> nsContentUtils::SynthesizeMouseEvent(
-   mouseOrPointerEvent.mModifiers =
-       GetWidgetModifiers(aMouseEventData.mModifiers);
-   mouseOrPointerEvent.mButton = aMouseEventData.mButton;
-+  StealthSetJugglerId(mouseOrPointerEvent, aMouseEventData.mJugglerEventId);  // STEALTH-HOOK(automation/input)
-   mouseOrPointerEvent.mButtons =
-       aMouseEventData.mButtons.WasPassed()
-           ? aMouseEventData.mButtons.Value()
-@@ -10542,6 +10546,7 @@ Result<bool, nsresult> nsContentUtils::SynthesizeMouseEvent(
+@@ -10545,6 +10546,7 @@ Result<bool, nsresult> nsContentUtils::SynthesizeMouseEvent(
                                            aMouseEventData.mMovementY.Value());
    }
  
@@ -93,30 +95,62 @@ index 7929fcdeb59c47dbd2bee9e8d8bfd7ef2e8db87b..ff2d17735369d2b63043b28430e6a995
    nsEventStatus status = nsEventStatus_eIgnore;
    if (aOptions.mToWindow) {
      nsresult rv = aPresShell->HandleEvent(aPresShell->GetRootFrame(),
-@@ -10555,6 +10560,7 @@ Result<bool, nsresult> nsContentUtils::SynthesizeMouseEvent(
-     // targeted directly at a window and async dispatching is requested.
-     mouseOrPointerEvent.mFlags.mIsAsyncSynthesizedForTests =
-         aOptions.mIsDOMEventSynthesized;
-+    StealthJugglerNotAsyncSynthesized(mouseOrPointerEvent);  // STEALTH-HOOK(automation/input)
-     status = aWidget->DispatchInputEvent(&mouseOrPointerEvent).mContentStatus;
-   } else {
-     status = aWidget->DispatchEvent(&mouseOrPointerEvent);
+diff --git a/dom/base/nsDOMWindowUtils.cpp b/dom/base/nsDOMWindowUtils.cpp
+index d58f8b12906fa67390dce28178e8dc50c1f2f5f8..d315ffa27c8bc083972ad7651ab69977d1c4c79e 100644
+--- a/dom/base/nsDOMWindowUtils.cpp
++++ b/dom/base/nsDOMWindowUtils.cpp
+@@ -145,6 +145,7 @@
+ #  undef GetClassName
+ #endif
+ 
++#include "StealthInputEventBirth.h"  // STEALTH-HOOK(fingerprint/input/event-birth)
+ #include "StealthJugglerInput.h"  // STEALTH-HOOK(automation/input)
+ 
+ using namespace mozilla;
+@@ -725,7 +726,8 @@ nsDOMWindowUtils::SendWheelEvent(float aX, float aY, double aDeltaX,
+                                  uint32_t aDeltaMode, int32_t aModifiers,
+                                  int32_t aLineOrPageDeltaX,
+                                  int32_t aLineOrPageDeltaY, uint32_t aOptions,
+-                                 nsISynthesizedEventCallback* aCallback) {
++                                 nsISynthesizedEventCallback* aCallback,
++                                 double aLatency) {  // STEALTH-HOOK(fingerprint/input/event-birth)
+   if (XRE_IsContentProcess() && aCallback &&
+       ((aOptions & WHEEL_EVENT_ASYNC_ENABLED) ||
+        StaticPrefs::test_events_async_enabled())) {
+@@ -760,6 +762,7 @@ nsDOMWindowUtils::SendWheelEvent(float aX, float aY, double aDeltaX,
+   wheelEvent.mCallbackId = notifier.SaveCallback();
+   wheelEvent.mFlags.mIsSynthesizedForTests = true;
+ 
++  StealthSetInputEventBirth(wheelEvent, aLatency, GetDocument());  // STEALTH-HOOK(fingerprint/input/event-birth)
+   nsPresContext* presContext = GetPresContext();
+   NS_ENSURE_TRUE(presContext, NS_ERROR_FAILURE);
+ 
 diff --git a/dom/base/test/gtest/moz.build b/dom/base/test/gtest/moz.build
-index aaf31169b44149bd6042cea4eb2e08c87c1378e7..572c787950574a9ab5801547ef1882f1c615d62e 100644
+index 3efdf2f5dc5616f1902d165f0c3520f7d2e22f18..783a1ff52f2bcb121e6e7874c162a422036042b1 100644
 --- a/dom/base/test/gtest/moz.build
 +++ b/dom/base/test/gtest/moz.build
-@@ -13,6 +13,11 @@ UNIFIED_SOURCES += [
-     "TestXMLSerializerNoBreakLink.cpp",
+@@ -14,6 +14,7 @@ UNIFIED_SOURCES += [
      "TestXPathGenerator.cpp",
  ]
-+UNIFIED_SOURCES += ["TestStealthCallerObject.cpp"]  # STEALTH-HOOK(automation/hybrid-xrays)
-+UNIFIED_SOURCES += ["TestStealthDocumentLanguage.cpp"]  # STEALTH-HOOK(fingerprint/locale-time/session-declaration)
+ UNIFIED_SOURCES += ["TestStealthCallerObject.cpp"]  # STEALTH-HOOK(automation/hybrid-xrays)
 +UNIFIED_SOURCES += ["TestStealthInputEventBirth.cpp"]  # STEALTH-HOOK(fingerprint/input/event-birth)
-+UNIFIED_SOURCES += ["TestStealthStackFrames.cpp"]  # STEALTH-HOOK(fingerprint/js-surface/stack-frames)
-+UNIFIED_SOURCES += ["TestStealthTimezone.cpp"]  # STEALTH-HOOK(fingerprint/locale-time/timezone)
  
  LOCAL_INCLUDES += ["/dom/base"]
  
+diff --git a/dom/interfaces/base/nsIDOMWindowUtils.idl b/dom/interfaces/base/nsIDOMWindowUtils.idl
+index 1adedd581d491bbb963a6411906e4b2f878c8dd8..897223e2cf219e4c8c8b4d10c93d51a048c6174a 100644
+--- a/dom/interfaces/base/nsIDOMWindowUtils.idl
++++ b/dom/interfaces/base/nsIDOMWindowUtils.idl
+@@ -381,7 +381,8 @@ interface nsIDOMWindowUtils : nsISupports {
+                       in long aLineOrPageDeltaX,
+                       in long aLineOrPageDeltaY,
+                       in unsigned long aOptions,
+-                      [optional] in nsISynthesizedEventCallback aCallback);
++                      [optional] in nsISynthesizedEventCallback aCallback,
++                      [optional] in double aLatency);  // STEALTH-HOOK(fingerprint/input/event-birth)
+ 
+   /**
+    * Native modifiers for sendNativeKeyEvent and sendNativeMouseEvent.
 diff --git a/dom/interfaces/base/nsITextInputProcessor.idl b/dom/interfaces/base/nsITextInputProcessor.idl
 index 3ca850fa757d21e31d7a2addb1983ec2c6d3323a..d755dfcc15240810323b9e7f08731ad601cd53b9 100644
 --- a/dom/interfaces/base/nsITextInputProcessor.idl

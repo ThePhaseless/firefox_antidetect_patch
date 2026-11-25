@@ -1,7 +1,11 @@
 {
  "modified": [
+  "gfx/2d/moz.build",
+  "gfx/thebes/moz.build",
+  "toolkit/xre/nsAppRunner.cpp",
   "widget/GfxInfoBase.cpp",
-  "widget/gtk/GfxInfo.cpp"
+  "widget/gtk/GfxInfo.cpp",
+  "widget/gtk/moz.build"
  ],
  "added": {
   "gfx/2d/StealthRefuse.h": "100644",
@@ -28,6 +32,45 @@
   "widget/gtk/StealthHostGLProbe.cpp": "139f766ac4f3fc595003d0a3b05adc3b803ad423d2fa32354cf503e503f4b159"
  },
  "inventory": [
+  {
+   "file": "gfx/2d/moz.build",
+   "category": "build",
+   "feature": "gfx-feature-status-declared",
+   "prefs": [],
+   "added": 1,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "",
+   "notes": ""
+  },
+  {
+   "file": "gfx/thebes/moz.build",
+   "category": "build",
+   "feature": "gfx-feature-status-declared",
+   "prefs": [],
+   "added": 1,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 1,
+   "hookable": "",
+   "anchor": "",
+   "notes": ""
+  },
+  {
+   "file": "toolkit/xre/nsAppRunner.cpp",
+   "category": "other",
+   "feature": "gfx-feature-status-declared",
+   "prefs": [],
+   "added": 5,
+   "removed": 0,
+   "hunks": 2,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "",
+   "notes": ""
+  },
   {
    "file": "widget/GfxInfoBase.cpp",
    "category": "spoof",
@@ -65,6 +108,19 @@
     "changed": [],
     "why": "Written with the hook, 2026-11-21."
    }
+  },
+  {
+   "file": "widget/gtk/moz.build",
+   "category": "spoof",
+   "feature": "gfx-feature-status-declared",
+   "prefs": [],
+   "added": 1,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "",
+   "notes": ""
   }
  ]
 }

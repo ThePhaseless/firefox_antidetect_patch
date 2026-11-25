@@ -11,14 +11,13 @@ index b85d03a786b52a0598280a9b4da8b006edc59b8e..a3a7630aa54e58e78791cf75fd588273
  include("../common.build")
  
 diff --git a/dom/media/webrtc/transport/common.build b/dom/media/webrtc/transport/common.build
-index 215d61190dbe192fba09e129e869093ced0eacca..571252e084d04932e704bf769bf6acc61ba21826 100644
+index 016f3d776db38668fbca860106cae1ea1860de8e..571252e084d04932e704bf769bf6acc61ba21826 100644
 --- a/dom/media/webrtc/transport/common.build
 +++ b/dom/media/webrtc/transport/common.build
-@@ -30,6 +30,8 @@ transport_lcppsrcs = [
-     "transportlayersrtp.cpp",
+@@ -31,6 +31,7 @@ transport_lcppsrcs = [
      "WebrtcTCPSocketWrapper.cpp",
  ]
-+transport_lcppsrcs += ["StealthIceResolverContext.cpp"]  # STEALTH-HOOK(network/doh)
+ transport_lcppsrcs += ["StealthIceResolverContext.cpp"]  # STEALTH-HOOK(network/doh)
 +transport_lcppsrcs += ["nr_stealth_network.cpp"]  # STEALTH-HOOK(fingerprint/webrtc/declared-network)
  
  transport_cppsrcs = [
@@ -54,6 +53,19 @@ index db8a3c004486d5b27e012b0b318b4d8ac477569a..c2f7ce4e4495c34005fe571dcef765a8
  
  void StunAddrsRequestParent::MDNSServiceWrapper::RegisterHostname(
      const char* hostname, const char* address) {
+diff --git a/dom/media/webrtc/transport/ipc/WebrtcTCPSocket.cpp b/dom/media/webrtc/transport/ipc/WebrtcTCPSocket.cpp
+index 59912b1f41195811707a27f6dccc3bc8876b01fc..b69c9071f938743ef3a2ecdbf9ad675d3f40b4cd 100644
+--- a/dom/media/webrtc/transport/ipc/WebrtcTCPSocket.cpp
++++ b/dom/media/webrtc/transport/ipc/WebrtcTCPSocket.cpp
+@@ -343,6 +343,8 @@ void WebrtcTCPSocket::OpenWithoutHttpProxy(nsIProxyInfo* aSocksProxyInfo) {
+     return;
+   }
+ 
++  StealthTcpSocketBorn(this, &prAddr);  // STEALTH-HOOK(fingerprint/webrtc/declared-network)
++
+   mozilla::net::NetAddr addr(&prAddr);
+   rv = mTransport->Bind(&addr);
+   if (NS_WARN_IF(NS_FAILED(rv))) {
 diff --git a/dom/media/webrtc/transport/mdns_service/src/lib.rs b/dom/media/webrtc/transport/mdns_service/src/lib.rs
 index 82d3609ed94472e02ab3a7b9b291824160e8a79b..3b08d4adb8bfbf548b210ee03165fc04501d0f98 100644
 --- a/dom/media/webrtc/transport/mdns_service/src/lib.rs
@@ -96,6 +108,97 @@ index 98369755834cfc31e3f3df454879a1d6df64cbf6..d5b1cfc5b8919762298b011529b450c9
  LICENSED_UNDER += ["libjingle"]
  LICENSED_UNDER["libjingle"].paths = [
      "sigslot.h",
+diff --git a/dom/media/webrtc/transport/nr_socket_prsock.cpp b/dom/media/webrtc/transport/nr_socket_prsock.cpp
+index c8fbcc1071931912bbf41d10698566aceaa70b28..f3662e04a37987170d515b7478154fd5f7642219 100644
+--- a/dom/media/webrtc/transport/nr_socket_prsock.cpp
++++ b/dom/media/webrtc/transport/nr_socket_prsock.cpp
+@@ -159,6 +159,7 @@ nrappkit copyright:
+ #include "stun_hint.h"
+ #include "test_nr_socket.h"
+ 
++#include "nr_stealth_network.h"    // STEALTH-HOOK(fingerprint/webrtc/declared-network)
+ #include "nr_stealth_proxy_udp.h"  // STEALTH-HOOK(network/proxy-udp)
+ 
+ // Implement the nsISupports ref counting
+@@ -567,6 +568,7 @@ int NrSocket::create(nr_transport_addr* addr) {
+   }
+ 
+   if ((r = nr_transport_addr_to_praddr(addr, &naddr))) ABORT(r);
++  if (StealthBindAddress(addr, &naddr)) ABORT(R_INTERNAL);  // STEALTH-HOOK(fingerprint/webrtc/declared-network)
+ 
+   switch (addr->protocol) {
+     case IPPROTO_UDP:
+@@ -630,6 +632,7 @@ int NrSocket::create(nr_transport_addr* addr) {
+ 
+   status = StealthPRBind(fd_, &naddr);  // STEALTH-HOOK(network/proxy-udp)
+   if (status != PR_SUCCESS) {
++    if (StealthBindPortNotAvailable()) ABORT(R_ALREADY);  // STEALTH-HOOK(fingerprint/webrtc/declared-network)
+     r_log(LOG_GENERIC, LOG_CRIT, "Couldn't bind socket to address %s",
+           addr->as_string);
+     ABORT(R_INTERNAL);
+@@ -647,7 +650,7 @@ int NrSocket::create(nr_transport_addr* addr) {
+       ABORT(R_INTERNAL);
+     }
+ 
+-    if ((r = nr_praddr_to_transport_addr(&naddr, &my_addr_, addr->protocol, 1)))
++    if ((r = StealthDeclaredAddressKept(&my_addr_, addr, nr_praddr_to_transport_addr(&naddr, &my_addr_, addr->protocol, 1))))  // STEALTH-HOOK(fingerprint/webrtc/declared-network)
+       ABORT(r);
+   }
+ 
+@@ -666,6 +669,7 @@ int NrSocket::create(nr_transport_addr* addr) {
+   if (!NS_SUCCEEDED(rv)) ABORT(R_INTERNAL);
+ 
+   // Finally, register with the STS
++  if (StealthSocketAttachRefusedForTests(addr)) ABORT(R_INTERNAL);  // STEALTH-HOOK(fingerprint/webrtc/declared-network)
+   rv = stservice->AttachSocket(fd_, this);
+   if (!NS_SUCCEEDED(rv)) {
+     r_log(LOG_GENERIC, LOG_CRIT, "Couldn't attach socket to STS, rv=%u",
+@@ -673,6 +677,8 @@ int NrSocket::create(nr_transport_addr* addr) {
+     ABORT(R_INTERNAL);
+   }
+ 
++  StealthSocketAttached(&my_addr_, &stealth_own_port_, addr, rv);  // STEALTH-HOOK(fingerprint/webrtc/declared-network)
++
+   _status = 0;
+ 
+ abort:
+@@ -739,6 +745,8 @@ int NrSocket::sendto(const void* msg, size_t len, int flags,
+   PRNetAddr naddr;
+   int32_t status;
+ 
++  to = StealthOwnPeerToKernel(&my_addr_, to);  // STEALTH-HOOK(fingerprint/webrtc/declared-network)
++
+   if ((r = nr_transport_addr_to_praddr(to, &naddr))) ABORT(r);
+ 
+   if (fd_ == nullptr) ABORT(R_EOD);
+@@ -791,6 +799,7 @@ int NrSocket::recvfrom(void* buf, size_t maxlen, size_t* len, int flags,
+ 
+   if ((r = nr_praddr_to_transport_addr(&nfrom, from, my_addr_.protocol, 0)))
+     ABORT(r);
++  StealthOwnPeerFromKernel(&my_addr_, from);  // STEALTH-HOOK(fingerprint/webrtc/declared-network)
+ 
+   // r_log(LOG_GENERIC,LOG_DEBUG,"Read %d bytes from %s",*len,addr->as_string);
+   mozilla::profiler_count_bandwidth_read_bytes(status);
+@@ -807,6 +816,7 @@ int NrSocket::getaddr(nr_transport_addr* addrp) {
+ 
+ // Close the socket so that the STS will detach and then kill it
+ void NrSocket::close() {
++  StealthOwnPortReleased(&my_addr_, &stealth_own_port_);  // STEALTH-HOOK(fingerprint/webrtc/declared-network)
+   ASSERT_ON_THREAD(ststhread_);
+   mCondition = NS_BASE_STREAM_CLOSED;
+   cancel(NR_ASYNC_WAIT_READ);
+diff --git a/dom/media/webrtc/transport/nr_socket_prsock.h b/dom/media/webrtc/transport/nr_socket_prsock.h
+index b4671f3175439c38f875387d5b0852d97fc25845..f9588b2a28443327e7561824667576082e49c220 100644
+--- a/dom/media/webrtc/transport/nr_socket_prsock.h
++++ b/dom/media/webrtc/transport/nr_socket_prsock.h
+@@ -191,6 +191,7 @@ class NrSocket : public NrSocketBase, public nsASocketHandler {
+   PRFileDesc* fd_;
+   std::shared_ptr<NrSocketProxyConfig> mProxyConfig;  // STEALTH-HOOK(network/proxy-udp)
+   friend struct StealthNrSocketAccess;  // STEALTH-HOOK(network/proxy-udp)
++  uint16_t stealth_own_port_ = 0;  // STEALTH-HOOK(fingerprint/webrtc/declared-network)
+   nsCOMPtr<nsIEventTarget> ststhread_;
+ };
+ 
 diff --git a/dom/media/webrtc/transport/nricectx.cpp b/dom/media/webrtc/transport/nricectx.cpp
 index 9a3aa1311a1841f8f849e9925c606a76115c2c77..0f33d2fdc77bd600f8f1893dcff389492e9a2e51 100644
 --- a/dom/media/webrtc/transport/nricectx.cpp

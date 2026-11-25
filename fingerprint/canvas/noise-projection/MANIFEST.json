@@ -1,5 +1,6 @@
 {
  "modified": [
+  "dom/canvas/ClientWebGLContext.cpp",
   "dom/canvas/ClientWebGLContext.h",
   "dom/canvas/OffscreenCanvas.cpp",
   "dom/canvas/OffscreenCanvas.h",
@@ -42,6 +43,19 @@
   "gfx/tests/gtest/TestStealthCanvasProjection.cpp": "d2436d572ee39a3d32e480e6ec9e44e94047f6b2b047143d142ee07e32764d66"
  },
  "inventory": [
+  {
+   "file": "dom/canvas/ClientWebGLContext.cpp",
+   "category": "spoof",
+   "feature": "canvas-noise-projection",
+   "prefs": [],
+   "added": 8,
+   "removed": 2,
+   "hunks": 7,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "",
+   "notes": ""
+  },
   {
    "file": "dom/canvas/ClientWebGLContext.h",
    "category": "spoof",
@@ -135,9 +149,9 @@
    "category": "build",
    "feature": "canvas-noise-projection",
    "prefs": [],
-   "added": 5,
+   "added": 3,
    "removed": 0,
-   "hunks": 3,
+   "hunks": 2,
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "hook added by the 2026-10-29 move to our files",
@@ -171,7 +185,7 @@
    "category": "spoof",
    "feature": "canvas-noise-projection",
    "prefs": [],
-   "added": 3,
+   "added": 1,
    "removed": 0,
    "hunks": 1,
    "inline_logic_lines": 0,
@@ -294,7 +308,7 @@
    "category": "build",
    "feature": "canvas-noise-projection",
    "prefs": [],
-   "added": 6,
+   "added": 3,
    "removed": 0,
    "hunks": 2,
    "inline_logic_lines": 0,
@@ -313,9 +327,9 @@
    "category": "build",
    "feature": "canvas-noise-projection",
    "prefs": [],
-   "added": 14,
+   "added": 1,
    "removed": 0,
-   "hunks": 2,
+   "hunks": 1,
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "UNIFIED_SOURCES of gfx/tests/gtest and a WINNT-only block",

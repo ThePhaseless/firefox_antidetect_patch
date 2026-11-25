@@ -47,7 +47,7 @@ index 0986f712c9246d9dee01a95237eb1b69e4b8349e..0bfaae6747286abc77f5e4c17c75ffd8
    PreOrderWalk([&](BrowsingContext* aBrowsingContext) {
      if (RefPtr<WindowContext> windowContext =
 diff --git a/dom/base/Document.cpp b/dom/base/Document.cpp
-index 24fc4978206ae6eba18971f243d680a8b8802e65..bfd723d484d57bf0521f79276c66b6608e72e251 100644
+index df89b38f0edea6885764c02580e590296f7b3f67..bfd723d484d57bf0521f79276c66b6608e72e251 100644
 --- a/dom/base/Document.cpp
 +++ b/dom/base/Document.cpp
 @@ -486,6 +486,8 @@
@@ -59,15 +59,7 @@ index 24fc4978206ae6eba18971f243d680a8b8802e65..bfd723d484d57bf0521f79276c66b660
  #define XML_DECLARATION_BITS_DECLARATION_EXISTS (1 << 0)
  #define XML_DECLARATION_BITS_ENCODING_EXISTS (1 << 1)
  #define XML_DECLARATION_BITS_STANDALONE_EXISTS (1 << 2)
-@@ -4070,6 +4072,7 @@ nsresult Document::InitCSP(nsIChannel* aChannel) {
-     }
-   }
- 
-+  if (CSP_IsBypassedFor(*this)) return NS_OK;  // STEALTH-HOOK(automation/bypass-csp)
-   nsAutoCString tCspHeaderValue, tCspROHeaderValue;
- 
-   nsCOMPtr<nsIHttpChannel> httpChannel;
-@@ -4600,7 +4603,7 @@ void Document::SetDocumentURI(nsIURI* aURI) {
+@@ -4601,7 +4603,7 @@ void Document::SetDocumentURI(nsIURI* aURI) {
  static void GetFormattedTimeString(PRTime aTime, bool aUniversal,
                                     nsAString& aFormattedTimeString) {
    PRExplodedTime prtime;
@@ -76,7 +68,7 @@ index 24fc4978206ae6eba18971f243d680a8b8802e65..bfd723d484d57bf0521f79276c66b660
                   &prtime);
    // "MM/DD/YYYY hh:mm:ss"
    char formatedTime[24];
-@@ -4619,6 +4622,7 @@ void Document::GetLastModified(nsAString& aLastModified) const {
+@@ -4620,6 +4622,7 @@ void Document::GetLastModified(nsAString& aLastModified) const {
    if (!mLastModified.IsEmpty()) {
      aLastModified.Assign(mLastModified);
    } else {
@@ -84,7 +76,7 @@ index 24fc4978206ae6eba18971f243d680a8b8802e65..bfd723d484d57bf0521f79276c66b660
      GetFormattedTimeString(PR_Now(),
                             ShouldResistFingerprinting(RFPTarget::JSDateTimeUTC),
                             aLastModified);
-@@ -8541,6 +8545,7 @@ void Document::SetContainer(nsDocShell* aContainer) {
+@@ -8542,6 +8545,7 @@ void Document::SetContainer(nsDocShell* aContainer) {
  
    mInChromeDocShell =
        aContainer && aContainer->GetBrowsingContext()->IsChrome();
@@ -92,7 +84,7 @@ index 24fc4978206ae6eba18971f243d680a8b8802e65..bfd723d484d57bf0521f79276c66b660
  
    NotifyActivityChanged();
  
-@@ -12233,6 +12238,7 @@ void Document::RetrieveRelevantHeaders(nsIChannel* aChannel) {
+@@ -12234,6 +12238,7 @@ void Document::RetrieveRelevantHeaders(nsIChannel* aChannel) {
  
    mLastModified.Truncate();
    if (modDate != 0) {
@@ -100,7 +92,7 @@ index 24fc4978206ae6eba18971f243d680a8b8802e65..bfd723d484d57bf0521f79276c66b660
      GetFormattedTimeString(modDate,
                             ShouldResistFingerprinting(RFPTarget::JSDateTimeUTC),
                             mLastModified);
-@@ -20983,7 +20989,7 @@ const LangGroupFontPrefs* Document::GetFontPrefsForLang(
+@@ -20984,7 +20989,7 @@ const LangGroupFontPrefs* Document::GetFontPrefsForLang(
  }
  
  void Document::RecomputeLanguageFromCharset() {
@@ -121,6 +113,18 @@ index 8d5870ae7c2d09a637e5230780a8cd62fece1e2e..eb001affdb0c0f210ad2387505a3ee0a
    bool GetSHEntryHasUserInteraction();
  
    void AppendAutoFocusCandidateToTopDocument(Element* aAutoFocusCandidate);
+diff --git a/dom/base/test/gtest/moz.build b/dom/base/test/gtest/moz.build
+index 38e1b21f380ddbd834a4a4cc4eef8d911366b623..572c787950574a9ab5801547ef1882f1c615d62e 100644
+--- a/dom/base/test/gtest/moz.build
++++ b/dom/base/test/gtest/moz.build
+@@ -17,6 +17,7 @@ UNIFIED_SOURCES += ["TestStealthCallerObject.cpp"]  # STEALTH-HOOK(automation/hy
+ UNIFIED_SOURCES += ["TestStealthDocumentLanguage.cpp"]  # STEALTH-HOOK(fingerprint/locale-time/session-declaration)
+ UNIFIED_SOURCES += ["TestStealthInputEventBirth.cpp"]  # STEALTH-HOOK(fingerprint/input/event-birth)
+ UNIFIED_SOURCES += ["TestStealthStackFrames.cpp"]  # STEALTH-HOOK(fingerprint/js-surface/stack-frames)
++UNIFIED_SOURCES += ["TestStealthTimezone.cpp"]  # STEALTH-HOOK(fingerprint/locale-time/timezone)
+ 
+ LOCAL_INCLUDES += ["/dom/base"]
+ 
 diff --git a/dom/xslt/xslt/txEXSLTFunctions.cpp b/dom/xslt/xslt/txEXSLTFunctions.cpp
 index ba2f3c2e6022c7dc4c15b331a3f0ee5eadc6b550..a684a25d885c9fd652f99db7cbd3de41260a7d53 100644
 --- a/dom/xslt/xslt/txEXSLTFunctions.cpp
@@ -144,6 +148,27 @@ index ba2f3c2e6022c7dc4c15b331a3f0ee5eadc6b550..a684a25d885c9fd652f99db7cbd3de41
  
        int32_t offset =
            (prtime.tm_params.tp_gmt_offset + prtime.tm_params.tp_dst_offset) /
+diff --git a/js/xpconnect/src/Sandbox.cpp b/js/xpconnect/src/Sandbox.cpp
+index ab61b42f1ff09bb7793f400e68adeb9be5756f7b..b633b619fbd708874f0ce96a4e53f4ece5a0135c 100644
+--- a/js/xpconnect/src/Sandbox.cpp
++++ b/js/xpconnect/src/Sandbox.cpp
+@@ -112,6 +112,7 @@
+ #include "mozilla/ResultExtensions.h"
+ #include "mozilla/StaticPrefs_extensions.h"
+ 
++#include "mozilla/intl/StealthSessionPrefs.h"  // STEALTH-HOOK(fingerprint/locale-time/timezone)
+ #include "StealthSandbox.h"  // STEALTH-HOOK(automation/hybrid-xrays)
+ 
+ using namespace mozilla;
+@@ -1388,7 +1389,7 @@ nsresult xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp,
+           window->GetBrowsingContext()->Top()->GetLanguageOverride();
+       if (!localeOverride.IsEmpty()) {
+         realmOptions.behaviors().setLocaleOverride(
+-            PromiseFlatCString(localeOverride).get());
++            mozilla::intl::StealthPrimaryLanguageTag(PromiseFlatCString(localeOverride)).get());  // STEALTH-HOOK(fingerprint/locale-time/timezone)
+       }
+ 
+       const nsAString& timezoneOverride =
 diff --git a/js/xpconnect/src/nsXPConnect.cpp b/js/xpconnect/src/nsXPConnect.cpp
 index e9b93e5e8d2151b63ded2abb6a3a6293df8bb5e2..4fae1ca137b8e60cf72cee4a6a3a0506555ccd5b 100644
 --- a/js/xpconnect/src/nsXPConnect.cpp

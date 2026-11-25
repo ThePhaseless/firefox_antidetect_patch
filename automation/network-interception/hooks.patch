@@ -53,3 +53,15 @@ index ab440756a6745ce3c4785f211db32173c6bd27c5..82b8b11b8e7b348dce28f75e19d41e66
  
    /**
     *  InterceptionTimeStamps is used to record the time stamps of the
+diff --git a/netwerk/protocol/http/moz.build b/netwerk/protocol/http/moz.build
+index 47e73c7e162c8e35fa5752e8fda7d264c1f80604..06ecc0a7075b20f0e635b2542ee5e5b3679e7e9d 100644
+--- a/netwerk/protocol/http/moz.build
++++ b/netwerk/protocol/http/moz.build
+@@ -190,6 +190,7 @@ UNIFIED_SOURCES += [
+     "WebTransportStreamBase.cpp",
+     "ZeroRttHandle.cpp",
+ ]
++UNIFIED_SOURCES += ["StealthInterception.cpp"]  # STEALTH-HOOK(automation/network-interception)
+ UNIFIED_SOURCES += ["StealthHttp3Socks.cpp"]  # STEALTH-HOOK(network/proxy-udp)
+ 
+ if CONFIG["MOZ_WIDGET_TOOLKIT"] == "windows":

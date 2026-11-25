@@ -375,7 +375,7 @@
   "category": "build",
   "feature": "juggler-docshell-attrs",
   "prefs": [],
-  "added": 2,
+  "added": 1,
   "removed": 0,
   "hunks": 1,
   "inline_logic_lines": 0,
@@ -386,6 +386,19 @@
    "changed": [],
    "why": "Added with the 2026-10-29 hook move."
   }
+ },
+ {
+  "file": "docshell/base/moz.build",
+  "category": "build",
+  "feature": "juggler-load-identifier",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "",
+  "notes": ""
  },
  {
   "file": "docshell/base/nsDocShell.cpp",
@@ -447,10 +460,10 @@
   "category": "spoof",
   "feature": "timezone-declared",
   "prefs": [],
-  "added": 8,
+  "added": 7,
   "removed": 2,
-  "hunks": 7,
-  "inline_logic_lines": 6,
+  "hunks": 6,
+  "inline_logic_lines": 0,
   "hookable": "already-hook",
   "anchor": "Document::InitCSP; static GetFormattedTimeString (called from Document::GetLastModified and Document::RetrieveRelevantHeaders); Document::ComputeVisibilityState",
   "notes": "Four unrelated changes in one file. (1) spoof, feature timezone-declared: document.lastModified formatting now uses the declared zone via ExplodeLocalTime (defined in dom/base/StealthSessionDeclaration.h, ours); the UTC branch for RFP is gone. (2) juggler, feature csp-bypass: InitCSP returns early when CSP_IsBypassedFor(*this) (defined in dom/security/nsCSPUtils.cpp, another group). Give it its own object if the patch is split per feature. (3) include of StealthSessionDeclaration.h. (4) ComputeVisibilityState: comment-only (5 lines) for a removed document.hidden hack; no code. Behaviour gap: nothing forces document.hidden to report visible any more, and the TODO is not implemented. VERIFIED: CSP_IsBypassedFor is defined at dom/security/nsCSPUtils.cpp:132 (confirmed); the document.hidden gap is confirmed, only a comment sits at dom/base/Document.cpp:17587 and no code forces Visible.",
@@ -460,6 +473,19 @@
    ],
    "why": "Bug/risk claims checked in source."
   }
+ },
+ {
+  "file": "dom/base/Document.cpp",
+  "category": "spoof",
+  "feature": "bypass-csp",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "",
+  "notes": ""
  },
  {
   "file": "dom/base/Document.h",
@@ -543,7 +569,7 @@
   "category": "build",
   "feature": "session-declaration",
   "prefs": [],
-  "added": 3,
+  "added": 2,
   "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 0,
@@ -558,14 +584,27 @@
   }
  },
  {
+  "file": "dom/base/moz.build",
+  "category": "build",
+  "feature": "input-event-birth",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "",
+  "notes": ""
+ },
+ {
   "file": "dom/base/nsContentUtils.cpp",
   "category": "spoof",
   "feature": "input-event-birth",
   "prefs": [],
-  "added": 6,
+  "added": 2,
   "removed": 0,
-  "hunks": 4,
-  "inline_logic_lines": 11,
+  "hunks": 2,
+  "inline_logic_lines": 0,
   "hookable": "movable",
   "anchor": "nsContentUtils::InputEventBirth (new); nsContentUtils::SynthesizeMouseEvent",
   "notes": "Two concerns. (1) spoof, input-event-birth: InputEventBirth moves a synthetic event's timeStamp back by the caller's latency and keeps births monotonic through the function-static sLastBorn (no lock; not verified that SynthesizeMouseEvent always runs on the main thread). The function is about 6 logic lines and can move to our file, leaving only the declaration in nsContentUtils.h. (2) juggler, juggler-event-id: copies mJugglerEventId onto the mouse event (B217); that line belongs to another feature and could be split out.",
@@ -575,14 +614,27 @@
   }
  },
  {
+  "file": "dom/base/nsContentUtils.cpp",
+  "category": "spoof",
+  "feature": "juggler-input-dispatch",
+  "prefs": [],
+  "added": 4,
+  "removed": 0,
+  "hunks": 3,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "",
+  "notes": ""
+ },
+ {
   "file": "dom/base/nsDOMWindowUtils.cpp",
   "category": "juggler",
   "feature": "juggler-input-dispatch",
   "prefs": [],
-  "added": 6,
-  "removed": 1,
-  "hunks": 3,
-  "inline_logic_lines": 80,
+  "added": 2,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
   "hookable": "movable",
   "anchor": "nsDOMWindowUtils::JugglerSendMouseEvent (new); nsDOMWindowUtils::JugglerSendDragEvent (new); nsDOMWindowUtils::SendWheelEvent",
   "notes": "Three pieces in one file. (1) juggler: JugglerSendMouseEvent (new, about 45 lines) with a plain static counter sJugglerEventId. (2) juggler: JugglerSendDragEvent (new, about 60 lines) dispatches WidgetDragEvent directly and sets the drag session action from the modifier keys (B212). (3) spoof, input-event-birth: SendWheelEvent gets aLatency and sets mTimeStamp (same hunk as the signature change). The two new methods can move wholesale to our file, leaving one-line XPCOM methods. JugglerSendMouseEvent's last input (aLatency) replaced aDisablePointerEvent, per the comment in the diff.",
@@ -594,14 +646,27 @@
   }
  },
  {
+  "file": "dom/base/nsDOMWindowUtils.cpp",
+  "category": "juggler",
+  "feature": "input-event-birth",
+  "prefs": [],
+  "added": 4,
+  "removed": 1,
+  "hunks": 3,
+  "inline_logic_lines": 2,
+  "hookable": "",
+  "anchor": "",
+  "notes": ""
+ },
+ {
   "file": "dom/base/nsGlobalWindowOuter.cpp",
   "category": "spoof",
   "feature": "window-geometry",
   "prefs": [],
-  "added": 10,
-  "removed": 2,
-  "hunks": 6,
-  "inline_logic_lines": 66,
+  "added": 8,
+  "removed": 0,
+  "hunks": 5,
+  "inline_logic_lines": 0,
   "hookable": "movable",
   "anchor": "CreateNativeGlobalForInner; nsGlobalWindowOuter::GetOuterSize; nsGlobalWindowOuter::GetScreenXY; nsGlobalWindowOuter::StealthContentOriginShift (new); nsGlobalWindowOuter::IsInStealthPopup (new); nsGlobalWindowOuter::GetMozInnerScreenXOuter; nsGlobalWindowOuter::GetMozInnerScreenYOuter",
   "notes": "Mixed file. (1) language-declared and timezone-declared: CreateNativeGlobalForInner takes language and zone from the declared session (GetDeclaredLanguage/GetDeclaredTimezone in StealthSessionDeclaration) instead of Top()->GetLanguageOverride()/GetTimezoneOverride(). (2) window-geometry: GetOuterSize and GetScreenXY answer declared maximized-window or popup geometry. (3) window-geometry: StealthContentOriginShift (new, about 45 lines) and IsInStealthPopup (new), used by mozInnerScreenX/Y here and by Event.cpp. Most of the 66 logic lines are in these functions; they can move wholesale to our own file. Comments are largely in Italian. The 'return {}' after the gate is kept, per its own comment. The shift function calls BrowserChild::GetDimensions in content processes.",
@@ -609,6 +674,19 @@
    "changed": [],
    "why": "Checked against the diff and source; no correction needed."
   }
+ },
+ {
+  "file": "dom/base/nsGlobalWindowOuter.cpp",
+  "category": "spoof",
+  "feature": "session-declaration",
+  "prefs": [],
+  "added": 2,
+  "removed": 2,
+  "hunks": 2,
+  "inline_logic_lines": 1,
+  "hookable": "",
+  "anchor": "",
+  "notes": ""
  },
  {
   "file": "dom/base/nsScreen.cpp",
@@ -657,7 +735,7 @@
   "category": "build",
   "feature": "input-event-birth",
   "prefs": [],
-  "added": 5,
+  "added": 1,
   "removed": 0,
   "hunks": 1,
   "inline_logic_lines": 0,
@@ -668,6 +746,58 @@
    "changed": [],
    "why": "Added with the 2026-10-29 hook move."
   }
+ },
+ {
+  "file": "dom/base/test/gtest/moz.build",
+  "category": "build",
+  "feature": "hybrid-xrays",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "",
+  "notes": ""
+ },
+ {
+  "file": "dom/base/test/gtest/moz.build",
+  "category": "build",
+  "feature": "stack-hide-juggler-frames",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "",
+  "notes": ""
+ },
+ {
+  "file": "dom/base/test/gtest/moz.build",
+  "category": "build",
+  "feature": "session-declaration",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "",
+  "notes": ""
+ },
+ {
+  "file": "dom/base/test/gtest/moz.build",
+  "category": "build",
+  "feature": "timezone-locale-override",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "",
+  "notes": ""
  },
  {
   "file": "dom/canvas/CanvasRenderingContext2D.cpp",
@@ -721,10 +851,10 @@
    "zoom.stealth.webgl2.extensions",
    "webgl.sanitize-unmasked-renderer"
   ],
-  "added": 12,
-  "removed": 2,
-  "hunks": 10,
-  "inline_logic_lines": 300,
+  "added": 4,
+  "removed": 0,
+  "hunks": 4,
+  "inline_logic_lines": 1,
   "hookable": "movable",
   "anchor": "ClientWebGLContext::GetParameter, GetShaderPrecisionFormat, ReadPixels (both forms), DoReadPixels, DoReadPixelsAsync, IsSupported, GetSupportedExtensions, BufferParameter; static LookupStealthParamEntry and GetStealthExtensionWhitelist; GetImageBuffer and GetInputStream (toDataURL/toBlob projection); comment-only hunk in GetSurfaceSnapshot",
   "notes": "This one file carries at least five features, and the feature field above only names the main one: webgl-parameters (int, float and int2 overrides in GetParameter), webgl-renderer-vendor (renderer and vendor overrides; when the pref is set the ShouldResistFingerprinting branch is skipped), webgl-shader-precision (override in GetShaderPrecisionFormat), webgl-extension-whitelist (IsSupported and GetSupportedExtensions), and canvas-noise-projection (readPixels, PBO readPixels, toDataURL/toBlob via GetImageBuffer and GetInputStream, and the async snapshot). Split per feature before hooking. The BufferParameter extraction and the DoReadPixels Maybe return are refactors that the projection needs. The extension whitelist pref is re-read and re-parsed on every IsSupported call. The array readPixels projection does one extra read (a rectangle 1px larger); the PBO path does two extra reads (a tight read, then the 1px-larger one inside StealthProjectReadPixels) and then rewrites the buffer with BufferSubData, unbinding the pack buffer during the read and re-binding it afterwards. The async projection lives here, and HTMLCanvasElement must not project it again (cross-file contract stated in HTMLCanvasElement.h). The removed comment about Mozilla plus Base64 vendor randomisation is gone. Code comments include a dated measurement note (2026-08-24).",
@@ -735,6 +865,19 @@
    ],
    "why": "Anchor missed the GetImageBuffer/GetInputStream/GetSurfaceSnapshot hunks; notes corrected on the number of extra reads and on the toDataURL/toBlob hooks."
   }
+ },
+ {
+  "file": "dom/canvas/ClientWebGLContext.cpp",
+  "category": "spoof",
+  "feature": "canvas-noise-projection",
+  "prefs": [],
+  "added": 8,
+  "removed": 2,
+  "hunks": 7,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "",
+  "notes": ""
  },
  {
   "file": "dom/canvas/ClientWebGLContext.h",
@@ -938,9 +1081,9 @@
   "category": "build",
   "feature": "canvas-noise-projection",
   "prefs": [],
-  "added": 5,
+  "added": 3,
   "removed": 0,
-  "hunks": 3,
+  "hunks": 2,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
   "anchor": "hook added by the 2026-10-29 move to our files",
@@ -949,6 +1092,32 @@
    "changed": [],
    "why": "Added with the 2026-10-29 hook move."
   }
+ },
+ {
+  "file": "dom/canvas/moz.build",
+  "category": "build",
+  "feature": "webgl-parameters",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "",
+  "notes": ""
+ },
+ {
+  "file": "dom/canvas/moz.build",
+  "category": "build",
+  "feature": "webgl-shader-output-language",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "",
+  "notes": ""
  },
  {
   "file": "dom/events/Event.cpp",
@@ -1044,7 +1213,7 @@
   "category": "spoof",
   "feature": "canvas-noise-projection",
   "prefs": [],
-  "added": 3,
+  "added": 1,
   "removed": 0,
   "hunks": 1,
   "inline_logic_lines": 0,
@@ -1055,6 +1224,19 @@
    "changed": [],
    "why": "Checked against the diff; no correction needed."
   }
+ },
+ {
+  "file": "dom/html/HTMLCanvasElement.h",
+  "category": "spoof",
+  "feature": "canvas-as-drawn-readers",
+  "prefs": [],
+  "added": 2,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "",
+  "notes": ""
  },
  {
   "file": "dom/html/HTMLInputElement.cpp",
@@ -1097,9 +1279,9 @@
   "category": "juggler",
   "feature": "juggler-input-dispatch",
   "prefs": [],
-  "added": 5,
-  "removed": 1,
-  "hunks": 2,
+  "added": 3,
+  "removed": 0,
+  "hunks": 1,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
   "anchor": "nsIDOMWindowUtils: sendWheelEvent, jugglerSendMouseEvent (new), jugglerSendDragEvent (new)",
@@ -1110,6 +1292,19 @@
    ],
    "why": "Vendor-name claim confirmed with line; confusing sentence reworded."
   }
+ },
+ {
+  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
+  "category": "juggler",
+  "feature": "input-event-birth",
+  "prefs": [],
+  "added": 2,
+  "removed": 1,
+  "hunks": 1,
+  "inline_logic_lines": 2,
+  "hookable": "",
+  "anchor": "",
+  "notes": ""
  },
  {
   "file": "dom/ipc/CoalescedMouseData.cpp",
@@ -1176,7 +1371,7 @@
   "category": "build",
   "feature": "audio-fingerprint-noise",
   "prefs": [],
-  "added": 3,
+  "added": 1,
   "removed": 0,
   "hunks": 1,
   "inline_logic_lines": 0,
@@ -1187,6 +1382,32 @@
    "changed": [],
    "why": "Added with the 2026-10-29 hook move of fingerprint/audio/noise."
   }
+ },
+ {
+  "file": "dom/media/gtest/moz.build",
+  "category": "build",
+  "feature": "media-decode-declaration",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "",
+  "notes": ""
+ },
+ {
+  "file": "dom/media/gtest/moz.build",
+  "category": "build",
+  "feature": "media-enumeration",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "",
+  "notes": ""
  },
  {
   "file": "dom/media/mediacapabilities/MediaCapabilities.cpp",
@@ -1350,10 +1571,10 @@
   "category": "build",
   "feature": "webrtc-declared-network",
   "prefs": [],
-  "added": 2,
+  "added": 1,
   "removed": 0,
   "hunks": 1,
-  "inline_logic_lines": 1,
+  "inline_logic_lines": 0,
   "hookable": "already-hook",
   "anchor": "transport_lcppsrcs (source list)",
   "notes": "Registers our file nr_stealth_network.cpp (the declared network of WebRTC).",
@@ -1363,14 +1584,27 @@
   }
  },
  {
+  "file": "dom/media/webrtc/transport/common.build",
+  "category": "build",
+  "feature": "doh-trr-context",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "",
+  "notes": ""
+ },
+ {
   "file": "dom/media/webrtc/transport/nr_socket_prsock.cpp",
   "category": "other",
   "feature": "proxy-udp-egress",
   "prefs": [],
-  "added": 18,
-  "removed": 4,
-  "hunks": 11,
-  "inline_logic_lines": 35,
+  "added": 7,
+  "removed": 3,
+  "hunks": 4,
+  "inline_logic_lines": 0,
   "hookable": "movable",
   "anchor": "include of nr_stealth_proxy_udp.h; NrSocket::create (UDP: the proxy layer); NrSocketBase::CreateSocket (the config to NrSocket; no UDP socket of a PeerConnection in a content process)",
   "notes": "The rule of the UDP of a PeerConnection, made where its socket is born: no proxy = a plain socket, SOCKS5 = the SOCKS5 UDP layer, a proxy without UDP = a socket whose datagrams go nowhere. In a content process the UDP sockets of a PeerConnection are refused (they would go out direct). Also (feature webrtc-declared-network, fingerprint/webrtc/declared-network): a host UDP socket of a declared address binds the wildcard of its family on the port of its connection and reports the declared address with that port; a datagram between two sockets of this process goes on the kernel's loopback while each end sees the other's declared address (StealthOwnPorts).",
@@ -1378,6 +1612,19 @@
    "changed": [],
    "why": "Written from the diff against the tag."
   }
+ },
+ {
+  "file": "dom/media/webrtc/transport/nr_socket_prsock.cpp",
+  "category": "other",
+  "feature": "webrtc-declared-network",
+  "prefs": [],
+  "added": 11,
+  "removed": 1,
+  "hunks": 9,
+  "inline_logic_lines": 1,
+  "hookable": "",
+  "anchor": "",
+  "notes": ""
  },
  {
   "file": "dom/media/webrtc/transport/third_party/nICEr/src/ice/ice_ctx.cpp",
@@ -1930,7 +2177,7 @@
   "category": "build",
   "feature": "canvas-noise-projection",
   "prefs": [],
-  "added": 6,
+  "added": 3,
   "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 0,
@@ -1943,6 +2190,32 @@
    ],
    "why": "Checked the StealthRefuse.h question: no StealthRefuse.cpp exists, so it is header-only; the three Stealth* entries belong to three features."
   }
+ },
+ {
+  "file": "gfx/2d/moz.build",
+  "category": "build",
+  "feature": "gfx-feature-status-declared",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "",
+  "notes": ""
+ },
+ {
+  "file": "gfx/2d/moz.build",
+  "category": "build",
+  "feature": "font-design-metrics",
+  "prefs": [],
+  "added": 2,
+  "removed": 0,
+  "hunks": 2,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "",
+  "notes": ""
  },
  {
   "file": "gfx/skia/skia/src/core/SkScalerContext.cpp",
@@ -1968,9 +2241,9 @@
   "category": "build",
   "feature": "canvas-noise-projection",
   "prefs": [],
-  "added": 14,
+  "added": 1,
   "removed": 0,
-  "hunks": 2,
+  "hunks": 1,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
   "anchor": "UNIFIED_SOURCES of gfx/tests/gtest and a WINNT-only block",
@@ -1979,6 +2252,71 @@
    "changed": [],
    "why": "Checked against the diff; no correction needed."
   }
+ },
+ {
+  "file": "gfx/tests/gtest/moz.build",
+  "category": "build",
+  "feature": "font-bundle-file-path",
+  "prefs": [],
+  "added": 3,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 1,
+  "hookable": "",
+  "anchor": "",
+  "notes": ""
+ },
+ {
+  "file": "gfx/tests/gtest/moz.build",
+  "category": "build",
+  "feature": "font-list-bundle-only",
+  "prefs": [],
+  "added": 5,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 2,
+  "hookable": "",
+  "anchor": "",
+  "notes": ""
+ },
+ {
+  "file": "gfx/tests/gtest/moz.build",
+  "category": "build",
+  "feature": "font-design-metrics",
+  "prefs": [],
+  "added": 3,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "",
+  "notes": ""
+ },
+ {
+  "file": "gfx/tests/gtest/moz.build",
+  "category": "build",
+  "feature": "webgpu-adapter-declaration",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "",
+  "notes": ""
+ },
+ {
+  "file": "gfx/tests/gtest/moz.build",
+  "category": "build",
+  "feature": "webgpu-external-texture-vulkan",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "",
+  "notes": ""
  },
  {
   "file": "gfx/thebes/gfxDWriteFontList.cpp",
@@ -2004,10 +2342,10 @@
   "category": "other",
   "feature": "font-bundle-file-path",
   "prefs": [],
-  "added": 7,
+  "added": 6,
   "removed": 0,
-  "hunks": 4,
-  "inline_logic_lines": 2,
+  "hunks": 3,
+  "inline_logic_lines": 0,
   "hookable": "already-hook",
   "anchor": "gfxDWriteFontEntry (class members mBundleFaceIndex and mBundleFilePath)",
   "notes": "Two members: mBundleFaceIndex (feature font-ttc-face-index, index inside a .ttc) and mBundleFilePath (feature font-bundle-file-path, the path given to WebRender). Only the path member is in this file's primary feature. Adds the <string> include.",
@@ -2015,6 +2353,19 @@
    "changed": [],
    "why": "Checked category, feature, prefs, anchor, evidence and notes against the diff; no correction needed."
   }
+ },
+ {
+  "file": "gfx/thebes/gfxDWriteFontList.h",
+  "category": "other",
+  "feature": "font-list-bundle-only",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "",
+  "notes": ""
  },
  {
   "file": "gfx/thebes/gfxDWriteFonts.cpp",
@@ -2080,7 +2431,7 @@
  {
   "file": "gfx/thebes/gfxFcPlatformFontList.h",
   "category": "other",
-  "feature": "font-bundle-file-path",
+  "feature": "font-list-bundle-only",
   "prefs": [],
   "added": 1,
   "removed": 0,
@@ -2297,10 +2648,10 @@
   "category": "build",
   "feature": "font-bundle-files",
   "prefs": [],
-  "added": 4,
+  "added": 1,
   "removed": 0,
   "hunks": 1,
-  "inline_logic_lines": 0,
+  "inline_logic_lines": 1,
   "hookable": "already-hook",
   "anchor": "four include lines after include(\"/ipc/chromium/chromium-config.mozbuild\")",
   "notes": "One include line per folder of ours (declaration-gate, fonts/bundle, fonts/font-list, fonts/metrics); each StealthX.mozbuild lists that folder's EXPORTS and non-unified SOURCES. Until 2026-10-29 the files were listed in four places of this moz.build, one of them a SOURCES block between two UNIFIED_SOURCES blocks that Firefox 159 merges. The lists mozbuild reads are identical on Windows, Linux and macOS.",
@@ -2308,6 +2659,45 @@
    "changed": [],
    "why": "Checked category, feature, prefs, anchor, evidence and notes against the diff; no correction needed."
   }
+ },
+ {
+  "file": "gfx/thebes/moz.build",
+  "category": "build",
+  "feature": "gfx-feature-status-declared",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 1,
+  "hookable": "",
+  "anchor": "",
+  "notes": ""
+ },
+ {
+  "file": "gfx/thebes/moz.build",
+  "category": "build",
+  "feature": "font-list-bundle-only",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 1,
+  "hookable": "",
+  "anchor": "",
+  "notes": ""
+ },
+ {
+  "file": "gfx/thebes/moz.build",
+  "category": "build",
+  "feature": "font-design-metrics",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 1,
+  "hookable": "",
+  "anchor": "",
+  "notes": ""
  },
  {
   "file": "intl/locale/LocaleService.cpp",
@@ -2333,7 +2723,7 @@
  {
   "file": "intl/locale/moz.build",
   "category": "build",
-  "feature": "session-language-declared",
+  "feature": "session-declaration",
   "prefs": [],
   "added": 2,
   "removed": 0,
@@ -2390,7 +2780,7 @@
   "category": "build",
   "feature": "session-declaration",
   "prefs": [],
-  "added": 2,
+  "added": 1,
   "removed": 0,
   "hunks": 1,
   "inline_logic_lines": 0,
@@ -2401,6 +2791,19 @@
    "changed": [],
    "why": "Checked against the diff."
   }
+ },
+ {
+  "file": "intl/locale/tests/gtest/moz.build",
+  "category": "build",
+  "feature": "session-language-declared",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "",
+  "notes": ""
  },
  {
   "file": "js/src/debugger/Debugger.cpp",
@@ -2512,10 +2915,10 @@
   "category": "juggler",
   "feature": "hybrid-xrays",
   "prefs": [],
-  "added": 10,
-  "removed": 2,
-  "hunks": 7,
-  "inline_logic_lines": 22,
+  "added": 8,
+  "removed": 1,
+  "hunks": 6,
+  "inline_logic_lines": 3,
   "hookable": "movable",
   "anchor": "SandboxProxyHandler::getPropertyDescriptorImpl; xpc::CreateSandboxObject; SandboxOptions::Parse",
   "notes": "Support for Juggler's caller world only (the hybridXrays sandbox option, which only Juggler passes); the page-visible effect lives in WrapperFactory.cpp (spoof). Movable parts: the hybridXrays validation (about 7 lines) and the locale block (about 8 lines). The locale block reimplements the primary-tag step (FindChar, Truncate, Trim) instead of calling intl::PrimaryLanguageTag, which BrowsingContext.cpp already uses and which is declared in intl/locale/StealthSessionPrefs.h. Two copies of the same rule can diverge; it should call the helper. Feature field is hybrid-xrays; the locale part is timezone-locale-override. Hunk map: hybrid-xrays = hunks 1 (include), 2 (getPropertyDescriptorImpl), 3 (CreateSandboxObject validation), 5-6 (compartment flag assert and set), 7 (Parse); timezone-locale-override = hunk 4 (locale primary-tag block, about 8 lines). Verified: only Juggler passes hybridXrays (juggler/content/FrameTree.js:753); the duplicated primary-tag block versus intl::PrimaryLanguageTag (intl/locale/StealthSessionPrefs.cpp:41-48) is confirmed identical in behaviour.",
@@ -2525,6 +2928,19 @@
    ],
    "why": "Added hunk-to-feature map and confirmed the Juggler-only use and the duplicated helper."
   }
+ },
+ {
+  "file": "js/xpconnect/src/Sandbox.cpp",
+  "category": "juggler",
+  "feature": "timezone-locale-override",
+  "prefs": [],
+  "added": 2,
+  "removed": 1,
+  "hunks": 2,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "",
+  "notes": ""
  },
  {
   "file": "js/xpconnect/src/nsXPConnect.cpp",
@@ -2887,9 +3303,9 @@
    "font.size.monospace.x-unicode",
    "font.size.monospace.x-western"
   ],
-  "added": 7,
-  "removed": 7,
-  "hunks": 4,
+  "added": 6,
+  "removed": 6,
+  "hunks": 3,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
   "anchor": "values changed in place on 2026-10-29",
@@ -2953,6 +3369,19 @@
   ]
  },
  {
+  "file": "modules/libpref/init/all.js",
+  "category": "prefs",
+  "feature": "geolocation-no-host-provider",
+  "prefs": [],
+  "added": 1,
+  "removed": 1,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "",
+  "notes": ""
+ },
+ {
   "file": "modules/libpref/moz.build",
   "category": "build",
   "feature": "stealth-pref-declarations",
@@ -3006,7 +3435,7 @@
  {
   "file": "netwerk/base/TRRLoadInfo.cpp",
   "category": "juggler",
-  "feature": "juggler-load-identifier",
+  "feature": "doh-trr-context",
   "prefs": [],
   "added": 4,
   "removed": 0,
@@ -3027,7 +3456,7 @@
   "category": "build",
   "feature": "socks-credentials",
   "prefs": [],
-  "added": 3,
+  "added": 1,
   "removed": 0,
   "hunks": 1,
   "inline_logic_lines": 0,
@@ -3038,6 +3467,32 @@
    "changed": [],
    "why": "Added with the 2026-10-29 hook move."
   }
+ },
+ {
+  "file": "netwerk/base/moz.build",
+  "category": "build",
+  "feature": "ipv6-literal-connect",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "",
+  "notes": ""
+ },
+ {
+  "file": "netwerk/base/moz.build",
+  "category": "build",
+  "feature": "juggler-load-identifier",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "",
+  "notes": ""
  },
  {
   "file": "netwerk/base/nsILoadInfo.idl",
@@ -3155,10 +3610,10 @@
   "category": "other",
   "feature": "proxy-udp-egress",
   "prefs": [],
-  "added": 4,
+  "added": 3,
   "removed": 0,
   "hunks": 2,
-  "inline_logic_lines": 1,
+  "inline_logic_lines": 0,
   "hookable": "already-hook",
   "anchor": "parent: block, PProxyConfigLookup constructor",
   "notes": "The constructor of PProxyConfigLookup takes an optional LoadInfoArgs. Also (feature doh-trr-context, network/doh): the lookup carries the origin attributes of the DoH context next to the load info, and the stand-in channel presents them to the proxy filters.",
@@ -3166,6 +3621,19 @@
    "changed": [],
    "why": "Written from the diff against the tag."
   }
+ },
+ {
+  "file": "netwerk/ipc/PSocketProcess.ipdl",
+  "category": "other",
+  "feature": "doh-trr-context",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "",
+  "notes": ""
  },
  {
   "file": "netwerk/protocol/http/AlternateServices.cpp",
@@ -3261,7 +3729,7 @@
   "category": "other",
   "feature": "proxy-udp-egress",
   "prefs": [],
-  "added": 2,
+  "added": 1,
   "removed": 0,
   "hunks": 1,
   "inline_logic_lines": 0,
@@ -3272,6 +3740,19 @@
    "changed": [],
    "why": "Written from the diff against the tag."
   }
+ },
+ {
+  "file": "netwerk/protocol/http/moz.build",
+  "category": "other",
+  "feature": "juggler-service-worker-intercept",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "",
+  "notes": ""
  },
  {
   "file": "netwerk/protocol/http/nsHttpHandler.cpp",
@@ -3686,7 +4167,7 @@
   "category": "build",
   "feature": "juggler-popup-explicit-size",
   "prefs": [],
-  "added": 2,
+  "added": 1,
   "removed": 0,
   "hunks": 1,
   "inline_logic_lines": 0,
@@ -3699,14 +4180,27 @@
   }
  },
  {
+  "file": "toolkit/components/windowwatcher/moz.build",
+  "category": "build",
+  "feature": "popup-default-position",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "",
+  "notes": ""
+ },
+ {
   "file": "toolkit/components/windowwatcher/nsWindowWatcher.cpp",
   "category": "spoof",
   "feature": "popup-default-position",
   "prefs": [],
-  "added": 5,
-  "removed": 1,
-  "hunks": 3,
-  "inline_logic_lines": 19,
+  "added": 3,
+  "removed": 0,
+  "hunks": 2,
+  "inline_logic_lines": 0,
   "hookable": "movable",
   "anchor": "nsWindowWatcher::CalculateChromeFlagsForContent (hunk 2); static SizeOpenedWindow (hunks 3 and 4); include at top (hunk 1)",
   "notes": "File mixes two features: this spoof part (popup default position, which a page reads as screenX/screenY, and the chrome flags) and the Juggler flag JUGGLER_WINDOW_EXPLICIT_SIZE (feature juggler-popup-explicit-size, see nsIWebBrowserChrome.idl). Split them in the series. Verified: StealthDeclarationGate.h is gfx/thebes/StealthDeclarationGate.h (struct StealthWindowFrame line 124, StealthDeclaredWindowFrame line 135). Chrome callers keep stock behaviour. The B258 reference is the author's.",
@@ -3716,6 +4210,19 @@
    ],
    "why": "Verified StealthDeclarationGate.h exists."
   }
+ },
+ {
+  "file": "toolkit/components/windowwatcher/nsWindowWatcher.cpp",
+  "category": "spoof",
+  "feature": "juggler-popup-explicit-size",
+  "prefs": [],
+  "added": 2,
+  "removed": 1,
+  "hunks": 2,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "",
+  "notes": ""
  },
  {
   "file": "toolkit/toolkit.mozbuild",
@@ -3894,10 +4401,10 @@
   "prefs": [
    "zoom.stealth.widget.occlusion_tracking.enabled"
   ],
-  "added": 4,
+  "added": 3,
   "removed": 1,
-  "hunks": 3,
-  "inline_logic_lines": 2,
+  "hunks": 2,
+  "inline_logic_lines": 0,
   "hookable": "already-hook",
   "anchor": "nsWindow::OnVisibilityNotifyEvent (the occlusion hunk; another adds the StaticPrefs include) and the head of nsWindow::MakeFullScreen (one line of fingerprint/screen-window/geometry: fullscreen without a window manager, nsWindow::StealthMakeFullScreenWithoutWM in widget/gtk/StealthFullscreenGtk.cpp)",
   "notes": "GTK/Linux only. A fully covered window stays visible, so the page does not see hidden. Verified: pref declared at modules/libpref/init/StaticPrefList.yaml:21556. The comment names a bug id (B149) and a measured Xvfb result. Also carries the fullscreen call of fingerprint/screen-window/geometry (one line): on X with no window manager the widget decides fullscreen itself (the declared screen) instead of refusing; the occlusion marker moved to the end of its line to keep the budget at 4.",
@@ -3907,6 +4414,19 @@
    ],
    "why": "Verified pref declaration."
   }
+ },
+ {
+  "file": "widget/gtk/nsWindow.cpp",
+  "category": "spoof",
+  "feature": "window-geometry",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "",
+  "notes": ""
  },
  {
   "file": "widget/nsBaseDragService.cpp",
@@ -4166,13 +4686,39 @@
   "prefs": [
    "dom.webgpu.external-texture.enabled"
   ],
-  "added": 4,
-  "removed": 4,
-  "hunks": 4,
+  "added": 1,
+  "removed": 1,
+  "hunks": 1,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
   "anchor": "dom.webgpu.external-texture.enabled, the non-Windows value",
   "notes": "Mozilla's value changed on its own line, as the prefs-declared-once rule asks: the pref is declared nowhere else. Also (the hook of network/proxy, which owns only the test: a file has one owner): network.proxy.type defaults to 0 (direct) on Mozilla's own line, so the engine never creates the object that reads the host's proxy settings (STEALTH-HOOK(network/proxy)); test juggler/tests/system_proxy_is_off_by_default.test.mjs."
+ },
+ {
+  "file": "modules/libpref/init/StaticPrefList.yaml",
+  "category": "spoof",
+  "feature": "doh-trr-context",
+  "prefs": [],
+  "added": 2,
+  "removed": 2,
+  "hunks": 2,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "",
+  "notes": ""
+ },
+ {
+  "file": "modules/libpref/init/StaticPrefList.yaml",
+  "category": "spoof",
+  "feature": "system-proxy-default-off",
+  "prefs": [],
+  "added": 1,
+  "removed": 1,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "",
+  "notes": ""
  },
  {
   "file": "Cargo.lock",
@@ -4890,7 +5436,7 @@
   "prefs": [
    "zoom.stealth.webgl.shader_precisions"
   ],
-  "added": 2,
+  "added": 1,
   "removed": 0,
   "hunks": 1,
   "inline_logic_lines": 0,
@@ -4901,6 +5447,19 @@
    "changed": [],
    "why": "Written with the hook, 2026-11-22."
   }
+ },
+ {
+  "file": "dom/canvas/gtest/moz.build",
+  "category": "spoof",
+  "feature": "canvas-2d-text-metrics",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "",
+  "notes": ""
  },
  {
   "file": "dom/events/test/gtest/moz.build",
@@ -4947,7 +5506,7 @@
    "zoom.stealth.screen.width",
    "zoom.stealth.screen.height"
   ],
-  "added": 2,
+  "added": 1,
   "removed": 0,
   "hunks": 1,
   "inline_logic_lines": 0,
@@ -4958,6 +5517,19 @@
    "changed": [],
    "why": "Written with the hook, 2026-11-01."
   }
+ },
+ {
+  "file": "widget/moz.build",
+  "category": "spoof",
+  "feature": "juggler-input-dispatch",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "",
+  "notes": ""
  },
  {
   "file": "widget/gtk/nsWindow.h",
@@ -4987,7 +5559,7 @@
    "zoom.stealth.screen.width",
    "zoom.stealth.screen.height"
   ],
-  "added": 2,
+  "added": 1,
   "removed": 0,
   "hunks": 1,
   "inline_logic_lines": 0,
@@ -4998,6 +5570,19 @@
    "changed": [],
    "why": "Written with the hook, 2026-11-01."
   }
+ },
+ {
+  "file": "widget/gtk/moz.build",
+  "category": "spoof",
+  "feature": "gfx-feature-status-declared",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "",
+  "notes": ""
  },
  {
   "file": "widget/tests/gtest/moz.build",
@@ -5449,10 +6034,10 @@
   "category": "other",
   "feature": "proxy-udp-egress",
   "prefs": [],
-  "added": 6,
+  "added": 4,
   "removed": 0,
-  "hunks": 4,
-  "inline_logic_lines": 9,
+  "hunks": 3,
+  "inline_logic_lines": 0,
   "hookable": "movable",
   "anchor": "WebrtcTCPSocket::DoProxyConfigLookup and OpenWithHttpProxy (the channel of the proxy lookup and of the HTTP tunnel)",
   "notes": "The channel of the proxy lookup of a PeerConnection's TCP socket (TURN over TCP) is made by StealthNewChannelOfLoadInfo, with the load info of the document: the proxy filters answer for the context of the page, not for the system principal's. The HTTP tunnel's own channel is made by the same function (the code it had is gone from here). In OpenWithoutHttpProxy one call of StealthTcpNameContext (network/doh, body in StealthIceResolverContext.cpp) gives the socket transport the origin attributes of the PeerConnection right after CreateTransport, so a TURN name over TCP is resolved in the context of the page.",
@@ -5460,6 +6045,19 @@
    "changed": [],
    "why": "Written from the diff against the tag."
   }
+ },
+ {
+  "file": "dom/media/webrtc/transport/ipc/WebrtcTCPSocket.cpp",
+  "category": "other",
+  "feature": "webrtc-declared-network",
+  "prefs": [],
+  "added": 2,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "",
+  "notes": ""
  },
  {
   "file": "dom/media/webrtc/transport/nr_socket_proxy_config.h",
@@ -5500,7 +6098,7 @@
   "category": "other",
   "feature": "proxy-udp-egress",
   "prefs": [],
-  "added": 4,
+  "added": 3,
   "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 1,
@@ -5511,6 +6109,19 @@
    "changed": [],
    "why": "Written from the diff against the tag."
   }
+ },
+ {
+  "file": "dom/media/webrtc/transport/nr_socket_prsock.h",
+  "category": "other",
+  "feature": "webrtc-declared-network",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "",
+  "notes": ""
  },
  {
   "file": "netwerk/base/nsIUDPSocket.idl",
@@ -5585,10 +6196,10 @@
   "category": "other",
   "feature": "proxy-udp-egress",
   "prefs": [],
-  "added": 7,
+  "added": 3,
   "removed": 0,
   "hunks": 3,
-  "inline_logic_lines": 10,
+  "inline_logic_lines": 0,
   "hookable": "movable",
   "anchor": "ProxyConfigLookup::Create, constructor, DoProxyResolve",
   "notes": "The lookup uses a channel built from the document's load info when it has one (StealthNewChannelOfLoadInfo), so the proxy filters see its context. Also (feature doh-trr-context, network/doh): the lookup carries the origin attributes of the DoH context next to the load info, and the stand-in channel presents them to the proxy filters.",
@@ -5596,6 +6207,19 @@
    "changed": [],
    "why": "Written from the diff against the tag."
   }
+ },
+ {
+  "file": "netwerk/ipc/ProxyConfigLookup.cpp",
+  "category": "other",
+  "feature": "doh-trr-context",
+  "prefs": [],
+  "added": 4,
+  "removed": 0,
+  "hunks": 3,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "",
+  "notes": ""
  },
  {
   "file": "netwerk/ipc/ProxyConfigLookupChild.h",
@@ -5619,10 +6243,10 @@
   "category": "other",
   "feature": "proxy-udp-egress",
   "prefs": [],
-  "added": 5,
+  "added": 2,
   "removed": 0,
   "hunks": 2,
-  "inline_logic_lines": 2,
+  "inline_logic_lines": 0,
   "hookable": "already-hook",
   "anchor": "ProxyConfigLookupChild::Create",
   "notes": "Sends the optional LoadInfoArgs with the PProxyConfigLookup constructor. Also (feature doh-trr-context, network/doh): the lookup carries the origin attributes of the DoH context next to the load info, and the stand-in channel presents them to the proxy filters.",
@@ -5630,6 +6254,19 @@
    "changed": [],
    "why": "Written from the diff against the tag."
   }
+ },
+ {
+  "file": "netwerk/ipc/ProxyConfigLookupChild.cpp",
+  "category": "other",
+  "feature": "doh-trr-context",
+  "prefs": [],
+  "added": 3,
+  "removed": 0,
+  "hunks": 2,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "",
+  "notes": ""
  },
  {
   "file": "netwerk/ipc/ProxyConfigLookupParent.h",
@@ -5670,10 +6307,10 @@
   "category": "other",
   "feature": "proxy-udp-egress",
   "prefs": [],
-  "added": 2,
+  "added": 1,
   "removed": 0,
   "hunks": 1,
-  "inline_logic_lines": 2,
+  "inline_logic_lines": 0,
   "hookable": "already-hook",
   "anchor": "AllocPProxyConfigLookupParent, RecvPProxyConfigLookupConstructor",
   "notes": "Declarations follow the new constructor arguments. Also (feature doh-trr-context, network/doh): the lookup carries the origin attributes of the DoH context next to the load info, and the stand-in channel presents them to the proxy filters.",
@@ -5683,14 +6320,27 @@
   }
  },
  {
+  "file": "netwerk/ipc/SocketProcessParent.h",
+  "category": "other",
+  "feature": "doh-trr-context",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "",
+  "notes": ""
+ },
+ {
   "file": "netwerk/ipc/SocketProcessParent.cpp",
   "category": "other",
   "feature": "proxy-udp-egress",
   "prefs": [],
-  "added": 5,
+  "added": 2,
   "removed": 0,
   "hunks": 2,
-  "inline_logic_lines": 3,
+  "inline_logic_lines": 0,
   "hookable": "movable",
   "anchor": "AllocPProxyConfigLookupParent, RecvPProxyConfigLookupConstructor",
   "notes": "Gives the optional LoadInfoArgs to the lookup actor. Also (feature doh-trr-context, network/doh): the lookup carries the origin attributes of the DoH context next to the load info, and the stand-in channel presents them to the proxy filters.",
@@ -5700,11 +6350,24 @@
   }
  },
  {
+  "file": "netwerk/ipc/SocketProcessParent.cpp",
+  "category": "other",
+  "feature": "doh-trr-context",
+  "prefs": [],
+  "added": 3,
+  "removed": 0,
+  "hunks": 2,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "",
+  "notes": ""
+ },
+ {
   "file": "netwerk/ipc/moz.build",
   "category": "other",
   "feature": "proxy-udp-egress",
   "prefs": [],
-  "added": 4,
+  "added": 2,
   "removed": 0,
   "hunks": 2,
   "inline_logic_lines": 0,
@@ -5715,6 +6378,19 @@
    "changed": [],
    "why": "Written from the diff against the tag."
   }
+ },
+ {
+  "file": "netwerk/ipc/moz.build",
+  "category": "other",
+  "feature": "doh-trr-context",
+  "prefs": [],
+  "added": 2,
+  "removed": 0,
+  "hunks": 2,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "",
+  "notes": ""
  },
  {
   "file": "netwerk/protocol/http/HttpConnectionUDP.cpp",
@@ -5738,9 +6414,9 @@
   "category": "other",
   "feature": "proxy-udp-egress",
   "prefs": [],
-  "added": 5,
-  "removed": 1,
-  "hunks": 3,
+  "added": 3,
+  "removed": 0,
+  "hunks": 2,
   "inline_logic_lines": 0,
   "hookable": "already-hook",
   "anchor": "nsSOCKSIOLayerAddToSocket after Init",
@@ -5749,6 +6425,19 @@
    "changed": [],
    "why": "Written from the diff against the tag."
   }
+ },
+ {
+  "file": "netwerk/socket/nsSOCKSIOLayer.cpp",
+  "category": "other",
+  "feature": "ipv6-literal-connect",
+  "prefs": [],
+  "added": 2,
+  "removed": 1,
+  "hunks": 2,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "",
+  "notes": ""
  },
  {
   "file": "dom/media/webrtc/transport/build/moz.build",
@@ -6172,10 +6861,10 @@
    "network.process.enabled",
    "media.peerconnection.mtransport_process"
   ],
-  "added": 7,
+  "added": 2,
   "removed": 0,
   "hunks": 2,
-  "inline_logic_lines": 2,
+  "inline_logic_lines": 0,
   "hookable": "already-hook",
   "anchor": "XREMain::XRE_mainRun after InitializeUserPrefs",
   "notes": "Locks the two prefs that decide where the ICE of a PeerConnection runs to the retail value (socket process, ICE in it): the SOCKS5 UDP layer is attached only to the sockets of that process, and a locked pref reads its default whatever user.js, prefs.js or a caller wrote. platform/declaration-gate: the signal that the profile's preferences have been read (StealthMarkUserPrefsRead), right after InitializeUserPrefs; before it the Linux GL probe does not run. With the engine off, Mozilla's early host GL probe is fired again right after the preferences are read (StealthFireHostGLProbeIfStock).",
@@ -6183,6 +6872,19 @@
    "changed": [],
    "why": "Written from the diff against the tag."
   }
+ },
+ {
+  "file": "toolkit/xre/nsAppRunner.cpp",
+  "category": "other",
+  "feature": "gfx-feature-status-declared",
+  "prefs": [],
+  "added": 5,
+  "removed": 0,
+  "hunks": 2,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "",
+  "notes": ""
  },
  {
   "file": "toolkit/components/geolocation/GeolocationService.cpp",
@@ -6263,7 +6965,7 @@
   "category": "juggler",
   "feature": "juggler-input-dispatch",
   "prefs": [],
-  "added": 2,
+  "added": 1,
   "removed": 0,
   "hunks": 1,
   "inline_logic_lines": 0,
@@ -6274,6 +6976,19 @@
    "changed": [],
    "why": "Written with the hook, 2026-11-21."
   }
+ },
+ {
+  "file": "layout/base/gtest/moz.build",
+  "category": "juggler",
+  "feature": "canvas-as-drawn-readers",
+  "prefs": [],
+  "added": 1,
+  "removed": 0,
+  "hunks": 1,
+  "inline_logic_lines": 0,
+  "hookable": "already-hook",
+  "anchor": "",
+  "notes": ""
  },
  {
   "file": "docshell/base/test/gtest/moz.build",

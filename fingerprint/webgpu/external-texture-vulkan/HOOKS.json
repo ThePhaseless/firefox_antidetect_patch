@@ -1,5 +1,13 @@
 [
  {
+  "file": "gfx/tests/gtest/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"TestStealthWebGPUExternalTexture.cpp\"]  # STEALTH-HOOK(fingerprint/webgpu/external-texture-vulkan)",
+  "test": "gtest:StealthWebGPUExternalTexture.SampledLoadedQueriedThroughAParameter"
+ },
+ {
   "file": "gfx/wgpu_bindings/src/lib.rs",
   "function": "use nsstring::nsACString;",
   "kind": "add",

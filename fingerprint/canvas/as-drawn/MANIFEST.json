@@ -1,5 +1,7 @@
 {
  "modified": [
+  "dom/html/HTMLCanvasElement.h",
+  "layout/base/gtest/moz.build",
   "layout/base/nsLayoutUtils.cpp",
   "layout/base/nsLayoutUtils.h",
   "layout/painting/nsImageRenderer.cpp",
@@ -15,6 +17,32 @@
   "layout/base/gtest/TestStealthSurfaceFlags.cpp": "167864808e721df769c16c0236bdb7b8db500bc686bd83630a7c23c6b3a3edbd"
  },
  "inventory": [
+  {
+   "file": "dom/html/HTMLCanvasElement.h",
+   "category": "spoof",
+   "feature": "canvas-as-drawn-readers",
+   "prefs": [],
+   "added": 2,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "",
+   "notes": ""
+  },
+  {
+   "file": "layout/base/gtest/moz.build",
+   "category": "juggler",
+   "feature": "canvas-as-drawn-readers",
+   "prefs": [],
+   "added": 1,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "",
+   "notes": ""
+  },
   {
    "file": "layout/base/nsLayoutUtils.cpp",
    "category": "spoof",

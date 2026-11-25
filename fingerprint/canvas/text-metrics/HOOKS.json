@@ -36,6 +36,14 @@
   "why": "the call replaces the function's return value and needs six locals that exist only inside DrawOrMeasureText (font, fontOrientation, totalWidth and the four actualBoundingBox values); a guard at the top finds them unborn, a wrap of MakeUnique<TextMetrics> would build and discard it and still needs the locals, copying the baseline switch already cost one bug (see StealthCanvasTextMetrics.h)"
  },
  {
+  "file": "dom/canvas/gtest/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"TestStealthCanvasPageSnapshot.cpp\"]  # STEALTH-HOOK(fingerprint/canvas/text-metrics)",
+  "test": "gtest:StealthCanvasPageSnapshot.TheSnapshotOfTheContextIsNotTakenWhenItHasAnElement"
+ },
+ {
   "file": "dom/canvas/nsICanvasRenderingContextInternal.h",
   "function": "class nsICanvasRenderingContextInternal : public nsISupports,",
   "kind": "add",

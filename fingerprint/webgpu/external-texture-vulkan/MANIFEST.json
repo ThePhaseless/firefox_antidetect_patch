@@ -1,6 +1,7 @@
 {
  "modified": [
   "Cargo.lock",
+  "gfx/tests/gtest/moz.build",
   "gfx/wgpu_bindings/src/lib.rs",
   "third_party/rust/naga-types/.cargo-checksum.json",
   "third_party/rust/naga-types/Cargo.toml",
@@ -60,6 +61,19 @@
     "changed": [],
     "why": "Written with the backport, 2026-11-01."
    }
+  },
+  {
+   "file": "gfx/tests/gtest/moz.build",
+   "category": "build",
+   "feature": "webgpu-external-texture-vulkan",
+   "prefs": [],
+   "added": 1,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "",
+   "notes": ""
   },
   {
    "file": "gfx/wgpu_bindings/src/lib.rs",

@@ -8,14 +8,6 @@
   "test": "wrapper:tests/test_bypass_csp_e2e.py::test_bypass_csp_lifts_the_page_policy_and_its_absence_keeps_it"
  },
  {
-  "file": "docshell/base/moz.build",
-  "function": "UNIFIED_SOURCES += [",
-  "kind": "add",
-  "form": "registration",
-  "line": "UNIFIED_SOURCES += [\"StealthNavigation.cpp\"]  # STEALTH-HOOK(automation/navigation)",
-  "test": "wrapper:tests/test_a_goto_to_a_refused_port_ends_with_its_reason_e2e.py::test_a_goto_to_a_refused_port_ends_with_its_reason"
- },
- {
   "file": "docshell/base/nsDocShell.h",
   "function": "class nsDocShell final : public nsDocLoader,",
   "kind": "add",

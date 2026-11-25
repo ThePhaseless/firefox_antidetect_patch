@@ -1,3 +1,15 @@
+diff --git a/dom/media/gtest/moz.build b/dom/media/gtest/moz.build
+index 4a9568d15bff22ba9a9fadbe8fbc911a8c2138a8..546c548b995a55a882f5de8afdc4f2f188eb7c21 100644
+--- a/dom/media/gtest/moz.build
++++ b/dom/media/gtest/moz.build
+@@ -102,6 +102,7 @@ UNIFIED_SOURCES += [
+     "YUVBufferGenerator.cpp",
+ ]
+ UNIFIED_SOURCES += ["TestStealthAudioNoise.cpp"]  # STEALTH-HOOK(fingerprint/audio/noise)
++UNIFIED_SOURCES += ["TestStealthMediaDeclaration.cpp"]  # STEALTH-HOOK(fingerprint/media/decode-declaration)
+ 
+ if CONFIG["MOZ_WEBRTC"]:
+     LOCAL_INCLUDES += [
 diff --git a/dom/media/mediacapabilities/MediaCapabilities.cpp b/dom/media/mediacapabilities/MediaCapabilities.cpp
 index b25c2e748f7f8f02a14bfb5d476cdc52cbaf3e01..d24a135386d359ad42cbcd8e1ce11dd014fff730 100644
 --- a/dom/media/mediacapabilities/MediaCapabilities.cpp

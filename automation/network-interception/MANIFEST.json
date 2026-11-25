@@ -2,7 +2,8 @@
  "modified": [
   "netwerk/base/nsINetworkInterceptController.idl",
   "netwerk/protocol/http/InterceptedHttpChannel.cpp",
-  "netwerk/protocol/http/InterceptedHttpChannel.h"
+  "netwerk/protocol/http/InterceptedHttpChannel.h",
+  "netwerk/protocol/http/moz.build"
  ],
  "added": {
   "netwerk/protocol/http/StealthInterception.cpp": "100644"
@@ -67,6 +68,19 @@
     ],
     "why": "cross-reference to the idl declaration"
    }
+  },
+  {
+   "file": "netwerk/protocol/http/moz.build",
+   "category": "other",
+   "feature": "juggler-service-worker-intercept",
+   "prefs": [],
+   "added": 1,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "",
+   "notes": ""
   }
  ]
 }

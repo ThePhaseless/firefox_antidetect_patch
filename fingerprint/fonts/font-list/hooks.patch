@@ -1,3 +1,19 @@
+diff --git a/gfx/tests/gtest/moz.build b/gfx/tests/gtest/moz.build
+index 722f623d861ed44fed382835e9e89f50dcbf6315..63c31d0b5b13e44c003fa793d4f503709139b35f 100644
+--- a/gfx/tests/gtest/moz.build
++++ b/gfx/tests/gtest/moz.build
+@@ -43,6 +43,11 @@ if CONFIG["OS_TARGET"] != "Android":
+         "TestRect.cpp",
+     ]
+ 
++if CONFIG["MOZ_WIDGET_TOOLKIT"] == "gtk":  # STEALTH-HOOK(fingerprint/fonts/font-list)
++
++    UNIFIED_SOURCES += ["TestStealthFcFontList.cpp"]  # STEALTH-HOOK(fingerprint/fonts/font-list)
++    CXXFLAGS += CONFIG["CAIRO_FT_CFLAGS"]  # STEALTH-HOOK(fingerprint/fonts/font-list)
++
+ if CONFIG["OS_TARGET"] == "WINNT":  # STEALTH-HOOK(fingerprint/fonts/bundle)
+ 
+     UNIFIED_SOURCES += ["TestStealthBundledCollection.cpp"]  # STEALTH-HOOK(fingerprint/fonts/bundle)
 diff --git a/gfx/thebes/gfxDWriteFontList.cpp b/gfx/thebes/gfxDWriteFontList.cpp
 index a804e7154b7182fe73a37a94b186b50275971f5e..36f5b9c6f88267af7929d1adb29b00d88e5ae1da 100644
 --- a/gfx/thebes/gfxDWriteFontList.cpp
@@ -123,6 +139,18 @@ index a804e7154b7182fe73a37a94b186b50275971f5e..36f5b9c6f88267af7929d1adb29b00d8
    nsCOMPtr<nsIFile> localDir;
    nsresult rv = NS_GetSpecialDirectory(NS_GRE_DIR, getter_AddRefs(localDir));
    if (NS_FAILED(rv)) {
+diff --git a/gfx/thebes/gfxDWriteFontList.h b/gfx/thebes/gfxDWriteFontList.h
+index c0f294db13dd6acc29478169961c3fee751ed097..07d63c1b44147ffdbcefce8e287a2c06f97f0a7b 100644
+--- a/gfx/thebes/gfxDWriteFontList.h
++++ b/gfx/thebes/gfxDWriteFontList.h
+@@ -465,6 +465,7 @@ class gfxDWriteFontList final : public gfxPlatformFontList {
+       nsTArray<mozilla::fontlist::Family::InitData>& aFamilies,
+       const nsTArray<nsCString>* aForceClassicFams = nullptr)
+       MOZ_REQUIRES(mLock);
++  void StealthAppendFamiliesFromCollection(IDWriteFontCollection* aCollection, nsTArray<mozilla::fontlist::Family::InitData>& aFamilies, const nsTArray<nsCString>* aForceClassicFams) MOZ_REQUIRES(mLock);  // STEALTH-HOOK(fingerprint/fonts/font-list)
+ 
+   void AddSubstitute(const nsCString& aSubstituteName,
+                      const nsCString& aActualFontName, bool aIsHardcoded)
 diff --git a/gfx/thebes/gfxFcPlatformFontList.cpp b/gfx/thebes/gfxFcPlatformFontList.cpp
 index 3fbad92c0dbcb8f65fb58e052fe798a1dbe58aad..8e3c2404db887bb46a894268cef16792056f04b2 100644
 --- a/gfx/thebes/gfxFcPlatformFontList.cpp
@@ -252,6 +280,18 @@ index 3fbad92c0dbcb8f65fb58e052fe798a1dbe58aad..8e3c2404db887bb46a894268cef16792
      gfxPlatformFontList::AddGenericFonts(aFontVisibilityProvider, aGenericType,
                                           aLanguage, aFamilyList);
      if (!isSystemUi) {
+diff --git a/gfx/thebes/gfxFcPlatformFontList.h b/gfx/thebes/gfxFcPlatformFontList.h
+index 28f3feb31c25afb55d431ffed6c0e32d90fd516d..ca305076d452f1b01c97790191dfb4644693674e 100644
+--- a/gfx/thebes/gfxFcPlatformFontList.h
++++ b/gfx/thebes/gfxFcPlatformFontList.h
+@@ -68,6 +68,7 @@ struct default_delete<FcObjectSet> {
+ 
+ class gfxFontconfigFontEntry final : public gfxFT2FontEntryBase {
+   friend class gfxFcPlatformFontList;
++  friend struct StealthFcAccess;  // STEALTH-HOOK(fingerprint/fonts/font-list)
+ 
+  public:
+   // used for system fonts with explicit patterns
 diff --git a/gfx/thebes/gfxPlatformFontList.cpp b/gfx/thebes/gfxPlatformFontList.cpp
 index cabecffc5c4f9a21f5d069738f82d866c2bcbeb2..6f3860b1719bdcf973f280a4c35da81d76c98910 100644
 --- a/gfx/thebes/gfxPlatformFontList.cpp
@@ -396,3 +436,15 @@ index 4719c99e05d8b71dc8ccc95f57f3918b8f4fef17..2db798036371613750d969d23829bea6
  
    // This is an owning reference; we are responsible to delete the FontList at
    // appropriate times.
+diff --git a/gfx/thebes/moz.build b/gfx/thebes/moz.build
+index 9c490cdb39e956e500c4e418f0cd9acf506f152c..014cedeab619e028a99f531be42071ccbbe6d704 100644
+--- a/gfx/thebes/moz.build
++++ b/gfx/thebes/moz.build
+@@ -245,6 +245,7 @@ USE_LIBS += [
+ include("/ipc/chromium/chromium-config.mozbuild")
+ include("StealthDeclarationGate.mozbuild")  # STEALTH-HOOK(platform/declaration-gate)
+ include("StealthBundleFontList.mozbuild")  # STEALTH-HOOK(fingerprint/fonts/bundle)
++include("StealthFcFontList.mozbuild")  # STEALTH-HOOK(fingerprint/fonts/font-list)
+ 
+ FINAL_LIBRARY = "xul"
+ 

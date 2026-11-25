@@ -4,6 +4,7 @@
   "dom/events/Event.cpp",
   "dom/events/test/gtest/moz.build",
   "widget/gtk/moz.build",
+  "widget/gtk/nsWindow.cpp",
   "widget/gtk/nsWindow.h",
   "widget/moz.build",
   "widget/nsIWidget.cpp",
@@ -39,10 +40,10 @@
    "category": "spoof",
    "feature": "window-geometry",
    "prefs": [],
-   "added": 10,
-   "removed": 2,
-   "hunks": 6,
-   "inline_logic_lines": 66,
+   "added": 8,
+   "removed": 0,
+   "hunks": 5,
+   "inline_logic_lines": 0,
    "hookable": "movable",
    "anchor": "CreateNativeGlobalForInner; nsGlobalWindowOuter::GetOuterSize; nsGlobalWindowOuter::GetScreenXY; nsGlobalWindowOuter::StealthContentOriginShift (new); nsGlobalWindowOuter::IsInStealthPopup (new); nsGlobalWindowOuter::GetMozInnerScreenXOuter; nsGlobalWindowOuter::GetMozInnerScreenYOuter",
    "notes": "Mixed file. (1) language-declared and timezone-declared: CreateNativeGlobalForInner takes language and zone from the declared session (GetDeclaredLanguage/GetDeclaredTimezone in StealthSessionDeclaration) instead of Top()->GetLanguageOverride()/GetTimezoneOverride(). (2) window-geometry: GetOuterSize and GetScreenXY answer declared maximized-window or popup geometry. (3) window-geometry: StealthContentOriginShift (new, about 45 lines) and IsInStealthPopup (new), used by mozInnerScreenX/Y here and by Event.cpp. Most of the 66 logic lines are in these functions; they can move wholesale to our own file. Comments are largely in Italian. The 'return {}' after the gate is kept, per its own comment. The shift function calls BrowserChild::GetDimensions in content processes.",
@@ -93,7 +94,7 @@
     "zoom.stealth.screen.width",
     "zoom.stealth.screen.height"
    ],
-   "added": 2,
+   "added": 1,
    "removed": 0,
    "hunks": 1,
    "inline_logic_lines": 0,
@@ -104,6 +105,19 @@
     "changed": [],
     "why": "Written with the hook, 2026-11-01."
    }
+  },
+  {
+   "file": "widget/gtk/nsWindow.cpp",
+   "category": "spoof",
+   "feature": "window-geometry",
+   "prefs": [],
+   "added": 1,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "",
+   "notes": ""
   },
   {
    "file": "widget/gtk/nsWindow.h",
@@ -133,7 +147,7 @@
     "zoom.stealth.screen.width",
     "zoom.stealth.screen.height"
    ],
-   "added": 2,
+   "added": 1,
    "removed": 0,
    "hunks": 1,
    "inline_logic_lines": 0,

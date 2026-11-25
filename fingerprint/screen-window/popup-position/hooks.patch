@@ -1,27 +1,29 @@
+diff --git a/toolkit/components/windowwatcher/moz.build b/toolkit/components/windowwatcher/moz.build
+index 54c299fef9cc6803792067c39a6ddf21b09773cb..13fa7db13d634947d4226ebdfa627b80257bd302 100644
+--- a/toolkit/components/windowwatcher/moz.build
++++ b/toolkit/components/windowwatcher/moz.build
+@@ -31,6 +31,7 @@ UNIFIED_SOURCES += [
+     "nsWindowWatcher.cpp",
+ ]
+ UNIFIED_SOURCES += ["JugglerWindowSize.cpp"]  # STEALTH-HOOK(automation/window-size)
++UNIFIED_SOURCES += ["StealthWindowPlacement.cpp"]  # STEALTH-HOOK(fingerprint/screen-window/popup-position)
+ 
+ FINAL_LIBRARY = "xul"
+ # For nsJSUtils
 diff --git a/toolkit/components/windowwatcher/nsWindowWatcher.cpp b/toolkit/components/windowwatcher/nsWindowWatcher.cpp
-index a1044338912d917f109fb89bda437cece4007e09..49290fc90538d52c43634b5afc17238c3c9de3d7 100644
+index 4de5c2290a01997a5fe0784b15525055d56f6893..49290fc90538d52c43634b5afc17238c3c9de3d7 100644
 --- a/toolkit/components/windowwatcher/nsWindowWatcher.cpp
 +++ b/toolkit/components/windowwatcher/nsWindowWatcher.cpp
-@@ -77,6 +77,9 @@
- #include "nsIXULBrowserWindow.h"
+@@ -78,6 +78,8 @@
  #include "ReferrerInfo.h"
  
-+#include "JugglerWindowSize.h"  // STEALTH-HOOK(automation/window-size)
+ #include "JugglerWindowSize.h"  // STEALTH-HOOK(automation/window-size)
 +#include "StealthWindowPlacement.h"  // STEALTH-HOOK(fingerprint/screen-window/popup-position)
 +
  using namespace mozilla;
  using namespace mozilla::dom;
  
-@@ -1902,7 +1905,7 @@ uint32_t nsWindowWatcher::CalculateChromeFlagsForContent(
-     return nsIWebBrowserChrome::CHROME_DOCUMENT_PICTURE_IN_PICTURE_FLAGS;
-   }
-   *aIsPopupRequested = ShouldOpenPopup(aFeatures);
--  return *aIsPopupRequested ? nsIWebBrowserChrome::CHROME_MINIMAL_POPUP
-+  return *aIsPopupRequested ? mozilla::JugglerPopupChromeFlags(aFeatures, nsIWebBrowserChrome::CHROME_MINIMAL_POPUP)  // STEALTH-HOOK(automation/window-size)
-                             : nsIWebBrowserChrome::CHROME_ALL;
- }
- 
-@@ -2339,6 +2342,7 @@ static void SizeOpenedWindow(nsIDocShellTreeOwner* aTreeOwner,
+@@ -2340,6 +2342,7 @@ static void SizeOpenedWindow(nsIDocShellTreeOwner* aTreeOwner,
    }
  
    bool positionSpecified = aSizeSpec.PositionSpecified();

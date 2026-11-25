@@ -32,6 +32,15 @@
   "test": "wrapper:tests/test_geolocation_reads_nothing_of_the_host_windows_e2e.py::test_no_host_location_module_loads_and_no_windows_utils_process_starts"
  },
  {
+  "file": "modules/libpref/init/all.js",
+  "function": "pref(\"network.tcp.keepalive.idle_time\", 600); // seconds; 10 mins",
+  "kind": "rewrite",
+  "form": "declared-value",
+  "line": "  pref(\"geo.provider.network.url\", \"\");  // STEALTH-HOOK(fingerprint/geolocation/no-host-provider)",
+  "removed": "  pref(\"geo.provider.network.url\", \"https://www.googleapis.com/geolocation/v1/geolocate?key=%GOOGLE_LOCATION_SERVICE_API_KEY%&solution_channel=%OS%\");",
+  "test": "node:juggler/tests/geolocation_network_url_is_empty_by_default.test.mjs#the value is changed on Mozilla's own line, with the hook, and the line is one"
+ },
+ {
   "file": "toolkit/components/geolocation/GeolocationService.cpp",
   "function": "",
   "kind": "add",

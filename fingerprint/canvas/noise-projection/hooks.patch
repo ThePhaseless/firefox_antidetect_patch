@@ -1,3 +1,66 @@
+diff --git a/dom/canvas/ClientWebGLContext.cpp b/dom/canvas/ClientWebGLContext.cpp
+index 097d20229785c61c89dc5c7e4c22799c48fb7c12..dade7ffd84008eebcddab3a0a7efd06a8bb768de 100644
+--- a/dom/canvas/ClientWebGLContext.cpp
++++ b/dom/canvas/ClientWebGLContext.cpp
+@@ -46,6 +46,8 @@
+ #include "nsContentUtils.h"
+ #include "nsDisplayList.h"
+ 
++#include "StealthWebGLReadback.h"  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
++
+ namespace mozilla {
+ 
+ namespace webgl {
+@@ -1361,6 +1363,7 @@ UniquePtr<uint8_t[]> ClientWebGLContext::GetImageBuffer(
+   gfxAlphaType any;
+   RefPtr<gfx::SourceSurface> snapshot = GetSurfaceSnapshot(&any);
+   if (!snapshot) return nullptr;
++  StealthWebGLProjectReaderSnapshot(*this, snapshot, any);  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
+ 
+   RefPtr<gfx::DataSourceSurface> dataSurface = snapshot->GetDataSurface();
+ 
+@@ -1391,6 +1394,7 @@ ClientWebGLContext::GetInputStream(
+   gfxAlphaType any;
+   RefPtr<gfx::SourceSurface> snapshot = GetSurfaceSnapshot(&any);
+   if (!snapshot) return NS_ERROR_FAILURE;
++  StealthWebGLProjectReaderSnapshot(*this, snapshot, any);  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
+ 
+   RefPtr<gfx::DataSourceSurface> dataSurface = snapshot->GetDataSurface();
+   const auto& premultAlpha = notLost->info.options.premultipliedAlpha;
+@@ -5416,6 +5420,7 @@ void ClientWebGLContext::ReadPixels(GLint x, GLint y, GLsizei width,
+                                           {format, type},
+                                           state.mPixelPackState};
+   Run<RPROC(ReadPixelsPbo)>(desc, static_cast<uint64_t>(offset));
++  StealthWebGLReadback::ProjectReadPixelsPbo(*this, desc, offset);  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
+ }
+ 
+ void ClientWebGLContext::ReadPixels(GLint x, GLint y, GLsizei width,
+@@ -5463,7 +5468,7 @@ void ClientWebGLContext::ReadPixels(GLint x, GLint y, GLsizei width,
+                                             *uvec2::From(width, height),
+                                             {format, type},
+                                             state.mPixelPackState};
+-    bool succeeded = DoReadPixels(desc, *range);
++    bool succeeded = StealthDoReadPixels(this, desc, *range);  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
+     if (succeeded) {
+       CanvasUtils::ImageExtraction extraction =
+           ImageExtractionResult(mCanvasElement, mOffscreenCanvas);
+@@ -5546,6 +5551,7 @@ bool ClientWebGLContext::DoReadPixels(const webgl::ReadPixelsDesc& desc,
+     Memcpy(&destRow, srcRow);
+   }
+ 
++  StealthWebGLReadback::NoteReadPixels(*this, subrect, byteStride);  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
+   return true;
+ }
+ 
+@@ -5681,7 +5687,7 @@ ClientWebGLContext::DoReadPixelsAsync() {
+               {size.x, size.y}));
+         }
+ 
+-        promise->Resolve(std::move(sourceSurface), __func__);
++        promise->Resolve(StealthWebGLProjectAsyncSnapshot(*self, std::move(sourceSurface)), __func__);  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
+       },
+ 
+       [promise](const mozilla::ipc::ResponseRejectReason aReason) {
 diff --git a/dom/canvas/ClientWebGLContext.h b/dom/canvas/ClientWebGLContext.h
 index 6996d25296b650e8890abb18269801073b3f6140..0eef26194822dff18e0e4f22a6ce78a1a07da1bc 100644
 --- a/dom/canvas/ClientWebGLContext.h
@@ -78,7 +141,7 @@ index f7db258e2e1ac8ad40966f0ed3931cc3f189635a..fb777ab3ce6191111fcd7db68ad23813
    UniquePtr<uint8_t[]> GetImageBuffer(
        CanvasUtils::ImageExtraction aExtractionBehavior, int32_t* aOutFormat,
 diff --git a/dom/canvas/moz.build b/dom/canvas/moz.build
-index b5809a1fca1bed238396bfdac6dec054a7a72a4d..a72e9efd8b1851e1772a8d12b18b9f90eea3e82b 100644
+index b5809a1fca1bed238396bfdac6dec054a7a72a4d..175c23cd389b6ac8205c399192b3988aa023de80 100644
 --- a/dom/canvas/moz.build
 +++ b/dom/canvas/moz.build
 @@ -74,6 +74,7 @@ EXPORTS.mozilla.dom += [
@@ -98,15 +161,6 @@ index b5809a1fca1bed238396bfdac6dec054a7a72a4d..a72e9efd8b1851e1772a8d12b18b9f90
  
  # WebGL Sources
  UNIFIED_SOURCES += [
-@@ -164,6 +167,8 @@ UNIFIED_SOURCES += [
-     "WebGLVertexArrayFake.cpp",
-     "WebGLVertexArrayGL.cpp",
- ]
-+UNIFIED_SOURCES += ["StealthWebGLParams.cpp"]  # STEALTH-HOOK(fingerprint/webgl/parameters)
-+UNIFIED_SOURCES += ["StealthWebGLShaderLanguage.cpp"]  # STEALTH-HOOK(fingerprint/webgl/shader-language)
- 
- SOURCES += [
-     "MurmurHash3.cpp",
 diff --git a/dom/html/HTMLCanvasElement.cpp b/dom/html/HTMLCanvasElement.cpp
 index e40c9fef90e5a0b4a6df73a5d7a2ed74304ecdaa..3863517363d150e611aed0bbc0c51e29e50c2598 100644
 --- a/dom/html/HTMLCanvasElement.cpp
@@ -127,19 +181,17 @@ index e40c9fef90e5a0b4a6df73a5d7a2ed74304ecdaa..3863517363d150e611aed0bbc0c51e29
    return nullptr;
  }
 diff --git a/dom/html/HTMLCanvasElement.h b/dom/html/HTMLCanvasElement.h
-index 4280abcde7c0449e3c6ce5ddd5b4e6664dc0c628..e6e137b105f29232617b54d8878f9c085a028a48 100644
+index 0cbe628a4797ed0d5cf2f67162f83da06127cccf..e6e137b105f29232617b54d8878f9c085a028a48 100644
 --- a/dom/html/HTMLCanvasElement.h
 +++ b/dom/html/HTMLCanvasElement.h
-@@ -225,6 +225,9 @@ class HTMLCanvasElement final : public nsGenericHTMLElement,
+@@ -225,6 +225,7 @@ class HTMLCanvasElement final : public nsGenericHTMLElement,
        gfxAlphaType* aOutAlphaType = nullptr,
        gfx::DrawTarget* aTarget = nullptr);
  
 +  already_AddRefed<gfx::SourceSurface> GetSurfaceSnapshotAsDrawn(gfxAlphaType* aOutAlphaType = nullptr, gfx::DrawTarget* aTarget = nullptr);  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
-+  already_AddRefed<gfx::SourceSurface> StealthGetSurfaceSnapshot(uint32_t aSurfaceFlags, gfxAlphaType* aOutAlphaType = nullptr, gfx::DrawTarget* aTarget = nullptr);  // STEALTH-HOOK(fingerprint/canvas/as-drawn)
-+
-   using SurfaceSnapshotPromise =
-       MozPromise<RefPtr<gfx::SourceSurface>, nsresult, true>;
+   already_AddRefed<gfx::SourceSurface> StealthGetSurfaceSnapshot(uint32_t aSurfaceFlags, gfxAlphaType* aOutAlphaType = nullptr, gfx::DrawTarget* aTarget = nullptr);  // STEALTH-HOOK(fingerprint/canvas/as-drawn)
  
+   using SurfaceSnapshotPromise =
 diff --git a/dom/html/moz.build b/dom/html/moz.build
 index 0a91baabcbd50ca9c178e4d9fb20560833f9bbb0..92d1bc0454b051d6db2d77e806b7f1fd30c172c9 100644
 --- a/dom/html/moz.build
@@ -265,58 +317,35 @@ index 88ec520156fcf4d84098f546286aeb2ca138729f..d61bfc6172ab08e20ee6391caf0a48f0
    f(DRAWTARGETDESTRUCTION, RecordedDrawTargetDestruction);         \
    f(SETCURRENTDRAWTARGET, RecordedSetCurrentDrawTarget);           \
 diff --git a/gfx/2d/moz.build b/gfx/2d/moz.build
-index 2abc9c45814d6931ad1edcb9daacab750909d597..ff5ac016d4024828019006727a67a415e0acce9d 100644
+index e18eafe72a563367de6081df7b032ffa15067db2..97c80d37f7b8f828d483a8e1bfc0bf34abc9d246 100644
 --- a/gfx/2d/moz.build
 +++ b/gfx/2d/moz.build
-@@ -60,6 +60,10 @@ EXPORTS.mozilla.gfx += [
+@@ -60,6 +60,8 @@ EXPORTS.mozilla.gfx += [
      "Types.h",
      "UserData.h",
  ]
 +EXPORTS.mozilla.gfx += ["StealthCanvasProjection.h"]  # STEALTH-HOOK(fingerprint/canvas/noise-projection)
 +EXPORTS.mozilla.gfx += ["StealthRecordedProjection.h"]  # STEALTH-HOOK(fingerprint/canvas/noise-projection)
-+EXPORTS.mozilla.gfx += ["StealthGlyphCoverage.h"]  # STEALTH-HOOK(fingerprint/fonts/metrics)
-+EXPORTS.mozilla.gfx += ["StealthRefuse.h"]  # STEALTH-HOOK(platform/declaration-gate)
+ EXPORTS.mozilla.gfx += ["StealthRefuse.h"]  # STEALTH-HOOK(platform/declaration-gate)
  
  if CONFIG["MOZ_WIDGET_TOOLKIT"] in ("cocoa", "uikit"):
-     EXPORTS.mozilla.gfx += [
-@@ -170,6 +174,8 @@ UNIFIED_SOURCES += [
+@@ -171,6 +173,7 @@ UNIFIED_SOURCES += [
      "Swizzle.cpp",
      "Types.cpp",
  ]
 +UNIFIED_SOURCES += ["StealthCanvasProjection.cpp"]  # STEALTH-HOOK(fingerprint/canvas/noise-projection)
-+UNIFIED_SOURCES += ["StealthGlyphCoverage.cpp"]  # STEALTH-HOOK(fingerprint/fonts/metrics)
  
  SOURCES += [
      "InlineTranslator.cpp",
 diff --git a/gfx/tests/gtest/moz.build b/gfx/tests/gtest/moz.build
-index ec00ffc43e7dc3dcd8ea8f224969feb9b977e7b8..56ea1ddbb02f684a57d5e0733bba013219bd4eed 100644
+index ec00ffc43e7dc3dcd8ea8f224969feb9b977e7b8..d43be641d204e593c47e6decbdc3b4d2b9ec4a61 100644
 --- a/gfx/tests/gtest/moz.build
 +++ b/gfx/tests/gtest/moz.build
-@@ -32,6 +32,9 @@ UNIFIED_SOURCES += [
+@@ -32,6 +32,7 @@ UNIFIED_SOURCES += [
      "TestVsync.cpp",
      "TestYUVtoRGB32.cpp",
  ]
 +UNIFIED_SOURCES += ["TestStealthCanvasProjection.cpp"]  # STEALTH-HOOK(fingerprint/canvas/noise-projection)
-+UNIFIED_SOURCES += ["TestStealthWebGPUDeclaration.cpp"]  # STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)
-+UNIFIED_SOURCES += ["TestStealthWebGPUExternalTexture.cpp"]  # STEALTH-HOOK(fingerprint/webgpu/external-texture-vulkan)
  
  SOURCES += [
      "SwizzleGeneric.cpp",
-@@ -42,6 +45,17 @@ if CONFIG["OS_TARGET"] != "Android":
-         "TestRect.cpp",
-     ]
- 
-+if CONFIG["MOZ_WIDGET_TOOLKIT"] == "gtk":  # STEALTH-HOOK(fingerprint/fonts/font-list)
-+
-+    UNIFIED_SOURCES += ["TestStealthFcFontList.cpp"]  # STEALTH-HOOK(fingerprint/fonts/font-list)
-+    UNIFIED_SOURCES += ["TestStealthFontMetrics.cpp"]  # STEALTH-HOOK(fingerprint/fonts/metrics)
-+    CXXFLAGS += CONFIG["CAIRO_FT_CFLAGS"]  # STEALTH-HOOK(fingerprint/fonts/font-list)
-+
-+if CONFIG["OS_TARGET"] == "WINNT":  # STEALTH-HOOK(fingerprint/fonts/bundle)
-+
-+    UNIFIED_SOURCES += ["TestStealthBundledCollection.cpp"]  # STEALTH-HOOK(fingerprint/fonts/bundle)
-+    UNIFIED_SOURCES += ["TestStealthTextQuality.cpp"]  # STEALTH-HOOK(fingerprint/fonts/metrics)
-+
- if CONFIG["OS_TARGET"] == "Darwin":
-     # Not in UNIFIED_SOURCES: MacIOSurface.h includes Carbon headers (MacTypes.h)
-     # which would make Rect/Point/Size ambiguous in all subsequent unified files.

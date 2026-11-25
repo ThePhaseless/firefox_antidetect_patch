@@ -1,5 +1,21 @@
 [
  {
+  "file": "gfx/2d/moz.build",
+  "function": "EXPORTS.mozilla.gfx += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "EXPORTS.mozilla.gfx += [\"StealthGlyphCoverage.h\"]  # STEALTH-HOOK(fingerprint/fonts/metrics)",
+  "test": "gtest:StealthGlyphCoverage.A8MaskIsOnTheLadder"
+ },
+ {
+  "file": "gfx/2d/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"StealthGlyphCoverage.cpp\"]  # STEALTH-HOOK(fingerprint/fonts/metrics)",
+  "test": "gtest:StealthGlyphCoverage.A8MaskIsOnTheLadder"
+ },
+ {
   "file": "gfx/skia/skia/src/core/SkScalerContext.cpp",
   "function": "",
   "kind": "add",
@@ -16,6 +32,22 @@
   "test": "wrapper:tests/test_a_screenshot_draws_the_text_of_the_bundled_fonts_as_the_content_does_e2e.py::test_the_text_of_a_bundled_family_is_drawn_by_the_screenshot_as_the_content_drew_it",
   "anchor": "if (!fGenerateImageFromPath) { ... } else { ... } (the block that fills the mask; the line after it is if (fMaskFilter))",
   "why": "a guard at the top or a wrap of getImage cannot run before the mask filter: with fMaskFilter the blur must act on the already quantised mask (unfilteredGlyph), while the output of getImage is already blurred; a wrap of an expression is impossible because the mask is born in three places (DirectWrite, FreeType, from a path)"
+ },
+ {
+  "file": "gfx/tests/gtest/moz.build",
+  "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
+  "kind": "add",
+  "form": "registration",
+  "line": "    UNIFIED_SOURCES += [\"TestStealthFontMetrics.cpp\"]  # STEALTH-HOOK(fingerprint/fonts/metrics)",
+  "test": "gtest:StealthFontMetrics.ClearTypeTakesTheOS2AverageUnrounded"
+ },
+ {
+  "file": "gfx/tests/gtest/moz.build",
+  "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
+  "kind": "add",
+  "form": "registration",
+  "line": "    UNIFIED_SOURCES += [\"TestStealthTextQuality.cpp\"]  # STEALTH-HOOK(fingerprint/fonts/metrics)",
+  "test": "gtest:StealthTextQuality.TheDeclarationIsReadAndTheHostIsNot"
  },
  {
   "file": "gfx/thebes/gfxDWriteFonts.cpp",
@@ -153,6 +185,14 @@
   "kind": "add",
   "form": "member",
   "line": "  mutable hb_font_t* mDesignFont = nullptr;  // STEALTH-HOOK(fingerprint/fonts/metrics)",
+  "test": "gtest:StealthFontMetrics.DesignAdvanceAtAFractionalSize"
+ },
+ {
+  "file": "gfx/thebes/moz.build",
+  "function": "include(\"/ipc/chromium/chromium-config.mozbuild\")",
+  "kind": "add",
+  "form": "unknown",
+  "line": "include(\"StealthDesignMetrics.mozbuild\")  # STEALTH-HOOK(fingerprint/fonts/metrics)",
   "test": "gtest:StealthFontMetrics.DesignAdvanceAtAFractionalSize"
  }
 ]

@@ -16,12 +16,32 @@
   "test": "gtest:StealthDocumentLanguage.TheDeclaredListBecomesTheAtomOfItsPrimaryTag"
  },
  {
-  "file": "dom/base/moz.build",
+  "file": "dom/base/nsGlobalWindowOuter.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/dom/StealthSessionDeclaration.h\"  // STEALTH-HOOK(fingerprint/locale-time/session-declaration)",
+  "test": "wrapper:tests/test_context_locale_e2e.py::test_intl_in_the_page_realm_follows_the_language_and_zone_of_its_context"
+ },
+ {
+  "file": "dom/base/nsGlobalWindowOuter.cpp",
+  "function": "static nsresult CreateNativeGlobalForInner(",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "      GetDeclaredRealmLanguage(aDocument), GetDeclaredRealmTimezone(aDocument));  // STEALTH-HOOK(fingerprint/locale-time/session-declaration)",
+  "removed": "      aDocument->GetBrowsingContext()->Top()->GetLanguageOverride(),\n      aDocument->GetBrowsingContext()->Top()->GetTimezoneOverride());",
+  "test": "wrapper:tests/test_context_locale_e2e.py::test_intl_in_the_page_realm_follows_the_language_and_zone_of_its_context",
+  "exception": "the two arguments of xpc::InitGlobalObjectOptions in CreateNativeGlobalForInner are the document's context language and zone, or the session's when the context carries none, including a document with no BrowsingContext. Mozilla's expressions dereference the context, no add-only form can substitute a value for them or stop their evaluation (arguments are evaluated before any callee of ours), and a hook before the statement cannot skip it.",
+  "reason_kind": "expression",
+  "pm": "approvato"
+ },
+ {
+  "file": "dom/base/test/gtest/moz.build",
   "function": "UNIFIED_SOURCES += [",
   "kind": "add",
   "form": "registration",
-  "line": "UNIFIED_SOURCES += [\"StealthInputEventBirth.cpp\"]  # STEALTH-HOOK(fingerprint/input/event-birth)",
-  "test": "gtest:StealthKeyBirthScope.SetNextKeyLatencyOfARealProcessorDeclaresTheNextKeyAndTheScopeTakesIt"
+  "line": "UNIFIED_SOURCES += [\"TestStealthDocumentLanguage.cpp\"]  # STEALTH-HOOK(fingerprint/locale-time/session-declaration)",
+  "test": "gtest:Intl_Locale_StealthSystemLocales.TheDeclaredListIsWhatEveryCallerOfTheSystemSees"
  },
  {
   "file": "intl/locale/OSPreferences.cpp",
@@ -48,19 +68,27 @@
   "test": "gtest:Intl_Locale_StealthSystemLocales.TheDeclaredListIsWhatEveryCallerOfTheSystemSees"
  },
  {
-  "file": "intl/locale/tests/gtest/moz.build",
+  "file": "intl/locale/moz.build",
+  "function": "EXPORTS.mozilla.intl += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "EXPORTS.mozilla.intl += [\"StealthSessionPrefs.h\"]  # STEALTH-HOOK(fingerprint/locale-time/session-declaration)",
+  "test": "gtest:Intl_Locale_StealthSystemLocales.TheDeclaredLanguageIsTheRegionalLanguage"
+ },
+ {
+  "file": "intl/locale/moz.build",
   "function": "UNIFIED_SOURCES += [",
   "kind": "add",
   "form": "registration",
-  "line": "UNIFIED_SOURCES += [\"TestStealthSystemLocales.cpp\"]  # STEALTH-HOOK(fingerprint/locale-time/session-declaration)",
-  "test": "gtest:Intl_Locale_StealthSystemLocales.TheDeclaredListIsWhatEveryCallerOfTheSystemSees"
+  "line": "UNIFIED_SOURCES += [\"StealthSessionPrefs.cpp\"]  # STEALTH-HOOK(fingerprint/locale-time/session-declaration)",
+  "test": "gtest:Intl_Locale_StealthSystemLocales.TheDeclaredLanguageIsTheRegionalLanguage"
  },
  {
   "file": "intl/locale/tests/gtest/moz.build",
   "function": "UNIFIED_SOURCES += [",
   "kind": "add",
   "form": "registration",
-  "line": "UNIFIED_SOURCES += [\"TestStealthRegionalLocales.cpp\"]  # STEALTH-HOOK(fingerprint/locale-time/language)",
-  "test": "gtest:Intl_Locale_StealthSystemLocales.TheDeclaredLanguageIsTheRegionalLanguage"
+  "line": "UNIFIED_SOURCES += [\"TestStealthSystemLocales.cpp\"]  # STEALTH-HOOK(fingerprint/locale-time/session-declaration)",
+  "test": "gtest:Intl_Locale_StealthSystemLocales.TheDeclaredListIsWhatEveryCallerOfTheSystemSees"
  }
 ]

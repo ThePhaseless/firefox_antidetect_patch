@@ -96,3 +96,15 @@ index 1f16b1042ebf1759056be5cecc1aae85faca9546..6a8603a857835daa932ab012791cd9dc
  namespace mozilla::webgl {
  
  class ShaderValidatorResults final {
+diff --git a/dom/canvas/moz.build b/dom/canvas/moz.build
+index 6635d1ba060ea11a60e04518114cac9a5f569c14..a72e9efd8b1851e1772a8d12b18b9f90eea3e82b 100644
+--- a/dom/canvas/moz.build
++++ b/dom/canvas/moz.build
+@@ -168,6 +168,7 @@ UNIFIED_SOURCES += [
+     "WebGLVertexArrayGL.cpp",
+ ]
+ UNIFIED_SOURCES += ["StealthWebGLParams.cpp"]  # STEALTH-HOOK(fingerprint/webgl/parameters)
++UNIFIED_SOURCES += ["StealthWebGLShaderLanguage.cpp"]  # STEALTH-HOOK(fingerprint/webgl/shader-language)
+ 
+ SOURCES += [
+     "MurmurHash3.cpp",

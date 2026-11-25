@@ -1,5 +1,6 @@
 {
  "modified": [
+  "dom/media/gtest/moz.build",
   "dom/media/mediacapabilities/MediaCapabilities.cpp",
   "dom/media/moz.build",
   "dom/media/platforms/PDMFactory.cpp",
@@ -17,6 +18,19 @@
   "dom/media/gtest/TestStealthMediaDeclaration.cpp": "cbb93ac92c732a322179dd4f34a1fa64be0b458dbc0578fc3a1b2fa4e4853749"
  },
  "inventory": [
+  {
+   "file": "dom/media/gtest/moz.build",
+   "category": "build",
+   "feature": "media-decode-declaration",
+   "prefs": [],
+   "added": 1,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "",
+   "notes": ""
+  },
   {
    "file": "dom/media/mediacapabilities/MediaCapabilities.cpp",
    "category": "spoof",
@@ -47,7 +61,7 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "EXPORTS += [...] and UNIFIED_SOURCES += [...] in dom/media/moz.build",
-   "notes": "",
+   "notes": "Exports StealthMediaDeclaration.h in the EXPORTS list and builds StealthMediaDeclaration.cpp in UNIFIED_SOURCES: what a page learns about decoding comes from the declaration (zoom.stealth.media.decode_support), not from the machine.",
    "verifier": {
     "changed": [],
     "why": "Checked against the diff; no change needed."

@@ -10,6 +10,18 @@ index e519ac213512690c337506d244ab0b1a304b8464..61afdb6b5420cad2766d9c879aec6ed1
   "hashbrown 0.17.1",
   "indexmap",
   "rustc-hash 1.999.999",
+diff --git a/gfx/tests/gtest/moz.build b/gfx/tests/gtest/moz.build
+index 806fc376b3dd0a6bf4f4a635f9a092ae4cc3dfae..56ea1ddbb02f684a57d5e0733bba013219bd4eed 100644
+--- a/gfx/tests/gtest/moz.build
++++ b/gfx/tests/gtest/moz.build
+@@ -34,6 +34,7 @@ UNIFIED_SOURCES += [
+ ]
+ UNIFIED_SOURCES += ["TestStealthCanvasProjection.cpp"]  # STEALTH-HOOK(fingerprint/canvas/noise-projection)
+ UNIFIED_SOURCES += ["TestStealthWebGPUDeclaration.cpp"]  # STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)
++UNIFIED_SOURCES += ["TestStealthWebGPUExternalTexture.cpp"]  # STEALTH-HOOK(fingerprint/webgpu/external-texture-vulkan)
+ 
+ SOURCES += [
+     "SwizzleGeneric.cpp",
 diff --git a/gfx/wgpu_bindings/src/lib.rs b/gfx/wgpu_bindings/src/lib.rs
 index 4a1fca82649d01062c83809a2673b38cd85f6f21..5a072f189aaf3ff726d2453b5141284de94940d6 100644
 --- a/gfx/wgpu_bindings/src/lib.rs

@@ -277,9 +277,9 @@
     "font.size.monospace.x-unicode",
     "font.size.monospace.x-western"
    ],
-   "added": 7,
-   "removed": 7,
-   "hunks": 4,
+   "added": 6,
+   "removed": 6,
+   "hunks": 3,
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "values changed in place on 2026-10-29",

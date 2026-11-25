@@ -1,5 +1,6 @@
 {
  "modified": [
+  "dom/base/test/gtest/moz.build",
   "js/src/vm/SavedStacks.cpp"
  ],
  "added": {
@@ -11,6 +12,19 @@
   "js/src/vm/StealthStackFrames.h": "34faa99be8cd4c1251fc89a4d6c1855bd92c0c49c90139c3f148322d8ea47ed0"
  },
  "inventory": [
+  {
+   "file": "dom/base/test/gtest/moz.build",
+   "category": "build",
+   "feature": "stack-hide-juggler-frames",
+   "prefs": [],
+   "added": 1,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "",
+   "notes": ""
+  },
   {
    "file": "js/src/vm/SavedStacks.cpp",
    "category": "spoof",

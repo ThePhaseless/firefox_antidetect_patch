@@ -1,6 +1,7 @@
 {
  "modified": [
   "dom/canvas/CanvasRenderingContext2D.cpp",
+  "dom/canvas/gtest/moz.build",
   "dom/canvas/nsICanvasRenderingContextInternal.h"
  ],
  "added": {
@@ -31,6 +32,19 @@
     ],
     "why": "Two evidence quotes had the wrong indentation (8 spaces, not 6); notes now say which pref StealthEngineActive() reads."
    }
+  },
+  {
+   "file": "dom/canvas/gtest/moz.build",
+   "category": "spoof",
+   "feature": "canvas-2d-text-metrics",
+   "prefs": [],
+   "added": 1,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "",
+   "notes": ""
   },
   {
    "file": "dom/canvas/nsICanvasRenderingContextInternal.h",

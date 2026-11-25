@@ -5,7 +5,8 @@
   "dom/canvas/WebGLContextFramebufferOperations.cpp",
   "dom/canvas/WebGLContextGL.cpp",
   "dom/canvas/WebGLContextValidate.cpp",
-  "dom/canvas/gtest/moz.build"
+  "dom/canvas/gtest/moz.build",
+  "dom/canvas/moz.build"
  ],
  "added": {
   "dom/canvas/StealthWebGLParams.cpp": "100644",
@@ -33,10 +34,10 @@
     "zoom.stealth.webgl2.extensions",
     "webgl.sanitize-unmasked-renderer"
    ],
-   "added": 12,
-   "removed": 2,
-   "hunks": 10,
-   "inline_logic_lines": 300,
+   "added": 4,
+   "removed": 0,
+   "hunks": 4,
+   "inline_logic_lines": 1,
    "hookable": "movable",
    "anchor": "ClientWebGLContext::GetParameter, GetShaderPrecisionFormat, ReadPixels (both forms), DoReadPixels, DoReadPixelsAsync, IsSupported, GetSupportedExtensions, BufferParameter; static LookupStealthParamEntry and GetStealthExtensionWhitelist; GetImageBuffer and GetInputStream (toDataURL/toBlob projection); comment-only hunk in GetSurfaceSnapshot",
    "notes": "This one file carries at least five features, and the feature field above only names the main one: webgl-parameters (int, float and int2 overrides in GetParameter), webgl-renderer-vendor (renderer and vendor overrides; when the pref is set the ShouldResistFingerprinting branch is skipped), webgl-shader-precision (override in GetShaderPrecisionFormat), webgl-extension-whitelist (IsSupported and GetSupportedExtensions), and canvas-noise-projection (readPixels, PBO readPixels, toDataURL/toBlob via GetImageBuffer and GetInputStream, and the async snapshot). Split per feature before hooking. The BufferParameter extraction and the DoReadPixels Maybe return are refactors that the projection needs. The extension whitelist pref is re-read and re-parsed on every IsSupported call. The array readPixels projection does one extra read (a rectangle 1px larger); the PBO path does two extra reads (a tight read, then the 1px-larger one inside StealthProjectReadPixels) and then rewrites the buffer with BufferSubData, unbinding the pack buffer during the read and re-binding it afterwards. The async projection lives here, and HTMLCanvasElement must not project it again (cross-file contract stated in HTMLCanvasElement.h). The removed comment about Mozilla plus Base64 vendor randomisation is gone. Code comments include a dated measurement note (2026-08-24).",
@@ -126,7 +127,7 @@
    "prefs": [
     "zoom.stealth.webgl.shader_precisions"
    ],
-   "added": 2,
+   "added": 1,
    "removed": 0,
    "hunks": 1,
    "inline_logic_lines": 0,
@@ -137,6 +138,19 @@
     "changed": [],
     "why": "Written with the hook, 2026-11-22."
    }
+  },
+  {
+   "file": "dom/canvas/moz.build",
+   "category": "build",
+   "feature": "webgl-parameters",
+   "prefs": [],
+   "added": 1,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "",
+   "notes": ""
   }
  ]
 }

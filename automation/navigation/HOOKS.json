@@ -28,6 +28,14 @@
   "why": "needs the local loadState, an out-parameter of CreateFromLoadURIOptions born inside the function: a guard at the top has nothing to read; a wrap of the function is impossible (the funnel is BrowsingContext::LoadURI(nsDocShellLoadState*, bool), shared by many callers that must not notify); a wrap of the creation would fire before the MALFORMED_URI/NS_FAILED checks and before SetIsCaptivePortalTab"
  },
  {
+  "file": "docshell/base/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"StealthNavigation.cpp\"]  # STEALTH-HOOK(automation/navigation)",
+  "test": "wrapper:tests/test_a_goto_to_a_refused_port_ends_with_its_reason_e2e.py::test_a_goto_to_a_refused_port_ends_with_its_reason"
+ },
+ {
   "file": "docshell/base/nsDocShell.cpp",
   "function": "",
   "kind": "add",
@@ -148,34 +156,12 @@
   "test": "gtest:TestStealthLoadInfo.EveryCopyOfALoadInfoKeepsItsLoadIdentifier"
  },
  {
-  "file": "netwerk/base/TRRLoadInfo.cpp",
-  "function": "",
+  "file": "netwerk/base/moz.build",
+  "function": "UNIFIED_SOURCES += [",
   "kind": "add",
   "form": "registration",
-  "line": "#include \"StealthLoadInfo.h\"  // STEALTH-HOOK(network/doh)",
-  "test": "gtest:TestStealthTRRContext.ATRRLoadInfoStoresWhatItIsGiven",
-  "quiet_anchor_why": {
-   "kind": "deferred",
-   "quieter": "netwerk/base/TRRLoadInfo.cpp:using namespace mozilla::dom;"
-  }
- },
- {
-  "file": "netwerk/base/TRRLoadInfo.cpp",
-  "function": "already_AddRefed<nsILoadInfo> TRRLoadInfo::Clone() const {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  static_cast<TRRLoadInfo*>(loadInfo.get())->mOriginAttributes = mOriginAttributes;  // STEALTH-HOOK(network/doh)",
-  "test": "gtest:TestStealthTRRContext.TheCloneOfATRRLoadInfoKeepsTheContext",
-  "anchor": "return loadInfo.forget(); (TRRLoadInfo::Clone)",
-  "why": "carries the context of the DNS-over-HTTPS lookup into the clone; the clone is a local of Clone"
- },
- {
-  "file": "netwerk/base/TRRLoadInfo.cpp",
-  "function": "nsresult TRRLoadInfo::SetOriginAttributes(",
-  "kind": "add",
-  "form": "guard",
-  "line": "  if (nsresult rv; StealthTRRSetOriginAttributes(mOriginAttributes, aOriginAttributes, &rv)) return rv;  // STEALTH-HOOK(network/doh)",
-  "test": "gtest:TestStealthTRRContext.ATRRLoadInfoStoresWhatItIsGiven"
+  "line": "UNIFIED_SOURCES += [\"StealthLoadInfo.cpp\"]  # STEALTH-HOOK(automation/navigation)",
+  "test": "gtest:TestStealthLoadInfo.EveryCopyOfALoadInfoKeepsItsLoadIdentifier"
  },
  {
   "file": "netwerk/base/nsILoadInfo.idl",

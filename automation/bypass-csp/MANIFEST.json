@@ -1,5 +1,6 @@
 {
  "modified": [
+  "dom/base/Document.cpp",
   "dom/security/moz.build",
   "dom/security/nsCSPUtils.cpp",
   "dom/security/nsCSPUtils.h"
@@ -11,6 +12,19 @@
   "dom/security/StealthBypassCSP.cpp": "0811859c51641bfac2b6e8d4726730c129d99aebdb7626a85dac167461fb0dc5"
  },
  "inventory": [
+  {
+   "file": "dom/base/Document.cpp",
+   "category": "spoof",
+   "feature": "bypass-csp",
+   "prefs": [],
+   "added": 1,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "",
+   "notes": ""
+  },
   {
    "file": "dom/security/moz.build",
    "category": "build",

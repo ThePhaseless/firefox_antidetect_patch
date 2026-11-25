@@ -1,9 +1,13 @@
 {
  "modified": [
+  "gfx/tests/gtest/moz.build",
   "gfx/thebes/gfxDWriteFontList.cpp",
+  "gfx/thebes/gfxDWriteFontList.h",
   "gfx/thebes/gfxFcPlatformFontList.cpp",
+  "gfx/thebes/gfxFcPlatformFontList.h",
   "gfx/thebes/gfxPlatformFontList.cpp",
-  "gfx/thebes/gfxPlatformFontList.h"
+  "gfx/thebes/gfxPlatformFontList.h",
+  "gfx/thebes/moz.build"
  ],
  "added": {
   "gfx/tests/gtest/TestStealthBundledCollection.cpp": "100644",
@@ -27,6 +31,19 @@
  },
  "inventory": [
   {
+   "file": "gfx/tests/gtest/moz.build",
+   "category": "build",
+   "feature": "font-list-bundle-only",
+   "prefs": [],
+   "added": 5,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 2,
+   "hookable": "",
+   "anchor": "",
+   "notes": ""
+  },
+  {
    "file": "gfx/thebes/gfxDWriteFontList.cpp",
    "category": "spoof",
    "feature": "font-list-bundle-only",
@@ -44,6 +61,19 @@
     ],
     "why": "The pref is one comment in the diff (not two) and upstream code in the same file reads it at lines 2180 and 2236."
    }
+  },
+  {
+   "file": "gfx/thebes/gfxDWriteFontList.h",
+   "category": "other",
+   "feature": "font-list-bundle-only",
+   "prefs": [],
+   "added": 1,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "",
+   "notes": ""
   },
   {
    "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
@@ -66,6 +96,23 @@
      "notes"
     ],
     "why": "The real pref names use an underscore (freetype_hintstyle, freetype_antialias), not a dot; checked in StaticPrefList.yaml."
+   }
+  },
+  {
+   "file": "gfx/thebes/gfxFcPlatformFontList.h",
+   "category": "other",
+   "feature": "font-list-bundle-only",
+   "prefs": [],
+   "added": 1,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 2,
+   "hookable": "already-hook",
+   "anchor": "gfxFontconfigFontEntry::gfxFontconfigFontEntry (explicit constructor for data fonts)",
+   "notes": "Adds defaulted aFile and aIndex arguments, so upstream data-font callers compile unchanged. The bundle path passes both. Comment cross-references [B154].",
+   "verifier": {
+    "changed": [],
+    "why": "Checked category, feature, prefs, anchor, evidence and notes against the diff; no correction needed."
    }
   },
   {
@@ -108,6 +155,19 @@
     ],
     "why": "The diff adds one stray blank line outside comments, not two."
    }
+  },
+  {
+   "file": "gfx/thebes/moz.build",
+   "category": "build",
+   "feature": "font-list-bundle-only",
+   "prefs": [],
+   "added": 1,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 1,
+   "hookable": "",
+   "anchor": "",
+   "notes": ""
   }
  ]
 }

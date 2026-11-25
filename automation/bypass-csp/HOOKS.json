@@ -1,5 +1,15 @@
 [
  {
+  "file": "dom/base/Document.cpp",
+  "function": "nsresult Document::InitCSP(nsIChannel* aChannel) {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  if (CSP_IsBypassedFor(*this)) return NS_OK;  // STEALTH-HOOK(automation/bypass-csp)",
+  "test": "wrapper:tests/test_bypass_csp_e2e.py::test_bypass_csp_lifts_the_page_policy_and_its_absence_keeps_it",
+  "anchor": "the block `if (principal->IsSystemPrincipal() ...) {...}` of Document::InitCSP (the statement just before)",
+  "why": "an early return that must come after the baseline CSP block, which still runs even when the automation lifts the page's policies; a guard at the head of the function would skip it"
+ },
+ {
   "file": "dom/security/moz.build",
   "function": "UNIFIED_SOURCES += [",
   "kind": "add",

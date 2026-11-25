@@ -5,7 +5,8 @@
   "dom/canvas/WebGLShader.cpp",
   "dom/canvas/WebGLShader.h",
   "dom/canvas/WebGLShaderValidator.cpp",
-  "dom/canvas/WebGLShaderValidator.h"
+  "dom/canvas/WebGLShaderValidator.h",
+  "dom/canvas/moz.build"
  ],
  "added": {
   "dom/canvas/StealthWebGLShaderLanguage.cpp": "100644",
@@ -124,6 +125,19 @@
     "changed": [],
     "why": "Checked against the diff; no correction needed."
    }
+  },
+  {
+   "file": "dom/canvas/moz.build",
+   "category": "build",
+   "feature": "webgl-shader-output-language",
+   "prefs": [],
+   "added": 1,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "",
+   "notes": ""
   }
  ]
 }

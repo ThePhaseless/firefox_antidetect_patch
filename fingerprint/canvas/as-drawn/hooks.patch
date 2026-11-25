@@ -1,3 +1,28 @@
+diff --git a/dom/html/HTMLCanvasElement.h b/dom/html/HTMLCanvasElement.h
+index 4280abcde7c0449e3c6ce5ddd5b4e6664dc0c628..0cbe628a4797ed0d5cf2f67162f83da06127cccf 100644
+--- a/dom/html/HTMLCanvasElement.h
++++ b/dom/html/HTMLCanvasElement.h
+@@ -225,6 +225,8 @@ class HTMLCanvasElement final : public nsGenericHTMLElement,
+       gfxAlphaType* aOutAlphaType = nullptr,
+       gfx::DrawTarget* aTarget = nullptr);
+ 
++  already_AddRefed<gfx::SourceSurface> StealthGetSurfaceSnapshot(uint32_t aSurfaceFlags, gfxAlphaType* aOutAlphaType = nullptr, gfx::DrawTarget* aTarget = nullptr);  // STEALTH-HOOK(fingerprint/canvas/as-drawn)
++
+   using SurfaceSnapshotPromise =
+       MozPromise<RefPtr<gfx::SourceSurface>, nsresult, true>;
+ 
+diff --git a/layout/base/gtest/moz.build b/layout/base/gtest/moz.build
+index 44f6c56d852b2d71f49830627837f750fd922634..50d00e67fb317760ffea7bdfbd6019a8215930ff 100644
+--- a/layout/base/gtest/moz.build
++++ b/layout/base/gtest/moz.build
+@@ -9,6 +9,7 @@ UNIFIED_SOURCES += [
+     "TestUniqueOrNonOwningPtr.cpp",
+ ]
+ UNIFIED_SOURCES += ["TestStealthJugglerMouseAck.cpp"]  # STEALTH-HOOK(automation/input)
++UNIFIED_SOURCES += ["TestStealthSurfaceFlags.cpp"]  # STEALTH-HOOK(fingerprint/canvas/as-drawn)
+ 
+ # THE MOCK_METHOD2 macro from gtest triggers this clang warning and it's hard
+ # to work around, so we just ignore it.
 diff --git a/layout/base/nsLayoutUtils.cpp b/layout/base/nsLayoutUtils.cpp
 index ef125f0123d9949a8f65a5b3de7ad65b62ddd18b..955d882a7018b302a87c480f0c763caa274b62af 100644
 --- a/layout/base/nsLayoutUtils.cpp

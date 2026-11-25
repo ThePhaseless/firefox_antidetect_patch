@@ -1,3 +1,23 @@
+diff --git a/gfx/2d/moz.build b/gfx/2d/moz.build
+index 97c80d37f7b8f828d483a8e1bfc0bf34abc9d246..ff5ac016d4024828019006727a67a415e0acce9d 100644
+--- a/gfx/2d/moz.build
++++ b/gfx/2d/moz.build
+@@ -62,6 +62,7 @@ EXPORTS.mozilla.gfx += [
+ ]
+ EXPORTS.mozilla.gfx += ["StealthCanvasProjection.h"]  # STEALTH-HOOK(fingerprint/canvas/noise-projection)
+ EXPORTS.mozilla.gfx += ["StealthRecordedProjection.h"]  # STEALTH-HOOK(fingerprint/canvas/noise-projection)
++EXPORTS.mozilla.gfx += ["StealthGlyphCoverage.h"]  # STEALTH-HOOK(fingerprint/fonts/metrics)
+ EXPORTS.mozilla.gfx += ["StealthRefuse.h"]  # STEALTH-HOOK(platform/declaration-gate)
+ 
+ if CONFIG["MOZ_WIDGET_TOOLKIT"] in ("cocoa", "uikit"):
+@@ -174,6 +175,7 @@ UNIFIED_SOURCES += [
+     "Types.cpp",
+ ]
+ UNIFIED_SOURCES += ["StealthCanvasProjection.cpp"]  # STEALTH-HOOK(fingerprint/canvas/noise-projection)
++UNIFIED_SOURCES += ["StealthGlyphCoverage.cpp"]  # STEALTH-HOOK(fingerprint/fonts/metrics)
+ 
+ SOURCES += [
+     "InlineTranslator.cpp",
 diff --git a/gfx/skia/skia/src/core/SkScalerContext.cpp b/gfx/skia/skia/src/core/SkScalerContext.cpp
 index 85edc26a3f7930ec9ffff752141ffacb881e7e23..fc723ae64a416c7f067590a156a983fff4a01477 100644
 --- a/gfx/skia/skia/src/core/SkScalerContext.cpp
@@ -20,6 +40,25 @@ index 85edc26a3f7930ec9ffff752141ffacb881e7e23..fc723ae64a416c7f067590a156a983ff
      if (fMaskFilter) {
          // k3D_Format should not be mask filtered.
          SkASSERT(SkMask::k3D_Format != unfilteredGlyph->fMaskFormat);
+diff --git a/gfx/tests/gtest/moz.build b/gfx/tests/gtest/moz.build
+index 63c31d0b5b13e44c003fa793d4f503709139b35f..6e5fc96e0c3a3df348f17fbfe37bc3d1b30f6564 100644
+--- a/gfx/tests/gtest/moz.build
++++ b/gfx/tests/gtest/moz.build
+@@ -46,11 +46,14 @@ if CONFIG["OS_TARGET"] != "Android":
+ if CONFIG["MOZ_WIDGET_TOOLKIT"] == "gtk":  # STEALTH-HOOK(fingerprint/fonts/font-list)
+ 
+     UNIFIED_SOURCES += ["TestStealthFcFontList.cpp"]  # STEALTH-HOOK(fingerprint/fonts/font-list)
++    UNIFIED_SOURCES += ["TestStealthFontMetrics.cpp"]  # STEALTH-HOOK(fingerprint/fonts/metrics)
+     CXXFLAGS += CONFIG["CAIRO_FT_CFLAGS"]  # STEALTH-HOOK(fingerprint/fonts/font-list)
+ 
+ if CONFIG["OS_TARGET"] == "WINNT":  # STEALTH-HOOK(fingerprint/fonts/bundle)
+ 
+     UNIFIED_SOURCES += ["TestStealthBundledCollection.cpp"]  # STEALTH-HOOK(fingerprint/fonts/bundle)
++    UNIFIED_SOURCES += ["TestStealthTextQuality.cpp"]  # STEALTH-HOOK(fingerprint/fonts/metrics)
++
+ if CONFIG["OS_TARGET"] == "Darwin":
+     # Not in UNIFIED_SOURCES: MacIOSurface.h includes Carbon headers (MacTypes.h)
+     # which would make Rect/Point/Size ambiguous in all subsequent unified files.
 diff --git a/gfx/thebes/gfxDWriteFonts.cpp b/gfx/thebes/gfxDWriteFonts.cpp
 index ce52760aeeed01b32648a6d9164cf9384acf3889..846579f800beee95d1701c44e5ff8912d0cbd97f 100644
 --- a/gfx/thebes/gfxDWriteFonts.cpp
@@ -179,3 +218,15 @@ index e6d43b6a3998fc2a1905b9da680f0ac544d413b1..a8e42bd9c715c6f67eac3432e621c56d
  
    // Held for the duration of ShapeText(): the shaper (and its hb_buffer_t)
    // is shared across threads via the global gfxFontCache, so concurrent
+diff --git a/gfx/thebes/moz.build b/gfx/thebes/moz.build
+index 014cedeab619e028a99f531be42071ccbbe6d704..f07fd5d96ae22e8d27a2acf8880881d7f5daf957 100644
+--- a/gfx/thebes/moz.build
++++ b/gfx/thebes/moz.build
+@@ -246,6 +246,7 @@ include("/ipc/chromium/chromium-config.mozbuild")
+ include("StealthDeclarationGate.mozbuild")  # STEALTH-HOOK(platform/declaration-gate)
+ include("StealthBundleFontList.mozbuild")  # STEALTH-HOOK(fingerprint/fonts/bundle)
+ include("StealthFcFontList.mozbuild")  # STEALTH-HOOK(fingerprint/fonts/font-list)
++include("StealthDesignMetrics.mozbuild")  # STEALTH-HOOK(fingerprint/fonts/metrics)
+ 
+ FINAL_LIBRARY = "xul"
+ 
