@@ -12,6 +12,10 @@
 #
 # Same single-source-of-truth drive logic as release.yml: scripts/ci_drive_gate.py.
 # Headless, no screenshot → GPU-free. Zero proxy / zero secrets.
+#
+# NO LEG READS A MIRROR (ci-03): the Python packages come from the wheelhouse of the job `py-deps-assets` (py-deps.yml, from the wrapper's gate lock
+# ci/py-lock/gate.txt at main: every file hash-checked) and are installed offline; the Ubuntu packages of Firefox's runtime come from the job `linux-deps-assets`
+# (linux-deps.yml: the roots of `playwright install-deps firefox`, read from the locked Playwright's table), installed by name with --no-download.
 # ─────────────────────────────────────────────────────────────────────────────
 name: verify-assets
 
@@ -30,8 +34,29 @@ permissions:
   contents: write
 
 jobs:
+  # The wrapper checked out below is main's, so the lock is main's too.
+  py-deps-assets:
+    name: py-deps-assets
+    permissions: { contents: read }
+    uses: ./.github/workflows/py-deps.yml
+    with:
+      name: assets
+      python: "3.11"
+      lock_repository: oss-invisible/playwright
+      lock_ref: main
+      lock: ci/py-lock/gate.txt
+      runners: '["ubuntu-24.04", "windows-latest"]'
+  linux-deps-assets:
+    name: linux-deps-assets
+    permissions: { contents: read }
+    uses: ./.github/workflows/linux-deps.yml
+    with:
+      name: assets
+      playwright_wrapper_ref: main
+
   drive:
     name: drive-${{ matrix.leg }}
+    needs: [py-deps-assets, linux-deps-assets]
     runs-on: ${{ matrix.runner }}
     # TEMP and TMP on D:\a\_temp (the runner's temp folder): the Firefox profiles land in TEMP and on C: they saturate the disk (queue up to 144,
     # latencies up to 4 s, parent main thread still 40-60 s). On the job, not in a step: `runner.temp` is not readable in a job's `env`.
@@ -82,13 +107,36 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with: { python-version: '3.11' }
-      - name: Install Playwright driver (no bundled browser — we override executable_path)
-        # Single-source pin (see release.yml); the drive gate enforces juggler compat.
+      - name: The wheelhouse of the run's py-deps-assets job
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: py-deps-assets-${{ matrix.kind == 'win' && 'windows' || 'linux' }}
+          path: ${{ runner.temp }}/py-deps
+      - name: Install Playwright driver (no bundled browser — we override executable_path), from the wheelhouse alone (no index)
+        # Single-source pin (scripts/playwright_pin.txt, which the lock follows); the drive gate enforces juggler compat.
         shell: bash
-        run: python -m pip install --quiet "playwright==$(cat scripts/playwright_pin.txt)"
+        run: python -m pip install --quiet --no-index --find-links "$RUNNER_TEMP/py-deps" --require-hashes -r "$RUNNER_TEMP/py-deps/lock.txt"
+      - name: The Linux packages (the run's linux-deps-assets job, no mirror)
+        if: matrix.kind == 'linux'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ${{ needs.linux-deps-assets.outputs.artifact }}
+          path: /tmp/linux-deps
       - name: Linux system deps for headless firefox
         if: matrix.kind == 'linux'
-        run: sudo "$(which python)" -m playwright install-deps firefox
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The run's linux-deps repository and nothing else: apt reads only its sources list and lists folder, the files are already in apt's archives,
+          # and the roots are installed by name with --no-download: a package the repository does not hold is named here and red, never fetched.
+          read -r OS VER < /tmp/linux-deps/image.txt
+          echo "the repository was read on $OS $VER; this runner is $ImageOS $ImageVersion"
+          sudo mkdir -p /tmp/linux-deps-apt/lists/partial /tmp/linux-deps-apt/parts
+          echo "deb [trusted=yes] file:/tmp/linux-deps ./" | sudo tee /tmp/linux-deps-apt/sources.list >/dev/null
+          APT="-o Dir::Etc::SourceList=/tmp/linux-deps-apt/sources.list -o Dir::Etc::SourceParts=/tmp/linux-deps-apt/parts -o Dir::State::Lists=/tmp/linux-deps-apt/lists -o Acquire::Languages=none"
+          sudo apt-get $APT update
+          sudo cp /tmp/linux-deps/*.deb /var/cache/apt/archives/
+          sudo apt-get $APT install -y --no-download --no-install-recommends $(cat /tmp/linux-deps/roots.txt)
       - name: Extract + locate firefox binary
         shell: bash
         run: |

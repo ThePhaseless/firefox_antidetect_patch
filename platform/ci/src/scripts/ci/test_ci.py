@@ -400,7 +400,7 @@ def main() -> int:
     import subprocess
     import sccache_build as sb
 
-    def fake_build(tmp, check_fails=False, cached=False, patches=("0002-b.patch", "0001-a.patch")):
+    def fake_build(tmp, check_fails=False, cached=False, patches=("0002-b.patch", "0001-a.patch"), head=None, tag="v0.18.0"):
         pdir, out, calls = tmp / "patches", tmp / "bin", []
         pdir.mkdir()
         for name in patches:
@@ -409,18 +409,22 @@ def main() -> int:
             out.mkdir()
             (out / sb.binary_name()).write_bytes(b"BIN")
 
-        def run(cmd, check=True, env=None):
+        def run(cmd, check=True, env=None, **kw):
             calls.append(cmd)
             if check_fails and "--check" in cmd:
                 raise subprocess.CalledProcessError(1, cmd)
+            if "rev-parse" in cmd:
+                return subprocess.CompletedProcess(cmd, 0, stdout=(head or sb.COMMITS["v0.18.0"]) + chr(10))
+            if "init" in cmd:
+                (Path(cmd[cmd.index("-C") + 1]) / ".git").mkdir(exist_ok=True)
             if cmd[0] == "cargo":
                 release = Path(cmd[cmd.index("--manifest-path") + 1]).parent / "target" / "release"
                 release.mkdir(parents=True)
                 (release / sb.binary_name()).write_bytes(b"BIN")
             return subprocess.CompletedProcess(cmd, 0)
         try:
-            exe = sb.build("v0.18.0", pdir, out, run)
-        except (subprocess.CalledProcessError, ValueError) as exc:
+            exe = sb.build(tag, pdir, out, run)
+        except (subprocess.CalledProcessError, ValueError, RuntimeError) as exc:
             exe = exc
         return exe, calls
     with tempfile.TemporaryDirectory() as t:
@@ -430,11 +434,25 @@ def main() -> int:
     with tempfile.TemporaryDirectory() as t:
         exe, calls = fake_build(Path(t))
         applied = [Path(c[-1]).name for c in calls if c[:1] == ["git"] and "apply" in c and "--check" not in c]
-        cases.append(("sccache: cloned at the pinned tag with LF kept, every patch checked then applied in order, built --locked",
+        cases.append(("sccache: fetched at the pinned commit with LF kept, every patch checked then applied in order, built --locked",
                       isinstance(exe, Path) and exe.is_file()
-                      and calls[0][:3] == ["git", "-c", "core.autocrlf=false"] and "v0.18.0" in calls[0]
+                      and calls[0][:3] == ["git", "-c", "core.autocrlf=false"]
                       and applied == ["0001-a.patch", "0002-b.patch"]
                       and calls[-1][:2] == ["cargo", "build"] and "--locked" in calls[-1]))
+        fetches = [c for c in calls if "fetch" in c]
+        cases.append(("sccache: the source is fetched by the 40-hex commit written in the script (git fetch --depth 1 URL <sha>, checkout FETCH_HEAD), never cloned by a tag (ci-03)",
+                      len(fetches) == 1 and fetches[0][-2:] == [sb.URL, "01c35e69b97f516c2ebfbdb418b5cd6277bde280"] and "--depth" in fetches[0]
+                      and sb.COMMITS == {"v0.18.0": "01c35e69b97f516c2ebfbdb418b5cd6277bde280"}
+                      and not any("clone" in c or "--branch" in c or "v0.18.0" in c for c in calls)
+                      and any("checkout" in c and "FETCH_HEAD" in c for c in calls)))
+    with tempfile.TemporaryDirectory() as t:
+        exe, calls = fake_build(Path(t), head="0" * 40)
+        cases.append(("sccache: a checkout that is not the pinned commit is a refusal before any patch or build",
+                      isinstance(exe, RuntimeError) and not any(c[0] == "cargo" or "apply" in c for c in calls)))
+    with tempfile.TemporaryDirectory() as t:
+        exe, calls = fake_build(Path(t), tag="v9.9.9")
+        cases.append(("sccache: a tag with no commit pinned in the script is refused, nothing fetched",
+                      isinstance(exe, ValueError) and calls == []))
     with tempfile.TemporaryDirectory() as t:
         exe, calls = fake_build(Path(t), check_fails=True)
         cases.append(("sccache: a patch that no longer applies is a refusal, never a binary without it",
@@ -451,7 +469,8 @@ def main() -> int:
     pinned = re.search(r'SCCACHE_PINNED_VERSION=(\S+)"', rel).group(1)
     cases.append(("sccache: built, never downloaded, at the pinned version, keyed by its patches",
                   "sccache-action" not in rel and "sccache-build --tag v%s " % pinned in rel
-                  and "hashFiles('scripts/ci/sccache/*.patch')" in rel and "-v%s-" % pinned in rel))
+                  and "hashFiles('scripts/ci/sccache/*.patch', 'scripts/ci/sccache_build.py')" in rel and "-v%s-" % pinned in rel
+                  and "v%s" % pinned in sb.COMMITS))
     cases.append(("input watch: the build verifies the profile strictly", "--verify --strict" in rel))
     try:
         import yaml
@@ -588,6 +607,60 @@ def main() -> int:
                       and len(check(good.splitlines()[0])) == 1
                       and "prove(lib," in (HERE / "lavapipe_build.py").read_text(encoding="utf-8")
                       and all((lvp / "proof" / f).is_file() for f in ("proof.c", "big.comp", "many.vert", "many.frag"))))
+        # ci-03: Mesa's build tools come from the wheelhouse of scripts/ci/locks/lavapipe.txt, offline and by hash, never from the index.
+        import subprocess as _sp
+        lock_a = lvp.parent / "locks" / "lavapipe.txt"
+        lvp_build = steps.get("WebGPU's Vulkan driver (linux-x86_64) - build", {})
+        with tempfile.TemporaryDirectory() as t:
+            fake = Path(t)
+            (fake / "VERSIONS.json").write_text("{}", encoding="utf-8")
+            (fake / "a.lock").write_text("meson==1 --hash=sha256:" + "a" * 64, encoding="utf-8")
+            (fake / "b.lock").write_text("meson==1 --hash=sha256:" + "b" * 64, encoding="utf-8")
+            (fake / "proof").mkdir()
+            key_a = lavapipe_build.inputs_key("clang", fake / "VERSIONS.json", fake, pip_lock=fake / "a.lock")
+            key_b = lavapipe_build.inputs_key("clang", fake / "VERSIONS.json", fake, pip_lock=fake / "b.lock")
+            no_house, empty_house, seen = [], [], []
+
+            def fake_run(cmd, check=True, **kw):
+                seen.append(cmd)
+                if cmd[-1] == "--version" and "clang" in cmd[0]:
+                    return _sp.CompletedProcess(cmd, 0, stdout="clang version 22.1.8\n")
+                if cmd[0] == "glslangValidator":
+                    return _sp.CompletedProcess(cmd, 0, stdout="Glslang Version: 11:14.0.0\n")
+                if cmd[:1] == ["git"] and "init" in cmd:
+                    raise KeyboardInterrupt("stop after the build tools")
+                return _sp.CompletedProcess(cmd, 0, stdout="")
+            for house, into in ((None, no_house), (fake / "nothing", empty_house)):
+                try:
+                    lavapipe_build.build(fake / "out", fake / "clang", fake / "sysroot", 1, run=fake_run, pip_house=house)
+                except ValueError as exc:
+                    into.append(str(exc))
+            ran_before_refusal = list(seen)
+            (fake / "house").mkdir()
+            (fake / "house" / "lock.txt").write_text("x", encoding="utf-8")
+            try:
+                lavapipe_build.build(fake / "out", fake / "clang", fake / "sysroot", 1, run=fake_run, pip_house=fake / "house")
+            except KeyboardInterrupt:
+                pass
+            pip_calls = [c for c in seen if len(c) > 1 and c[1] == "install"]
+        command = lavapipe_build.pip_install_command(Path("venv"), Path("house"))
+        source = (HERE / "lavapipe_build.py").read_text(encoding="utf-8")
+        cases.append(("ci-03: lavapipe's build tools are installed from the lock's wheelhouse (--no-index --find-links HOUSE --require-hashes -r scripts/ci/locks/lavapipe.txt), never by name from the index",
+                      all(f in command for f in ("--no-index", "--find-links", "--require-hashes")) and command[command.index("--find-links") + 1] == str(Path("house"))
+                      and command[-2:] == ["-r", str(lock_a)] and not any("==" in c for c in command)
+                      and len(pip_calls) == 1 and "--no-index" in pip_calls[0] and "--require-hashes" in pip_calls[0]
+                      and '"%s==%s" % kv' not in source and 'versions["pip"]' not in source))
+        cases.append(("ci-03: a lavapipe build without its wheelhouse is refused before anything runs but the compiler's version (none given, or one with no lock.txt)",
+                      len(no_house) == 1 and len(empty_house) == 1 and "wheelhouse" in no_house[0] and "wheelhouse" in empty_house[0]
+                      and not any("venv" in c or c[0] == "glslangValidator" for c in ran_before_refusal)))
+        cases.append(("ci-03: the exact files of the build tools are in lavapipe's cache key (another lock, another library), and the lock is the one VERSIONS.json's pins make",
+                      key_a != key_b and lock_a.is_file() and lavapipe_build.PIP_LOCK == lock_a
+                      and "scripts/ci/py_deps.py" in lock_a.read_text(encoding="utf-8").splitlines()[0]
+                      and all(("%s==%s" % kv) in lock_a.read_text(encoding="utf-8") for kv in pins["pip"].items())))
+        cases.append(("ci-03: the lavapipe step of the build job hands the build the wheelhouse of its own py-deps job, downloaded before it",
+                      '--pip-house "$RUNNER_TEMP/py-deps-lavapipe"' in lvp_build.get("run", "")
+                      and any(st.get("with", {}).get("name") == "py-deps-build-lavapipe-linux" and "download-artifact" in st.get("uses", "") for st in build_steps)
+                      and [n for n in names if "py-deps-build-lavapipe job" in n] and names.index("The wheelhouse of the run's py-deps-build-lavapipe job") < names.index(lvp_build["name"])))
         # WebGL's GL on Linux: llvmpipe behind EGL from lavapipe's tree, never
         # the host's (before, the host's Mesa or GPU driver decided the served
         # extensions and every pixel).
@@ -692,7 +765,7 @@ def main() -> int:
         cases += found
     # A floor per module: one that returns fewer cases than it had (an emptied list, a stopped import) is red, not a shorter green. Raise a floor by
     # hand when a case is added; lower it never.
-    floors = {"test_release_checks": 94, "test_gate_geoip": 5, "test_gate_security_state": 10, "test_gate_protocol_mirror": 4, "test_workflow_steps_bind": 18, "test_gate_windows_temp": 21, "test_gate_legs": 73, "test_latitude_node": 357, "test_xpcshell_run": 132, "test_ab_package": 47, "test_cargo_junit": 12, "test_junit_legs": 25, "test_py_junit": 11, "test_py_deps": 55, "test_hook_tests_judge_job": 16}
+    floors = {"test_release_checks": 97, "test_gate_geoip": 5, "test_gate_security_state": 10, "test_gate_protocol_mirror": 4, "test_workflow_steps_bind": 18, "test_gate_windows_temp": 21, "test_gate_legs": 95, "test_latitude_node": 361, "test_xpcshell_run": 132, "test_ab_package": 47, "test_cargo_junit": 12, "test_junit_legs": 25, "test_py_junit": 11, "test_py_deps": 55, "test_hook_tests_judge_job": 16, "test_release_builder": 98}
     short = {name: (len(parts[name]), floor) for name, floor in floors.items() if len(parts[name]) < floor}
     cases.append(("the modules this file runs still bring their cases (a floor each)%s" % ("" if not short else ": fewer than the floor: %s" % short), not short))
 

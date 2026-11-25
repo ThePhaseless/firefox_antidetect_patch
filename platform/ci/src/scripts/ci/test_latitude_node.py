@@ -774,7 +774,8 @@ def group_bootstrap():
                 bootstrap.count("apt-get update -qq -o APT::Update::Error-Mode=any") == 1 and "apt-get update -qq\n" not in bootstrap))
     out.append(("bootstrap: every download by version and sha256, nothing else fetched, the runner's version pinned",
                 all(v in bootstrap for v in ("RUNNER_VERSION=", "RUNNER_SHA256=", "NODE_SHA256=", "RUSTUP_SHA256=", "GLSLANG_SHA256="))
-                and bootstrap.count("fetch \"https://") == 2 and bootstrap.count('fetch "$(asset_api_url ') == 1 and bootstrap.count('fetch "$GLSLANG_URL" "$GLSLANG_SHA256"') == 1
+                and bootstrap.count("fetch \"https://") == 2 and bootstrap.count('fetch "$(asset_api_url ') == 2 and bootstrap.count('fetch "$GLSLANG_URL" "$GLSLANG_SHA256"') == 1
+                and bootstrap.count("CPYTHON=(") == 1 and bootstrap.count('fetch "$(asset_api_url actions/python-versions') == 1
                 and "cmake -S" not in bootstrap and "KhronosGroup" not in bootstrap))
     as_runner = next(l for l in bootstrap.splitlines() if l.startswith("as_runner()"))
     out.append(("bootstrap: its checks see the PATH the job will have, where glslang 14 comes before Ubuntu's 11.8",
@@ -1303,7 +1304,9 @@ def group_node_deps():
                 'RUNNER_FILE="actions-runner-linux-x64-$RUNNER_VERSION.tar.gz"' in bootstrap
                 and 'fetch "$(asset_api_url actions/runner "v$RUNNER_VERSION" "$RUNNER_FILE")"' in bootstrap
                 and 'fetch "$GLSLANG_URL" "$GLSLANG_SHA256" /tmp/glslang.tar "$GLSLANG_WEB_URL"' in bootstrap
-                and bootstrap.count("releases/download") == 2
+                and bootstrap.count("releases/download") == 3
+                and 'fetch "$(asset_api_url actions/python-versions "$release" "$file")" "$3" /tmp/cpython.tar.gz' in bootstrap
+                and '"https://github.com/actions/python-versions/releases/download/$release/$file"' in bootstrap
                 and '-H "Accept: application/octet-stream"' in fetch and 'for url in ${1:+"$1"} ${4:+"$4"}' in fetch
                 and "for round in 1 2 3" in fetch and fetch.index("sha256sum -c") < fetch.index("return 0")))
     out.append(("node deps: python3 and curl, which read the API's answer, are installed by the apt step (PACKAGES), before the first lookup, and the lookup is one call without a token",
@@ -3025,11 +3028,66 @@ def group_node_hardening():
     return out
 
 
-GROUPS = [group_prefetch, group_node_deps, group_node_bootstrap_closure, group_closure, group_node_job, group_node_deps_apt, group_runner_isolated, group_turning_on, group_no_fallback, group_two_runs, group_off, group_stop_node, group_bootstrap, group_github_blip, group_false_lost,
+def group_node_cpython():
+    """ci-03: the node's CPython is the tarball its bootstrap pins by sha256 (the one actions/python-versions publishes and setup-python would download), put in the tool
+    cache where setup-python looks, so setup-python downloads nothing; the tarball's own `pip install --upgrade pip` is not run."""
+    out = []
+    bootstrap = (HERE / "node_bootstrap.sh").read_text(encoding="utf-8").replace("\r\n", "\n")
+    out.append(("node cpython: the final check of the bootstrap names a CPython that is not in the tool cache whole (the marker, the version and the modules pip and mach need)",
+                'cache="/opt/hostedtoolcache/Python/$version"' in bootstrap and '[ -f "$cache/x64.complete" ]' in bootstrap
+                and '"Python $version"' in bootstrap and "import ssl, zlib, venv, ensurepip" in bootstrap
+                and 'missing+=("CPython $version in the tool cache")' in bootstrap
+                and bootstrap.index('missing+=("CPython $version in the tool cache")') < bootstrap.index('[ "${#missing[@]}" = 0 ]')))
+    if not sys.platform.startswith("linux"):
+        print("skip  node cpython: bash, Linux only")
+        return out
+    section = bootstrap[bootstrap.index("install_cpython() {"):bootstrap.index("\n}\n", bootstrap.index("install_cpython() {")) + 3]
+    fetch = bootstrap.split("fetch() {", 1)[1].split("\n}", 1)[0]
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp = Path(tmp)
+        tool_cache, release, name = tmp / "hostedtoolcache", "3.11.18-9", "python-3.11.18-linux-24.04-x64.tar.gz"
+        src = tmp / "tarball"
+        (src / "bin").mkdir(parents=True)
+        (src / "lib").mkdir()
+        (src / "bin" / "python3.11").write_text("#!/bin/sh\necho Python 3.11.18\n", newline="\n")
+        (src / "bin" / "python3.11").chmod(0o755)
+        (src / "setup.sh").write_text("echo the tarball's own installer, which runs pip\n", newline="\n")
+        (tmp / "served" / release).mkdir(parents=True)
+        subprocess.run(["tar", "-czf", str(tmp / "served" / release / name), "-C", str(src), "."], check=True)
+        digest = hashlib.sha256((tmp / "served" / release / name).read_bytes()).hexdigest()
+        text = (section.replace("/opt/hostedtoolcache", tool_cache.as_posix()).replace("/tmp/cpython.tar.gz", (tmp / "got.tar.gz").as_posix())
+                .replace('"https://github.com/actions/python-versions/releases/download/$release/$file"',
+                         '"file://%s/$release/$file"' % (tmp / "served").as_posix()))
+        header = "\n".join(["set -euo pipefail", "FETCH_PAUSE=0", 'die() { echo "node_bootstrap: ERROR: $*" >&2; exit 1; }', fetch.join(["fetch() {", "\n}"]),
+                            'as_runner() { "$@"; }', 'asset_api_url() { :; }',
+                            'install() { local a=(); while [ $# -gt 0 ]; do case "$1" in -d) shift;; -o|-g) shift 2;; *) a+=("$1"); shift;; esac; done; mkdir -p "${a[@]}"; }', text])
+
+        def run(*calls):
+            return subprocess.run(["bash", "-c", header + "\n" + "\n".join(calls)], capture_output=True, text=True, timeout=60)
+        root = tool_cache / "Python" / "3.11.18"
+        done = run("install_cpython 3.11.18 9 %s" % digest)
+        x64 = root / "x64"
+        out.append(("node cpython: the tarball is fetched by its pin and unpacked into Python/<version>/x64 of the tool cache, the folders and links setup.sh makes are there, "
+                    "the marker beside it, and setup.sh (which would run pip) is gone (%s)" % (done.stderr.strip()[-200:] or done.returncode),
+                    done.returncode == 0 and (root / "x64.complete").is_file() and (x64 / "bin" / "python3.11").is_file() and not (x64 / "setup.sh").exists()
+                    and (x64 / "python").is_symlink() and os.readlink(x64 / "python") == "./bin/python3.11"
+                    and (x64 / "bin" / "python").is_symlink() and os.readlink(x64 / "bin" / "python") == "python3.11"
+                    and os.readlink(x64 / "bin" / "python311") == "python3.11" and (x64 / "lib").is_dir()))
+        shutil_rm = subprocess.run(["rm", "-rf", str(tmp / "served")], check=True)
+        again = run("install_cpython 3.11.18 9 %s" % digest)
+        out.append(("node cpython: a version already complete is left as it is, with nothing fetched (the files are gone from the server, and the run is green)",
+                    again.returncode == 0 and (root / "x64.complete").is_file() and "failed" not in again.stderr))
+        wrong = run("install_cpython 3.11.19 9 %s" % ("0" * 64))
+        out.append(("node cpython: a tarball that does not match its sha256 stops the bootstrap by name and leaves no marker for that version",
+                    wrong.returncode != 0 and "does not match its sha256" in wrong.stderr and not (tool_cache / "Python" / "3.11.19" / "x64.complete").exists()))
+    return out
+
+
+GROUPS = [group_prefetch, group_node_deps,group_node_bootstrap_closure, group_closure, group_node_job, group_node_deps_apt, group_runner_isolated, group_turning_on, group_no_fallback, group_two_runs, group_off, group_stop_node, group_bootstrap, group_github_blip, group_false_lost,
           group_lost_either_order, group_two_legs, group_relaunch, group_stuck, group_watch_stages, group_sweep, group_secrets,
           group_probe, group_runner, group_cancelled_by_hand, group_runner_clock, group_same_code,
           group_workflow_steps, group_any_shape, group_clear_verdicts, group_dispatch_once, group_lingering_and_silence,
-          group_refused_job, group_address, group_host_key, group_deployment_id, group_bootstrap_retry, group_node_hardening, group_capacity_wait]
+          group_refused_job, group_address, group_host_key, group_deployment_id, group_bootstrap_retry, group_node_hardening, group_capacity_wait, group_node_cpython]
 
 
 def cases() -> list:

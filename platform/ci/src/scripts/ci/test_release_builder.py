@@ -582,6 +582,69 @@ def group_node_steps(doc, jobs, build, steps) -> list:
     tests = (HERE.parent / "ci" / "__main__.py").read_text(encoding="utf-8")
     import mozconfig
     out.append(("CPU: the node's measured limits give it all its 48 threads, and the report exists", mozconfig.node_parallel(48, 67177832448) == 48 and "cpu-report" in tests))
+    out += group_node_python(doc, jobs, build, steps)
+    return out
+
+
+def group_node_python(doc, jobs, build, steps) -> list:
+    """ci-03 on the node: its CPython is the tarball its bootstrap pins by sha256, found in the tool cache and never downloaded; its Python packages come from the
+    wheelhouses of py-deps jobs, offline; pip reads no index for the rest of the job."""
+    out = []
+    bootstrap = (HERE / "node_bootstrap.sh").read_text(encoding="utf-8").replace("\r\n", "\n")
+    pinned = re.findall(r'^  "(\d+\.\d+\.\d+) (\d+) ([0-9a-f]{64})"$', re.search(r"^CPYTHON=\((.*?)^\)", bootstrap, re.M | re.S).group(1), re.M)
+    versions = [v for v, _, _ in pinned]
+    ordered = build["steps"]
+    setups = [i for i, st in enumerate(ordered) if str(st.get("uses", "")).startswith("actions/setup-python@")]
+    asked = [ordered[i]["with"].get("python-version") for i in setups]
+    guards = [ordered[i - 1] for i in setups if i > 0]
+    out.append(("node python: the bootstrap pins CPython 3.11 and 3.12 by version, release and sha256 of the tarball actions/python-versions publishes",
+                versions == ["3.11.18", "3.12.16"] and [(r, h) for _, r, h in pinned] == [
+                    ("40260280589", "099ef30fc27f0d7067a67be5a5fb7fd66154cfa1e4186c88f71c3a3070c81abc"),
+                    ("40260402378", "dec61ed20cd3e71143f1642ef9966945dea8ae4f3e96b306205a710da4f2191a")]))
+    out.append(("node python: every setup-python step of the build job asks for one of those exact versions, never a minor to resolve to the latest, with check-latest off, "
+                "and both are asked for",
+                len(setups) == 2 and sorted(asked) == sorted(versions)
+                and all(ordered[i]["with"].get("check-latest") is False for i in setups)))
+    out.append(("node python: before each setup-python a step stops the job, by name, when the tool cache lacks that version (setup-python has no switch against a download, "
+                "and one would fetch the manifest and a tarball, and `pip install pip` after it)",
+                len(guards) == 2 and all(
+                    "x64.complete" in g.get("run", "") and "exit 1" in g.get("run", "") and "/Python/%s" % v in g.get("run", "") and "RUNNER_TOOL_CACHE:?" in g.get("run", "")
+                    and "never downloaded" in g.get("name", "") for g, v in zip(guards, asked))))
+    out.append(("node python: the bootstrap puts each tarball where setup-python looks (Python/<version>/x64 and x64.complete beside it), after fetching it by its pin, "
+                "and its own pip upgrade is not run",
+                'root="/opt/hostedtoolcache/Python/$1"' in bootstrap and 'as_runner touch "$root/x64.complete"' in bootstrap
+                and 'tar -xzf /tmp/cpython.tar.gz -C "$root/x64"' in bootstrap and not any(re.search(r"\bpip3?\b", l) for l in bootstrap.splitlines() if not l.lstrip().startswith("#"))
+                and bootstrap.index("install_cpython() {") < bootstrap.index("install_cpython $entry") < bootstrap.index('echo "== glslang')))
+    deps = {"py-deps-build-core": ("scripts/ci/locks/core-checks.txt", "build-core"), "py-deps-build-mach": ("scripts/ci/locks/mach.txt", "build-mach"),
+            "py-deps-build-lavapipe": ("scripts/ci/locks/lavapipe.txt", "build-lavapipe")}
+    condition = jobs["node"]["if"]
+    out.append(("node python: the packages come from three py-deps.yml calls (core, mach, lavapipe: Ubuntu 24.04, Python 3.11), skipped as the node is, and the build job needs all three",
+                all(name in jobs and jobs[name].get("uses") == "./.github/workflows/py-deps.yml" and jobs[name].get("if") == condition
+                    and jobs[name]["with"]["lock"] == lock and jobs[name]["with"]["name"] == artifact and jobs[name]["with"]["python"] == "3.11"
+                    and "runners" not in jobs[name]["with"] and jobs[name]["needs"] == ["plan", "checks", "still-head"]
+                    for name, (lock, artifact) in deps.items())
+                and jobs["py-deps-build-core"]["with"]["core_ref"] == "${{ needs.plan.outputs.core_ref }}"
+                and all("core_ref" not in jobs[n]["with"] for n in ("py-deps-build-mach", "py-deps-build-lavapipe"))
+                and all(n in build["needs"] for n in deps)))
+    houses = {st.get("with", {}).get("name"): st for st in ordered if str(st.get("uses", "")).startswith("actions/download-artifact@")}
+    out.append(("node python: each wheelhouse is downloaded into its own folder of the runner's temp before it is used",
+                all(houses.get("py-deps-%s-linux" % h, {}).get("with", {}).get("path") == "${{ runner.temp }}/py-deps-%s" % short
+                    for h, short in (("build-core", "core"), ("build-mach", "mach"), ("build-lavapipe", "lavapipe")))))
+    names = [st.get("name", "") for st in ordered]
+    offline = steps.get("Python packages - the wheelhouses install on this Python, and pip reads no index from here on", {})
+    first_mach = min(i for i, st in enumerate(ordered) if re.search(r"\./mach\b|scripts/ci objects|scripts/ci phase|scripts/ci/objects_first", str(st.get("run", ""))))
+    out.append(("node python: pip and uv read no index and the mach wheelhouse for every step after it, set before the first command that runs mach, and each wheelhouse is proved "
+                "installable on the node's Python first",
+                all(l in offline.get("run", "") for l in ('echo "PIP_NO_INDEX=1"', 'echo "PIP_FIND_LINKS=$RUNNER_TEMP/py-deps-mach"', 'echo "UV_NO_INDEX=1"',
+                                                         'echo "UV_FIND_LINKS=$RUNNER_TEMP/py-deps-mach"', '>> "$GITHUB_ENV"'))
+                and "--dry-run --no-index --find-links" in offline.get("run", "") and "--require-hashes" in offline.get("run", "")
+                and names.index(offline["name"]) < first_mach and max(names.index(st["name"]) for st in houses.values()) < names.index(offline["name"])))
+    core = steps.get("Install the invisible_core the page-surface gate asks for its branding", {})
+    out.append(("node python: the core of the branding gate is the wheel the resolver built from core_ref, by name from its wheelhouse, no dependency of its own, no git URL",
+                "--no-index --no-deps --find-links \"$RUNNER_TEMP/py-deps-core\" invisible_core" in core.get("run", "")
+                and "--require-hashes -r \"$RUNNER_TEMP/py-deps-core/lock.txt\"" in core.get("run", "")
+                and "git+https" not in core.get("run", "") and "git+https" not in "".join(str(st.get("run", "")) for st in ordered)
+                and not core.get("env")))
     return out
 
 
