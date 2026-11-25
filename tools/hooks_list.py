@@ -83,6 +83,7 @@ import shlex
 from pathlib import Path
 
 import hook_contract as hc
+import layout
 from failure import Failure, fail
 
 # The decisions the messages of this file name: literals, because the scan of tools/tests/test_failure_messages.py reads a literal or a
@@ -191,14 +192,86 @@ def render(entries: list) -> str:
     return json.dumps(entries, indent=1, ensure_ascii=False) + "\n"
 
 
-def write_all(root: Path) -> dict:
-    """Writes the HOOKS.json of every folder (the export and `hooks-list` both come here). -> folder -> entries."""
+def committed_entries(root: Path) -> dict:
+    """{folder: committed entries} of every HOOKS.json on disk under the series (a folder that is in SERIES or not): the hand fields the
+    export must not lose when it moves a hook's line to another folder or removes a folder. A file that is not a list is left out."""
+    root, found = Path(root), {}
+    for folder in sorted(set(layout.folders_on_disk(root)) | set(series_names(root) if (root / "SERIES").is_file() else [])):
+        path = list_path(root, folder)
+        if path.is_file():
+            data = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(data, list):
+                found[folder] = data
+    return found
+
+
+def _by_identity(entries: list) -> dict:
+    pool = {}
+    for c in entries or []:
+        if isinstance(c, dict) and all(k in c for k in ("file", "function", "kind", "line")):
+            pool.setdefault(identity(c), []).append(c)
+    return pool
+
+
+def _loose(e: dict) -> tuple:
+    """An entry without its host function: file, kind, normalized line and removed text."""
+    return (e["file"], e["kind"], hc.norm(e["line"]), hc.norm(e.get("removed", "")))
+
+
+def merge_all(generated_by_folder: dict, committed_by_folder: dict) -> dict:
+    """{folder: entries}: each generated entry with the hand fields of the committed entry of the same identity, found first in the
+    folder's own committed list (as `merge` does), then in a fallback pool of every entry that no folder's own list used, over all
+    committed lists in folder order: a hook whose line moved to another folder keeps its hand fields (test, anchor, why, exception,
+    reason_kind, pm, quiet_anchor_why, untestable). An entry is used once."""
+    own = {f: _by_identity(committed_by_folder.get(f)) for f in generated_by_folder}
+    matched = {f: [None] * len(gen) for f, gen in generated_by_folder.items()}
+    for f, gen in generated_by_folder.items():
+        for i, e in enumerate(gen):
+            same = own[f].get(identity(e))
+            if same:
+                matched[f][i] = same.pop(0)
+    spare = {}
+    for f in sorted(committed_by_folder):
+        pool = own[f] if f in own else _by_identity(committed_by_folder[f])
+        for ident, entries in pool.items():
+            spare.setdefault(ident, []).extend(entries)
+    for f, gen in generated_by_folder.items():
+        for i, e in enumerate(gen):
+            if matched[f][i] is None:
+                same = spare.get(identity(e))
+                if same:
+                    matched[f][i] = same.pop(0)
+    # A hunk header (`function`) is git's choice of a line above the hunk, and the line above a hook is another folder's hook once the
+    # file is split, so the header of a hook can change while the hook does not: the leftover entries are matched once more without it, where
+    # the pairing is not a guess (as many leftover entries as hooks to give them to, for that file, kind and text).
+    loose = {}
+    for entries in spare.values():
+        for c in entries:
+            loose.setdefault(_loose(c), []).append(c)
+    wanting = {}
+    for f, gen in generated_by_folder.items():
+        for i, e in enumerate(gen):
+            if matched[f][i] is None:
+                wanting.setdefault(_loose(e), []).append((f, i))
+    for key, places in wanting.items():
+        if len(loose.get(key, [])) == len(places):
+            for (f, i), c in zip(places, loose[key]):
+                matched[f][i] = c
+    return {f: [_with_hand_fields(e, matched[f][i]) for i, e in enumerate(gen)] for f, gen in generated_by_folder.items()}
+
+
+def write_all(root: Path, pool: dict | None = None) -> dict:
+    """Writes the HOOKS.json of every folder (the export and `hooks-list` both come here). -> folder -> entries. `pool` is
+    committed_entries(root) taken before the run (the export takes it before it removes or writes a folder); without it, the lists on disk
+    now."""
     root = Path(root)
+    pool = committed_entries(root) if pool is None else pool
+    names = folders(root)
+    merged = merge_all({f: generated(root, f) for f in names}, pool)
     counts = {}
-    for folder in folders(root):
-        entries = expected(root, folder)
-        list_path(root, folder).write_text(render(entries), encoding="utf-8", newline="")
-        counts[folder] = len(entries)
+    for folder in names:
+        list_path(root, folder).write_text(render(merged[folder]), encoding="utf-8", newline="")
+        counts[folder] = len(merged[folder])
     return counts
 
 

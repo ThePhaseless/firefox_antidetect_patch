@@ -314,7 +314,7 @@ def test_a_rule_main_does_not_know_yet_may_enter_the_debt_once():
 
 
 def test_export_and_the_command_write_the_same_list(tmp_path, monkeypatch, capsys):
-    assert "write_hooks_list()" in inspect.getsource(engine.export)
+    assert "write_hooks_list(pool)" in inspect.getsource(engine.export)
     root = series(tmp_path, pair(G1, G2))
     monkeypatch.setattr(engine, "ROOT", root)
     monkeypatch.setattr(sys, "argv", ["engine.py", "hooks-list"])
@@ -790,3 +790,114 @@ def test_a_py_reference_under_tools_tests_names_a_test_of_the_series_itself(tmp_
     for name in ("test_claude_md_is_the_tag_plus_one_line_naming_a_file_that_exists",
                  "test_readme_md_is_the_tag_plus_one_line_naming_a_file_that_exists"):
         assert hl.reference_problem(engine.ROOT, "py:tools/tests/test_repo_files_are_ours.py::" + name) is None
+
+
+# --------------------------------------------------------------------------- a hook that changes folder keeps its hand fields
+OTHER = "fingerprint/y"
+MARK_Y = "  // STEALTH-HOOK(fingerprint/y)"
+GY = "  if (StealthOnY(this, aArg)) return NS_OK;" + MARK_Y
+HAND = {"test": "gtest:StealthY.Works", "anchor": "StealthMid after int x", "why": "no form says it", "exception": "a rewrite no form can say",
+        "reason_kind": "macro", "untestable": "no host to run it on", "pm": "approvato",
+        "quiet_anchor_why": {"kind": "only-place", "why": "the only place Mozilla has it"}}
+
+
+def two_folders(tmp_path, first_patch, second_patch=None):
+    root = series(tmp_path, first_patch)
+    series(tmp_path, second_patch or "", folder=OTHER)
+    if second_patch is None:
+        (root / OTHER / "hooks.patch").unlink()
+    (root / "SERIES").write_text("%s\n%s\n" % (FOLDER, OTHER), encoding="utf-8", newline="")
+    return root
+
+
+def entry_of(root, folder, needle):
+    return next(e for e in json.loads(hl.list_path(root, folder).read_text(encoding="utf-8")) if needle in e["line"])
+
+
+def test_a_hook_whose_line_moves_to_another_folder_keeps_every_hand_field(tmp_path):
+    root = two_folders(tmp_path, pair(G1, GY))                         # the hook of y sits in the patch of x, as the series had it
+    hl.write_all(root)
+    committed = hl.load(root, FOLDER)
+    for e in committed:
+        if "StealthOnY" in e["line"]:
+            e.update(HAND)
+        else:
+            e["test"] = "gtest:StealthX.Works"
+    commit_list(root, committed)
+    before = {e["line"]: dict(e) for e in committed}
+    pool = hl.committed_entries(root)
+    set_patch(root, top(G1))                                            # the export moves the line to the patch of its marker's folder
+    (root / OTHER).mkdir(exist_ok=True)
+    (root / OTHER / "hooks.patch").write_text(top(GY, file="dom/B.cpp"), encoding="utf-8", newline="")
+    hl.write_all(root, pool)
+    moved = entry_of(root, OTHER, "StealthOnY")
+    assert {k: moved[k] for k in HAND} == HAND, "every hand field is the one the entry had in the other folder"
+    assert moved["file"] == "dom/B.cpp" and moved["line"] == before[GY.rstrip()]["line"] and moved["form"] == before[GY.rstrip()]["form"]
+    assert entry_of(root, FOLDER, "StealthOne")["test"] == "gtest:StealthX.Works"
+    assert not [e for e in hl.load(root, FOLDER) if "StealthOnY" in e["line"]], "the entry left the folder it was in"
+
+
+def test_without_the_pool_a_moved_hook_has_no_hand_fields_and_the_pool_is_taken_before_a_folder_is_removed(tmp_path):
+    root = two_folders(tmp_path, pair(G1, GY))
+    hl.write_all(root)
+    committed = hl.load(root, FOLDER)
+    for e in committed:
+        e["test"] = "gtest:Some.Test"
+    commit_list(root, committed)
+    pool = hl.committed_entries(root)
+    assert set(pool) == {FOLDER, OTHER}
+    # the folder x goes away whole; its hooks are now the ones of y
+    import shutil
+    shutil.rmtree(root / FOLDER)
+    (root / OTHER).mkdir(exist_ok=True)
+    (root / OTHER / "hooks.patch").write_text(pair(GY.replace("OnY", "TwoOnY"), GY), encoding="utf-8", newline="")
+    (root / "SERIES").write_text(OTHER + "\n", encoding="utf-8", newline="")
+    hl.write_all(root, pool)
+    assert entry_of(root, OTHER, "StealthOnY")["test"] == "gtest:Some.Test"
+    assert entry_of(root, OTHER, "StealthTwoOnY")["test"] == ""
+
+
+def test_a_leftover_entry_is_used_once(tmp_path):
+    root = two_folders(tmp_path, top(GY))
+    hl.write_all(root)
+    committed = hl.load(root, FOLDER)
+    committed[0]["test"] = "gtest:Only.Once"
+    commit_list(root, committed)
+    pool = hl.committed_entries(root)
+    set_patch(root, "")
+    (root / OTHER).mkdir(exist_ok=True)
+    again = hunk("dom/A.cpp", ["   // lead", " ", " " + FN, "+" + GY, *BODY], start=60)        # the same hook twice: one entry to give
+    (root / OTHER / "hooks.patch").write_text(top(GY) + again, encoding="utf-8", newline="")
+    hl.write_all(root, pool)
+    tests = [e["test"] for e in hl.load(root, OTHER)]
+    assert sorted(tests) == ["", "gtest:Only.Once"], tests
+
+
+def test_a_hook_whose_hunk_header_changed_keeps_its_hand_fields_when_the_pairing_is_no_guess(tmp_path):
+    root = series(tmp_path, mid(G1))
+    hl.write_all(root)
+    committed = hl.load(root, FOLDER)
+    committed[0].update(HAND)
+    commit_list(root, committed)
+    set_patch(root, hunk("dom/A.cpp", ["   int x = 1;", "+" + G1, "   DoIt(x);", "   return NS_OK;"], section="void SomethingElseAbove() {"))
+    hl.write_all(root)
+    got = hl.load(root, FOLDER)[0]
+    assert got["function"] == "void SomethingElseAbove() {" and {k: got[k] for k in HAND} == HAND
+    # two hooks of one file, kind and text, and one leftover entry: a guess, so none is given
+    root2 = series(tmp_path / "two", mid(G1))
+    hl.write_all(root2)
+    committed = hl.load(root2, FOLDER)
+    committed[0].update(HAND)
+    commit_list(root2, committed)
+    bare = ["   int x = 1;", "+" + G1, "   DoIt(x);", "   return NS_OK;"]
+    set_patch(root2, hunk("dom/A.cpp", bare, section="void One() {") + hunk("dom/A.cpp", bare, section="void Two() {", start=60))
+    hl.write_all(root2)
+    assert all(e.get("test", "") == "" for e in hl.load(root2, FOLDER))
+
+
+def test_a_moved_hook_of_the_series_as_committed_is_in_the_folder_of_its_marker():
+    root = engine.ROOT
+    for folder in hl.folders(root):
+        for e in hl.load(root, folder) or []:
+            mark = hc.marker_split(e["line"])[1]
+            assert mark in (None, folder) or (root / folder / "BACKPORT.json").exists(), (folder, e["line"])
