@@ -14,6 +14,8 @@
 
 #include "gtest/gtest.h"
 
+#include "mozilla/RefPtr.h"
+
 #include "mozilla/UntrustedModulesData.h"
 #include "mozilla/ModuleVersionInfo.h"
 #include "../../StealthOwnBinaries.h"
@@ -119,18 +121,18 @@ TEST(StealthOwnBinaries, ModuleRecordSkipsTheSignatureLookupOfTheRunningExecutab
   ASSERT_FALSE(ntdllNt.IsEmpty());
   const uint32_t beforeControl = mozilla::StealthOwnBinarySkips();
   {
-    mozilla::ModuleRecord control(ntdllNt);
-    EXPECT_NE(control.mResolvedDosName.get(), nullptr);
+    RefPtr<mozilla::ModuleRecord> control = new mozilla::ModuleRecord(ntdllNt);
+    EXPECT_NE(control->mResolvedDosName.get(), nullptr);
   }
   EXPECT_EQ(mozilla::StealthOwnBinarySkips(), beforeControl);
 
   // The running executable: the lookup is skipped, once.
   const uint32_t before = mozilla::StealthOwnBinarySkips();
-  mozilla::ModuleRecord own(exeNt);
-  ASSERT_NE(own.mResolvedDosName.get(), nullptr);
+  RefPtr<mozilla::ModuleRecord> own = new mozilla::ModuleRecord(exeNt);
+  ASSERT_NE(own->mResolvedDosName.get(), nullptr);
   EXPECT_EQ(mozilla::StealthOwnBinarySkips(), before + 1);
-  if (own.mVendorInfo.isSome()) {
-    EXPECT_TRUE(own.mVendorInfo->mSource == mozilla::VendorInfo::Source::VersionInfo)
+  if (own->mVendorInfo.isSome()) {
+    EXPECT_TRUE(own->mVendorInfo->mSource == mozilla::VendorInfo::Source::VersionInfo)
         << "the vendor of a module whose signature was not looked up came from a signature";
   }
 }
