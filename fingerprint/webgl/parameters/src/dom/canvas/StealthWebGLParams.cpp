@@ -18,7 +18,7 @@
 #include "mozilla/StaticPrefs_webgl.h"
 #include "mozilla/StaticPrefs_zoom.h"
 #include "mozilla/dom/TypedArray.h"
-#include "mozilla/dom/WEBGL_debug_renderer_infoBinding.h"
+#include "mozilla/dom/WebGLRenderingContextBinding.h"
 #include "nsDependentSubstring.h"
 
 namespace mozilla {

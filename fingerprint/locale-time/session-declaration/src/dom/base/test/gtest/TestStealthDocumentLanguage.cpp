@@ -109,16 +109,18 @@ TEST(StealthDocumentLanguage, WithNoContextTheRealmTakesTheSessionsValues)
 {
   nsAutoCString language;
   nsAutoString zone;
+  // The overload the realm's hook reads: Document::GetBrowsingContext()'s type.
+  BrowsingContext* noContext = nullptr;
   // Nothing declared (negative control for the declared case below).
-  GetDeclaredLanguage(nullptr, language);
-  GetDeclaredTimezone(nullptr, zone);
+  GetDeclaredLanguage(noContext, language);
+  GetDeclaredTimezone(noContext, zone);
   EXPECT_TRUE(language.IsEmpty());
   EXPECT_TRUE(zone.IsEmpty());
 
   DeclaredLanguage session("ja-JP, ja");
   Preferences::SetCString("juggler.timezone.override", "Asia/Tokyo");
-  GetDeclaredLanguage(nullptr, language);
-  GetDeclaredTimezone(nullptr, zone);
+  GetDeclaredLanguage(noContext, language);
+  GetDeclaredTimezone(noContext, zone);
   EXPECT_TRUE(language.EqualsLiteral("ja-JP, ja"));
   EXPECT_TRUE(zone.EqualsLiteral("Asia/Tokyo"));
   Preferences::ClearUser("juggler.timezone.override");
