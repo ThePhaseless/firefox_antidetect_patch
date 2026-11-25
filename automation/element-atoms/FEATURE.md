@@ -13,13 +13,17 @@ Xrays waived, so a page that replaced `getComputedStyle` or `getBoundingClientRe
 sees every call. Juggler runs the same sources in a sandbox of its own, through
 Xrays: the page's own functions are never called and the answer is Marionette's.
 For that it needs the table of sources, which Mozilla's module keeps in a constant
-that it does not export. The module's only change is that export.
+that it does not export. The module's only change is its last line, which hands the
+table (`ATOMS`) to a module of ours.
 
 ## Hooks in Mozilla files
 
-- `remote/marionette/atom.sys.mjs` (registration, module level, right after the closing `};` of `const ATOMS = {...}`): `export const ATOM_SOURCES = ATOMS;`. One added line, the same export as before; the three comment lines that were above it left the file (the reason is here and in the comment of `Page._elementAtom` in `juggler/content/PageAgent.js`, the only consumer: `ATOM_SOURCES[atom]` run with `Cu.evalInSandbox`). It breaks, loudly, if Mozilla renames `ATOMS`: the module then fails to load.
+- `remote/marionette/atom.sys.mjs` (anchor, the last line of the module, G33): `ChromeUtils.importESModule("resource://gre/modules/juggler/StealthAtoms.sys.mjs").stealthRegisterAtoms(ATOMS);`. One added line; `ATOMS` is the module's own constant and is read after its declaration, and nothing of Mozilla's is changed. It breaks, loudly, if Mozilla renames `ATOMS`: the module then fails to load.
+- `juggler/moz.build`: `"StealthAtoms.sys.mjs"` in the list of modules packaged under `modules/juggler`.
 - Alternative rejected: Juggler extracting the object from the text of the module. It is brittle if Mozilla regenerates the atoms.
 
 ## Our own files
 
-None: the logic is in juggler/content/PageAgent.js (folder automation/juggler).
+- `juggler/StealthAtoms.sys.mjs`: `stealthRegisterAtoms(table)` keeps the table that Marionette's module hands over, and `stealthAtomSources()` gives back the same object after making sure Marionette's module has been evaluated. Same table, same sandbox, same run.
+- `juggler/tests/element_atoms_reach_juggler_by_the_last_line_of_their_module.test.mjs`: a run of the module with a stand-in for `ChromeUtils`, a negative control, and the guards of the two lines.
+- The consumer is `juggler/content/PageAgent.js` (folder automation/juggler): `Page._elementAtom` asks `stealthAtomSources()`.

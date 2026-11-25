@@ -203,7 +203,6 @@ def test_a_backport_folder_is_exempt(tmp_path):
 
 
 # --------------------------------------------------------------------------- the debt list
-@pytest.mark.xfail(strict=True, reason="green after part 2 moves the inline logic into our code (the one T2 left: the mid-function scope of network/doh declares its anchor and why, or moves to the top)")
 def test_the_debt_as_committed_is_exactly_the_violations_of_the_series():
     # port-06 rules (C12..C15) are never debt: they are fixed by the engine change and the HOOKS.json fields
     now = sorted(v.key for v in hc.contract_violations(engine.ROOT) if v.rule not in hc.PORT06_RULES + hc.HOOK02_NEVER_DEBT)

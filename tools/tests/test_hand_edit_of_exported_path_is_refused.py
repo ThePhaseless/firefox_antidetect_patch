@@ -64,7 +64,6 @@ def edit_by_hand(root: Path):
     path.write_bytes(data)
 
 
-@pytest.mark.xfail(strict=True, reason="green after part 2 moves the inline logic into our code")
 def test_the_unedited_series_passes_check(series):
     done = check(series)
     assert done.returncode == 0, done.stdout + done.stderr

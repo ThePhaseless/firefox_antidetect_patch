@@ -446,7 +446,6 @@ def test_a_violation_is_left_out_only_when_every_hook_it_concerns_is_an_exceptio
     assert hc.contract_violations(root) == []
 
 
-@pytest.mark.xfail(strict=True, reason="green after part 2 moves the inline logic into our code")
 def test_check_prints_the_number_of_declared_exceptions(tmp_path, monkeypatch, capsys):
     root, entries = exception_series(tmp_path)
     entries[0].update(exception="why", reason_kind="expression", pm="approvato")
@@ -605,7 +604,6 @@ def test_an_untestable_without_the_pm_or_beside_a_test_is_a_failure(tmp_path):
     assert list(entries[0]) == ["file", "function", "kind", "form", "line", "test", "untestable"]
 
 
-@pytest.mark.xfail(strict=True, reason="green after part 2 moves the inline logic into our code")
 def test_check_prints_the_untestable_count(capsys, monkeypatch):
     _port06_is_not_under_test(monkeypatch)
     assert engine.check() == 0
