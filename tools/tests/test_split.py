@@ -158,9 +158,54 @@ def test_a_block_with_no_marker_is_red():
 
 
 def test_a_line_between_two_folders_hooks_is_red():
-    block = Block(3, [], 3, ["a(); // STEALTH-HOOK(fingerprint/a)", "", "b(); // STEALTH-HOOK(network/b)"])
+    block = Block(3, [], 3, ["a(); // STEALTH-HOOK(fingerprint/a)", "c();", "b(); // STEALTH-HOOK(network/b)"])
     text = one(assign("dom/x.cpp", [block], KNOWN, set()).problems)
     check_failure(text, "dom/x.cpp:5", "a line between two folders' hooks: it follows a hook of fingerprint/a and precedes one of network/b")
+
+
+def test_a_whitespace_only_line_between_two_folders_hooks_goes_with_the_hook_above():
+    for blank in ("", " ", "\t  "):
+        block = Block(3, [], 3, ["a(); // STEALTH-HOOK(fingerprint/a)", blank, "b(); // STEALTH-HOOK(network/b)"])
+        got = assign("dom/x.cpp", [block], KNOWN, set())
+        assert got.problems == [] and got.added == [[A, A, B]], repr(blank)
+    several = Block(3, [], 3, ["b(); // STEALTH-HOOK(network/b)", "", "", "a(); // STEALTH-HOOK(fingerprint/a)"])
+    assert assign("dom/x.cpp", [several], KNOWN, set()).added == [[B, B, B, A]]
+
+
+def test_a_blank_line_between_two_folders_hooks_is_in_the_patch_of_the_folder_above(tmp_path):
+    root = tmp_path / "firefox"
+    root.mkdir()
+    git(root, "init", "-q")
+    base = "".join("int v%d;\n" % n for n in range(1, 11))
+    (root / "x.cpp").write_bytes(base.encode())
+    git(root, "add", "-A")
+    git(root, "commit", "-q", "-m", "base")
+    first = git(root, "rev-parse", "HEAD").decode().strip()
+    lines = base.splitlines(keepends=True)
+    lines[4:4] = ["a(); // STEALTH-HOOK(fingerprint/a)\n", "\n", "b(); // STEALTH-HOOK(network/b)\n"]
+    (root / "x.cpp").write_bytes("".join(lines).encode())
+    git(root, "commit", "-q", "-a", "-m", "head")
+    last = git(root, "rev-parse", "HEAD").decode().strip()
+    plan = split.make_plan(root, first, last, {"x.cpp": (A, "spoof")}, KNOWN, set())
+    assert plan["x.cpp"].problems == [] and plan["x.cpp"].added == [[A, A, B]]
+    patches = split.folder_patches(root, first, last, plan, ORDER)
+    assert patches.problems == []
+    got = apply_in_order({"x.cpp": base}, patches, ORDER)
+    assert got["x.cpp"] == "".join(lines).encode()
+    assert "+\n" in patches[A].decode() and "+\n" not in patches[B].decode()
+
+
+def test_a_removed_or_added_line_that_starts_with_two_signs_is_a_line_not_a_header():
+    diff = "diff --git a/x b/x\n--- a/x\n+++ b/x\n@@ -2 +2 @@\n--- a comment\n+++i;\n"
+    block, = split.parse_blocks(diff)
+    assert block.old == ["-- a comment"] and block.new == ["++i;"]
+
+
+def test_the_diff_of_many_files_is_cut_at_its_file_headers(repo):
+    root, base, head = repo
+    both = split.diff_blocks_of(root, base, head, [F, G])
+    assert both[F] == blocks_of(repo, F) and both[G] == blocks_of(repo, G) and both[F] and both[G]
+    assert split.diff_blocks_of(root, base, head, ["dom/nothing.cpp"]) == {"dom/nothing.cpp": []}
 
 
 def test_a_rewrite_owned_by_two_folders_is_red():
@@ -270,3 +315,12 @@ def test_the_source_repository_is_not_written(repo):
     patches_of(repo)
     assert git(root, "count-objects", "-v") == before
     assert git(root, "status", "--porcelain") == b""
+
+
+def test_the_plan_of_many_files_is_two_git_commands_not_two_per_file(repo, monkeypatch):
+    root, base, head = repo
+    calls = []
+    real = subprocess.run
+    monkeypatch.setattr(split.subprocess, "run", lambda *a, **k: calls.append(a[0]) or real(*a, **k))
+    plan = split.make_plan(root, base, head, {F: (A, "spoof"), G: (A, "spoof")}, KNOWN, set())
+    assert set(plan) == {F, G} and len(calls) == 2, calls

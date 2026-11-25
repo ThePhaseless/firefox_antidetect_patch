@@ -1,9 +1,8 @@
 """One Mozilla file, several folders: each folder holds exactly the lines its marker names (rule series-01).
 
-Today export gives a modified Mozilla file whole to ONE folder, the folder of its inventory feature. Every line a hook adds carries
-`STEALTH-HOOK(<folder>)`; this module gives every changed line of a file to the folder its marker names and builds one hooks.patch per
-folder, in SERIES order, so that applying them one after the other on the tag gives the head byte for byte. Nothing here is wired into
-tools/engine.py: export calls `make_plan`, `assign` and `folder_patches`.
+Every line a hook adds carries `STEALTH-HOOK(<folder>)`; this module gives every changed line of a file to the folder its marker names and
+builds one hooks.patch per folder, in SERIES order, so that applying them one after the other on the tag gives the head byte for byte.
+tools/engine.py export calls `make_plan` and `folder_patches` (`assign` is what make_plan calls for each file).
 
     from split import assign, folder_patches, make_plan
 
@@ -13,8 +12,8 @@ assign(path, diff_blocks, folders_known, backport_folders)   pure: one file's ch
       - an added line with a marker: the folder the marker names (marker_split of tools/hook_contract.py);
       - an added line without one (a blank line, a body line of a multi-line form whose marker sits on another line): the folder of the
         marked lines next to it in the same block of added lines: the nearest marked line above and the nearest below, if they name the
-        same folder, or only one side exists. Two different folders: red, "a line between two folders' hooks". A block with no marker:
-        red, "untagged change";
+        same folder, or only one side exists. Two different folders: a whitespace-only line goes with the hook ABOVE it; any other line is
+        red, "a line between two folders' hooks". A block with no marker: red, "untagged change";
       - the removed lines of a block: the folder of the block's added lines (two folders: red, "a rewrite owned by two folders");
       - a block that only removes: the one folder the file's markers name; else the folder the marked lines of its hunk (blocks at most
         six lines apart in the tag, what a -U3 diff joins) agree on; else `file_folder` when the file has no marker at all (a Mozilla
@@ -73,7 +72,8 @@ class Block:
 
 
 def parse_blocks(diff_text: str) -> list:
-    """The Blocks of a `git diff -U0` of one file (the text of the diff, from its first line on)."""
+    """The Blocks of a `git diff -U0` of one file (the text of the diff, from its first line on). The ---/+++ header lines come before the
+    first hunk, where no block is open yet, so every line inside a hunk is a line: one that starts with -- or ++ is a removed or added line."""
     blocks = []
     for line in diff_text.split("\n"):
         m = HUNK.match(line)
@@ -82,18 +82,52 @@ def parse_blocks(diff_text: str) -> list:
             b = 1 if b is None else int(b)
             d = 1 if d is None else int(d)
             blocks.append(Block(a - 1 if b else a, [], c - 1 if d else c, []))
-        elif blocks and line[:1] == "-" and not line.startswith("---"):
+        elif blocks and line[:1] == "-":
             blocks[-1].old.append(line[1:].rstrip("\r"))
-        elif blocks and line[:1] == "+" and not line.startswith("+++"):
+        elif blocks and line[:1] == "+":
             blocks[-1].new.append(line[1:].rstrip("\r"))
     return blocks
 
 
+CHUNK = 100           # paths per git command: a long command line is refused by some systems
+
+
+def _chunks(items: list, size: int = CHUNK):
+    for i in range(0, len(items), size):
+        yield items[i:i + size]
+
+
+def _header_path(line: str) -> str:
+    """The path of a `diff --git a/<path> b/<path>` line (no renames, so both sides are the same path). A path git quotes (a quote, a
+    backslash or a control character in it) is unquoted."""
+    rest = line[len("diff --git "):]
+    if rest.startswith('"'):
+        end = 1
+        while rest[end] != '"':
+            end += 2 if rest[end] == "\\" else 1
+        text = re.sub(r"\(.)", lambda m: {"t": "\t", "n": "\n"}.get(m.group(1), m.group(1)), rest[1:end])
+        return text[2:]
+    return rest[2:2 + (len(rest) - 5) // 2]
+
+
+def diff_blocks_of(source: Path, base: str, head: str, paths: list) -> dict:
+    """{path: [Block]} of `git diff -U0 --no-renames <base> <head> -- <paths>` in the source repository (read only): one git command for
+    each CHUNK paths, the output cut at its `diff --git` lines. A path the diff does not mention has no blocks."""
+    found = {p: [] for p in paths}
+    for part in _chunks(sorted(paths)):
+        out = subprocess.run(["git", "-C", str(source), "-c", "core.quotepath=false", "diff", "-U0", "--no-renames", "--no-color", base, head,
+                              "--", *part], check=True, capture_output=True).stdout.decode("utf-8", errors="replace")
+        for section in re.split(r"(?m)^(?=diff --git )", out):
+            if section.startswith("diff --git "):
+                path = _header_path(section.split("\n", 1)[0])
+                if path in found:
+                    found[path] = parse_blocks(section)
+    return found
+
+
 def diff_blocks(source: Path, base: str, head: str, path: str) -> list:
     """parse_blocks of `git diff -U0 --no-renames <base> <head> -- <path>` in the source repository (read only)."""
-    out = subprocess.run(["git", "-C", str(source), "diff", "-U0", "--no-renames", "--no-color", base, head, "--", path],
-                         check=True, capture_output=True).stdout
-    return parse_blocks(out.decode("utf-8", errors="replace"))
+    return diff_blocks_of(source, base, head, [path])[path]
 
 
 # ---------------------------------------------------------------------------------------------------- assign
@@ -159,12 +193,14 @@ def assign(path: str, diff_blocks, folders_known, backport_folders, file_folder=
             for j in range(len(row)):
                 if row[j]:
                     continue
-                if above[j] and below[j] and above[j] != below[j]:
+                if above[j] and below[j] and above[j] != below[j] and block.new[j].strip():
                     problems.append(fail(
                         _where(path, block, j), "a line between two folders' hooks: it follows a hook of %s and precedes one of %s"
                         % (above[j], below[j]),
                         "put the marker of the folder that owns the line on it, or move it next to that folder's hook "
                         "(a blank or body line of a form goes with the form's marker, not between two folders' hooks)", RULE))
+                elif above[j] and below[j] and above[j] != below[j]:
+                    owners[j] = above[j]          # a whitespace-only line between two folders' hooks goes with the hook above it
                 else:
                     owners[j] = above[j] or below[j]
         elif block.new:
@@ -219,23 +255,27 @@ def _removal_owner(bi: int, blocks: list, marks: list, file_marks: set, file_fol
 
 def make_plan(source: Path, base: str, head: str, files: dict, folders_known, backport_folders) -> dict:
     """{path: Assignment or folder name} for `files`, {path: (folder of its inventory feature, category)}: a file of category backport,
-    or one git calls binary, goes whole to that folder; every other one is split by assign."""
+    or one git calls binary, goes whole to that folder; every other one is split by assign. Two git commands per CHUNK paths (the binary
+    list and the diff), not one per file."""
     plan = {}
-    binary = _binary_paths(source, base, head, [p for p, (_f, cat) in files.items() if cat != "backport"])
+    splittable = [p for p, (_f, cat) in files.items() if cat != "backport"]
+    binary = _binary_paths(source, base, head, splittable)
+    blocks = diff_blocks_of(source, base, head, [p for p in splittable if p not in binary])
     for path, (folder, category) in sorted(files.items()):
         if category == "backport" or path in binary:
             plan[path] = folder
         else:
-            plan[path] = assign(path, diff_blocks(source, base, head, path), folders_known, backport_folders, file_folder=folder)
+            plan[path] = assign(path, blocks[path], folders_known, backport_folders, file_folder=folder)
     return plan
 
 
 def _binary_paths(source: Path, base: str, head: str, paths: list) -> set:
-    if not paths:
-        return set()
-    out = subprocess.run(["git", "-C", str(source), "diff", "--numstat", "-z", "--no-renames", base, head, "--", *paths],
-                         check=True, capture_output=True).stdout
-    return {rec.split(b"\t", 2)[2].decode() for rec in out.split(b"\0") if rec.startswith(b"-\t-\t")}
+    found = set()
+    for part in _chunks(sorted(paths)):
+        out = subprocess.run(["git", "-C", str(source), "diff", "--numstat", "-z", "--no-renames", base, head, "--", *part],
+                             check=True, capture_output=True).stdout
+        found |= {rec.split(b"\t", 2)[2].decode() for rec in out.split(b"\0") if rec.startswith(b"-\t-\t")}
+    return found
 
 
 # ---------------------------------------------------------------------------------------------------- patches
@@ -273,19 +313,28 @@ def _state(base_lines: list, head_lines: list, assignment: Assignment, order: di
 
 def folder_patches(source: Path, base: str, head: str, plan: dict, series_order: list) -> Patches:
     """{folder: hooks.patch bytes} for `plan` (the module text says how). A file with a red assignment is left out and its reds are in
-    `.problems`; so is a file whose last state is not the head blob."""
+    `.problems`; so is a file whose last state is not the head blob. A fixed number of git commands whatever the number of files: one
+    `ls-tree` of each revision per CHUNK paths, one `cat-file --batch` for every blob read, and per folder one update-index, one
+    write-tree and one diff (the trees hold every file of the plan, so the tree after one folder is the tree before the next)."""
     order = {f: i for i, f in enumerate(series_order)}
     result = Patches()
     with tempfile.TemporaryDirectory() as tmp:
         scratch = Scratch(Path(source), Path(tmp))
-        steps = {}          # folder -> {path: (mode, oid) after the folder}
-        current = {}        # path -> (mode, oid) now (None: the file is absent)
+        usable = []
         for path, owned in sorted(plan.items()):
             if isinstance(owned, Assignment) and owned.problems:
                 result.problems += owned.problems
                 result.skipped.append(path)
-                continue
-            start, end = _entry(scratch, base, path), _entry(scratch, head, path)
+            else:
+                usable.append(path)
+        starts, ends = _entries(scratch, base, usable), _entries(scratch, head, usable)
+        splits = [p for p in usable if not isinstance(plan[p], str) and plan[p].folders]
+        blobs = scratch.blobs(sorted({e[1] for p in splits for e in (starts.get(p), ends.get(p)) if e}))
+        steps = {}          # folder -> {path: (mode, oid) after the folder, None: the file is gone}
+        current = {}        # path -> (mode, oid) at the tag (None: the file is absent)
+        for path in usable:
+            owned = plan[path]
+            start, end = starts.get(path), ends.get(path)
             names = [owned] if isinstance(owned, str) else owned.folders
             outside = [f for f in names if f not in order]
             if outside:
@@ -297,42 +346,61 @@ def folder_patches(source: Path, base: str, head: str, plan: dict, series_order:
             if isinstance(owned, str):
                 chain = [(owned, end)]
             else:
-                chain = _chain(scratch, path, owned, start, end, order, result)
+                chain = _chain(scratch, path, owned, start, end, order, result, blobs)
                 if chain is None:
                     result.skipped.append(path)
                     continue
             current[path] = start
             for folder, entry in chain:
                 steps.setdefault(folder, {})[path] = entry
+        _write_index(scratch, [(p, current[p]) for p in sorted(current)])
+        before = scratch.out("write-tree")
         for folder in sorted(steps, key=lambda f: order[f]):
             paths = sorted(steps[folder])
-            result[folder] = _diff(scratch, [(p, current[p]) for p in paths], [(p, steps[folder][p]) for p in paths], paths)
-            current.update(steps[folder])
+            _write_index(scratch, [(p, steps[folder][p]) for p in paths], keep=True)
+            after = scratch.out("write-tree")
+            result[folder] = scratch.run("diff", "--binary", "--full-index", "--no-renames", before, after, "--", *paths).stdout
+            before = after
     return result
 
 
-def _entry(scratch: Scratch, rev: str, path: str):
-    """(mode, oid) of `path` at `rev`, or None when the revision does not have it."""
-    out = scratch.run("ls-tree", "-z", rev, "--", path, source=True).stdout.split(b"\0")[0].decode()
-    if not out:
-        return None
-    meta, _name = out.split("	", 1)
-    mode, _kind, oid = meta.split()
-    return mode, oid
+def _entries(scratch: Scratch, rev: str, paths: list) -> dict:
+    """{path: (mode, oid)} at `rev` for the paths it has: one `ls-tree` per CHUNK paths."""
+    found = {}
+    for part in _chunks(paths):
+        out = scratch.run("ls-tree", "-z", rev, "--", *part, source=True).stdout
+        for rec in out.split(b"\0"):
+            if rec:
+                meta, name = rec.decode("utf-8", errors="surrogateescape").split("\t", 1)
+                mode, _kind, oid = meta.split()
+                found[name] = (mode, oid)
+    return found
 
 
-def _chain(scratch: Scratch, path: str, owned: Assignment, start, end, order: dict, result: Patches):
+def _write_index(scratch: Scratch, rows: list, keep: bool = False) -> None:
+    """The index of the scratch repository holds `rows` ([(path, (mode, oid) or None)]): a new index, or with `keep` the rows set on the
+    one there is (a None row takes the path out of it)."""
+    if not keep:
+        scratch.index.unlink(missing_ok=True)
+    info = [("%s %s\t%s" % (*(entry or ("0", "0" * 40)), path)).encode("utf-8", errors="surrogateescape")
+            for path, entry in rows if entry or keep]
+    if info:
+        scratch.run("update-index", "--add", "-z", "--index-info", input=b"\0".join(info) + b"\0")
+
+
+def _chain(scratch: Scratch, path: str, owned: Assignment, start, end, order: dict, result: Patches, blobs: dict):
     """[(folder, (mode, oid) after it)] for a split file, in series order; None (and a red) when the last state is not the head."""
     folders = sorted(owned.folders, key=lambda f: order[f])
     if not folders:
         return []
-    base_lines = _lines(scratch.blob(start[1])) if start else []
-    head_lines = _lines(scratch.blob(end[1])) if end else []
+    base_lines = _lines(blobs[start[1]]) if start else []
+    head_blob = blobs[end[1]] if end else b""
+    head_lines = _lines(head_blob)
     chain, last = [], b""
     for folder in folders:
         last = _state(base_lines, head_lines, owned, order, order[folder])
         chain.append((folder, end if folder == folders[-1] else (start[0], scratch.hash(last))))
-    if last != (scratch.blob(end[1]) if end else b""):
+    if last != head_blob:
         taken = _lines(last)
         left = _untaken(taken, head_lines)
         result.problems.append(fail(
@@ -350,15 +418,3 @@ def _untaken(taken: list, head_lines: list) -> list:
         if tag in ("replace", "insert"):
             found += range(j1 + 1, j2 + 1)
     return found
-
-
-def _diff(scratch: Scratch, old: list, new: list, paths: list) -> bytes:
-    """`git diff --binary --full-index --no-renames` of two trees holding `paths` as in `old` and as in `new` ([(path, (mode, oid) or None)])."""
-    trees = []
-    for rows in (old, new):
-        scratch.index.unlink(missing_ok=True)
-        info = [("%s %s	%s" % (entry[0], entry[1], path)).encode() for path, entry in rows if entry]
-        if info:
-            scratch.run("update-index", "--add", "-z", "--index-info", input=b"\0".join(info) + b"\0")
-        trees.append(scratch.out("write-tree"))
-    return scratch.run("diff", "--binary", "--full-index", "--no-renames", trees[0], trees[1], "--", *paths).stdout
