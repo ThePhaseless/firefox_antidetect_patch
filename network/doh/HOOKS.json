@@ -141,7 +141,11 @@
   "kind": "add",
   "form": "registration",
   "line": "#include \"mozilla/net/StealthTRRContext.h\"  // STEALTH-HOOK(network/doh)",
-  "test": "gtest:TestStealthTRRContext.AFailedLookupOfAServiceChannelEndsItAndGivesOkToItsCaller"
+  "test": "gtest:TestStealthTRRContext.AFailedLookupOfAServiceChannelEndsItAndGivesOkToItsCaller",
+  "quiet_anchor_why": {
+   "kind": "only-place",
+   "why": "An include of ours sits in a block of its own after Mozilla's include block. The only file-scope place after that block is the blank line before `namespace mozilla::net {`; every quieter place is inside Mozilla's include block (C8) or inside the namespace, where our header's declarations would land in the wrong scope."
+  }
  },
  {
   "file": "netwerk/protocol/http/TRRServiceChannel.cpp",
@@ -223,7 +227,11 @@
   "kind": "add",
   "form": "registration",
   "line": "#include \"mozilla/net/StealthTRRContext.h\"  // STEALTH-HOOK(network/doh)",
-  "test": "gtest:TestStealthTRRContext.TheOcspRequestKeepsTheContextOfThePage"
+  "test": "gtest:TestStealthTRRContext.TheOcspRequestKeepsTheContextOfThePage",
+  "quiet_anchor_why": {
+   "kind": "only-place",
+   "why": "An include of ours sits in a block of its own after Mozilla's include block. The quieter places (churn 0) all come after `using namespace mozilla::psm;`; there our header, and what it pulls in that this file has not parsed yet, would be read under a using-directive, which can change name lookup, so the same result is not shown, and before that line the places are inside the include block (C8)."
+  }
  },
  {
   "file": "security/manager/ssl/nsNSSCallbacks.cpp",

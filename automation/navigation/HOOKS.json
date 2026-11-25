@@ -153,7 +153,11 @@
   "kind": "add",
   "form": "registration",
   "line": "#include \"StealthLoadInfo.h\"  // STEALTH-HOOK(network/doh)",
-  "test": "gtest:TestStealthTRRContext.ATRRLoadInfoStoresWhatItIsGiven"
+  "test": "gtest:TestStealthTRRContext.ATRRLoadInfoStoresWhatItIsGiven",
+  "quiet_anchor_why": {
+   "kind": "deferred",
+   "quieter": "netwerk/base/TRRLoadInfo.cpp:using namespace mozilla::dom;"
+  }
  },
  {
   "file": "netwerk/base/TRRLoadInfo.cpp",

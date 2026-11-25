@@ -147,7 +147,11 @@
   "kind": "add",
   "form": "registration",
   "line": "UNIFIED_SOURCES += [\"TestStealthDragGesture.cpp\", \"TestStealthJugglerCoalesce.cpp\", \"TestStealthMouseEventIPC.cpp\"]  # STEALTH-HOOK(automation/input)",
-  "test": "gtest:StealthDragGesture.ThePressOfJugglerDecidesWhichMovesContinueTheGesture"
+  "test": "gtest:StealthDragGesture.ThePressOfJugglerDecidesWhichMovesContinueTheGesture",
+  "quiet_anchor_why": {
+   "kind": "only-place",
+   "why": "A moz.build registration goes directly after the closing `]` of the UNIFIED_SOURCES list it registers in, and that list is the churning one: Mozilla edits that list and the lines around it in releases 152 and 157. The other places (after an unrelated list, or at the end of the file) are not the list the line registers in."
+  }
  },
  {
   "file": "dom/ipc/gtest/moz.build",
