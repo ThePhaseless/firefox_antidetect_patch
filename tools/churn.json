@@ -1,15 +1,42 @@
 {
  "base": "FIREFOX_159_0_RELEASE",
  "releases": [
-  "FIREFOX_151_0_RELEASE",
-  "FIREFOX_152_0_RELEASE",
-  "FIREFOX_153_0_RELEASE",
-  "FIREFOX_154_0_RELEASE",
-  "FIREFOX_155_0_RELEASE",
-  "FIREFOX_156_0_RELEASE",
-  "FIREFOX_157_0_RELEASE",
-  "FIREFOX_158_0_RELEASE",
-  "FIREFOX_159_0_RELEASE"
+  {
+   "tag": "FIREFOX_151_0_RELEASE",
+   "commit": "79eeaf756b8cee11ca4c173a7b86b04b22db707b"
+  },
+  {
+   "tag": "FIREFOX_152_0_RELEASE",
+   "commit": "9891f60a72cbb3db7561e314df546795c0945cc7"
+  },
+  {
+   "tag": "FIREFOX_153_0_RELEASE",
+   "commit": "f1b6c0f86b96b7e0688c26f65803576f27cdaf88"
+  },
+  {
+   "tag": "FIREFOX_154_0_RELEASE",
+   "commit": "032a9fc1ac0cc3209f7c142744ba2e40847c8086"
+  },
+  {
+   "tag": "FIREFOX_155_0_RELEASE",
+   "commit": "d065a04bc5610f496762935dee56604a78b91b51"
+  },
+  {
+   "tag": "FIREFOX_156_0_RELEASE",
+   "commit": "3bf8f468258c2181f455e23d4ffcd6acb8f4cdb1"
+  },
+  {
+   "tag": "FIREFOX_157_0_RELEASE",
+   "commit": "fdd757a2e09c9471cddf383e64e631e4ce178499"
+  },
+  {
+   "tag": "FIREFOX_158_0_RELEASE",
+   "commit": "3c71aeacdb296402e41fb2084b13e797d1770642"
+  },
+  {
+   "tag": "FIREFOX_159_0_RELEASE",
+   "commit": "9a2dc53c369c7ae5172018b35988e1d2ffeff402"
+  }
  ],
  "band": 2,
  "hooks": [
@@ -186,7 +213,7 @@
    "which": []
   },
   {
-   "key": "H|automation/hybrid-xrays|js/xpconnect/src/Sandbox.cpp|bool SandboxProxyHandler::getPropertyDescriptorImpl(|3714af64cce5",
+   "key": "H|automation/hybrid-xrays|js/xpconnect/src/Sandbox.cpp|bool SandboxProxyHandler::getPropertyDescriptorImpl(|96911bf932e2",
    "folder": "automation/hybrid-xrays",
    "file": "js/xpconnect/src/Sandbox.cpp",
    "hunk": 2,
@@ -194,7 +221,7 @@
    "which": []
   },
   {
-   "key": "H|automation/hybrid-xrays|js/xpconnect/src/Sandbox.cpp|nsresult xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp,|d151b4d1820e",
+   "key": "H|automation/hybrid-xrays|js/xpconnect/src/Sandbox.cpp|nsresult xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp,|2e28c3a37432",
    "folder": "automation/hybrid-xrays",
    "file": "js/xpconnect/src/Sandbox.cpp",
    "hunk": 3,
@@ -202,7 +229,7 @@
    "which": []
   },
   {
-   "key": "H|automation/hybrid-xrays|js/xpconnect/src/Sandbox.cpp|nsresult xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp,|f78040c81dff",
+   "key": "H|automation/hybrid-xrays|js/xpconnect/src/Sandbox.cpp|nsresult xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp,|b9e6bd4d9872",
    "folder": "automation/hybrid-xrays",
    "file": "js/xpconnect/src/Sandbox.cpp",
    "hunk": 4,
@@ -286,7 +313,7 @@
    "which": []
   },
   {
-   "key": "H|automation/hybrid-xrays|js/xpconnect/wrappers/WrapperFactory.cpp|JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,|dac3ecc55745",
+   "key": "H|automation/hybrid-xrays|js/xpconnect/wrappers/WrapperFactory.cpp|JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,|fc68e5ea7f37",
    "folder": "automation/hybrid-xrays",
    "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
    "hunk": 3,
@@ -294,7 +321,7 @@
    "which": []
   },
   {
-   "key": "H|automation/hybrid-xrays|js/xpconnect/wrappers/WrapperFactory.cpp|JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,|77742932fcf6",
+   "key": "H|automation/hybrid-xrays|js/xpconnect/wrappers/WrapperFactory.cpp|JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,|a401f2a0dc37",
    "folder": "automation/hybrid-xrays",
    "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
    "hunk": 4,
@@ -302,7 +329,7 @@
    "which": []
   },
   {
-   "key": "H|automation/hybrid-xrays|js/xpconnect/wrappers/WrapperFactory.cpp|JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,|6cd883d0e1f5",
+   "key": "H|automation/hybrid-xrays|js/xpconnect/wrappers/WrapperFactory.cpp|JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,|9a3207078a20",
    "folder": "automation/hybrid-xrays",
    "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
    "hunk": 5,
@@ -310,10 +337,18 @@
    "which": []
   },
   {
-   "key": "H|automation/hybrid-xrays|js/xpconnect/wrappers/WrapperFactory.cpp|JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,|d0765cdd4f7d",
+   "key": "H|automation/hybrid-xrays|js/xpconnect/wrappers/WrapperFactory.cpp|JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,|4acb0264c254",
    "folder": "automation/hybrid-xrays",
    "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
    "hunk": 6,
+   "churn": 0,
+   "which": []
+  },
+  {
+   "key": "H|automation/hybrid-xrays|js/xpconnect/wrappers/WrapperFactory.cpp|JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,|7cd7cf1bd8b3",
+   "folder": "automation/hybrid-xrays",
+   "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
+   "hunk": 7,
    "churn": 0,
    "which": []
   },
@@ -352,7 +387,7 @@
    "which": []
   },
   {
-   "key": "H|automation/input|dom/base/nsDOMWindowUtils.cpp||00dca494a56a",
+   "key": "H|automation/input|dom/base/nsDOMWindowUtils.cpp||623d737a6d39",
    "folder": "automation/input",
    "file": "dom/base/nsDOMWindowUtils.cpp",
    "hunk": 1,
@@ -376,14 +411,6 @@
    "which": [
     "159"
    ]
-  },
-  {
-   "key": "H|automation/input|dom/base/nsDOMWindowUtils.cpp|nsDOMWindowUtils::NodesFromRect(float aX, float aY, float aTopSize,|506c914af1d7",
-   "folder": "automation/input",
-   "file": "dom/base/nsDOMWindowUtils.cpp",
-   "hunk": 4,
-   "churn": 0,
-   "which": []
   },
   {
    "key": "H|automation/input|dom/events/EventStateManager.cpp||39c9f89d8bad",
@@ -495,7 +522,7 @@
    "which": []
   },
   {
-   "key": "H|automation/input|layout/base/gtest/moz.build|UNIFIED_SOURCES += [|719e20059cbb",
+   "key": "H|automation/input|layout/base/gtest/moz.build|UNIFIED_SOURCES += [|b87032a80f6a",
    "folder": "automation/input",
    "file": "layout/base/gtest/moz.build",
    "hunk": 1,
@@ -519,20 +546,30 @@
    "which": []
   },
   {
-   "key": "H|automation/input|widget/nsGUIEventIPC.h|struct ParamTraits<mozilla::WidgetMouseEventBase> {|a69bad896a8a",
+   "key": "H|automation/input|widget/nsGUIEventIPC.h||319976f86592",
    "folder": "automation/input",
    "file": "widget/nsGUIEventIPC.h",
    "hunk": 1,
+   "churn": 1,
+   "which": [
+    "154"
+   ]
+  },
+  {
+   "key": "H|automation/input|widget/nsGUIEventIPC.h|struct ParamTraits<mozilla::WidgetMouseEventBase> {|a69bad896a8a",
+   "folder": "automation/input",
+   "file": "widget/nsGUIEventIPC.h",
+   "hunk": 2,
    "churn": 1,
    "which": [
     "152"
    ]
   },
   {
-   "key": "H|automation/input|widget/nsGUIEventIPC.h|struct ParamTraits<mozilla::WidgetMouseEventBase> {|de6b9a85ef7a",
+   "key": "H|automation/input|widget/nsGUIEventIPC.h|struct ParamTraits<mozilla::WidgetMouseEventBase> {|0642ad7873de",
    "folder": "automation/input",
    "file": "widget/nsGUIEventIPC.h",
-   "hunk": 2,
+   "hunk": 3,
    "churn": 0,
    "which": []
   },
@@ -605,7 +642,7 @@
    ]
   },
   {
-   "key": "H|automation/navigation|docshell/base/nsDocShell.cpp|nsresult nsDocShell::InternalLoad(nsDocShellLoadState* aLoadState,|065eac35601f",
+   "key": "H|automation/navigation|docshell/base/nsDocShell.cpp|nsresult nsDocShell::InternalLoad(nsDocShellLoadState* aLoadState,|db4033232c31",
    "folder": "automation/navigation",
    "file": "docshell/base/nsDocShell.cpp",
    "hunk": 2,
@@ -828,7 +865,7 @@
    "which": []
   },
   {
-   "key": "H|automation/shadow-root|dom/base/Element.cpp|void Element::SetSlot(const nsAString& aName, ErrorResult& aError) {|7065b299f11a",
+   "key": "H|automation/shadow-root|dom/base/Element.cpp|void Element::SetSlot(const nsAString& aName, ErrorResult& aError) {|4f13e74878fa",
    "folder": "automation/shadow-root",
    "file": "dom/base/Element.cpp",
    "hunk": 2,
@@ -888,7 +925,7 @@
    "which": []
   },
   {
-   "key": "H|fingerprint/audio/noise|dom/media/gtest/moz.build|UNIFIED_SOURCES += [|a0945a71e2b8",
+   "key": "H|fingerprint/audio/noise|dom/media/gtest/moz.build|UNIFIED_SOURCES += [|a12d24d877ef",
    "folder": "fingerprint/audio/noise",
    "file": "dom/media/gtest/moz.build",
    "hunk": 1,
@@ -988,10 +1025,18 @@
    "which": []
   },
   {
-   "key": "H|fingerprint/canvas/as-drawn|layout/base/nsLayoutUtils.cpp|SurfaceFromElementResult nsLayoutUtils::SurfaceFromElement(|32b7dd71af3e",
+   "key": "H|fingerprint/canvas/as-drawn|layout/base/nsLayoutUtils.cpp|SurfaceFromElementResult nsLayoutUtils::SurfaceFromElement(|e8c316c22124",
    "folder": "fingerprint/canvas/as-drawn",
    "file": "layout/base/nsLayoutUtils.cpp",
    "hunk": 2,
+   "churn": 0,
+   "which": []
+  },
+  {
+   "key": "H|fingerprint/canvas/as-drawn|layout/base/nsLayoutUtils.h|class nsLayoutUtils {|136b852e84c4",
+   "folder": "fingerprint/canvas/as-drawn",
+   "file": "layout/base/nsLayoutUtils.h",
+   "hunk": 1,
    "churn": 0,
    "which": []
   },
@@ -1004,7 +1049,7 @@
    "which": []
   },
   {
-   "key": "H|fingerprint/canvas/as-drawn|layout/painting/nsImageRenderer.cpp|bool nsImageRenderer::PrepareImage() {|cd8b0fb276bb",
+   "key": "H|fingerprint/canvas/as-drawn|layout/painting/nsImageRenderer.cpp|bool nsImageRenderer::PrepareImage() {|aa377fa68c01",
    "folder": "fingerprint/canvas/as-drawn",
    "file": "layout/painting/nsImageRenderer.cpp",
    "hunk": 2,
@@ -1120,7 +1165,7 @@
    "which": []
   },
   {
-   "key": "H|fingerprint/canvas/noise-projection|dom/html/HTMLCanvasElement.h|class HTMLCanvasElement final : public nsGenericHTMLElement,|fb412cb9eb97",
+   "key": "H|fingerprint/canvas/noise-projection|dom/html/HTMLCanvasElement.h|class HTMLCanvasElement final : public nsGenericHTMLElement,|3f98194d844d",
    "folder": "fingerprint/canvas/noise-projection",
    "file": "dom/html/HTMLCanvasElement.h",
    "hunk": 1,
@@ -1264,7 +1309,7 @@
    "which": []
   },
   {
-   "key": "H|fingerprint/canvas/text-metrics|dom/canvas/CanvasRenderingContext2D.cpp|already_AddRefed<CanvasPattern> CanvasRenderingContext2D::CreatePattern(|dfb854fed61c",
+   "key": "H|fingerprint/canvas/text-metrics|dom/canvas/CanvasRenderingContext2D.cpp|already_AddRefed<CanvasPattern> CanvasRenderingContext2D::CreatePattern(|b28b5346154b",
    "folder": "fingerprint/canvas/text-metrics",
    "file": "dom/canvas/CanvasRenderingContext2D.cpp",
    "hunk": 2,
@@ -1272,7 +1317,7 @@
    "which": []
   },
   {
-   "key": "H|fingerprint/canvas/text-metrics|dom/canvas/CanvasRenderingContext2D.cpp|already_AddRefed<CanvasPattern> CanvasRenderingContext2D::CreatePattern(|7996a45ce0f6",
+   "key": "H|fingerprint/canvas/text-metrics|dom/canvas/CanvasRenderingContext2D.cpp|already_AddRefed<CanvasPattern> CanvasRenderingContext2D::CreatePattern(|b28b5346154b#2",
    "folder": "fingerprint/canvas/text-metrics",
    "file": "dom/canvas/CanvasRenderingContext2D.cpp",
    "hunk": 3,
@@ -1284,6 +1329,14 @@
    "folder": "fingerprint/canvas/text-metrics",
    "file": "dom/canvas/CanvasRenderingContext2D.cpp",
    "hunk": 4,
+   "churn": 0,
+   "which": []
+  },
+  {
+   "key": "H|fingerprint/canvas/text-metrics|dom/canvas/nsICanvasRenderingContextInternal.h|class nsICanvasRenderingContextInternal : public nsISupports,|4f30b9a5626d",
+   "folder": "fingerprint/canvas/text-metrics",
+   "file": "dom/canvas/nsICanvasRenderingContextInternal.h",
+   "hunk": 1,
    "churn": 0,
    "which": []
   },
@@ -1363,10 +1416,18 @@
    ]
   },
   {
-   "key": "H|fingerprint/fonts/bundle|gfx/thebes/gfxDWriteFontList.h|class gfxDWriteFontList final : public gfxPlatformFontList {|cdade3cb98a1",
+   "key": "H|fingerprint/fonts/bundle|gfx/thebes/gfxDWriteFontList.h|class gfxDWriteFontList final : public gfxPlatformFontList {|809ba562b655",
    "folder": "fingerprint/fonts/bundle",
    "file": "gfx/thebes/gfxDWriteFontList.h",
    "hunk": 3,
+   "churn": 0,
+   "which": []
+  },
+  {
+   "key": "H|fingerprint/fonts/bundle|gfx/thebes/gfxDWriteFontList.h|class gfxDWriteFontList final : public gfxPlatformFontList {|cdade3cb98a1",
+   "folder": "fingerprint/fonts/bundle",
+   "file": "gfx/thebes/gfxDWriteFontList.h",
+   "hunk": 4,
    "churn": 0,
    "which": []
   },
@@ -1546,7 +1607,7 @@
    "which": []
   },
   {
-   "key": "H|fingerprint/fonts/font-list|gfx/thebes/gfxDWriteFontList.cpp|void gfxDWriteFontList::InitSharedFontListForPlatform() {|a495b83092f6",
+   "key": "H|fingerprint/fonts/font-list|gfx/thebes/gfxDWriteFontList.cpp|void gfxDWriteFontList::InitSharedFontListForPlatform() {|f12948eddfd9",
    "folder": "fingerprint/fonts/font-list",
    "file": "gfx/thebes/gfxDWriteFontList.cpp",
    "hunk": 9,
@@ -2256,7 +2317,7 @@
    ]
   },
   {
-   "key": "H|fingerprint/input/event-birth|dom/base/test/gtest/moz.build|UNIFIED_SOURCES += [|66f055bf3c26",
+   "key": "H|fingerprint/input/event-birth|dom/base/test/gtest/moz.build|UNIFIED_SOURCES += [|91db95b93613",
    "folder": "fingerprint/input/event-birth",
    "file": "dom/base/test/gtest/moz.build",
    "hunk": 1,
@@ -2440,7 +2501,7 @@
    ]
   },
   {
-   "key": "H|fingerprint/js-surface/debugger|js/src/debugger/Debugger.cpp|bool Debugger::addDebuggeeGlobal(JSContext* cx, Handle<GlobalObject*> global) {|10e557f34d11",
+   "key": "H|fingerprint/js-surface/debugger|js/src/debugger/Debugger.cpp|bool Debugger::addDebuggeeGlobal(JSContext* cx, Handle<GlobalObject*> global) {|baafe34f7344",
    "folder": "fingerprint/js-surface/debugger",
    "file": "js/src/debugger/Debugger.cpp",
    "hunk": 2,
@@ -2448,7 +2509,7 @@
    "which": []
   },
   {
-   "key": "H|fingerprint/js-surface/debugger|js/src/debugger/Debugger.cpp|bool Debugger::addDebuggeeGlobal(JSContext* cx, Handle<GlobalObject*> global) {|b054524505e3",
+   "key": "H|fingerprint/js-surface/debugger|js/src/debugger/Debugger.cpp|bool Debugger::addDebuggeeGlobal(JSContext* cx, Handle<GlobalObject*> global) {|f6d6cc6eb4ea",
    "folder": "fingerprint/js-surface/debugger",
    "file": "js/src/debugger/Debugger.cpp",
    "hunk": 3,
@@ -2520,10 +2581,26 @@
    "which": []
   },
   {
-   "key": "H|fingerprint/js-surface/stack-frames|js/src/vm/SavedStacks.cpp|JS_PUBLIC_API bool BuildStackString(JSContext* cx, JSPrincipals* principals,|c7ac1174e395",
+   "key": "H|fingerprint/js-surface/stack-frames|js/src/vm/SavedStacks.cpp|JS_PUBLIC_API bool BuildStackString(JSContext* cx, JSPrincipals* principals,|e12a84382b06",
    "folder": "fingerprint/js-surface/stack-frames",
    "file": "js/src/vm/SavedStacks.cpp",
    "hunk": 2,
+   "churn": 0,
+   "which": []
+  },
+  {
+   "key": "H|fingerprint/js-surface/stack-frames|js/src/vm/SavedStacks.cpp|JS_PUBLIC_API bool BuildStackString(JSContext* cx, JSPrincipals* principals,|dbc20c713565",
+   "folder": "fingerprint/js-surface/stack-frames",
+   "file": "js/src/vm/SavedStacks.cpp",
+   "hunk": 3,
+   "churn": 0,
+   "which": []
+  },
+  {
+   "key": "H|fingerprint/js-surface/stack-frames|js/src/vm/SavedStacks.cpp|JS_PUBLIC_API bool BuildStackString(JSContext* cx, JSPrincipals* principals,|f4f72a1bd6e4",
+   "folder": "fingerprint/js-surface/stack-frames",
+   "file": "js/src/vm/SavedStacks.cpp",
+   "hunk": 4,
    "churn": 0,
    "which": []
   },
@@ -2552,7 +2629,7 @@
    "which": []
   },
   {
-   "key": "H|fingerprint/locale-time/language|intl/locale/LocaleService.cpp|LocaleService::GetRegionalPrefsLocales(nsTArray<nsCString>& aRetVal) {|a886a0134bf5",
+   "key": "H|fingerprint/locale-time/language|intl/locale/LocaleService.cpp|LocaleService::GetRegionalPrefsLocales(nsTArray<nsCString>& aRetVal) {|8cdb1bbab277",
    "folder": "fingerprint/locale-time/language",
    "file": "intl/locale/LocaleService.cpp",
    "hunk": 2,
@@ -2560,7 +2637,7 @@
    "which": []
   },
   {
-   "key": "H|fingerprint/locale-time/language|intl/locale/LocaleService.cpp|LocaleService::GetRegionalPrefsLocales(nsTArray<nsCString>& aRetVal) {|5af6b21b0b3c",
+   "key": "H|fingerprint/locale-time/language|intl/locale/LocaleService.cpp|LocaleService::GetRegionalPrefsLocales(nsTArray<nsCString>& aRetVal) {|54c4e56330c5",
    "folder": "fingerprint/locale-time/language",
    "file": "intl/locale/LocaleService.cpp",
    "hunk": 3,
@@ -2684,7 +2761,7 @@
    ]
   },
   {
-   "key": "H|fingerprint/locale-time/timezone|docshell/base/BrowsingContext.cpp|void BrowsingContext::DidSet(FieldIndex<IDX_LanguageOverride>,|7a62bdc64fbc",
+   "key": "H|fingerprint/locale-time/timezone|docshell/base/BrowsingContext.cpp|void BrowsingContext::DidSet(FieldIndex<IDX_LanguageOverride>,|3bd11baafec7",
    "folder": "fingerprint/locale-time/timezone",
    "file": "docshell/base/BrowsingContext.cpp",
    "hunk": 4,
@@ -2722,7 +2799,7 @@
    ]
   },
   {
-   "key": "H|fingerprint/locale-time/timezone|dom/base/Document.cpp|void Document::SetDocumentURI(nsIURI* aURI) {|8c4ddcd3cd3c",
+   "key": "H|fingerprint/locale-time/timezone|dom/base/Document.cpp|void Document::SetDocumentURI(nsIURI* aURI) {|58af4459b6a7",
    "folder": "fingerprint/locale-time/timezone",
    "file": "dom/base/Document.cpp",
    "hunk": 3,
@@ -2730,7 +2807,7 @@
    "which": []
   },
   {
-   "key": "H|fingerprint/locale-time/timezone|dom/base/Document.cpp|void Document::GetLastModified(nsAString& aLastModified) const {|18ddeb0a2497",
+   "key": "H|fingerprint/locale-time/timezone|dom/base/Document.cpp|void Document::GetLastModified(nsAString& aLastModified) const {|f1e7c81bd7e0",
    "folder": "fingerprint/locale-time/timezone",
    "file": "dom/base/Document.cpp",
    "hunk": 4,
@@ -2746,7 +2823,7 @@
    "which": []
   },
   {
-   "key": "H|fingerprint/locale-time/timezone|dom/base/Document.cpp|void Document::RetrieveRelevantHeaders(nsIChannel* aChannel) {|9a0190d182b1",
+   "key": "H|fingerprint/locale-time/timezone|dom/base/Document.cpp|void Document::RetrieveRelevantHeaders(nsIChannel* aChannel) {|f1e7c81bd7e0",
    "folder": "fingerprint/locale-time/timezone",
    "file": "dom/base/Document.cpp",
    "hunk": 6,
@@ -2754,7 +2831,7 @@
    "which": []
   },
   {
-   "key": "H|fingerprint/locale-time/timezone|dom/base/Document.cpp|const LangGroupFontPrefs* Document::GetFontPrefsForLang(|50d0834bf597",
+   "key": "H|fingerprint/locale-time/timezone|dom/base/Document.cpp|const LangGroupFontPrefs* Document::GetFontPrefsForLang(|6423f3ddb788",
    "folder": "fingerprint/locale-time/timezone",
    "file": "dom/base/Document.cpp",
    "hunk": 7,
@@ -2772,7 +2849,7 @@
    ]
   },
   {
-   "key": "H|fingerprint/locale-time/timezone|dom/xslt/xslt/txEXSLTFunctions.cpp||2df54eb321a4",
+   "key": "H|fingerprint/locale-time/timezone|dom/xslt/xslt/txEXSLTFunctions.cpp||fa75245ca1f7",
    "folder": "fingerprint/locale-time/timezone",
    "file": "dom/xslt/xslt/txEXSLTFunctions.cpp",
    "hunk": 1,
@@ -2780,7 +2857,7 @@
    "which": []
   },
   {
-   "key": "H|fingerprint/locale-time/timezone|dom/xslt/xslt/txEXSLTFunctions.cpp|nsresult txEXSLTFunctionCall::evaluate(txIEvalContext* aContext,|82fbd5f6bba1",
+   "key": "H|fingerprint/locale-time/timezone|dom/xslt/xslt/txEXSLTFunctions.cpp|nsresult txEXSLTFunctionCall::evaluate(txIEvalContext* aContext,|ec88c6daca44",
    "folder": "fingerprint/locale-time/timezone",
    "file": "dom/xslt/xslt/txEXSLTFunctions.cpp",
    "hunk": 2,
@@ -3087,10 +3164,18 @@
    "which": []
   },
   {
-   "key": "H|fingerprint/media/enumeration|dom/media/MediaManager.cpp|RefPtr<ConstDeviceSetPromise> MediaManager::GetPhysicalDevices() {|2148a883814b",
+   "key": "H|fingerprint/media/enumeration|dom/media/MediaManager.cpp|RefPtr<ConstDeviceSetPromise> MediaManager::GetPhysicalDevices() {|127b2c3ad51b",
    "folder": "fingerprint/media/enumeration",
    "file": "dom/media/MediaManager.cpp",
    "hunk": 6,
+   "churn": 0,
+   "which": []
+  },
+  {
+   "key": "H|fingerprint/media/enumeration|dom/media/MediaManager.cpp|RefPtr<ConstDeviceSetPromise> MediaManager::GetPhysicalDevices() {|a1d8b85f506c",
+   "folder": "fingerprint/media/enumeration",
+   "file": "dom/media/MediaManager.cpp",
+   "hunk": 7,
    "churn": 0,
    "which": []
   },
@@ -3307,7 +3392,7 @@
    ]
   },
   {
-   "key": "H|fingerprint/screen-window/geometry|widget/moz.build|SOURCES += [|0ba98d315f30",
+   "key": "H|fingerprint/screen-window/geometry|widget/moz.build|SOURCES += [|56bc9b6e306b",
    "folder": "fingerprint/screen-window/geometry",
    "file": "widget/moz.build",
    "hunk": 1,
@@ -3423,18 +3508,10 @@
    ]
   },
   {
-   "key": "H|fingerprint/screen-window/popup-position|toolkit/components/windowwatcher/nsWindowWatcher.cpp|static void SizeOpenedWindow(nsIDocShellTreeOwner* aTreeOwner,|b4b7161f6fde",
+   "key": "H|fingerprint/screen-window/popup-position|toolkit/components/windowwatcher/nsWindowWatcher.cpp|static void SizeOpenedWindow(nsIDocShellTreeOwner* aTreeOwner,|229cf54f8478",
    "folder": "fingerprint/screen-window/popup-position",
    "file": "toolkit/components/windowwatcher/nsWindowWatcher.cpp",
    "hunk": 3,
-   "churn": 0,
-   "which": []
-  },
-  {
-   "key": "H|fingerprint/screen-window/popup-position|toolkit/components/windowwatcher/nsWindowWatcher.cpp|static void SizeOpenedWindow(nsIDocShellTreeOwner* aTreeOwner,|c7a89c54085d",
-   "folder": "fingerprint/screen-window/popup-position",
-   "file": "toolkit/components/windowwatcher/nsWindowWatcher.cpp",
-   "hunk": 4,
    "churn": 0,
    "which": []
   },
@@ -3591,7 +3668,7 @@
    "which": []
   },
   {
-   "key": "H|fingerprint/webgl/parameters|dom/canvas/ClientWebGLContext.cpp|UniquePtr<uint8_t[]> ClientWebGLContext::GetImageBuffer(|4161e20656ca",
+   "key": "H|fingerprint/webgl/parameters|dom/canvas/ClientWebGLContext.cpp|UniquePtr<uint8_t[]> ClientWebGLContext::GetImageBuffer(|16b42243cf03",
    "folder": "fingerprint/webgl/parameters",
    "file": "dom/canvas/ClientWebGLContext.cpp",
    "hunk": 2,
@@ -3599,7 +3676,7 @@
    "which": []
   },
   {
-   "key": "H|fingerprint/webgl/parameters|dom/canvas/ClientWebGLContext.cpp|ClientWebGLContext::GetInputStream(|4161e20656ca",
+   "key": "H|fingerprint/webgl/parameters|dom/canvas/ClientWebGLContext.cpp|ClientWebGLContext::GetInputStream(|16b42243cf03",
    "folder": "fingerprint/webgl/parameters",
    "file": "dom/canvas/ClientWebGLContext.cpp",
    "hunk": 3,
@@ -3607,15 +3684,17 @@
    "which": []
   },
   {
-   "key": "H|fingerprint/webgl/parameters|dom/canvas/ClientWebGLContext.cpp|void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,|efa00b237a35",
+   "key": "H|fingerprint/webgl/parameters|dom/canvas/ClientWebGLContext.cpp|Maybe<std::string> ClientWebGLContext::GetString(const GLenum pname) {|af52678102a8",
    "folder": "fingerprint/webgl/parameters",
    "file": "dom/canvas/ClientWebGLContext.cpp",
    "hunk": 4,
-   "churn": 0,
-   "which": []
+   "churn": 1,
+   "which": [
+    "155"
+   ]
   },
   {
-   "key": "H|fingerprint/webgl/parameters|dom/canvas/ClientWebGLContext.cpp|void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,|5d7771ff4aed",
+   "key": "H|fingerprint/webgl/parameters|dom/canvas/ClientWebGLContext.cpp|void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,|efa00b237a35",
    "folder": "fingerprint/webgl/parameters",
    "file": "dom/canvas/ClientWebGLContext.cpp",
    "hunk": 5,
@@ -3623,26 +3702,10 @@
    "which": []
   },
   {
-   "key": "H|fingerprint/webgl/parameters|dom/canvas/ClientWebGLContext.cpp|void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,|81b41d54de58",
-   "folder": "fingerprint/webgl/parameters",
-   "file": "dom/canvas/ClientWebGLContext.cpp",
-   "hunk": 6,
-   "churn": 0,
-   "which": []
-  },
-  {
-   "key": "H|fingerprint/webgl/parameters|dom/canvas/ClientWebGLContext.cpp|void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,|42af528c9a3b",
-   "folder": "fingerprint/webgl/parameters",
-   "file": "dom/canvas/ClientWebGLContext.cpp",
-   "hunk": 7,
-   "churn": 0,
-   "which": []
-  },
-  {
    "key": "H|fingerprint/webgl/parameters|dom/canvas/ClientWebGLContext.cpp|ClientWebGLContext::GetShaderPrecisionFormat(const GLenum shadertype,|552027d69c2f",
    "folder": "fingerprint/webgl/parameters",
    "file": "dom/canvas/ClientWebGLContext.cpp",
-   "hunk": 8,
+   "hunk": 6,
    "churn": 1,
    "which": [
     "154"
@@ -3652,15 +3715,15 @@
    "key": "H|fingerprint/webgl/parameters|dom/canvas/ClientWebGLContext.cpp|void ClientWebGLContext::ReadPixels(GLint x, GLint y, GLsizei width,|f6d59e086c5d",
    "folder": "fingerprint/webgl/parameters",
    "file": "dom/canvas/ClientWebGLContext.cpp",
-   "hunk": 9,
+   "hunk": 7,
    "churn": 0,
    "which": []
   },
   {
-   "key": "H|fingerprint/webgl/parameters|dom/canvas/ClientWebGLContext.cpp|void ClientWebGLContext::ReadPixels(GLint x, GLint y, GLsizei width,|3c4c6384012e",
+   "key": "H|fingerprint/webgl/parameters|dom/canvas/ClientWebGLContext.cpp|void ClientWebGLContext::ReadPixels(GLint x, GLint y, GLsizei width,|8a8f1577a81f",
    "folder": "fingerprint/webgl/parameters",
    "file": "dom/canvas/ClientWebGLContext.cpp",
-   "hunk": 10,
+   "hunk": 8,
    "churn": 0,
    "which": []
   },
@@ -3668,7 +3731,7 @@
    "key": "H|fingerprint/webgl/parameters|dom/canvas/ClientWebGLContext.cpp|bool ClientWebGLContext::DoReadPixels(const webgl::ReadPixelsDesc& desc,|b7ed56b0d364",
    "folder": "fingerprint/webgl/parameters",
    "file": "dom/canvas/ClientWebGLContext.cpp",
-   "hunk": 11,
+   "hunk": 9,
    "churn": 1,
    "which": [
     "155"
@@ -3678,7 +3741,7 @@
    "key": "H|fingerprint/webgl/parameters|dom/canvas/ClientWebGLContext.cpp|ClientWebGLContext::DoReadPixelsAsync() {|71fa840a27ba",
    "folder": "fingerprint/webgl/parameters",
    "file": "dom/canvas/ClientWebGLContext.cpp",
-   "hunk": 12,
+   "hunk": 10,
    "churn": 1,
    "which": [
     "155"
@@ -3805,7 +3868,7 @@
    "which": []
   },
   {
-   "key": "H|fingerprint/webgl/parameters|dom/canvas/gtest/moz.build|UNIFIED_SOURCES += [|b17458d0d883",
+   "key": "H|fingerprint/webgl/parameters|dom/canvas/gtest/moz.build|UNIFIED_SOURCES += [|a77e83836b9c",
    "folder": "fingerprint/webgl/parameters",
    "file": "dom/canvas/gtest/moz.build",
    "hunk": 1,
@@ -3831,7 +3894,7 @@
    "which": []
   },
   {
-   "key": "H|fingerprint/webgl/shader-language|dom/canvas/WebGLShader.cpp|void WebGLShader::CompileShader() {|ff7487181d83",
+   "key": "H|fingerprint/webgl/shader-language|dom/canvas/WebGLShader.cpp|void WebGLShader::CompileShader() {|00711357a3ef",
    "folder": "fingerprint/webgl/shader-language",
    "file": "dom/canvas/WebGLShader.cpp",
    "hunk": 1,
@@ -3839,7 +3902,7 @@
    "which": []
   },
   {
-   "key": "H|fingerprint/webgl/shader-language|dom/canvas/WebGLShader.h|class WebGLShader final : public WebGLContextBoundObject {|d575a2b94f58",
+   "key": "H|fingerprint/webgl/shader-language|dom/canvas/WebGLShader.h|class WebGLShader final : public WebGLContextBoundObject {|8367424ef3e8",
    "folder": "fingerprint/webgl/shader-language",
    "file": "dom/canvas/WebGLShader.h",
    "hunk": 1,
@@ -5002,7 +5065,7 @@
    "which": []
   },
   {
-   "key": "H|fingerprint/webrtc/declared-network|dom/media/webrtc/transport/ipc/StunAddrsRequestParent.cpp|void StunAddrsRequestParent::SendStunAddrs(const NrIceStunAddrArray& addrs) {|7d4b8e1da21a",
+   "key": "H|fingerprint/webrtc/declared-network|dom/media/webrtc/transport/ipc/StunAddrsRequestParent.cpp|void StunAddrsRequestParent::SendStunAddrs(const NrIceStunAddrArray& addrs) {|513920e0f0d2",
    "folder": "fingerprint/webrtc/declared-network",
    "file": "dom/media/webrtc/transport/ipc/StunAddrsRequestParent.cpp",
    "hunk": 2,
@@ -5012,7 +5075,17 @@
    ]
   },
   {
-   "key": "H|fingerprint/webrtc/declared-network|dom/media/webrtc/transport/mdns_service/src/lib.rs|const MAX_NAME_LENGTH: usize = 255;|fcd9aac4c359",
+   "key": "H|fingerprint/webrtc/declared-network|dom/media/webrtc/transport/ipc/StunAddrsRequestParent.cpp|StaticRefPtr<StunAddrsRequestParent::MDNSServiceWrapper>|065009d3937f",
+   "folder": "fingerprint/webrtc/declared-network",
+   "file": "dom/media/webrtc/transport/ipc/StunAddrsRequestParent.cpp",
+   "hunk": 3,
+   "churn": 1,
+   "which": [
+    "153"
+   ]
+  },
+  {
+   "key": "H|fingerprint/webrtc/declared-network|dom/media/webrtc/transport/mdns_service/src/lib.rs|const MAX_NAME_LENGTH: usize = 255;|306c90b10aa0",
    "folder": "fingerprint/webrtc/declared-network",
    "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
    "hunk": 1,
@@ -5022,10 +5095,18 @@
    ]
   },
   {
-   "key": "H|fingerprint/webrtc/declared-network|dom/media/webrtc/transport/mdns_service/src/lib.rs|impl MDNSService {|ea2c9fd07df5",
+   "key": "H|fingerprint/webrtc/declared-network|dom/media/webrtc/transport/mdns_service/src/lib.rs|impl MDNSService {|a01322c2b389",
    "folder": "fingerprint/webrtc/declared-network",
    "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
    "hunk": 2,
+   "churn": 0,
+   "which": []
+  },
+  {
+   "key": "H|fingerprint/webrtc/declared-network|dom/media/webrtc/transport/mdns_service/src/lib.rs|impl MDNSService {|f2ecd1162e51",
+   "folder": "fingerprint/webrtc/declared-network",
+   "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
+   "hunk": 3,
    "churn": 0,
    "which": []
   },
@@ -5287,14 +5368,12 @@
    "which": []
   },
   {
-   "key": "H|network/doh|netwerk/protocol/http/TRRServiceChannel.cpp|nsresult TRRServiceChannel::ResolveProxy() {|58efe2413605",
+   "key": "H|network/doh|netwerk/protocol/http/TRRServiceChannel.cpp|nsresult TRRServiceChannel::ResolveProxy() {|4bcd56f42113",
    "folder": "network/doh",
    "file": "netwerk/protocol/http/TRRServiceChannel.cpp",
    "hunk": 3,
-   "churn": 1,
-   "which": [
-    "156"
-   ]
+   "churn": 0,
+   "which": []
   },
   {
    "key": "H|network/doh|netwerk/protocol/http/TRRServiceChannel.cpp|TRRServiceChannel::OnProxyAvailable(nsICancelable* request, nsIChannel* channel,|edde707d6466",
@@ -5468,7 +5547,7 @@
    "which": []
   },
   {
-   "key": "H|network/ipv6-literal|netwerk/base/nsSocketTransport2.cpp|nsresult nsSocketTransport::InitiateSocket() {|2340ce509425",
+   "key": "H|network/ipv6-literal|netwerk/base/nsSocketTransport2.cpp|nsresult nsSocketTransport::InitiateSocket() {|ae60a05c3dac",
    "folder": "network/ipv6-literal",
    "file": "netwerk/base/nsSocketTransport2.cpp",
    "hunk": 2,
@@ -5476,6 +5555,14 @@
    "which": [
     "155"
    ]
+  },
+  {
+   "key": "H|network/ipv6-literal|netwerk/base/nsSocketTransport2.h|class nsSocketTransport final : public nsASocketHandler,|4ced24ba7583",
+   "folder": "network/ipv6-literal",
+   "file": "netwerk/base/nsSocketTransport2.h",
+   "hunk": 1,
+   "churn": 0,
+   "which": []
   },
   {
    "key": "H|network/proxy-udp|dom/media/webrtc/jsapi/PeerConnectionImpl.cpp||5d98594569e7",
@@ -5486,7 +5573,7 @@
    "which": []
   },
   {
-   "key": "H|network/proxy-udp|dom/media/webrtc/jsapi/PeerConnectionImpl.cpp|nsresult PeerConnectionImpl::SetConfiguration(|130823b8c7e1",
+   "key": "H|network/proxy-udp|dom/media/webrtc/jsapi/PeerConnectionImpl.cpp|nsresult PeerConnectionImpl::SetConfiguration(|ca137e93df94",
    "folder": "network/proxy-udp",
    "file": "dom/media/webrtc/jsapi/PeerConnectionImpl.cpp",
    "hunk": 2,
@@ -5502,7 +5589,7 @@
    "which": []
   },
   {
-   "key": "H|network/proxy-udp|dom/media/webrtc/transport/ipc/WebrtcTCPSocket.cpp|nsresult WebrtcTCPSocket::DoProxyConfigLookup() {|6ae8f35353bd",
+   "key": "H|network/proxy-udp|dom/media/webrtc/transport/ipc/WebrtcTCPSocket.cpp|nsresult WebrtcTCPSocket::DoProxyConfigLookup() {|33f726bf4ae6",
    "folder": "network/proxy-udp",
    "file": "dom/media/webrtc/transport/ipc/WebrtcTCPSocket.cpp",
    "hunk": 2,
@@ -5534,7 +5621,7 @@
    "which": []
   },
   {
-   "key": "H|network/proxy-udp|dom/media/webrtc/transport/nr_socket_proxy_config.cpp||4e8d571b072c",
+   "key": "H|network/proxy-udp|dom/media/webrtc/transport/nr_socket_proxy_config.cpp||f09229b92664",
    "folder": "network/proxy-udp",
    "file": "dom/media/webrtc/transport/nr_socket_proxy_config.cpp",
    "hunk": 1,
@@ -5751,7 +5838,7 @@
    ]
   },
   {
-   "key": "H|network/proxy-udp|netwerk/ipc/PSocketProcess.ipdl|parent:|ba9eb61d1a4c",
+   "key": "H|network/proxy-udp|netwerk/ipc/PSocketProcess.ipdl|parent:|7cb082a89d00",
    "folder": "network/proxy-udp",
    "file": "netwerk/ipc/PSocketProcess.ipdl",
    "hunk": 1,
@@ -5779,7 +5866,7 @@
    ]
   },
   {
-   "key": "H|network/proxy-udp|netwerk/ipc/ProxyConfigLookup.cpp|namespace net {|22305ca8d472",
+   "key": "H|network/proxy-udp|netwerk/ipc/ProxyConfigLookup.cpp|nsresult ProxyConfigLookup::Create(|090496b8ca83",
    "folder": "network/proxy-udp",
    "file": "netwerk/ipc/ProxyConfigLookup.cpp",
    "hunk": 2,
@@ -5789,7 +5876,7 @@
    ]
   },
   {
-   "key": "H|network/proxy-udp|netwerk/ipc/ProxyConfigLookup.cpp|nsresult ProxyConfigLookup::DoProxyResolve(nsICancelable** aLookupCancellable) {|4ed09c3f2082",
+   "key": "H|network/proxy-udp|netwerk/ipc/ProxyConfigLookup.cpp|nsresult ProxyConfigLookup::DoProxyResolve(nsICancelable** aLookupCancellable) {|bb6e0ffab637",
    "folder": "network/proxy-udp",
    "file": "netwerk/ipc/ProxyConfigLookup.cpp",
    "hunk": 3,
@@ -5799,118 +5886,18 @@
    ]
   },
   {
-   "key": "H|network/proxy-udp|netwerk/ipc/ProxyConfigLookup.h||f1fb05fa0ad2",
-   "folder": "network/proxy-udp",
-   "file": "netwerk/ipc/ProxyConfigLookup.h",
-   "hunk": 1,
-   "churn": 1,
-   "which": [
-    "154"
-   ]
-  },
-  {
-   "key": "H|network/proxy-udp|netwerk/ipc/ProxyConfigLookup.h|class ProxyConfigLookup final : public nsIProtocolProxyCallback {|42646b5f6f7e",
-   "folder": "network/proxy-udp",
-   "file": "netwerk/ipc/ProxyConfigLookup.h",
-   "hunk": 2,
-   "churn": 1,
-   "which": [
-    "156"
-   ]
-  },
-  {
-   "key": "H|network/proxy-udp|netwerk/ipc/ProxyConfigLookup.h|class ProxyConfigLookup final : public nsIProtocolProxyCallback {|895d3ed82c73",
-   "folder": "network/proxy-udp",
-   "file": "netwerk/ipc/ProxyConfigLookup.h",
-   "hunk": 3,
-   "churn": 1,
-   "which": [
-    "156"
-   ]
-  },
-  {
-   "key": "H|network/proxy-udp|netwerk/ipc/ProxyConfigLookupChild.cpp|namespace net {|c74c484253bc",
+   "key": "H|network/proxy-udp|netwerk/ipc/ProxyConfigLookupChild.cpp||78b4e40c5893",
    "folder": "network/proxy-udp",
    "file": "netwerk/ipc/ProxyConfigLookupChild.cpp",
-   "hunk": 1,
-   "churn": 1,
-   "which": [
-    "156"
-   ]
-  },
-  {
-   "key": "H|network/proxy-udp|netwerk/ipc/ProxyConfigLookupChild.cpp|bool ProxyConfigLookupChild::Create(|f922f3b1a0fb",
-   "folder": "network/proxy-udp",
-   "file": "netwerk/ipc/ProxyConfigLookupChild.cpp",
-   "hunk": 2,
-   "churn": 1,
-   "which": [
-    "156"
-   ]
-  },
-  {
-   "key": "H|network/proxy-udp|netwerk/ipc/ProxyConfigLookupChild.h||8feff7ac1db2",
-   "folder": "network/proxy-udp",
-   "file": "netwerk/ipc/ProxyConfigLookupChild.h",
-   "hunk": 1,
-   "churn": 1,
-   "which": [
-    "154"
-   ]
-  },
-  {
-   "key": "H|network/proxy-udp|netwerk/ipc/ProxyConfigLookupChild.h|class ProxyConfigLookupChild final : public PProxyConfigLookupChild {|569750b491ad",
-   "folder": "network/proxy-udp",
-   "file": "netwerk/ipc/ProxyConfigLookupChild.h",
-   "hunk": 2,
-   "churn": 1,
-   "which": [
-    "156"
-   ]
-  },
-  {
-   "key": "H|network/proxy-udp|netwerk/ipc/ProxyConfigLookupParent.cpp||db13a7b8cf9d",
-   "folder": "network/proxy-udp",
-   "file": "netwerk/ipc/ProxyConfigLookupParent.cpp",
-   "hunk": 1,
-   "churn": 1,
-   "which": [
-    "156"
-   ]
-  },
-  {
-   "key": "H|network/proxy-udp|netwerk/ipc/ProxyConfigLookupParent.cpp|void ProxyConfigLookupParent::DoProxyLookup() {|2b02283c1206",
-   "folder": "network/proxy-udp",
-   "file": "netwerk/ipc/ProxyConfigLookupParent.cpp",
-   "hunk": 2,
-   "churn": 1,
-   "which": [
-    "156"
-   ]
-  },
-  {
-   "key": "H|network/proxy-udp|netwerk/ipc/ProxyConfigLookupParent.h||8feff7ac1db2",
-   "folder": "network/proxy-udp",
-   "file": "netwerk/ipc/ProxyConfigLookupParent.h",
    "hunk": 1,
    "churn": 0,
    "which": []
   },
   {
-   "key": "H|network/proxy-udp|netwerk/ipc/ProxyConfigLookupParent.h|class ProxyConfigLookupParent final : public PProxyConfigLookupParent {|cfbf20b1be40",
+   "key": "H|network/proxy-udp|netwerk/ipc/ProxyConfigLookupChild.cpp|bool ProxyConfigLookupChild::Create(|893a76537e41",
    "folder": "network/proxy-udp",
-   "file": "netwerk/ipc/ProxyConfigLookupParent.h",
+   "file": "netwerk/ipc/ProxyConfigLookupChild.cpp",
    "hunk": 2,
-   "churn": 1,
-   "which": [
-    "156"
-   ]
-  },
-  {
-   "key": "H|network/proxy-udp|netwerk/ipc/ProxyConfigLookupParent.h|class ProxyConfigLookupParent final : public PProxyConfigLookupParent {|895d3ed82c73",
-   "folder": "network/proxy-udp",
-   "file": "netwerk/ipc/ProxyConfigLookupParent.h",
-   "hunk": 3,
    "churn": 1,
    "which": [
     "156"
@@ -5925,17 +5912,25 @@
    "which": []
   },
   {
-   "key": "H|network/proxy-udp|netwerk/ipc/SocketProcessParent.cpp|SocketProcessParent::AllocPAltServiceParent() {|b36c980645f4",
+   "key": "H|network/proxy-udp|netwerk/ipc/SocketProcessParent.cpp||78b4e40c5893",
    "folder": "network/proxy-udp",
    "file": "netwerk/ipc/SocketProcessParent.cpp",
    "hunk": 1,
+   "churn": 0,
+   "which": []
+  },
+  {
+   "key": "H|network/proxy-udp|netwerk/ipc/SocketProcessParent.cpp|SocketProcessParent::AllocPProxyConfigLookupParent(|f22d631a4149",
+   "folder": "network/proxy-udp",
+   "file": "netwerk/ipc/SocketProcessParent.cpp",
+   "hunk": 2,
    "churn": 1,
    "which": [
     "156"
    ]
   },
   {
-   "key": "H|network/proxy-udp|netwerk/ipc/SocketProcessParent.h|class SocketProcessParent final|069740f536d7",
+   "key": "H|network/proxy-udp|netwerk/ipc/SocketProcessParent.h|class SocketProcessParent final|0b3979da3d94",
    "folder": "network/proxy-udp",
    "file": "netwerk/ipc/SocketProcessParent.h",
    "hunk": 1,
@@ -6099,7 +6094,7 @@
    ]
   },
   {
-   "key": "H|network/proxy-udp|netwerk/socket/nsSOCKSIOLayer.cpp|PRStatus nsSOCKSSocketInfo::ConnectToProxy(PRFileDesc* fd) {|4d18b4f76c93",
+   "key": "H|network/proxy-udp|netwerk/socket/nsSOCKSIOLayer.cpp|PRStatus nsSOCKSSocketInfo::ConnectToProxy(PRFileDesc* fd) {|eb3591546c2a",
    "folder": "network/proxy-udp",
    "file": "netwerk/socket/nsSOCKSIOLayer.cpp",
    "hunk": 2,
@@ -6350,7 +6345,7 @@
    "which": []
   },
   {
-   "key": "H|platform/hidden-desktop|third_party/libwebrtc/modules/desktop_capture/cropping_window_capturer_win.cc|bool CroppingWindowCapturerWin::ShouldUseScreenCapturer() {|840e15df5185",
+   "key": "H|platform/hidden-desktop|third_party/libwebrtc/modules/desktop_capture/cropping_window_capturer_win.cc|bool CroppingWindowCapturerWin::ShouldUseScreenCapturer() {|f074f3a69ca5",
    "folder": "platform/hidden-desktop",
    "file": "third_party/libwebrtc/modules/desktop_capture/cropping_window_capturer_win.cc",
    "hunk": 2,
@@ -6585,7 +6580,7 @@
    "which": []
   },
   {
-   "key": "H|platform/untrusted-modules|toolkit/xre/dllservices/UntrustedModulesData.cpp|ModuleRecord::ModuleRecord(const nsAString& aResolvedNtPath)|24d1d60230ff",
+   "key": "H|platform/untrusted-modules|toolkit/xre/dllservices/UntrustedModulesData.cpp|void ModuleRecord::GetVersionAndVendorInfo(const nsAString& aPath) {|7768e396fc27",
    "folder": "platform/untrusted-modules",
    "file": "toolkit/xre/dllservices/UntrustedModulesData.cpp",
    "hunk": 2,
@@ -6737,7 +6732,7 @@
    "which": []
   },
   {
-   "key": "H|stillborn/telemetry|toolkit/components/telemetry/app/TelemetrySend.sys.mjs|import { ServiceRequest } from \"resource://gre/modules/ServiceRequest.sys.mjs\";|ba1858d15787",
+   "key": "H|stillborn/telemetry|toolkit/components/telemetry/app/TelemetrySend.sys.mjs|import { ServiceRequest } from \"resource://gre/modules/ServiceRequest.sys.mjs\";|87f9563dcdf6",
    "folder": "stillborn/telemetry",
    "file": "toolkit/components/telemetry/app/TelemetrySend.sys.mjs",
    "hunk": 1,
@@ -6753,18 +6748,10 @@
    "which": []
   },
   {
-   "key": "H|stillborn/telemetry|toolkit/components/telemetry/app/TelemetrySend.sys.mjs|export var TelemetrySendImpl = {|8b06ff6a90ce",
+   "key": "H|stillborn/telemetry|toolkit/components/telemetry/app/TelemetrySend.sys.mjs|export var TelemetrySendImpl = {|22e7f027a4d8",
    "folder": "stillborn/telemetry",
    "file": "toolkit/components/telemetry/app/TelemetrySend.sys.mjs",
    "hunk": 3,
-   "churn": 0,
-   "which": []
-  },
-  {
-   "key": "H|stillborn/telemetry|toolkit/components/telemetry/app/TelemetrySend.sys.mjs|export var TelemetrySendImpl = {|2b178652e4b5",
-   "folder": "stillborn/telemetry",
-   "file": "toolkit/components/telemetry/app/TelemetrySend.sys.mjs",
-   "hunk": 4,
    "churn": 0,
    "which": []
   },
@@ -6811,7 +6798,7 @@
    "which": []
   },
   {
-   "key": "H|stillborn/updater|toolkit/mozapps/update/UpdateService.sys.mjs|import {|ee325998f148",
+   "key": "H|stillborn/updater|toolkit/mozapps/update/UpdateService.sys.mjs|import {|d4a83195c364",
    "folder": "stillborn/updater",
    "file": "toolkit/mozapps/update/UpdateService.sys.mjs",
    "hunk": 1,
@@ -6829,7 +6816,7 @@
    "which": []
   },
   {
-   "key": "H|stillborn/updater|toolkit/mozapps/update/UpdateService.sys.mjs|export class CheckerService {|7456a1318643",
+   "key": "H|stillborn/updater|toolkit/mozapps/update/UpdateService.sys.mjs|export class CheckerService {|8571fe59a08a",
    "folder": "stillborn/updater",
    "file": "toolkit/mozapps/update/UpdateService.sys.mjs",
    "hunk": 3,

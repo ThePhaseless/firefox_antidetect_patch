@@ -35,7 +35,7 @@ Public API (stable: the HOOKS.json generator reads it):
     load_debt(path) / write_debt(path, violations) / debt_problems(violations, debt, main_debt)
     debt_summary(entries)      -> text
 
-Rules (the id is in the key; C12..C15 are port-06, below): C1 a hook of more than one line (two adjacent lines are two hooks when each is a complete statement or declaration
+Rules (the id is in the key; C12..C15 are port-06, C18 is port-07, below): C1 a hook of more than one line (two adjacent lines are two hooks when each is a complete statement or declaration
 with its own marker: C1 is a line of ours without a marker in a run, or one statement over several lines); C2 marker missing; C3 the marker
 comment carries more than the marker; C4 a comment line added; C5 logic in the hook (&&, ||,
 ternary, arithmetic); C6 Mozilla lines removed or changed outside the three rewriting forms;
@@ -97,6 +97,7 @@ RULES = {
     "C15": "a parameter threaded through a C++ signature or call: carry it by side state, or declare it with reason_kind declaration and say why no side state can (port-06)",
     "C16": "a hook passes a local of Mozilla's function as an argument outside an anchor (hook-02 point 3; read from the lines the hunks show)",
     "C17": "a Stealth-named function in the top-level namespace of someone else (JS::, js::, xpc::, a library's): ours live in `mozilla` or the global namespace",
+    "C18": "a hook in the churn band of tools/churn.py with no reason why no quieter anchor serves, or whose hunk has no churn (port-07)",
     "T1": "a hook with no test (the `test` of its HOOKS.json entry is empty)",
     "T2": "an anchor hook without its `anchor` and `why` in HOOKS.json",
     "T3": "a hook whose test no round runs (gtest filter of the candidate, node job, python step)",
@@ -106,6 +107,10 @@ RULES = {
 INTRODUCED_RULES = {"T1", "T2", "T3"}
 # port-06: these rules are fixed by the engine change and the HOOKS.json fields, never by the debt list (debt_problems refuses them)
 PORT06_RULES = ("C12", "C13", "C14", "C15", "C16", "C17")      # C16 and C17 are hook-02 rules: fixed by the hook, never by the debt
+PORT07_RULES = ("C18",)         # port-07: fixed by moving the hook or by its reason in HOOKS.json, never by the debt
+NEVER_DEBT_RULES = PORT06_RULES + PORT07_RULES
+PORT07_DECISION = "docs/decisions/port-07-quiet-anchors.md"
+QUIET_KINDS = ("only-place", "deferred")        # the two forms of the HOOKS.json hand field `quiet_anchor_why`
 
 HASH_COMMENT = {"py", "yaml", "yml", "toml", "build", "configure", "sh", "txt", "in", "ini",
                 "cfg", "cmake", "gitignore", "mk", "conf", "lock"}
@@ -1673,6 +1678,93 @@ def namespace_violations(root, unqualified: bool = False) -> list:
     return found
 
 
+# --------------------------------------------------------------------------- C18: an anchor is chosen where Mozilla is quiet
+# port-07 (docs/decisions/port-07-quiet-anchors.md). tools/churn.py counts, for every hunk of the series, in how many of the last eight
+# releases Mozilla changed a line near it (tools/churn.json); a hunk whose churn is at least churn.BAND_MIN_CHURN is in the band. A hook
+# in the band carries the HOOKS.json hand field `quiet_anchor_why`, one of
+#     {"kind": "only-place", "why": "<words>"}                       no quieter anchor serves, and why
+#     {"kind": "deferred", "quieter": "<mozilla file>:<anchor text>"}   a quieter anchor exists and the hook moves there at the next port
+# `deferred` holds only while tools/churn.json is for the tag the series is on (UPSTREAM.json `mozilla_tag`): the next port makes every
+# one of them red until the hook is moved or given an `only-place` reason. A hook whose hunk is not in tools/churn.json (a new hook, a
+# hook that moved or changed) is red: python tools/churn.py --write. Offline: only tools/churn.json and UPSTREAM.json are read. Never debt.
+def quiet_anchor_problem(value) -> str:
+    """Why a `quiet_anchor_why` is not one of the two forms ('' when it is)."""
+    if not isinstance(value, dict):
+        return "it is not an object: write {kind: only-place, why: <words>} or {kind: deferred, quieter: <mozilla file>:<anchor text>}"
+    kind = value.get("kind")
+    if kind not in QUIET_KINDS:
+        return "its kind %r is not one of %s" % (kind, "/".join(QUIET_KINDS))
+    field = "why" if kind == "only-place" else "quieter"
+    extra = sorted(set(value) - {"kind", field})
+    if extra:
+        return "a %s has the keys kind and %s, not %s" % (kind, field, "/".join(extra))
+    text = value.get(field)
+    if not (isinstance(text, str) and text.strip()):
+        return "a %s has a non-empty `%s`" % (kind, field)
+    if kind == "deferred":
+        where, sep, anchor = text.partition(":")
+        if not (sep and where.strip() and anchor.strip() and not re.search(r"\s", where.strip())):
+            return "`quieter` is <mozilla file>:<anchor text>, the file with no space and the text of the quieter anchor after the colon"
+    return ""
+
+
+def churn_violations(root) -> list:
+    """C18 of every non-backport folder: a hook whose hunk is not in tools/churn.json, a hook whose hunk is in the band
+    (churn.BAND_MIN_CHURN) without a valid `quiet_anchor_why`, a `deferred` reason older than the tag the series is on."""
+    import churn            # imports this module (and hooks_list does): loaded here, not at the top
+    import hooks_list
+    root = Path(root)
+    problem, data = "", None
+    try:
+        data = json.loads((root / "tools" / "churn.json").read_text(encoding="utf-8"))
+        if not isinstance(data.get("hooks"), list):
+            raise ValueError("no list of hooks")
+    except OSError:
+        problem = "tools/churn.json is missing"
+    except ValueError as exc:
+        problem = "tools/churn.json is not what tools/churn.py writes (%s)" % exc
+    try:
+        tag = json.loads((root / "UPSTREAM.json").read_text(encoding="utf-8")).get("mozilla_tag")
+    except (OSError, ValueError):
+        tag = None
+    by_key = {h["key"]: h for h in (data or {}).get("hooks", []) if isinstance(h, dict) and "key" in h}
+    keys = churn.hunk_keys(root) if not problem else {}
+    fix = "run `python tools/churn.py --source <repo with the tags> --write` and commit tools/churn.json"
+    fix_missing = "a new or moved hook has no churn: " + fix
+    out = []
+    for folder in _folders(root):
+        hooks, _ = analyse_patch(folder, (root / folder / "hooks.patch").read_text(encoding="utf-8", errors="replace"))
+        entries = hooks_list.expected(root, folder)
+        for h, e in zip(hooks, entries):
+            text = h.line.strip() or "<%s> %s" % (h.kind, _squeeze(h.removed)[:80])
+            mine = lambda detail: Violation("C18", folder, h.file, h.function, text, _key("C18", folder, h.file, h.function, text),
+                                            detail, (hook_identity(h),))
+            if h.hunk:
+                rows = [by_key.get(keys.get((folder, h.file, h.hunk)))]
+            else:               # a whole file deleted or replaced: its hunks are its churn
+                rows = [by_key.get(k) for (f, p, _), k in keys.items() if (f, p) == (folder, h.file)]
+            rows = [r for r in rows if r]
+            if not rows:
+                out.append(mine("`%s`, %s%s (rule: %s)" % (_squeeze(text)[:60], "hunk %d: " % h.hunk if h.hunk else "",
+                                                          "%s: %s" % (problem, fix) if problem else fix_missing, PORT07_DECISION)))
+                continue
+            row = max(rows, key=lambda r: r["churn"])
+            value = e.get("quiet_anchor_why")
+            shape = quiet_anchor_problem(value) if "quiet_anchor_why" in e else ""
+            where = "`%s`, hunk %d, churn %d (releases %s)" % (_squeeze(text)[:60], row["hunk"], row["churn"], ", ".join(row["which"]))
+            if shape:
+                out.append(mine("%s: quiet_anchor_why is wrong: %s (rule: %s)" % (where, shape, PORT07_DECISION)))
+            elif row["churn"] >= churn.BAND_MIN_CHURN and not value:
+                out.append(mine("%s is at or above BAND_MIN_CHURN of tools/churn.py: name why no quieter anchor serves with the hand field "
+                                "`quiet_anchor_why` of its HOOKS.json entry ({kind: only-place, why} or {kind: deferred, quieter}), or move "
+                                "the hook to a quieter anchor (rule: %s)" % (where, PORT07_DECISION)))
+            elif row["churn"] >= churn.BAND_MIN_CHURN and value["kind"] == "deferred" and (data or {}).get("base") != tag:
+                out.append(mine("%s: a `deferred` reason holds only for the port that wrote it (tools/churn.json is for %s, the series is on %s): "
+                                "move the hook to %s, or give it an `only-place` reason (rule: %s)"
+                                % (where, (data or {}).get("base"), tag, value["quieter"], PORT07_DECISION)))
+    return _unique(out)
+
+
 def _folders(root: Path) -> list:
     names = (root / "SERIES").read_text(encoding="utf-8").split()
     return [f for f in names if (root / f / "hooks.patch").is_file() and not (root / f / "BACKPORT.json").exists()]
@@ -1737,7 +1829,7 @@ def update_debt(entries: list, violations: list, init: bool = False) -> list:
     """The debt after `hook-debt`: with init, every violation of now; without, only the entries that
     still occur (a list never grows by itself)."""
     if init:
-        return [entry_of(v) for v in violations if v.rule not in PORT06_RULES]
+        return [entry_of(v) for v in violations if v.rule not in NEVER_DEBT_RULES]
     now = {v.key for v in violations}
     return [e for e in entries if e["key"] in now]
 
@@ -1748,12 +1840,12 @@ def debt_problems(violations: list, debt: list, main_debt: list | None) -> list:
     found = []
     now = {v.key: v for v in violations}
     listed = {e["key"] for e in debt}
-    for key in sorted(k for k in listed if k.split("|", 1)[0] in PORT06_RULES):
-        found.append("tools/hook-debt.json lists %s: the rules %s are never debt (port-06): fix the rewrite by an engine change or "
-                     "by its HOOKS.json exception" % (key, "/".join(PORT06_RULES)))
+    for key in sorted(k for k in listed if k.split("|", 1)[0] in NEVER_DEBT_RULES):
+        found.append("tools/hook-debt.json lists %s: the rules %s are never debt (port-06, port-07): fix the rewrite by an engine change or "
+                     "by its HOOKS.json exception, a C18 by moving the hook or by its `quiet_anchor_why`" % (key, "/".join(NEVER_DEBT_RULES)))
     for key in sorted(set(now) - listed):
         v = now[key]
-        if v.rule in PORT06_RULES:
+        if v.rule in NEVER_DEBT_RULES:
             found.append("%s/hooks.patch, %s: %s (%s): %s" % (v.folder, v.file, v.rule, RULES[v.rule], v.detail or _squeeze(v.text)[:100]))
             continue
         found.append("%s/hooks.patch, %s: %s (%s): a hook breaks the contract and is not in the debt list "

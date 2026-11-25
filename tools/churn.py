@@ -9,13 +9,21 @@ older file's coordinates before the next interval. A file that does not exist in
 as changed in the interval where it appears. The churn of a hunk is the number of intervals that count.
 
     python tools/churn.py --source <firefox repo> --base FIREFOX_159_0_RELEASE [--releases <tag,...>] [--write]
+    python tools/churn.py --source <firefox repo> --check          the committed tools/churn.json is what the series gives now
+    python tools/churn.py --source <repo> --fetch                  the tags tools/churn.json lists, one commit deep, into <repo>
+    python tools/churn.py --cache-key                              the key of the commits tools/churn.json lists (a cache's)
 
 --releases is the chain of release tags, oldest first, ending with the base: eight intervals are nine tags
 (default: the eight releases before the base, `FIREFOX_<N>_0_RELEASE`). The tags must exist in --source; a
-missing one is named with the command that fetches it, nothing is fetched here.
+missing one is named with the command that fetches it, nothing is fetched by the compute (`--fetch` does it).
+Every tag is also a commit: tools/churn.json records it, and a tag of the source that resolves to another commit
+(a moved tag, another repository) is red, in the compute, in `--check` and in `--fetch`.
 
-tools/churn.json: {"base", "releases", "band", "hooks": [{key, folder, file, hunk, churn, which}]} sorted by
-folder, file, hunk; the same input gives the same bytes on every machine. The key is the one of
+--check recomputes at the base and the tags the committed file names and compares the bytes; a difference is red and
+names the hunks that differ (a port, a hook moved or added, a constant changed: `--write` and commit).
+
+tools/churn.json: {"base", "releases": [{tag, commit}], "band", "hooks": [{key, folder, file, hunk, churn, which}]}
+sorted by folder, file, hunk; the same input gives the same bytes on every machine. The key is the one of
 tools/hook_contract.py (rule|folder|file|function|sha1(normalized text)[:12]) with the rule `H` and the
 changed lines of the hunk as the text: no line number, so a hunk that only moved keeps its key. A hunk of a
 backport folder is in the file with its folder (it is not a hook). `band`: a hunk is in the band when its
@@ -24,10 +32,12 @@ churn is at least that many (BAND_MIN_CHURN).
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import subprocess
 import sys
+import time
 from collections import Counter
 from pathlib import Path
 
@@ -43,6 +53,8 @@ BAND_MIN_CHURN = 2       # a hunk is in the band when this many of the intervals
 HUNK_HEADER = re.compile(rb"@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@ ?(.*)$")
 TAG = re.compile(r"^FIREFOX_(\d+(?:_\d+)*)_RELEASE$")
 PATH_BATCH = 24000       # bytes of paths on one command line
+FETCH_WAITS = (5, 15, 45)   # seconds before each new try of a fetch from Mozilla's repository
+SHOWN = 25               # differing hunks `--check` names; the rest is counted
 
 
 class ChurnError(Exception):
@@ -78,9 +90,9 @@ def git(source, *args, check=True, input_bytes=None) -> subprocess.CompletedProc
     return done
 
 
-def mozilla_repository() -> str:
+def mozilla_repository(root=None) -> str:
     try:
-        return json.loads((ROOT / "UPSTREAM.json").read_text(encoding="utf-8"))["mozilla_repository"]
+        return json.loads((Path(root or ROOT) / "UPSTREAM.json").read_text(encoding="utf-8"))["mozilla_repository"]
     except (OSError, ValueError, KeyError):
         return "<the Mozilla repository>"
 
@@ -93,6 +105,77 @@ def check_tags(source, tags: list) -> None:
         url = mozilla_repository()
         raise ChurnError("the source repository lacks the tags: %s\nfetch each with: git -C <source> fetch --depth=1 %s %s"
                          % (", ".join(missing), url, "refs/tags/<tag>:refs/tags/<tag>"))
+
+
+def commit_of(source, tag: str):
+    """The commit a tag resolves to in the source, or None."""
+    done = git(source, "rev-parse", "-q", "--verify", "refs/tags/%s^{commit}" % tag, check=False)
+    return done.stdout.decode().strip() if done.returncode == 0 else None
+
+
+def check_commits(source, expected: dict) -> None:
+    """Every tag the file records resolves, in the source, to the commit recorded: a tag does not move, so another commit is
+    another repository or a retagged release, and every number computed on it would be meaningless."""
+    found = {t: commit_of(source, t) for t in expected}
+    wrong = [(t, c, found[t]) for t, c in expected.items() if found[t] not in (None, c)]
+    if wrong:
+        raise ChurnError("the tags of the source are not the releases tools/churn.json recorded:\n%s"
+                         % "\n".join("  %s is %s in the source, %s in tools/churn.json" % (t, got, c) for t, c, got in wrong))
+
+
+def recorded(data: dict) -> dict:
+    """tag -> commit of the releases of a churn.json (its `releases` is [{tag, commit}])."""
+    try:
+        return {r["tag"]: r["commit"] for r in data["releases"]}
+    except (TypeError, KeyError):
+        raise ChurnError("the `releases` of tools/churn.json is not a list of {tag, commit}: python tools/churn.py --write")
+
+
+def load_committed(path=None):
+    """The committed tools/churn.json (or the file at `path`) as data."""
+    path = Path(path or OUTPUT)
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except OSError:
+        raise ChurnError("tools/churn.json is missing: python tools/churn.py --source <repo> --base <tag> --write")
+    except ValueError as exc:
+        raise ChurnError("tools/churn.json is not JSON: %s" % exc)
+
+
+def cache_key(data: dict) -> str:
+    """A key for what the tags are: the commits, in the order of the chain, not the names of the tags."""
+    return hashlib.sha256("\n".join(r["commit"] for r in data["releases"]).encode()).hexdigest()[:32]
+
+
+def fetch(source, data: dict, url=None, say=print, sleep=time.sleep) -> None:
+    """Puts every release tag of `data` into `source` (a repository, made bare when it is not one yet), one commit deep, from
+    `url` (default: the Mozilla repository of UPSTREAM.json), and requires each to be the commit recorded. A tag already there is
+    not fetched: a restored cache costs a `rev-parse` per tag."""
+    source = Path(source)
+    if not (source / "objects").is_dir() and not (source / ".git").exists():
+        source.mkdir(parents=True, exist_ok=True)
+        subprocess.run(["git", "init", "-q", "--bare", str(source)], check=True)
+    url = url or mozilla_repository()
+    for tag, commit in recorded(data).items():
+        have = commit_of(source, tag)
+        if have == commit:
+            say("%s: in the repository" % tag)
+            continue
+        if have is not None:
+            raise ChurnError("%s is %s in %s, tools/churn.json recorded %s" % (tag, have, source, commit))
+        began = time.monotonic()
+        for attempt in range(len(FETCH_WAITS) + 1):
+            done = git(source, "fetch", "-q", "--depth=1", "--no-tags", url, "refs/tags/%s:refs/tags/%s" % (tag, tag), check=False)
+            if done.returncode == 0:
+                break
+            if attempt == len(FETCH_WAITS):
+                raise ChurnError("git fetch %s %s: %s" % (url, tag, done.stderr.decode(errors="replace").strip()[-300:]))
+            say("%s: the fetch failed, again in %d s" % (tag, FETCH_WAITS[attempt]))
+            sleep(FETCH_WAITS[attempt])
+        got = commit_of(source, tag)
+        if got != commit:
+            raise ChurnError("%s is %s in %s, tools/churn.json recorded %s" % (tag, got, url, commit))
+        say("%s: fetched in %.0f s" % (tag, time.monotonic() - began))
 
 
 # --------------------------------------------------------------------------- reading a hooks.patch
@@ -205,6 +288,28 @@ def hunk_key(folder: str, path: str, h: dict) -> str:
     return hook_contract._key("H", folder, path, h["section"], text)
 
 
+def keyed_hunks(folder: str, fd: dict) -> list:
+    """[(number, hunk, key)] of one file of a hooks.patch: two hunks with one key are told apart by `#2`, `#3`."""
+    seen, out = Counter(), []
+    for no, h in enumerate(fd["hunks"], 1):
+        key = hunk_key(folder, fd["path"], h)
+        seen[key] += 1
+        out.append((no, h, key if seen[key] == 1 else "%s#%d" % (key, seen[key])))
+    return out
+
+
+def hunk_keys(root) -> dict:
+    """(folder, file, hunk number) -> key, of every hunk of every hooks.patch of SERIES: what tools/churn.json says about it."""
+    root, out = Path(root), {}
+    for folder in series_folders(root):
+        patch = root / folder / "hooks.patch"
+        if patch.is_file():
+            for fd in parse_patch(patch.read_bytes()):
+                for no, _, key in keyed_hunks(folder, fd):
+                    out[(folder, fd["path"], no)] = key
+    return out
+
+
 # --------------------------------------------------------------------------- the regions of the series at the base tag
 def series_folders(root: Path) -> list:
     return (Path(root) / "SERIES").read_text(encoding="utf-8").split()
@@ -234,8 +339,8 @@ def regions(root, base_blob, warn=None) -> list:
                     mapping[path] = list(range(1, len(content[path]) + 1))
             body, m = content[path] or [], mapping[path]
             absent = content[path] is None
-            newc, newm, cursor, seen = [], [], 0, Counter()
-            for no, h in enumerate(fd["hunks"], 1):
+            newc, newm, cursor = [], [], 0
+            for no, h, key in keyed_hunks(folder, fd):
                 p = locate(body, h)
                 if p is None:
                     warn.append("%s %s hunk %d: the old side is not in the layered file" % (folder, path, no))
@@ -258,10 +363,7 @@ def regions(root, base_blob, warn=None) -> list:
                         warn.append("%s %s hunk %d: every neighbour is added by an earlier folder, anchored at %d" % (folder, path, no, near))
                     if fd["deleted"]:
                         region = (1, max([x for x in m if x is not None] or [1]))
-                key = hunk_key(folder, path, h)
-                seen[key] += 1
-                out.append({"folder": folder, "file": path, "hunk": no,
-                            "key": key if seen[key] == 1 else "%s#%d" % (key, seen[key]), "region": region})
+                out.append({"folder": folder, "file": path, "hunk": no, "key": key, "region": region})
                 # the layered file after this hunk: Mozilla's lines keep their number, a line of ours has none
                 newc.extend(body[cursor:p])
                 newm.extend(m[cursor:p])
@@ -436,14 +538,16 @@ def in_band(churn: int) -> bool:
     return churn >= BAND_MIN_CHURN
 
 
-def compute(root, source, base: str, releases: list | None = None, warn=None) -> dict:
-    """The data of tools/churn.json for the series in `root`, the Mozilla tags in `source`."""
+def compute(root, source, base: str, releases: list | None = None, warn=None, expected: dict | None = None) -> dict:
+    """The data of tools/churn.json for the series in `root`, the Mozilla tags in `source`. `expected` (tag -> commit): the
+    commits the tags must resolve to (check_commits); the commits found are recorded in the result."""
     releases = list(releases) if releases else default_releases(base)
     if releases[-1] != base:
         raise ChurnError("the chain of releases must end with the base %s (it ends with %s)" % (base, releases[-1]))
     if len(set(releases)) != len(releases) or len(releases) < 2:
         raise ChurnError("the releases are not a chain of distinct tags: %s" % ", ".join(releases))
     check_tags(source, releases)
+    check_commits(source, {t: c for t, c in (expected or {}).items() if t in releases})
     warn = warn if warn is not None else []
     last = len(releases) - 1
     paths = set()
@@ -461,7 +565,8 @@ def compute(root, source, base: str, releases: list | None = None, warn=None) ->
         hooks.append({"key": r["key"], "folder": r["folder"], "file": r["file"], "hunk": r["hunk"],
                       "churn": len(which), "which": which})
     hooks.sort(key=lambda h: (h["folder"], h["file"], h["hunk"], h["key"]))
-    return {"base": base, "releases": releases, "band": BAND_MIN_CHURN, "hooks": hooks}
+    return {"base": base, "releases": [{"tag": t, "commit": commit_of(source, t)} for t in releases], "band": BAND_MIN_CHURN,
+            "hooks": hooks}
 
 
 def render(data: dict) -> bytes:
@@ -482,17 +587,96 @@ def summary(data: dict) -> str:
                       "in the band (churn >= %d): %d" % (data["band"], banded)])
 
 
+def describe(h: dict) -> str:
+    return "%s %s hunk %d" % (h["folder"], h["file"], h["hunk"])
+
+
+def differences(old: dict, new: dict) -> list:
+    """What differs between a committed churn.json and the one computed now, one sentence each, the hunks by name."""
+    out = []
+    for field in ("base", "band"):
+        if old.get(field) != new[field]:
+            out.append("%s: %r in tools/churn.json, %r now" % (field, old.get(field), new[field]))
+    if old.get("releases") != new["releases"]:
+        out.append("releases: the tags or their commits differ")
+    before = {h["key"]: h for h in old.get("hooks", [])}
+    now = {h["key"]: h for h in new["hooks"]}
+    for key in sorted(set(before) - set(now)):
+        out.append("%s: in tools/churn.json (churn %s), no longer in the series" % (describe(before[key]), before[key].get("churn")))
+    for key in sorted(set(now) - set(before)):
+        out.append("%s: in the series (churn %d), not in tools/churn.json" % (describe(now[key]), now[key]["churn"]))
+    for key in sorted(set(now) & set(before)):
+        o, n = before[key], now[key]
+        if o != n:
+            out.append("%s: churn %s %s in tools/churn.json, churn %d %s now" % (describe(n), o.get("churn"), o.get("which"), n["churn"], n["which"]))
+    return out
+
+
+def stale_message(found: list) -> str:
+    head = "tools/churn.json is not what the series gives now: %d difference(s)" % len(found)
+    shown = found[:SHOWN] + (["... and %d more" % (len(found) - SHOWN)] if len(found) > SHOWN else [])
+    return "\n".join([head] + ["  " + f for f in shown] +
+                     ["fix: python tools/churn.py --source <repo with the tags> --write, and commit the file",
+                      "rule: docs/decisions/port-07-quiet-anchors.md"])
+
+
+def check(series: Path, source: Path, warn=None) -> list:
+    """`--check`: recompute at the base and the tags the committed file names, and compare the bytes. -> the problems ([] = same)."""
+    path = Path(series) / "tools" / "churn.json"
+    committed = load_committed(path)
+    data = compute(series, source, committed.get("base", ""), [r["tag"] for r in committed["releases"]], warn, recorded(committed))
+    found = []
+    try:
+        pinned = json.loads((Path(series) / "UPSTREAM.json").read_text(encoding="utf-8")).get("mozilla_tag")
+    except (OSError, ValueError):
+        pinned = None
+    if pinned and committed.get("base") != pinned:
+        found.append("base: tools/churn.json is for %s, the series is on %s" % (committed.get("base"), pinned))
+    found += differences(committed, data)
+    if not found and render(data) != path.read_bytes():
+        found.append("the bytes differ and no hunk does: the file was not written by tools/churn.py")
+    return found
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--source", type=Path, required=True, help="a repository that has the Mozilla release tags")
-    ap.add_argument("--base", required=True, help="the Mozilla tag of the series, the last of the chain")
+    ap.add_argument("--source", type=Path, help="a repository that has the Mozilla release tags")
+    ap.add_argument("--base", help="the Mozilla tag of the series, the last of the chain (default: the mozilla_tag of UPSTREAM.json)")
     ap.add_argument("--releases", help="the tags, oldest first, comma separated, ending with the base (default: the eight before it)")
     ap.add_argument("--write", action="store_true", help="write tools/churn.json (else only print the summary)")
+    ap.add_argument("--check", action="store_true", help="red unless tools/churn.json is what the series gives now (byte for byte)")
+    ap.add_argument("--fetch", action="store_true", help="fetch the tags tools/churn.json lists into --source, one commit deep, and verify them")
+    ap.add_argument("--cache-key", action="store_true", help="print the key of the commits tools/churn.json lists")
     ap.add_argument("--series", type=Path, default=ROOT, help="the series root (default: this repository)")
     a = ap.parse_args(argv)
+    out_path = a.series / "tools" / "churn.json"
     warn = []
     try:
-        data = compute(a.series, a.source, a.base, a.releases.split(",") if a.releases else None, warn)
+        if a.cache_key:
+            print(cache_key(load_committed(out_path)))
+            return 0
+        if a.source is None:
+            ap.error("--source is needed")
+        if a.fetch:
+            fetch(a.source, load_committed(out_path), mozilla_repository(a.series))
+            return 0
+        if a.check:
+            found = check(a.series, a.source, warn)
+            for w in warn:
+                print("warning: " + w, file=sys.stderr)
+            if found:
+                print(stale_message(found), file=sys.stderr)
+                return 1
+            print("ok: tools/churn.json is what the series gives now")
+            return 0
+        base = a.base
+        if not base:
+            base = json.loads((a.series / "UPSTREAM.json").read_text(encoding="utf-8"))["mozilla_tag"]
+        try:
+            before = recorded(load_committed(out_path))
+        except ChurnError:
+            before = {}
+        data = compute(a.series, a.source, base, a.releases.split(",") if a.releases else None, warn, before)
     except ChurnError as exc:
         print(str(exc), file=sys.stderr)
         return 2
@@ -500,8 +684,9 @@ def main(argv=None) -> int:
         print("warning: " + w, file=sys.stderr)
     print(summary(data))
     if a.write:
-        OUTPUT.write_bytes(render(data))
-        print("wrote %s" % OUTPUT.relative_to(ROOT).as_posix())
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_bytes(render(data))
+        print("wrote tools/churn.json")
     return 0
 
 

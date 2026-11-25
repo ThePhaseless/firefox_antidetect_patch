@@ -8,8 +8,12 @@ Mozilla's releases are four tags of a few files; the series is one or two folder
   * a hunk of a later folder is placed by Mozilla's lines, not by the lines an earlier folder added to the file;
   * the file is the same bytes for the same input, wherever it is built;
   * the band is the churn the constant says, and the file says which;
-  * the numbers of three hunks of the real series at the base 159 equal the ones measured with the first tool (skipped when the release tags are
-    not in the repository named by CHURN_TAGS_REPO).
+  * every release tag is recorded with its commit, and a tag of the source that resolves to another commit is red (compute, --check, --fetch);
+  * `--check` is red unless the committed file is what the series gives now, byte for byte, and names the hunks that differ;
+  * `--fetch` puts the tags a file lists into a repository, one commit deep, and the cache key is the commits, not the names;
+  * the numbers of three hunks of the real series at the base 159 equal the ones measured with the first tool, and the committed file is what the
+    series gives (skipped when the release tags are not in the repository named by CHURN_TAGS_REPO; with CHURN_REQUIRE_TAGS=1, the round that
+    runs it, their absence is a failure, not a skip).
 
     python -m pytest tools/tests/test_churn.py
 """
@@ -243,8 +247,147 @@ def test_the_default_chain_is_the_eight_releases_before_the_base():
     assert [churn.release_label(t) for t in ("FIREFOX_152_0_RELEASE", "FIREFOX_160_0_1_RELEASE")] == ["152", "160.0.1"]
 
 
+# --------------------------------------------------------------------------- the commits of the tags, --check, --fetch
+def one_hook_series(tmp_path):
+    """A series root with two hooks, a UPSTREAM.json for the fixture's base, and no churn.json yet."""
+    root = series(tmp_path / "s", [("fingerprint/a", patch_text("a.txt", A4, edit(A4, 24, "x"))),
+                                   ("network/b", patch_text("d.txt", D4, edit(D4, 11, "x")))])
+    (root / "UPSTREAM.json").write_text(json.dumps({"mozilla_tag": BASE, "mozilla_repository": "unused"}), encoding="utf-8")
+    return root
+
+
+def write_churn(root, source):
+    assert churn.main(["--source", str(source), "--base", BASE, "--releases", ",".join(TAGS), "--series", str(root), "--write"]) == 0
+    return root / "tools" / "churn.json"
+
+
+def test_every_tag_is_recorded_with_its_commit(tmp_path, source):
+    data = run(one_hook_series(tmp_path), source)
+    heads = {t: git(source, "rev-parse", t + "^{commit}").decode().strip() for t in TAGS}
+    assert data["releases"] == [{"tag": t, "commit": heads[t]} for t in TAGS]
+    assert churn.recorded(data) == heads
+
+
+def test_a_tag_that_resolves_to_another_commit_is_red(tmp_path, source, capsys):
+    root = one_hook_series(tmp_path)
+    good = run(root, source)
+    wrong = churn.recorded(good)
+    wrong[TAGS[1]] = "f" * 40
+    with pytest.raises(churn.ChurnError) as err:
+        churn.compute(root, source, BASE, TAGS, None, wrong)
+    text = str(err.value)
+    assert TAGS[1] in text and "f" * 40 in text and good["releases"][1]["commit"] in text
+    assert TAGS[0] not in text                      # only the tag that is not the one recorded
+    # the same from the command line: --check against a file that records another commit, and a --write over it
+    path = write_churn(root, source)
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["releases"][1]["commit"] = "f" * 40
+    path.write_bytes(churn.render(data))
+    capsys.readouterr()
+    assert churn.main(["--source", str(source), "--check", "--series", str(root)]) == 2
+    assert TAGS[1] in capsys.readouterr().err
+    assert churn.main(["--source", str(source), "--base", BASE, "--releases", ",".join(TAGS), "--series", str(root), "--write"]) == 2
+    assert json.loads(path.read_text(encoding="utf-8"))["releases"][1]["commit"] == "f" * 40       # nothing was overwritten
+
+
+def test_check_is_green_on_a_file_that_is_what_the_series_gives(tmp_path, source, capsys):
+    root = one_hook_series(tmp_path)
+    write_churn(root, source)
+    assert churn.main(["--source", str(source), "--check", "--series", str(root)]) == 0
+    assert "ok" in capsys.readouterr().out
+
+
+def test_check_is_red_on_a_stale_file_and_names_the_hunks(tmp_path, source, capsys):
+    root = one_hook_series(tmp_path)
+    path = write_churn(root, source)
+    # (1) a number of the file edited: the hunk is named with both values
+    data = json.loads(path.read_text(encoding="utf-8"))
+    row = [h for h in data["hooks"] if h["file"] == "d.txt"][0]
+    row["churn"], row["which"] = 0, []
+    path.write_bytes(churn.render(data))
+    capsys.readouterr()
+    assert churn.main(["--source", str(source), "--check", "--series", str(root)]) == 1
+    err = capsys.readouterr().err
+    assert "network/b d.txt hunk 1: churn 0 [] in tools/churn.json, churn 2 ['152', '153'] now" in err
+    assert "a.txt" not in err and "docs/decisions/port-07-quiet-anchors.md" in err and "--write" in err
+    # (2) the series moved on: a hunk the file does not have, a hunk it has that is gone
+    write_churn(root, source)
+    newer = series(tmp_path / "t", [("fingerprint/a", patch_text("a.txt", A4, edit(A4, 24, "x"))),
+                                    ("network/b", patch_text("d.txt", D4, edit(D4, 11, "changed")))])
+    (newer / "UPSTREAM.json").write_bytes((root / "UPSTREAM.json").read_bytes())
+    (newer / "tools").mkdir()
+    (newer / "tools" / "churn.json").write_bytes(path.read_bytes())
+    assert churn.main(["--source", str(source), "--check", "--series", str(newer)]) == 1
+    err = capsys.readouterr().err
+    assert "network/b d.txt hunk 1: in tools/churn.json (churn 2), no longer in the series" in err
+    assert "network/b d.txt hunk 1: in the series (churn 2), not in tools/churn.json" in err
+
+
+def test_check_is_red_on_bytes_alone(tmp_path, source, capsys):
+    root = one_hook_series(tmp_path)
+    path = write_churn(root, source)
+    path.write_bytes(json.dumps(json.loads(path.read_text(encoding="utf-8")), indent=2).encode() + b"\n")      # the same data, another layout
+    capsys.readouterr()
+    assert churn.main(["--source", str(source), "--check", "--series", str(root)]) == 1
+    assert "the bytes differ and no hunk does" in capsys.readouterr().err
+
+
+def test_check_is_red_when_the_file_is_for_another_base(tmp_path, source, capsys):
+    root = one_hook_series(tmp_path)
+    write_churn(root, source)
+    (root / "UPSTREAM.json").write_text(json.dumps({"mozilla_tag": "FIREFOX_155_0_RELEASE"}), encoding="utf-8")
+    assert churn.main(["--source", str(source), "--check", "--series", str(root)]) == 1
+    assert "tools/churn.json is for %s, the series is on FIREFOX_155_0_RELEASE" % BASE in capsys.readouterr().err
+
+
+def test_check_is_red_when_the_file_is_missing(tmp_path, source, capsys):
+    root = one_hook_series(tmp_path)
+    assert churn.main(["--source", str(source), "--check", "--series", str(root)]) == 2
+    assert "tools/churn.json is missing" in capsys.readouterr().err
+
+
+def test_fetch_puts_the_listed_tags_into_a_repository_and_checks_each_commit(tmp_path, source, capsys):
+    root = one_hook_series(tmp_path)
+    path = write_churn(root, source)
+    (root / "UPSTREAM.json").write_text(json.dumps({"mozilla_tag": BASE, "mozilla_repository": source.as_uri()}), encoding="utf-8")
+    into = tmp_path / "cache" / "tags.git"
+    capsys.readouterr()
+    assert churn.main(["--source", str(into), "--fetch", "--series", str(root)]) == 0
+    assert all(churn.commit_of(into, t) == git(source, "rev-parse", t + "^{commit}").decode().strip() for t in TAGS)
+    assert capsys.readouterr().out.count("fetched in") == len(TAGS)
+    # a second run (a restored cache) fetches nothing, and the repository is the one the check reads
+    assert churn.main(["--source", str(into), "--fetch", "--series", str(root)]) == 0
+    assert capsys.readouterr().out.count("in the repository") == len(TAGS)
+    assert churn.main(["--source", str(into), "--check", "--series", str(root)]) == 0
+    # a file that records another commit: the fetch fetches the tag and refuses it
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["releases"][2]["commit"] = "e" * 40
+    path.write_bytes(churn.render(data))
+    other = tmp_path / "cold.git"
+    assert churn.main(["--source", str(other), "--fetch", "--series", str(root)]) == 2
+    assert TAGS[2] in capsys.readouterr().err
+    # a cache that holds a tag at another commit is refused too
+    assert churn.main(["--source", str(into), "--fetch", "--series", str(root)]) == 2
+
+
+def test_the_cache_key_is_the_commits_not_the_names_of_the_tags(tmp_path, source, capsys):
+    data = run(one_hook_series(tmp_path), source)
+    renamed = json.loads(json.dumps(data))
+    for r in renamed["releases"]:
+        r["tag"] = r["tag"].lower()
+    other = json.loads(json.dumps(data))
+    other["releases"][0]["commit"] = "d" * 40
+    assert churn.cache_key(data) == churn.cache_key(renamed) != churn.cache_key(other)
+    root = one_hook_series(tmp_path / "again")
+    write_churn(root, source)
+    capsys.readouterr()
+    assert churn.main(["--cache-key", "--series", str(root)]) == 0
+    assert capsys.readouterr().out.strip() == churn.cache_key(data)
+
+
 # --------------------------------------------------------------------------- the real series
 SNAPSHOTS = os.environ.get("CHURN_TAGS_REPO", "")
+REQUIRED = os.environ.get("CHURN_REQUIRE_TAGS") == "1"      # the round that runs the real series: no tags there is red, not a skip
 REAL = churn.default_releases("FIREFOX_159_0_RELEASE")
 
 
@@ -258,7 +401,11 @@ def snapshots_available():
     return True
 
 
-@pytest.mark.skipif(not snapshots_available(),
+def test_the_round_that_requires_the_tags_has_them():
+    assert snapshots_available() or not REQUIRED, "CHURN_REQUIRE_TAGS=1 and the tags 151..159 are not in CHURN_TAGS_REPO=%r" % SNAPSHOTS
+
+
+@pytest.mark.skipif(not snapshots_available() and not REQUIRED,
                     reason="the Mozilla release tags 151..159 are not in the repository named by CHURN_TAGS_REPO")
 def test_three_hunks_of_the_series_at_159_equal_the_first_measurement():
     data = churn.compute(churn.ROOT, SNAPSHOTS, "FIREFOX_159_0_RELEASE")
@@ -273,4 +420,5 @@ def test_three_hunks_of_the_series_at_159_equal_the_first_measurement():
               ("fingerprint/fonts/font-list", "gfx/thebes/gfxDWriteFontList.cpp", 5)]
     assert region == [(1128, 1135)]
     committed = json.loads((churn.ROOT / "tools" / "churn.json").read_text(encoding="utf-8"))
-    assert committed["base"] == data["base"] and committed["hooks"] == data["hooks"]
+    assert committed["base"] == data["base"] and committed["hooks"] == data["hooks"] and committed["releases"] == data["releases"]
+    assert churn.check(churn.ROOT, SNAPSHOTS) == []

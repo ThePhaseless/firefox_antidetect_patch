@@ -69,6 +69,7 @@ One per folder without `BACKPORT.json`, beside `hooks.patch`, one entry per hook
 | `test` | Hand | The test that proves the hook (grammar below); a hook with none is debt T1 |
 | `anchor`, `why` | Hand | Form `anchor` only: the Mozilla statement it follows, and why a guard or a wrap is not enough (debt T2) |
 | `own_function`, `renamed`, `calls_mozilla` | Hand | Read by `prebuild`: our functions to link-check besides `Stealth*`, a renamed Mozilla body besides `*_Mozilla`, a direct call of a renamed body that is allowed |
+| `quiet_anchor_why` | Hand | A hook in the churn band of `tools/churn.py`: `{kind: only-place, why}` or `{kind: deferred, quieter}`, why no quieter anchor serves (rule C18, [port-07](decisions/port-07-quiet-anchors.md)) |
 | `exception`, `untestable`, `replaces` | Hand | A declared exception to the contract, a hook that cannot be tested, one rewritten line standing for several hooks; the first two count only together with the `pm` field |
 
 A hook is identified by file, function, kind and normalized text. A hook whose text changes loses its hand fields and `check` asks for them again.

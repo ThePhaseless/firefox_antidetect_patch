@@ -202,9 +202,9 @@ def _cases() -> list:
                 "secrets." not in str(called) and not any("environment" in j for j in called["jobs"].values()) and called["permissions"] == {"contents": "read"}
                 and not any("permissions" in j for j in called["jobs"].values())))
     out.append(("checks: the job `tree` has a limit", 0 < tree.get("timeout-minutes", 0) <= 30))
-    out.append(("checks: the jobs the two rounds share, by name: rules, rebuilds, noreply-identity, tree, and the three that give them their packages (ci-03): "
-                "py-deps-tools, core-ref, py-deps-core",
-                list(called["jobs"]) == ["py-deps-tools", "core-ref", "py-deps-core", "rules", "rebuilds", "noreply-identity", "tree"]))
+    out.append(("checks: the jobs the two rounds share, by name: rules, churn (port-07), rebuilds, noreply-identity, tree, and the three that give them their packages "
+                "(ci-03): py-deps-tools, core-ref, py-deps-core",
+                list(called["jobs"]) == ["py-deps-tools", "core-ref", "py-deps-core", "rules", "churn", "rebuilds", "noreply-identity", "tree"]))
     gnames = [s.get("name") for s in guard_job["steps"]]
     out.append(("guard: a job `still-head` of release.yml, after the checks (it needs nothing else), with the token that may cancel this very run and read; "
                 "the guard that a newer push has not replaced the run is its LAST step, the one that can cancel",
