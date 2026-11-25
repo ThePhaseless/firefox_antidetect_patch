@@ -4,28 +4,8 @@
   "function": "",
   "kind": "add",
   "form": "registration",
-  "line": "#include \"mozilla/dom/StealthSessionDeclaration.h\"  // STEALTH-HOOK(fingerprint/locale-time/session-declaration)",
-  "test": "wrapper:tests/test_context_locale_e2e.py::test_intl_in_the_page_realm_follows_the_language_and_zone_of_its_context"
- },
- {
-  "file": "dom/base/nsGlobalWindowOuter.cpp",
-  "function": "",
-  "kind": "add",
-  "form": "registration",
   "line": "#include \"StealthWindowGeometry.h\"  // STEALTH-HOOK(fingerprint/screen-window/geometry)",
   "test": "wrapper:tests/test_popup_geometry_is_the_declared_frame_e2e.py::test_a_popup_is_its_inner_size_plus_the_declared_frame"
- },
- {
-  "file": "dom/base/nsGlobalWindowOuter.cpp",
-  "function": "static nsresult CreateNativeGlobalForInner(",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "      GetDeclaredRealmLanguage(aDocument), GetDeclaredRealmTimezone(aDocument));  // STEALTH-HOOK(fingerprint/locale-time/session-declaration)",
-  "removed": "      aDocument->GetBrowsingContext()->Top()->GetLanguageOverride(),\n      aDocument->GetBrowsingContext()->Top()->GetTimezoneOverride());",
-  "test": "wrapper:tests/test_context_locale_e2e.py::test_intl_in_the_page_realm_follows_the_language_and_zone_of_its_context",
-  "exception": "the two arguments of xpc::InitGlobalObjectOptions in CreateNativeGlobalForInner are the document's context language and zone, or the session's when the context carries none, including a document with no BrowsingContext. Mozilla's expressions dereference the context, no add-only form can substitute a value for them or stop their evaluation (arguments are evaluated before any callee of ours), and a hook before the statement cannot skip it.",
-  "reason_kind": "expression",
-  "pm": "approvato"
  },
  {
   "file": "dom/base/nsGlobalWindowOuter.cpp",
@@ -109,14 +89,6 @@
   "test": "wrapper:scripts/ci_host_gate.py::invariant:fullscreen_is_the_screen"
  },
  {
-  "file": "widget/gtk/moz.build",
-  "function": "SOURCES += [",
-  "kind": "add",
-  "form": "registration",
-  "line": "SOURCES += [\"StealthHostGLProbe.cpp\"]  # STEALTH-HOOK(platform/declaration-gate)",
-  "test": "gtest:StealthGfxFeatureStatus.TheHostProbeIsLaunchedAsSoonAsThePrefsAreReadWithTheEngineOff"
- },
- {
   "file": "widget/gtk/nsWindow.h",
   "function": "class nsWindow : public nsIWidget {",
   "kind": "add",
@@ -131,14 +103,6 @@
   "form": "registration",
   "line": "UNIFIED_SOURCES += [\"StealthFullscreen.cpp\"]  # STEALTH-HOOK(fingerprint/screen-window/geometry)",
   "test": "gtest:StealthFullscreen.TheRectOrTakesTheDeclaredScreenAndElseMozillas"
- },
- {
-  "file": "widget/moz.build",
-  "function": "SOURCES += [",
-  "kind": "add",
-  "form": "registration",
-  "line": "EXPORTS.ipc += [\"StealthMouseEventIPC.h\"]  # STEALTH-HOOK(automation/input)",
-  "test": "gtest:StealthMouseEventIPC.TheIdSurvivesTheMessage"
  },
  {
   "file": "widget/nsIWidget.cpp",
@@ -204,5 +168,15 @@
   "test": "wrapper:scripts/ci_host_gate.py::invariant:fullscreen_is_the_screen",
   "anchor": "the closing brace of the forced-fullscreen block of nsWindow::OnWindowPosChanging (before the DWM unhide block)",
   "why": "it holds the declared fullscreen size on the WINDOWPOS Mozilla's block has just adjusted and before the DWM block reads it; it does not move (PM-DECISIONS geometry, G28), so it stays an anchor in the middle of the function"
+ },
+ {
+  "file": "widget/gtk/nsWindow.cpp",
+  "function": "nsresult nsWindow::MakeFullScreen(bool aFullScreen) {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "    if (StealthMakeFullScreenWithoutWM(aFullScreen)) return NS_OK;  // STEALTH-HOOK(fingerprint/screen-window/geometry)",
+  "test": "wrapper:tests/test_fullscreen_without_wm_e2e.py::test_fullscreen_without_a_window_manager_is_the_declared_screen",
+  "anchor": "if (GdkIsX11Display() && !IsFullscreenSupported(mShell)) {  (Mozilla's own condition: the hook is the first statement inside this block, Mozilla's `return NS_ERROR_NOT_AVAILABLE;` stays below it)",
+  "why": "the hook needs Mozilla's computation of `no window manager` (IsFullscreenSupported: gdk_x11_screen_supports_net_wm_hint); a guard at the head of MakeFullScreen would copy that test (G16), and a wrap of MakeFullScreen would read the refusal from the return code, which the kiosk unfullscreen path also returns. In 160 the enclosing block is `if (!IsFullscreenSupported()) {` (a member): the hook text is the same in 159 and 160 and never names IsFullscreenSupported"
  }
 ]

@@ -154,5 +154,45 @@
   "form": "member",
   "line": "  mutable hb_font_t* mDesignFont = nullptr;  // STEALTH-HOOK(fingerprint/fonts/metrics)",
   "test": "gtest:StealthFontMetrics.DesignAdvanceAtAFractionalSize"
+ },
+ {
+  "file": "gfx/2d/moz.build",
+  "function": "EXPORTS.mozilla.gfx += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "EXPORTS.mozilla.gfx += [\"StealthGlyphCoverage.h\"]  # STEALTH-HOOK(fingerprint/fonts/metrics)",
+  "test": "gtest:StealthGlyphCoverage.A8MaskIsOnTheLadder"
+ },
+ {
+  "file": "gfx/2d/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"StealthGlyphCoverage.cpp\"]  # STEALTH-HOOK(fingerprint/fonts/metrics)",
+  "test": "gtest:StealthGlyphCoverage.A8MaskIsOnTheLadder"
+ },
+ {
+  "file": "gfx/tests/gtest/moz.build",
+  "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
+  "kind": "add",
+  "form": "registration",
+  "line": "    UNIFIED_SOURCES += [\"TestStealthFontMetrics.cpp\"]  # STEALTH-HOOK(fingerprint/fonts/metrics)",
+  "test": "gtest:StealthFontMetrics.ClearTypeTakesTheOS2AverageUnrounded"
+ },
+ {
+  "file": "gfx/tests/gtest/moz.build",
+  "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
+  "kind": "add",
+  "form": "registration",
+  "line": "    UNIFIED_SOURCES += [\"TestStealthTextQuality.cpp\"]  # STEALTH-HOOK(fingerprint/fonts/metrics)",
+  "test": "gtest:StealthTextQuality.TheDeclarationIsReadAndTheHostIsNot"
+ },
+ {
+  "file": "gfx/thebes/moz.build",
+  "function": "USE_LIBS += [",
+  "kind": "add",
+  "form": "unknown",
+  "line": "include(\"StealthDesignMetrics.mozbuild\")  # STEALTH-HOOK(fingerprint/fonts/metrics)",
+  "test": "gtest:StealthFontMetrics.DesignAdvanceAtAFractionalSize"
  }
 ]

@@ -75,5 +75,13 @@
   "form": "registration",
   "line": "#include \"StealthWebGLShaderLanguage.h\"  // STEALTH-HOOK(fingerprint/webgl/shader-language)",
   "test": "wrapper:tests/test_webgl_shader_language_e2e.py::test_get_translated_shader_source_is_in_the_declared_language_and_the_driver_still_compiles"
+ },
+ {
+  "file": "dom/canvas/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"StealthWebGLShaderLanguage.cpp\"]  # STEALTH-HOOK(fingerprint/webgl/shader-language)",
+  "test": "wrapper:tests/test_webgl_shader_language_e2e.py::test_get_translated_shader_source_is_in_the_declared_language_and_the_driver_still_compiles"
  }
 ]

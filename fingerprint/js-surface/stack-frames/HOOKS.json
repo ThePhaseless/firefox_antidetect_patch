@@ -33,5 +33,13 @@
   "line": "          if (!FormatV8StackFrame(cx, sb, frame, indent, StealthIsLastFrame(!nextFrame))) {  // STEALTH-HOOK(fingerprint/js-surface/stack-frames)",
   "removed": "          if (!FormatV8StackFrame(cx, sb, frame, indent, !nextFrame)) {",
   "test": "gtest:StealthStackFrames.TheV8FormatKeepsTheNewlineOfTheLastShownFrameWhenJugglersFramesEndTheStack"
+ },
+ {
+  "file": "dom/base/test/gtest/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"TestStealthStackFrames.cpp\"]  # STEALTH-HOOK(fingerprint/js-surface/stack-frames)",
+  "test": "gtest:StealthStackFrames.JugglersFrameIsNotInTheStackAPageReads"
  }
 ]

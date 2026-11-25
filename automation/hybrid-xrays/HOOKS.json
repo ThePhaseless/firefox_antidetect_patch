@@ -4,14 +4,6 @@
   "function": "",
   "kind": "add",
   "form": "registration",
-  "line": "#include \"mozilla/intl/StealthSessionPrefs.h\"  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
-  "test": "wrapper:tests/test_context_locale_e2e.py::test_a_context_locale_reaches_navigator_intl_and_the_header"
- },
- {
-  "file": "js/xpconnect/src/Sandbox.cpp",
-  "function": "",
-  "kind": "add",
-  "form": "registration",
   "line": "#include \"StealthSandbox.h\"  // STEALTH-HOOK(automation/hybrid-xrays)",
   "test": "wrapper:tests/test_the_callers_code_is_not_counted_e2e.py::test_what_the_page_added_is_the_pages"
  },
@@ -33,15 +25,6 @@
   "test": "xpcshell:js/xpconnect/tests/unit/test_stealth_hybrid_xrays_options.js#run_test",
   "anchor": "bool isSystemPrincipal = principal->IsSystemPrincipal();",
   "why": "principal is derived inside CreateSandboxObject (QI of prinOrSop, GetPrincipal, NullPrincipal fallback) and is passed to the check as it is; recomputing it would copy Mozilla's logic, and a guard at the top would also move the check before the associatedWindow error"
- },
- {
-  "file": "js/xpconnect/src/Sandbox.cpp",
-  "function": "nsresult xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp,",
-  "kind": "rewrite",
-  "form": "wrap-expression",
-  "line": "            mozilla::intl::StealthPrimaryLanguageTag(PromiseFlatCString(localeOverride)).get());  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
-  "removed": "            PromiseFlatCString(localeOverride).get());",
-  "test": "wrapper:tests/test_context_locale_e2e.py::test_a_context_locale_reaches_navigator_intl_and_the_header"
  },
  {
   "file": "js/xpconnect/src/Sandbox.cpp",
@@ -212,5 +195,13 @@
   "form": "registration",
   "line": "SOURCES += [\"StealthHybridXray.cpp\"]  # STEALTH-HOOK(automation/hybrid-xrays)",
   "test": "wrapper:tests/test_the_callers_code_is_not_counted_e2e.py::test_what_the_page_added_is_the_pages"
+ },
+ {
+  "file": "dom/base/test/gtest/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"TestStealthCallerObject.cpp\"]  # STEALTH-HOOK(automation/hybrid-xrays)",
+  "test": "gtest:StealthCallerObject.ADecisionIsReadOnceAndAReadWithNoDecisionIsFalse"
  }
 ]

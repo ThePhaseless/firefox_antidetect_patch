@@ -42,5 +42,13 @@
   "form": "member",
   "line": "  already_AddRefed<mozilla::gfx::SourceSurface> StealthGetSurfaceSnapshot();  // STEALTH-HOOK(fingerprint/canvas/text-metrics)",
   "test": "wrapper:tests/test_canvas_create_pattern_projection_e2e.py::test_create_pattern_from_a_webgl_canvas_carries_the_projection"
+ },
+ {
+  "file": "dom/canvas/gtest/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"TestStealthCanvasPageSnapshot.cpp\"]  # STEALTH-HOOK(fingerprint/canvas/text-metrics)",
+  "test": "gtest:StealthCanvasPageSnapshot.TheSnapshotOfTheContextIsNotTakenWhenItHasAnElement"
  }
 ]

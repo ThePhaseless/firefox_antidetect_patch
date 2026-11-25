@@ -23,7 +23,7 @@ step requires its declaration.
 Two things about the rules that the table cannot say. A HOOKS.json entry with the hand fields `exception` and `pm: "approvato"` is
 a declared exception (G35): contract_violations leaves out every violation of such a hook (C1..C11, T1, T2, T3), and `check`
 counts them ("declared exceptions: N"); C12..C15 (port-06) are the opposite: they judge the exception itself, by its `reason_kind`.
-C12..C18 never enter the debt list, and a declared exception does not leave them out.
+C12..C19 never enter the debt list, and a declared exception does not leave them out.
 """
 from __future__ import annotations
 
@@ -132,6 +132,9 @@ RULES = _rules(
          "move the hook to a quieter anchor, or name why none serves in the `quiet_anchor_why` of its HOOKS.json entry, or run "
          "`python tools/churn.py --source <repo with the tags> --write` and commit tools/churn.json",
          D_PORT07),
+    Rule("C19", "the entry of a hook whose marker names another folder is in the HOOKS.json of the folder whose hooks.patch holds the hook, not in the HOOKS.json of the folder its marker names",
+         "run `python tools/engine.py hooks-list`: it writes the entry, with its hand fields, into the HOOKS.json of the folder `{detail}` that the marker names",
+         D_HOOK02, "the marker names `{detail}`"),
     Rule("T1", "a hook has no test (the `test` of its HOOKS.json entry is empty)",
          "write the test, with a negative control, and name it in the `test` field of the HOOKS.json entry of this hook (grammar: docs/STRUCTURE.md, test references)",
          D_HOOK04),
@@ -149,7 +152,8 @@ INTRODUCED_RULES = {"T1", "T2", "T3"}
 # port-06: these rules are fixed by the engine change and the HOOKS.json fields, never by the debt list (debt_problems refuses them)
 PORT06_RULES = ("C12", "C13", "C14", "C15", "C16", "C17")      # C16 and C17 are hook-02 rules: fixed by the hook, never by the debt
 PORT07_RULES = ("C18",)         # port-07: fixed by moving the hook or by its reason in HOOKS.json, never by the debt
-NEVER_DEBT_RULES = PORT06_RULES + PORT07_RULES
+HOOK02_NEVER_DEBT = ("C19",)    # fixed by writing HOOKS.json again (`hooks-list`), never by the debt
+NEVER_DEBT_RULES = PORT06_RULES + PORT07_RULES + HOOK02_NEVER_DEBT
 QUIET_KINDS = ("only-place", "deferred")        # the two forms of the HOOKS.json hand field `quiet_anchor_why`
 
 # The forms of a hook line, in the order of STRUCTURE.md: (form, where, looks like). The one table of the forms.
@@ -1491,9 +1495,9 @@ def rewrite_violations(root) -> list:
     """port-06: the C12..C15 violations of every non-backport folder, judged with the committed HOOKS.json hand fields."""
     import hooks_list
     root, found = Path(root), []
+    entries = hooks_list.all_entries(root)      # a hook's entry is in the HOOKS.json of the folder its marker names (C19)
     for folder in _folders(root):
-        found += analyse_rewrites(folder, (root / folder / "hooks.patch").read_text(encoding="utf-8", errors="replace"),
-                                  hooks_list.expected(root, folder))
+        found += analyse_rewrites(folder, (root / folder / "hooks.patch").read_text(encoding="utf-8", errors="replace"), entries)
     return found
 
 
@@ -1873,10 +1877,14 @@ def churn_violations(root) -> list:
     keys = churn.hunk_keys(root) if not problem else {}
     fix_churn = "run `python tools/churn.py --source <repo with the tags> --write` and commit tools/churn.json"
     out = []
+    pool = {}
+    for entry in hooks_list.all_entries(root):      # a hook's entry is in the HOOKS.json of the folder its marker names (C19)
+        pool.setdefault(hooks_list.identity(entry), []).append(entry)
     for folder in _folders(root):
         hooks, _ = analyse_patch(folder, (root / folder / "hooks.patch").read_text(encoding="utf-8", errors="replace"))
-        entries = hooks_list.expected(root, folder)
-        for h, e in zip(hooks, entries):
+        for h in hooks:
+            same = pool.get(hook_identity(h))
+            e = same.pop(0) if same else {}
             text = h.line.strip() or "<%s> %s" % (h.kind, _squeeze(h.removed))
             where = hook_where(folder, h.file, h.function)
             if h.hunk:
@@ -1949,18 +1957,18 @@ def contract_violations(root) -> list:
     declared exception (G35: HOOKS.json entry with `exception` and `pm: "approvato"`) are left out: a violation is
     left out when every hook it concerns is one."""
     import hooks_list      # imports this module: loaded here, not at the top
-    excepted = {(folder, hooks_list.identity(e)) for folder, e in hooks_list.declared_exceptions(Path(root))}
-    anchored = {(folder, hooks_list.identity(e)) for folder in hooks_list.folders(Path(root))
-                for e in hooks_list.expected(Path(root), folder) if e.get("anchor") and e.get("why")}
+    # a file belongs to one folder's hooks.patch, so a hook's identity is one hook of the series whatever HOOKS.json holds its entry (C19)
+    excepted = {hooks_list.identity(e) for _, e in hooks_list.declared_exceptions(Path(root))}
+    anchored = {hooks_list.identity(e) for e in hooks_list.all_entries(Path(root)) if e.get("anchor") and e.get("why")}
 
     def end_anchor(v):      # G23/G30/G33: the last statement of a block, declared with its `anchor` and `why`
         return (v.rule == "C9" and bool(v.ids) and re.search(r"placement=(end_of_block|function_top)", v.detail) is not None
-                and all((v.folder, i) in anchored for i in v.ids))
+                and all(i in anchored for i in v.ids))
 
     kept = [v for v in _analyse(root)[1]
-            if not (v.ids and all((v.folder, i) in excepted for i in v.ids)) and not end_anchor(v)]
+            if not (v.ids and all(i in excepted for i in v.ids)) and not end_anchor(v)]
     # port-06: a declared exception does not leave these out; they judge the exception itself
-    return sorted(kept + hooks_list.missing_test_violations(root) + rewrite_violations(root)
+    return sorted(kept + hooks_list.missing_test_violations(root) + hooks_list.foreign_violations(root) + rewrite_violations(root)
                   + locals_violations(root) + namespace_violations(root), key=lambda v: v.key)
 
 
@@ -2002,7 +2010,7 @@ def debt_problems(violations: list, debt: list, main_debt: list | None) -> list:
         found.append(fail("tools/hook-debt.json",
                           "it lists %s, and the rules %s are never debt" % (key, "/".join(NEVER_DEBT_RULES)),
                           "delete the entry (`python tools/engine.py hook-debt` drops it) and fix the hook: a C12 to C17 by an engine change "
-                          "or by its HOOKS.json exception, a C18 by moving the hook or by its `quiet_anchor_why`", D_HOOK03))
+                          "or by its HOOKS.json exception, a C18 by moving the hook or by its `quiet_anchor_why`, a C19 by `python tools/engine.py hooks-list`", D_HOOK03))
     for key in sorted(set(now) - listed):
         found.append(violation_failure(now[key]))
     for key in sorted(listed - set(now)):

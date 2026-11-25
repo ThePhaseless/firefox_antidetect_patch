@@ -62,5 +62,57 @@
   "form": "guard",
   "line": "  if (gfx::StealthNoHostGLProbe()) return false;  // STEALTH-HOOK(platform/declaration-gate)",
   "test": "gtest:StealthGfxFeatureStatus.TheHostIsNotProbedWhileDeclared"
+ },
+ {
+  "file": "toolkit/xre/nsAppRunner.cpp",
+  "function": "constinit std::unique_ptr<WaylandProxy> gWaylandProxy;",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthGfxFeatureStatus.h\"  // STEALTH-HOOK(platform/declaration-gate)",
+  "test": "gtest:StealthGfxFeatureStatus.NothingProbesTheHostBeforeTheProfilePrefsAreRead"
+ },
+ {
+  "file": "toolkit/xre/nsAppRunner.cpp",
+  "function": "nsresult XREMain::XRE_mainRun() {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "    mozilla::gfx::StealthMarkUserPrefsRead();  // STEALTH-HOOK(platform/declaration-gate)",
+  "test": "gtest:StealthGfxFeatureStatus.NothingProbesTheHostBeforeTheProfilePrefsAreRead",
+  "anchor": "`StealthLockIcePrefs();` (network/proxy-udp), right after `mDirProvider.InitializeUserPrefs();` of XREMain::XRE_mainRun",
+  "why": "the signal says the profile's preferences, where the declaration arrives, have been read: it must come right after InitializeUserPrefs and before anything reads GfxInfo; nothing between them reads a preference of the declaration"
+ },
+ {
+  "file": "toolkit/xre/nsAppRunner.cpp",
+  "function": "nsresult XREMain::XRE_mainRun() {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "    mozilla::widget::StealthFireHostGLProbeIfStock();  // STEALTH-HOOK(platform/declaration-gate)",
+  "test": "gtest:StealthGfxFeatureStatus.TheHostProbeIsLaunchedAsSoonAsThePrefsAreReadWithTheEngineOff",
+  "anchor": "`mozilla::gfx::StealthMarkUserPrefsRead();` (platform/declaration-gate), right after `mDirProvider.InitializeUserPrefs();` of XREMain::XRE_mainRun",
+  "why": "Mozilla's early host GL probe of XRE_mainStartup comes before the profile's preferences, where the declaration cannot be read; this is the same fire as soon as they are read, so stock Firefox (engine off) probes at startup again"
+ },
+ {
+  "file": "gfx/2d/moz.build",
+  "function": "EXPORTS.mozilla.gfx += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "EXPORTS.mozilla.gfx += [\"StealthRefuse.h\"]  # STEALTH-HOOK(platform/declaration-gate)",
+  "test": "gtest:StealthGfxFeatureStatus.EveryLiveFeatureAnswersFromTheDeclaration"
+ },
+ {
+  "file": "gfx/thebes/moz.build",
+  "function": "USE_LIBS += [",
+  "kind": "add",
+  "form": "unknown",
+  "line": "include(\"StealthDeclarationGate.mozbuild\")  # STEALTH-HOOK(platform/declaration-gate)",
+  "test": "gtest:StealthGfxFeatureStatus.EveryLiveFeatureAnswersFromTheDeclaration"
+ },
+ {
+  "file": "widget/gtk/moz.build",
+  "function": "SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "SOURCES += [\"StealthHostGLProbe.cpp\"]  # STEALTH-HOOK(platform/declaration-gate)",
+  "test": "gtest:StealthGfxFeatureStatus.TheHostProbeIsLaunchedAsSoonAsThePrefsAreReadWithTheEngineOff"
  }
 ]
