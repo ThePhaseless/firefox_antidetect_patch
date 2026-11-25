@@ -130,7 +130,7 @@ Rule: [hook-03](decisions/hook-03-budgets-and-debt-only-go-down.md).
 ## Every change
 
 1. In the source repository, on the source branch: the change, its test, the commit.
-2. Here: `export`. It first runs the node tests, the tree's python tests and `tools/tests`, and writes nothing if one is red.
+2. Here: `export`. It first runs the node tests and the tree's python tests on the head's tree; then it writes the series into a scratch copy of the checkout, runs `engine.py check` and `tools/tests` (`-n auto`) on that copy, and only if all is green replaces the series of the checkout with it. A red leaves the checkout untouched.
 3. `verify`: it must say `identical`.
 4. `hook-debt` drops the resolved debt; `shrink-budget` after logic moved; a Mozilla file new to the series needs its row in `tools/hook-budget.json` (at most 5 lines).
 5. Fill the hand fields of the touched `HOOKS.json` (`test`; `anchor` and `why` for an anchor) and the `Test:` line of `FEATURE.md`.

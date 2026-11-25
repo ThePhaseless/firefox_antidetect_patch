@@ -3,6 +3,7 @@
 Run 43156862361 died a minute after it started on six node tests of the Juggler that nobody had run: the tree they were tried on
 was a sparse one, and four of them read files it does not have (tools/export_gate.py says the rest). These tests hold the gate to
 what it says: it is on the path of `engine.py export`, it needs Node, it needs the whole tree, and a red test stops the export.
+(That the series tests run on the series the export writes, and what a red leaves, is in test_export_gate_tests_what_it_writes.py.)
 
     python -m pytest tools/tests
 """
@@ -19,9 +20,11 @@ import export_gate  # noqa: E402
 
 def test_the_export_of_the_command_line_goes_through_the_gate_before_it_writes():
     text = (Path(engine.__file__)).read_text(encoding="utf-8")
-    branch = text[text.index('if a.command == "export":'):]
-    assert branch.index("export_gate.gate(") < branch.index("export(a.source, base, head)"), \
-        "engine.py export must run the gate before it writes anything"
+    branch = text[text.index('if a.command == "export":'):text.index("return verify(")]
+    assert "export_gate.gate(" in branch and "export_into(scratch, a.source, base, head)" in branch, \
+        "engine.py export must hand the gate the write into its scratch tree"
+    assert branch.index("export_gate.gate(") < branch.index("export_into("), "the write is an argument of the gate"
+    assert "export(a.source" not in branch, "no way to the write that does not go through the gate"
 
 
 def test_a_machine_without_node_refuses_the_export(monkeypatch):
@@ -72,9 +75,10 @@ def test_a_red_gate_stops_the_export(monkeypatch):
     monkeypatch.setattr(export_gate, "prepare_tree", lambda source, head: Path("tree"))
     monkeypatch.setattr(export_gate, "run_node_tests", lambda tree, node: ["a node test is red"])
     monkeypatch.setattr(export_gate, "run_tree_python_tests", lambda tree: [])
-    monkeypatch.setattr(export_gate, "run_series_tests", lambda: [])
+    written = []
     with pytest.raises(SystemExit, match="a node test is red"):
-        export_gate.gate(Path("src"), "head")
+        export_gate.gate(Path("src"), "head", written.append)
+    assert written == []
 
 
 def test_the_series_tests_it_runs_are_these_ones():

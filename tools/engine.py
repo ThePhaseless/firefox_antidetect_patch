@@ -80,6 +80,7 @@ check    needs no Firefox: SERIES lists exactly the folders that exist, every fo
 from __future__ import annotations
 
 import argparse
+import contextlib
 import hashlib
 import json
 import os
@@ -221,6 +222,29 @@ def export(source: Path, base: str, head: str) -> None:
     print("exported %d folders: %d modified files, %d added files, from %s"
           % (len(series), sum(len(plan[f]["modified"]) for f in series),
              sum(len(plan[f]["added"]) for f in series), up["exported_from"][:10]))
+
+
+@contextlib.contextmanager
+def rebased(root: Path):
+    """Inside the block every module path under ROOT (ROOT itself, UPSTREAM, INVENTORY, the budgets, the workflow folders, ...) is
+    the same path under `root`: the code of this module reads and writes another checkout. Every path is found by what it is, not
+    from a list, so a constant added later follows. Restored on exit."""
+    module = sys.modules[__name__]
+    old = dict(vars(module))
+    here = module.ROOT
+    moved = {name: root / value.relative_to(here) for name, value in old.items()
+             if isinstance(value, Path) and (value == here or here in value.parents)}
+    vars(module).update(moved)
+    try:
+        yield root
+    finally:
+        vars(module).update({name: old[name] for name in moved})
+
+
+def export_into(root: Path, source: Path, base: str, head: str) -> None:
+    """`export` writing into the checkout at `root` (the scratch copy of the gate) instead of this one."""
+    with rebased(root):
+        export(source, base, head)
 
 
 def write_hooks_list() -> str:
@@ -1517,10 +1541,10 @@ def main() -> int:
     if a.command == "status":
         return status(a.source, head)
     if a.command == "export":
-        # The tests the build job runs first, on the whole tree of the head, before a byte is written (tools/export_gate.py).
+        # The tests the build job runs, on the head's tree and on the series about to be written; the checkout takes the series
+        # only if they are green (tools/export_gate.py). The write is not reachable from here except through the gate.
         import export_gate
-        export_gate.gate(a.source, head)
-        export(a.source, base, head)
+        export_gate.gate(a.source, head, lambda scratch: export_into(scratch, a.source, base, head), ROOT)
         return 0
     return verify(a.source, base, head)
 
