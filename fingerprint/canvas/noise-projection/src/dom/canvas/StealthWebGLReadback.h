@@ -94,7 +94,7 @@ struct StealthWebGLReadback final {
   // context in front and Mozilla's arguments as they were: the read has run, on
   // this thread, a moment ago, and the anchor in its body left what it wrote in
   // the context's field. Returns what DoReadPixels returned.
-  static bool DoReadPixels(ClientWebGLContext& aCtx,
+  static bool DoReadPixels(const ClientWebGLContext& aCtx,
                            const webgl::ReadPixelsDesc& aDesc,
                            const Span<uint8_t> aDest) {
     const bool succeeded = aCtx.DoReadPixels(aDesc, aDest);
@@ -341,7 +341,7 @@ inline RefPtr<gfx::SourceSurface> StealthWebGLProjectAsyncSnapshot(
   return StealthWebGLReadback::ProjectAsyncSnapshot(aCtx, std::move(aSurface));
 }
 
-inline bool StealthDoReadPixels(ClientWebGLContext* aCtx,
+inline bool StealthDoReadPixels(const ClientWebGLContext* aCtx,
                                 const webgl::ReadPixelsDesc& aDesc,
                                 const Span<uint8_t> aDest) {
   return StealthWebGLReadback::DoReadPixels(*aCtx, aDesc, aDest);
