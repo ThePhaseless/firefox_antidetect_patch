@@ -67,12 +67,12 @@ class ChurnError(Exception):
     """Something the caller can fix: a missing tag, a patch that does not apply. Its text is the text of a fail()."""
 
 
-def failed(where: str, what: str, fix: str) -> str:
-    """One problem of the churn as the text of a fail(): FAIL where: what. Fix: fix. Rule: path.
+def failed(where: str, what: str, fix: str):
+    """One problem of the churn as a Failure (where, what, fix, rule: tools/failure.py), which prints as FAIL where: what. Fix: fix. Rule: path.
 
     The lines `say(...)` of the fetch (`the fetch of the files failed, again in 5 s`) and the `warning:` lines of --check are WARN-level
     progress and notes: the run goes on after each, so they are not failures and are not built here."""
-    return str(fail(where, what, fix, RULE_ID))
+    return fail(where, what, fix, RULE_ID)
 
 
 # --------------------------------------------------------------------------- tags

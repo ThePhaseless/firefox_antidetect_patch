@@ -67,11 +67,11 @@ class Stop(Exception):
         super().__init__(self.text)
 
 
-def failed(where: str, what: str, fix: str) -> str:
-    """One problem of the backport replay as the text of a fail(): FAIL where: what. Fix: fix. Rule: path.
+def failed(where: str, what: str, fix: str):
+    """One problem of the backport replay as a Failure (where, what, fix, rule: tools/failure.py), which prints as FAIL where: what. Fix: fix. Rule: path.
 
     Not failures, and not built here: the summary lines of `report` (what each commit did) and the `skipped:` and `glue:` lines."""
-    return str(fail(where, what, fix, RULE_ID))
+    return fail(where, what, fix, RULE_ID)
 
 
 REBASE = ("rebase the commit onto the revision Mozilla vendors in a clone of the upstream repository (git rebase, then git format-patch), "
@@ -875,7 +875,7 @@ def check_folders(source: Path, tag: str, folders: list) -> list:
         try:
             found += folder_problems(replay(source, tag, folder, record), folder, record)
         except Stop as stop:
-            found.append(stop.text)
+            found.append(stop.failure)
     return found
 
 

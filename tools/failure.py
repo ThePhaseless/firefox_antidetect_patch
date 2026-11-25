@@ -16,7 +16,6 @@ tools/tests/test_failure_messages.py finds every message of the series tools tha
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
@@ -41,29 +40,42 @@ def rule_exists(rule: str) -> bool:
     return bool(RULE_ID.fullmatch(rule)) and (ROOT / DECISIONS / (rule + ".md")).is_file()
 
 
-@dataclass(frozen=True)
-class Failure:
-    where: str
-    what: str
-    fix: str
-    rule: str
+class Failure(str):
+    """One failure: a text that already is the whole line (`FAIL where: what. Fix: fix. Rule: path`), with its four fields kept.
 
-    def __post_init__(self):
-        for name in ("where", "what", "fix", "rule"):
-            value = getattr(self, name)
+    It is a `str` so that every consumer of a list of problems (a join, a regex, `in`, a JSON dump, a test that reads the line) takes it
+    as the line it is and nothing adds a second `FAIL` in front: `str(problem)` is the problem. The fields are read-only."""
+
+    __slots__ = ("where", "what", "fix", "rule")
+
+    def __new__(cls, where: str, what: str, fix: str, rule: str):
+        values = {"where": where, "what": what, "fix": fix, "rule": rule}
+        for name, value in values.items():
             if not isinstance(value, str) or not value.strip():
                 raise FailureError(_render(
                     "tools/failure.py fail()", "the field `%s` is %r, and a failure needs a non-empty text there" % (name, value),
                     "pass where (a file, folder or command), what (the broken state), fix (the next step) and rule (a decision id)",
                     SELF_RULE))
-        if not rule_exists(self.rule):
+        if not rule_exists(rule):
             raise FailureError(_render(
-                "tools/failure.py fail()", "the rule %r names no file %s/%s.md" % (self.rule, DECISIONS, self.rule),
+                "tools/failure.py fail()", "the rule %r names no file %s/%s.md" % (rule, DECISIONS, rule),
                 "pass the id of a file in %s/, the decision that forbids the state, without the .md" % DECISIONS,
                 SELF_RULE))
+        self = super().__new__(cls, _render(where, what, fix, rule))
+        for name, value in values.items():
+            object.__setattr__(self, name, value)
+        return self
+
+    def __setattr__(self, name, value):
+        raise FailureError(_render(
+            "tools/failure.py Failure", "the field `%s` is set after the failure was built" % name,
+            "build another failure with fail(): a Failure is read-only", SELF_RULE))
+
+    def __getnewargs__(self):
+        return (self.where, self.what, self.fix, self.rule)
 
     def __str__(self) -> str:
-        return _render(self.where, self.what, self.fix, self.rule)
+        return str.__str__(self)
 
 
 def fail(where: str, what: str, fix: str, rule: str) -> Failure:

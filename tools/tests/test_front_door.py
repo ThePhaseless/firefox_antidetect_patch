@@ -17,7 +17,6 @@ import re
 import shlex
 import sys
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 
@@ -29,6 +28,7 @@ import engine  # noqa: E402
 import export_gate  # noqa: E402
 import births  # noqa: E402
 import hook_contract  # noqa: E402
+from failure import fail  # noqa: E402
 from test_apply_builds_the_layer_stack import run, world  # noqa: E402,F401
 from test_port import new_tag  # noqa: E402
 
@@ -254,12 +254,12 @@ def test_status_that_finds_the_source_moved_ends_with_next_export(world, upstrea
 
 
 def test_check_that_finds_a_problem_ends_with_next_check(monkeypatch, capsys):
-    monkeypatch.setattr(engine, "problems", lambda: ["a problem not yet moved to fail()"])
+    monkeypatch.setattr(engine, "problems", lambda: [fail("SERIES", "a problem", "export again", "series-01-export-is-the-only-writer")])
     monkeypatch.setattr(engine.folders, "problems", lambda root: [])
     monkeypatch.setattr(engine, "contract_problems", lambda *a, **k: ([], 0, 0))
     assert engine.check(None, None, against_main=False) == 1
     out = capsys.readouterr().out
-    assert out.startswith("FAIL a problem not yet moved") and assert_next(out) == "check"
+    assert out.startswith("FAIL SERIES: a problem.") and "FAIL FAIL" not in out and assert_next(out) == "check"
 
 
 def test_the_hook_debt_and_locals_stops_end_with_next(monkeypatch, tmp_path, capsys):
@@ -267,12 +267,14 @@ def test_the_hook_debt_and_locals_stops_end_with_next(monkeypatch, tmp_path, cap
     monkeypatch.setattr(engine.hook_contract, "contract_violations", lambda root: [])
     text = stop_text(lambda: engine.hook_debt())
     assert "tools/hook-debt.json" in text and assert_next(text) == "hook-debt"
-    found = [SimpleNamespace(folder="fingerprint/a", file="mozilla.txt", rule="C16", detail="passes a local")]
+    found = [hook_contract.Violation("C16", "fingerprint/a", "mozilla.txt", "void F() {", "Use(local);", "key", detail="passes a local")]
     monkeypatch.setattr(engine.hook_contract, "git_base_reader", lambda source, tag: None)
     monkeypatch.setattr(engine.hook_contract, "locals_violations", lambda root, base: found)
     monkeypatch.setattr(engine.hook_contract, "namespace_violations", lambda root, unqualified=False: [])
     assert engine.hook_locals(Path("src"), "TAG") == 1
-    assert assert_next(capsys.readouterr().out) == "export"
+    out = capsys.readouterr().out
+    assert assert_next(out) == "export"
+    assert out.splitlines()[0] == str(hook_contract.violation_failure(found[0])) and out.startswith("FAIL fingerprint/a/hooks.patch")
 
 
 def test_a_missing_origin_main_ends_with_next(tmp_path, monkeypatch):

@@ -54,9 +54,9 @@ class RangeDiffError(Exception):
     """Something the caller can fix: a missing tag, a missing file, a series that does not apply."""
 
 
-def failed(where: str, what: str, fix: str) -> str:
-    """One problem of the range-diff as the text of a fail(): FAIL where: what. Fix: fix. Rule: path."""
-    return str(fail(where, what, fix, RULE_ID))
+def failed(where: str, what: str, fix: str):
+    """One problem of the range-diff as a Failure (where, what, fix, rule: tools/failure.py), which prints as FAIL where: what. Fix: fix. Rule: path."""
+    return fail(where, what, fix, RULE_ID)
 
 
 class Series:

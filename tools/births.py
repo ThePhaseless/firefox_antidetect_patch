@@ -437,15 +437,15 @@ def entry_sort_key(e: dict) -> tuple:
 
 def ledger_problems(ledger: dict, folders=None) -> list:
     """What is wrong with the ledger as a file, with no tree: every entry decided and complete, sorted, unique, the hooks real. `folders` is SERIES.
-    Each problem is the text of a fail(); the list is empty when the ledger is sound."""
+    Each problem is a Failure (tools/failure.py); the list is empty when the ledger is sound."""
     found, seen, last = [], set(), None
 
-    def bad(where: str, what: str, fix: str) -> str:
-        return str(fail("%s entry %s" % (LEDGER_FILE, where), what, fix, RULE))
+    def bad(where: str, what: str, fix: str):
+        return fail("%s entry %s" % (LEDGER_FILE, where), what, fix, RULE)
 
     if "tag" in ledger:
-        found.append(str(fail(LEDGER_FILE, "the field `tag` is stored (%r) and the Mozilla tag is derived from UPSTREAM.json `mozilla_tag`" % ledger["tag"],
-                              "delete the `tag` line at the top of tools/birth-ledger.json; a port changes the tag in UPSTREAM.json only", RULE)))
+        found.append(fail(LEDGER_FILE, "the field `tag` is stored (%r) and the Mozilla tag is derived from UPSTREAM.json `mozilla_tag`" % ledger["tag"],
+                              "delete the `tag` line at the top of tools/birth-ledger.json; a port changes the tag in UPSTREAM.json only", RULE))
     for e in ledger.get("entries", []):
         where = "%s: %s %s/%s #%d" % (e.get("file"), e.get("function"), e.get("kind"), e.get("call"), e.get("n", 0))
         for name in ("file", "function", "kind", "call", "n", "stmt_sha", "ctx_sig", "carries", "reach", "verdict", "reason"):
@@ -549,13 +549,13 @@ def judge(ledger: dict, sites: list, read=None, folders=None) -> Report:
                   "--accept-changed (it rewrites stmt_sha and ctx_sig of EVERY CHANGED entry, so read each one first), otherwise change the verdict "
                   "and reason of the entry")
         if entry.get("stmt_sha") != site.stmt_sha:
-            what.append(str(fail(where, "CHANGED: the statement is not the one that was reviewed (%s -> %s): %s"
-                                 % (entry.get("stmt_sha"), site.stmt_sha, site.stmt), accept, RULE)))
+            what.append(fail(where, "CHANGED: the statement is not the one that was reviewed (%s -> %s): %s"
+                                 % (entry.get("stmt_sha"), site.stmt_sha, site.stmt), accept, RULE))
         if entry.get("ctx_sig") != site.ctx_sig:
-            what.append(str(fail(where, "CHANGED: the context signature of %s changed: %r -> %r" % (site.function, entry.get("ctx_sig"), site.ctx_sig),
-                                 accept, RULE)))
+            what.append(fail(where, "CHANGED: the context signature of %s changed: %r -> %r" % (site.function, entry.get("ctx_sig"), site.ctx_sig),
+                                 accept, RULE))
         if what:
-            report.changed.append((site, entry, "\n".join(what)))
+            report.changed.append((site, entry, "\n".join(str(w) for w in what)))
         report.invalid += _entry_against_tree(entry, site, read)
         if entry.get("verdict") == "fix" and isinstance(entry.get("open"), dict):
             report.open.append(entry)
@@ -584,20 +584,20 @@ def _entry_against_tree(entry: dict, site: Site, read) -> list:
                 return out
             needle = marker.get("contains", tag)
             if tag not in text or needle not in text:
-                out.append(str(fail("%s entry %s" % (LEDGER_FILE, where),
+                out.append(fail("%s entry %s" % (LEDGER_FILE, where),
                                     "is hooked by %s and the hook is gone: %s has %s=%s, %s=%s"
                                     % (entry["hook"], at_file, repr(tag), tag in text, repr(needle), needle in text),
                                     "restore the %s line in the function (or at hook_at) from the folder %s, or, if the hook was removed on purpose, "
-                                    "change the verdict of the entry" % (tag, entry["hook"]), RULE)))
+                                    "change the verdict of the entry" % (tag, entry["hook"]), RULE))
     return out
 
 
 def judge_chrome_js(ledger: dict, counts: dict) -> list:
     allowed = ledger.get("chrome_js_http", {})
-    return [str(fail("%s chrome_js_http %s" % (LEDGER_FILE, d),
+    return [fail("%s chrome_js_http %s" % (LEDGER_FILE, d),
                      "chrome JS HTTP clients in %s: %d, the ledger allows %d (each is a reader of user context 0)" % (d, n, allowed.get(d, 0)),
                      "read the new fetch, XMLHttpRequest or Request calls in that directory, decide each, then raise chrome_js_http[%r] to %d in "
-                     "tools/birth-ledger.json" % (d, n), RULE))
+                     "tools/birth-ledger.json" % (d, n), RULE)
             for d, n in sorted(counts.items()) if n > allowed.get(d, 0)]
 
 

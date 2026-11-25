@@ -41,9 +41,9 @@ SHAPES = ('{"relation": "product"}, {"relation": "defect", "upstream": "not-file
           '"https://bugzilla.mozilla.org/show_bug.cgi?id=<N>"}, and for a defect only "fixed_in": "FIREFOX_<N>_<M>_RELEASE"')
 
 
-def failed(where: str, what: str, fix: str) -> str:
-    """One problem of series-02 as the text of a fail(): FAIL where: what. Fix: fix. Rule: path."""
-    return str(fail(where, what, fix, RULE_ID))
+def failed(where: str, what: str, fix: str):
+    """One problem of series-02 as a Failure (where, what, fix, rule: tools/failure.py), which prints as FAIL where: what. Fix: fix. Rule: path."""
+    return fail(where, what, fix, RULE_ID)
 
 
 def release_version(tag) -> tuple | None:

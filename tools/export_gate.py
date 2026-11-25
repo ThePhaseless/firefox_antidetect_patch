@@ -110,13 +110,13 @@ def _failures(output: str) -> list:
 def run_node_tests(tree: Path, node: str) -> list:
     files = sorted(glob.glob(str(tree / "juggler" / "tests" / "*.test.mjs")))
     if not files:
-        return [str(fail("%s/juggler/tests" % tree, "there is no *.test.mjs file",
-                         "restore the tests in the source branch: the export runs the Juggler's node tests and a gate with none is not a pass", RULE))]
+        return [fail("%s/juggler/tests" % tree, "there is no *.test.mjs file",
+                         "restore the tests in the source branch: the export runs the Juggler's node tests and a gate with none is not a pass", RULE)]
     done = subprocess.run([node, "--test", "--test-reporter=tap", *files], cwd=tree, capture_output=True, text=True, encoding="utf-8", errors="replace")
     summary = [line for line in done.stdout.splitlines() if line.startswith(("# tests", "# pass", "# fail"))]
     print("export gate: node tests: " + ", ".join(s[2:] for s in summary))
     if done.returncode:
-        return [str(fail("juggler/tests (node --test)", "a node test is red: %s" % reason, "fix the test or the code in the source branch, then run the export again", RULE))
+        return [fail("juggler/tests (node --test)", "a node test is red: %s" % reason, "fix the test or the code in the source branch, then run the export again", RULE)
                 for reason in (_failures(done.stdout) or ["node exited %d: %s" % (done.returncode, done.stderr.strip())])]
     return []
 
@@ -126,8 +126,8 @@ def run_tree_python_tests(tree: Path) -> list:
     for script in sorted(glob.glob(str(tree / "modules" / "libpref" / "test" / "test_stealth_*.py"))):
         done = subprocess.run([sys.executable, script], cwd=tree, capture_output=True, text=True, encoding="utf-8", errors="replace")
         if done.returncode:
-            problems.append(str(fail("modules/libpref/test/%s" % Path(script).name, "a python test of the tree is red: %s" % (done.stdout + done.stderr).strip(),
-                                     "fix the test or the code in the source branch, then run the export again", RULE)))
+            problems.append(fail("modules/libpref/test/%s" % Path(script).name, "a python test of the tree is red: %s" % (done.stdout + done.stderr).strip(),
+                                     "fix the test or the code in the source branch, then run the export again", RULE))
     print("export gate: %d python tests of the tree" % len(glob.glob(str(tree / "modules" / "libpref" / "test" / "test_stealth_*.py"))))
     return problems
 

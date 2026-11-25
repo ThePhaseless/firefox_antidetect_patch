@@ -51,7 +51,7 @@ OTHER_PROBLEM_LISTS = {
 # Problem lists that share a name with a list that is not one: (file, function, name).
 NOT_PROBLEM_LISTS = {("births.py", "_signature", "found")}
 # Calls that return the text of a problem, per file. (churn.py's `say` is a progress callback, not one of them.)
-MESSAGE_BUILDERS = {"folders.py": {"say"}, "range_diff.py": {"say"}, "hook_contract.py": {"mine"}}
+MESSAGE_BUILDERS = {"folders.py": {"say"}, "range_diff.py": {"say"}}
 RETURNS_MESSAGE = re.compile(r"say|rule_c\d+|_exception_of|quiet_anchor_problem|\w+_problem")   # functions whose return is a message
 
 PATTERNS = {
@@ -59,7 +59,7 @@ PATTERNS = {
               ".extend(), `+= [...]`, `= [...]`, a list comprehension",
     "fail-text": "a text that starts with FAIL, anywhere, or print('FAIL', ...)",
     "raise": "raise <Exception>(text) of any class, sys.exit(text), parser.error(text)",
-    "builder": "Finding(FAIL, ...), violate(..., detail) with a detail that is not '', mine(text), say(...): the templates that carry a problem",
+    "builder": "Finding(FAIL, ...), violate(..., detail) with a detail that is not '', say(...): the templates that carry a problem",
     "return": "a text returned by say, rule_cNN, _exception_of, quiet_anchor_problem or a *_problem function",
 }
 
@@ -97,8 +97,14 @@ def call_name(n):
     return f.id if isinstance(f, ast.Name) else f.attr if isinstance(f, ast.Attribute) else None
 
 
+# fail() is the constructor; hook_contract.violation_failure and rule_failure return a Failure whose decision comes from the RULES table
+# (a Failure refuses a decision with no file, and test_every_rule_of_the_table_names_a_decision_file reads the table), so a call of
+# either is a message built by the constructor, like a call of fail().
+FAILURE_BUILDERS = {"fail", "violation_failure", "rule_failure"}
+
+
 def is_fail_call(n) -> bool:
-    return isinstance(n, ast.Call) and call_name(n) == "fail"
+    return isinstance(n, ast.Call) and call_name(n) in FAILURE_BUILDERS
 
 
 def is_message(n, builders=frozenset()) -> bool:
@@ -358,7 +364,7 @@ def test_the_scan_covers_the_files_it_names():
 
 # --------------------------------------------------------------------------------------------------- the scan on small sources
 def lines_of(text: str, attr: str, name: str = "x.py") -> list:
-    name = {"x.py": "folders.py"}.get(name, name)      # `say` and `mine` are builders in folders.py, range_diff.py, hook_contract.py
+    name = {"x.py": "folders.py"}.get(name, name)      # `say` is a builder in folders.py and range_diff.py
     sc = scan_source(name, text)
     return sorted(getattr(sc, attr))
 
@@ -399,9 +405,31 @@ def test_the_scan_sees_each_pattern(text, pattern):
     "FAIL, WARN = 'FAIL', 'WARN'\n",
     "def f():\n    '''FAIL is the word the docstring uses'''\n",
     "def f(p):\n    raise SystemExit(2)\n",
+    # violation_failure and rule_failure (hook_contract.py) take the decision from RULES: the scan accepts them
+    "def f(v):\n    found = []\n    found.append(violation_failure(v))\n    return found\n",
+    "def f(v):\n    problems = [violation_failure(x) for x in v]\n    return problems\n",
+    "def f(v):\n    found = []\n    found.append(rule_failure('C12', 'w', 'what', 'fix'))\n    return found\n",
+    "def f(v):\n    raise SystemExit(str(violation_failure(v)))\n",
+    "def f(v):\n    print(violation_failure(v))\n",
 ])
 def test_the_scan_leaves_what_fail_builds(text):
     assert lines_of(text, "sites") == []
+
+
+@pytest.mark.parametrize("text", [
+    "def f(v):\n    found = []\n    found.append('%s is bad' % v)\n    return found\n",
+    "def f(v):\n    found = []\n    found.append('FAIL ' + str(violation_failure(v)))\n    return found\n",
+    "def f(v):\n    return 'FAIL ' + str(rule_failure('C12', 'w', 'x', 'y'))\n",
+])
+def test_the_scan_still_sees_a_text_next_to_violation_failure(text):
+    assert lines_of(text, "sites") != []
+
+
+def test_every_rule_of_the_table_names_a_decision_file():
+    import hook_contract
+    missing = sorted(rid for rid, r in hook_contract.RULES.items() if not failure.rule_exists(r.decision))
+    assert missing == [], str(fail("tools/hook_contract.py RULES", "the rules %s name no file in docs/decisions/" % ", ".join(missing),
+                                   "give each rule the id of its decision file, without the .md", RULE))
 
 
 def test_the_scan_sees_a_cut_in_a_message_and_in_what_it_uses():

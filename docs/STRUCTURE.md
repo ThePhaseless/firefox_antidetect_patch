@@ -175,7 +175,7 @@ Rule: [hook-03](decisions/hook-03-budgets-and-debt-only-go-down.md).
 | `<folder>/FOLDER.json` | By hand (a folder without a `BACKPORT.json`); `export` never writes or edits it |
 | `ports/range-diff.txt` | `range-diff --write`, at every port |
 | `<folder>/BACKPORT.json` and the upstream diff beside it | By hand |
-| `UPSTREAM.json`: `mozilla_tag`, `source_branch` | By hand |
+| `UPSTREAM.json`: `mozilla_tag`, `source_branch` | `port`: it writes both once its branch exists |
 | `tools/layout.py`, `tools/inventory.json`, `tools/hook-budget-raises.json`, `tools/hook-names.json`, `tools/birth-ledger.json` | By hand |
 | `tools/hook-budget.json`, `tools/removed-budget.json` | By hand, downward; `shrink-budget` |
 | `tools/hook-debt.json` | `hook-debt` only |
