@@ -20,7 +20,7 @@
    "added": 5,
    "removed": 0,
    "hunks": 3,
-   "inline_logic_lines": 6,
+   "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "Navigator::HardwareConcurrency; Navigator::MaxTouchPoints",
    "notes": "hardwareConcurrency returns the pref when it is > 0, with no engine gate. maxTouchPoints returns the pref only when the engine is active and the caller is not System, after StealthAssertDeclarationsComplete(). Both read StaticPrefs directly from Mozilla code; each could become a one-line call into our file. The two gate differently (one checks the engine, the other does not).",

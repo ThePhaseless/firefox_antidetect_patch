@@ -19,7 +19,7 @@
    "added": 3,
    "removed": 0,
    "hunks": 2,
-   "inline_logic_lines": 2,
+   "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "PreferredSampleRate",
    "notes": "Declared sample rate checked after the sCubebForcedSampleRate test override and before the fingerprint-resistance 44100. Reads StaticPrefs directly; it could be one call into our file.",

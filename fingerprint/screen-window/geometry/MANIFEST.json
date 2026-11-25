@@ -60,7 +60,7 @@
    "added": 4,
    "removed": 1,
    "hunks": 2,
-   "inline_logic_lines": 9,
+   "inline_logic_lines": 0,
    "hookable": "movable",
    "anchor": "Event::GetScreenCoords",
    "notes": "Adds the declared content origin to the screen coordinates computed in Event::GetScreenCoords, so event.screenX - event.clientX equals mozInnerScreenX. Hot path: the comment records that an earlier version with an extra layout query per event made the browser too slow, so keep it arithmetic-only. Includes nsGlobalWindowOuter.h only for one static call, which pulls a large header into Event.cpp. About 50 lines of comment in the hunk; some may belong in docs.",

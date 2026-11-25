@@ -178,6 +178,34 @@ def test_an_empty_anchor_is_red_through_problems_and_check_not_only_the_cli(worl
     assert not [f for f in engine.problems() if "its `anchor` is empty" in f or "its `notes` is empty" in f]
 
 
+def test_a_stale_inline_logic_lines_is_red_and_export_writes_it_for_every_record(world):
+    export(world)
+    records = json.loads(engine.INVENTORY.read_text(encoding="utf-8"))
+    patches = {B: (world[1] / B / "hooks.patch").read_bytes(), A: (world[1] / A / "hooks.patch").read_bytes()}
+    assert [r["inline_logic_lines"] for r in records] == [engine.inline_logic_of(layout.feature_folder(r["feature"]), patches[layout.feature_folder(r["feature"])], FILE) for r in records]
+    records[0]["inline_logic_lines"] = 99
+    engine.write_json(engine.INVENTORY, records)
+    found = [f for f in engine.problems() if "inline_logic_lines" in f]
+    assert len(found) == 1 and "the record of mozilla.txt in fingerprint/a says inline_logic_lines 99" in found[0], found
+    assert ". Fix: do not edit inline_logic_lines: `" in found[0] and "export" in found[0] and ". Rule: docs/decisions/repo-06-" in found[0]
+    export(world)
+    assert not [f for f in engine.problems() if "inline_logic_lines" in f]
+
+
+def test_export_writes_inline_logic_lines_of_a_record_whose_file_is_not_split(world):
+    src, series = world
+    export(world)
+    records = json.loads(engine.INVENTORY.read_text(encoding="utf-8"))
+    for r in records:
+        r["inline_logic_lines"] = 77
+    engine.write_json(engine.INVENTORY, records)
+    run(src, "checkout", "-q", "-B", "only-b", "TAG")
+    commit(src, BASE.replace("int v5;\n", "int v5;\nB3();  // STEALTH-HOOK(network/b)\n"), "only B")
+    export(world, "only-b")
+    (record,) = json.loads(engine.INVENTORY.read_text(encoding="utf-8"))
+    assert record["inline_logic_lines"] == engine.inline_logic_of(B, (series / B / "hooks.patch").read_bytes(), FILE) != 77
+
+
 def test_a_record_whose_folder_owns_no_line_any_more_moves_with_its_hand_text_to_the_folder_that_does(world, capsys):
     src, series = world
     run(src, "checkout", "-q", "-B", "only-b", "TAG")

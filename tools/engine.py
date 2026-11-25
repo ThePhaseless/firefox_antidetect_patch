@@ -44,7 +44,7 @@ export   writes one folder per feature (tools/layout.py says which):
                           (test, anchor, why) of the committed file are kept
          SERIES, the order the folders are applied in, and UPSTREAM.json's
          "exported_from". A folder that no longer owns anything is removed.
-         It also writes what it can compute (repo-06): the `added`, `removed` and `hunks` of every record of
+         It also writes what it can compute (repo-06): the `added`, `removed`, `hunks` and `inline_logic_lines` of every record of
          tools/inventory.json (one per file and folder) from the folder's hooks.patch (the hand fields stay; a (file, folder) with no record
          gets one with its counts, category, feature and hookable, and an empty anchor and notes for a hand), the entry of tools/hook-budget.json
          and tools/removed-budget.json (keyed <file>|<folder>) of a (file, folder) patched for the first time, at the counted value, and
@@ -155,6 +155,7 @@ R_BACKPORT = "backport-01-upstream-code-as-is"
 R_HOOK = "hook-02-shape-and-contract"
 R_BUDGET = "hook-03-budgets-and-debt-only-go-down"
 R_ONE_FACT = "repo-07-one-fact-one-place"
+R_TOOL_WRITES = "repo-06-what-a-tool-can-write-a-tool-writes"
 R_BUILD = "ci-01-builds-from-main-or-latitude-branches"
 
 
@@ -374,13 +375,19 @@ def part_hooks(folder: str, patch: bytes, path: str) -> list:
     return hook_contract.analyse_patch(folder, section.decode("utf-8", errors="replace"))[0] if section else []
 
 
+def inline_logic_of(folder: str, patch: bytes, path: str) -> int:
+    """repo-06: `inline_logic_lines` of the record of (path, folder): the added or rewritten lines of the folder's part of the file that are
+    no hook form (hook_contract reads them as unknown). A tool writes it for every record of a Mozilla file that is not a backport."""
+    return sum(1 for h in part_hooks(folder, patch, path) if h.form == "unknown" and h.kind in ("add", "rewrite"))
+
+
 def derived_record(path: str, folder: str, diff: dict, category: str, feature: str, patch: bytes) -> dict:
     """The record of a (file, folder) the inventory does not have: what a tool can write. The counts come from the folder's part of the
     file; `category` is the file's (a property of the file); `feature` is the folder's; `hookable` is `already-hook` when every line of
     the part is a hook form (no line hook_contract reads as unknown, no deletion), else empty. `anchor` and `notes` are empty: the check
     refuses them until a hand writes them. inline_logic_lines is the number of added lines that are no hook form."""
     hooks = part_hooks(folder, patch, path)
-    inline = sum(1 for h in hooks if h.form == "unknown" and h.kind in ("add", "rewrite"))
+    inline = inline_logic_of(folder, patch, path)
     all_forms = bool(hooks) and all(h.form != "unknown" and h.kind in ("add", "rewrite") for h in hooks)
     return computed_record({"file": path, "category": category, "feature": feature, "prefs": [], "inline_logic_lines": inline,
                             "hookable": "already-hook" if all_forms else "", "anchor": "", "notes": ""}, diff)
@@ -404,9 +411,8 @@ def inventory_after(old: list, modified: dict, diffs: dict, patches: dict, say=p
             f = record_folder(r)
             if f in folders_of:
                 record = computed_record(r, diffs[(path, f)])
-                if split_file:
-                    hooks = part_hooks(f, patches[f], path)
-                    record["inline_logic_lines"] = sum(1 for h in hooks if h.form == "unknown" and h.kind in ("add", "rewrite"))
+                if record["category"] != "backport":
+                    record["inline_logic_lines"] = inline_logic_of(f, patches[f], path)
                 fresh[(path, f)], carried[id(r)] = record, record
         if orphans and len(uncovered) > 1:
             raise SystemExit(halt(fail(
@@ -422,8 +428,8 @@ def inventory_after(old: list, modified: dict, diffs: dict, patches: dict, say=p
                 continue
             target = uncovered.pop(0)
             record = computed_record({**r, "feature": feature_of_folder(target, old)}, diffs[(path, target)])
-            if split_file:
-                record["inline_logic_lines"] = derived_record(path, target, diffs[(path, target)], category, record["feature"], patches[target])["inline_logic_lines"]
+            if record["category"] != "backport":
+                record["inline_logic_lines"] = inline_logic_of(target, patches[target], path)
             say("inventory: the record of %s moved from %s to %s (its markers name %s)" % (path, record_folder(r) or r["feature"], target, target))
             fresh[(path, target)], carried[id(r)] = record, record
         for f in uncovered:
@@ -1125,6 +1131,24 @@ def record_count_problems(records: list, diffs: dict) -> list:
     return found
 
 
+def record_inline_problems(records: list, diffs: dict, patches: dict) -> list:
+    """repo-06: `inline_logic_lines` of each record of a Mozilla file that is not a backport is the number `export` computes from the
+    hooks.patch of its folder (inline_logic_of); a hand value, or one that was not refreshed after a hunk moved, differs and is refused.
+    `patches`: folder -> hooks.patch bytes; `diffs` as for record_count_problems."""
+    found = []
+    for r in records:
+        folder = record_folder(r)
+        if r.get("category") == "backport" or folder not in patches or diffs.get((r["file"], folder)) is None:
+            continue
+        real = inline_logic_of(folder, patches[folder], r["file"])
+        if r.get("inline_logic_lines") != real:
+            found.append(fail(
+                "tools/inventory.json", "the record of %s in %s says inline_logic_lines %s; the folder's part of the file in its hooks.patch has %d"
+                % (r["file"], folder, r.get("inline_logic_lines"), real),
+                "do not edit inline_logic_lines: `%s` writes it from the hooks.patch of the folder" % command("export", "--source", "<source>"), R_TOOL_WRITES))
+    return found
+
+
 INVENTORY_HOOKABLE = ("already-hook", "movable", "hard")
 INVENTORY_HAND_FIELDS = ("anchor", "notes")      # text a hand writes; `hookable` is one of INVENTORY_HOOKABLE
 
@@ -1630,6 +1654,7 @@ def problems() -> list:
             diffs.update({(path, f): d for path, d in _diffs_of(patch).items()})
     found += record_count_problems(records, diffs)
     found += inventory_hand_problems(records, diffs)      # the text a hand writes in a record the export derived: every caller of problems() sees it
+    found += record_inline_problems(records, diffs, {f: (ROOT / f / "hooks.patch").read_bytes() for f in present if (ROOT / f / "hooks.patch").exists()})
     found += own_cxx_problems()
     found += own_cr_problems()
     for f in present:

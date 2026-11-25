@@ -77,7 +77,7 @@
    "added": 4,
    "removed": 0,
    "hunks": 3,
-   "inline_logic_lines": 2,
+   "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "include list; OSPreferences::GetSystemLocales and GetSystemLocale, first line of each",
    "notes": "The languages of the machine (what the OS preferences say) are the session declaration: both getters first ask SessionSystemLocales / SessionSystemLocale (intl/locale/StealthSessionPrefs.cpp, ours) and return its answer when a declaration is set. Two calls at the head of two functions plus the include; no logic inline.",

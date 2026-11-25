@@ -17,7 +17,7 @@
    "added": 6,
    "removed": 0,
    "hunks": 5,
-   "inline_logic_lines": 60,
+   "inline_logic_lines": 2,
    "hookable": "movable",
    "anchor": "RenderBackend (the shared font resources are kept in the backend; clear_namespace clears them whether or not the window is still registered)",
    "notes": "A namespace whose window left first used to skip the cleanup of the font resources the windows share (UnregisterWindow reaches the backend on the direct channel, ClearNamespace on the low-priority queue): the font templates, font instances and key mappings of a closed window stayed in the shared font resources of the pool (the glyph cache lives in the window's own ResourceCache and goes with it). The backend now clears the shared font resources itself. Fixes Mozilla's own code; follows Mozilla when they change it.",

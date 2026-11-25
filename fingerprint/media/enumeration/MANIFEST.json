@@ -22,7 +22,7 @@
    "added": 8,
    "removed": 5,
    "hunks": 7,
-   "inline_logic_lines": 23,
+   "inline_logic_lines": 0,
    "hookable": "movable",
    "anchor": "MediaManager::EnumerationParams::RealDeviceRequested; HostSpeakersMayBeAsked (new); EnumerationParams::HostSpeakersRequested (new); MediaManager::MaybeRequestPermissionAndEnumerateRawDevices; MediaManager::EnumerateRawDevices; MediaManager::GetPhysicalDevices",
    "notes": "B300: with zoom.stealth.media_enumeration_ms set, speakers are not enumerated from the host, and GetPhysicalDevices resolves after the declared delay (the resolve step is wrapped in a lambda, hunk 6, the largest block). Risk: the nsresult from NS_DelayedDispatchToCurrentThread is ignored; if the dispatch fails, the enumeration promise never resolves. RealDeviceRequested no longer counts EnumerateAudioOutputs when the enumeration is declared (intended, not stated in the diff). The declared-delay logic can move to our file behind one hook. VERIFIED: the nsresult of NS_DelayedDispatchToCurrentThread is ignored at dom/media/MediaManager.cpp:2472 (confirmed); that the promise then never resolves is a consequence of the code but was not reproduced (unverified).",

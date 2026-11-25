@@ -28,7 +28,7 @@
    "added": 7,
    "removed": 0,
    "hunks": 6,
-   "inline_logic_lines": 0,
+   "inline_logic_lines": 3,
    "hookable": "movable",
    "anchor": "TextInputProcessor::Keydown/Keyup/CommitCompositionWith and KeydownInternal/KeyupInternal",
    "notes": "A key is delivered at once and born the declared latency in the past: setNextKeyLatency (chrome only) declares it for the next key; a StealthKeyBirthScope opened right after the IsCallerChrome assert of each key method takes it (and zeroes it in every case); KeydownInternal/KeyupInternal stamp keyEvent.mTimeStamp with it (StealthInputEventBirth.h). It replaces the chrome setTimeout of PageAgent, which under load moved the delivery itself.",

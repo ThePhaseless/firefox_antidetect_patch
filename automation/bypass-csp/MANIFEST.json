@@ -50,7 +50,7 @@
    "added": 2,
    "removed": 0,
    "hunks": 1,
-   "inline_logic_lines": 8,
+   "inline_logic_lines": 0,
    "hookable": "movable",
    "anchor": "CSP_IsBypassedFor (new) and CSP_ApplyMetaCSPToDoc",
    "notes": "Reads the Juggler bypassCSP flag through nsIDocShell::GetBypassCSPEnabled. The header comment says InitCSP also uses it for header policies. [verified: CONFIRMED, the call site exists at dom/base/Document.cpp:4010 (not in this group).] The comment says the attribute was stored but never read before. The comment has an emoji marker that must be removed. The comment names Playwright and an internal issue number (vendor/test name in a code comment).",

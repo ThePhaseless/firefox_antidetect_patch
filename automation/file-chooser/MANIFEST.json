@@ -17,7 +17,7 @@
    "added": 4,
    "removed": 0,
    "hunks": 2,
-   "inline_logic_lines": 5,
+   "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "HTMLInputElement::InitFilePicker",
    "notes": "When Juggler asked to intercept the file chooser, InitFilePicker returns before the native dialog opens, without touching mPickerRunning. The JS side gets the element through the notification fired just above. Reads nsIDocShell::GetFileInputInterceptionEnabled, which is in the docshell group (not checked here). Adds #include nsIDocShell.h. The comment is in Italian and dates a fix to 2026-08-25. VERIFIED: nsIDocShell.fileInputInterceptionEnabled exists at docshell/base/nsIDocShell.idl:692.",
