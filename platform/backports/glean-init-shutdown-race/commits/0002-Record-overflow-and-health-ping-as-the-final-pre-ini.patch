@@ -1,0 +1,327 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Travis Long <tlong@mozilla.com>
+Date: Thu, 29 Oct 2026 08:05:42 -0500
+Subject: [PATCH] Record overflow and health ping as the final pre-init task
+
+(cherry picked from commit d9fa34a3f1e48eb2cbddd88bdd3cfc386ca3172c)
+(narrowed to glean-core/src/: the files outside the vendored crate are left out)
+---
+ glean-core/src/dispatcher/global.rs | 14 +++--
+ glean-core/src/dispatcher/mod.rs    | 89 +++++++++++++++++++++++++----
+ glean-core/src/lib.rs               | 68 +++++++++++-----------
+ 3 files changed, 123 insertions(+), 48 deletions(-)
+
+diff --git a/glean-core/src/dispatcher/global.rs b/glean-core/src/dispatcher/global.rs
+index af686be..a7b4925 100644
+--- a/glean-core/src/dispatcher/global.rs
++++ b/glean-core/src/dispatcher/global.rs
+@@ -80,17 +80,21 @@ pub fn block_on_queue_timeout(timeout: Duration) -> Result<(), RecvTimeoutError>
+     guard().block_on_queue_timeout(timeout)
+ }
+ 
+-/// Starts processing queued tasks in the global dispatch queue.
++/// Starts processing queued tasks in the global dispatch queue,
++/// running `final_task` as the last pre-init task.
+ ///
+ /// This function blocks until queued tasks prior to this call are finished.
+ /// Once the initial queue is empty the dispatcher will wait for new tasks to be launched.
+ ///
++/// `final_task` is passed the number of tasks that overflowed the pre-init queue.
++/// It runs even if the pre-init queue is full, and before any task launched after this call.
++///
+ /// # Returns
+ ///
+ /// Returns the total number of items that were added to the queue before being flushed,
+ /// or an error if the queue couldn't be flushed.
+-pub fn flush_init() -> Result<usize, DispatchError> {
+-    guard().flush_init()
++pub fn flush_init(final_task: impl FnOnce(usize) + Send + 'static) -> Result<usize, DispatchError> {
++    guard().flush_init(final_task)
+ }
+ 
+ fn join_dispatcher_thread() -> Result<(), DispatchError> {
+@@ -173,7 +177,7 @@ mod test {
+             });
+         }
+ 
+-        flush_init().unwrap();
++        flush_init(|_| {}).unwrap();
+ 
+         {
+             let result = Arc::clone(&result);
+@@ -203,7 +207,7 @@ mod test {
+             });
+         }
+ 
+-        flush_init().unwrap();
++        flush_init(|_| {}).unwrap();
+ 
+         {
+             let result = Arc::clone(&result);
+diff --git a/glean-core/src/dispatcher/mod.rs b/glean-core/src/dispatcher/mod.rs
+index c7c604e..2684869 100644
+--- a/glean-core/src/dispatcher/mod.rs
++++ b/glean-core/src/dispatcher/mod.rs
+@@ -10,7 +10,7 @@
+ //!
+ //! ```rust,ignore
+ //! // Ensure the dispatcher queue is being worked on.
+-//! dispatcher::flush_init();
++//! dispatcher::flush_init(|_| {});
+ //!
+ //! dispatcher::launch(|| {
+ //!     println!("Executing expensive task");
+@@ -133,7 +133,7 @@ impl DispatchGuard {
+     pub fn shutdown(&mut self) -> Result<(), DispatchError> {
+         // Need to flush in order for the thread to actually process anything,
+         // including the shutdown command.
+-        self.flush_init().ok();
++        self.flush_init(|_| {}).ok();
+         self.send(Command::Shutdown)
+     }
+ 
+@@ -209,13 +209,19 @@ impl DispatchGuard {
+         Ok(())
+     }
+ 
+-    /// Flushes the pre-init buffer.
++    /// Flushes the pre-init buffer, running `final_task` as the last pre-init task.
+     ///
+     /// This function blocks until tasks queued prior to this call are finished.
+     /// Once the initial queue is empty the dispatcher will wait for new tasks to be launched.
+     ///
++    /// `final_task` is passed the number of tasks that overflowed the pre-init buffer.
++    /// It is queued regardless of the maximum queue size, so it runs even if the buffer is full.
++    ///
+     /// Returns an error if called multiple times.
+-    fn flush_init(&mut self) -> Result<usize, DispatchError> {
++    fn flush_init(
++        &mut self,
++        final_task: impl FnOnce(usize) + Send + 'static,
++    ) -> Result<usize, DispatchError> {
+         // We immediately stop queueing in the pre-init buffer.
+         let old_val = self.queue_preinit.swap(false, Ordering::SeqCst);
+         if !old_val {
+@@ -225,6 +231,15 @@ impl DispatchGuard {
+         // Unblock the worker thread exactly once.
+         self.block_sender.send(Blocked::Continue)?;
+ 
++        // Queue the final task behind all other pre-init tasks.
++        // We explicitly don't use `self.launch` here, which would discard it if the buffer is full.
++        let guard = self.clone();
++        self.preinit_sender
++            .send(Command::Task(Box::new(move || {
++                final_task(guard.overflow_count.load(Ordering::SeqCst))
++            })))
++            .map_err(|_| DispatchError::SendError)?;
++
+         // Single-use channel to communicate with the worker thread.
+         let (swap_sender, swap_receiver) = bounded(0);
+ 
+@@ -392,7 +407,7 @@ mod test {
+         // Force the Dispatcher out of the pre-init queue mode.
+         dispatcher
+             .guard()
+-            .flush_init()
++            .flush_init(|_| {})
+             .expect("Failed to get out of preinit queue mode");
+ 
+         let canary_clone = thread_canary.clone();
+@@ -441,7 +456,7 @@ mod test {
+         // Flush the queue and wait for the tasks to complete.
+         dispatcher
+             .guard()
+-            .flush_init()
++            .flush_init(|_| {})
+             .expect("Failed to get out of preinit queue mode");
+         // Validate that we have the expected canary value.
+         assert_eq!(3, thread_canary.load(Ordering::SeqCst));
+@@ -465,7 +480,7 @@ mod test {
+         }
+ 
+         result.lock().unwrap().push(0);
+-        dispatcher.guard().flush_init().unwrap();
++        dispatcher.guard().flush_init(|_| {}).unwrap();
+         for i in 6..=10 {
+             let result = Arc::clone(&result);
+             dispatcher
+@@ -493,7 +508,7 @@ mod test {
+ 
+         let result = Arc::new(Mutex::new(vec![]));
+ 
+-        dispatcher.guard().flush_init().unwrap();
++        dispatcher.guard().flush_init(|_| {}).unwrap();
+ 
+         dispatcher.guard().shutdown().unwrap();
+         {
+@@ -537,7 +552,7 @@ mod test {
+             assert_eq!(Err(DispatchError::QueueFull), err);
+         }
+ 
+-        dispatcher.guard().flush_init().unwrap();
++        dispatcher.guard().flush_init(|_| {}).unwrap();
+ 
+         {
+             let result = Arc::clone(&result);
+@@ -554,6 +569,60 @@ mod test {
+         assert_eq!(&*result.lock().unwrap(), &[1, 2, 3, 4, 5, 20]);
+     }
+ 
++    #[test]
++    fn flush_init_runs_final_task_after_full_preinit_buffer() {
++        enable_test_logging();
++
++        let dispatcher = Dispatcher::new(5);
++
++        let result = Arc::new(Mutex::new(vec![]));
++
++        for i in 1..=5 {
++            let result = Arc::clone(&result);
++            dispatcher
++                .guard()
++                .launch(move || {
++                    result.lock().unwrap().push(i);
++                })
++                .unwrap();
++        }
++
++        {
++            let result = Arc::clone(&result);
++            let err = dispatcher.guard().launch(move || {
++                result.lock().unwrap().push(10);
++            });
++            assert_eq!(Err(DispatchError::QueueFull), err);
++        }
++
++        {
++            let result = Arc::clone(&result);
++            let overflow_count = dispatcher
++                .guard()
++                .flush_init(move |overflow_count| {
++                    assert_eq!(1, overflow_count);
++                    result.lock().unwrap().push(100);
++                })
++                .unwrap();
++            assert_eq!(1, overflow_count);
++        }
++
++        {
++            let result = Arc::clone(&result);
++            dispatcher
++                .guard()
++                .launch(move || {
++                    result.lock().unwrap().push(20);
++                })
++                .unwrap();
++        }
++
++        dispatcher.guard().block_on_queue();
++
++        // The final task runs despite the full buffer, after all preinit tasks and before any later ones.
++        assert_eq!(&*result.lock().unwrap(), &[1, 2, 3, 4, 5, 100, 20]);
++    }
++
+     #[test]
+     fn normal_queue_is_unbounded() {
+         enable_test_logging();
+@@ -576,7 +645,7 @@ mod test {
+                 .unwrap();
+         }
+ 
+-        dispatcher.guard().flush_init().unwrap();
++        dispatcher.guard().flush_init(|_| {}).unwrap();
+ 
+         // Queue more than 5 tasks,
+         // Each one is slow to process, so we should be faster in queueing
+diff --git a/glean-core/src/lib.rs b/glean-core/src/lib.rs
+index 4574b85..98cd9ff 100644
+--- a/glean-core/src/lib.rs
++++ b/glean-core/src/lib.rs
+@@ -609,37 +609,37 @@ fn initialize_inner(
+         // that shutdown() depends on. At time of writing that's only setting up
+         // the global Glean, but it is probably best to flush the preinit queue
+         // as late as possible in the glean.init thread.
+-        let overflow_count = match dispatcher::flush_init() {
+-            Ok(task_count) => task_count,
+-            Err(err) => {
+-                log::error!("Unable to flush the preinit queue: {}", err);
+-                0
+-            }
+-        };
+-
+-        // bug 2072668: Anything recorded after the flush is launched on the dispatcher rather than run directly on
+-        // this thread, so that `shutdown()` waits for it (by blocking on the dispatcher) before closing the database.
++        //
++        // bug 2072668: Anything recorded at this point runs as the final preinit task on the dispatcher, rather than
++        // directly on this thread. That way it runs after any preinit tasks, and before anything a concurrent
++        // `shutdown()` waits on, so the database is still open. Recording it after the flush could race with
++        // `shutdown()`.
+         let submit_health_ping = !is_test_mode() && internal_pings_enabled;
+-        if overflow_count > 0 || submit_health_ping {
+-            dispatcher::launch(move || {
++        let flushed = dispatcher::flush_init(move |overflow_count| {
++            let sent = core::with_glean(|glean| {
++                // This needs to be recorded before the health ping is submitted, as it is sent in that ping.
+                 if overflow_count > 0 {
+-                    core::with_glean(|glean| {
+-                        glean_metrics::error::preinit_tasks_overflow
+-                            .add_sync(glean, overflow_count as i32);
+-                    });
++                    glean_metrics::error::preinit_tasks_overflow
++                        .add_sync(glean, overflow_count as i32);
+                 }
+ 
+-                if submit_health_ping {
+-                    // Now that Glean is initialized, we can capture the directory info from the pre_init phase and
+-                    // send it in a health ping with reason "pre_init".
+-                    record_dir_info_and_submit_health_ping(dir_info, "pre_init");
++                // Now that Glean is initialized, we can capture the directory info from the pre_init phase and send
++                // it in a health ping with reason "pre_init".
++                submit_health_ping
++                    && record_dir_info_and_submit_health_ping(glean, dir_info, "pre_init")
++            });
+ 
+-                    let state = global_state().lock().unwrap();
+-                    if let Err(e) = state.callbacks.trigger_upload() {
+-                        log::error!("Triggering upload failed. Error: {}", e);
+-                    }
++            // Need to separate access to the Glean object from access to global state.
++            // `trigger_upload` itself might lock the Glean object and we need to avoid that deadlock.
++            if sent {
++                let state = global_state().lock().unwrap();
++                if let Err(e) = state.callbacks.trigger_upload() {
++                    log::error!("Triggering upload failed. Error: {}", e);
+                 }
+-            });
++            }
++        });
++        if let Err(err) = flushed {
++            log::error!("Unable to flush the preinit queue: {}", err);
+         }
+ 
+         let state = global_state().lock().unwrap();
+@@ -1756,14 +1756,16 @@ fn collect_directory_info(path: &Path) -> Option<serde_json::Value> {
+     }
+ }
+ 
+-fn record_dir_info_and_submit_health_ping(dir_info: Option<serde_json::Value>, reason: &str) {
+-    core::with_glean(|glean| {
+-        glean
+-            .health_metrics
+-            .data_directory_info
+-            .set_sync(glean, dir_info.unwrap_or(serde_json::json!({})));
+-        glean.internal_pings.health.submit_sync(glean, Some(reason));
+-    });
++fn record_dir_info_and_submit_health_ping(
++    glean: &Glean,
++    dir_info: Option<serde_json::Value>,
++    reason: &str,
++) -> bool {
++    glean
++        .health_metrics
++        .data_directory_info
++        .set_sync(glean, dir_info.unwrap_or(serde_json::json!({})));
++    glean.internal_pings.health.submit_sync(glean, Some(reason))
+ }
+ 
+ /// Unused function. Not used on Android or iOS.

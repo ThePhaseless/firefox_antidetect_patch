@@ -21,7 +21,7 @@ its input: regenerating it later gives the same bytes; moving the date is a deci
 for a consumer's platform fails the resolution here, as `pip download --only-binary=:all:` fails in the resolver job; no setup.py ever runs in CI.
 
 The input of a lock is a function of its source, so it cannot drift from it: `lock` writes it, `check` (and test_py_deps.py) compares it again:
-  tools         scripts/ci/locks/tools.in (pytest, pyyaml, fonttools==4.51.0: the checks' and the tree checks' tools)
+  tools         scripts/ci/locks/tools.in (pytest, pytest-xdist for the gate's `pytest -n`, pyyaml, fonttools==4.51.0: the checks' and the tree checks' tools)
   core-checks   the third-party dependencies and the `dev` extra of the core's pyproject.toml at the ref the series pins (the core wheel itself is built
                 by the resolver from the core ref, --no-deps)
   lavapipe      scripts/ci/lavapipe/VERSIONS.json, "pip" (what lavapipe_build.py installs)

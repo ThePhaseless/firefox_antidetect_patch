@@ -41,6 +41,8 @@ FEATURES = {
     "win-long-build-paths": "platform/build-tools",
     # platform: commits of Mozilla's repository carried before the tag has them
     "fontconfig-face-index": "platform/backports/fontconfig-face-index",
+    # platform: commits of mozilla/glean carried before the glean-core Mozilla vendors has them
+    "glean-init-shutdown-race": "platform/backports/glean-init-shutdown-race",
     # stillborn
     "updater-refuses": "stillborn/updater",
     "pingsender-session-route": "stillborn/telemetry",

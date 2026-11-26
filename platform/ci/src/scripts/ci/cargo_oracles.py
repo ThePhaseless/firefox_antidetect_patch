@@ -1,8 +1,9 @@
 r"""The verdict of the cargo job: the unit tests of OUR Rust code in WebRender ran, and passed.
 
-Our Rust lives in a few Mozilla files (gfx/wr, dom/media/webrtc/transport/mdns_service), with #[cfg(test)] modules and tests of our own. No other round runs them: gtests are the C++ ones. The job
-`cargo-tests` of .github/workflows/cargo-tests.yml runs only those modules (libtest filters by name), in two cargo runs (WebRender's workspace, then
-the standalone crate mdns_service) that write one log; this reads the log. A run
+Our Rust lives in a few Mozilla files (gfx/wr, dom/media/webrtc/transport/mdns_service), with #[cfg(test)] modules and tests of our own; and one test of
+upstream's (glean-core) that a backport carries. No other round runs them: gtests are the C++ ones. The job
+`cargo-tests` of .github/workflows/cargo-tests.yml runs only those modules (libtest filters by name), in three cargo runs (WebRender's workspace, then
+the standalone crates mdns_service and glean-core, one run each) that write one log; this reads the log. A run
 whose filters matched nothing is green for cargo (`0 passed`), so the verdict is red unless every module of ours reported at least its floor of
 tests, each `ok`, and the run ended with no failed and no ignored test.
 
@@ -21,14 +22,21 @@ from pathlib import Path
 #: mdns_service: the module `stealth_tests` of ours (dom/media/webrtc/transport/mdns_service/src/stealth_tests.rs, declared in lib.rs by `#[cfg(test)] mod stealth_tests;`),
 #: crate `mdns_service`; its floor is the count of #[test] in that file. On a tree that does not have the file, cargo reports `0 passed` and the verdict is red:
 #: the job is for the tree where the branch hooks/fingerprint__webrtc__declared-network is merged.
+#: glean-core: the one test of upstream's own that the backport platform/backports/glean-init-shutdown-race carries (mozilla/glean PR 3727, bug 2072668;
+#: src/dispatcher/mod.rs, `mod test`), crate `glean-core`, run standalone from third_party/rust/glean-core. A tree without the backport has no such test:
+#: cargo reports `0 passed` and the verdict is red, which is what makes the row red on the code as vendored and green with the backport.
+GLEAN_TEST = "dispatcher::test::flush_init_runs_final_task_after_full_preinit_buffer"
 OURS = {
     "render_backend::stealth_shared_fonts::tests::": 5,
     "stealth_tests::": 1,
+    GLEAN_TEST: 1,
 }
 #: The libtest filters that select exactly those modules (a substring of the full path), WebRender's run (`cargo test -p webrender --lib`).
 FILTERS = ("render_backend::stealth_shared_fonts::tests",)
 #: The filter of the second run (`cargo test --lib`, in the directory of mdns_service).
 MDNS_FILTERS = ("stealth_tests::",)
+#: The filter of the third run (`cargo test --lib`, in third_party/rust/glean-core): the full path of the one test.
+GLEAN_FILTERS = (GLEAN_TEST,)
 
 LINE = re.compile(r"^test (\S+) \.\.\. (\S+)", re.M)
 RESULT = re.compile(r"^test result: (\w+)\. (\d+) passed; (\d+) failed; (\d+) ignored;", re.M)
