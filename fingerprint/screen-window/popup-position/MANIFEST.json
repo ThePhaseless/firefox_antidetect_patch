@@ -6,6 +6,10 @@
   "toolkit/components/windowwatcher/StealthWindowPlacement.cpp": "100644",
   "toolkit/components/windowwatcher/StealthWindowPlacement.h": "100644"
  },
+ "sha256": {
+  "toolkit/components/windowwatcher/StealthWindowPlacement.cpp": "fdcac6fcaa4898c44731f0f9879f444bb0ea93510171374233dbd80b62c34fd8",
+  "toolkit/components/windowwatcher/StealthWindowPlacement.h": "2a6b9e18fc21e3a05bdb40fe74d5ec9d4fe35d636408cef2d0de2beaf03f3b70"
+ },
  "inventory": [
   {
    "file": "toolkit/components/windowwatcher/nsWindowWatcher.cpp",

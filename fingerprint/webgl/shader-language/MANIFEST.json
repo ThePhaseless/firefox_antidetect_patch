@@ -11,6 +11,10 @@
   "dom/canvas/StealthWebGLShaderLanguage.cpp": "100644",
   "dom/canvas/StealthWebGLShaderLanguage.h": "100644"
  },
+ "sha256": {
+  "dom/canvas/StealthWebGLShaderLanguage.cpp": "9362c84d9923ce4a1092e3183ee392deec23397ebc261c0dac4f1bfb6abbbdff",
+  "dom/canvas/StealthWebGLShaderLanguage.h": "d409bd5b9bd383965bc24ce187cdc86fcfd66a8f6905410397fee44aa46ff762"
+ },
  "inventory": [
   {
    "file": "dom/canvas/WebGLContext.cpp",

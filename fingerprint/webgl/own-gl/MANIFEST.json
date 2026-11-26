@@ -6,6 +6,9 @@
  "added": {
   "gfx/gl/StealthOwnGL.h": "100644"
  },
+ "sha256": {
+  "gfx/gl/StealthOwnGL.h": "5b953713194c8f3a6da51dd89613ce661afa915421c77bb24285bde7e282a6fd"
+ },
  "inventory": [
   {
    "file": "gfx/gl/GLContextProviderLinux.cpp",

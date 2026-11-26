@@ -16,6 +16,15 @@
   "modules/libpref/test/test_stealth_prefs_declared_once.py": "100644",
   "modules/libpref/test/test_stealth_prefs_final_values.py": "100644"
  },
+ "sha256": {
+  "modules/libpref/StealthPrefSanitize.cpp": "74b3011a7ba4c985156487aea997956abff1068177c94ac6adbbeaa68da935c9",
+  "modules/libpref/StealthPrefSanitize.h": "e9edb92b0ecbcca7fd60f9f1bbcea78e29e58cd8e03831bb13d296fd84cde322",
+  "modules/libpref/init/StealthPrefList.yaml": "aeb143a1c882568156a4f61f48fea0429978021584bf1605360caa037ce28029",
+  "modules/libpref/init/StealthPrefs.js": "4d2469ac65a42accab90abc97d9cd46e402783611351a4ecb98d6c2d76947abc",
+  "modules/libpref/test/gtest/TestStealthPrefSanitize.cpp": "8a68b7e61ee063fb1f4344a3c02e2a6aff947f1881ed79f393ea614d06f9e964",
+  "modules/libpref/test/test_stealth_prefs_declared_once.py": "a45f16eb3e43b4a2f9088a7dec154ab6835fd903e4978a3802f2fda042e9e9ef",
+  "modules/libpref/test/test_stealth_prefs_final_values.py": "2b13ffabbd40f3807323924bf2e2ccb987ecde424cf9db55bab934aea5eb1845"
+ },
  "inventory": [
   {
    "file": "browser/app/profile/firefox.js",
@@ -58,6 +67,10 @@
    "hookable": "already-hook",
    "anchor": "values changed in place on 2026-10-29",
    "notes": "Terms-of-use values changed on their lines; the two translations enable lines become a marker.",
+   "verifier": {
+    "changed": [],
+    "why": "Added with the 2026-10-29 hook move."
+   },
    "pref_groups": [
     {
      "feature": "system-fonts-pinned-windows",
@@ -110,11 +123,7 @@
      "category": "stillborn",
      "prefs": []
     }
-   ],
-   "verifier": {
-    "changed": [],
-    "why": "Added with the 2026-10-29 hook move."
-   }
+   ]
   },
   {
    "file": "modules/libpref/Preferences.cpp",
@@ -176,6 +185,10 @@
    "hookable": "already-hook",
    "anchor": "hook moved off the end of the pref files on 2026-10-29",
    "notes": "Includes our StealthPrefs.js right after all.js, so our defaults win.",
+   "verifier": {
+    "changed": [],
+    "why": "Added with the 2026-10-29 hook move."
+   },
    "pref_groups": [
     {
      "feature": "system-fonts-pinned-windows",
@@ -228,11 +241,7 @@
      "category": "stillborn",
      "prefs": []
     }
-   ],
-   "verifier": {
-    "changed": [],
-    "why": "Added with the 2026-10-29 hook move."
-   }
+   ]
   },
   {
    "file": "modules/libpref/init/all.js",
@@ -275,6 +284,10 @@
    "hookable": "already-hook",
    "anchor": "values changed in place on 2026-10-29",
    "notes": "Six monospace sizes and the data-submission notification changed on their own lines, marked.",
+   "verifier": {
+    "changed": [],
+    "why": "Added with the 2026-10-29 hook move."
+   },
    "pref_groups": [
     {
      "feature": "system-fonts-pinned-windows",
@@ -327,11 +340,7 @@
      "category": "stillborn",
      "prefs": []
     }
-   ],
-   "verifier": {
-    "changed": [],
-    "why": "Added with the 2026-10-29 hook move."
-   }
+   ]
   },
   {
    "file": "modules/libpref/moz.build",

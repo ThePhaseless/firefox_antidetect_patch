@@ -5,6 +5,9 @@
  "added": {
   "gfx/wr/webrender/src/render_backend/stealth_shared_fonts.rs": "100644"
  },
+ "sha256": {
+  "gfx/wr/webrender/src/render_backend/stealth_shared_fonts.rs": "4def1317a5696fa32f1ea3de9785c82ad34fe2db5968367ddaab6ebd0a23aae2"
+ },
  "inventory": [
   {
    "file": "gfx/wr/webrender/src/render_backend.rs",

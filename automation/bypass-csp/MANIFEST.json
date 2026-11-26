@@ -7,6 +7,9 @@
  "added": {
   "dom/security/StealthBypassCSP.cpp": "100644"
  },
+ "sha256": {
+  "dom/security/StealthBypassCSP.cpp": "0811859c51641bfac2b6e8d4726730c129d99aebdb7626a85dac167461fb0dc5"
+ },
  "inventory": [
   {
    "file": "dom/security/moz.build",

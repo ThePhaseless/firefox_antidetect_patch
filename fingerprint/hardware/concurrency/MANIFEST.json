@@ -5,6 +5,9 @@
  "added": {
   "dom/workers/StealthHardwareConcurrency.h": "100644"
  },
+ "sha256": {
+  "dom/workers/StealthHardwareConcurrency.h": "d5c63295310706cdb43ce208e7b4e0ac249ac8c4def9afb208b3bdda1c451279"
+ },
  "inventory": [
   {
    "file": "dom/workers/WorkerNavigator.cpp",

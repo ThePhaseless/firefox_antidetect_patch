@@ -7,6 +7,9 @@
  "added": {
   "dom/base/StealthShadowRoot.h": "100644"
  },
+ "sha256": {
+  "dom/base/StealthShadowRoot.h": "d71a4d0810cf65318f19b8efe50019146e0d4ed21504b1ae942c1c8b13fc9307"
+ },
  "inventory": [
   {
    "file": "dom/base/Element.cpp",

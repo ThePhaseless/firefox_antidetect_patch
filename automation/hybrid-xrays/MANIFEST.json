@@ -15,6 +15,14 @@
   "js/xpconnect/wrappers/StealthHybridXray.h": "100644",
   "juggler/tests/caller_object_decision_is_written_before_its_branch_reads_it.test.mjs": "100644"
  },
+ "sha256": {
+  "dom/base/test/gtest/TestStealthCallerObject.cpp": "cc11223e7d64edc4c042b8323edff888a7ce32531cd51af1f9fdb52917e41423",
+  "js/xpconnect/src/StealthSandbox.h": "1f3069d3f38b078f32f48d8dd3cd1c3f039500588f9c61c375066d6a798ebdba",
+  "js/xpconnect/tests/unit/test_stealth_hybrid_xrays_options.js": "6598e2b37d536047b4d62c4e90df0b2026a517f56a78fd1c53bf1e97c10b16de",
+  "js/xpconnect/wrappers/StealthHybridXray.cpp": "f3f865fb17f5be976fb8b97ce318c7ff8515ee22d7b123a8d8b77aee060770fb",
+  "js/xpconnect/wrappers/StealthHybridXray.h": "40762b2c50351164b12d3d4275b2fa239632c940ab629a928058832d2fe6721c",
+  "juggler/tests/caller_object_decision_is_written_before_its_branch_reads_it.test.mjs": "9a33c086d3eb8d77cd97f229fcc5e14e790753955dc7579046bd8c14620e0809"
+ },
  "inventory": [
   {
    "file": "js/xpconnect/src/Sandbox.cpp",

@@ -79,6 +79,10 @@
   "hookable": "already-hook",
   "anchor": "values changed in place on 2026-10-29",
   "notes": "Terms-of-use values changed on their lines; the two translations enable lines become a marker.",
+  "verifier": {
+   "changed": [],
+   "why": "Added with the 2026-10-29 hook move."
+  },
   "pref_groups": [
    {
     "feature": "system-fonts-pinned-windows",
@@ -131,11 +135,7 @@
     "category": "stillborn",
     "prefs": []
    }
-  ],
-  "verifier": {
-   "changed": [],
-   "why": "Added with the 2026-10-29 hook move."
-  }
+  ]
  },
  {
   "file": "browser/app/winlauncher/LauncherProcessWin.cpp",
@@ -2795,6 +2795,10 @@
   "hookable": "already-hook",
   "anchor": "hook moved off the end of the pref files on 2026-10-29",
   "notes": "Includes our StealthPrefs.js right after all.js, so our defaults win.",
+  "verifier": {
+   "changed": [],
+   "why": "Added with the 2026-10-29 hook move."
+  },
   "pref_groups": [
    {
     "feature": "system-fonts-pinned-windows",
@@ -2847,11 +2851,7 @@
     "category": "stillborn",
     "prefs": []
    }
-  ],
-  "verifier": {
-   "changed": [],
-   "why": "Added with the 2026-10-29 hook move."
-  }
+  ]
  },
  {
   "file": "modules/libpref/init/all.js",
@@ -2894,6 +2894,10 @@
   "hookable": "already-hook",
   "anchor": "values changed in place on 2026-10-29",
   "notes": "Six monospace sizes and the data-submission notification changed on their own lines, marked.",
+  "verifier": {
+   "changed": [],
+   "why": "Added with the 2026-10-29 hook move."
+  },
   "pref_groups": [
    {
     "feature": "system-fonts-pinned-windows",
@@ -2946,11 +2950,7 @@
     "category": "stillborn",
     "prefs": []
    }
-  ],
-  "verifier": {
-   "changed": [],
-   "why": "Added with the 2026-10-29 hook move."
-  }
+  ]
  },
  {
   "file": "modules/libpref/moz.build",

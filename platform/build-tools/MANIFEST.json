@@ -13,6 +13,14 @@
   "scripts/ci/test_stealth_download_watchdog.py": "100644",
   "third_party/python/vsdownload/stealth_download_watchdog.py": "100644"
  },
+ "sha256": {
+  "build/stealth_check_build_files.py": "f5c36242984bd8afd03f7848e29120072962f8247b2119465ac6a8f5d7fc9bfa",
+  "build/stealth_check_sources.py": "dd827118a62f0667e9a24cc02d1713f4d02773425e08d4e3d55753573fa7bac3",
+  "python/mozbuild/mozbuild/stealth_build_tools.py": "3b2e0f839949fa3a0df89098b0d49e9c16ee919e553ead10d8332193f3e78c35",
+  "scripts/ci/test_stealth_build_tools.py": "84a62c0de2593e9acbff992f306d499d3af06ce198aea0385d58b46d2e433266",
+  "scripts/ci/test_stealth_download_watchdog.py": "75d0fa09c34f87b94dc0cfd9ce584f690b83cc9c6acafd35625d6ff163e055cd",
+  "third_party/python/vsdownload/stealth_download_watchdog.py": "1924f8b830a9057675a2ca25b56694eb23c172699aea129a064945d684f39dae"
+ },
  "inventory": [
   {
    "file": "python/mozbuild/mozbuild/backend/recursivemake.py",

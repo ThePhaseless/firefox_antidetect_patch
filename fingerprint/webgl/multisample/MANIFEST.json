@@ -10,6 +10,11 @@
   "gfx/gl/StealthGLMultisample.h": "100644",
   "gfx/gl/gtest/TestStealthGLMultisample.cpp": "100644"
  },
+ "sha256": {
+  "gfx/gl/StealthGLMultisample.cpp": "a69477f037a872a8a6fa3b4c51e4a616ebbf43a596bc007f42ca3bfe9d2b87f9",
+  "gfx/gl/StealthGLMultisample.h": "ed4ef1d789e484fd282c379bbf4895b264b7bab0ea82348522cde60641dc0487",
+  "gfx/gl/gtest/TestStealthGLMultisample.cpp": "fd96f2b9042a46b0f5daab53328d005227be5463aa7ff249d789dd9594acaafe"
+ },
  "inventory": [
   {
    "file": "gfx/gl/GLContext.cpp",

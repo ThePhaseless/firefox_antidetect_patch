@@ -9,6 +9,10 @@
   "juggler/tests/updater_refuses_what_follows_the_check.test.mjs": "100644",
   "toolkit/mozapps/update/StealthUpdate.sys.mjs": "100644"
  },
+ "sha256": {
+  "juggler/tests/updater_refuses_what_follows_the_check.test.mjs": "5d65082127c3cbc549939ebbbd3c3374e4b9437a30a33a5f616896f3d1261b5a",
+  "toolkit/mozapps/update/StealthUpdate.sys.mjs": "4c81ae0bb8b2f44d9016b1a60d643c5a09edd6544e86e1e82234373c64e2f7b1"
+ },
  "inventory": [
   {
    "file": "browser/branding/unofficial/pref/firefox-branding.js",

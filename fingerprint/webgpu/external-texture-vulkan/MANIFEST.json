@@ -38,6 +38,11 @@
   "gfx/wgpu_bindings/src/stealth_external_texture.rs": "100644",
   "third_party/rust/naga/src/common/external_texture.rs": "100644"
  },
+ "sha256": {
+  "gfx/tests/gtest/TestStealthWebGPUExternalTexture.cpp": "ba2f08d2fbc0618b8a31a4126e7c1d9ac0722815e5e2f102039a6b01a1c80fae",
+  "gfx/wgpu_bindings/src/stealth_external_texture.rs": "983aa7ec55576d9a8ea6031f4379b6d756b9ebca7171f5bf54b6ae8360768891",
+  "third_party/rust/naga/src/common/external_texture.rs": "2f4be4717e580ca04ee2cfa99146884092d8e2358679dcabb3fcfa6ff737140a"
+ },
  "inventory": [
   {
    "file": "Cargo.lock",

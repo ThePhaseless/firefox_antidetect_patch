@@ -15,6 +15,13 @@
   "dom/workers/StealthWorkerDeclaration.h": "100644",
   "dom/worklet/StealthWorkletDeclaration.h": "100644"
  },
+ "sha256": {
+  "dom/base/test/browser_stealth_language_workers.js": "6c8d43b1f4e9125fd670430282ce78ab9cba3c6df29865f592c3ba6e6e40b5bb",
+  "dom/serviceworkers/StealthServiceWorkerDeclaration.cpp": "eba4826132d444132d11b20dfd8bac630d5dbe285a967e6888104d5cf035afe9",
+  "dom/serviceworkers/StealthServiceWorkerDeclaration.h": "669f02f298720dc9ca8f0425d9728c2bd317411c9aa6d5e3649d67100e646787",
+  "dom/workers/StealthWorkerDeclaration.h": "001dda2a0b7d68d98a622e24028d221e6086fd1a4bad10a9e0342c334b869688",
+  "dom/worklet/StealthWorkletDeclaration.h": "a1f209d915ea1e6b2cebd8c4f334e34fb69ea479acdf4b18abf6ee1edb856aa1"
+ },
  "inventory": [
   {
    "file": "dom/base/test/browser.toml",

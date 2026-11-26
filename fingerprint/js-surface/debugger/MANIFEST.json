@@ -10,6 +10,11 @@
   "js/src/debugger/StealthDebugger.h": "100644",
   "juggler/tests/a_forced_detach_returns_before_the_thread_attaches.test.mjs": "100644"
  },
+ "sha256": {
+  "devtools/shared/heapsnapshot/tests/gtest/TestStealthDebugger.cpp": "c39fa060a5211bf951cc02c549fb4081e8674016352f4d78f1616d975a6aea39",
+  "js/src/debugger/StealthDebugger.h": "e760c10c15e18061323ea8232c87348b01c4d1b474577a9d37dfad7a0584af75",
+  "juggler/tests/a_forced_detach_returns_before_the_thread_attaches.test.mjs": "b326b65efe335a68bf49ee8f283b0571802c8dfaea27546a40be8fb363a78e44"
+ },
  "inventory": [
   {
    "file": "devtools/server/actors/thread.js",

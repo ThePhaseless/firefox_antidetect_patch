@@ -5,6 +5,9 @@
  "added": {
   "security/manager/ssl/StealthIgnoreHTTPSErrors.h": "100644"
  },
+ "sha256": {
+  "security/manager/ssl/StealthIgnoreHTTPSErrors.h": "4890b605e6979471ac1e1b31b51d02ff9f02c6226daec71735a8440cd32968fe"
+ },
  "inventory": [
   {
    "file": "security/manager/ssl/nsCertOverrideService.cpp",

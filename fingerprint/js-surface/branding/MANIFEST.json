@@ -22,6 +22,17 @@
   "security/sandbox/linux/gtest/TestStealthBrandingPolicy.cpp": "100644",
   "security/sandbox/win/src/sandboxbroker/StealthSandboxBranding.h": "100644"
  },
+ "sha256": {
+  "chrome/test/unit/test_stealth_branding_chrome_registry.js": "63eee0c971f8c30f523571adb21400f493de7ee18d8341e49089dec26889dc7c",
+  "chrome/test/unit/xpcshell-stealth.toml": "bcf2bdf1bca2121f402552522673a499d05f864edfb0785c47e719674a343497",
+  "netwerk/protocol/res/StealthBranding.cpp": "227629a0f7b2cb9257d2e10191a157efe01431a1645e08ed3e7b8cda4656d9a2",
+  "netwerk/protocol/res/StealthBranding.h": "1b5d44b9e146159efc2ae2a2cfbda5606cb108d39a8024417c574d85cfc8845f",
+  "netwerk/protocol/res/gtest/TestStealthBranding.cpp": "1a5620e60f568dc5b396c8087f05b1100a96c7d00a799184aa70962eac0bce8a",
+  "netwerk/protocol/res/gtest/moz.build": "c8721e15602ed3d313b1ac93373d0b614ea1e0f527d5168dbcc7e33fb88adbc1",
+  "security/sandbox/linux/broker/StealthLinuxSandboxBranding.h": "96910c14ef3e18bdc0eeb3ea19932b116aee13d2dd8d61c74e65320c1a8bfe54",
+  "security/sandbox/linux/gtest/TestStealthBrandingPolicy.cpp": "e08394e0a2926f108b6461cd2407cec5c4fb31b3f689c1d8d0d3346c09b0f65d",
+  "security/sandbox/win/src/sandboxbroker/StealthSandboxBranding.h": "d17cc0dae6bac8deb154266276a8faf072814669d7ae150eaf034231245b13b1"
+ },
  "inventory": [
   {
    "file": "chrome/nsChromeRegistry.cpp",

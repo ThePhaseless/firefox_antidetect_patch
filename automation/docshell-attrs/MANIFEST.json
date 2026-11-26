@@ -7,6 +7,9 @@
  "added": {
   "docshell/base/StealthDocShellAttrs.cpp": "100644"
  },
+ "sha256": {
+  "docshell/base/StealthDocShellAttrs.cpp": "1ea869c1dcb1e4f6cca469fed28440e73e21ba66a915fdba124b2a7e75a8c12a"
+ },
  "inventory": [
   {
    "file": "docshell/base/moz.build",

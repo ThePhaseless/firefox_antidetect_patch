@@ -11,6 +11,11 @@
   "dom/base/StealthInputEventBirth.h": "100644",
   "dom/base/test/gtest/TestStealthInputEventBirth.cpp": "100644"
  },
+ "sha256": {
+  "dom/base/StealthInputEventBirth.cpp": "6141b2695eec76a7df1fd1ed7f3d51dfe3027533035b42c92b563e494040e016",
+  "dom/base/StealthInputEventBirth.h": "3295f1a373d6b1fed42d0933ad7af9058c3324724880fe245efdd74848833b2e",
+  "dom/base/test/gtest/TestStealthInputEventBirth.cpp": "5549ddc1dd4c228b38e395bda5be3a4049f1032503f36147c2f16f56559a07c0"
+ },
  "inventory": [
   {
    "file": "dom/base/TextInputProcessor.cpp",

@@ -15,6 +15,13 @@
   "gfx/wgpu_bindings/src/stealth_webgpu_adapter.rs": "100644",
   "gfx/wgpu_bindings/src/stealth_webgpu_env.rs": "100644"
  },
+ "sha256": {
+  "dom/webgpu/StealthWebGPUDeclaration.cpp": "5d19da40d7b7a1ef3164e8d5b674f7b54c7a44a2d183783c85f2fe49b8977460",
+  "dom/webgpu/StealthWebGPUDeclaration.h": "9bdebcd7796914cd8cfeabc5f41aaef214b7c12d517f24cad14905b66fe67c78",
+  "gfx/tests/gtest/TestStealthWebGPUDeclaration.cpp": "7c38239e1d73a4c1e47192d11f951cd225224f1491e16cc073fa15e687d8d0b6",
+  "gfx/wgpu_bindings/src/stealth_webgpu_adapter.rs": "86e0fb2c8843aa9693b9c844f240b927fd8dae913ed82d40d0b2a415479e0c98",
+  "gfx/wgpu_bindings/src/stealth_webgpu_env.rs": "b10d99566cf73e751cd7bdbdc02a8b6c7bc326fd5fd6e8f378a02b14c8ee3d36"
+ },
  "inventory": [
   {
    "file": "dom/webgpu/Adapter.cpp",

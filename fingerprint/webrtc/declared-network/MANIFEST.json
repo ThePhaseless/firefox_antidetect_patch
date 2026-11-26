@@ -27,6 +27,21 @@
   "juggler/tests/the_host_network_is_read_nowhere_and_ports_are_the_connections.test.mjs": "100644",
   "third_party/libwebrtc/api/location.h": "100644"
  },
+ "sha256": {
+  "dom/media/webrtc/transport/mdns_service/src/stealth_interface.rs": "7189a0da49fe418dd5af2f5f4b4c7b97f7145fae1c31636a7cf6b8b3df2b0481",
+  "dom/media/webrtc/transport/mdns_service/src/stealth_tests.rs": "9623e79c8256bedce58bd5e39828da54a36dd58791a8ab2e5f30a5d3e219d325",
+  "dom/media/webrtc/transport/nr_stealth_network.cpp": "95a7ab0e5502ee49b183950ddd5cf2ba557e45f23e4150f133bfda2ce3ae1ac4",
+  "dom/media/webrtc/transport/nr_stealth_network.h": "7cf4b56c3c4d52fa6fc05dca5c1aff950050ccf4f5a994d1c8c64a1584832e1a",
+  "dom/media/webrtc/transport/test/gtest/TestStealthDeclaredNetwork.cpp": "d861a2093fed1e404a79e3c89ac54a345d911a7dcac1f52b6b11ab33f4037e5e",
+  "dom/media/webrtc/transport/test/gtest/TestStealthDeclaredNetworkBirth.cpp": "8a2b3e918e8689379099b174bee7eab30fb0cc589fc35d59173126e3d19066fd",
+  "dom/media/webrtc/transport/test/gtest/TestStealthExclusivePort.cpp": "15c35b307fe86210274a858905af94a082d720c7346c253ec828ed9e2652ca85",
+  "dom/media/webrtc/transport/test/gtest/moz.build": "481a6131079aa52337e3e845adccf2e14d5aa410a5e41f70ddf6af642377af28",
+  "dom/media/webrtc/transport/test/nr_stealth_test_network.h": "e30acfadf583a669d6096659b49f05b0aa069d78988ccc30f146ed9c8da4fb01",
+  "dom/media/webrtc/transport/third_party/nICEr/src/stun/nr_stealth_addrs.h": "43fe5242373cb012fe0e284486961bceb2c7694a653ca8460e1b2e3e18c80686",
+  "juggler/tests/ipv6_is_one_fact_of_the_declared_network.test.mjs": "5343f6f2f35c3046f1490ae7325ff1fa66603f5cd5bcd3e47fb0403d8c210296",
+  "juggler/tests/the_host_network_is_read_nowhere_and_ports_are_the_connections.test.mjs": "e23e713c2f8db6c732ada362b39062d8703ba9f68d2247de28ca4b8480deb143",
+  "third_party/libwebrtc/api/location.h": "4f43ca05ec205e1fe11f213470de992e8ef7272b7dd3cfcd76552d9ea734d942"
+ },
  "inventory": [
   {
    "file": "dom/media/webrtc/transport/build/moz.build",

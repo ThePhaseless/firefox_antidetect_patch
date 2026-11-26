@@ -6,6 +6,9 @@
  "added": {
   "layout/base/StealthInnerSizeSync.h": "100644"
  },
+ "sha256": {
+  "layout/base/StealthInnerSizeSync.h": "216389e4c8a0eea61c0ba995b9915af12f1957ea00f7920dfc8629fbd0984476"
+ },
  "inventory": [
   {
    "file": "dom/base/nsScreen.cpp",

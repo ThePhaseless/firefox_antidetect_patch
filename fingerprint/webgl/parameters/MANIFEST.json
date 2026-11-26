@@ -12,6 +12,11 @@
   "dom/canvas/StealthWebGLParams.h": "100644",
   "dom/canvas/gtest/TestStealthWebGLParams.cpp": "100644"
  },
+ "sha256": {
+  "dom/canvas/StealthWebGLParams.cpp": "1f9449e4429431342474ca8b0a814fd014a08b3e1ced899bdc2883929c2bf271",
+  "dom/canvas/StealthWebGLParams.h": "4404ee11fc2340bfa9cbda247eba1b03bfcdb43984a9e2f680c607ec862d6e0f",
+  "dom/canvas/gtest/TestStealthWebGLParams.cpp": "e8dce0d8031b9b09d8191618084876b2d07696ba7005b5dfb1a25425c8d8e518"
+ },
  "inventory": [
   {
    "file": "dom/canvas/ClientWebGLContext.cpp",

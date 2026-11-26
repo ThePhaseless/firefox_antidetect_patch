@@ -5,6 +5,9 @@
  "added": {
   "dom/base/StealthHardwareProfile.h": "100644"
  },
+ "sha256": {
+  "dom/base/StealthHardwareProfile.h": "19c7ee2109e66d81ff8a4afde56aed2d56d2d8738b7dfc668cc6f9170b946a9f"
+ },
  "inventory": [
   {
    "file": "dom/base/Navigator.cpp",

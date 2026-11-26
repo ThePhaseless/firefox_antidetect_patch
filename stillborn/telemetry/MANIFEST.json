@@ -10,6 +10,12 @@
   "toolkit/components/telemetry/app/StealthPingsender.sys.mjs": "100644",
   "toolkit/components/telemetry/pings/StealthPingsenderRoute.sys.mjs": "100644"
  },
+ "sha256": {
+  "juggler/tests/pingsender_route_lives_in_our_file.test.mjs": "8a83782a4a6d16fa41c373026126ffe92339881960701787f22332aab570bd4d",
+  "juggler/tests/pingsender_route_reaches_the_channel.test.mjs": "e11fde2a8944f13765b9de5af126c810accfc2281544db4141b2c1c70a6bb1da",
+  "toolkit/components/telemetry/app/StealthPingsender.sys.mjs": "a3fb933cb60bd68d477cc08956c71e41b545024e8de0353c677b3f0c43a6e001",
+  "toolkit/components/telemetry/pings/StealthPingsenderRoute.sys.mjs": "3b8a7f6def3ea9f9f22736421da7149f46c7273346fb325ec209baace7b5b38e"
+ },
  "inventory": [
   {
    "file": "toolkit/components/telemetry/app/TelemetrySend.sys.mjs",

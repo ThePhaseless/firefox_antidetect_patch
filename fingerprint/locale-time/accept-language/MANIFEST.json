@@ -5,6 +5,9 @@
  "added": {
   "netwerk/protocol/http/StealthAcceptLanguage.h": "100644"
  },
+ "sha256": {
+  "netwerk/protocol/http/StealthAcceptLanguage.h": "05b89d83e8ff274fab1974bcbf745a66f3240f404df9dc77df5ab1f1d0e7fe15"
+ },
  "inventory": [
   {
    "file": "netwerk/protocol/http/nsHttpHandler.cpp",

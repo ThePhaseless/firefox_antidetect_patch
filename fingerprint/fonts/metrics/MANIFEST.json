@@ -20,6 +20,18 @@
   "gfx/thebes/StealthTextMeasuring.h": "100644",
   "gfx/thebes/StealthTextQuality.h": "100644"
  },
+ "sha256": {
+  "gfx/2d/StealthGlyphCoverage.cpp": "1bb965705c8f199b62e0ea39d8a37c28226bb3142867aaf6b5f29330d2872fe0",
+  "gfx/2d/StealthGlyphCoverage.h": "c3ca601c3832c0101ab76ba03900fcad6500ede5e5627a33c582a772ff91de10",
+  "gfx/tests/gtest/TestStealthFontMetrics.cpp": "a96a7ef3bd49f2688df0cff4422c518077c64721828cebe83f4cab3c17173e62",
+  "gfx/tests/gtest/TestStealthTextQuality.cpp": "bef66b23e42b3950b5a6c09f06680cc4058622702a15e615aef3dbf3f5ba9193",
+  "gfx/thebes/StealthDesignFontAccess.h": "8d5bb39b4106a64794aa1b3b8649bd704a5f943f6d389a1efd8d466cf3b9d5d5",
+  "gfx/thebes/StealthDesignMetrics.cpp": "91e7764335647aa724a4bef99ae708a777db3ba76f6d9ff450ab921ab9d42492",
+  "gfx/thebes/StealthDesignMetrics.h": "7abc8df9e0c663e6c6f1ebd878cc7e5fbbe0ee4d0a8e6280ae0b474c107f6b9a",
+  "gfx/thebes/StealthDesignMetrics.mozbuild": "7a0804fe71204592df10bbc159f979202588d8106ed7caf520dd009abceb2fee",
+  "gfx/thebes/StealthTextMeasuring.h": "9171831d4d8761a9e14c4374c3b21452ddb310653662c54f35c3f7d6a02a7c2d",
+  "gfx/thebes/StealthTextQuality.h": "0576d8c20509d8739f1ef0151d1b2c5b0d98cdc477c50041836f2cefc0856e17"
+ },
  "inventory": [
   {
    "file": "gfx/skia/skia/src/core/SkScalerContext.cpp",

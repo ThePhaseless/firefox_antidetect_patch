@@ -11,6 +11,11 @@
   "dom/media/StealthMediaDeclaration.h": "100644",
   "dom/media/gtest/TestStealthMediaDeclaration.cpp": "100644"
  },
+ "sha256": {
+  "dom/media/StealthMediaDeclaration.cpp": "2bcebd3a72d965da580e7a28e90ee0ad99003437d1fa9c3ad394ceb144f20167",
+  "dom/media/StealthMediaDeclaration.h": "d775d667e78686d744c5faed6b034a67f5dfd607126e2d8651719fc6cf0bed03",
+  "dom/media/gtest/TestStealthMediaDeclaration.cpp": "cbb93ac92c732a322179dd4f34a1fa64be0b458dbc0578fc3a1b2fa4e4853749"
+ },
  "inventory": [
   {
    "file": "dom/media/mediacapabilities/MediaCapabilities.cpp",

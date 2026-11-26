@@ -7,6 +7,9 @@
  "added": {
   "intl/locale/tests/gtest/TestStealthRegionalLocales.cpp": "100644"
  },
+ "sha256": {
+  "intl/locale/tests/gtest/TestStealthRegionalLocales.cpp": "4d46932b9a231cac4880ed078d9fe349b77a8b9fab8d69bd816d5ec9ee1b8570"
+ },
  "inventory": [
   {
    "file": "intl/locale/LocaleService.cpp",

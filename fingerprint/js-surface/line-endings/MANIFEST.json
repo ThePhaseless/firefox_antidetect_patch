@@ -7,6 +7,10 @@
   "dom/file/StealthNativeEOL.h": "100644",
   "dom/serializers/StealthPlainTextLineBreak.h": "100644"
  },
+ "sha256": {
+  "dom/file/StealthNativeEOL.h": "4c4a66ecbfb3554df7ecd9988b86f9245cc3546d911bbf1dbf72d94db8510946",
+  "dom/serializers/StealthPlainTextLineBreak.h": "5643f87c15bf8002da231877e30fd3a08c822f9f1154ab0f58cab3addcb0652d"
+ },
  "inventory": [
   {
    "file": "dom/file/BlobSet.cpp",

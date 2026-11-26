@@ -5,6 +5,9 @@
  "added": {
   "dom/media/webaudio/StealthAudioContextValues.h": "100644"
  },
+ "sha256": {
+  "dom/media/webaudio/StealthAudioContextValues.h": "a0d05040f75fc1ccca3d71772aa4168c19ff3d2a78e4b975be214e9f2602814b"
+ },
  "inventory": [
   {
    "file": "dom/media/webaudio/AudioContext.cpp",

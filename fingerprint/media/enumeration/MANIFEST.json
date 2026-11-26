@@ -6,6 +6,10 @@
   "dom/media/StealthMediaEnumeration.h": "100644",
   "dom/media/gtest/TestStealthMediaEnumeration.cpp": "100644"
  },
+ "sha256": {
+  "dom/media/StealthMediaEnumeration.h": "48e53ae1c177338f92f8840130fe533ccbea8c261470e684fb70ad1f8c88cb7b",
+  "dom/media/gtest/TestStealthMediaEnumeration.cpp": "fad257421bd79b3466b756d7ed30abe2aed60edfd65ee2e53522430650d1e8d8"
+ },
  "inventory": [
   {
    "file": "dom/media/MediaManager.cpp",

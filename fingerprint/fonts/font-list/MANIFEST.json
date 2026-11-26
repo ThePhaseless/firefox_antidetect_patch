@@ -15,6 +15,16 @@
   "gfx/thebes/StealthFontListHooks.cpp": "100644",
   "gfx/thebes/StealthFontListHooks.h": "100644"
  },
+ "sha256": {
+  "gfx/tests/gtest/TestStealthBundledCollection.cpp": "bfa844598753259f9dd7caaffefb7c15490ca945ef87aabdfbbdd1abf649957e",
+  "gfx/tests/gtest/TestStealthFcFontList.cpp": "0d4bceb1d4d73bab8b07b1009bc6581df8b1e95aa8744dcb5615887a671a8a00",
+  "gfx/tests/gtest/TestStealthFontListHooks.h": "74521cbb07cc2b94e02ace8b4772295320261c2938c2b47826c5a037f89d1f88",
+  "gfx/thebes/StealthFcFontList.cpp": "3a9f4286cc54431eca86c7984669046e5254c8f580f7d8454a10db7551e30357",
+  "gfx/thebes/StealthFcFontList.h": "a598c9278d2cf4cbe162ace77de2d971115c35ccf217360e0536aff4e0bcfbd4",
+  "gfx/thebes/StealthFcFontList.mozbuild": "428f2f01beedf106acce96d8696e553771eab343af5ac9972904590ec9854b66",
+  "gfx/thebes/StealthFontListHooks.cpp": "1e47e3f9c861755335d8effea749c96d9506849550dbc0187a72a64090ab2c75",
+  "gfx/thebes/StealthFontListHooks.h": "aa6538f8e816edf3435095be5ee43120b282831068e5c8622eccc1d5b0e55e13"
+ },
  "inventory": [
   {
    "file": "gfx/thebes/gfxDWriteFontList.cpp",

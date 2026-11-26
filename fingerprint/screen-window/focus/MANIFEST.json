@@ -5,6 +5,9 @@
  "added": {
   "xpfe/appshell/StealthAppWindowFocus.h": "100644"
  },
+ "sha256": {
+  "xpfe/appshell/StealthAppWindowFocus.h": "13b0d80033225321a15850f2bf4e342682434447d54e54e4c78840d0be497dc5"
+ },
  "inventory": [
   {
    "file": "xpfe/appshell/AppWindow.cpp",

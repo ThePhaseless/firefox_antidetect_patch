@@ -8,6 +8,10 @@
   "startupcache/StealthStartupCache.h": "100644",
   "startupcache/test/TestStealthStartupCache.cpp": "100644"
  },
+ "sha256": {
+  "startupcache/StealthStartupCache.h": "26387ef24a5087a57bb8a5a8478d5f62f3414287397023148b429691ca833c2d",
+  "startupcache/test/TestStealthStartupCache.cpp": "08d5c96cdf1a378405a07051cba5dfd5bc4cacd55ac23d8c65e786c8eb3b46bf"
+ },
  "inventory": [
   {
    "file": "startupcache/StartupCache.cpp",

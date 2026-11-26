@@ -7,6 +7,10 @@
   "dom/canvas/StealthCanvasTextMetrics.h": "100644",
   "dom/canvas/gtest/TestStealthCanvasPageSnapshot.cpp": "100644"
  },
+ "sha256": {
+  "dom/canvas/StealthCanvasTextMetrics.h": "c11e7b321864d66d94a6fcebb31d90d7c9c17822dd24e8b0831f2d9636c439e8",
+  "dom/canvas/gtest/TestStealthCanvasPageSnapshot.cpp": "e4175519c47d0259ee140b58d852ab056e63b517778fbafdfb3a82e9fbf1aa33"
+ },
  "inventory": [
   {
    "file": "dom/canvas/CanvasRenderingContext2D.cpp",

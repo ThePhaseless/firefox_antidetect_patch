@@ -5,6 +5,9 @@
  "added": {
   "dom/html/StealthFileChooser.h": "100644"
  },
+ "sha256": {
+  "dom/html/StealthFileChooser.h": "667550108c5aed6a5a96d4d0cc97b45a27061154ab405cc019a6218f47a3e1e5"
+ },
  "inventory": [
   {
    "file": "dom/html/HTMLInputElement.cpp",

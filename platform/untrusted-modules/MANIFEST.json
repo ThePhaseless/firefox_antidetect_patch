@@ -9,6 +9,11 @@
   "toolkit/xre/dllservices/StealthOwnBinaries.h": "100644",
   "toolkit/xre/dllservices/tests/gtest/TestStealthOwnBinaries.cpp": "100644"
  },
+ "sha256": {
+  "toolkit/xre/dllservices/StealthOwnBinaries.cpp": "9e4318123395cb71a39d227408b657e5a6051a90ccd93dbf4487c8594c166c71",
+  "toolkit/xre/dllservices/StealthOwnBinaries.h": "870ee94a28b0c8e513f278c68beb9a9f98cb7c8003d57f61f41315ee65948eec",
+  "toolkit/xre/dllservices/tests/gtest/TestStealthOwnBinaries.cpp": "b62e1dbd49f3f56fe72708aebfb882265b95e4c7ad157f9e94bcb535a0ac669a"
+ },
  "inventory": [
   {
    "file": "toolkit/xre/dllservices/UntrustedModulesData.cpp",

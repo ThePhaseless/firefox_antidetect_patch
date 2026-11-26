@@ -11,6 +11,12 @@
   "netwerk/test/gtest/TestStealthSocksCredentials.cpp": "100644",
   "netwerk/test/gtest/stealth.build": "100644"
  },
+ "sha256": {
+  "netwerk/base/StealthSocksCredentials.cpp": "34eb4af640904980ce70b53ec12495544f0b97b626e7600781d1e3fa9166a19e",
+  "netwerk/base/StealthSocksCredentials.h": "8728da7a96cf8aa0038c4d1eb80ebd969069baea7e321038aa519f63a56684be",
+  "netwerk/test/gtest/TestStealthSocksCredentials.cpp": "87467258aeab02724be39dab1329663a1326d27241d4f3aae7fa630bfa6148e5",
+  "netwerk/test/gtest/stealth.build": "564a97659075de3da3dda25d81fc82ac96d2e824a3c60acda4fd20cfc1974b47"
+ },
  "inventory": [
   {
    "file": "netwerk/base/moz.build",

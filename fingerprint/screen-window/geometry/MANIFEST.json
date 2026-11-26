@@ -22,6 +22,17 @@
   "widget/windows/StealthFullscreenWin.cpp": "100644",
   "widget/windows/StealthFullscreenWin.h": "100644"
  },
+ "sha256": {
+  "dom/base/StealthWindowGeometry.h": "77d6c8e40803f0b74aba5eea29a49447e881b56a0d2c1647dc02c3b9e9e8ce97",
+  "dom/events/StealthScreenCoords.h": "3f25310b99b1a4270ce5af94481794c8ea62aa9eeead29abfb1d3bfc8432f775",
+  "dom/events/test/gtest/TestStealthWindowGeometry.cpp": "85bb5a00b1243cca68e958e74fed682e90103a7cccfad969984d6f200bbea10d",
+  "widget/StealthFullscreen.cpp": "dc70186a64ce74e7b6884b4b9070c138a205ae8aecadc61726d939e25b0208cf",
+  "widget/StealthFullscreen.h": "729c754fe0556d42eb0c4b260778704b18e6589bd45cdacd22139828d4d64b8d",
+  "widget/gtk/StealthFullscreenGtk.cpp": "87662eb8eaecec034517ed7aed2241aa0bfbc4b9e29583271ec3a13fe8d6c713",
+  "widget/tests/gtest/TestStealthFullscreen.cpp": "4c2c81acad3a4fa67224ab0923bb8d40fb8a25fe1a7d4a648c3050c8ff78cdfb",
+  "widget/windows/StealthFullscreenWin.cpp": "84ae49aa42519f5e4f30357dbfadc1760ebdbb4a14f5e416d78fa01fa4341172",
+  "widget/windows/StealthFullscreenWin.h": "d1491b22e974c00f02d6e044b94ae66e6c9f4726cd49475f97d83029addec692"
+ },
  "inventory": [
   {
    "file": "dom/base/nsGlobalWindowOuter.cpp",

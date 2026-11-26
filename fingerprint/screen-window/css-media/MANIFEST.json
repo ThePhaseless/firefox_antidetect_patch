@@ -5,6 +5,9 @@
  "added": {
   "layout/style/StealthMediaFeatures.h": "100644"
  },
+ "sha256": {
+  "layout/style/StealthMediaFeatures.h": "c2a281c32276c4e4b2f7566edbe79d7c3bd870279c6e4652b3d08613e1cdc995"
+ },
  "inventory": [
   {
    "file": "layout/style/nsMediaFeatures.cpp",

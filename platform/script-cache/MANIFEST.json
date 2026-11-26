@@ -6,6 +6,9 @@
  "added": {
   "js/xpconnect/loader/StealthScriptCache-inl.h": "100644"
  },
+ "sha256": {
+  "js/xpconnect/loader/StealthScriptCache-inl.h": "f8011c85cea94f84afbfdcd73488871ba0dca1f9b3160a20c6c228ff55c5cf0b"
+ },
  "inventory": [
   {
    "file": "js/xpconnect/loader/ScriptPreloader.cpp",

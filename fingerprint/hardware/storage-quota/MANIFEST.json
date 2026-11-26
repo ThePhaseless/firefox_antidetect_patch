@@ -7,6 +7,10 @@
   "dom/quota/StealthQuotaEstimate.h": "100644",
   "dom/quota/test/gtest/TestStealthQuotaEstimate.cpp": "100644"
  },
+ "sha256": {
+  "dom/quota/StealthQuotaEstimate.h": "6e15c3b13ac09f5a6c57bb03198fa758d7b1a42fd5660beb509dbbb2f3f5294c",
+  "dom/quota/test/gtest/TestStealthQuotaEstimate.cpp": "45139604ce1de5083b2257d91b005b910d6d0955681c76c385893b22f1f853d6"
+ },
  "inventory": [
   {
    "file": "dom/quota/OriginOperations.cpp",

@@ -10,6 +10,12 @@
   "dom/media/webspeech/synth/StealthSpeechVoices.cpp": "100644",
   "dom/media/webspeech/synth/StealthSpeechVoices.h": "100644"
  },
+ "sha256": {
+  "dom/media/webspeech/synth/StealthSpeechVoice.cpp": "812a3edb359facfdc2e29bfe5dc3fbe28cd8415405d3e0d50d69c5ae963d9f82",
+  "dom/media/webspeech/synth/StealthSpeechVoice.h": "52f21de1197d42f6ca17df5ad66b1ef3c50234e8c58a64040ba42f64d882395d",
+  "dom/media/webspeech/synth/StealthSpeechVoices.cpp": "adaf5e5ccf0f64f2d1f3748ddebe96f2129e8688a7e88d243136422a03fe2c1d",
+  "dom/media/webspeech/synth/StealthSpeechVoices.h": "3c301926e2765aa0e4f2f1619d1975f02899477131571abc2124c4035612a919"
+ },
  "inventory": [
   {
    "file": "dom/media/webspeech/synth/SpeechSynthesis.cpp",

@@ -24,6 +24,18 @@
   "layout/base/gtest/TestStealthJugglerMouseAck.cpp": "100644",
   "widget/StealthMouseEventIPC.h": "100644"
  },
+ "sha256": {
+  "dom/base/StealthJugglerEventId.h": "35664eeaf33f525a14a7a8357e0e65ffd410bb4e721eed7579da2eb6bba19ae6",
+  "dom/base/StealthJugglerInput.h": "fb65b3eb57517e32944786d5de7606799d3100e587606e9c33eb927261ec8642",
+  "dom/events/StealthDragGesture.h": "1155870e5898f5f67f153eec38f4eadb339ffd5d1b5ec4622a94bd5368711d52",
+  "dom/ipc/StealthJugglerCoalesce.h": "73c162cc2a1529fc622947227e1ab4e63fd1e4a6db7024a58416a3420002dd2b",
+  "dom/ipc/gtest/TestStealthDragGesture.cpp": "238548efed6a3c815cffad95d229ff2276691d3134dd2d85fa4b2a2f1307504e",
+  "dom/ipc/gtest/TestStealthJugglerCoalesce.cpp": "0745247803edfcc34ed87352f47b1adc8822cc3a482569fdbccf0ab9f7fc1151",
+  "dom/ipc/gtest/TestStealthMouseEventIPC.cpp": "5d95606dec0ecd2c773fbe0050d6322fe2606d418cfd8e11bce11e0013ff29ca",
+  "layout/base/StealthJugglerAck.h": "1e28f06282cfe6cec28b10ba2cf7a100dc8b41c4c5802829115549052171e4db",
+  "layout/base/gtest/TestStealthJugglerMouseAck.cpp": "e99a01ab36ee4a7b2ee4b4219a9356697db2c6fc70c92c71e6e47db137abb25c",
+  "widget/StealthMouseEventIPC.h": "d289cea775ec47880fba7b8cfc579abec12c41b339b1ff0bbb68e5abc78bfb9a"
+ },
  "inventory": [
   {
    "file": "dom/base/nsDOMWindowUtils.cpp",

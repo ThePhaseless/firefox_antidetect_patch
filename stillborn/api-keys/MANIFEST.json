@@ -10,6 +10,12 @@
   "toolkit/components/urlformatter/tests/unit/test_stealth_apikeys_observer.js": "100644",
   "toolkit/components/urlformatter/tests/unit/xpcshell-stealth.toml": "100644"
  },
+ "sha256": {
+  "toolkit/components/urlformatter/StealthApiKeys.sys.mjs": "2df633c22d3501832f1f4dc6af98396eac45d50dbdfa3c6ab32ed420e47d34d3",
+  "toolkit/components/urlformatter/tests/unit/test_stealth_apikeys.js": "00801c5a76eac2677c3c3fa20a3197ce98b7079fd8b58c4d1701727ef9fe68d0",
+  "toolkit/components/urlformatter/tests/unit/test_stealth_apikeys_observer.js": "28f4e316c4c8b48ad04f73778ae8a37b291a13941770c69aea263388d707f80d",
+  "toolkit/components/urlformatter/tests/unit/xpcshell-stealth.toml": "cd5ffbfb411110c57a28f69f3888ce007547e5e26f27243c797ad2a166869968"
+ },
  "inventory": [
   {
    "file": "toolkit/components/url-classifier/SafeBrowsing.sys.mjs",

@@ -10,6 +10,10 @@
   "layout/base/StealthSurfaceFlags.h": "100644",
   "layout/base/gtest/TestStealthSurfaceFlags.cpp": "100644"
  },
+ "sha256": {
+  "layout/base/StealthSurfaceFlags.h": "73b2e5d7cc7c4c5105619645a90f3e8c5972f4f6671d1d001b39993236ce39fa",
+  "layout/base/gtest/TestStealthSurfaceFlags.cpp": "167864808e721df769c16c0236bdb7b8db500bc686bd83630a7c23c6b3a3edbd"
+ },
  "inventory": [
   {
    "file": "layout/base/nsLayoutUtils.cpp",

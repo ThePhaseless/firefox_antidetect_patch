@@ -7,6 +7,9 @@
  "added": {
   "netwerk/protocol/http/StealthInterception.cpp": "100644"
  },
+ "sha256": {
+  "netwerk/protocol/http/StealthInterception.cpp": "d331cfa56e9757e0b5d02ba35ca562199e1d387b61ded8bc930ed3cc72b1b300"
+ },
  "inventory": [
   {
    "file": "netwerk/base/nsINetworkInterceptController.idl",

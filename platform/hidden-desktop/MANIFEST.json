@@ -8,6 +8,11 @@
   "dom/media/webrtc/tests/gtest/moz.build": "100644",
   "third_party/libwebrtc/modules/desktop_capture/win/StealthWindowInputDesktop.h": "100644"
  },
+ "sha256": {
+  "dom/media/webrtc/tests/gtest/TestStealthWindowInputDesktop.cpp": "772461200a7e102d391406ce5c6c42c3bcb52a950f6768fa18b8d9614b55db40",
+  "dom/media/webrtc/tests/gtest/moz.build": "ab7cc832030f81d39b971175280dad24a2f34b7bfdef859da1f86f30d83e1513",
+  "third_party/libwebrtc/modules/desktop_capture/win/StealthWindowInputDesktop.h": "463bfb1ea492a7176388bcfd867a9993e9fb2e13c1dc43d7d092c0c992975c9d"
+ },
  "inventory": [
   {
    "file": "dom/media/webrtc/moz.build",

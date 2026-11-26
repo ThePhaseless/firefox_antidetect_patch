@@ -29,6 +29,18 @@
   "gfx/2d/StealthRecordingProjectedSurface.inc.h": "100644",
   "gfx/tests/gtest/TestStealthCanvasProjection.cpp": "100644"
  },
+ "sha256": {
+  "dom/canvas/StealthCanvasNoise.cpp": "d1fc75d8d22aaa0502b11c1af506065d42c0ca713145e9919d836f26661061c4",
+  "dom/canvas/StealthCanvasUtils.h": "9c21900af77cd5a4f919144857e6a9de5d2853a85e04da715efdc85144fe0058",
+  "dom/canvas/StealthOffscreenSnapshot.cpp": "cbbc59dacc2d5f002c9c21f0a06b99b5d37e3eac07f64aa5d40ff2d0a5c3e564",
+  "dom/canvas/StealthWebGLReadback.h": "187ab20b067e7cb6e2fa0b588d7cf06eaa0288a8620a5528a61cb47fbcc985da",
+  "dom/html/StealthCanvasSnapshot.cpp": "e31e8a571aabbadeedee96abb1fe4c4050a53c166660063eeedaeb3a7f884cbc",
+  "gfx/2d/StealthCanvasProjection.cpp": "67d7b4915ad2069448435a0e78504f454738a1066cb6a3b71903b5658c9372e2",
+  "gfx/2d/StealthCanvasProjection.h": "2174510459c2814537b5a2d02dc666dceb9a9304fbeb0d7d653831a0487e48c0",
+  "gfx/2d/StealthRecordedProjection.h": "8920c5f742db6482e2bad27719fc00cedbfc69c2e9950025c18062a125ee8b4e",
+  "gfx/2d/StealthRecordingProjectedSurface.inc.h": "392014d9603e3be5f5630bd751e73ed84bb6bfe0c98daba5c81eebd61eb1f324",
+  "gfx/tests/gtest/TestStealthCanvasProjection.cpp": "d2436d572ee39a3d32e480e6ec9e44e94047f6b2b047143d142ee07e32764d66"
+ },
  "inventory": [
   {
    "file": "dom/canvas/ClientWebGLContext.h",

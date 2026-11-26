@@ -12,6 +12,14 @@
   "intl/locale/StealthSessionPrefs.h": "100644",
   "intl/locale/tests/gtest/TestStealthSystemLocales.cpp": "100644"
  },
+ "sha256": {
+  "dom/base/StealthSessionDeclaration.cpp": "3446243fb34bca96c613e10d75a7fd60f849c6341c0fadd4cf2424d94a641cf5",
+  "dom/base/StealthSessionDeclaration.h": "732cdcd90ac0b0760b306ac6c5e922182a7fa9cabf9f106f790eb700d1a03cc1",
+  "dom/base/test/gtest/TestStealthDocumentLanguage.cpp": "69b82f878338de20318758b4907e4478784bcef61397a01b41f5845ac7bc0b47",
+  "intl/locale/StealthSessionPrefs.cpp": "69014471ea26a1dce67841ad3f077f60fdec947bc49d4b6cf74a67dcfa6a53bd",
+  "intl/locale/StealthSessionPrefs.h": "562fcda6bd4dc69f00f5fa3559b9c236d17da771e978255db9dca42df45fa1e4",
+  "intl/locale/tests/gtest/TestStealthSystemLocales.cpp": "f82520876b66f2e7c3a1b2f4758fe4f93b4b00f7db9da59c52aed55c7fe529ef"
+ },
  "inventory": [
   {
    "file": "dom/base/moz.build",

@@ -10,6 +10,11 @@
   "uriloader/exthandler/StealthDownloadIntercept.h": "100644",
   "uriloader/exthandler/StealthDownloadInterceptor.idl": "100644"
  },
+ "sha256": {
+  "uriloader/exthandler/StealthDownloadIntercept.cpp": "d1ba7830199c28c3c72b2e00cba2775796db5ee856458f0ce541adf066ccf5b0",
+  "uriloader/exthandler/StealthDownloadIntercept.h": "18f7f0948fb446e9a817bf24da6007fc351a8fd6fac56ae0bf76ac749e07db0a",
+  "uriloader/exthandler/StealthDownloadInterceptor.idl": "5caa9b26c429d8f4cef234352b17b8308ef1614f75426416eea01648af0458e0"
+ },
  "inventory": [
   {
    "file": "uriloader/exthandler/moz.build",

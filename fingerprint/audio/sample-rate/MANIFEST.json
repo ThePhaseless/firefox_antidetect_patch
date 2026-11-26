@@ -5,6 +5,9 @@
  "added": {
   "dom/media/StealthSampleRate.h": "100644"
  },
+ "sha256": {
+  "dom/media/StealthSampleRate.h": "e41adff8de44656c489c828372aaa1dfa02c0d47b9149e8afc8f1140969b221d"
+ },
  "inventory": [
   {
    "file": "dom/media/CubebUtils.cpp",

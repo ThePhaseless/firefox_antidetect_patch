@@ -9,6 +9,12 @@
   "STEALTH_README.md": "100644",
   "release-out/.gitignore": "100644"
  },
+ "sha256": {
+  "STEALTH_BRANCH_README.md": "8d5f24f26527f40d73baa1f1cea7d4499d6a818d4f41a9bbcd7df8ecbb347011",
+  "STEALTH_CLAUDE.md": "1c9a25fa1a1189f002970d55d75185e23e4c161fa6c0a0cd26448a4598ee6edd",
+  "STEALTH_README.md": "9ab9719bc3abed46f9910b68fad13df1716562420ea01e8979aea8155ca5c282",
+  "release-out/.gitignore": "240a3e0d37d2e86b614063f5347eb02d4f99ca6c254de6b82871ff8d95532a7d"
+ },
  "inventory": [
   {
    "file": "CLAUDE.md",

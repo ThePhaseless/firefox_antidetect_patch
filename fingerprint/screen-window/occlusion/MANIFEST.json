@@ -5,6 +5,9 @@
  "added": {
   "widget/gtk/StealthOcclusion.h": "100644"
  },
+ "sha256": {
+  "widget/gtk/StealthOcclusion.h": "f1216085205ad5784d7381bf388e0d7317976bedb71a7706e9602be322fba66c"
+ },
  "inventory": [
   {
    "file": "widget/gtk/nsWindow.cpp",

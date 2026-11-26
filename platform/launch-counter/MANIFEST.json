@@ -8,6 +8,10 @@
   "browser/components/StealthLaunchCounter.sys.mjs": "100644",
   "browser/components/tests/unit/test_stealth_launch_counter.js": "100644"
  },
+ "sha256": {
+  "browser/components/StealthLaunchCounter.sys.mjs": "7e5db57f912751dd0af834ac4436cf866edfba9ca4f5b4b2bb5f51a43fee70e8",
+  "browser/components/tests/unit/test_stealth_launch_counter.js": "ca0c933e96880e093e1ada39682c152c1154d137c7a56bbef98027bb89ff206b"
+ },
  "inventory": [
   {
    "file": "browser/components/BrowserGlue.sys.mjs",

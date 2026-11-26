@@ -11,6 +11,11 @@
   "dom/media/webaudio/StealthAudioNoise.cpp": "100644",
   "dom/media/webaudio/StealthAudioNoise.h": "100644"
  },
+ "sha256": {
+  "dom/media/gtest/TestStealthAudioNoise.cpp": "a518ff802498679d6ed4857ce622e59f9b89232395fccb09bb8ac31bf467dccd",
+  "dom/media/webaudio/StealthAudioNoise.cpp": "486ca29a3963f06b705c6b067476c8a8bf98def10d694f42be6ee596854180d9",
+  "dom/media/webaudio/StealthAudioNoise.h": "be1f25f4f8f79bd3a599c4c0a0c724674c197582d2da3212592a0e44fe42f5d7"
+ },
  "inventory": [
   {
    "file": "dom/media/gtest/moz.build",

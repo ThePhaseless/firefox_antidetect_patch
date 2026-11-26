@@ -11,6 +11,11 @@
   "dom/xslt/xslt/StealthExsltTime.h": "100644",
   "juggler/tests/exslt_time_finds_the_source_document_as_the_file_does.test.mjs": "100644"
  },
+ "sha256": {
+  "dom/base/test/gtest/TestStealthTimezone.cpp": "53b78b8be21c30b1cf6544974377412e3cbcbcccdd757c3dd40c50f84f5eda79",
+  "dom/xslt/xslt/StealthExsltTime.h": "397ccc58622d89029ac3754e46f9c0dda8f4f8685346cb83fceb2c7fafb899b9",
+  "juggler/tests/exslt_time_finds_the_source_document_as_the_file_does.test.mjs": "9df852fa818891ad4e671120b380504a291c12d1f8244a407e9ea78c4cf92775"
+ },
  "inventory": [
   {
    "file": "docshell/base/BrowsingContext.cpp",
