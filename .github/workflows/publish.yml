@@ -4,6 +4,8 @@
 # republish.yml on another run's, and written ONCE for both: the two copies
 # had already diverged once (republish's produced no seal, 2026-07-25).
 #
+# The crash symbols of the build are published too, as release assets beside the archives and outside the seal and checksums.txt.
+#
 # The payload refusal was republish's alone; on every publish now: a tag's
 # payload never changes, whoever asks.
 # ─────────────────────────────────────────────────────────────────────────────
@@ -106,12 +108,41 @@ jobs:
             [ -s "$a" ] || { echo "ERROR: missing/empty release asset: $a (a build leg silently dropped out?)"; exit 1; }
           done
           echo "all 3 target archives present"
+      # The crash symbols of the release are kept (release.yml makes them per leg, proves them against the archive it built, and keeps the artifact 30 days
+      # on a release): a published build's crash reports are read with them, and until now none survived the artifact. Where they come from is
+      # scripts/ci/release_symbols.py's `fetch`: the assets the release already has (a republish of a release that exists does not depend on the artifact's
+      # retention; each zip is verified against its symbols.sha256), else the build run's artifact symbols-<leg> BY NAME, like the archives (a pattern sees
+      # one page of a run's artifacts). Neither is red, never a skip: a release without its symbols is not published.
+      - name: The crash symbols of the release, from its own assets or the build run's artifacts by name
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_RUN: ${{ inputs.build_run_id }}
+          TAG: ${{ inputs.tag }}
+        run: python3 _src/scripts/ci symbols-fetch --tag "$TAG" --repo "$GITHUB_REPOSITORY" --build-run "$BUILD_RUN" --dest symdl
+      # The build proved them against its own package; this proves them against the archive that is published (scripts/ci/release_symbols.py), and names each by
+      # the BuildID of that archive's application.ini: symbols-<os>-<arch>-<BuildID>.zip, listed in symbols.sha256. They live in sym/, never in dl/: the seal
+      # and checksums.txt read dl/, and an engine archive is `firefox-*-stealth-*`.
+      - name: The crash symbols describe the archives that ship, named by their BuildID
+        shell: bash
+        run: |
+          set -euo pipefail
+          LEGS="$(python3 _src/scripts/ci matrix | python3 -c 'import json, sys; print(" ".join(i["leg"] for i in json.load(sys.stdin)["include"]))')"
+          mkdir -p sym
+          for leg in $LEGS; do
+            python3 _src/scripts/ci symbols-release --leg "$leg" --package "dl/$(python3 _src/scripts/ci asset --leg "$leg")" --symbols "symdl/$leg" --out sym
+          done
+          python3 _src/scripts/ci symbols-seal --dir sym
+          ls -la sym
       - name: Generate checksums.txt
         run: |
           cd dl; ls -la
           # explicit glob — never include checksums.txt itself (the `*`-includes-itself trap)
           sha256sum firefox-*-stealth-* > checksums.txt
           echo "----- checksums.txt -----"; cat checksums.txt
+      # The symbols are published beside the archives and are NOT the engine: no symbols name matches the glob above, and checksums.txt lists none.
+      - name: No symbols file is an engine archive or in checksums.txt
+        run: python3 _src/scripts/ci symbols-guard --dir dl --dir sym --checksums dl/checksums.txt
       # The tag, its number for the title and the previous tag for the changelog
       # range are the caller's plan (scripts/release_plan.py), not derived here.
       - name: Generate + gate seal.json
@@ -180,6 +211,8 @@ jobs:
             dl/source-commit.txt
             dl/series-commit.txt
             dl/seal.json
+            sym/symbols-*.zip
+            sym/symbols.sha256
           body_path: body.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

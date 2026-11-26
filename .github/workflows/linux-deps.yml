@@ -9,7 +9,7 @@
 # hold ("E: Unable to fetch some archives"). GitHub mixes builds of an image in one run, so the files cannot depend on the image they were read on.
 #
 # So this job hands the jobs a REPOSITORY: the roots (the packages named with their recommends, the recommends themselves, the packages named without,
-# and the roots `playwright install-deps firefox` installs for the Playwright of the wrapper's pin, read from its table), their whole closure of
+# and the roots `playwright install-deps firefox` installs for the Playwright the wrapper's gate lock names, read from its table), their whole closure of
 # Depends and Pre-Depends with the virtual packages' providers, INCLUDING what the image already has, a Packages index, and roots.txt. A job
 # installs the roots BY NAME with an apt that reads only that repository (its own sources list and lists folder) and --no-download: whatever its
 # image has or lacks is resolved from the files, and a package that is not there is named by apt, red, never fetched from a mirror.
@@ -18,6 +18,11 @@
 # on it, and the builds of one release are mixed in a run (20261116.133.1, 20261116.376.1), so a key per build missed the entry run after run and
 # read the archive each time (wrapper PR #585: 13 minutes for a closure, from a slow mirror). The download runs 8 at a time: the slowness seen is
 # per connection.
+#
+# THE PLAYWRIGHT OF THAT TABLE is read from the locked wheel, never from the index by version (ci-03): the wrapper's gate lock (ci/py-lock/gate.txt, at
+# playwright_wrapper_ref) names playwright==<version> with the sha256 of every file of it, and on a miss, and only then, the one wheel is downloaded with
+# --no-deps --require-hashes and its driver's table (coreBundle.js) is read from the zip, without installing it. The lock's stanza (version and hashes) is part of
+# the entry's key.
 # ─────────────────────────────────────────────────────────────────────────────
 name: linux-deps
 
@@ -37,7 +42,7 @@ on:
         type: string
         default: ''
       playwright_wrapper_ref:
-        description: the oss-invisible/playwright ref whose scripts/playwright_pin.txt names the Playwright of `install-deps firefox`; empty for none
+        description: the oss-invisible/playwright ref whose ci/py-lock/gate.txt locks the Playwright of `install-deps firefox`; empty for none
         type: string
         default: ''
     outputs:
@@ -55,7 +60,7 @@ jobs:
     outputs:
       artifact: linux-deps-${{ inputs.name }}
     steps:
-      - name: Checkout wrapper (its Playwright pin)
+      - name: Checkout wrapper (its gate lock)
         if: inputs.playwright_wrapper_ref != ''
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
@@ -63,7 +68,8 @@ jobs:
           ref: ${{ inputs.playwright_wrapper_ref }}
           path: linux-deps-pin
           fetch-depth: 1
-          sparse-checkout: scripts/playwright_pin.txt
+          persist-credentials: false
+          sparse-checkout: ci/py-lock/gate.txt
           sparse-checkout-cone-mode: false
       - name: Set up Python
         if: inputs.playwright_wrapper_ref != ''
@@ -79,10 +85,34 @@ jobs:
         run: |
           set -euo pipefail
           : "${ImageOS:?no ImageOS: not a GitHub runner image}" "${ImageVersion:?no ImageVersion: not a GitHub runner image}"
-          PIN=""
-          if [ -n "$PW_REF" ]; then PIN="$(tr -d '[:space:]' < linux-deps-pin/scripts/playwright_pin.txt)"; [ -n "$PIN" ] || { echo "ERROR: empty scripts/playwright_pin.txt at $PW_REF"; exit 1; }; fi
+          PIN=""; LOCKSHA="-"
           mkdir -p "$RUNNER_TEMP/linux-deps-spec"
-          printf 'form: repository of the closure\nrecommends: %s\nno-recommends: %s\nplaywright-roots-firefox: %s\n' "$PACKAGES" "$NO_REC" "$PIN" > "$RUNNER_TEMP/linux-deps-spec/spec.txt"
+          if [ -n "$PW_REF" ]; then
+            [ -s linux-deps-pin/ci/py-lock/gate.txt ] || { echo "ERROR: no ci/py-lock/gate.txt at $PW_REF of oss-invisible/playwright: the lock that names the Playwright of install-deps"; exit 1; }
+            # The Playwright of the lock: its requirement line with every hash (a stanza of the lock, as pip reads it), written as a requirements file of its own.
+            PIN="$(python - linux-deps-pin/ci/py-lock/gate.txt "$RUNNER_TEMP/linux-deps-spec/playwright-lock.txt" <<'PY'
+          import re, sys
+          lines = open(sys.argv[1], encoding="utf-8").read().splitlines()
+          start = next((i for i, l in enumerate(lines) if re.match(r"playwright==[0-9][^ ;]* \\$", l)), None)
+          if start is None:
+              sys.exit("no `playwright==<version>` with hashes in ci/py-lock/gate.txt")
+          stanza = [lines[start]]
+          for l in lines[start + 1:]:
+              if not l.startswith("    --hash=sha256:"):
+                  break
+              stanza.append(l)
+          if len(stanza) < 2 or any(not re.fullmatch(r"    --hash=sha256:[0-9a-f]{64}( \\)?", l) for l in stanza[1:]):
+              sys.exit("the playwright stanza of ci/py-lock/gate.txt has no hash, or a line that is not one")
+          if stanza[-1].endswith("\\"):
+              sys.exit("the playwright stanza of ci/py-lock/gate.txt does not end")
+          open(sys.argv[2], "w", encoding="utf-8", newline="\n").write("\n".join(stanza) + "\n")
+          print(re.match(r"playwright==([0-9][^ ;]*)", lines[start]).group(1))
+          PY
+          )"
+            [ -n "$PIN" ] || { echo "ERROR: the lock names no Playwright version"; exit 1; }
+            LOCKSHA="$(sha256sum < "$RUNNER_TEMP/linux-deps-spec/playwright-lock.txt" | cut -c1-64)"
+          fi
+          printf 'form: repository of the closure\nrecommends: %s\nno-recommends: %s\nplaywright-roots-firefox: %s\nplaywright-lock-stanza: sha256 %s\n' "$PACKAGES" "$NO_REC" "$PIN" "$LOCKSHA" > "$RUNNER_TEMP/linux-deps-spec/spec.txt"
           cat "$RUNNER_TEMP/linux-deps-spec/spec.txt"
           SHA="$(sha256sum < "$RUNNER_TEMP/linux-deps-spec/spec.txt" | cut -c1-16)"
           echo "pin=$PIN" >> "$GITHUB_OUTPUT"
@@ -109,18 +139,24 @@ jobs:
           command -v apt-ftparchive >/dev/null || sudo apt-get install -y -qq apt-utils
           PW_ROOTS=""
           if [ -n "$PIN" ]; then
-            python -m pip install --quiet "playwright==$PIN"
+            # The one wheel of the lock (this runner's, by its hashes), not installed: its driver's table is read from the zip.
+            rm -rf "$RUNNER_TEMP/linux-deps-playwright"
+            python -m pip download --quiet --disable-pip-version-check --only-binary=:all: --no-deps --require-hashes \
+              -r "$RUNNER_TEMP/linux-deps-spec/playwright-lock.txt" -d "$RUNNER_TEMP/linux-deps-playwright"
             # The roots `playwright install-deps firefox` installs (with --no-install-recommends): the `tools` and `firefox` lists of this system's
             # entry in the driver's table, the list install-deps itself reads.
             PLATFORM="ubuntu$(. /etc/os-release && echo "$VERSION_ID")-x64"
-            PW_ROOTS="$(python - "$PLATFORM" <<'PY'
-          import os, re, sys
-          import playwright
-          path = os.path.join(os.path.dirname(playwright.__file__), "driver", "package", "lib", "coreBundle.js")
-          text = open(path, encoding="utf-8").read()
+            PW_ROOTS="$(python - "$PLATFORM" "$RUNNER_TEMP/linux-deps-playwright" <<'PY'
+          import glob, re, sys, zipfile
+          wheels = glob.glob(sys.argv[2] + "/playwright-*.whl")
+          if len(wheels) != 1:
+              sys.exit("the download of the locked playwright made %d wheels, not one: %s" % (len(wheels), wheels))
+          path = "playwright/driver/package/lib/coreBundle.js"
+          with zipfile.ZipFile(wheels[0]) as wheel:
+              text = wheel.read(path).decode("utf-8")
           at = text.find('"%s": {' % sys.argv[1])
           if at < 0:
-              sys.exit("no entry %s in %s" % (sys.argv[1], path))
+              sys.exit("no entry %s in %s of %s" % (sys.argv[1], path, wheels[0]))
           roots = []
           for group in ("tools", "firefox"):
               m = re.compile(r"\b%s: \[(.*?)\]" % group, re.S).search(text, at)
