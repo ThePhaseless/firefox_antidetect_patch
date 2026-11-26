@@ -29,7 +29,7 @@ def _violation():
 def _every_producer(tmp_path, monkeypatch):
     """-> {producer: its list of problems}, with the series of this checkout broken in each one."""
     budget = json.loads(engine.BUDGET.read_text(encoding="utf-8"))
-    budget["browser/components/moz.build"] -= 1
+    budget[next(k for k in sorted(budget) if k.split("|")[0] == "browser/components/moz.build")] -= 1
     path = tmp_path / "hook-budget.json"
     path.write_text(json.dumps(budget), encoding="utf-8")
     monkeypatch.setattr(engine, "BUDGET", path)

@@ -7,7 +7,7 @@ Where each kind of change goes. The engine is Firefox as a patch series on a Moz
 | Layer | What it is | Where | Registered in |
 |---|---|---|---|
 | Our own files | `Stealth*` code and its tests, stored byte for byte | `<folder>/src/<tree path>` | Nothing: the folder that holds `<folder>/src/<path>` owns it; a new file is placed once with `export --own` |
-| Hooks | One-line changes to Mozilla files, each with `STEALTH-HOOK(<folder>)` on the line | `<folder>/hooks.patch` | `tools/inventory.json` (one record per Mozilla file) and `layout.FEATURES` |
+| Hooks | One-line changes to Mozilla files, each with `STEALTH-HOOK(<folder>)` on the line | `<folder>/hooks.patch` | the `inventory` of the folder's `MANIFEST.json` (one record per Mozilla file that the folder holds lines of) and `layout.FEATURES` |
 | Backports | Upstream code carried until the tag has it | `platform/backports/<name>/` (a Mozilla commit, or the upstream commits of a vendored crate that no feature of ours needs); vendored code under `third_party/rust/` in the folder that needs it | `BACKPORT.json` in the folder |
 
 A folder holds `hooks.patch`, `src/`, `MANIFEST.json`, `FEATURE.md`, `HOOKS.json` and `FOLDER.json`; a folder with a `BACKPORT.json` has no `HOOKS.json` and no `FOLDER.json`. Rules: [backport-01](decisions/backport-01-upstream-code-as-is.md), [series-02](decisions/series-02-every-folder-states-its-relation-to-mozilla.md).
@@ -66,7 +66,7 @@ Every rule of the contract is one entry of `RULES` in `tools/hook_contract.py`, 
 <!-- generated:hook-rules begin: written by `python tools/engine.py docs --write` from tools/hook_contract.py; do not edit -->
 | Decision | Rules |
 |---|---|
-| [hook-02](decisions/hook-02-shape-and-contract.md) | C1, C2, C3, C4, C5, C6, C7, C8, C9, C10, C16, C17, C19 |
+| [hook-02](decisions/hook-02-shape-and-contract.md) | C1, C2, C3, C4, C5, C6, C7, C8, C9, C10, C16, C17, C20 |
 | [hook-05](decisions/hook-05-no-values-in-mozilla-numbered-spaces.md) | C11 |
 | [port-06](decisions/port-06-hooks-only-add.md) | C12, C13, C14, C15 |
 | [port-07](decisions/port-07-quiet-anchors.md) | C18 |
@@ -101,7 +101,7 @@ A message of the hook tools may name a G code: a case the code accepts. Each one
 
 ## HOOKS.json
 
-One per folder without `BACKPORT.json`, beside `hooks.patch`, one entry per hook. The entry of a hook whose `STEALTH-HOOK(<folder>)` names another folder than the one whose `hooks.patch` holds it is in the HOOKS.json of the folder the marker names (rule C19; `hooks-list` writes it there). `check` fails when it differs from what the series generates: a hook lost in a merge does not pass silently.
+One per folder without `BACKPORT.json`, beside `hooks.patch`, one entry per hook; a backport folder has one for the hooks of its files that are not upstream code (category `backport`), and none for the upstream files. A hook's entry is in the HOOKS.json of the folder whose `hooks.patch` holds it, and that is the folder its marker `STEALTH-HOOK(<folder>)` names: a line whose marker names another folder is rule C20 (the export writes each line into the `hooks.patch` of its marker's folder). `check` fails when it differs from what the series generates: a hook lost in a merge does not pass silently.
 
 | Fields | Written by | Meaning |
 |---|---|---|
@@ -144,8 +144,8 @@ Rule: [hook-03](decisions/hook-03-budgets-and-debt-only-go-down.md).
 
 | File | Counts | Moves by |
 |---|---|---|
-| `tools/hook-budget.json` | Our lines per Mozilla file | `shrink-budget` lowers it; a raise above `origin/main` needs a row in `tools/hook-budget-raises.json` |
-| `tools/removed-budget.json` | Mozilla lines removed or rewritten per file; a missing file counts 0 | `shrink-budget` |
+| `tools/hook-budget.json` | Our lines per Mozilla file and folder (key `<file>\|<folder>`) | `shrink-budget` lowers it; a raise above `origin/main` needs a row in `tools/hook-budget-raises.json` |
+| `tools/removed-budget.json` | Mozilla lines removed or rewritten per file and folder (key `<file>\|<folder>`); a missing key counts 0 | `shrink-budget` |
 | `tools/hook-debt.json` | Each place that breaks the contract today, keyed by rule, folder, file, function and a hash of the text (no line number) | `hook-debt` drops resolved entries and never adds one; `--summary` counts them |
 | `tools/hook-names.json` | Existing function names a hook may call without the `Stealth` prefix | Fixed; a new function is named `Stealth<What>` |
 | `tools/birth-ledger.json` | Every place the tree creates a network request, with its verdict ([port-03](decisions/port-03-births-ledger.md)) | Hand, with `tools/births.py` |
@@ -156,7 +156,7 @@ Rule: [hook-03](decisions/hook-03-budgets-and-debt-only-go-down.md).
 |---|---|
 | `tools/engine.py` | The commands: `export`, `verify`, `check`, `port` and the rest |
 | `tools/layout.py` | `GROUP_ORDER`; `FEATURES`: inventory feature name to folder; the owner of a file of ours, read from the `src/` trees (no table) |
-| `tools/inventory.json` | One record per Mozilla file we modify: file, category, feature, prefs, anchor, notes (by hand); added / removed / hunk counts (written by `export` from `hooks.patch`; `check` refuses a different value, and an `evidence` field: the lines are `hooks.patch` itself) |
+| `<folder>/MANIFEST.json`, `inventory` | One record per Mozilla file the folder holds lines of (the folder is the one the record's feature maps to; there is no other copy and no `tools/inventory.json`, which `check` refuses): file, category, feature, prefs, anchor, notes (by hand; `check` refuses an empty anchor or notes, and a hookable that is not already-hook, movable or hard); added / removed / hunk counts of the folder's part of the file (written by `export` from the folder's `hooks.patch`, which also derives a record a new (file, folder) needs, with empty anchor and notes; `check` refuses a different value, and an `evidence` field: the lines are `hooks.patch` itself) |
 | `tools/gtest-suites.json` | The gtest suites the `HOOKS.json` files name, sorted, each marked windows-only or linux-only where its tests are built on one platform; written by `gtest-list --write` |
 | `tools/hook_contract.py`, `tools/hooks_list.py` | The contract and the `HOOKS.json` generator |
 | `tools/folders.py`, `tools/range_diff.py` | The `FOLDER.json` check; the range-diff of a port |
@@ -168,8 +168,8 @@ Rule: [hook-03](decisions/hook-03-budgets-and-debt-only-go-down.md).
 | File | Written by |
 |---|---|
 | `<folder>/hooks.patch`, `<folder>/src/`, `<folder>/MANIFEST.json` (with the `sha256` of every file under `src/`) | `export` |
-| `tools/inventory.json`: `added`, `removed`, `hunks` of each record | `export` (from `hooks.patch`) |
-| `tools/hook-budget.json`, `tools/removed-budget.json`: the entry of a Mozilla file patched for the first time | `export`, at the counted value |
+| `<folder>/MANIFEST.json`, `inventory`: `added`, `removed`, `hunks`, `inline_logic_lines` of each record | `export` (from `hooks.patch`) |
+| `tools/hook-budget.json`, `tools/removed-budget.json`: the entry of a (file, folder) patched for the first time | `export`, at the counted value |
 | `tools/gtest-suites.json` | `gtest-list --write`, and `export` |
 | A folder that owns nothing any more | `export` removes it |
 | `SERIES` | `export` |
@@ -182,7 +182,8 @@ Rule: [hook-03](decisions/hook-03-budgets-and-debt-only-go-down.md).
 | `ports/range-diff.txt` | `range-diff --write`, at every port |
 | `<folder>/BACKPORT.json` and the upstream diff beside it | By hand |
 | `UPSTREAM.json`: `mozilla_tag`, `source_branch` | `port`: it writes both once its branch exists |
-| `tools/layout.py`, `tools/inventory.json` (feature, category, anchor, hookable, notes, verifier), `tools/hook-budget-raises.json`, `tools/hook-names.json`, `tools/birth-ledger.json` | By hand |
+| `<folder>/MANIFEST.json`, `inventory`: feature, category, prefs, anchor, hookable, notes, verifier (`export` keeps them; a modified file with no record needs one written before the export) | By hand |
+| `tools/layout.py`, `tools/hook-budget-raises.json`, `tools/hook-names.json`, `tools/birth-ledger.json` | By hand |
 | `tools/hook-budget.json`, `tools/removed-budget.json` | By hand, downward; `shrink-budget` |
 | `tools/hook-debt.json` | `hook-debt` only |
 | `.github/workflows/series.yml`, `.github/workflows/noreply-identity.yml` | By hand |
@@ -191,9 +192,9 @@ Rule: [hook-03](decisions/hook-03-budgets-and-debt-only-go-down.md).
 ## Every change
 
 1. In the source repository, on the source branch: the change, its test, the commit.
-2. Here: `export`. It first runs the node tests and the tree's python tests on the head's tree; then it writes the series into a scratch copy of the checkout, runs `engine.py check` and `tools/tests` (`-n auto`) on that copy, and only if all is green replaces the series of the checkout with it. A red leaves the checkout untouched.
+2. Here: `export`. It first runs the node tests and the tree's python tests on the head's tree; then it writes the series into a scratch copy of the checkout, runs `engine.py check` and `tools/tests` (`-n auto`) on that copy, and only if all is green replaces the series of the checkout with it. A red leaves the checkout untouched. Two failures of `check` that only a later step can close (the empty text of a record the export derived, the churn rows of the hunks it moved) are printed as `TODO after export` and do not stop it; `check` itself still refuses them.
 3. `verify`: it must say `identical`.
-4. `hook-debt` drops the resolved debt; `shrink-budget` after logic moved; a Mozilla file new to the series gets its row in `tools/hook-budget.json` from `export` (at most 5 lines: more is a failure of `check`).
+4. `hook-debt` drops the resolved debt; `shrink-budget` after logic moved; a (file, folder) new to the series gets its row in `tools/hook-budget.json` from `export` (at most 5 lines: more is a failure of `check`).
 5. A folder `export` made anew has no `FOLDER.json`: write it (`product`, or `defect` with its `upstream`). Fill the hand fields of the touched `HOOKS.json` (`test`; `anchor` and `why` for an anchor) and the `Test:` line of `FEATURE.md`.
 6. `check`, and `python -m pytest -q tools/tests`.
 7. Commit here with the same title as the source commit.

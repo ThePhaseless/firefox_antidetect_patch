@@ -1,5 +1,13 @@
 [
  {
+  "file": "toolkit/components/windowwatcher/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"StealthWindowPlacement.cpp\"]  # STEALTH-HOOK(fingerprint/screen-window/popup-position)",
+  "test": "wrapper:tests/test_popup_geometry_is_the_declared_frame_e2e.py::test_a_popup_is_its_inner_size_plus_the_declared_frame"
+ },
+ {
   "file": "toolkit/components/windowwatcher/nsWindowWatcher.cpp",
   "function": "",
   "kind": "add",
@@ -16,13 +24,5 @@
   "test": "wrapper:tests/test_popup_geometry_is_the_declared_frame_e2e.py::test_a_popup_is_its_inner_size_plus_the_declared_frame",
   "anchor": "Mozilla's `bool positionSpecified = aSizeSpec.PositionSpecified();`",
   "why": "places a popup opened without a position at the default position and updates `positionSpecified`, a local Mozilla reads on the next lines, through the reference; `left`, `top` and `treeOwnerAsWin` are the geometry locals of the function that the placement reads, so a guard at the head of SizeOpenedWindow finds them unborn"
- },
- {
-  "file": "toolkit/components/windowwatcher/moz.build",
-  "function": "UNIFIED_SOURCES += [",
-  "kind": "add",
-  "form": "registration",
-  "line": "UNIFIED_SOURCES += [\"StealthWindowPlacement.cpp\"]  # STEALTH-HOOK(fingerprint/screen-window/popup-position)",
-  "test": "wrapper:tests/test_popup_geometry_is_the_declared_frame_e2e.py::test_a_popup_is_its_inner_size_plus_the_declared_frame"
  }
 ]

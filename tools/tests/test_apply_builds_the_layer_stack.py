@@ -36,7 +36,7 @@ def world(tmp_path, monkeypatch):
     run(src, "commit", "-qm", "upstream")
     run(src, "tag", "TAG")
     # the patch the series carries for mozilla.txt
-    (src / "mozilla.txt").write_bytes(b"one\nhook();\ntwo\n")
+    (src / "mozilla.txt").write_bytes(b"one\nhook(); // STEALTH-HOOK(fingerprint/a)\ntwo\n")
     patch = subprocess.run(["git", "-C", str(src), "diff", "--binary", "--full-index"],
                            check=True, capture_output=True).stdout
     run(src, "checkout", "-q", "--", "mozilla.txt")
@@ -61,7 +61,7 @@ def test_apply_writes_one_commit_per_folder_on_top_of_the_tag(world):
     engine.apply(world, "TAG", "work", force=False)
     titles = run(world, "log", "--format=%s", "TAG..work").splitlines()
     assert titles == ["fingerprint/a", "platform/b"]
-    assert run(world, "show", "work:mozilla.txt") == "one\nhook();\ntwo"
+    assert run(world, "show", "work:mozilla.txt") == "one\nhook(); // STEALTH-HOOK(fingerprint/a)\ntwo"
     assert run(world, "show", "work:dom/StealthA.cpp") == "// ours"
     assert "100755" in run(world, "ls-tree", "work", "tool.py")
     assert run(world, "log", "-1", "--format=%ae", "work") == engine.IDENTITY["GIT_AUTHOR_EMAIL"]

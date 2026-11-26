@@ -1,7 +1,11 @@
 {
  "modified": [
+  "gfx/2d/moz.build",
+  "gfx/thebes/moz.build",
+  "toolkit/xre/nsAppRunner.cpp",
   "widget/GfxInfoBase.cpp",
-  "widget/gtk/GfxInfo.cpp"
+  "widget/gtk/GfxInfo.cpp",
+  "widget/gtk/moz.build"
  ],
  "added": {
   "gfx/2d/StealthRefuse.h": "100644",
@@ -28,6 +32,45 @@
   "widget/gtk/StealthHostGLProbe.cpp": "139f766ac4f3fc595003d0a3b05adc3b803ad423d2fa32354cf503e503f4b159"
  },
  "inventory": [
+  {
+   "file": "gfx/2d/moz.build",
+   "category": "build",
+   "feature": "gfx-feature-status-declared",
+   "prefs": [],
+   "added": 1,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "EXPORTS.mozilla.gfx (StealthRefuse.h, after the StealthCanvasProjection and StealthRecordedProjection lines)",
+   "notes": "Exports StealthRefuse.h, the header-only function by which the engine refuses to run (a declaration missing or malformed): the sentence goes to stderr first, then into the crash."
+  },
+  {
+   "file": "gfx/thebes/moz.build",
+   "category": "build",
+   "feature": "gfx-feature-status-declared",
+   "prefs": [],
+   "added": 1,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 1,
+   "hookable": "already-hook",
+   "anchor": "include lines after include(\"/ipc/chromium/chromium-config.mozbuild\") (StealthDeclarationGate.mozbuild)",
+   "notes": "One include line of StealthDeclarationGate.mozbuild, which exports StealthDeclarationGate.h and StealthGfxFeatureStatus.h and lists their .cpp files."
+  },
+  {
+   "file": "toolkit/xre/nsAppRunner.cpp",
+   "category": "other",
+   "feature": "gfx-feature-status-declared",
+   "prefs": [],
+   "added": 5,
+   "removed": 0,
+   "hunks": 2,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "include of StealthGfxFeatureStatus.h; XREMain::XRE_mainRun (right after InitializeUserPrefs)",
+   "notes": "Two notices after the profile's preferences are read: StealthMarkUserPrefsRead records that the declaration has arrived, and StealthFireHostGLProbeIfStock fires Mozilla's host GL probe only for a launch with no declaration."
+  },
   {
    "file": "widget/GfxInfoBase.cpp",
    "category": "spoof",
@@ -65,6 +108,19 @@
     "changed": [],
     "why": "Written with the hook, 2026-11-21."
    }
+  },
+  {
+   "file": "widget/gtk/moz.build",
+   "category": "spoof",
+   "feature": "gfx-feature-status-declared",
+   "prefs": [],
+   "added": 1,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "SOURCES of widget/gtk (StealthHostGLProbe.cpp, after the list that ends with nsWindow.cpp)",
+   "notes": "Registers StealthHostGLProbe.cpp, which fires Mozilla's host GL probe right after the profile's preferences are read; with the engine on it launches nothing and reads nothing from the host."
   }
  ]
 }

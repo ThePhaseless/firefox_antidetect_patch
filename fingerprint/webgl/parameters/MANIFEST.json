@@ -5,7 +5,8 @@
   "dom/canvas/WebGLContextFramebufferOperations.cpp",
   "dom/canvas/WebGLContextGL.cpp",
   "dom/canvas/WebGLContextValidate.cpp",
-  "dom/canvas/gtest/moz.build"
+  "dom/canvas/gtest/moz.build",
+  "dom/canvas/moz.build"
  ],
  "added": {
   "dom/canvas/StealthWebGLParams.cpp": "100644",
@@ -33,10 +34,10 @@
     "zoom.stealth.webgl2.extensions",
     "webgl.sanitize-unmasked-renderer"
    ],
-   "added": 12,
-   "removed": 2,
-   "hunks": 10,
-   "inline_logic_lines": 300,
+   "added": 4,
+   "removed": 0,
+   "hunks": 4,
+   "inline_logic_lines": 1,
    "hookable": "movable",
    "anchor": "ClientWebGLContext::GetParameter, GetShaderPrecisionFormat, ReadPixels (both forms), DoReadPixels, DoReadPixelsAsync, IsSupported, GetSupportedExtensions, BufferParameter; static LookupStealthParamEntry and GetStealthExtensionWhitelist; GetImageBuffer and GetInputStream (toDataURL/toBlob projection); comment-only hunk in GetSurfaceSnapshot",
    "notes": "This one file carries at least five features, and the feature field above only names the main one: webgl-parameters (int, float and int2 overrides in GetParameter), webgl-renderer-vendor (renderer and vendor overrides; when the pref is set the ShouldResistFingerprinting branch is skipped), webgl-shader-precision (override in GetShaderPrecisionFormat), webgl-extension-whitelist (IsSupported and GetSupportedExtensions), and canvas-noise-projection (readPixels, PBO readPixels, toDataURL/toBlob via GetImageBuffer and GetInputStream, and the async snapshot). Split per feature before hooking. The BufferParameter extraction and the DoReadPixels Maybe return are refactors that the projection needs. The extension whitelist pref is re-read and re-parsed on every IsSupported call. The array readPixels projection does one extra read (a rectangle 1px larger); the PBO path does two extra reads (a tight read, then the 1px-larger one inside StealthProjectReadPixels) and then rewrites the buffer with BufferSubData, unbinding the pack buffer during the read and re-binding it afterwards. The async projection lives here, and HTMLCanvasElement must not project it again (cross-file contract stated in HTMLCanvasElement.h). The removed comment about Mozilla plus Base64 vendor randomisation is gone. Code comments include a dated measurement note (2026-08-24).",
@@ -59,7 +60,7 @@
    "added": 4,
    "removed": 0,
    "hunks": 3,
-   "inline_logic_lines": 1,
+   "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "WebGLContext::IsExtensionSupported, case WEBGL_provoking_vertex (ahead of Mozilla's per-platform policy)",
    "notes": "The host serves an extension the persona declares wherever its GL has it, ahead of Mozilla's policy (ANGLE or macOS only). The page is told the persona's list on the client side; a declared extension the host refused tripped the assert in ProvokingVertex and took the main process down on Linux (2026-11-07).",
@@ -76,7 +77,7 @@
    "added": 3,
    "removed": 0,
    "hunks": 2,
-   "inline_logic_lines": 1,
+   "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "WebGLContext::ColorMask (indexed, OES_draw_buffers_indexed)",
    "notes": "An entry point whose extension the host never enabled returns before Mozilla's MOZ_RELEASE_ASSERT, which stays. The persona's list declares extensions the host may refuse by platform policy; until firefox-56 one call from the page aborted the host process (Linux: the main process). Read with symbols 2026-11-07.",
@@ -93,7 +94,7 @@
    "added": 7,
    "removed": 0,
    "hunks": 6,
-   "inline_logic_lines": 5,
+   "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "WebGLContext::BlendEquationSeparate / BlendFuncSeparate (indexed), PolygonOffsetClampEXT, ProvokingVertex, ClipControlEXT",
    "notes": "An entry point whose extension the host never enabled returns before Mozilla's MOZ_RELEASE_ASSERT, which stays. The persona's list declares extensions the host may refuse by platform policy; until firefox-56 one call from the page aborted the host process (Linux: the main process). Read with symbols 2026-11-07.",
@@ -110,7 +111,7 @@
    "added": 4,
    "removed": 0,
    "hunks": 3,
-   "inline_logic_lines": 1,
+   "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "WebGLContext::InitAndValidateGL (the stencil masks' starting values)",
    "notes": "The four stencil masks WebGLContext tracks start at all ones, ANGLE's value on Windows, instead of the driver's (Mesa trims to its stencil bits: 255). Placed after Mozilla's reads and their debug assertions, which stay. What a page sets is unchanged; the driver masks to its own bits either way.",
@@ -126,7 +127,7 @@
    "prefs": [
     "zoom.stealth.webgl.shader_precisions"
    ],
-   "added": 2,
+   "added": 1,
    "removed": 0,
    "hunks": 1,
    "inline_logic_lines": 0,
@@ -137,6 +138,19 @@
     "changed": [],
     "why": "Written with the hook, 2026-11-22."
    }
+  },
+  {
+   "file": "dom/canvas/moz.build",
+   "category": "build",
+   "feature": "webgl-parameters",
+   "prefs": [],
+   "added": 1,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "UNIFIED_SOURCES of dom/canvas (StealthWebGLParams.cpp, after the closing bracket of the list)",
+   "notes": "Registers StealthWebGLParams.cpp, which holds the getParameter overrides read from the declared \"ENUM|VALUE\" pref entries."
   }
  ]
 }

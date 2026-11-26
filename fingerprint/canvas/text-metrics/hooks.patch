@@ -37,6 +37,18 @@ index 2f28cb5686188778c4f836a2a4ac942d7494b1d2..db87eba36c2a601dd8f8bdb642ff8213
      return MakeUnique<TextMetrics>(
          totalWidth, actualBoundingBoxLeft, actualBoundingBoxRight,
          fontMetrics.maxAscent - baselineAnchor,   // fontBBAscent
+diff --git a/dom/canvas/gtest/moz.build b/dom/canvas/gtest/moz.build
+index e1fd0c7e9f8d4e9d0f7b8e6c430ce5b8a4679e5a..9c90b6fa7791ac30f5c860553da2b85563bb1cd3 100644
+--- a/dom/canvas/gtest/moz.build
++++ b/dom/canvas/gtest/moz.build
+@@ -12,6 +12,7 @@ UNIFIED_SOURCES += [
+     "TestSanitizeRenderer.cpp",
+     "TestWebGLTextureUploadInit.cpp",
+ ]
++UNIFIED_SOURCES += ["TestStealthCanvasPageSnapshot.cpp"]  # STEALTH-HOOK(fingerprint/canvas/text-metrics)
+ 
+ include("/ipc/chromium/chromium-config.mozbuild")
+ 
 diff --git a/dom/canvas/nsICanvasRenderingContextInternal.h b/dom/canvas/nsICanvasRenderingContextInternal.h
 index 6e066b1c21593c03a95ed0997f6298d55d674708..4502a59db586c3abab3f61f1cca4e58fd407f7f6 100644
 --- a/dom/canvas/nsICanvasRenderingContextInternal.h

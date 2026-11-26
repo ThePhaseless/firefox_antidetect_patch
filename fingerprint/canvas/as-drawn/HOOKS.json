@@ -1,5 +1,21 @@
 [
  {
+  "file": "dom/html/HTMLCanvasElement.h",
+  "function": "class HTMLCanvasElement final : public nsGenericHTMLElement,",
+  "kind": "add",
+  "form": "member",
+  "line": "  already_AddRefed<gfx::SourceSurface> StealthGetSurfaceSnapshot(uint32_t aSurfaceFlags, gfxAlphaType* aOutAlphaType = nullptr, gfx::DrawTarget* aTarget = nullptr);  // STEALTH-HOOK(fingerprint/canvas/as-drawn)",
+  "test": "wrapper:tests/test_moz_element_paints_a_webgl_canvas_as_drawn_e2e.py::test_moz_element_paints_a_webgl_canvas_as_drawn"
+ },
+ {
+  "file": "layout/base/gtest/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"TestStealthSurfaceFlags.cpp\"]  # STEALTH-HOOK(fingerprint/canvas/as-drawn)",
+  "test": "gtest:StealthSurfaceFlags.OnlyOurFlagAsksForTheCanvasAsDrawn"
+ },
+ {
   "file": "layout/base/nsLayoutUtils.cpp",
   "function": "",
   "kind": "add",
@@ -62,21 +78,5 @@
   "test": "",
   "untestable": "a page cannot read a drag image or a taskbar preview; the compile and HOOKS.json prove the hook",
   "pm": "approvato"
- },
- {
-  "file": "layout/base/gtest/moz.build",
-  "function": "UNIFIED_SOURCES += [",
-  "kind": "add",
-  "form": "registration",
-  "line": "UNIFIED_SOURCES += [\"TestStealthSurfaceFlags.cpp\"]  # STEALTH-HOOK(fingerprint/canvas/as-drawn)",
-  "test": "gtest:StealthSurfaceFlags.OnlyOurFlagAsksForTheCanvasAsDrawn"
- },
- {
-  "file": "dom/html/HTMLCanvasElement.h",
-  "function": "class HTMLCanvasElement final : public nsGenericHTMLElement,",
-  "kind": "add",
-  "form": "member",
-  "line": "  already_AddRefed<gfx::SourceSurface> StealthGetSurfaceSnapshot(uint32_t aSurfaceFlags, gfxAlphaType* aOutAlphaType = nullptr, gfx::DrawTarget* aTarget = nullptr);  // STEALTH-HOOK(fingerprint/canvas/as-drawn)",
-  "test": "wrapper:tests/test_moz_element_paints_a_webgl_canvas_as_drawn_e2e.py::test_moz_element_paints_a_webgl_canvas_as_drawn"
  }
 ]

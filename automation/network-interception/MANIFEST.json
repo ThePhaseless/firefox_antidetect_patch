@@ -2,7 +2,8 @@
  "modified": [
   "netwerk/base/nsINetworkInterceptController.idl",
   "netwerk/protocol/http/InterceptedHttpChannel.cpp",
-  "netwerk/protocol/http/InterceptedHttpChannel.h"
+  "netwerk/protocol/http/InterceptedHttpChannel.h",
+  "netwerk/protocol/http/moz.build"
  ],
  "added": {
   "netwerk/protocol/http/StealthInterception.cpp": "100644"
@@ -38,7 +39,7 @@
    "added": 1,
    "removed": 0,
    "hunks": 1,
-   "inline_logic_lines": 18,
+   "inline_logic_lines": 0,
    "hookable": "movable",
    "anchor": "InterceptedHttpChannel::ResetInterception (new InterceptAfterServiceWorkerResets and ResetInterceptionWithURI); InterceptedHttpChannel::OnStartRequest",
    "notes": "Hunk 1 adds an 18-line state machine (two new NS_IMETHODIMPs plus a branch in ResetInterception). Move the bodies to our own file and keep a 2-line hook in ResetInterception. Hunk 2 wraps the active MOZ_ASSERT_IF and MOZ_DIAGNOSTIC_ASSERT (loading principal / service-worker tainting; two assert macros) in a block comment (0 added logic lines): keep as a documented Juggler-only deviation or move behind a hook. COMPILE CHECK (first-pass claim 'no declaration found'): REFUTED. Both methods are declared in netwerk/base/nsINetworkInterceptController.idl:65 (resetInterceptionWithURI) and :68 (interceptAfterServiceWorkerResets), inside nsIInterceptedChannel, between '// ----- Playwright begin -----' markers (that .idl is also modified by us, +10 lines vs Mozilla; it is in another group). InterceptedHttpChannel derives from nsIInterceptedChannel (InterceptedHttpChannel.h:53) and juggler/NetworkObserver.js:199 and :378 call them. Move together with the .idl change. The comments name a third-party project (and a GitHub URL); the repo rule forbids vendor names in code, so rewrite them when moving the code.",
@@ -67,6 +68,19 @@
     ],
     "why": "cross-reference to the idl declaration"
    }
+  },
+  {
+   "file": "netwerk/protocol/http/moz.build",
+   "category": "other",
+   "feature": "juggler-service-worker-intercept",
+   "prefs": [],
+   "added": 1,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "UNIFIED_SOURCES of netwerk/protocol/http (StealthInterception.cpp, after the closing bracket of the list)",
+   "notes": "Registers StealthInterception.cpp, which holds what the automation driver needs from an intercepted channel that a service worker may or may not answer."
   }
  ]
 }

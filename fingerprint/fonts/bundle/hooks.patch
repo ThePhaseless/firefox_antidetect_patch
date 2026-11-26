@@ -49,6 +49,20 @@ index 14fea8ac8725e33901e18ac1b714df2a3ca56f8a..635a4192e3b1d84298ee24c0d9aaae56
  
    static already_AddRefed<UnscaledFont> CreateFromFontDescriptor(
        const uint8_t* aData, uint32_t aDataLength, uint32_t aIndex);
+diff --git a/gfx/tests/gtest/moz.build b/gfx/tests/gtest/moz.build
+index d43be641d204e593c47e6decbdc3b4d2b9ec4a61..722f623d861ed44fed382835e9e89f50dcbf6315 100644
+--- a/gfx/tests/gtest/moz.build
++++ b/gfx/tests/gtest/moz.build
+@@ -43,6 +43,9 @@ if CONFIG["OS_TARGET"] != "Android":
+         "TestRect.cpp",
+     ]
+ 
++if CONFIG["OS_TARGET"] == "WINNT":  # STEALTH-HOOK(fingerprint/fonts/bundle)
++
++    UNIFIED_SOURCES += ["TestStealthBundledCollection.cpp"]  # STEALTH-HOOK(fingerprint/fonts/bundle)
+ if CONFIG["OS_TARGET"] == "Darwin":
+     # Not in UNIFIED_SOURCES: MacIOSurface.h includes Carbon headers (MacTypes.h)
+     # which would make Rect/Point/Size ambiguous in all subsequent unified files.
 diff --git a/gfx/thebes/FontData.h b/gfx/thebes/FontData.h
 index d1a4d801b5ceb70defd1df9dea8a939306ddb703..ece053cac22e48a18a2bf831c949c55cff1cd8fd 100644
 --- a/gfx/thebes/FontData.h
@@ -80,7 +94,7 @@ index d1a4d801b5ceb70defd1df9dea8a939306ddb703..ece053cac22e48a18a2bf831c949c55c
  };
  
 diff --git a/gfx/thebes/gfxDWriteFontList.h b/gfx/thebes/gfxDWriteFontList.h
-index 93bd8c8d01c3b5c339d6b4ff8e4ae670ceb313dc..07d63c1b44147ffdbcefce8e287a2c06f97f0a7b 100644
+index 93bd8c8d01c3b5c339d6b4ff8e4ae670ceb313dc..c0f294db13dd6acc29478169961c3fee751ed097 100644
 --- a/gfx/thebes/gfxDWriteFontList.h
 +++ b/gfx/thebes/gfxDWriteFontList.h
 @@ -18,6 +18,8 @@
@@ -103,15 +117,7 @@ index 93bd8c8d01c3b5c339d6b4ff8e4ae670ceb313dc..07d63c1b44147ffdbcefce8e287a2c06
  
  #if MOZ_FONTATIONS
    // File fragment backing our Skrifa font, if unable to mmap the file.
-@@ -461,6 +465,7 @@ class gfxDWriteFontList final : public gfxPlatformFontList {
-       nsTArray<mozilla::fontlist::Family::InitData>& aFamilies,
-       const nsTArray<nsCString>* aForceClassicFams = nullptr)
-       MOZ_REQUIRES(mLock);
-+  void StealthAppendFamiliesFromCollection(IDWriteFontCollection* aCollection, nsTArray<mozilla::fontlist::Family::InitData>& aFamilies, const nsTArray<nsCString>* aForceClassicFams) MOZ_REQUIRES(mLock);  // STEALTH-HOOK(fingerprint/fonts/font-list)
- 
-   void AddSubstitute(const nsCString& aSubstituteName,
-                      const nsCString& aActualFontName, bool aIsHardcoded)
-@@ -471,6 +476,8 @@ class gfxDWriteFontList final : public gfxPlatformFontList {
+@@ -471,6 +475,8 @@ class gfxDWriteFontList final : public gfxPlatformFontList {
        IDWriteFactory* aFactory);
  #endif
  
@@ -120,18 +126,6 @@ index 93bd8c8d01c3b5c339d6b4ff8e4ae670ceb313dc..07d63c1b44147ffdbcefce8e287a2c06
    /**
     * Fonts listed in the registry as substitutes but for which no actual
     * font family is found.
-diff --git a/gfx/thebes/gfxFcPlatformFontList.h b/gfx/thebes/gfxFcPlatformFontList.h
-index 28f3feb31c25afb55d431ffed6c0e32d90fd516d..ca305076d452f1b01c97790191dfb4644693674e 100644
---- a/gfx/thebes/gfxFcPlatformFontList.h
-+++ b/gfx/thebes/gfxFcPlatformFontList.h
-@@ -68,6 +68,7 @@ struct default_delete<FcObjectSet> {
- 
- class gfxFontconfigFontEntry final : public gfxFT2FontEntryBase {
-   friend class gfxFcPlatformFontList;
-+  friend struct StealthFcAccess;  // STEALTH-HOOK(fingerprint/fonts/font-list)
- 
-  public:
-   // used for system fonts with explicit patterns
 diff --git a/gfx/thebes/gfxFontEntry.h b/gfx/thebes/gfxFontEntry.h
 index b4bb5867fdf5dd6b25282b73e2d7d54d7e34b8f2..42364a288d677afabb67420da3356bedadd8b95a 100644
 --- a/gfx/thebes/gfxFontEntry.h
@@ -246,17 +240,14 @@ index 121abbea9808dd46cbbcd67f5783f645a0db4fbb..f2fd6fb7fbdffd2fde09e5cdb03517c6
      pfl->StartCmapLoadingFromFamily(aFamily - list->Families());
      return nullptr;
 diff --git a/gfx/thebes/moz.build b/gfx/thebes/moz.build
-index ab172d9588a03526bb904289ee451ab652dbfdaa..f07fd5d96ae22e8d27a2acf8880881d7f5daf957 100644
+index 0637b85b23dc5ec650ebccc1afa237f334f9f0a0..9c490cdb39e956e500c4e418f0cd9acf506f152c 100644
 --- a/gfx/thebes/moz.build
 +++ b/gfx/thebes/moz.build
-@@ -243,6 +243,10 @@ USE_LIBS += [
- ]
+@@ -244,6 +244,7 @@ USE_LIBS += [
  
  include("/ipc/chromium/chromium-config.mozbuild")
-+include("StealthDeclarationGate.mozbuild")  # STEALTH-HOOK(platform/declaration-gate)
+ include("StealthDeclarationGate.mozbuild")  # STEALTH-HOOK(platform/declaration-gate)
 +include("StealthBundleFontList.mozbuild")  # STEALTH-HOOK(fingerprint/fonts/bundle)
-+include("StealthFcFontList.mozbuild")  # STEALTH-HOOK(fingerprint/fonts/font-list)
-+include("StealthDesignMetrics.mozbuild")  # STEALTH-HOOK(fingerprint/fonts/metrics)
  
  FINAL_LIBRARY = "xul"
  

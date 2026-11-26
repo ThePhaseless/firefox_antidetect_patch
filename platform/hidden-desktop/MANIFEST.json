@@ -39,7 +39,7 @@
    "added": 4,
    "removed": 0,
    "hunks": 2,
-   "inline_logic_lines": 2,
+   "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "CroppingWindowCapturerWin::ShouldUseScreenCapturer",
    "notes": "Vendored libwebrtc file. The hook is 2 logic lines; most of the 13 added lines are a comment block that can be shortened or moved to the commit message. Depends on IsWindowOnInputDesktop (window_capture_utils.h in this group). The comment carries a measurement date; keep that in the commit, not the code.",

@@ -1,7 +1,10 @@
 {
  "modified": [
   "dom/base/moz.build",
+  "dom/base/nsGlobalWindowOuter.cpp",
+  "dom/base/test/gtest/moz.build",
   "intl/locale/OSPreferences.cpp",
+  "intl/locale/moz.build",
   "intl/locale/tests/gtest/moz.build"
  ],
  "added": {
@@ -26,7 +29,7 @@
    "category": "build",
    "feature": "session-declaration",
    "prefs": [],
-   "added": 3,
+   "added": 2,
    "removed": 0,
    "hunks": 2,
    "inline_logic_lines": 0,
@@ -41,6 +44,32 @@
    }
   },
   {
+   "file": "dom/base/nsGlobalWindowOuter.cpp",
+   "category": "spoof",
+   "feature": "session-declaration",
+   "prefs": [],
+   "added": 2,
+   "removed": 2,
+   "hunks": 2,
+   "inline_logic_lines": 1,
+   "hookable": "already-hook",
+   "anchor": "include of StealthSessionDeclaration.h; CreateNativeGlobalForInner (the language and timezone arguments of the realm options)",
+   "notes": "The realm of a new global takes its language and timezone from the declaration (GetDeclaredRealmLanguage and GetDeclaredRealmTimezone: the context's, else the session's) in place of the top browsing context's two overrides. Mozilla's two argument lines are replaced by one line of two calls."
+  },
+  {
+   "file": "dom/base/test/gtest/moz.build",
+   "category": "build",
+   "feature": "session-declaration",
+   "prefs": [],
+   "added": 1,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "UNIFIED_SOURCES of dom/base/test/gtest (TestStealthDocumentLanguage.cpp, after the TestStealthCallerObject.cpp line)",
+   "notes": "Registers the gtest TestStealthDocumentLanguage.cpp: the language of a document's text that declares none is the language its context declares."
+  },
+  {
    "file": "intl/locale/OSPreferences.cpp",
    "category": "spoof",
    "feature": "session-declaration",
@@ -48,7 +77,7 @@
    "added": 4,
    "removed": 0,
    "hunks": 3,
-   "inline_logic_lines": 2,
+   "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "include list; OSPreferences::GetSystemLocales and GetSystemLocale, first line of each",
    "notes": "The languages of the machine (what the OS preferences say) are the session declaration: both getters first ask SessionSystemLocales / SessionSystemLocale (intl/locale/StealthSessionPrefs.cpp, ours) and return its answer when a declaration is set. Two calls at the head of two functions plus the include; no logic inline.",
@@ -58,11 +87,28 @@
    }
   },
   {
-   "file": "intl/locale/tests/gtest/moz.build",
+   "file": "intl/locale/moz.build",
    "category": "build",
    "feature": "session-declaration",
    "prefs": [],
    "added": 2,
+   "removed": 0,
+   "hunks": 2,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "(moz.build EXPORTS and UNIFIED_SOURCES lists)",
+   "notes": "Registers our own StealthSessionPrefs files; the .cpp is added to UNIFIED_SOURCES.",
+   "verifier": {
+    "changed": [],
+    "why": "Checked against the diff; no correction needed."
+   }
+  },
+  {
+   "file": "intl/locale/tests/gtest/moz.build",
+   "category": "build",
+   "feature": "session-declaration",
+   "prefs": [],
+   "added": 1,
    "removed": 0,
    "hunks": 1,
    "inline_logic_lines": 0,

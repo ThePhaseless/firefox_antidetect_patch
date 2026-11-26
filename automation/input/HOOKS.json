@@ -1,23 +1,39 @@
 [
  {
+  "file": "dom/base/nsContentUtils.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthJugglerEventId.h\"  // STEALTH-HOOK(automation/input)",
+  "test": "wrapper:tests/test_a_pointer_event_is_handled_before_the_call_returns_e2e.py::test_each_pointer_call_answers_after_the_page_handled_its_event"
+ },
+ {
+  "file": "dom/base/nsContentUtils.cpp",
+  "function": "Result<bool, nsresult> nsContentUtils::SynthesizeMouseEvent(",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  StealthSetJugglerId(mouseOrPointerEvent, aMouseEventData.mJugglerEventId);  // STEALTH-HOOK(automation/input)",
+  "test": "wrapper:tests/test_a_pointer_event_is_handled_before_the_call_returns_e2e.py::test_each_pointer_call_answers_after_the_page_handled_its_event",
+  "anchor": "mouseOrPointerEvent.mButton = aMouseEventData.mButton;",
+  "why": "the id of the synthesized event belongs on the event Mozilla has just begun to fill (mouseOrPointerEvent); it does not exist at the top of SynthesizeMouseEvent, so no guard or wrap there can reach it"
+ },
+ {
+  "file": "dom/base/nsContentUtils.cpp",
+  "function": "Result<bool, nsresult> nsContentUtils::SynthesizeMouseEvent(",
+  "kind": "add",
+  "form": "anchor",
+  "line": "    StealthJugglerNotAsyncSynthesized(mouseOrPointerEvent);  // STEALTH-HOOK(automation/input)",
+  "test": "wrapper:tests/test_a_pointer_event_is_handled_before_the_call_returns_e2e.py::test_each_pointer_call_answers_after_the_page_handled_its_event",
+  "anchor": "mouseOrPointerEvent.mFlags.mIsAsyncSynthesizedForTests = aOptions.mIsDOMEventSynthesized;",
+  "why": "it takes back the flag Mozilla has just set, so it runs right after that assignment, inside the `if (aOptions.mToWindow)` block, before the event is dispatched"
+ },
+ {
   "file": "dom/base/nsDOMWindowUtils.cpp",
   "function": "",
   "kind": "add",
   "form": "registration",
   "line": "#include \"StealthJugglerInput.h\"  // STEALTH-HOOK(automation/input)",
   "test": "wrapper:tests/test_a_pointer_event_is_handled_before_the_call_returns_e2e.py::test_each_pointer_call_answers_after_the_page_handled_its_event"
- },
- {
-  "file": "dom/base/nsDOMWindowUtils.cpp",
-  "function": "nsDOMWindowUtils::SendWheelEvent(float aX, float aY, double aDeltaX,",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "                                 nsISynthesizedEventCallback* aCallback,",
-  "removed": "                                 nsISynthesizedEventCallback* aCallback) {",
-  "test": "wrapper:tests/test_input_is_born_before_the_page_sees_it_e2e.py::test_every_key_and_move_is_born_before_its_handler_runs",
-  "exception": "G35, approved in PM-DECISIONS (automation/input): aLatency is a parameter of ours in the signature of a Mozilla method; the C++ signature of an XPIDL method is generated from the IDL, so the IDL line and this one are one change; it is the interface that Juggler and the minimal driver use the C++ signature is generated from the XPIDL line; a side state cannot change a generated signature.",
-  "reason_kind": "declaration",
-  "pm": "approvato"
  },
  {
   "file": "dom/events/EventStateManager.cpp",
@@ -54,18 +70,6 @@
   "form": "member",
   "line": "  bool mGestureDownFromJuggler = false;  // STEALTH-HOOK(automation/input)",
   "test": "gtest:StealthDragGesture.ThePressOfJugglerDecidesWhichMovesContinueTheGesture"
- },
- {
-  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
-  "function": "interface nsIDOMWindowUtils : nsISupports {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "                      [optional] in nsISynthesizedEventCallback aCallback,",
-  "removed": "                      [optional] in nsISynthesizedEventCallback aCallback);",
-  "test": "wrapper:tests/test_input_is_born_before_the_page_sees_it_e2e.py::test_every_key_and_move_is_born_before_its_handler_runs",
-  "exception": "G35, approved in PM-DECISIONS (automation/input): aLatency is a parameter of ours in the signature of a Mozilla method; the C++ signature of an XPIDL method is generated from the IDL, so the IDL line and this one are one change; it is the interface that Juggler and the minimal driver use the C++ signature is generated from the XPIDL line; a side state cannot change a generated signature.",
-  "reason_kind": "declaration",
-  "pm": "approvato"
  },
  {
   "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
@@ -162,6 +166,14 @@
   "test": "gtest:StealthMouseEventCopy.DuplicateKeepsTheId"
  },
  {
+  "file": "widget/moz.build",
+  "function": "SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "EXPORTS.ipc += [\"StealthMouseEventIPC.h\"]  # STEALTH-HOOK(automation/input)",
+  "test": "gtest:StealthMouseEventIPC.TheIdSurvivesTheMessage"
+ },
+ {
   "file": "widget/nsGUIEventIPC.h",
   "function": "",
   "kind": "add",
@@ -196,41 +208,5 @@
   "line": "#  define PARAM_BUFFER_COUNT 15  // STEALTH-HOOK(automation/input)",
   "removed": "#  define PARAM_BUFFER_COUNT 14",
   "test": "wrapper:tests/test_a_pointer_event_is_handled_before_the_call_returns_e2e.py::test_each_pointer_call_answers_after_the_page_handled_its_event"
- },
- {
-  "file": "dom/base/nsContentUtils.cpp",
-  "function": "",
-  "kind": "add",
-  "form": "registration",
-  "line": "#include \"StealthJugglerEventId.h\"  // STEALTH-HOOK(automation/input)",
-  "test": "wrapper:tests/test_a_pointer_event_is_handled_before_the_call_returns_e2e.py::test_each_pointer_call_answers_after_the_page_handled_its_event"
- },
- {
-  "file": "dom/base/nsContentUtils.cpp",
-  "function": "Result<bool, nsresult> nsContentUtils::SynthesizeMouseEvent(",
-  "kind": "add",
-  "form": "anchor",
-  "line": "  StealthSetJugglerId(mouseOrPointerEvent, aMouseEventData.mJugglerEventId);  // STEALTH-HOOK(automation/input)",
-  "test": "wrapper:tests/test_a_pointer_event_is_handled_before_the_call_returns_e2e.py::test_each_pointer_call_answers_after_the_page_handled_its_event",
-  "anchor": "mouseOrPointerEvent.mButton = aMouseEventData.mButton;",
-  "why": "the id of the synthesized event belongs on the event Mozilla has just begun to fill (mouseOrPointerEvent); it does not exist at the top of SynthesizeMouseEvent, so no guard or wrap there can reach it"
- },
- {
-  "file": "dom/base/nsContentUtils.cpp",
-  "function": "Result<bool, nsresult> nsContentUtils::SynthesizeMouseEvent(",
-  "kind": "add",
-  "form": "anchor",
-  "line": "    StealthJugglerNotAsyncSynthesized(mouseOrPointerEvent);  // STEALTH-HOOK(automation/input)",
-  "test": "wrapper:tests/test_a_pointer_event_is_handled_before_the_call_returns_e2e.py::test_each_pointer_call_answers_after_the_page_handled_its_event",
-  "anchor": "mouseOrPointerEvent.mFlags.mIsAsyncSynthesizedForTests = aOptions.mIsDOMEventSynthesized;",
-  "why": "it takes back the flag Mozilla has just set, so it runs right after that assignment, inside the `if (aOptions.mToWindow)` block, before the event is dispatched"
- },
- {
-  "file": "widget/moz.build",
-  "function": "SOURCES += [",
-  "kind": "add",
-  "form": "registration",
-  "line": "EXPORTS.ipc += [\"StealthMouseEventIPC.h\"]  # STEALTH-HOOK(automation/input)",
-  "test": "gtest:StealthMouseEventIPC.TheIdSurvivesTheMessage"
  }
 ]

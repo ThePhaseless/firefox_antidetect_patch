@@ -60,6 +60,14 @@
   "test": "gtest:StealthKeyBirthScope.TheMemberOfTheProcessorHasTheShapeOfTheDeclaration"
  },
  {
+  "file": "dom/base/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"StealthInputEventBirth.cpp\"]  # STEALTH-HOOK(fingerprint/input/event-birth)",
+  "test": "gtest:StealthKeyBirthScope.SetNextKeyLatencyOfARealProcessorDeclaresTheNextKeyAndTheScopeTakesIt"
+ },
+ {
   "file": "dom/base/nsContentUtils.cpp",
   "function": "",
   "kind": "add",
@@ -78,28 +86,24 @@
   "why": "The hook changes the local event mouseOrPointerEvent, which three dispatch calls below use (HandleEvent, DispatchInputEvent, DispatchEvent); there is no single expression to wrap and the statements above must run first."
  },
  {
-  "file": "dom/base/test/gtest/moz.build",
-  "function": "UNIFIED_SOURCES += [",
-  "kind": "add",
-  "form": "registration",
-  "line": "UNIFIED_SOURCES += [\"TestStealthInputEventBirth.cpp\"]  # STEALTH-HOOK(fingerprint/input/event-birth)",
-  "test": "gtest:StealthInputEventBirth.TheMouseHookReadsTheLatencyOfTheDataAndStampsTheEvent"
- },
- {
-  "file": "dom/interfaces/base/nsITextInputProcessor.idl",
-  "function": "interface nsITextInputProcessor : nsISupports",
-  "kind": "add",
-  "form": "member",
-  "line": "  void setNextKeyLatency(in double aLatencyMs, [optional] in unsigned long long aPageId);  // STEALTH-HOOK(fingerprint/input/event-birth)",
-  "test": "gtest:StealthKeyBirthScope.SetNextKeyLatencyOfARealProcessorDeclaresTheNextKeyAndTheScopeTakesIt"
- },
- {
   "file": "dom/base/nsDOMWindowUtils.cpp",
   "function": "",
   "kind": "add",
   "form": "registration",
   "line": "#include \"StealthInputEventBirth.h\"  // STEALTH-HOOK(fingerprint/input/event-birth)",
   "test": "wrapper:tests/test_input_is_born_before_the_page_sees_it_e2e.py::test_every_key_and_move_is_born_before_its_handler_runs"
+ },
+ {
+  "file": "dom/base/nsDOMWindowUtils.cpp",
+  "function": "nsDOMWindowUtils::SendWheelEvent(float aX, float aY, double aDeltaX,",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "                                 nsISynthesizedEventCallback* aCallback,",
+  "removed": "                                 nsISynthesizedEventCallback* aCallback) {",
+  "test": "wrapper:tests/test_input_is_born_before_the_page_sees_it_e2e.py::test_every_key_and_move_is_born_before_its_handler_runs",
+  "exception": "G35, approved in PM-DECISIONS (automation/input): aLatency is a parameter of ours in the signature of a Mozilla method; the C++ signature of an XPIDL method is generated from the IDL, so the IDL line and this one are one change; it is the interface that Juggler and the minimal driver use the C++ signature is generated from the XPIDL line; a side state cannot change a generated signature.",
+  "reason_kind": "declaration",
+  "pm": "approvato"
  },
  {
   "file": "dom/base/nsDOMWindowUtils.cpp",
@@ -123,6 +127,26 @@
   "why": "the hook stamps the local wheelEvent, which exists only inside SendWheelEvent: a guard at the top has nothing to stamp, a function wrap cannot reach a local, and the event is a constructor declaration, not an expression to wrap; GetDocument() is a protected member of this, so the template cannot take this"
  },
  {
+  "file": "dom/base/test/gtest/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"TestStealthInputEventBirth.cpp\"]  # STEALTH-HOOK(fingerprint/input/event-birth)",
+  "test": "gtest:StealthInputEventBirth.TheMouseHookReadsTheLatencyOfTheDataAndStampsTheEvent"
+ },
+ {
+  "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
+  "function": "interface nsIDOMWindowUtils : nsISupports {",
+  "kind": "rewrite",
+  "form": "unknown",
+  "line": "                      [optional] in nsISynthesizedEventCallback aCallback,",
+  "removed": "                      [optional] in nsISynthesizedEventCallback aCallback);",
+  "test": "wrapper:tests/test_input_is_born_before_the_page_sees_it_e2e.py::test_every_key_and_move_is_born_before_its_handler_runs",
+  "exception": "G35, approved in PM-DECISIONS (automation/input): aLatency is a parameter of ours in the signature of a Mozilla method; the C++ signature of an XPIDL method is generated from the IDL, so the IDL line and this one are one change; it is the interface that Juggler and the minimal driver use the C++ signature is generated from the XPIDL line; a side state cannot change a generated signature.",
+  "reason_kind": "declaration",
+  "pm": "approvato"
+ },
+ {
   "file": "dom/interfaces/base/nsIDOMWindowUtils.idl",
   "function": "interface nsIDOMWindowUtils : nsISupports {",
   "kind": "rewrite",
@@ -134,11 +158,11 @@
   "pm": "approvato"
  },
  {
-  "file": "dom/base/moz.build",
-  "function": "UNIFIED_SOURCES += [",
+  "file": "dom/interfaces/base/nsITextInputProcessor.idl",
+  "function": "interface nsITextInputProcessor : nsISupports",
   "kind": "add",
-  "form": "registration",
-  "line": "UNIFIED_SOURCES += [\"StealthInputEventBirth.cpp\"]  # STEALTH-HOOK(fingerprint/input/event-birth)",
+  "form": "member",
+  "line": "  void setNextKeyLatency(in double aLatencyMs, [optional] in unsigned long long aPageId);  // STEALTH-HOOK(fingerprint/input/event-birth)",
   "test": "gtest:StealthKeyBirthScope.SetNextKeyLatencyOfARealProcessorDeclaresTheNextKeyAndTheScopeTakesIt"
  }
 ]

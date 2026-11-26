@@ -1,5 +1,5 @@
 diff --git a/dom/base/moz.build b/dom/base/moz.build
-index f94e5a88fcbd5d22d9cbce9d308c01bfadaa10f3..415491a012f54cb6d19398f801ecc841ce9e93d2 100644
+index 222e26b30adee294e42d6bcabff2268bba20234b..415491a012f54cb6d19398f801ecc841ce9e93d2 100644
 --- a/dom/base/moz.build
 +++ b/dom/base/moz.build
 @@ -301,6 +301,7 @@ EXPORTS.mozilla.dom += [
@@ -10,15 +10,48 @@ index f94e5a88fcbd5d22d9cbce9d308c01bfadaa10f3..415491a012f54cb6d19398f801ecc841
  
  if CONFIG["FUZZING"]:
      EXPORTS.mozilla.dom += [
-@@ -521,6 +522,8 @@ UNIFIED_SOURCES += [
+@@ -521,6 +522,7 @@ UNIFIED_SOURCES += [
      "WindowNamedPropertiesHandler.cpp",
      "XPathGenerator.cpp",
  ]
 +UNIFIED_SOURCES += ["StealthSessionDeclaration.cpp"]  # STEALTH-HOOK(fingerprint/locale-time/session-declaration)
-+UNIFIED_SOURCES += ["StealthInputEventBirth.cpp"]  # STEALTH-HOOK(fingerprint/input/event-birth)
+ UNIFIED_SOURCES += ["StealthInputEventBirth.cpp"]  # STEALTH-HOOK(fingerprint/input/event-birth)
  
  if CONFIG["FUZZING"]:
-     UNIFIED_SOURCES += [
+diff --git a/dom/base/nsGlobalWindowOuter.cpp b/dom/base/nsGlobalWindowOuter.cpp
+index 59a1a4671078a3fc3491a5200c30d908fd87cbf1..6f072ae4ff4528e187e2338dc5793e0881161d9c 100644
+--- a/dom/base/nsGlobalWindowOuter.cpp
++++ b/dom/base/nsGlobalWindowOuter.cpp
+@@ -235,6 +235,7 @@
+ #include "prrng.h"
+ #include "xpcprivate.h"
+ 
++#include "mozilla/dom/StealthSessionDeclaration.h"  // STEALTH-HOOK(fingerprint/locale-time/session-declaration)
+ #ifdef MOZ_WEBSPEECH
+ #  include "mozilla/dom/SpeechSynthesis.h"
+ #endif
+@@ -2095,8 +2096,7 @@ static nsresult CreateNativeGlobalForInner(
+       aDocument->ShouldResistFingerprinting(RFPTarget::JSDateTimeUTC),
+       aDocument->ShouldResistFingerprinting(RFPTarget::JSMathFdlibm),
+       aDocument->ShouldResistFingerprinting(RFPTarget::JSLocale),
+-      aDocument->GetBrowsingContext()->Top()->GetLanguageOverride(),
+-      aDocument->GetBrowsingContext()->Top()->GetTimezoneOverride());
++      GetDeclaredRealmLanguage(aDocument), GetDeclaredRealmTimezone(aDocument));  // STEALTH-HOOK(fingerprint/locale-time/session-declaration)
+ 
+   if (principal->IsSystemPrincipal()) {
+     creationOptions.setFreezeBuiltins(true);
+diff --git a/dom/base/test/gtest/moz.build b/dom/base/test/gtest/moz.build
+index 14e2ad6c679fefdfccbf5e8d4d9b0ba8b9c724a2..38e1b21f380ddbd834a4a4cc4eef8d911366b623 100644
+--- a/dom/base/test/gtest/moz.build
++++ b/dom/base/test/gtest/moz.build
+@@ -14,6 +14,7 @@ UNIFIED_SOURCES += [
+     "TestXPathGenerator.cpp",
+ ]
+ UNIFIED_SOURCES += ["TestStealthCallerObject.cpp"]  # STEALTH-HOOK(automation/hybrid-xrays)
++UNIFIED_SOURCES += ["TestStealthDocumentLanguage.cpp"]  # STEALTH-HOOK(fingerprint/locale-time/session-declaration)
+ UNIFIED_SOURCES += ["TestStealthInputEventBirth.cpp"]  # STEALTH-HOOK(fingerprint/input/event-birth)
+ UNIFIED_SOURCES += ["TestStealthStackFrames.cpp"]  # STEALTH-HOOK(fingerprint/js-surface/stack-frames)
+ 
 diff --git a/intl/locale/OSPreferences.cpp b/intl/locale/OSPreferences.cpp
 index b185d97c87a71fec3d9736d429d9bd1c2d73760e..a2eebb50fd64fe9efb6cc86184ecc6fba81fff98 100644
 --- a/intl/locale/OSPreferences.cpp
@@ -48,15 +81,35 @@ index b185d97c87a71fec3d9736d429d9bd1c2d73760e..a2eebb50fd64fe9efb6cc86184ecc6fb
    if (!mSystemLocales.IsEmpty()) {
      aRetVal = mSystemLocales[0];
    } else {
+diff --git a/intl/locale/moz.build b/intl/locale/moz.build
+index 4d6ff0428de7faaa6f6c6570708f7f5690e0e4df..d26b374eba597ef4982743711ae4bc1ae7fdbcb8 100644
+--- a/intl/locale/moz.build
++++ b/intl/locale/moz.build
+@@ -40,6 +40,7 @@ EXPORTS.mozilla.intl += [
+     "OSPreferences.h",
+     "Quotes.h",
+ ]
++EXPORTS.mozilla.intl += ["StealthSessionPrefs.h"]  # STEALTH-HOOK(fingerprint/locale-time/session-declaration)
+ 
+ UNIFIED_SOURCES += [
+     "AppCollator.cpp",
+@@ -51,6 +52,7 @@ UNIFIED_SOURCES += [
+     "OSPreferences.cpp",
+     "Quotes.cpp",
+ ]
++UNIFIED_SOURCES += ["StealthSessionPrefs.cpp"]  # STEALTH-HOOK(fingerprint/locale-time/session-declaration)
+ 
+ MOZ_SRC_FILES += [
+     "LangPackMatcher.sys.mjs",
 diff --git a/intl/locale/tests/gtest/moz.build b/intl/locale/tests/gtest/moz.build
-index 65c43ebab8704671225f9a29f9b12f6445450b4e..2c54417efc5b8ad375192b36f3e1e41a17f2b3c1 100644
+index 7d33342db9d1806eea737680d87b490491446fa9..2c54417efc5b8ad375192b36f3e1e41a17f2b3c1 100644
 --- a/intl/locale/tests/gtest/moz.build
 +++ b/intl/locale/tests/gtest/moz.build
-@@ -8,5 +8,7 @@ UNIFIED_SOURCES += [
+@@ -8,6 +8,7 @@ UNIFIED_SOURCES += [
      "TestLocaleServiceNegotiate.cpp",
      "TestOSPreferences.cpp",
  ]
 +UNIFIED_SOURCES += ["TestStealthSystemLocales.cpp"]  # STEALTH-HOOK(fingerprint/locale-time/session-declaration)
-+UNIFIED_SOURCES += ["TestStealthRegionalLocales.cpp"]  # STEALTH-HOOK(fingerprint/locale-time/language)
+ UNIFIED_SOURCES += ["TestStealthRegionalLocales.cpp"]  # STEALTH-HOOK(fingerprint/locale-time/language)
  
  FINAL_LIBRARY = "xul-gtest"

@@ -1,3 +1,50 @@
+diff --git a/gfx/2d/moz.build b/gfx/2d/moz.build
+index 2abc9c45814d6931ad1edcb9daacab750909d597..e18eafe72a563367de6081df7b032ffa15067db2 100644
+--- a/gfx/2d/moz.build
++++ b/gfx/2d/moz.build
+@@ -60,6 +60,7 @@ EXPORTS.mozilla.gfx += [
+     "Types.h",
+     "UserData.h",
+ ]
++EXPORTS.mozilla.gfx += ["StealthRefuse.h"]  # STEALTH-HOOK(platform/declaration-gate)
+ 
+ if CONFIG["MOZ_WIDGET_TOOLKIT"] in ("cocoa", "uikit"):
+     EXPORTS.mozilla.gfx += [
+diff --git a/gfx/thebes/moz.build b/gfx/thebes/moz.build
+index ab172d9588a03526bb904289ee451ab652dbfdaa..0637b85b23dc5ec650ebccc1afa237f334f9f0a0 100644
+--- a/gfx/thebes/moz.build
++++ b/gfx/thebes/moz.build
+@@ -243,6 +243,7 @@ USE_LIBS += [
+ ]
+ 
+ include("/ipc/chromium/chromium-config.mozbuild")
++include("StealthDeclarationGate.mozbuild")  # STEALTH-HOOK(platform/declaration-gate)
+ 
+ FINAL_LIBRARY = "xul"
+ 
+diff --git a/toolkit/xre/nsAppRunner.cpp b/toolkit/xre/nsAppRunner.cpp
+index 003fc8545a7a8940dad6c34c3e15f8eb26928f68..621135ef4835d7e6483e539b7786ebaf682f23b7 100644
+--- a/toolkit/xre/nsAppRunner.cpp
++++ b/toolkit/xre/nsAppRunner.cpp
+@@ -359,6 +359,8 @@ constinit std::unique_ptr<WaylandProxy> gWaylandProxy;
+ 
+ #include "BinaryPath.h"
+ 
++#include "StealthGfxFeatureStatus.h"  // STEALTH-HOOK(platform/declaration-gate)
++
+ #ifdef FUZZING
+ #  include "FuzzerRunner.h"
+ 
+@@ -6203,6 +6205,9 @@ nsresult XREMain::XRE_mainRun() {
+     // ready in time for early consumers, such as the component loader.
+     mDirProvider.InitializeUserPrefs();
+ 
++    mozilla::gfx::StealthMarkUserPrefsRead();  // STEALTH-HOOK(platform/declaration-gate)
++    mozilla::widget::StealthFireHostGLProbeIfStock();  // STEALTH-HOOK(platform/declaration-gate)
++
+     // Now that preferences are loaded the profile service may be able to
+     // determine the correct startup profile.
+     mProfileSvc->UpdateCurrentProfile();
 diff --git a/widget/GfxInfoBase.cpp b/widget/GfxInfoBase.cpp
 index 9ebeb94673c98bde3238c03208d6fa9408c21452..469cee301a37656e89d1d72693912d9670930378 100644
 --- a/widget/GfxInfoBase.cpp
@@ -64,3 +111,15 @@ index cac1557e2f595204473e75e8977055e6a121a810..c8b6fc9524253946ded1b441078aa709
    if (sGLXTestPID != 0) {
      return true;
    }
+diff --git a/widget/gtk/moz.build b/widget/gtk/moz.build
+index e4be8ea072892ced0d3d6191f2ce122929e3b335..f9d5cbab9ce319df7bc05edcdc1772fcd276b6c1 100644
+--- a/widget/gtk/moz.build
++++ b/widget/gtk/moz.build
+@@ -117,6 +117,7 @@ SOURCES += [
+     "nsNativeThemeGTK.cpp",  # conflicts with X11 headers
+     "nsWindow.cpp",  # conflicts with X11 headers
+ ]
++SOURCES += ["StealthHostGLProbe.cpp"]  # STEALTH-HOOK(platform/declaration-gate)
+ 
+ if CONFIG["MOZ_WAYLAND"]:
+     UNIFIED_SOURCES += [

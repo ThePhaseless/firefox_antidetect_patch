@@ -1,6 +1,7 @@
 {
  "modified": [
   "dom/canvas/CanvasRenderingContext2D.cpp",
+  "dom/canvas/gtest/moz.build",
   "dom/canvas/nsICanvasRenderingContextInternal.h"
  ],
  "added": {
@@ -20,7 +21,7 @@
    "added": 5,
    "removed": 2,
    "hunks": 4,
-   "inline_logic_lines": 45,
+   "inline_logic_lines": 0,
    "hookable": "movable",
    "anchor": "CanvasRenderingContext2D::DrawOrMeasureText (TextMetrics return); also CreatePattern (2 hunks) and a comment-only block near GetImageBuffer",
    "notes": "The DrawOrMeasureText hunk is about 45 logic lines (vertical metrics rounding, baseline switch, MakeUnique call). It can move into an own file taking a small input struct, leaving a one-line hook that returns a Maybe<TextMetrics>. The CreatePattern hunks (source snapshot read through the element) belong to canvas-noise-projection, not to text metrics. The 30-line comment block 'a 2D canvas reads back exactly as drawn' is documentation of a decision with no code; it and the removed coverage-ladder history should live in our files. Includes StealthDeclarationGate.h, StealthBundleFontList.h and StaticPrefs_zoom.h, but no pref is read in this diff; StealthEngineActive() (gfx/thebes/StealthDeclarationGate.h:42) reads zoom.stealth.fpp.hw_seed (> 0 means active); verified, not read in this diff itself.",
@@ -31,6 +32,19 @@
     ],
     "why": "Two evidence quotes had the wrong indentation (8 spaces, not 6); notes now say which pref StealthEngineActive() reads."
    }
+  },
+  {
+   "file": "dom/canvas/gtest/moz.build",
+   "category": "spoof",
+   "feature": "canvas-2d-text-metrics",
+   "prefs": [],
+   "added": 1,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "UNIFIED_SOURCES of dom/canvas/gtest (TestStealthCanvasPageSnapshot.cpp, after the list that ends with TestWebGLTextureUploadInit.cpp)",
+   "notes": "Registers the gtest TestStealthCanvasPageSnapshot.cpp: createPattern from a canvas takes the snapshot a page reads, and never the snapshot of the context itself when the context has an element."
   },
   {
    "file": "dom/canvas/nsICanvasRenderingContextInternal.h",

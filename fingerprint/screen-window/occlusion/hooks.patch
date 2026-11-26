@@ -1,5 +1,5 @@
 diff --git a/widget/gtk/nsWindow.cpp b/widget/gtk/nsWindow.cpp
-index 8b8fc4480ab2d06d23027f466bbaadced635bdb2..231301aecbaa8d1b5add1d9a72d2b404c5eb746c 100644
+index c895417ebf6182a1306f965182a1578c9412da67..231301aecbaa8d1b5add1d9a72d2b404c5eb746c 100644
 --- a/widget/gtk/nsWindow.cpp
 +++ b/widget/gtk/nsWindow.cpp
 @@ -115,6 +115,8 @@
@@ -20,11 +20,3 @@ index 8b8fc4480ab2d06d23027f466bbaadced635bdb2..231301aecbaa8d1b5add1d9a72d2b404
                     ? OcclusionState::OCCLUDED
                     : OcclusionState::UNKNOWN;
    NotifyOcclusionState(state);
-@@ -5308,6 +5310,7 @@ nsresult nsWindow::MakeFullScreen(bool aFullScreen) {
-   LOG("nsWindow::MakeFullScreen aFullScreen %d\n", aFullScreen);
- 
-   if (GdkIsX11Display() && !IsFullscreenSupported(mShell)) {
-+    if (StealthMakeFullScreenWithoutWM(aFullScreen)) return NS_OK;  // STEALTH-HOOK(fingerprint/screen-window/geometry)
-     return NS_ERROR_NOT_AVAILABLE;
-   }
- 

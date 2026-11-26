@@ -1,13 +1,33 @@
 diff --git a/toolkit/components/windowwatcher/moz.build b/toolkit/components/windowwatcher/moz.build
-index 4d1326dbbb1367a7f721cb6e36fec5c34442a223..13fa7db13d634947d4226ebdfa627b80257bd302 100644
+index 4d1326dbbb1367a7f721cb6e36fec5c34442a223..54c299fef9cc6803792067c39a6ddf21b09773cb 100644
 --- a/toolkit/components/windowwatcher/moz.build
 +++ b/toolkit/components/windowwatcher/moz.build
-@@ -30,6 +30,8 @@ UNIFIED_SOURCES += [
+@@ -30,6 +30,7 @@ UNIFIED_SOURCES += [
      "nsOpenWindowInfo.cpp",
      "nsWindowWatcher.cpp",
  ]
 +UNIFIED_SOURCES += ["JugglerWindowSize.cpp"]  # STEALTH-HOOK(automation/window-size)
-+UNIFIED_SOURCES += ["StealthWindowPlacement.cpp"]  # STEALTH-HOOK(fingerprint/screen-window/popup-position)
  
  FINAL_LIBRARY = "xul"
  # For nsJSUtils
+diff --git a/toolkit/components/windowwatcher/nsWindowWatcher.cpp b/toolkit/components/windowwatcher/nsWindowWatcher.cpp
+index a1044338912d917f109fb89bda437cece4007e09..4de5c2290a01997a5fe0784b15525055d56f6893 100644
+--- a/toolkit/components/windowwatcher/nsWindowWatcher.cpp
++++ b/toolkit/components/windowwatcher/nsWindowWatcher.cpp
+@@ -77,6 +77,7 @@
+ #include "nsIXULBrowserWindow.h"
+ #include "ReferrerInfo.h"
+ 
++#include "JugglerWindowSize.h"  // STEALTH-HOOK(automation/window-size)
+ using namespace mozilla;
+ using namespace mozilla::dom;
+ 
+@@ -1902,7 +1903,7 @@ uint32_t nsWindowWatcher::CalculateChromeFlagsForContent(
+     return nsIWebBrowserChrome::CHROME_DOCUMENT_PICTURE_IN_PICTURE_FLAGS;
+   }
+   *aIsPopupRequested = ShouldOpenPopup(aFeatures);
+-  return *aIsPopupRequested ? nsIWebBrowserChrome::CHROME_MINIMAL_POPUP
++  return *aIsPopupRequested ? mozilla::JugglerPopupChromeFlags(aFeatures, nsIWebBrowserChrome::CHROME_MINIMAL_POPUP)  // STEALTH-HOOK(automation/window-size)
+                             : nsIWebBrowserChrome::CHROME_ALL;
+ }
+ 

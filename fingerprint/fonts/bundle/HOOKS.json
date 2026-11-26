@@ -40,6 +40,22 @@
   "test": "wrapper:tests/test_a_screenshot_draws_the_text_of_the_bundled_fonts_as_the_content_does_e2e.py::test_the_text_of_a_bundled_family_is_drawn_by_the_screenshot_as_the_content_drew_it"
  },
  {
+  "file": "gfx/tests/gtest/moz.build",
+  "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
+  "kind": "add",
+  "form": "unknown",
+  "line": "if CONFIG[\"OS_TARGET\"] == \"WINNT\":  # STEALTH-HOOK(fingerprint/fonts/bundle)",
+  "test": "gtest:StealthBundledCollection.ContentProcessUnderBundleOnlyBuildsNone"
+ },
+ {
+  "file": "gfx/tests/gtest/moz.build",
+  "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
+  "kind": "add",
+  "form": "registration",
+  "line": "    UNIFIED_SOURCES += [\"TestStealthBundledCollection.cpp\"]  # STEALTH-HOOK(fingerprint/fonts/bundle)",
+  "test": "gtest:StealthBundledCollection.ContentProcessUnderBundleOnlyBuildsNone"
+ },
+ {
   "file": "gfx/thebes/FontData.h",
   "function": "class FontData final {",
   "kind": "add",
@@ -232,21 +248,5 @@
   "form": "unknown",
   "line": "include(\"StealthBundleFontList.mozbuild\")  # STEALTH-HOOK(fingerprint/fonts/bundle)",
   "test": "wrapper:tests/test_the_font_list_is_the_bundle_e2e.py::test_the_font_list_is_the_bundle_and_nothing_else"
- },
- {
-  "file": "gfx/tests/gtest/moz.build",
-  "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
-  "kind": "add",
-  "form": "unknown",
-  "line": "if CONFIG[\"OS_TARGET\"] == \"WINNT\":  # STEALTH-HOOK(fingerprint/fonts/bundle)",
-  "test": "gtest:StealthBundledCollection.ContentProcessUnderBundleOnlyBuildsNone"
- },
- {
-  "file": "gfx/tests/gtest/moz.build",
-  "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
-  "kind": "add",
-  "form": "registration",
-  "line": "    UNIFIED_SOURCES += [\"TestStealthBundledCollection.cpp\"]  # STEALTH-HOOK(fingerprint/fonts/bundle)",
-  "test": "gtest:StealthBundledCollection.ContentProcessUnderBundleOnlyBuildsNone"
  }
 ]

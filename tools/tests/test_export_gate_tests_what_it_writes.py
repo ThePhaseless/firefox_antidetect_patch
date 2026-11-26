@@ -32,6 +32,7 @@ IDENTITY = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.invalid", "GI
             "GIT_COMMITTER_EMAIL": "t@example.invalid"}
 OURS = "browser/fonts/StealthFonts.cpp"                    # a file of ours that layout.OWN_FILES gives to this folder
 FOLDER = "fingerprint/fonts/bundle"
+TAG = "FIREFOX_159_0_RELEASE"
 # the test the tools change adds: it reads what the export writes, so it is red on the series before the export
 THE_TOOLS_TEST = '''from pathlib import Path
 
@@ -65,43 +66,52 @@ def world(tmp_path):
     (source / "README").write_bytes(b"mozilla\n")
     git(source, "add", ".")
     git(source, "commit", "-qm", "upstream")
-    git(source, "tag", "FIREFOX_159_0_RELEASE")
+    git(source, "tag", TAG)
     (source / OURS).parent.mkdir(parents=True)
     (source / OURS).write_bytes(b"// ours\n")
     git(source, "add", ".")
     git(source, "commit", "-qm", "ours")
+    series = make_series(tmp_path, [FOLDER])
+    # the commit of tools under test, not committed yet: the scratch copy must carry it
+    (series / "tools" / "tests" / "test_the_export_wrote_the_folder.py").write_text(THE_TOOLS_TEST, encoding="utf-8")
+    return series, source, git(source, "rev-parse", "HEAD")
 
+
+def make_series(tmp_path, folders):
+    """A committed series (origin/main is its HEAD) with the real tools, empty data files, the decisions a failure names and a FOLDER.json
+    for each of `folders`: the checkout the gate is asked to replace."""
     series = tmp_path / "series"
     (series / "tools" / "tests").mkdir(parents=True)
     for tool in TOOLS.glob("*.py"):
         shutil.copy(tool, series / "tools" / tool.name)
-    for name, empty in {"hook-budget.json": {}, "removed-budget.json": {}, "hook-debt.json": [], "inventory.json": [],
+    for name, empty in {"hook-budget.json": {}, "removed-budget.json": {}, "hook-debt.json": [],
                         "hook-budget-raises.json": [], "budget-realign-69.json": []}.items():
         (series / "tools" / name).write_text(json.dumps(empty) + "\n", encoding="utf-8")
     shutil.copy(TOOLS / "hook-names.json", series / "tools" / "hook-names.json")
     ledger = json.loads((TOOLS / "birth-ledger.json").read_text(encoding="utf-8"))
     ledger.update(entries=[], chrome_js_http={})
     (series / "tools" / "birth-ledger.json").write_text(json.dumps(ledger), encoding="utf-8")
-    (series / "UPSTREAM.json").write_text(json.dumps({"mozilla_tag": "FIREFOX_159_0_RELEASE", "source_branch": "main", "exported_from": "",
+    (series / "UPSTREAM.json").write_text(json.dumps({"mozilla_tag": TAG, "source_branch": "main", "exported_from": "",
                                                       "exported_tree": ""}), encoding="utf-8")
     (series / "SERIES").write_text("", encoding="utf-8")
-    (series / FOLDER).mkdir(parents=True)                  # series-02: the folder states its relation to Mozilla, by hand
-    (series / FOLDER / "FOLDER.json").write_text(json.dumps({"relation": "product"}, indent=1) + chr(10), encoding="utf-8")
+    shutil.copytree(TOOLS.parent / "docs" / "decisions", series / "docs" / "decisions")        # the rules a failure names
+    for folder in folders:
+        (series / folder).mkdir(parents=True)
+        (series / folder / "FOLDER.json").write_text(json.dumps({"relation": "product"}) + "\n", encoding="utf-8")      # said once by hand (series-02)
+    (series / "tools" / "churn.json").write_text(json.dumps({"base": TAG, "releases": [], "band": 2, "hooks": []}), encoding="utf-8")
     (series / ".gitignore").write_text("__pycache__/\n", encoding="utf-8")
     git(series, "init", "-q")
     git(series, "add", "-A")
     git(series, "commit", "-qm", "main")
     git(series, "update-ref", "refs/remotes/origin/main", "HEAD")
-    # the commit of tools under test, not committed yet: the scratch copy must carry it
-    (series / "tools" / "tests" / "test_the_export_wrote_the_folder.py").write_text(THE_TOOLS_TEST, encoding="utf-8")
-    return series, source, git(source, "rev-parse", "HEAD")
+    return series
 
 
 def run_gate(world, gate=None):
     """`engine.py export` of the series of `world`: the engine of this module, pointed at the series, through the gate."""
     series, source, head = world
     with engine.rebased(series):
-        (gate or export_gate.gate)(source, head, lambda scratch: engine.export_into(scratch, source, "FIREFOX_159_0_RELEASE", head, {OURS: FOLDER}), series)
+        (gate or export_gate.gate)(source, head, lambda scratch: engine.export_into(scratch, source, TAG, head, {OURS: FOLDER}), series)
 
 
 @pytest.fixture(autouse=True)
@@ -128,14 +138,14 @@ def test_the_rehearsal_case_is_refused_by_the_old_order_and_written_by_the_new_o
     # the old order: the tests of the tools commit are red on the old series, so the export that turns them green is refused
     with pytest.raises(SystemExit, match="(?s)red before the write.*test_the_export_wrote_the_folder_of_our_file"):
         run_gate(world, gate=old_order)
-    assert snapshot(series) == before and not (series / FOLDER / "src").exists()
+    assert snapshot(series) == before and not (series / FOLDER / "MANIFEST.json").exists()
     # the new order: the same tests run on the series the export writes, and they are green
     run_gate(world)
     assert (series / FOLDER / "src" / OURS).read_bytes() == b"// ours\n"
     assert (series / "SERIES").read_text(encoding="utf-8") == FOLDER + "\n"
     assert json.loads((series / "UPSTREAM.json").read_text(encoding="utf-8"))["exported_from"] == head
     assert export_gate.run_series_tests(series) == [], "what the checkout took passes the tests where they live"
-    assert export_gate.run_series_check(series) == []
+    assert export_gate.run_series_check(series) == ([], [])
     assert len(worktrees(series)) == 1, "the scratch tree is registered nowhere after the export"
 
 
@@ -148,9 +158,9 @@ def test_a_red_on_the_series_it_writes_leaves_the_checkout_byte_identical(world,
     with pytest.raises(SystemExit) as stopped:
         run_gate(world)
     message = str(stopped.value)
-    assert message.startswith("FAIL ") and "red on what export writes" in message, message
+    assert "FAIL tools/tests: " in message and "tools/tests/test_a_second_one.py::test_red_even_on_the_series_written" in message, message
     assert "\nnext: " in message and "Rule: docs/decisions/series-01-export-is-the-only-writer.md" in message, message
-    assert snapshot(series) == before and not (series / FOLDER / "src").exists()
+    assert snapshot(series) == before and not (series / FOLDER / "MANIFEST.json").exists()
     assert git(series, "status", "--porcelain", "--ignored").replace("__pycache__/", "") == status.replace("__pycache__/", "")
     assert len(worktrees(series)) == 1, "the scratch tree is removed on a red"
     assert not any(Path(line.split()[0]).name == "s" for line in worktrees(series)[1:])
@@ -165,22 +175,22 @@ def test_the_engine_tree_tests_run_before_anything_is_written(world, monkeypatch
     with pytest.raises(SystemExit, match="a node test is red") as stopped:
         export_gate.gate(source, head, lambda scratch: order.append("write"), series)
     assert order == ["engine tree"], "a red node test stops the export before the scratch copy and the write"
-    assert "\nnext: " in str(stopped.value) and snapshot(series) == before
+    assert "\nnext: " in str(stopped.value) and snapshot(series) == before, str(stopped.value)
 
 
 def test_the_engine_tree_tests_come_first_when_all_is_green(world, monkeypatch):
     series, source, head = world
     order = []
     monkeypatch.setattr(export_gate, "run_engine_tree_tests", lambda source, head: order.append("engine tree") or [])
-    monkeypatch.setattr(export_gate, "run_series_check", lambda tree: order.append("check") or [])
-    monkeypatch.setattr(export_gate, "run_series_tests", lambda tree: order.append("series tests") or [])
+    monkeypatch.setattr(export_gate, "run_series_check", lambda tree, news=None: order.append("check") or ([], []))
+    monkeypatch.setattr(export_gate, "run_series_tests", lambda tree, tolerate=None, todo=None: order.append("series tests") or [])
     export_gate.gate(source, head, lambda scratch: order.append("write"), series)
     assert order == ["engine tree", "write", "check", "series tests"]
 
 
 def test_the_checkout_takes_exactly_what_the_export_wrote_and_a_no_op_touches_nothing(world, monkeypatch):
     series, source, head = world
-    monkeypatch.setattr(export_gate, "run_series_tests", lambda tree: [])      # the tests are the subject of the others
+    monkeypatch.setattr(export_gate, "run_series_tests", lambda tree, tolerate=None, todo=None: [])      # the tests are the subject of the others
     run_gate(world)
     # a folder the head no longer owns, left by an older export, goes with its files; a stale file of a kept folder goes too
     stale = series / "port" / "old"
@@ -206,7 +216,7 @@ def test_the_checkout_takes_exactly_what_the_export_wrote_and_a_no_op_touches_no
 def test_a_path_constant_of_engine_follows_the_scratch_root_and_comes_back(tmp_path):
     here = engine.ROOT
     named = {n: v for n, v in vars(engine).items() if isinstance(v, Path) and (v == here or here in v.parents)}
-    assert {"ROOT", "UPSTREAM", "INVENTORY", "BUDGET", "REMOVED_BUDGET", "HOOK_DEBT", "WORKFLOWS_ROOT"} <= set(named)
+    assert {"ROOT", "UPSTREAM", "BUDGET", "REMOVED_BUDGET", "HOOK_DEBT", "WORKFLOWS_ROOT"} <= set(named)
     with engine.rebased(tmp_path):
         for name, value in named.items():
             assert getattr(engine, name) == tmp_path / value.relative_to(here), name

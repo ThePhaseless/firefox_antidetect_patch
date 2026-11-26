@@ -28,6 +28,14 @@
   "why": "needs the local loadState, an out-parameter of CreateFromLoadURIOptions born inside the function: a guard at the top has nothing to read; a wrap of the function is impossible (the funnel is BrowsingContext::LoadURI(nsDocShellLoadState*, bool), shared by many callers that must not notify); a wrap of the creation would fire before the MALFORMED_URI/NS_FAILED checks and before SetIsCaptivePortalTab"
  },
  {
+  "file": "docshell/base/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"StealthNavigation.cpp\"]  # STEALTH-HOOK(automation/navigation)",
+  "test": "wrapper:tests/test_a_goto_to_a_refused_port_ends_with_its_reason_e2e.py::test_a_goto_to_a_refused_port_ends_with_its_reason"
+ },
+ {
   "file": "docshell/base/nsDocShell.cpp",
   "function": "",
   "kind": "add",
@@ -148,6 +156,14 @@
   "test": "gtest:TestStealthLoadInfo.EveryCopyOfALoadInfoKeepsItsLoadIdentifier"
  },
  {
+  "file": "netwerk/base/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"StealthLoadInfo.cpp\"]  # STEALTH-HOOK(automation/navigation)",
+  "test": "gtest:TestStealthLoadInfo.EveryCopyOfALoadInfoKeepsItsLoadIdentifier"
+ },
+ {
   "file": "netwerk/base/nsILoadInfo.idl",
   "function": "interface nsILoadInfo : nsISupports",
   "kind": "add",
@@ -180,21 +196,5 @@
   "form": "notice",
   "line": "  StealthNotifyNavigationMoved(aContext, mContentParent, mLoadIdentifier, mIsDocumentLoad, aIsNewTab);  // STEALTH-HOOK(automation/navigation)",
   "test": "wrapper:tests/test_a_navigation_that_moved_is_told_by_the_engine_e2e.py::test_a_cross_site_goto_is_told_moved_by_the_engine_with_the_process_it_left"
- },
- {
-  "file": "netwerk/base/moz.build",
-  "function": "UNIFIED_SOURCES += [",
-  "kind": "add",
-  "form": "registration",
-  "line": "UNIFIED_SOURCES += [\"StealthLoadInfo.cpp\"]  # STEALTH-HOOK(automation/navigation)",
-  "test": "gtest:TestStealthLoadInfo.EveryCopyOfALoadInfoKeepsItsLoadIdentifier"
- },
- {
-  "file": "docshell/base/moz.build",
-  "function": "UNIFIED_SOURCES += [",
-  "kind": "add",
-  "form": "registration",
-  "line": "UNIFIED_SOURCES += [\"StealthNavigation.cpp\"]  # STEALTH-HOOK(automation/navigation)",
-  "test": "wrapper:tests/test_a_goto_to_a_refused_port_ends_with_its_reason_e2e.py::test_a_goto_to_a_refused_port_ends_with_its_reason"
  }
 ]

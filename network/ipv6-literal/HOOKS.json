@@ -1,5 +1,13 @@
 [
  {
+  "file": "netwerk/base/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"StealthIPv6Literal.cpp\"]  # STEALTH-HOOK(network/ipv6-literal)",
+  "test": "gtest:StealthDeclaredNetwork.NothingIsBlockedWhileIPv6IsDeclared"
+ },
+ {
   "file": "netwerk/base/nsSocketTransport2.cpp",
   "function": "",
   "kind": "add",
@@ -40,13 +48,5 @@
   "line": "    status = StealthHopConnect(this, fd->lower->methods->connect)(fd->lower, &prProxy, mTimeout);  // STEALTH-HOOK(network/ipv6-literal)",
   "removed": "    status = fd->lower->methods->connect(fd->lower, &prProxy, mTimeout);",
   "test": "gtest:StealthDeclaredNetwork.AnIPv4MappedAddressIsLeftAloneBehindAProxyAndOnTheProxyHop"
- },
- {
-  "file": "netwerk/base/moz.build",
-  "function": "UNIFIED_SOURCES += [",
-  "kind": "add",
-  "form": "registration",
-  "line": "UNIFIED_SOURCES += [\"StealthIPv6Literal.cpp\"]  # STEALTH-HOOK(network/ipv6-literal)",
-  "test": "gtest:StealthDeclaredNetwork.NothingIsBlockedWhileIPv6IsDeclared"
  }
 ]

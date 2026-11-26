@@ -22,7 +22,7 @@
    "added": 4,
    "removed": 0,
    "hunks": 3,
-   "inline_logic_lines": 11,
+   "inline_logic_lines": 0,
    "hookable": "movable",
    "anchor": "GetDeviceSize (device-size block) and GetPointerCapabilities (stealth branch)",
    "notes": "Two declared sub-features under one file. Device size: returns the declared width/height when both prefs are above 0, with no StealthEngineActive gate (the pointer branch has one: inconsistent, CONFIRMED from the diff); the same ungated pattern is used in dom/base/nsScreen.cpp:93-96, so it is the house pattern for these two prefs rather than a one-off. Pointer capabilities: declared primary and union bitmasks, checked by StealthAssertDeclarationsComplete (StealthDeclarationGate.h, included here). The pointer block (~8 logic lines) is movable behind one call. The comment documents the old compiled Fine|Hover and why it was replaced.",

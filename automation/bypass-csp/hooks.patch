@@ -1,3 +1,15 @@
+diff --git a/dom/base/Document.cpp b/dom/base/Document.cpp
+index 24fc4978206ae6eba18971f243d680a8b8802e65..df89b38f0edea6885764c02580e590296f7b3f67 100644
+--- a/dom/base/Document.cpp
++++ b/dom/base/Document.cpp
+@@ -4070,6 +4070,7 @@ nsresult Document::InitCSP(nsIChannel* aChannel) {
+     }
+   }
+ 
++  if (CSP_IsBypassedFor(*this)) return NS_OK;  // STEALTH-HOOK(automation/bypass-csp)
+   nsAutoCString tCspHeaderValue, tCspROHeaderValue;
+ 
+   nsCOMPtr<nsIHttpChannel> httpChannel;
 diff --git a/dom/security/moz.build b/dom/security/moz.build
 index faff244f374024a019ebc010b4c59efb4f4d2aa1..c9ff4739f97217dc98f07d0712f9040a1c5c1b5b 100644
 --- a/dom/security/moz.build

@@ -64,3 +64,15 @@ index a3d6a13aa50e48125243e7e15c0322e5e97f5937..6439f8fa3678891ec77928c8b6dfcfc6
            [](RefPtr<MediaMgrError>&& reason) {
              MOZ_ASSERT_UNREACHABLE(
                  "MaybeRequestPermissionAndEnumerateRawDevices does not reject");
+diff --git a/dom/media/gtest/moz.build b/dom/media/gtest/moz.build
+index 546c548b995a55a882f5de8afdc4f2f188eb7c21..6fc91a11352061e288c4e65048d58e4e3829609c 100644
+--- a/dom/media/gtest/moz.build
++++ b/dom/media/gtest/moz.build
+@@ -103,6 +103,7 @@ UNIFIED_SOURCES += [
+ ]
+ UNIFIED_SOURCES += ["TestStealthAudioNoise.cpp"]  # STEALTH-HOOK(fingerprint/audio/noise)
+ UNIFIED_SOURCES += ["TestStealthMediaDeclaration.cpp"]  # STEALTH-HOOK(fingerprint/media/decode-declaration)
++UNIFIED_SOURCES += ["TestStealthMediaEnumeration.cpp"]  # STEALTH-HOOK(fingerprint/media/enumeration)
+ 
+ if CONFIG["MOZ_WEBRTC"]:
+     LOCAL_INCLUDES += [

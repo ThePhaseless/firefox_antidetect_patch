@@ -236,3 +236,82 @@ def test_a_row_with_another_budget_than_hook_or_removed_fails():
     found = engine.raises_list_problems([dict(RAISE, budget="lines")], [])
     assert any("the budget 'lines'" in p for p in found), found
     assert engine.raises_list_problems([dict(RAISE, budget="hook")], []) == []
+
+
+# ------------------------------------------------------------------------------------------------ per (file, folder)
+# A budget is keyed `<file>|<folder>`. While main's is still per file, the keys of a file are compared as a sum with main's ceiling of the
+# file, so splitting a file by folder never loosens one; once main is per key, each key is compared with its own ceiling.
+X, Y = "a/A.cpp|fingerprint/x", "a/A.cpp|network/y"
+
+
+def test_the_keys_of_a_file_sum_to_at_most_main_s_ceiling_of_the_file():
+    assert _found({X: 2, Y: 2}, {X: 1, Y: 1}) == []
+    assert _found({X: 3, Y: 1}, {X: 2}) == []
+    found = _found({X: 3, Y: 2}, {X: 1, Y: 1})
+    assert len(found) == 1 and "a/A.cpp in tools/hook-budget.json" in found[0] and "hook budget 5 is above main's 4" in found[0], found
+    found = _found({X: 2, Y: 2}, {X: 2, Y: 1})
+    assert len(found) == 1 and "removed budget 3 is above main's 2" in found[0], found
+
+
+def test_a_folder_may_take_lines_from_another_as_long_as_the_file_does_not_grow():
+    assert _found({X: 4}, {}) == [] and _found({Y: 4}, {}) == [] and _found({X: 1, Y: 3}, {}) == []
+
+
+def test_every_file_of_the_series_sums_to_at_most_main_s_ceiling_of_the_file():
+    main_hook, main_removed = engine.load_main_budgets()
+    hook = json.loads(engine.BUDGET.read_text(encoding="utf-8"))
+    removed = json.loads(engine.REMOVED_BUDGET.read_text(encoding="utf-8"))
+    raised = {engine.raise_unit(r, main_hook) for r in json.loads(engine.RAISES.read_text(encoding="utf-8"))}      # a row of the register lifts its file
+    for name, branch, main in (("hook", hook, main_hook), ("removed", removed, main_removed)):
+        units = engine.budget_units(branch, main_hook)
+        for unit, n in sorted(units.items()):
+            if unit in main and unit not in raised:
+                assert n <= main[unit], "%s budget of %s: %d, main's %d" % (name, unit, n, main[unit])
+    assert not [k for k in hook if "|" not in k] or not [k for k in main_hook if "|" in k], "keyed by file and by key do not mix"
+    assert all("|" in k for k in hook) and all("|" in k for k in removed), "every key of the series is <file>|<folder>"
+
+
+def test_the_sum_rule_on_a_fixture_for_main_with_no_slack_is_equality():
+    main_hook = {"a/A.cpp": 4, "b/B.cpp": 2}
+    main_removed = {"a/A.cpp": 2}
+    hook = {X: 3, Y: 1, "b/B.cpp|network/y": 2}
+    removed = {X: 1, Y: 1}
+    assert engine.budget_raise_problems(hook, removed, main_hook, main_removed) == []
+    units = engine.budget_units(hook, main_hook)
+    assert units == main_hook and engine.budget_units(removed, main_hook) == main_removed
+
+
+def test_once_main_is_per_key_each_key_has_its_own_ceiling():
+    main_hook = {X: 3, Y: 1}
+    main_removed = {X: 1}
+    assert engine.budget_raise_problems({X: 3, Y: 1}, {X: 1}, main_hook, main_removed) == []
+    found = engine.budget_raise_problems({X: 4, Y: 0}, {X: 1}, main_hook, main_removed)
+    assert len(found) == 1 and "%s in tools/hook-budget.json" % X in found[0] and "above main's 3" in found[0], found
+    found = engine.budget_raise_problems({X: 3, Y: 1}, {X: 1, Y: 1}, main_hook, main_removed)
+    assert len(found) == 1 and "%s in tools/removed-budget.json" % Y in found[0] and "removed budget 1 is above main's 0" in found[0], found
+    # a key main does not have is a key new to the series: at most 5
+    assert engine.budget_raise_problems({X: 3, Y: 1, "a/A.cpp|port/z": 5}, {X: 1}, main_hook, main_removed) == []
+    found = engine.budget_raise_problems({X: 3, Y: 1, "a/A.cpp|port/z": 6}, {X: 1}, main_hook, main_removed)
+    assert len(found) == 1 and "at most 5" in found[0], found
+
+
+def test_a_raise_row_names_its_file_and_folder_and_judges_the_key_once_main_is_per_key():
+    row = dict(RAISE, **{"file": "a/A.cpp", "folder": "fingerprint/x", "from": 3, "to": 5})
+    main_hook = {X: 3, Y: 1}
+    assert engine.raise_unit(row, main_hook) == X
+    assert engine.budget_raise_problems({X: 5, Y: 1}, {}, main_hook, {}, [row]) == []
+    found = engine.budget_raise_problems({X: 5, Y: 1}, {}, main_hook, {}, [])
+    assert len(found) == 1 and "above main's 3" in found[0], found
+    found = engine.budget_raise_problems({X: 6, Y: 1}, {}, main_hook, {}, [row])
+    assert len(found) == 1 and "raises from 3 to 5, but main's budget is 3 and the branch's 6" in found[0], found
+    # while main is per file the row is about the file and the sum of the keys
+    legacy = dict(row, **{"from": 4, "to": 6})
+    assert engine.raise_unit(legacy, {"a/A.cpp": 4}) == "a/A.cpp"
+    assert engine.budget_raise_problems({X: 3, Y: 3}, {}, {"a/A.cpp": 4}, {}, [legacy]) == []
+    assert len(engine.budget_raise_problems({X: 3, Y: 3}, {}, {"a/A.cpp": 4}, {}, [])) == 1
+
+
+def test_a_budget_key_is_file_then_folder():
+    assert engine.budget_key("a/A.cpp", "network/y") == Y
+    assert engine.key_file(Y) == "a/A.cpp" and engine.key_folder(Y) == "network/y"
+    assert engine.key_file("a/A.cpp") == "a/A.cpp" and engine.key_folder("a/A.cpp") is None

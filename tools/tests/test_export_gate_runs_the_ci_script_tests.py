@@ -57,7 +57,7 @@ def test_a_job_added_to_checks_yml_without_its_name_in_the_release_checks_is_ref
     found = export_gate.run_ci_script_tests(tree, list(CHECKS), [])
     text = "\n".join(str(f) for f in found)
     assert found and "the jobs the two rounds share, by name" in text and "named in test_release_checks.py" in text, text
-    assert text.startswith("FAIL scripts/ci") and "Rule: docs/decisions/series-01-export-is-the-only-writer.md" in text
+    assert text.startswith("FAIL scripts/ci") and "Rule: docs/decisions/series-01-export-is-the-only-writer.md" in text, text
 
 
 def test_an_export_that_writes_no_ci_file_does_not_run_the_step(tmp_path, capsys):
@@ -70,8 +70,8 @@ def test_an_export_that_writes_no_ci_file_does_not_run_the_step(tmp_path, capsys
 def test_the_gate_refuses_the_export_that_adds_a_job_and_leaves_the_checkout_as_it_was(world, monkeypatch):
     series, source, head = world
     real_ci_tree(series)
-    monkeypatch.setattr(export_gate, "run_series_check", lambda tree: [])        # the subject is the step, not check or tools/tests
-    monkeypatch.setattr(export_gate, "run_series_tests", lambda tree: [])
+    monkeypatch.setattr(export_gate, "run_series_check", lambda tree, news=None: ([], []))        # the subject is the step, not check or tools/tests
+    monkeypatch.setattr(export_gate, "run_series_tests", lambda tree, tolerate=None, todo=None: [])
     before = snapshot(series)
 
     def write(scratch):

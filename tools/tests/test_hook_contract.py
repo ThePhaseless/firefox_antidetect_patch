@@ -111,6 +111,17 @@ def test_c8_our_include_is_a_block_after_mozillas_separated_by_a_blank_line():
     assert "C8" in rules(before)
 
 
+def test_c8_an_include_of_another_folders_hook_in_the_context_is_not_mozillas():
+    # the second folder of a file split by marker: the first folder's include is context of its hunk, and carries its marker
+    ours = " #include \"StealthFirst.h\"  // STEALTH-HOOK(automation/y)"
+    split = patch("dom/Foo.cpp", [" #include \"a.h\"", " #include \"b.h\"", " ", "+#include \"StealthX.h\"" + MARK, ours, " ", " using namespace mozilla;",
+                                  " ", " namespace x {"], section="")
+    assert rules(split) == []
+    mozillas = ours.replace("  // STEALTH-HOOK(automation/y)", "")
+    assert "C8" in rules(patch("dom/Foo.cpp", [" #include \"a.h\"", " #include \"b.h\"", " ", "+#include \"StealthX.h\"" + MARK, mozillas, " ",
+                                               " using namespace mozilla;", " ", " namespace x {"], section=""))
+
+
 def test_c9_not_inside_a_list_nor_the_last_line_of_a_block():
     last = patch("dom/Foo.cpp", ["   // lead", " ", " " + FN, "   int x = 1;", "   DoIt(x);",
                                  "+  mState = StealthState();" + MARK, " }", " ", " void Next() {}", " void More() {}"])
@@ -183,15 +194,16 @@ def test_a_backport_folder_is_exempt(tmp_path):
         (d / "hooks.patch").write_text(top("  StealthNote(this, aArg);"), encoding="utf-8", newline="")
         if backport:
             (d / "BACKPORT.json").write_text("{}", encoding="utf-8")
+            (d / "MANIFEST.json").write_text(json.dumps({"inventory": [{"file": "dom/Foo.cpp", "category": "backport"}]}), encoding="utf-8")
     (tmp_path / "SERIES").write_text("a/live\nb/port\n", encoding="utf-8")
     assert {h.folder for h in hc.series_hooks(tmp_path)} == {"a/live"}
-    assert {v.folder for v in hc.contract_violations(tmp_path)} == {"a/live"}
+    assert {v.folder for v in hc.contract_violations(tmp_path)} == {"a/live"}      # a file of category backport is upstream code: no rule
 
 
 # --------------------------------------------------------------------------- the debt list
 def test_the_debt_as_committed_is_exactly_the_violations_of_the_series():
     # port-06 rules (C12..C15) are never debt: they are fixed by the engine change and the HOOKS.json fields
-    now = sorted(v.key for v in hc.contract_violations(engine.ROOT) if v.rule not in hc.PORT06_RULES)
+    now = sorted(v.key for v in hc.contract_violations(engine.ROOT) if v.rule not in hc.PORT06_RULES + hc.HOOK02_NEVER_DEBT)
     debt = [e["key"] for e in json.loads(engine.HOOK_DEBT.read_text(encoding="utf-8"))]
     assert debt == sorted(debt), "tools/hook-debt.json is not sorted"
     assert now == debt
@@ -232,7 +244,7 @@ def test_hook_debt_removes_and_never_adds():
 
 def test_check_refuses_a_new_violation_and_a_stale_entry(tmp_path, monkeypatch, capsys):
     # whatever debt the series has, none at all once it is paid: one violation is added to the series' own
-    real = [v for v in hc.contract_violations(engine.ROOT) if v.rule not in hc.PORT06_RULES]     # port-06 rules are never debt
+    real = [v for v in hc.contract_violations(engine.ROOT) if v.rule not in hc.PORT06_RULES + hc.HOOK02_NEVER_DEBT]     # never debt: port-06 rules, C20
     text = "  x = StealthX(this) + 1;"
     extra = hc.Violation("C5", "fingerprint/x", "dom/X.cpp", "void X()", text,
                          hc._key("C5", "fingerprint/x", "dom/X.cpp", "void X()", text))

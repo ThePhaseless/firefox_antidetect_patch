@@ -19,6 +19,11 @@ def test_the_series_as_committed_breaks_no_rule():
     assert engine.problems() == []
 
 
+def _key(table, file):
+    """The key `<file>|<folder>` of a budget for `file` (the first one: a file several folders patch has one per folder)."""
+    return next(k for k in sorted(table) if k.split("|")[0] == file)
+
+
 def _with_budget(tmp_path, monkeypatch, change):
     budget = json.loads(engine.BUDGET.read_text(encoding="utf-8"))
     change(budget)
@@ -30,13 +35,13 @@ def _with_budget(tmp_path, monkeypatch, change):
 
 def test_a_mozilla_file_that_grows_past_its_budget_fails(tmp_path, monkeypatch):
     def shrink(b):
-        b["browser/components/moz.build"] -= 1
+        b[_key(b, "browser/components/moz.build")] -= 1
     found = _with_budget(tmp_path, monkeypatch, shrink)
     assert any("browser/components/moz.build" in p and "budget is" in p for p in found), found
 
 
 def test_a_newly_patched_mozilla_file_needs_a_budget(tmp_path, monkeypatch):
-    found = _with_budget(tmp_path, monkeypatch, lambda b: b.pop("browser/components/moz.build"))
+    found = _with_budget(tmp_path, monkeypatch, lambda b: b.pop(_key(b, "browser/components/moz.build")))
     assert any("no hook budget" in p for p in found), found
 
 
@@ -53,14 +58,15 @@ def test_series_must_list_exactly_the_folders_on_disk(tmp_path, monkeypatch):
 
 def test_the_budget_only_goes_down(tmp_path, monkeypatch):
     budget = json.loads(engine.BUDGET.read_text(encoding="utf-8"))
-    budget["browser/components/moz.build"] += 40
+    key = _key(budget, "browser/components/moz.build")
+    budget[key] += 40
     path = tmp_path / "hook-budget.json"
     path.write_text(json.dumps(budget), encoding="utf-8")
     monkeypatch.setattr(engine, "BUDGET", path)
     monkeypatch.setattr(engine, "REMOVED_BUDGET", _copy_removed_budget(tmp_path, lambda b: None))
     engine.shrink_budget()
     after = json.loads(path.read_text(encoding="utf-8"))
-    assert after["browser/components/moz.build"] == budget["browser/components/moz.build"] - 40
+    assert after[key] == budget[key] - 40
 
 
 # The second budget: Mozilla's lines we remove or rewrite. Such a line conflicts at a
@@ -79,14 +85,14 @@ def _copy_removed_budget(tmp_path, change):
 
 def test_a_mozilla_file_losing_more_lines_than_its_removed_budget_fails(tmp_path, monkeypatch):
     def shrink(b):
-        b[FILE] -= 1
+        b[_key(b, FILE)] -= 1
     monkeypatch.setattr(engine, "REMOVED_BUDGET", _copy_removed_budget(tmp_path, shrink))
     found = engine.problems()
     assert any(FILE in p and "removed budget is" in p for p in found), found
 
 
 def test_a_file_without_a_removed_budget_may_remove_nothing(tmp_path, monkeypatch):
-    monkeypatch.setattr(engine, "REMOVED_BUDGET", _copy_removed_budget(tmp_path, lambda b: b.pop(FILE)))
+    monkeypatch.setattr(engine, "REMOVED_BUDGET", _copy_removed_budget(tmp_path, lambda b: b.pop(_key(b, FILE))))
     found = engine.problems()
     assert any(FILE in p and "removed budget is 0" in p for p in found), found
 
@@ -100,8 +106,8 @@ def test_a_removed_budget_for_a_file_no_longer_patched_must_go(tmp_path, monkeyp
 
 def test_the_removed_budget_only_goes_down_and_drops_files_at_zero(tmp_path, monkeypatch):
     def loosen(b):
-        b[FILE] += 40
-        b["browser/components/moz.build"] = 7  # patched, removes nothing
+        b[_key(b, FILE)] += 40
+        b[_key(json.loads(engine.BUDGET.read_text(encoding="utf-8")), "browser/components/moz.build")] = 7  # patched, removes nothing
     path = _copy_removed_budget(tmp_path, loosen)
     monkeypatch.setattr(engine, "REMOVED_BUDGET", path)
     hook = tmp_path / "hook-budget.json"
@@ -110,8 +116,8 @@ def test_the_removed_budget_only_goes_down_and_drops_files_at_zero(tmp_path, mon
     engine.shrink_budget()
     after = json.loads(path.read_text(encoding="utf-8"))
     real = json.loads(engine.REMOVED_BUDGET.read_text(encoding="utf-8"))
-    assert after[FILE] == real[FILE]
-    assert "browser/components/moz.build" not in after
+    assert after[_key(after, FILE)] == real[_key(real, FILE)]
+    assert not [k for k in after if k.split("|")[0] == "browser/components/moz.build"]
 
 
 def test_lines_are_counted_inside_hunks_only(tmp_path):
@@ -176,7 +182,9 @@ def test_only_vendored_code_can_be_a_backport(tmp_path, monkeypatch):
 
 
 def test_upstream_code_carries_no_budget(tmp_path, monkeypatch):
-    found = _with_budget(tmp_path, monkeypatch, lambda b: b.__setitem__(BACKPORTED, 5000))
+    folder = next(f for f in engine.existing_folders()
+                  if BACKPORTED in json.loads((engine.ROOT / f / "MANIFEST.json").read_text(encoding="utf-8"))["modified"])
+    found = _with_budget(tmp_path, monkeypatch, lambda b: b.__setitem__(engine.budget_key(BACKPORTED, folder), 5000))
     assert any(BACKPORTED in p and "is upstream code" in p for p in found), found
 
 
@@ -224,12 +232,12 @@ SOCKS_LAYER = "netwerk/socket/nsSOCKSIOLayer.cpp"
 
 
 def _record(file):
-    return next(r for r in json.loads(engine.INVENTORY.read_text(encoding="utf-8")) if r["file"] == file)
+    return next(r for r in engine.inventory_records() if r["file"] == file)
 
 
-def _patch_text(file):
-    """The text of the hooks.patch of the folder that owns `file` (the one place that has its lines)."""
-    for f in engine.existing_folders():
+def _patch_text(file, folder=None):
+    """The text of the hooks.patch of the folder that owns `file` (the one place that has its lines); `folder` when several own lines of it."""
+    for f in [folder] if folder else engine.existing_folders():
         patch = engine.ROOT / f / "hooks.patch"
         if patch.exists() and ("diff --git a/%s b/" % file) in patch.read_text(encoding="utf-8", errors="replace"):
             return patch.read_text(encoding="utf-8", errors="replace")
@@ -243,7 +251,7 @@ def test_the_tags_of_the_series_as_committed_are_all_folders():
 
 
 def test_the_hook_of_the_socks_layer_names_the_folder_that_owns_it():
-    text = _patch_text(SOCKS_LAYER)
+    text = _patch_text(SOCKS_LAYER, "network/proxy-udp")
     assert "STEALTH-HOOK(network/proxy-udp)" in text
     assert engine.hook_tag_problems(set(engine.series_folders()), {"network/proxy-udp": text}) == []
 
@@ -256,22 +264,23 @@ def test_a_hook_of_a_patch_tagged_with_a_folder_that_does_not_exist_fails():
                                     {"network/proxy-udp": patch.replace("socks-udp-h3", "proxy-udp")}) == []
 
 
-def test_the_check_refuses_an_evidence_field_in_the_inventory(tmp_path, monkeypatch):
-    # repo-07: the lines are the hooks.patch itself; a record that quotes them again is red, where = the record, fix = delete it
-    records = json.loads(engine.INVENTORY.read_text(encoding="utf-8"))
-    for r in records:
-        if r["file"] == SOCKS_LAYER:
-            r["evidence"] = ["+  nsSOCKSUDPIOLayerWarm(proxy);  // STEALTH-HOOK(network/proxy-udp)"]
-    path = tmp_path / "inventory.json"
-    path.write_text(json.dumps(records), encoding="utf-8")
-    monkeypatch.setattr(engine, "INVENTORY", path)
-    found = [p for p in engine.problems() if "evidence" in p]
+def test_the_check_refuses_an_evidence_field_in_the_inventory():
+    # repo-07: the lines are the hooks.patch itself; a record that quotes them again is red, where = the MANIFEST.json of its folder, fix = delete it
+    first = dict(next(r for r in engine.inventory_records() if r["file"] == SOCKS_LAYER),     # one record of the file: it has one per folder that patches it
+                 evidence=["+  nsSOCKSUDPIOLayerWarm(proxy);  // STEALTH-HOOK(network/proxy-udp)"])
+    found = engine.evidence_problems(engine.record_where(first), [first])
     assert len(found) == 1, found
     assert SOCKS_LAYER in found[0] and "delete the field" in found[0] and "Rule: docs/decisions/repo-07-one-fact-one-place.md" in found[0], found
+    assert "MANIFEST.json" in found[0], found
+
+
+def test_the_committed_series_has_no_second_copy_of_the_inventory():
+    assert not engine.legacy_inventory().exists()
+    assert not [p for p in engine.problems() if p.startswith("FAIL tools/inventory.json")]
 
 
 def test_the_committed_series_has_no_evidence_field_anywhere():
-    assert not [r["file"] for r in json.loads(engine.INVENTORY.read_text(encoding="utf-8")) if "evidence" in r]
+    assert not [r["file"] for r in engine.inventory_records() if "evidence" in r]
     for f in engine.existing_folders():
         manifest = json.loads((engine.ROOT / f / "MANIFEST.json").read_text(encoding="utf-8"))
         assert not [r["file"] for r in manifest.get("inventory", []) if "evidence" in r], f
@@ -289,13 +298,12 @@ def _counts():
     for f in engine.existing_folders():
         patch = engine.ROOT / f / "hooks.patch"
         if patch.exists():
-            out.update(engine._diffs_of(patch))
+            out.update({(path, f): d for path, d in engine._diffs_of(patch).items()})
     return out
 
 
 def test_every_record_as_committed_has_the_counts_of_its_patch():
-    records = json.loads(engine.INVENTORY.read_text(encoding="utf-8"))
-    assert engine.record_count_problems(records, _counts()) == []
+    assert engine.record_count_problems(engine.inventory_records(), _counts()) == []
 
 
 def test_the_record_of_the_accept_language_hook_is_its_own():
@@ -312,14 +320,12 @@ def test_a_record_with_the_counts_of_another_feature_fails():
                and "python tools/engine.py export" in p for p in found), found
 
 
-def test_the_check_reads_the_counts_of_the_inventory(tmp_path, monkeypatch):
-    records = json.loads(engine.INVENTORY.read_text(encoding="utf-8"))
+def test_the_check_reads_the_counts_of_the_inventory(monkeypatch):
+    records = engine.inventory_records()
     for r in records:
         if r["file"] == HTTP_HANDLER:
             r["removed"] = 0
-    path = tmp_path / "inventory.json"
-    path.write_text(json.dumps(records), encoding="utf-8")
-    monkeypatch.setattr(engine, "INVENTORY", path)
+    monkeypatch.setattr(engine, "inventory_records", lambda: records)
     assert any(HTTP_HANDLER in p and "removed 0" in p for p in engine.problems())
 
 

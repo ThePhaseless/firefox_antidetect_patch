@@ -109,6 +109,14 @@
   "test": "gtest:StealthDocumentLanguage.WithNoContextTheSessionsLanguageIsTheDocumentsOne"
  },
  {
+  "file": "dom/base/test/gtest/moz.build",
+  "function": "UNIFIED_SOURCES += [\"TestStealthCallerObject.cpp\"]  # STEALTH-HOOK(automation/hy",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"TestStealthTimezone.cpp\"]  # STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "test": "gtest:StealthTimezone.LocalTimeIsTheDeclaredZonesWallClock"
+ },
+ {
   "file": "dom/xslt/xslt/txEXSLTFunctions.cpp",
   "function": "",
   "kind": "add",
@@ -134,24 +142,6 @@
   "test": "node:juggler/tests/exslt_time_finds_the_source_document_as_the_file_does.test.mjs#ours finds the source document the way getSourceDocument does, and explodes in its zone"
  },
  {
-  "file": "js/xpconnect/src/nsXPConnect.cpp",
-  "function": "",
-  "kind": "add",
-  "form": "registration",
-  "line": "#include \"mozilla/dom/StealthSessionDeclaration.h\"  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
-  "test": "wrapper:tests/test_context_locale_e2e.py::test_a_context_locale_reaches_navigator_intl_and_the_header"
- },
- {
-  "file": "js/xpconnect/src/nsXPConnect.cpp",
-  "function": "void InitGlobalObjectOptions(JS::RealmOptions& aOptions,",
-  "kind": "add",
-  "form": "anchor",
-  "line": "  mozilla::dom::SetDeclaredRealmTimeAndLanguage(aOptions, aForceUTC, aLocaleEnUS, aLanguageOverride, aTimezoneOverride);  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
-  "test": "wrapper:tests/test_context_locale_e2e.py::test_a_context_locale_reaches_navigator_intl_and_the_header",
-  "anchor": "the if (aLocaleEnUS) {...} else if (!aLanguageOverride.IsEmpty()) {...} chain (the last statement of xpc::InitGlobalObjectOptions)",
-  "why": "G30: the declaration of the realm's zone and language must follow Mozilla's own choices, which end the function"
- },
- {
   "file": "js/xpconnect/src/Sandbox.cpp",
   "function": "",
   "kind": "add",
@@ -169,11 +159,21 @@
   "test": "wrapper:tests/test_context_locale_e2e.py::test_a_context_locale_reaches_navigator_intl_and_the_header"
  },
  {
-  "file": "dom/base/test/gtest/moz.build",
-  "function": "UNIFIED_SOURCES += [",
+  "file": "js/xpconnect/src/nsXPConnect.cpp",
+  "function": "",
   "kind": "add",
   "form": "registration",
-  "line": "UNIFIED_SOURCES += [\"TestStealthTimezone.cpp\"]  # STEALTH-HOOK(fingerprint/locale-time/timezone)",
-  "test": "gtest:StealthTimezone.LocalTimeIsTheDeclaredZonesWallClock"
+  "line": "#include \"mozilla/dom/StealthSessionDeclaration.h\"  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "test": "wrapper:tests/test_context_locale_e2e.py::test_a_context_locale_reaches_navigator_intl_and_the_header"
+ },
+ {
+  "file": "js/xpconnect/src/nsXPConnect.cpp",
+  "function": "void InitGlobalObjectOptions(JS::RealmOptions& aOptions,",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  mozilla::dom::SetDeclaredRealmTimeAndLanguage(aOptions, aForceUTC, aLocaleEnUS, aLanguageOverride, aTimezoneOverride);  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "test": "wrapper:tests/test_context_locale_e2e.py::test_a_context_locale_reaches_navigator_intl_and_the_header",
+  "anchor": "the if (aLocaleEnUS) {...} else if (!aLanguageOverride.IsEmpty()) {...} chain (the last statement of xpc::InitGlobalObjectOptions)",
+  "why": "G30: the declaration of the realm's zone and language must follow Mozilla's own choices, which end the function"
  }
 ]

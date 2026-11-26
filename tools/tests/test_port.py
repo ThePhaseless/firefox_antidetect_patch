@@ -30,7 +30,7 @@ def new_tag(src, name, content):
 def test_a_port_onto_a_tag_that_moved_nearby_merges_cleanly(world):
     new_tag(world, "NEW", b"zero\none\ntwo\n")
     assert engine.port(world, "TAG", "NEW", "port/NEW", force=False) == 0
-    assert run(world, "show", "port/NEW:mozilla.txt") == "zero\none\nhook();\ntwo"
+    assert run(world, "show", "port/NEW:mozilla.txt") == "zero\none\nhook(); // STEALTH-HOOK(fingerprint/a)\ntwo"
     assert run(world, "log", "--format=%s", "NEW..port/NEW").splitlines() == ["fingerprint/a", "platform/b"]
 
 
@@ -52,9 +52,7 @@ def test_a_port_needs_both_tags(world):
 
 def test_drift_lists_the_patched_files_mozilla_changed(world, tmp_path, monkeypatch, capsys):
     new_tag(world, "NEW", b"zero\none\ntwo\n")
-    inv = tmp_path / "inventory.json"
-    inv.write_text('[{"file": "mozilla.txt"}, {"file": "untouched.txt"}]')
-    monkeypatch.setattr(engine, "INVENTORY", inv)
+    monkeypatch.setattr(engine, "inventory_records", lambda: [{"file": "mozilla.txt"}, {"file": "untouched.txt"}])
     engine.drift(world, "TAG", "NEW")
     out = capsys.readouterr().out
     assert "changed mozilla.txt" in out and "1 of our 2 patched Mozilla files changed" in out

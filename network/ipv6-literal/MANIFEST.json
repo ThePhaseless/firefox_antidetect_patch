@@ -1,7 +1,9 @@
 {
  "modified": [
+  "netwerk/base/moz.build",
   "netwerk/base/nsSocketTransport2.cpp",
-  "netwerk/base/nsSocketTransport2.h"
+  "netwerk/base/nsSocketTransport2.h",
+  "netwerk/socket/nsSOCKSIOLayer.cpp"
  ],
  "added": {
   "juggler/tests/ipv6_literal_fails_like_a_host_with_no_ipv6_route.test.mjs": "100644",
@@ -17,6 +19,19 @@
  },
  "inventory": [
   {
+   "file": "netwerk/base/moz.build",
+   "category": "build",
+   "feature": "ipv6-literal-connect",
+   "prefs": [],
+   "added": 1,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "UNIFIED_SOURCES of netwerk/base (StealthIPv6Literal.cpp, after the TRRLoadInfo.cpp line that ends the list)",
+   "notes": "Registers StealthIPv6Literal.cpp, which holds the rule that a connect to an IPv6 literal fails as on a host with no IPv6 route when IPv6 is disabled."
+  },
+  {
    "file": "netwerk/base/nsSocketTransport2.cpp",
    "category": "other",
    "feature": "ipv6-literal-connect",
@@ -24,7 +39,7 @@
    "added": 3,
    "removed": 1,
    "hunks": 2,
-   "inline_logic_lines": 1,
+   "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "include of StealthIPv6Literal.h; nsSocketTransport::InitiateSocket (the connect)",
    "notes": "Every direct TCP connection passes InitiateSocket: PR_Connect becomes StealthIPv6Connect, which, with IPv6 declared off, fails a routable IPv6 destination like a host with no IPv6 route (network unreachable, nothing sent). A destination behind a SOCKS proxy is left alone: the proxy reaches it, not this host. One line of Mozilla replaced.",
@@ -49,6 +64,19 @@
     "changed": [],
     "why": "Written from the diff against the tag."
    }
+  },
+  {
+   "file": "netwerk/socket/nsSOCKSIOLayer.cpp",
+   "category": "other",
+   "feature": "ipv6-literal-connect",
+   "prefs": [],
+   "added": 2,
+   "removed": 1,
+   "hunks": 2,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "include of StealthIPv6Literal.h; nsSOCKSSocketInfo::ConnectToProxy (the connect to the proxy)",
+   "notes": "The layer's connect to its proxy goes through StealthHopConnect, which sends nothing and fails as a failed connect when the route rule refuses the hop, and otherwise is the layer's own connect. Mozilla's sub-expression and arguments stay inside our call."
   }
  ]
 }

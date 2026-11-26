@@ -19,7 +19,7 @@
    "added": 4,
    "removed": 0,
    "hunks": 3,
-   "inline_logic_lines": 6,
+   "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "AppWindow::WindowActivated (hunk 2, line 2746); AppWindow::WindowDeactivated (hunk 3, line 2757); hunk 1 is an include",
    "notes": "The window keeps focus when the OS takes it away, so document.hasFocus() stays true (page-observable, hence spoof). WindowDeactivated now returns early under the pref, so Mozilla's deactivation body is skipped. The lowering block in WindowActivated (4 logic lines) could move to our own file. Pref accessor needs the pref declared in StaticPrefList (not in this list). Verified: zoom.stealth.focus.ignore_os_deactivation is declared at modules/libpref/init/StaticPrefList.yaml:21567.",

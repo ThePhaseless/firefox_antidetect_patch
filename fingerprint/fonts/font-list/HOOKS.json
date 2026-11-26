@@ -1,5 +1,29 @@
 [
  {
+  "file": "gfx/tests/gtest/moz.build",
+  "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
+  "kind": "add",
+  "form": "unknown",
+  "line": "if CONFIG[\"MOZ_WIDGET_TOOLKIT\"] == \"gtk\":  # STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "gtest:StealthFcFontList.DeclareFontFile"
+ },
+ {
+  "file": "gfx/tests/gtest/moz.build",
+  "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
+  "kind": "add",
+  "form": "registration",
+  "line": "    UNIFIED_SOURCES += [\"TestStealthFcFontList.cpp\"]  # STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "gtest:StealthFcFontList.DeclareFontFile"
+ },
+ {
+  "file": "gfx/tests/gtest/moz.build",
+  "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
+  "kind": "add",
+  "form": "unknown",
+  "line": "    CXXFLAGS += CONFIG[\"CAIRO_FT_CFLAGS\"]  # STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "gtest:StealthFcFontList.DeclareFontFile"
+ },
+ {
   "file": "gfx/thebes/gfxDWriteFontList.cpp",
   "function": "",
   "kind": "add",
@@ -128,6 +152,14 @@
   "form": "guard",
   "line": "  if (StealthSkipsBundledCollection(this)) return nullptr;  // STEALTH-HOOK(fingerprint/fonts/font-list)",
   "test": "gtest:StealthBundledCollection.SkippedOnlyForTheSharedListOfAContentProcess"
+ },
+ {
+  "file": "gfx/thebes/gfxDWriteFontList.h",
+  "function": "class gfxDWriteFontList final : public gfxPlatformFontList {",
+  "kind": "add",
+  "form": "member",
+  "line": "  void StealthAppendFamiliesFromCollection(IDWriteFontCollection* aCollection, nsTArray<mozilla::fontlist::Family::InitData>& aFamilies, const nsTArray<nsCString>* aForceClassicFams) MOZ_REQUIRES(mLock);  // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "wrapper:tests/test_the_font_list_is_the_bundle_e2e.py::test_the_font_list_is_the_bundle_and_nothing_else"
  },
  {
   "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
@@ -280,6 +312,14 @@
   "line": "  if (StealthUsePrefFontList(this, usePrefFontList)) {  // STEALTH-HOOK(fingerprint/fonts/font-list)",
   "removed": "  if (usePrefFontList) {",
   "test": "gtest:StealthFontListHooks.UsePrefFontList"
+ },
+ {
+  "file": "gfx/thebes/gfxFcPlatformFontList.h",
+  "function": "struct default_delete<FcObjectSet> {",
+  "kind": "add",
+  "form": "member",
+  "line": "  friend struct StealthFcAccess;  // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "gtest:StealthFcFontList.PreferFileUnscaledFont"
  },
  {
   "file": "gfx/thebes/gfxPlatformFontList.cpp",
@@ -451,46 +491,6 @@
   "form": "member",
   "line": "  bool mStealthBundleOnly = true;  // STEALTH-HOOK(fingerprint/fonts/font-list)",
   "test": "gtest:StealthFcBundleFonts.FallbackNeverDefersUnderBundleOnly"
- },
- {
-  "file": "gfx/tests/gtest/moz.build",
-  "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
-  "kind": "add",
-  "form": "unknown",
-  "line": "if CONFIG[\"MOZ_WIDGET_TOOLKIT\"] == \"gtk\":  # STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": "gtest:StealthFcFontList.DeclareFontFile"
- },
- {
-  "file": "gfx/tests/gtest/moz.build",
-  "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
-  "kind": "add",
-  "form": "registration",
-  "line": "    UNIFIED_SOURCES += [\"TestStealthFcFontList.cpp\"]  # STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": "gtest:StealthFcFontList.DeclareFontFile"
- },
- {
-  "file": "gfx/tests/gtest/moz.build",
-  "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    CXXFLAGS += CONFIG[\"CAIRO_FT_CFLAGS\"]  # STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": "gtest:StealthFcFontList.DeclareFontFile"
- },
- {
-  "file": "gfx/thebes/gfxDWriteFontList.h",
-  "function": "class gfxDWriteFontList final : public gfxPlatformFontList {",
-  "kind": "add",
-  "form": "member",
-  "line": "  void StealthAppendFamiliesFromCollection(IDWriteFontCollection* aCollection, nsTArray<mozilla::fontlist::Family::InitData>& aFamilies, const nsTArray<nsCString>* aForceClassicFams) MOZ_REQUIRES(mLock);  // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": "wrapper:tests/test_the_font_list_is_the_bundle_e2e.py::test_the_font_list_is_the_bundle_and_nothing_else"
- },
- {
-  "file": "gfx/thebes/gfxFcPlatformFontList.h",
-  "function": "struct default_delete<FcObjectSet> {",
-  "kind": "add",
-  "form": "member",
-  "line": "  friend struct StealthFcAccess;  // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": "gtest:StealthFcFontList.PreferFileUnscaledFont"
  },
  {
   "file": "gfx/thebes/moz.build",

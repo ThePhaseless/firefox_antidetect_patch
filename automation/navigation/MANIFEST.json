@@ -1,11 +1,12 @@
 {
  "modified": [
   "docshell/base/CanonicalBrowsingContext.cpp",
+  "docshell/base/moz.build",
   "docshell/base/nsDocShell.cpp",
   "docshell/base/test/gtest/moz.build",
   "netwerk/base/LoadInfo.cpp",
   "netwerk/base/LoadInfo.h",
-  "netwerk/base/TRRLoadInfo.cpp",
+  "netwerk/base/moz.build",
   "netwerk/base/nsILoadInfo.idl",
   "netwerk/ipc/DocumentLoadListener.cpp"
  ],
@@ -38,7 +39,7 @@
    "added": 4,
    "removed": 0,
    "hunks": 3,
-   "inline_logic_lines": 20,
+   "inline_logic_lines": 0,
    "hookable": "movable",
    "anchor": "CanonicalBrowsingContext::LoadURI; CanonicalBrowsingContext::FixupAndLoadURIString",
    "notes": "The same 11-line observer block is pasted into both functions. Each block is about 10 logic lines, so it moves into one helper in our own file called from both places. The notification fires before LoadURI(loadState, true) and carries the load identifier as its string payload. Nothing in Mozilla listens for it; only Juggler does.",
@@ -48,6 +49,19 @@
    }
   },
   {
+   "file": "docshell/base/moz.build",
+   "category": "build",
+   "feature": "juggler-load-identifier",
+   "prefs": [],
+   "added": 1,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "UNIFIED_SOURCES of docshell/base (StealthNavigation.cpp, after the StealthDocShellAttrs.cpp line)",
+   "notes": "Registers StealthNavigation.cpp, our file that sends the navigation notifications (an observer topic with the load identifier as a decimal string payload), in the UNIFIED_SOURCES of docshell/base."
+  },
+  {
    "file": "docshell/base/nsDocShell.cpp",
    "category": "juggler",
    "feature": "juggler-link-click-events",
@@ -55,7 +69,7 @@
    "added": 10,
    "removed": 0,
    "hunks": 7,
-   "inline_logic_lines": 45,
+   "inline_logic_lines": 2,
    "hookable": "movable",
    "anchor": "nsDocShell::nsDocShell (constructor); nsDocShell::Get/SetFileInputInterceptionEnabled; nsDocShell::Get/SetBypassCSPEnabled; nsDocShell::InternalLoad; NotifyJugglerLinkClick (static); OnLinkClickEvent::Run / Cancel / NotifyJugglerDone; nsDocShell::OnLinkClickWithLoadState",
    "notes": "Three features share this file (the notes said four, but only three are listed); feature field is the largest. (a) juggler-docshell-attrs, hunks 1-2: constructor init of the two bit-fields (must stay, fixes uninitialised bits) and the four accessors (about 16 logic lines, movable to an own docshell source file). (b) juggler-navigation-events, hunk 3: InternalLoad builds a StealthNavigationLoad (StealthNavigation.cpp) right before DoURILoad, which notifies juggler-navigation-started-renderer, and calls its Failed(rv) when DoURILoad fails, before DisplayLoadError, which notifies juggler-navigation-failed-renderer with the load identifier and the status: a navigation refused before any channel (a restricted port, an unknown protocol) ends there (juggler/tests/navigation_refused_before_a_channel.test.mjs). (c) juggler-link-click-events, hunks 4-8: static NotifyJugglerLinkClick (hunk 4), OnLinkClickEvent::Run (5), Cancel plus NotifyJugglerDone (6), fields mRunning/mJugglerNotified (7), OnLinkClickWithLoadState (8). OnLinkClickEvent is a Mozilla class, so its two fields and the Run/Cancel calls stay in this file while the notify helper can move out. The comments promise one \"after\" per \"before\": confirmed for the Run and Cancel paths by the mJugglerNotified guard (hunk 6); a runnable dropped without Run or Cancel is unverified. Page.linkClicked is handled at juggler/content/PageAgent.js:98-99 and :281 (confirmed).",
@@ -74,7 +88,7 @@
    "added": 1,
    "removed": 0,
    "hunks": 1,
-   "inline_logic_lines": 0,
+   "inline_logic_lines": 1,
    "hookable": "already-hook",
    "anchor": "after the closing bracket of UNIFIED_SOURCES",
    "notes": "One line includes docshell/base/test/gtest/stealth.build, our file, which lists TestStealthNavigation.cpp and the local include of docshell/base.",
@@ -91,7 +105,7 @@
    "added": 3,
    "removed": 0,
    "hunks": 2,
-   "inline_logic_lines": 5,
+   "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "LoadInfo::LoadInfo(const LoadInfo& rhs) (copy-constructor init list); LoadInfo::GetJugglerLoadIdentifier / SetJugglerLoadIdentifier appended after LoadInfo::UpdateParentAddressSpaceInfo",
    "notes": "Implements the nsILoadInfo.jugglerLoadIdentifier attribute from nsILoadInfo.idl. The copy constructor carries the value. In this diff only DocumentLoadListener.cpp sets it. The accessors must stay in LoadInfo because it implements the interface.",
@@ -118,23 +132,17 @@
    }
   },
   {
-   "file": "netwerk/base/TRRLoadInfo.cpp",
-   "category": "juggler",
+   "file": "netwerk/base/moz.build",
+   "category": "build",
    "feature": "juggler-load-identifier",
    "prefs": [],
-   "added": 4,
+   "added": 1,
    "removed": 0,
-   "hunks": 3,
-   "inline_logic_lines": 9,
-   "hookable": "movable",
-   "anchor": "TRRLoadInfo::GetJugglerLoadIdentifier / TRRLoadInfo::SetJugglerLoadIdentifier (end of file)",
-   "notes": "Stubs required because TRRLoadInfo implements nsILoadInfo. Risk 'infallible attribute returns NS_ERROR_NOT_IMPLEMENTED': REFUTED as a new problem. Upstream TRRLoadInfo.cpp:132-155 already returns NS_ERROR_NOT_IMPLEMENTED for the [infallible] attributes securityMode, isInThirdPartyContext and isThirdPartyContextToTopWindow (nsILoadInfo.idl:490, 637, 649); the new stubs follow the same pattern. Also (feature doh-trr-context, network/doh): the TRR load info keeps the origin attributes of the lookup's context, also in its clone, so the proxy filters see the context.",
-   "verifier": {
-    "changed": [
-     "notes"
-    ],
-    "why": "The infallible-stub risk is refuted: upstream TRRLoadInfo already does this for other infallible attributes."
-   }
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "UNIFIED_SOURCES of netwerk/base (StealthLoadInfo.cpp, after the StealthIPv6Literal.cpp line)",
+   "notes": "Registers StealthLoadInfo.cpp, which holds the load info side of the navigation identifier (the copy of the load identifier between load infos) and the setter of the origin attributes of TRRLoadInfo."
   },
   {
    "file": "netwerk/base/nsILoadInfo.idl",
@@ -163,7 +171,7 @@
    "added": 4,
    "removed": 0,
    "hunks": 3,
-   "inline_logic_lines": 1,
+   "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "CreateDocumentLoadInfo (static function)",
    "notes": "Copies the load identifier from the load state to the LoadInfo of each document load. GetLoadIdentifier confirmed in the source repository at docshell/base/nsDocShellLoadState.h:365 (returns mLoadIdentifier). The only place in this diff that sets the identifier. TriggerProcessSwitch tells the Juggler, as its first statement, that the parent moved the navigation to another process (StealthNotifyNavigationMoved, docshell/base/StealthNavigationEvents.h), so the docShell it left does not end it: goto aborted wrongly, an intermittent of the 68 (the owner, 22/11: the engine fixes of the intermittents enter the 69). The include is a registration line with its blank line.",

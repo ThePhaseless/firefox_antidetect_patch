@@ -1,3 +1,15 @@
+diff --git a/netwerk/base/moz.build b/netwerk/base/moz.build
+index dde0f0da60377e61b8987663f87304ebd63b4958..806f98c386c85dc439725b36af300bc7e417066e 100644
+--- a/netwerk/base/moz.build
++++ b/netwerk/base/moz.build
+@@ -257,6 +257,7 @@ UNIFIED_SOURCES += [
+     "TLSServerSocket.cpp",
+     "TRRLoadInfo.cpp",
+ ]
++UNIFIED_SOURCES += ["StealthIPv6Literal.cpp"]  # STEALTH-HOOK(network/ipv6-literal)
+ 
+ if CONFIG["FUZZING"]:
+     SOURCES += [
 diff --git a/netwerk/base/nsSocketTransport2.cpp b/netwerk/base/nsSocketTransport2.cpp
 index 440e4b8dfd0ad23d2b91b8f84cc8074dd0e1ed5c..12d47b679facb89f189c7fd51d60e83ea12b6c3d 100644
 --- a/netwerk/base/nsSocketTransport2.cpp
@@ -31,4 +43,25 @@ index ed81b052e28a78315dfc21115e2f794e11c5b146..47461bf28529609f80c0788fa317a97a
 +  friend struct StealthSocketTransportAccess;  // STEALTH-HOOK(network/ipv6-literal)
    friend class nsSocketOutputStream;
    friend class TLSServerSocket;
+ 
+diff --git a/netwerk/socket/nsSOCKSIOLayer.cpp b/netwerk/socket/nsSOCKSIOLayer.cpp
+index de33c4c1c0344437db3e6041bbb5c461a7cc0be9..74d705860f2021ada0044a9d1c90425ec3607162 100644
+--- a/netwerk/socket/nsSOCKSIOLayer.cpp
++++ b/netwerk/socket/nsSOCKSIOLayer.cpp
+@@ -22,6 +22,7 @@
+ #include "nspr.h"
+ #include "private/pprio.h"
+ 
++#include "StealthIPv6Literal.h"  // STEALTH-HOOK(network/ipv6-literal)
+ using mozilla::LogLevel;
+ using namespace mozilla::net;
+ 
+@@ -500,7 +501,7 @@ PRStatus nsSOCKSSocketInfo::ConnectToProxy(PRFileDesc* fd) {
+     FixupAddressFamily(fd, &proxy);
+     PRNetAddr prProxy;
+     NetAddrToPRNetAddr(&proxy, &prProxy);
+-    status = fd->lower->methods->connect(fd->lower, &prProxy, mTimeout);
++    status = StealthHopConnect(this, fd->lower->methods->connect)(fd->lower, &prProxy, mTimeout);  // STEALTH-HOOK(network/ipv6-literal)
+     if (status != PR_SUCCESS) {
+       PRErrorCode c = PR_GetError();
  

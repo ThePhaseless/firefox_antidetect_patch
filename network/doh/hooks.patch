@@ -20,6 +20,18 @@ index b22712ae96c69a44a335d9909c01b008660302a2..47d71fc59bbf829f967cfd29fac7af2d
    mIceCtx->SetProxyConfig(std::move(aProxyConfig));
  }
  
+diff --git a/dom/media/webrtc/transport/common.build b/dom/media/webrtc/transport/common.build
+index 215d61190dbe192fba09e129e869093ced0eacca..016f3d776db38668fbca860106cae1ea1860de8e 100644
+--- a/dom/media/webrtc/transport/common.build
++++ b/dom/media/webrtc/transport/common.build
+@@ -30,6 +30,7 @@ transport_lcppsrcs = [
+     "transportlayersrtp.cpp",
+     "WebrtcTCPSocketWrapper.cpp",
+ ]
++transport_lcppsrcs += ["StealthIceResolverContext.cpp"]  # STEALTH-HOOK(network/doh)
+ 
+ transport_cppsrcs = [
+     "/dom/media/webrtc/transport/%s" % s for s in sorted(transport_lcppsrcs)
 diff --git a/dom/media/webrtc/transport/nriceresolver.cpp b/dom/media/webrtc/transport/nriceresolver.cpp
 index 4e233cf5399813517cd06fd3e0c29b858d998929..4180d8a2ae49f62980d9ea261addf1708ca56844 100644
 --- a/dom/media/webrtc/transport/nriceresolver.cpp
@@ -63,6 +75,57 @@ index 744ed1808b299c2c166177c2580b6cfb51c3f5b1..e887755479048a936f89395198c7738d
    nsCOMPtr<nsIEventTarget> sts_thread_;
    nsCOMPtr<nsIDNSService> dns_;
  #ifdef DEBUG
+diff --git a/modules/libpref/init/StaticPrefList.yaml b/modules/libpref/init/StaticPrefList.yaml
+index 80be46d83cc04eb081ce58b4e322c8da15143c1c..bd6f71d4a25103a8e90fd80d78bfd7b8afb39a31 100644
+--- a/modules/libpref/init/StaticPrefList.yaml
++++ b/modules/libpref/init/StaticPrefList.yaml
+@@ -16239,7 +16239,7 @@
+ # Single TRR request timeout, in milliseconds
+ - name: network.trr.request_timeout_ms
+   type: RelaxedAtomicUint32
+-  value: 1500
++  value: 30000  # STEALTH-HOOK(network/doh)
+   mirror: always
+ 
+ # Single TRR request timeout, in milliseconds for mode 3
+@@ -16393,7 +16393,7 @@
+ # soon after startup or when the pref is flipped.
+ - name: network.trr.exclude-etc-hosts
+   type: RelaxedAtomicBool
+-  value: true
++  value: false  # STEALTH-HOOK(network/doh)
+   mirror: always
+ 
+ # Whether to add padding in the doh dns queries (rfc 7830)
+diff --git a/netwerk/base/TRRLoadInfo.cpp b/netwerk/base/TRRLoadInfo.cpp
+index 0cba54550072adc8a0ad11b1c9a502ff97a7bd7e..5990180a7c1941856e09046861cb55411861c2af 100644
+--- a/netwerk/base/TRRLoadInfo.cpp
++++ b/netwerk/base/TRRLoadInfo.cpp
+@@ -11,6 +11,8 @@
+ #include "nsContentUtils.h"
+ #include "nsIRedirectHistoryEntry.h"
+ 
++#include "StealthLoadInfo.h"  // STEALTH-HOOK(network/doh)
++
+ using namespace mozilla::dom;
+ 
+ namespace mozilla {
+@@ -26,6 +28,7 @@ TRRLoadInfo::TRRLoadInfo(nsIURI* aResultPrincipalURI,
+ already_AddRefed<nsILoadInfo> TRRLoadInfo::Clone() const {
+   nsCOMPtr<nsILoadInfo> loadInfo =
+       new TRRLoadInfo(mResultPrincipalURI, mInternalContentPolicyType);
++  static_cast<TRRLoadInfo*>(loadInfo.get())->mOriginAttributes = mOriginAttributes;  // STEALTH-HOOK(network/doh)
+ 
+   return loadInfo.forget();
+ }
+@@ -302,6 +305,7 @@ nsresult TRRLoadInfo::GetOriginAttributes(
+ 
+ nsresult TRRLoadInfo::SetOriginAttributes(
+     const mozilla::OriginAttributes& aOriginAttributes) {
++  if (nsresult rv; StealthTRRSetOriginAttributes(mOriginAttributes, aOriginAttributes, &rv)) return rv;  // STEALTH-HOOK(network/doh)
+   return NS_ERROR_NOT_IMPLEMENTED;
+ }
+ 
 diff --git a/netwerk/dns/TRR.cpp b/netwerk/dns/TRR.cpp
 index a960b375a00d55f8dc4baee1049b4af6859ff360..649c3e1e43ea7f17ab89b4d8621142b0f2d1c5f5 100644
 --- a/netwerk/dns/TRR.cpp
@@ -134,6 +197,121 @@ index 6ce08c2b016e757f30402b325dd615c332abd76f..c31762947ab83d886e1ef839b9a264a6
    RefPtr<nsHostRecord> rec;
    RefPtr<nsResolveHostCallback> callback(aCallback);
  
+diff --git a/netwerk/ipc/PSocketProcess.ipdl b/netwerk/ipc/PSocketProcess.ipdl
+index 8168d164d782847642aabcda232c3081389290bf..6ac1b2cde50a3482216b9130872c4186cbff27e9 100644
+--- a/netwerk/ipc/PSocketProcess.ipdl
++++ b/netwerk/ipc/PSocketProcess.ipdl
+@@ -129,6 +129,7 @@ parent:
+   async PAltService();
+   async PProxyConfigLookup(nullable nsIURI aUri, uint32_t aFlags,
+                            bool aIsTRRServiceChannel);
++  async StealthProxyLookupOrigin(OriginAttributes? aOriginAttributes);  // STEALTH-HOOK(network/doh)
+ 
+   async ExcludeHttp2OrHttp3(HttpConnectionInfoCloneArgs aArgs);
+ 
+diff --git a/netwerk/ipc/ProxyConfigLookup.cpp b/netwerk/ipc/ProxyConfigLookup.cpp
+index b09731c707ff8a47235fb6cbaeaaf3b5d25237b2..f2368cedd423a4fd778dbd1660ec582c95c591eb 100644
+--- a/netwerk/ipc/ProxyConfigLookup.cpp
++++ b/netwerk/ipc/ProxyConfigLookup.cpp
+@@ -15,6 +15,8 @@
+ #include "nsNetUtil.h"
+ #include "nsThreadUtils.h"
+ 
++#include "mozilla/net/StealthTRRContext.h"  // STEALTH-HOOK(network/doh)
++
+ namespace mozilla {
+ namespace net {
+ 
+@@ -23,6 +25,7 @@ nsresult ProxyConfigLookup::Create(
+     std::function<void(nsIProxyInfo*, nsresult)>&& aCallback, nsIURI* aURI,
+     uint32_t aProxyResolveFlags, bool aIsTRRServiceChannel,
+     nsICancelable** aLookupCancellable) {
++  StealthEnterTRRLookupContext();  // STEALTH-HOOK(network/doh)
+   MOZ_ASSERT(NS_IsMainThread());
+ 
+   RefPtr<ProxyConfigLookup> lookUp = new ProxyConfigLookup(
+@@ -60,6 +63,7 @@ nsresult ProxyConfigLookup::DoProxyResolve(nsICancelable** aLookupCancellable) {
+   if (NS_FAILED(rv)) {
+     return rv;
+   }
++  if (StealthApplyTRRLookupContext(channel, &rv)) return rv;  // STEALTH-HOOK(network/doh)
+ 
+   // The real requester is a TRRServiceChannel, which can't be handed to the
+   // proxy service because it doesn't live on the main thread. Propagate the
+diff --git a/netwerk/ipc/ProxyConfigLookupChild.cpp b/netwerk/ipc/ProxyConfigLookupChild.cpp
+index d64fa1391fa50832b101caea14eb9f942663cadc..58dd366d0a053cb451a58713ba2f1c8fca440eca 100644
+--- a/netwerk/ipc/ProxyConfigLookupChild.cpp
++++ b/netwerk/ipc/ProxyConfigLookupChild.cpp
+@@ -7,6 +7,8 @@
+ #include "mozilla/net/SocketProcessChild.h"
+ #include "nsProxyInfo.h"
+ 
++#include "mozilla/net/StealthTRRContext.h"  // STEALTH-HOOK(network/doh)
++
+ namespace mozilla {
+ namespace net {
+ 
+@@ -21,6 +23,7 @@ bool ProxyConfigLookupChild::Create(
+ 
+   RefPtr<ProxyConfigLookupChild> child =
+       new ProxyConfigLookupChild(std::move(aCallback));
++  StealthSendTRRLookupContext(socketChild);  // STEALTH-HOOK(network/doh)
+   return socketChild->SendPProxyConfigLookupConstructor(
+       child, aURI, aProxyResolveFlags, aIsTRRServiceChannel);
+ }
+diff --git a/netwerk/ipc/SocketProcessParent.cpp b/netwerk/ipc/SocketProcessParent.cpp
+index bf7e2b896b8fb3ad04a674a88456853d7ba4cb81..7d735916df87ac9910eaa24c4be9ac0b936ea062 100644
+--- a/netwerk/ipc/SocketProcessParent.cpp
++++ b/netwerk/ipc/SocketProcessParent.cpp
+@@ -46,6 +46,8 @@
+ #  include "mozilla/WinDllServices.h"
+ #endif
+ 
++#include "mozilla/net/StealthTRRContext.h"  // STEALTH-HOOK(network/doh)
++
+ namespace mozilla {
+ namespace net {
+ 
+@@ -274,6 +276,7 @@ SocketProcessParent::AllocPProxyConfigLookupParent(
+ mozilla::ipc::IPCResult SocketProcessParent::RecvPProxyConfigLookupConstructor(
+     PProxyConfigLookupParent* aActor, nsIURI* aURI,
+     const uint32_t& aProxyResolveFlags, const bool& aIsTRRServiceChannel) {
++  StealthTakeParkedTRRLookupContext(this);  // STEALTH-HOOK(network/doh)
+   mozilla::ipc::ActorCast<ProxyConfigLookupParent>(aActor)->DoProxyLookup();
+   return IPC_OK();
+ }
+diff --git a/netwerk/ipc/SocketProcessParent.h b/netwerk/ipc/SocketProcessParent.h
+index 78f3ec67f6e12111836bebdd0a5558ca3eb42b49..747a3f6654b66c6f35a6ead4eb3ab918b70060a6 100644
+--- a/netwerk/ipc/SocketProcessParent.h
++++ b/netwerk/ipc/SocketProcessParent.h
+@@ -87,6 +87,7 @@ class SocketProcessParent final
+       PProxyConfigLookupParent* aActor, nsIURI* aURI,
+       const uint32_t& aProxyResolveFlags,
+       const bool& aIsTRRServiceChannel) override;
++  mozilla::ipc::IPCResult RecvStealthProxyLookupOrigin(const Maybe<OriginAttributes>& aOriginAttributes);  // STEALTH-HOOK(network/doh)
+ 
+   mozilla::ipc::IPCResult RecvExcludeHttp2OrHttp3(
+       const HttpConnectionInfoCloneArgs& aArgs);
+diff --git a/netwerk/ipc/moz.build b/netwerk/ipc/moz.build
+index 15d732e2af42a195d94e3a5c11c28db94ec0e451..1526f2bee3e105ecdd9c648955a6a4e4230892d8 100644
+--- a/netwerk/ipc/moz.build
++++ b/netwerk/ipc/moz.build
+@@ -31,6 +31,7 @@ EXPORTS.mozilla.net += [
+     "SocketProcessImpl.h",
+     "SocketProcessParent.h",
+ ]
++EXPORTS.mozilla.net += ["StealthTRRContext.h"]  # STEALTH-HOOK(network/doh)
+ 
+ UNIFIED_SOURCES += [
+     "ChannelEventQueue.cpp",
+@@ -58,6 +59,7 @@ UNIFIED_SOURCES += [
+     "SocketProcessImpl.cpp",
+     "SocketProcessParent.cpp",
+ ]
++UNIFIED_SOURCES += ["StealthTRRContext.cpp"]  # STEALTH-HOOK(network/doh)
+ 
+ SOURCES += [
+     "ProxyAutoConfigChild.cpp",
 diff --git a/netwerk/protocol/http/TLSTransportLayer.cpp b/netwerk/protocol/http/TLSTransportLayer.cpp
 index 67a27ab0551a2999fad921c321844884e4fdc143..8fa5282159394b16a2e52d01200f211f4cd82841 100644
 --- a/netwerk/protocol/http/TLSTransportLayer.cpp

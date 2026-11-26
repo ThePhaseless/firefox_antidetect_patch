@@ -40,6 +40,19 @@ index ba044dac59c9f61c4c8dd833428f9dba9fb3d859..1ffbda5c81629c0b0d5961b4d8aceeca
    MOZ_ASSERT(XRE_IsParentProcess());
    EnsureOSMonitoring(aName);
  }
+diff --git a/modules/libpref/init/all.js b/modules/libpref/init/all.js
+index 15ce93f214584925c2030095eb4beab744c50c84..352bfe577470e4137262e0c791b6f1e3d3761482 100644
+--- a/modules/libpref/init/all.js
++++ b/modules/libpref/init/all.js
+@@ -3070,7 +3070,7 @@ pref("network.tcp.keepalive.idle_time", 600); // seconds; 10 mins
+ // All the Geolocation preferences are here.
+ //
+ #if !defined(ANDROID) && !defined(XP_WIN)
+-  pref("geo.provider.network.url", "https://www.googleapis.com/geolocation/v1/geolocate?key=%GOOGLE_LOCATION_SERVICE_API_KEY%&solution_channel=%OS%");
++  pref("geo.provider.network.url", "");  // STEALTH-HOOK(fingerprint/geolocation/no-host-provider)
+ 
+   // Timeout to wait before sending the location request.
+   pref("geo.provider.network.timeToWaitBeforeSending", 5000);
 diff --git a/toolkit/components/geolocation/GeolocationService.cpp b/toolkit/components/geolocation/GeolocationService.cpp
 index 70af7ec0c23833766fdee173c1bcf35448e3af85..e8904de4d409309e4ab39546acb33f5eeccdc76e 100644
 --- a/toolkit/components/geolocation/GeolocationService.cpp

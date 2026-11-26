@@ -1,27 +1,16 @@
 diff --git a/dom/base/nsGlobalWindowOuter.cpp b/dom/base/nsGlobalWindowOuter.cpp
-index 59a1a4671078a3fc3491a5200c30d908fd87cbf1..d864090c3f9171abfe4ae73e988a4ee8fead85a4 100644
+index 6f072ae4ff4528e187e2338dc5793e0881161d9c..d864090c3f9171abfe4ae73e988a4ee8fead85a4 100644
 --- a/dom/base/nsGlobalWindowOuter.cpp
 +++ b/dom/base/nsGlobalWindowOuter.cpp
-@@ -235,6 +235,9 @@
- #include "prrng.h"
+@@ -236,6 +236,8 @@
  #include "xpcprivate.h"
  
-+#include "mozilla/dom/StealthSessionDeclaration.h"  // STEALTH-HOOK(fingerprint/locale-time/session-declaration)
+ #include "mozilla/dom/StealthSessionDeclaration.h"  // STEALTH-HOOK(fingerprint/locale-time/session-declaration)
 +#include "StealthWindowGeometry.h"  // STEALTH-HOOK(fingerprint/screen-window/geometry)
 +
  #ifdef MOZ_WEBSPEECH
  #  include "mozilla/dom/SpeechSynthesis.h"
  #endif
-@@ -2095,8 +2098,7 @@ static nsresult CreateNativeGlobalForInner(
-       aDocument->ShouldResistFingerprinting(RFPTarget::JSDateTimeUTC),
-       aDocument->ShouldResistFingerprinting(RFPTarget::JSMathFdlibm),
-       aDocument->ShouldResistFingerprinting(RFPTarget::JSLocale),
--      aDocument->GetBrowsingContext()->Top()->GetLanguageOverride(),
--      aDocument->GetBrowsingContext()->Top()->GetTimezoneOverride());
-+      GetDeclaredRealmLanguage(aDocument), GetDeclaredRealmTimezone(aDocument));  // STEALTH-HOOK(fingerprint/locale-time/session-declaration)
- 
-   if (principal->IsSystemPrincipal()) {
-     creationOptions.setFreezeBuiltins(true);
 @@ -3554,6 +3556,8 @@ CSSIntSize nsGlobalWindowOuter::GetOuterSize(CallerType aCallerType,
      return {};
    }
@@ -94,18 +83,29 @@ index 2b1e2c210050c9f13c35395f9683baddfb756a07..41c8ef1419811b6556fdbb69f445f814
  LOCAL_INCLUDES += ["/dom/events"]
  
 diff --git a/widget/gtk/moz.build b/widget/gtk/moz.build
-index e4be8ea072892ced0d3d6191f2ce122929e3b335..b09d2c5b65f3ffd707649ca22dd2c54b13ca0bdb 100644
+index f9d5cbab9ce319df7bc05edcdc1772fcd276b6c1..b09d2c5b65f3ffd707649ca22dd2c54b13ca0bdb 100644
 --- a/widget/gtk/moz.build
 +++ b/widget/gtk/moz.build
-@@ -117,6 +117,8 @@ SOURCES += [
+@@ -117,6 +117,7 @@ SOURCES += [
      "nsNativeThemeGTK.cpp",  # conflicts with X11 headers
      "nsWindow.cpp",  # conflicts with X11 headers
  ]
 +SOURCES += ["StealthFullscreenGtk.cpp"]  # STEALTH-HOOK(fingerprint/screen-window/geometry)
-+SOURCES += ["StealthHostGLProbe.cpp"]  # STEALTH-HOOK(platform/declaration-gate)
+ SOURCES += ["StealthHostGLProbe.cpp"]  # STEALTH-HOOK(platform/declaration-gate)
  
  if CONFIG["MOZ_WAYLAND"]:
-     UNIFIED_SOURCES += [
+diff --git a/widget/gtk/nsWindow.cpp b/widget/gtk/nsWindow.cpp
+index 8b8fc4480ab2d06d23027f466bbaadced635bdb2..c895417ebf6182a1306f965182a1578c9412da67 100644
+--- a/widget/gtk/nsWindow.cpp
++++ b/widget/gtk/nsWindow.cpp
+@@ -5308,6 +5308,7 @@ nsresult nsWindow::MakeFullScreen(bool aFullScreen) {
+   LOG("nsWindow::MakeFullScreen aFullScreen %d\n", aFullScreen);
+ 
+   if (GdkIsX11Display() && !IsFullscreenSupported(mShell)) {
++    if (StealthMakeFullScreenWithoutWM(aFullScreen)) return NS_OK;  // STEALTH-HOOK(fingerprint/screen-window/geometry)
+     return NS_ERROR_NOT_AVAILABLE;
+   }
+ 
 diff --git a/widget/gtk/nsWindow.h b/widget/gtk/nsWindow.h
 index 8613fdfd1976a3df90d995ce59753c2ef1919f7f..b9d832e43134dd4a374b507a96ca457412850a19 100644
 --- a/widget/gtk/nsWindow.h
@@ -119,10 +119,10 @@ index 8613fdfd1976a3df90d995ce59753c2ef1919f7f..b9d832e43134dd4a374b507a96ca4574
  
    /**
 diff --git a/widget/moz.build b/widget/moz.build
-index 67a8082de98eb985cfa40c9af158b0518ec577de..780754a1f76d48bc7dca3ccbb5f3105b4cf15652 100644
+index 4810b64741bcdb1267ccba4dd3f5414934f8e13e..780754a1f76d48bc7dca3ccbb5f3105b4cf15652 100644
 --- a/widget/moz.build
 +++ b/widget/moz.build
-@@ -320,10 +320,12 @@ SOURCES += [
+@@ -320,6 +320,7 @@ SOURCES += [
      "nsIWidget.cpp",
      "ScreenManager.cpp",
  ]
@@ -130,11 +130,6 @@ index 67a8082de98eb985cfa40c9af158b0518ec577de..780754a1f76d48bc7dca3ccbb5f3105b
  
  EXPORTS.ipc = [
      "nsGUIEventIPC.h",
- ]
-+EXPORTS.ipc += ["StealthMouseEventIPC.h"]  # STEALTH-HOOK(automation/input)
- 
- if CONFIG["MOZ_X11"] or CONFIG["MOZ_WAYLAND"]:
-     DIRS += ["x11"]
 diff --git a/widget/nsIWidget.cpp b/widget/nsIWidget.cpp
 index 39411305c2b853b90a386d88b0c1fbae9449796e..032d61027ddf62e951b9383fde58a73f6c915ee3 100644
 --- a/widget/nsIWidget.cpp

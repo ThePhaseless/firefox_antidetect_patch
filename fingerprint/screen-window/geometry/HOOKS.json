@@ -89,6 +89,16 @@
   "test": "wrapper:scripts/ci_host_gate.py::invariant:fullscreen_is_the_screen"
  },
  {
+  "file": "widget/gtk/nsWindow.cpp",
+  "function": "nsresult nsWindow::MakeFullScreen(bool aFullScreen) {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "    if (StealthMakeFullScreenWithoutWM(aFullScreen)) return NS_OK;  // STEALTH-HOOK(fingerprint/screen-window/geometry)",
+  "test": "wrapper:tests/test_fullscreen_without_wm_e2e.py::test_fullscreen_without_a_window_manager_is_the_declared_screen",
+  "anchor": "if (GdkIsX11Display() && !IsFullscreenSupported(mShell)) {  (Mozilla's own condition: the hook is the first statement inside this block, Mozilla's `return NS_ERROR_NOT_AVAILABLE;` stays below it)",
+  "why": "the hook needs Mozilla's computation of `no window manager` (IsFullscreenSupported: gdk_x11_screen_supports_net_wm_hint); a guard at the head of MakeFullScreen would copy that test (G16), and a wrap of MakeFullScreen would read the refusal from the return code, which the kiosk unfullscreen path also returns. In 160 the enclosing block is `if (!IsFullscreenSupported()) {` (a member): the hook text is the same in 159 and 160 and never names IsFullscreenSupported"
+ },
+ {
   "file": "widget/gtk/nsWindow.h",
   "function": "class nsWindow : public nsIWidget {",
   "kind": "add",
@@ -168,15 +178,5 @@
   "test": "wrapper:scripts/ci_host_gate.py::invariant:fullscreen_is_the_screen",
   "anchor": "the closing brace of the forced-fullscreen block of nsWindow::OnWindowPosChanging (before the DWM unhide block)",
   "why": "it holds the declared fullscreen size on the WINDOWPOS Mozilla's block has just adjusted and before the DWM block reads it; it does not move (PM-DECISIONS geometry, G28), so it stays an anchor in the middle of the function"
- },
- {
-  "file": "widget/gtk/nsWindow.cpp",
-  "function": "nsresult nsWindow::MakeFullScreen(bool aFullScreen) {",
-  "kind": "add",
-  "form": "anchor",
-  "line": "    if (StealthMakeFullScreenWithoutWM(aFullScreen)) return NS_OK;  // STEALTH-HOOK(fingerprint/screen-window/geometry)",
-  "test": "wrapper:tests/test_fullscreen_without_wm_e2e.py::test_fullscreen_without_a_window_manager_is_the_declared_screen",
-  "anchor": "if (GdkIsX11Display() && !IsFullscreenSupported(mShell)) {  (Mozilla's own condition: the hook is the first statement inside this block, Mozilla's `return NS_ERROR_NOT_AVAILABLE;` stays below it)",
-  "why": "the hook needs Mozilla's computation of `no window manager` (IsFullscreenSupported: gdk_x11_screen_supports_net_wm_hint); a guard at the head of MakeFullScreen would copy that test (G16), and a wrap of MakeFullScreen would read the refusal from the return code, which the kiosk unfullscreen path also returns. In 160 the enclosing block is `if (!IsFullscreenSupported()) {` (a member): the hook text is the same in 159 and 160 and never names IsFullscreenSupported"
  }
 ]

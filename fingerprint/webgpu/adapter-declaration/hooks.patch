@@ -103,6 +103,18 @@ index a0d0ceba2c0d4615e259d7a04bed61adaff26203..1007a9714304e0c383c2b7ba242b4fef
  
  IPDL_SOURCES += [
      "ipc/PWebGPU.ipdl",
+diff --git a/gfx/tests/gtest/moz.build b/gfx/tests/gtest/moz.build
+index 6e5fc96e0c3a3df348f17fbfe37bc3d1b30f6564..806fc376b3dd0a6bf4f4a635f9a092ae4cc3dfae 100644
+--- a/gfx/tests/gtest/moz.build
++++ b/gfx/tests/gtest/moz.build
+@@ -33,6 +33,7 @@ UNIFIED_SOURCES += [
+     "TestYUVtoRGB32.cpp",
+ ]
+ UNIFIED_SOURCES += ["TestStealthCanvasProjection.cpp"]  # STEALTH-HOOK(fingerprint/canvas/noise-projection)
++UNIFIED_SOURCES += ["TestStealthWebGPUDeclaration.cpp"]  # STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)
+ 
+ SOURCES += [
+     "SwizzleGeneric.cpp",
 diff --git a/gfx/thebes/gfxPlatform.cpp b/gfx/thebes/gfxPlatform.cpp
 index 9385c82abed17b64c4dd7a45f15d1d0a26cc791c..27b4c0bbda0cef5c8fed9b59feac7bc872883d84 100644
 --- a/gfx/thebes/gfxPlatform.cpp
@@ -158,7 +170,7 @@ index b4ee977ca56ca3afa98cfcf2215b7790b97bd4fe..3103555abcc436c4cbbf3c63dc2ddc9e
              if result.is_none() {
                  let created = match global.request_adapter(
 diff --git a/modules/libpref/init/StaticPrefList.yaml b/modules/libpref/init/StaticPrefList.yaml
-index 80be46d83cc04eb081ce58b4e322c8da15143c1c..faadfa6fb77dd0a4c9fa2441df91c0f9eeeb7de0 100644
+index e951e8a87f6c10d1f5805d475cac5ae4c828d519..faadfa6fb77dd0a4c9fa2441df91c0f9eeeb7de0 100644
 --- a/modules/libpref/init/StaticPrefList.yaml
 +++ b/modules/libpref/init/StaticPrefList.yaml
 @@ -6248,7 +6248,7 @@
@@ -170,30 +182,3 @@ index 80be46d83cc04eb081ce58b4e322c8da15143c1c..faadfa6fb77dd0a4c9fa2441df91c0f9
  #endif
    mirror: once
  
-@@ -16000,7 +16000,7 @@
- #     PROXYCONFIG_SYSTEM   = 5
- - name: network.proxy.type
-   type: RelaxedAtomicUint32
--  value: 5
-+  value: 0  # STEALTH-HOOK(network/proxy)
-   mirror: always
- 
- # Whether to use WPAD while configuring proxy with system settings
-@@ -16239,7 +16239,7 @@
- # Single TRR request timeout, in milliseconds
- - name: network.trr.request_timeout_ms
-   type: RelaxedAtomicUint32
--  value: 1500
-+  value: 30000  # STEALTH-HOOK(network/doh)
-   mirror: always
- 
- # Single TRR request timeout, in milliseconds for mode 3
-@@ -16393,7 +16393,7 @@
- # soon after startup or when the pref is flipped.
- - name: network.trr.exclude-etc-hosts
-   type: RelaxedAtomicBool
--  value: true
-+  value: false  # STEALTH-HOOK(network/doh)
-   mirror: always
- 
- # Whether to add padding in the doh dns queries (rfc 7830)

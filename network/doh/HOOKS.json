@@ -18,6 +18,14 @@
   "why": "at the head the call would read the config on the closing road too; no test fixes the position, so it stays where it is today (G28)"
  },
  {
+  "file": "dom/media/webrtc/transport/common.build",
+  "function": "transport_lcppsrcs = [",
+  "kind": "add",
+  "form": "registration",
+  "line": "transport_lcppsrcs += [\"StealthIceResolverContext.cpp\"]  # STEALTH-HOOK(network/doh)",
+  "test": "node:juggler/tests/the_ice_name_is_resolved_in_the_context_of_the_peer_connection.test.mjs#the files are built"
+ },
+ {
   "file": "dom/media/webrtc/transport/nriceresolver.cpp",
   "function": "int NrIceResolver::resolve(nr_resolver_resource* resource,",
   "kind": "add",
@@ -58,6 +66,54 @@
   "form": "member",
   "line": "  OriginAttributes mAttrs;  // STEALTH-HOOK(network/doh)",
   "test": "gtest:StealthIceResolverContext.TheResolverPassesTheContextItWasGiven"
+ },
+ {
+  "file": "modules/libpref/init/StaticPrefList.yaml",
+  "function": "",
+  "kind": "rewrite",
+  "form": "declared-value",
+  "line": "  value: 30000  # STEALTH-HOOK(network/doh)",
+  "removed": "  value: 1500",
+  "test": "node:juggler/tests/a_proxied_doh_lookup_has_the_trr_only_timeout.test.mjs#the hook is on the value line of the pref of Mozilla, which is declared nowhere else"
+ },
+ {
+  "file": "modules/libpref/init/StaticPrefList.yaml",
+  "function": "",
+  "kind": "rewrite",
+  "form": "declared-value",
+  "line": "  value: false  # STEALTH-HOOK(network/doh)",
+  "removed": "  value: true",
+  "test": "node:juggler/tests/etc_hosts_exclusion_is_off.test.mjs#with network.trr.exclude-etc-hosts=false the hosts file is never read"
+ },
+ {
+  "file": "netwerk/base/TRRLoadInfo.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthLoadInfo.h\"  // STEALTH-HOOK(network/doh)",
+  "test": "gtest:TestStealthTRRContext.ATRRLoadInfoStoresWhatItIsGiven",
+  "quiet_anchor_why": {
+   "kind": "deferred",
+   "quieter": "netwerk/base/TRRLoadInfo.cpp:using namespace mozilla::dom;"
+  }
+ },
+ {
+  "file": "netwerk/base/TRRLoadInfo.cpp",
+  "function": "already_AddRefed<nsILoadInfo> TRRLoadInfo::Clone() const {",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  static_cast<TRRLoadInfo*>(loadInfo.get())->mOriginAttributes = mOriginAttributes;  // STEALTH-HOOK(network/doh)",
+  "test": "gtest:TestStealthTRRContext.TheCloneOfATRRLoadInfoKeepsTheContext",
+  "anchor": "return loadInfo.forget(); (TRRLoadInfo::Clone)",
+  "why": "carries the context of the DNS-over-HTTPS lookup into the clone; the clone is a local of Clone"
+ },
+ {
+  "file": "netwerk/base/TRRLoadInfo.cpp",
+  "function": "nsresult TRRLoadInfo::SetOriginAttributes(",
+  "kind": "add",
+  "form": "guard",
+  "line": "  if (nsresult rv; StealthTRRSetOriginAttributes(mOriginAttributes, aOriginAttributes, &rv)) return rv;  // STEALTH-HOOK(network/doh)",
+  "test": "gtest:TestStealthTRRContext.ATRRLoadInfoStoresWhatItIsGiven"
  },
  {
   "file": "netwerk/dns/TRR.cpp",
@@ -117,6 +173,98 @@
   "form": "notice",
   "line": "  StealthApplySessionFlags(host, aOriginAttributes, &flags);  // STEALTH-HOOK(network/doh)",
   "test": "gtest:TestStealthSessionResolver.TheHookAppliesTheFlagsThroughTheirAddress"
+ },
+ {
+  "file": "netwerk/ipc/PSocketProcess.ipdl",
+  "function": "parent:",
+  "kind": "add",
+  "form": "registration",
+  "line": "  async StealthProxyLookupOrigin(OriginAttributes? aOriginAttributes);  // STEALTH-HOOK(network/doh)",
+  "test": "gtest:TestStealthTRRContext.EachConstructorTakesTheMessageSentRightBeforeIt"
+ },
+ {
+  "file": "netwerk/ipc/ProxyConfigLookup.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/net/StealthTRRContext.h\"  // STEALTH-HOOK(network/doh)",
+  "test": "wrapper:tests/test_webrtc_realness.py::test_a_gateway_with_coherent_udp_gives_the_page_a_srflx_born_through_its_relay"
+ },
+ {
+  "file": "netwerk/ipc/ProxyConfigLookup.cpp",
+  "function": "nsresult ProxyConfigLookup::Create(",
+  "kind": "add",
+  "form": "notice",
+  "line": "  StealthEnterTRRLookupContext();  // STEALTH-HOOK(network/doh)",
+  "test": "gtest:TestStealthTRRContext.TheContextOfALookupIsNotTheNextOnes"
+ },
+ {
+  "file": "netwerk/ipc/ProxyConfigLookup.cpp",
+  "function": "nsresult ProxyConfigLookup::DoProxyResolve(nsICancelable** aLookupCancellable) {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  if (StealthApplyTRRLookupContext(channel, &rv)) return rv;  // STEALTH-HOOK(network/doh)",
+  "test": "gtest:TestStealthTRRContext.TheStandInChannelTakesTheActiveContextOfTheLookup",
+  "anchor": "the check of Mozilla's `rv = NS_NewChannel(getter_AddRefs(channel), mURI, ...)`: `if (NS_FAILED(rv)) { return rv; }`, after the line of the swap",
+  "why": "applies the DoH context to the channel and returns its failure; `channel` and `rv` are Mozilla's locals, so the line can only follow Mozilla's own check of the channel creation, and Mozilla's NS_NewChannel call stays whole"
+ },
+ {
+  "file": "netwerk/ipc/ProxyConfigLookupChild.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/net/StealthTRRContext.h\"  // STEALTH-HOOK(network/doh)",
+  "test": "gtest:TestStealthTRRContext.EachConstructorTakesTheMessageSentRightBeforeIt"
+ },
+ {
+  "file": "netwerk/ipc/ProxyConfigLookupChild.cpp",
+  "function": "bool ProxyConfigLookupChild::Create(",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  StealthSendTRRLookupContext(socketChild);  // STEALTH-HOOK(network/doh)",
+  "test": "gtest:TestStealthTRRContext.EachConstructorTakesTheMessageSentRightBeforeIt",
+  "anchor": "the construction of Mozilla's `RefPtr<ProxyConfigLookupChild> child = new ProxyConfigLookupChild(std::move(aCallback));`, right before `return socketChild->SendPProxyConfigLookupConstructor(`",
+  "why": "the message is sent on the one path that sends the constructor, in the posting order the receiver relies on, so it sits on the line before the constructor and after Mozilla's check of `socketChild`, a local of Mozilla's function; a guard at the head would send it on the paths that return before the constructor"
+ },
+ {
+  "file": "netwerk/ipc/SocketProcessParent.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/net/StealthTRRContext.h\"  // STEALTH-HOOK(network/doh)",
+  "test": "gtest:TestStealthTRRContext.WithoutItsMessageAConstructorHasNoContext"
+ },
+ {
+  "file": "netwerk/ipc/SocketProcessParent.cpp",
+  "function": "mozilla::ipc::IPCResult SocketProcessParent::RecvPProxyConfigLookupConstructor(",
+  "kind": "add",
+  "form": "notice",
+  "line": "  StealthTakeParkedTRRLookupContext(this);  // STEALTH-HOOK(network/doh)",
+  "test": "gtest:TestStealthTRRContext.WithoutItsMessageAConstructorHasNoContext"
+ },
+ {
+  "file": "netwerk/ipc/SocketProcessParent.h",
+  "function": "class SocketProcessParent final",
+  "kind": "add",
+  "form": "member",
+  "line": "  mozilla::ipc::IPCResult RecvStealthProxyLookupOrigin(const Maybe<OriginAttributes>& aOriginAttributes);  // STEALTH-HOOK(network/doh)",
+  "test": "gtest:TestStealthTRRContext.EachConstructorTakesTheMessageSentRightBeforeIt"
+ },
+ {
+  "file": "netwerk/ipc/moz.build",
+  "function": "EXPORTS.mozilla.net += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "EXPORTS.mozilla.net += [\"StealthTRRContext.h\"]  # STEALTH-HOOK(network/doh)",
+  "test": "wrapper:tests/test_webrtc_realness.py::test_a_gateway_with_coherent_udp_gives_the_page_a_srflx_born_through_its_relay"
+ },
+ {
+  "file": "netwerk/ipc/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"StealthTRRContext.cpp\"]  # STEALTH-HOOK(network/doh)",
+  "test": "wrapper:tests/test_webrtc_realness.py::test_a_gateway_with_coherent_udp_gives_the_page_a_srflx_born_through_its_relay"
  },
  {
   "file": "netwerk/protocol/http/TLSTransportLayer.cpp",
@@ -348,153 +496,5 @@
   "form": "unknown",
   "line": "DEFINES[\"MOZ_PROXY_BYPASS_PROTECTION\"] = True  # STEALTH-HOOK(network/doh)",
   "test": "node:juggler/tests/the_profile_lock_looks_up_no_host_name.test.mjs#the lookup of the host name in the symlink lock is compiled out for the directory by the define of its moz.build, and the only reader of the symbol is that block"
- },
- {
-  "file": "netwerk/ipc/PSocketProcess.ipdl",
-  "function": "parent:",
-  "kind": "add",
-  "form": "registration",
-  "line": "  async StealthProxyLookupOrigin(OriginAttributes? aOriginAttributes);  // STEALTH-HOOK(network/doh)",
-  "test": "gtest:TestStealthTRRContext.EachConstructorTakesTheMessageSentRightBeforeIt"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookup.cpp",
-  "function": "",
-  "kind": "add",
-  "form": "registration",
-  "line": "#include \"mozilla/net/StealthTRRContext.h\"  // STEALTH-HOOK(network/doh)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_a_gateway_with_coherent_udp_gives_the_page_a_srflx_born_through_its_relay"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookup.cpp",
-  "function": "nsresult ProxyConfigLookup::Create(",
-  "kind": "add",
-  "form": "notice",
-  "line": "  StealthEnterTRRLookupContext();  // STEALTH-HOOK(network/doh)",
-  "test": "gtest:TestStealthTRRContext.TheContextOfALookupIsNotTheNextOnes"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookup.cpp",
-  "function": "nsresult ProxyConfigLookup::DoProxyResolve(nsICancelable** aLookupCancellable) {",
-  "kind": "add",
-  "form": "anchor",
-  "line": "  if (StealthApplyTRRLookupContext(channel, &rv)) return rv;  // STEALTH-HOOK(network/doh)",
-  "test": "gtest:TestStealthTRRContext.TheStandInChannelTakesTheActiveContextOfTheLookup",
-  "anchor": "the check of Mozilla's `rv = NS_NewChannel(getter_AddRefs(channel), mURI, ...)`: `if (NS_FAILED(rv)) { return rv; }`, after the line of the swap",
-  "why": "applies the DoH context to the channel and returns its failure; `channel` and `rv` are Mozilla's locals, so the line can only follow Mozilla's own check of the channel creation, and Mozilla's NS_NewChannel call stays whole"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookupChild.cpp",
-  "function": "",
-  "kind": "add",
-  "form": "registration",
-  "line": "#include \"mozilla/net/StealthTRRContext.h\"  // STEALTH-HOOK(network/doh)",
-  "test": "gtest:TestStealthTRRContext.EachConstructorTakesTheMessageSentRightBeforeIt"
- },
- {
-  "file": "netwerk/ipc/ProxyConfigLookupChild.cpp",
-  "function": "bool ProxyConfigLookupChild::Create(",
-  "kind": "add",
-  "form": "anchor",
-  "line": "  StealthSendTRRLookupContext(socketChild);  // STEALTH-HOOK(network/doh)",
-  "test": "gtest:TestStealthTRRContext.EachConstructorTakesTheMessageSentRightBeforeIt",
-  "anchor": "the construction of Mozilla's `RefPtr<ProxyConfigLookupChild> child = new ProxyConfigLookupChild(std::move(aCallback));`, right before `return socketChild->SendPProxyConfigLookupConstructor(`",
-  "why": "the message is sent on the one path that sends the constructor, in the posting order the receiver relies on, so it sits on the line before the constructor and after Mozilla's check of `socketChild`, a local of Mozilla's function; a guard at the head would send it on the paths that return before the constructor"
- },
- {
-  "file": "netwerk/ipc/SocketProcessParent.cpp",
-  "function": "",
-  "kind": "add",
-  "form": "registration",
-  "line": "#include \"mozilla/net/StealthTRRContext.h\"  // STEALTH-HOOK(network/doh)",
-  "test": "gtest:TestStealthTRRContext.WithoutItsMessageAConstructorHasNoContext"
- },
- {
-  "file": "netwerk/ipc/SocketProcessParent.cpp",
-  "function": "mozilla::ipc::IPCResult SocketProcessParent::RecvPProxyConfigLookupConstructor(",
-  "kind": "add",
-  "form": "notice",
-  "line": "  StealthTakeParkedTRRLookupContext(this);  // STEALTH-HOOK(network/doh)",
-  "test": "gtest:TestStealthTRRContext.WithoutItsMessageAConstructorHasNoContext"
- },
- {
-  "file": "netwerk/ipc/SocketProcessParent.h",
-  "function": "class SocketProcessParent final",
-  "kind": "add",
-  "form": "member",
-  "line": "  mozilla::ipc::IPCResult RecvStealthProxyLookupOrigin(const Maybe<OriginAttributes>& aOriginAttributes);  // STEALTH-HOOK(network/doh)",
-  "test": "gtest:TestStealthTRRContext.EachConstructorTakesTheMessageSentRightBeforeIt"
- },
- {
-  "file": "netwerk/ipc/moz.build",
-  "function": "EXPORTS.mozilla.net += [",
-  "kind": "add",
-  "form": "registration",
-  "line": "EXPORTS.mozilla.net += [\"StealthTRRContext.h\"]  # STEALTH-HOOK(network/doh)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_a_gateway_with_coherent_udp_gives_the_page_a_srflx_born_through_its_relay"
- },
- {
-  "file": "netwerk/ipc/moz.build",
-  "function": "UNIFIED_SOURCES += [",
-  "kind": "add",
-  "form": "registration",
-  "line": "UNIFIED_SOURCES += [\"StealthTRRContext.cpp\"]  # STEALTH-HOOK(network/doh)",
-  "test": "wrapper:tests/test_webrtc_realness.py::test_a_gateway_with_coherent_udp_gives_the_page_a_srflx_born_through_its_relay"
- },
- {
-  "file": "netwerk/base/TRRLoadInfo.cpp",
-  "function": "",
-  "kind": "add",
-  "form": "registration",
-  "line": "#include \"StealthLoadInfo.h\"  // STEALTH-HOOK(network/doh)",
-  "test": "gtest:TestStealthTRRContext.ATRRLoadInfoStoresWhatItIsGiven",
-  "quiet_anchor_why": {
-   "kind": "deferred",
-   "quieter": "netwerk/base/TRRLoadInfo.cpp:using namespace mozilla::dom;"
-  }
- },
- {
-  "file": "netwerk/base/TRRLoadInfo.cpp",
-  "function": "already_AddRefed<nsILoadInfo> TRRLoadInfo::Clone() const {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  static_cast<TRRLoadInfo*>(loadInfo.get())->mOriginAttributes = mOriginAttributes;  // STEALTH-HOOK(network/doh)",
-  "test": "gtest:TestStealthTRRContext.TheCloneOfATRRLoadInfoKeepsTheContext",
-  "anchor": "return loadInfo.forget(); (TRRLoadInfo::Clone)",
-  "why": "carries the context of the DNS-over-HTTPS lookup into the clone; the clone is a local of Clone"
- },
- {
-  "file": "netwerk/base/TRRLoadInfo.cpp",
-  "function": "nsresult TRRLoadInfo::SetOriginAttributes(",
-  "kind": "add",
-  "form": "guard",
-  "line": "  if (nsresult rv; StealthTRRSetOriginAttributes(mOriginAttributes, aOriginAttributes, &rv)) return rv;  // STEALTH-HOOK(network/doh)",
-  "test": "gtest:TestStealthTRRContext.ATRRLoadInfoStoresWhatItIsGiven"
- },
- {
-  "file": "modules/libpref/init/StaticPrefList.yaml",
-  "function": "",
-  "kind": "rewrite",
-  "form": "declared-value",
-  "line": "  value: 30000  # STEALTH-HOOK(network/doh)",
-  "removed": "  value: 1500",
-  "test": "node:juggler/tests/a_proxied_doh_lookup_has_the_trr_only_timeout.test.mjs#the hook is on the value line of the pref of Mozilla, which is declared nowhere else"
- },
- {
-  "file": "modules/libpref/init/StaticPrefList.yaml",
-  "function": "",
-  "kind": "rewrite",
-  "form": "declared-value",
-  "line": "  value: false  # STEALTH-HOOK(network/doh)",
-  "removed": "  value: true",
-  "test": "node:juggler/tests/etc_hosts_exclusion_is_off.test.mjs#with network.trr.exclude-etc-hosts=false the hosts file is never read"
- },
- {
-  "file": "dom/media/webrtc/transport/common.build",
-  "function": "transport_lcppsrcs = [",
-  "kind": "add",
-  "form": "registration",
-  "line": "transport_lcppsrcs += [\"StealthIceResolverContext.cpp\"]  # STEALTH-HOOK(network/doh)",
-  "test": "node:juggler/tests/the_ice_name_is_resolved_in_the_context_of_the_peer_connection.test.mjs#the files are built"
  }
 ]

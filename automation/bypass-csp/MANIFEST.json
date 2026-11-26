@@ -1,5 +1,6 @@
 {
  "modified": [
+  "dom/base/Document.cpp",
   "dom/security/moz.build",
   "dom/security/nsCSPUtils.cpp",
   "dom/security/nsCSPUtils.h"
@@ -11,6 +12,19 @@
   "dom/security/StealthBypassCSP.cpp": "0811859c51641bfac2b6e8d4726730c129d99aebdb7626a85dac167461fb0dc5"
  },
  "inventory": [
+  {
+   "file": "dom/base/Document.cpp",
+   "category": "spoof",
+   "feature": "bypass-csp",
+   "prefs": [],
+   "added": 1,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "Document::InitCSP, after the early checks and before tCspHeaderValue is declared",
+   "notes": "Guard: when the automation asked the document's docshell to ignore the page's policies (CSP_IsBypassedFor, our function), InitCSP returns NS_OK before it reads any policy of the response headers. A guard because Mozilla's function has to stop at this point."
+  },
   {
    "file": "dom/security/moz.build",
    "category": "build",
@@ -36,7 +50,7 @@
    "added": 2,
    "removed": 0,
    "hunks": 1,
-   "inline_logic_lines": 8,
+   "inline_logic_lines": 0,
    "hookable": "movable",
    "anchor": "CSP_IsBypassedFor (new) and CSP_ApplyMetaCSPToDoc",
    "notes": "Reads the Juggler bypassCSP flag through nsIDocShell::GetBypassCSPEnabled. The header comment says InitCSP also uses it for header policies. [verified: CONFIRMED, the call site exists at dom/base/Document.cpp:4010 (not in this group).] The comment says the attribute was stored but never read before. The comment has an emoji marker that must be removed. The comment names Playwright and an internal issue number (vendor/test name in a code comment).",
