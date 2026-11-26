@@ -1,0 +1,10 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+# Read by toolkit/profile/moz.build (one include line).
+
+# nsProfileLock.cpp (Mozilla's, unchanged) looks up the machine's own host name for the signature of its Unix symlink
+# lock, unless this symbol is defined: a lookup at start-up, before any proxy is decided, through the system resolver. The
+# signature keeps 127.0.0.1. Only nsProfileLock.cpp of this directory reads the symbol.
+DEFINES["MOZ_PROXY_BYPASS_PROTECTION"] = True

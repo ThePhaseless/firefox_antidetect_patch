@@ -52,6 +52,30 @@ function run_test() {
     "a value that is not a boolean is refused"
   );
 
+  // The option is read right after `wantXrays`, so with two values that are not
+  // booleans the error names the first (the order of the reads of Parse's
+  // chain), and a bad `wantXrays` alone is refused before `hybridXrays` is read.
+  const errorOf = aOptions => {
+    try {
+      Cu.Sandbox(CONTENT, aOptions);
+    } catch (e) {
+      return String(e.message || e);
+    }
+    return "";
+  };
+  Assert.ok(
+    errorOf({ wantXrays: "x", hybridXrays: "y" }).includes("wantXrays"),
+    "two bad values: the error is the one of wantXrays"
+  );
+  Assert.ok(
+    !errorOf({ wantXrays: "x", hybridXrays: "y" }).includes("hybridXrays"),
+    "two bad values: hybridXrays was not read"
+  );
+  Assert.ok(
+    errorOf({ wantXrays: false, hybridXrays: "y" }).includes("hybridXrays"),
+    "a bad hybridXrays alone names hybridXrays"
+  );
+
   // Control: the same calls without the option work.
   Cu.Sandbox(system, { wantXrays: false });
   Cu.Sandbox(expanded, { wantXrays: false });

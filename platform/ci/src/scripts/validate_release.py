@@ -486,6 +486,35 @@ def assert_updater_is_retails(tree: Path) -> None:
     print("    updater as the retail, offered updates refused OK")
 
 
+#: The modules of the launch counter, as the browser's package serves them (resource:///modules/). BrowserGlue's one line
+#: imports the loader, which guards the import of the counter, so the loader is the one file a user's startup cannot do
+#: without: a package that lacks it fails here, in the build round, and not in the browser of a user.
+LAUNCH_COUNTER_MODULES = ("StealthLaunchCounterLoader.sys.mjs", "StealthLaunchCounter.sys.mjs")
+
+
+def assert_launch_counter_is_shipped(tree: Path) -> None:
+    """The launch counter and its loader are in the browser's package: in browser/omni.ja under modules/, or loose in
+    browser/modules/ (the Linux tarball may carry the unpacked tree)."""
+    import stock_parity  # Mozilla's reader: optimized jars too
+    shipped: set[str] = set()
+    for omni in sorted(tree.rglob("omni.ja")):
+        rel = omni.relative_to(tree).as_posix()
+        if rel != "browser/omni.ja" and not rel.endswith("/browser/omni.ja"):
+            continue
+        jar = stock_parity.open_jar(omni.read_bytes(), rel)
+        shipped |= {n.split("/", 1)[1] for n in jar.entries if n.startswith("modules/") and n.count("/") == 1}
+    for d in tree.rglob("modules"):
+        if d.is_dir() and d.parent.name == "browser":
+            shipped |= {f.name for f in d.iterdir() if f.is_file()}
+    missing = [m for m in LAUNCH_COUNTER_MODULES if m not in shipped]
+    if missing:
+        raise ValidationError(
+            f"the launch counter is not in the package: {', '.join(missing)} missing from browser/omni.ja "
+            "(modules/) and from browser/modules/. A browser without the loader would stop at start-up. "
+            "Do not publish it.")
+    print("    launch counter and its loader are in the package OK")
+
+
 def _build_id(ini: Path) -> str:
     for line in ini.read_text(encoding="utf-8", errors="replace").splitlines():
         if line.startswith("BuildID="):
@@ -592,6 +621,7 @@ def validate_linux_tarball(archive: Path) -> None:
         assert_juggler_provenance(td)
         assert_page_surface_is_stock(td)
         assert_updater_is_retails(td)
+        assert_launch_counter_is_shipped(td)
 
         print("  [4/4] smoke (firefox --version)...")
         smoke_linux(td)
@@ -614,6 +644,7 @@ def validate_windows_zip(archive: Path) -> None:
         assert_page_surface_is_stock(td)
         assert_windows_runtime_is_shipped(td)
         assert_updater_is_retails(td)
+        assert_launch_counter_is_shipped(td)
 
         print("  [3/4] no-symlinks check (zip cannot store them, but verify)...")
         for p in td.rglob("*"):
@@ -800,6 +831,36 @@ def _selftest() -> int:
          lambda: omni({"modules/UpdateService.sys.mjs": b"x"}, True), True,
          assert_updater_is_retails),
     ]
+
+    def counter_tree(omni_members=(), loose_members=(), where="browser/omni.ja"):
+        d = tree()
+        if omni_members:
+            jar = d / where
+            jar.parent.mkdir(parents=True, exist_ok=True)
+            with zipfile.ZipFile(jar, "w") as zf:
+                for m in omni_members:
+                    zf.writestr(m, "x")
+        for rel in loose_members:
+            f = d / rel
+            f.parent.mkdir(parents=True, exist_ok=True)
+            f.write_bytes(b"x")
+        return d
+
+    both = ["modules/StealthLaunchCounterLoader.sys.mjs", "modules/StealthLaunchCounter.sys.mjs"]
+    cases += [(name, factory, must_raise, assert_launch_counter_is_shipped) for name, factory, must_raise in [
+        ("the loader and the counter inside browser/omni.ja", lambda: counter_tree(both), False),
+        ("the loader and the counter loose in browser/modules (the unpacked Linux tree)",
+         lambda: counter_tree(loose_members=["browser/modules/StealthLaunchCounterLoader.sys.mjs",
+                                             "browser/modules/StealthLaunchCounter.sys.mjs"]), False),
+        ("the counter without its loader", lambda: counter_tree(both[1:]), True),
+        ("the loader without the counter", lambda: counter_tree(both[:1]), True),
+        ("no launch counter at all", lambda: counter_tree(["modules/AppConstants.sys.mjs"]), True),
+        ("no browser/omni.ja", lambda: tree(), True),
+        ("the loader only in the OTHER omni.ja (the toolkit's, not the browser's)",
+         lambda: counter_tree(both, where="omni.ja"), True),
+        ("the loader under another directory of the browser's omni.ja",
+         lambda: counter_tree(["chrome/StealthLaunchCounterLoader.sys.mjs", both[1]]), True),
+    ]]
 
     bad = 0
     for name, factory, must_raise, check in cases:

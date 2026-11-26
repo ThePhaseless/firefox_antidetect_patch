@@ -149,7 +149,7 @@ index ba2f3c2e6022c7dc4c15b331a3f0ee5eadc6b550..a684a25d885c9fd652f99db7cbd3de41
        int32_t offset =
            (prtime.tm_params.tp_gmt_offset + prtime.tm_params.tp_dst_offset) /
 diff --git a/js/xpconnect/src/Sandbox.cpp b/js/xpconnect/src/Sandbox.cpp
-index ab61b42f1ff09bb7793f400e68adeb9be5756f7b..b633b619fbd708874f0ce96a4e53f4ece5a0135c 100644
+index 021bef0f0c28315678a3417d64532cce7e7c7824..81d3de1a9fb65a5e338d8263935c01521d975534 100644
 --- a/js/xpconnect/src/Sandbox.cpp
 +++ b/js/xpconnect/src/Sandbox.cpp
 @@ -112,6 +112,7 @@

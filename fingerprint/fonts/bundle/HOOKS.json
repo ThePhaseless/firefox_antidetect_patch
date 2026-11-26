@@ -43,16 +43,8 @@
   "file": "gfx/tests/gtest/moz.build",
   "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
   "kind": "add",
-  "form": "unknown",
-  "line": "if CONFIG[\"OS_TARGET\"] == \"WINNT\":  # STEALTH-HOOK(fingerprint/fonts/bundle)",
-  "test": "gtest:StealthBundledCollection.ContentProcessUnderBundleOnlyBuildsNone"
- },
- {
-  "file": "gfx/tests/gtest/moz.build",
-  "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
-  "kind": "add",
   "form": "registration",
-  "line": "    UNIFIED_SOURCES += [\"TestStealthBundledCollection.cpp\"]  # STEALTH-HOOK(fingerprint/fonts/bundle)",
+  "line": "include(\"StealthBundleTests.mozbuild\")  # STEALTH-HOOK(fingerprint/fonts/bundle)",
   "test": "gtest:StealthBundledCollection.ContentProcessUnderBundleOnlyBuildsNone"
  },
  {
@@ -248,13 +240,5 @@
   "form": "registration",
   "line": "include(\"StealthBundleFontList.mozbuild\")  # STEALTH-HOOK(fingerprint/fonts/bundle)",
   "test": "wrapper:tests/test_the_font_list_is_the_bundle_e2e.py::test_the_font_list_is_the_bundle_and_nothing_else"
- },
- {
-  "file": "gfx/tests/gtest/moz.build",
-  "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
-  "kind": "add",
-  "form": "registration",
-  "line": "include(\"StealthBundleTests.mozbuild\")  # STEALTH-HOOK(fingerprint/fonts/bundle)",
-  "test": "gtest:StealthBundledCollection.ContentProcessUnderBundleOnlyBuildsNone"
  }
 ]

@@ -14,6 +14,7 @@ class OriginAttributes;
 namespace net {
 
 class LoadInfo;
+class TRRLoadInfo;
 
 // The copy of a LoadInfo (Clone, CloneWithNewSecFlags and CloneForNewRequest
 // all go through LoadInfo's copy constructor) keeps the identifier of the load
@@ -30,6 +31,15 @@ void StealthLoadInfoCopied(LoadInfo* aThis, const LoadInfo& aRhs);
 bool StealthTRRSetOriginAttributes(OriginAttributes& aField,
                                    const OriginAttributes& aValue,
                                    nsresult* aRv);
+
+// TRRLoadInfo::Clone: the clone of a load info that carries a context carries
+// it too (a redirect of the DoH request is made on a clone, and stays in the
+// same context, so it leaves by the same proxy). aClone is the object Clone has
+// just made, handed back for Clone to own; the attributes are given by the
+// public getter of aFrom and the setter of aClone (the one above), which are
+// the accessors of nsILoadInfo and not const, though the getter writes nothing.
+TRRLoadInfo* StealthTRRCloneContext(const TRRLoadInfo* aFrom,
+                                    TRRLoadInfo* aClone);
 
 }  // namespace net
 }  // namespace mozilla

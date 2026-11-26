@@ -50,16 +50,14 @@ index 14fea8ac8725e33901e18ac1b714df2a3ca56f8a..635a4192e3b1d84298ee24c0d9aaae56
    static already_AddRefed<UnscaledFont> CreateFromFontDescriptor(
        const uint8_t* aData, uint32_t aDataLength, uint32_t aIndex);
 diff --git a/gfx/tests/gtest/moz.build b/gfx/tests/gtest/moz.build
-index d43be641d204e593c47e6decbdc3b4d2b9ec4a61..722f623d861ed44fed382835e9e89f50dcbf6315 100644
+index d43be641d204e593c47e6decbdc3b4d2b9ec4a61..fb0475a94208630b54f7385255b1719fd4b45cf8 100644
 --- a/gfx/tests/gtest/moz.build
 +++ b/gfx/tests/gtest/moz.build
-@@ -43,6 +43,9 @@ if CONFIG["OS_TARGET"] != "Android":
+@@ -43,6 +43,7 @@ if CONFIG["OS_TARGET"] != "Android":
          "TestRect.cpp",
      ]
  
-+if CONFIG["OS_TARGET"] == "WINNT":  # STEALTH-HOOK(fingerprint/fonts/bundle)
-+
-+    UNIFIED_SOURCES += ["TestStealthBundledCollection.cpp"]  # STEALTH-HOOK(fingerprint/fonts/bundle)
++include("StealthBundleTests.mozbuild")  # STEALTH-HOOK(fingerprint/fonts/bundle)
  if CONFIG["OS_TARGET"] == "Darwin":
      # Not in UNIFIED_SOURCES: MacIOSurface.h includes Carbon headers (MacTypes.h)
      # which would make Rect/Point/Size ambiguous in all subsequent unified files.

@@ -1,5 +1,5 @@
 diff --git a/toolkit/xre/dllservices/UntrustedModulesData.cpp b/toolkit/xre/dllservices/UntrustedModulesData.cpp
-index 49df9886436395e75b660ffaafcc3ad9607003a1..f6a66f686923988a57a74f488faba1002f615d07 100644
+index 49df9886436395e75b660ffaafcc3ad9607003a1..715f33510e5577788bfd94e4ca721c898f914379 100644
 --- a/toolkit/xre/dllservices/UntrustedModulesData.cpp
 +++ b/toolkit/xre/dllservices/UntrustedModulesData.cpp
 @@ -20,6 +20,8 @@
@@ -11,22 +11,15 @@ index 49df9886436395e75b660ffaafcc3ad9607003a1..f6a66f686923988a57a74f488faba100
  // Some utility functions
  
  static LONGLONG GetQPCFreq() {
-@@ -117,9 +119,12 @@ void ModuleRecord::GetVersionAndVendorInfo(const nsAString& aPath) {
+@@ -117,7 +119,7 @@ void ModuleRecord::GetVersionAndVendorInfo(const nsAString& aPath) {
    // WinVerifyTrust is too slow and of limited utility for our purposes, so
    // we pass SkipTrustVerification here to avoid it.
    bool hasNestedMicrosoftSignature = false;
 -  UniquePtr<wchar_t[]> signedBy(dllSvc->GetBinaryOrgName(
--      PromiseFlatString(aPath).get(), &hasNestedMicrosoftSignature,
--      AuthenticodeFlags::SkipTrustVerification));
-+  UniquePtr<wchar_t[]> signedBy = StealthSignatureLookupUnlessOwn(aPath, [&]() {  // STEALTH-HOOK(platform/untrusted-modules)
-+    UniquePtr<wchar_t[]> signedBy(dllSvc->GetBinaryOrgName(  // STEALTH-HOOK(platform/untrusted-modules)
-+        PromiseFlatString(aPath).get(), &hasNestedMicrosoftSignature,  // STEALTH-HOOK(platform/untrusted-modules)
-+        AuthenticodeFlags::SkipTrustVerification));  // STEALTH-HOOK(platform/untrusted-modules)
-+    return signedBy;  // STEALTH-HOOK(platform/untrusted-modules)
-+  });  // STEALTH-HOOK(platform/untrusted-modules)
++  UniquePtr<wchar_t[]> signedBy(StealthSignatureLookupUnlessOwn(aPath, dllSvc)->GetBinaryOrgName(  // STEALTH-HOOK(platform/untrusted-modules)
+       PromiseFlatString(aPath).get(), &hasNestedMicrosoftSignature,
+       AuthenticodeFlags::SkipTrustVerification));
    if (signedBy) {
-     mVendorInfo = Some(VendorInfo(VendorInfo::Source::Signature,
-                                   nsDependentString(signedBy.get()),
 diff --git a/toolkit/xre/dllservices/moz.build b/toolkit/xre/dllservices/moz.build
 index 5ece47afcc859ac8bc0eb76bef6645eb2f7067e5..1c93f2928ceccfeb7bf475f7426e9d84dc10c63d 100644
 --- a/toolkit/xre/dllservices/moz.build

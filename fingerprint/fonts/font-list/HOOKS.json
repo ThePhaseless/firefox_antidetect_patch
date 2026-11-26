@@ -3,24 +3,8 @@
   "file": "gfx/tests/gtest/moz.build",
   "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
   "kind": "add",
-  "form": "unknown",
-  "line": "if CONFIG[\"MOZ_WIDGET_TOOLKIT\"] == \"gtk\":  # STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": "gtest:StealthFcFontList.DeclareFontFile"
- },
- {
-  "file": "gfx/tests/gtest/moz.build",
-  "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
-  "kind": "add",
   "form": "registration",
-  "line": "    UNIFIED_SOURCES += [\"TestStealthFcFontList.cpp\"]  # STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": "gtest:StealthFcFontList.DeclareFontFile"
- },
- {
-  "file": "gfx/tests/gtest/moz.build",
-  "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    CXXFLAGS += CONFIG[\"CAIRO_FT_CFLAGS\"]  # STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "line": "include(\"StealthFcFontListTests.mozbuild\")  # STEALTH-HOOK(fingerprint/fonts/font-list)",
   "test": "gtest:StealthFcFontList.DeclareFontFile"
  },
  {
@@ -499,13 +483,5 @@
   "form": "registration",
   "line": "include(\"StealthFcFontList.mozbuild\")  # STEALTH-HOOK(fingerprint/fonts/font-list)",
   "test": "wrapper:tests/test_bundle_font_names_e2e.py::test_src_local_resolves_a_bundled_postscript_name_and_not_a_host_only_name"
- },
- {
-  "file": "gfx/tests/gtest/moz.build",
-  "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
-  "kind": "add",
-  "form": "registration",
-  "line": "include(\"StealthFcFontListTests.mozbuild\")  # STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": "gtest:StealthFcFontList.DeclareFontFile"
  }
 ]

@@ -5,6 +5,9 @@
 #ifndef mozilla_StealthOwnBinaries_h
 #define mozilla_StealthOwnBinaries_h
 
+#include <type_traits>
+#include <utility>
+
 #include "mozilla/UniquePtr.h"
 #include "nsStringFwd.h"
 
@@ -48,18 +51,48 @@ bool StealthSkipsSignatureLookupOf(const nsAString& aPath);
 uint32_t StealthOwnBinarySkips();
 void StealthNoteOwnBinarySkip();
 
-// GetVersionAndVendorInfo: the signature lookup of Mozilla, handed over as a
-// thunk (its text stays in the hook), is made unless the module is one of this
-// build's own unsigned binaries; then there is no signature (null), as the
-// lookup would have answered after its catalog search.
-template <typename SignatureLookupT>
-UniquePtr<wchar_t[]> StealthSignatureLookupUnlessOwn(
-    const nsAString& aPath, SignatureLookupT&& aSignatureLookup) {
-  if (StealthSkipsSignatureLookupOf(aPath)) {
-    StealthNoteOwnBinarySkip();
-    return nullptr;
+// GetVersionAndVendorInfo: the signature lookup of Mozilla, which stays as Mozilla wrote it
+// (`dllSvc->GetBinaryOrgName(path, &hasNested, flags)`), is made through the object that
+// StealthSignatureLookupUnlessOwn(aPath, dllSvc) stands in for dllSvc: unless the module is one
+// of this build's own unsigned binaries, its GetBinaryOrgName is dllSvc's with the arguments it
+// is given; for an own binary it is not made, and there is no signature (null), as the lookup
+// would have answered after its catalog search, and the skip is counted. The decision (and the
+// count) is made when the object is made, before the arguments of the call are evaluated, which
+// read nothing and have no effect.
+template <typename DllServicesT>
+class StealthSignatureLookup final {
+ public:
+  StealthSignatureLookup(DllServicesT* aDllServices, bool aSkip)
+      : mDllServices(aDllServices), mSkip(aSkip) {}
+
+  // So that the call reads as Mozilla's own: `Stealth...(aPath, dllSvc)->GetBinaryOrgName(...)`; the
+  // object lives to the end of the full expression it is made in.
+  const StealthSignatureLookup* operator->() const { return this; }
+
+  template <typename... Args>
+  UniquePtr<wchar_t[]> GetBinaryOrgName(Args&&... aArgs) const {
+    if (mSkip) {
+      return nullptr;
+    }
+    return mDllServices->GetBinaryOrgName(std::forward<Args>(aArgs)...);
   }
-  return aSignatureLookup();
+
+ private:
+  DllServicesT* mDllServices;
+  bool mSkip;
+};
+
+// aDllServices is a RefPtr to the services (or a pointer to them); the object keeps the pointer.
+template <typename DllServicesPtrT>
+auto StealthSignatureLookupUnlessOwn(const nsAString& aPath,
+                                     DllServicesPtrT&& aDllServices) {
+  const bool skip = StealthSkipsSignatureLookupOf(aPath);
+  if (skip) {
+    StealthNoteOwnBinarySkip();
+  }
+  auto* services = &*aDllServices;
+  return StealthSignatureLookup<std::remove_pointer_t<decltype(services)>>(
+      services, skip);
 }
 
 }  // namespace mozilla

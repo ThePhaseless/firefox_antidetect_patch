@@ -17,7 +17,10 @@ of the source tree, never shipped. This script is the part of Mozilla's runner (
   prefs  every preference the packaged engine has (default branch: name, type, value, locked; user branch of a fresh profile), written by
          scripts/ci/prefs_dump.js in `-xpcshell` mode, as a sorted JSON
   prefs-compare  two such dumps: zero differences is green, any added, missing or changed preference (name, both values, the locked flag) is red; with
-         --control the two are one engine dumped twice and a difference is a broken control (exit 2), not a result
+         --control the two are one engine dumped twice and a difference is a broken control (exit 2), not a result. With --declared <file> (the series'
+         tools/prefs-declared.json, written by hand, every row read by the pm in its pull request) the rows are applied to the BASELINE (the first dump:
+         the published engine) before the comparison, which still has zero differences to allow; a row that matches nothing in the candidate, or that the
+         baseline already holds, is red (see the declared changes below)
   prefs-summary  the verdicts and every difference of a prefs-out folder, as Markdown for the job's summary
   verify-asset  the published engine (`gh release download <tag>`, seal.json and the leg's archive) is the one the seal says: sha256 of the archive
   lock   (a person, on a machine that has the Mozilla tag in git) rewrite the lock: the files every test needs, and for each declared test the manifest of
@@ -362,7 +365,7 @@ def _show(entry: dict) -> str:
 def prefs_diff(a: dict, b: dict) -> list:
     """Every difference between two dumps, as {branch, name, kind: changed|missing|added, a, b}: `missing` is in `a` and not in `b`, `added` the
     reverse. An entry is its type, its value (compared as JSON text, so 1 is not true and "5" is not 5) and, on the default branch, its locked flag.
-    Nothing is ignored: there is no list of expected differences."""
+    Nothing is ignored here: what a release declares to change is applied to the baseline BEFORE this (apply_declared), never subtracted from it."""
     found = []
     for branch in PREFS_BRANCHES:
         left, right = a.get(branch, {}), b.get(branch, {})
@@ -376,9 +379,70 @@ def prefs_diff(a: dict, b: dict) -> list:
     return found
 
 
-def prefs_compare(path_a: Path, path_b: Path, out: Path | None = None, control: bool = False) -> int:
+# ----------------------------------------------------------------------------------------------------------------------------------------------
+# the declared changes: what this release changes in the preferences against the latest published engine
+# ----------------------------------------------------------------------------------------------------------------------------------------------
+DECLARED = ("name", "branch", "type", "value", "reason", "decided_by")  # the fields of a row of tools/prefs-declared.json, all of them required
+DECLARED_TYPES = ("string", "int", "bool")
+
+
+def declared_problems(rows) -> list:
+    """What makes the declared file not a list of rows: not a list, a row that is not an object with exactly DECLARED, a branch that is not default or
+    user, a type that is not string, int or bool, a value that does not have that type, a reason or a decided_by that is not text, a (branch, name) twice."""
+    if not isinstance(rows, list):
+        return ["not a JSON list of rows"]
+    found, seen = [], set()
+    for number, row in enumerate(rows, 1):
+        if not isinstance(row, dict) or sorted(row) != sorted(DECLARED):
+            found.append("row %d has not exactly the fields %s: %r" % (number, ", ".join(DECLARED), row))
+            continue
+        entry = {"type": row["type"], "value": row["value"]}
+        if not isinstance(row["name"], str) or not row["name"] or row["branch"] not in PREFS_BRANCHES or row["type"] not in DECLARED_TYPES or not _value_ok(entry):
+            found.append("row %d is malformed (a name, a branch default or user, a type string, int or bool, and a value of that type): %r" % (number, row))
+        elif not all(isinstance(row[k], str) and row[k].strip() for k in ("reason", "decided_by")):
+            found.append("row %d (%s) has no reason or no decided_by" % (number, row["name"]))
+        elif (row["branch"], row["name"]) in seen:
+            found.append("row %d: %s %s is declared twice" % (number, row["branch"], row["name"]))
+        else:
+            seen.add((row["branch"], row["name"]))
+    return found
+
+
+def _declared_entry(row: dict) -> dict:
+    """The entry a row declares: its type and value, and on the default branch not locked (a row says nothing else, so nothing else is allowed)."""
+    entry = {"type": row["type"], "value": row["value"]}
+    return dict(entry, locked=False) if row["branch"] == "default" else entry
+
+
+def declared_row_problems(rows: list, baseline: dict, candidate: dict) -> list:
+    """The rows that are red: STALE when the baseline (the latest published engine) already holds exactly what the row declares (the release that published
+    it has gone: the row is removed), and MATCHES NOTHING when the candidate has no such preference or holds another type, value or locked flag."""
+    found = []
+    for row in rows:
+        branch, name, wanted = row["branch"], row["name"], _declared_entry(row)
+        base, cand = baseline.get(branch, {}).get(name), candidate.get(branch, {}).get(name)
+        if base is not None and json.dumps(base, sort_keys=True) == json.dumps(wanted, sort_keys=True):
+            found.append("stale row: %s %s: the baseline already holds %s; remove the row from the declared file" % (branch, name, _show(base)))
+        if cand is None:
+            found.append("row matches nothing: %s %s: the candidate has no such preference (the row declares %s)" % (branch, name, _show(wanted)))
+        elif json.dumps(cand, sort_keys=True) != json.dumps(wanted, sort_keys=True):
+            found.append("row matches nothing: %s %s: the candidate holds %s, the row declares %s" % (branch, name, _show(cand), _show(wanted)))
+    return found
+
+
+def apply_declared(baseline: dict, rows: list) -> dict:
+    """A copy of the baseline dump with every declared row written into its branch: the comparison then has zero differences to allow."""
+    applied = json.loads(json.dumps(baseline))
+    for row in rows:
+        applied.setdefault(row["branch"], {})[row["name"]] = _declared_entry(row)
+    return applied
+
+
+def prefs_compare(path_a: Path, path_b: Path, out: Path | None = None, control: bool = False, declared: Path | None = None) -> int:
     """0 when the two dumps have no difference at all; 1 for any difference (every one is printed: pref name, both values) or a dump that is not
-    usable; with `control` (one engine dumped twice) a difference or an unusable dump is a BROKEN CONTROL and the exit is EXIT_CONTROL."""
+    usable; with `control` (one engine dumped twice) a difference or an unusable dump is a BROKEN CONTROL and the exit is EXIT_CONTROL.
+    `declared` is the series' file of declared changes: its rows are checked against both dumps (declared_row_problems: red on a stale row, red on a row that
+    the candidate does not have as declared) and applied to the baseline `path_a` before the comparison; a file that is not a list of rows is red."""
     red = EXIT_CONTROL if control else 1
     label = "BROKEN CONTROL (the same engine dumped twice differs: the dump is not repeatable, nothing measured with it can be read)" if control else "RED"
     dumps = []
@@ -392,8 +456,22 @@ def prefs_compare(path_a: Path, path_b: Path, out: Path | None = None, control: 
             print("%s prefs-compare: %s is not usable: %s" % (label, Path(path).name, "; ".join(problems[:10])))
             return red
         dumps.append(dump)
+    rows, row_problems = [], []
+    if declared is not None:
+        try:
+            rows = json.loads(Path(declared).read_text(encoding="utf-8"))
+            row_problems = declared_problems(rows)
+        except (OSError, ValueError) as exc:
+            rows, row_problems = [], ["unreadable: %s" % exc]
+        if row_problems:
+            print("%s prefs-compare: the declared changes %s are not usable: %s" % (label, Path(declared).name, "; ".join(row_problems[:10])))
+            return red
+        row_problems = declared_row_problems(rows, dumps[0], dumps[1])
+        dumps[0] = apply_declared(dumps[0], rows)
     diff = prefs_diff(*dumps)
-    result = {"a": str(path_a), "b": str(path_b), "control": control, "verdict": "red" if diff else "green", "differences": diff,
+    bad = bool(diff or row_problems)
+    result = {"a": str(path_a), "b": str(path_b), "control": control, "verdict": "red" if bad else "green", "differences": diff,
+              "declared": [{"branch": r["branch"], "name": r["name"], "type": r["type"], "value": r["value"]} for r in rows], "declared_problems": row_problems,
               "count": {branch: len(dumps[0][branch]) for branch in PREFS_BRANCHES}}
     if out:
         Path(out).parent.mkdir(parents=True, exist_ok=True)
@@ -401,9 +479,15 @@ def prefs_compare(path_a: Path, path_b: Path, out: Path | None = None, control: 
     unreadable = sorted(n for dump in dumps for branch in PREFS_BRANCHES for n, e in dump[branch].items() if e["type"] in ("invalid", "error"))
     if unreadable:
         print("prefs-compare: %d prefs the dump could not read as a string, int or bool: %s" % (len(unreadable), unreadable[:20]))
-    if not diff:
+    if rows:
+        print("prefs-compare: %d declared changes applied to the baseline: %s" % (len(rows), ", ".join("%s %s" % (r["branch"], r["name"]) for r in rows)))
+    for problem in row_problems:
+        print("%s prefs-compare: declared %s" % (label, problem))
+    if not bad:
         print("prefs-compare: %s and %s have no difference (%d default, %d user prefs)" % (Path(path_a).name, Path(path_b).name, len(dumps[0]["default"]), len(dumps[0]["user"])))
         return 0
+    if not diff:
+        return red
     print("%s prefs-compare: %d differences between %s (a) and %s (b)" % (label, len(diff), Path(path_a).name, Path(path_b).name))
     for item in diff:
         if item["kind"] == "changed":
@@ -425,6 +509,10 @@ def prefs_summary(directory: Path, title: str) -> int:
             continue
         data = json.loads(path.read_text(encoding="utf-8"))
         print("- %s: %s, %d differences (%d default prefs)" % (name, data["verdict"], len(data["differences"]), data["count"]["default"]))
+        for row in data.get("declared", []):
+            print("  - declared `%s %s` = `%s:%s` (applied to the baseline)" % (row["branch"], row["name"], row["type"], json.dumps(row["value"])))
+        for problem in data.get("declared_problems", []):
+            print("  - declared %s" % problem)
         for item in data["differences"][:200]:
             print("  - `%s %s` %s: a=`%s` b=`%s`" % (item["branch"], item["name"], item["kind"], json.dumps(item["a"]), json.dumps(item["b"])))
     return 0
@@ -996,6 +1084,7 @@ def main(argv=None) -> int:
     pc.add_argument("b", type=Path)
     pc.add_argument("--out", type=Path, default=None)
     pc.add_argument("--control", action="store_true", help="a and b are one engine dumped twice: a difference is a broken control (exit 2)")
+    pc.add_argument("--declared", type=Path, default=None, help="the series' tools/prefs-declared.json: rows applied to the baseline a (not with --control)")
     ps = sub.add_parser("prefs-summary")
     ps.add_argument("dir", type=Path)
     ps.add_argument("--title", default="prefs")
@@ -1014,7 +1103,9 @@ def main(argv=None) -> int:
     if args.cmd == "prefs":
         return prefs_dump(args.binary, args.out, args.root, args.timeout)
     if args.cmd == "prefs-compare":
-        return prefs_compare(args.a, args.b, args.out, args.control)
+        if args.declared and args.control:
+            parser.error("--declared is not used with --control: the control is one engine dumped twice")
+        return prefs_compare(args.a, args.b, args.out, args.control, args.declared)
     if args.cmd == "prefs-summary":
         return prefs_summary(args.dir, args.title)
     if args.cmd == "lock":

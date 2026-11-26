@@ -170,6 +170,11 @@ bool StealthTargetWantsXrays(JSContext* aCx, bool aWantXrays);
 // Whether the context realm (the target of the wrapper) is a caller's world.
 bool StealthTargetIsHybrid(JSContext* aCx);
 
+// The same question for a realm given (DEBUG_CheckUnwrapSafety checks the
+// wrapper Rewrap made, for the target realm it was made for): wantXrays or a
+// caller's world.
+bool StealthRealmWantsXrays(JS::Realm* aRealm, bool aWantXrays);
+
 // STEALTHFOX [B322]: a caller's object, read by the page it shares a
 // principal with. It goes BEFORE the web-object case in Rewrap, which would
 // otherwise take it: the two compartments are same-origin and neither
@@ -181,14 +186,25 @@ bool StealthTargetIsHybrid(JSContext* aCx);
 // The four values it is decided from are Rewrap's own locals, which a hook
 // cannot pass to a branch of the chain: StealthNoteCallerObject takes them
 // where Rewrap has computed them (an anchor, after `sameOrigin`, on the one
-// straight path every call takes before the chain) and decides then, and
-// StealthCallerObjectApplies, the condition of the branch, answers with that
-// decision and clears it: a read with no decision since the last read is false.
-// The decision is kept per thread: Rewrap runs on the thread of the context, and
-// nothing between the anchor and the branch (the conditions of the cases before
-// it read the class of `obj` and two flags) reaches another Rewrap.
+// straight path every call takes before the chain) and decides then.
+//
+// The branch is not written into the chain. It would come between Mozilla's
+// cross-origin case and its web-object case, so the web-object case steps
+// aside for it: its first term goes through StealthNotCallerObject, which is
+// that term unless a decision is waiting (it only looks, it takes nothing),
+// and the regular case at the end of the chain, which is then the one reached,
+// hands the page the caller's wrapper through StealthSelectedWrapper, which
+// takes the decision (StealthCallerObjectApplies answers with it and clears it:
+// a read with no decision since the last read is false). What the regular case
+// computes before that (the flags, the Xray type, SelectWrapper's choice among
+// static wrappers) reads nothing of the page and has no effect, and the
+// wrapper it ends with is the one the branch gave. The decision is kept per
+// thread: Rewrap runs on the thread of the context, and nothing between the
+// anchor and the take (the conditions of the cases before it read the class of
+// `obj` and two flags) reaches another Rewrap.
 void StealthNoteCallerObject(JS::Realm* origin, JS::Realm* target,
                              bool targetIsChrome, bool targetSubsumesOrigin);
+bool StealthNotCallerObject(bool aMozillaCondition);
 bool StealthCallerObjectApplies();
 
 // The parts of the pair, for a test with no Realm: the decision as a function
@@ -219,7 +235,9 @@ const js::Wrapper* StealthHybridWrapper(xpc::XrayType xrayType);
 // reference with no Xray (both the transparent wrapper, as StealthHybridWrapper
 // gives for them). Every other choice (the waived Xray, the opaque filters of
 // the security wrappers) is Gecko's own answer, and so is every choice when the
-// realm is not a caller's world.
+// realm is not a caller's world. Before all that, a decision that
+// StealthNoteCallerObject left waiting (see above) is taken here: the wrapper
+// is the one the page reads the caller's objects through.
 const js::Wrapper* StealthSelectedWrapper(JSContext* aCx,
                                           const js::Wrapper* aMozillaWrapper);
 

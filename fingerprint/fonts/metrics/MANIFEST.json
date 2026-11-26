@@ -14,6 +14,7 @@
  "added": {
   "gfx/2d/StealthGlyphCoverage.cpp": "100644",
   "gfx/2d/StealthGlyphCoverage.h": "100644",
+  "gfx/tests/gtest/StealthFontMetricsTests.mozbuild": "100644",
   "gfx/tests/gtest/TestStealthFontMetrics.cpp": "100644",
   "gfx/tests/gtest/TestStealthTextQuality.cpp": "100644",
   "gfx/thebes/StealthDesignFontAccess.h": "100644",
@@ -26,6 +27,7 @@
  "sha256": {
   "gfx/2d/StealthGlyphCoverage.cpp": "1bb965705c8f199b62e0ea39d8a37c28226bb3142867aaf6b5f29330d2872fe0",
   "gfx/2d/StealthGlyphCoverage.h": "c3ca601c3832c0101ab76ba03900fcad6500ede5e5627a33c582a772ff91de10",
+  "gfx/tests/gtest/StealthFontMetricsTests.mozbuild": "32c9ca46407b54d40fd71bde7e45089c9c4a8528d648b512a3fe43fcb0c21327",
   "gfx/tests/gtest/TestStealthFontMetrics.cpp": "a96a7ef3bd49f2688df0cff4422c518077c64721828cebe83f4cab3c17173e62",
   "gfx/tests/gtest/TestStealthTextQuality.cpp": "bef66b23e42b3950b5a6c09f06680cc4058622702a15e615aef3dbf3f5ba9193",
   "gfx/thebes/StealthDesignFontAccess.h": "8d5bb39b4106a64794aa1b3b8649bd704a5f943f6d389a1efd8d466cf3b9d5d5",
@@ -73,7 +75,7 @@
    "category": "build",
    "feature": "font-design-metrics",
    "prefs": [],
-   "added": 3,
+   "added": 2,
    "removed": 0,
    "hunks": 1,
    "inline_logic_lines": 0,

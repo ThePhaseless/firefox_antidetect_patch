@@ -40,6 +40,7 @@
 
 #include "StealthTestProxyKit.h"
 #include "nr_stealth_network.h"
+#include "nr_stealth_proxy_udp.h"
 #include "nsSOCKSUDPIOLayer.h"
 #include "mozilla/RefPtr.h"
 #include "mozilla/SyncRunnable.h"
@@ -58,6 +59,12 @@
 
 namespace mozilla {
 namespace {
+
+// The socket of a PeerConnection as NrSocketBase::CreateSocket makes it: Mozilla's own `new NrSocket()`, given the proxy config
+// before create() is called (NrSocket has no constructor that takes it).
+RefPtr<NrSocket> NrSocketOf(const std::shared_ptr<NrSocketProxyConfig>& aConfig) {
+  return StealthNrSocketOf(aConfig, new NrSocket());
+}
 
 // Runs aFn on the socket transport thread and returns when it has run.
 template <typename F>
@@ -146,7 +153,7 @@ bool DatagramOfANrSocketArrives(const std::shared_ptr<NrSocketProxyConfig>& aCon
   EXPECT_FALSE(NrSocketBase::IsForbiddenAddress(&to)) << "no receiver port the engine would not drop was found";
   nr_transport_addr local = UdpAddr("0.0.0.0", 0);
 
-  RefPtr<NrSocket> nrSocket = new NrSocket(aConfig);
+  RefPtr<NrSocket> nrSocket = NrSocketOf(aConfig);
   int created = -1;
   OnSocketThread([&] {
     created = nrSocket->create(&local);
@@ -170,7 +177,7 @@ bool DatagramOfANrSocketArrives(const std::shared_ptr<NrSocketProxyConfig>& aCon
 // A NrSocket whose file descriptor the test can ask the layer about.
 class NrSocketWithItsFd final : public NrSocket {
  public:
-  explicit NrSocketWithItsFd(const std::shared_ptr<NrSocketProxyConfig>& aConfig) : NrSocket(aConfig) {}
+  explicit NrSocketWithItsFd(const std::shared_ptr<NrSocketProxyConfig>& aConfig) { StealthNrSocketAccess::SetProxyConfig(this, aConfig); }
   PRFileDesc* Fd() const { return fd_; }
 };
 
@@ -416,14 +423,14 @@ TEST(StealthNrSocketBirth, ASocketWhoseLayerCannotBePushedIsNotBorn)
   std::shared_ptr<NrSocketProxyConfig> config = stealthtest::MakeConfigAfterTheLookup();
   ASSERT_TRUE(config);
   nr_transport_addr local = UdpAddr("0.0.0.0", 0);
-  RefPtr<NrSocket> refused = new NrSocket(config);
+  RefPtr<NrSocket> refused = NrSocketOf(config);
   int result = 0;
   net::nsSOCKSUDPIOLayerFailNextPushForTests(true);
   OnSocketThread([&] { result = refused->create(&local); });
   net::nsSOCKSUDPIOLayerFailNextPushForTests(false);
   EXPECT_EQ(R_INTERNAL, result) << "the socket was born plain although its layer was refused: its datagrams would go out direct";
   // The refusal is for one socket: the next one is born, with its layer.
-  RefPtr<NrSocket> next = new NrSocket(config);
+  RefPtr<NrSocket> next = NrSocketOf(config);
   int nextResult = -1;
   OnSocketThread([&] { nextResult = next->create(&local); });
   EXPECT_EQ(0, nextResult);
@@ -540,7 +547,7 @@ TEST(StealthNrSocketBirth, TwoRefusedPortsLeaveTheReadyAssociationsToTheSocketTh
   OnSocketThread([&] {
     // What nr_socket_local_create does over a reserved range: a socket per port, each released at once when its bind is refused.
     for (int& result : refused) {
-      RefPtr<NrSocket> attempt = new NrSocket(config);
+      RefPtr<NrSocket> attempt = NrSocketOf(config);
       StealthFailNextBindForTests(PR_NO_ACCESS_RIGHTS_ERROR);
       result = attempt->create(&any);
     }

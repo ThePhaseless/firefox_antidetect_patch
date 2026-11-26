@@ -25,7 +25,7 @@ def _job(name):
 
 
 def test_the_legs_that_run_the_wrapper_make_the_database_before_they_run_it():
-    for name, first_use in (("gate", "      - name: Install Playwright driver"), ("wrapper-e2e", "      - name: Linux system deps")):
+    for name, first_use in (("gate", "      - name: The wheelhouse of the run's py-deps-gate job"), ("wrapper-e2e", "      - name: Linux system deps")):
         job = _job(name)
         assert job.count(FETCH) == 1, "%s makes the GeoIP database %d times" % (name, job.count(FETCH))
         assert job.index(STEP) < job.index(first_use), "%s makes the database after the wrapper is installed or run" % name

@@ -38,16 +38,8 @@
   "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
   "kind": "add",
   "form": "registration",
-  "line": "    UNIFIED_SOURCES += [\"TestStealthFontMetrics.cpp\"]  # STEALTH-HOOK(fingerprint/fonts/metrics)",
+  "line": "include(\"StealthFontMetricsTests.mozbuild\")  # STEALTH-HOOK(fingerprint/fonts/metrics)",
   "test": "gtest:StealthFontMetrics.ClearTypeTakesTheOS2AverageUnrounded"
- },
- {
-  "file": "gfx/tests/gtest/moz.build",
-  "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
-  "kind": "add",
-  "form": "registration",
-  "line": "    UNIFIED_SOURCES += [\"TestStealthTextQuality.cpp\"]  # STEALTH-HOOK(fingerprint/fonts/metrics)",
-  "test": "gtest:StealthTextQuality.TheDeclarationIsReadAndTheHostIsNot"
  },
  {
   "file": "gfx/thebes/gfxDWriteFonts.cpp",
@@ -194,13 +186,5 @@
   "form": "registration",
   "line": "include(\"StealthDesignMetrics.mozbuild\")  # STEALTH-HOOK(fingerprint/fonts/metrics)",
   "test": "gtest:StealthFontMetrics.DesignAdvanceAtAFractionalSize"
- },
- {
-  "file": "gfx/tests/gtest/moz.build",
-  "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
-  "kind": "add",
-  "form": "registration",
-  "line": "include(\"StealthFontMetricsTests.mozbuild\")  # STEALTH-HOOK(fingerprint/fonts/metrics)",
-  "test": "gtest:StealthFontMetrics.ClearTypeTakesTheOS2AverageUnrounded"
  }
 ]

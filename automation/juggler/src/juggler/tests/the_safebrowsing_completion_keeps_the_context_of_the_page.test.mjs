@@ -62,12 +62,17 @@ test('the completion callbacks of a lookup read the context the lookup was made 
   assert.ok(base.indexOf(member) < base.indexOf('  uint32_t mPendingCompletions = 0;\n'), 'the member is the last of the class');
   assert.ok(base.includes('  NS_DECL_NSIURLCLASSIFIERHASHCOMPLETERCALLBACK\n'));
 
-  const getter = 'NS_IMETHODIMP nsUrlClassifierHashCompleterBase::GetUserContextId(uint32_t* aId) { return mozilla::net::StealthLookupContextOut(mStealthUserContextId, aId); }  // ' + TAG + '\n';
-  assert.equal(count(text, getter), 1, 'the getter of the attribute is missing');
-  assert.ok(text.indexOf('NS_IMPL_ISUPPORTS(nsUrlClassifierHashCompleterBase,\n                  nsIUrlClassifierHashCompleterCallback)\n' + getter) > 0, 'the getter is not right after Mozilla\'s NS_IMPL_ISUPPORTS');
+  // The getter of the attribute is defined in a file of ours, included right after Mozilla's NS_IMPL_ISUPPORTS (the class is
+  // only visible in this file).
+  const include = '#include "StealthHashCompleterContext.inc.h"  // ' + TAG + '\n';
+  assert.equal(count(text, include), 1, 'the file with the getter of the attribute is not included');
+  assert.doesNotMatch(text, /GetUserContextId/, 'the getter is defined in Mozilla\'s file');
+  assert.ok(text.indexOf('NS_IMPL_ISUPPORTS(nsUrlClassifierHashCompleterBase,\n                  nsIUrlClassifierHashCompleterCallback)\n' + include) > 0, 'the include is not right after Mozilla\'s NS_IMPL_ISUPPORTS');
+  const getter = read(DIR + 'StealthHashCompleterContext.inc.h');
+  assert.match(getter, /NS_IMETHODIMP nsUrlClassifierHashCompleterBase::GetUserContextId\(uint32_t\* aId\) \{\n  return mozilla::net::StealthLookupContextOut\(mStealthUserContextId, aId\);\n\}\n/);
 });
 
-test('Classify opens the scope with the page\'s principal before any callback is made, and only there', () => {
+test('Classify opens the scope with the page\'s principal as its first statement, before any callback is made, and only there', () => {
   const text = read(DB);
   const hook = '  mozilla::net::StealthLookupContextScope stealthScope(aPrincipal);  // ' + TAG + '\n';
   assert.equal(count(text, hook), 1);
@@ -75,12 +80,15 @@ test('Classify opens the scope with the page\'s principal before any callback is
   const classify = text.match(/nsUrlClassifierDBService::Classify\(nsIPrincipal\* aPrincipal,[\s\S]*?\n\}\n/)[0];
   const at = classify.indexOf(hook);
   assert.ok(at > 0, 'the scope is not in Classify');
-  assert.ok(classify.indexOf('"safe-browsing"_ns, &perm);') < at, 'the scope is opened before the permission test, for a lookup that is not made (it must follow the early returns)');
-  assert.ok(classify.indexOf('perm == nsIPermissionManager::ALLOW_ACTION') < at);
-  const realTime = classify.indexOf('  if (Classifier::IsRealTimeModeEnabled()) {\n');
-  assert.equal(at + hook.length, realTime, 'the scope is not right before Mozilla\'s real-time branch');
+  // The first statement of the function: the scope only sets and restores the thread's context, and nothing that runs before the
+  // lookups (the checks of the arguments, the early returns, the IPC of a content process, the permission test) reads it, so it
+  // does not have to wait for the lookups to start.
+  assert.equal(classify.indexOf('{\n' + hook) + 2, at, 'the scope is not the first statement of Classify');
+  assert.ok(at < classify.indexOf('NS_ENSURE_ARG(aPrincipal);'), 'the scope is opened after the arguments are checked');
   assert.ok(at < classify.indexOf('new (fallible) nsUrlClassifierRealTimeLookupHandler('), 'the real-time handler is made before the scope');
   assert.ok(at < classify.indexOf('rv = LookupURI(key, holder, callback);'), 'the lookup callback is made before the scope');
+  // Nothing before the lookups reads the context of the thread (the only reader is the member of the completer base class).
+  assert.doesNotMatch(classify, /StealthCurrentLookupContext/);
   // Lookup() (download reputation) is outside this change: its callbacks are made with no scope.
   const lookup = text.match(/nsUrlClassifierDBService::Lookup\(nsIPrincipal\* aPrincipal,[\s\S]*?\n\}\n/)[0];
   assert.doesNotMatch(lookup, /Stealth/);

@@ -31,8 +31,8 @@
   "third_party/libwebrtc/api/location.h": "100644"
  },
  "sha256": {
-  "dom/media/webrtc/transport/mdns_service/src/stealth_interface.rs": "7189a0da49fe418dd5af2f5f4b4c7b97f7145fae1c31636a7cf6b8b3df2b0481",
-  "dom/media/webrtc/transport/mdns_service/src/stealth_tests.rs": "9623e79c8256bedce58bd5e39828da54a36dd58791a8ab2e5f30a5d3e219d325",
+  "dom/media/webrtc/transport/mdns_service/src/stealth_interface.rs": "60dda416cf57efd75b99a34b0a802e8d7f3140ed72c7fbeb11a518e3a28ef714",
+  "dom/media/webrtc/transport/mdns_service/src/stealth_tests.rs": "caf361a2067422405a8a4702d2598b55733430df4caf7212e3c5fe6444dba51e",
   "dom/media/webrtc/transport/nr_stealth_network.cpp": "95a7ab0e5502ee49b183950ddd5cf2ba557e45f23e4150f133bfda2ce3ae1ac4",
   "dom/media/webrtc/transport/nr_stealth_network.h": "7cf4b56c3c4d52fa6fc05dca5c1aff950050ccf4f5a994d1c8c64a1584832e1a",
   "dom/media/webrtc/transport/test/gtest/TestStealthDeclaredNetwork.cpp": "d861a2093fed1e404a79e3c89ac54a345d911a7dcac1f52b6b11ab33f4037e5e",
@@ -116,9 +116,9 @@
    "feature": "webrtc-declared-network",
    "prefs": [],
    "added": 4,
-   "removed": 0,
+   "removed": 1,
    "hunks": 3,
-   "inline_logic_lines": 1,
+   "inline_logic_lines": 0,
    "hookable": "movable",
    "anchor": "MDNSService::new, after the join_multicast_v4 loop",
    "notes": "The responder sets the multicast interface to the address it joined on, or a query would leave on the default multicast route and never come back to its socket (on Linux a join on the loopback hears nothing without it). The loop iterates by reference so the first address stays available.",
