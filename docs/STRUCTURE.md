@@ -191,7 +191,7 @@ Rule: [hook-03](decisions/hook-03-budgets-and-debt-only-go-down.md).
 ## Every change
 
 1. In the source repository, on the source branch: the change, its test, the commit.
-2. Here: `export`. It first runs the node tests and the tree's python tests on the head's tree; then it writes the series into a scratch copy of the checkout, runs `engine.py check` and `tools/tests` (`-n auto`) on that copy, and only if all is green replaces the series of the checkout with it. A red leaves the checkout untouched.
+2. Here: `export`. It first runs the node tests and the tree's python tests on the head's tree; then it writes the series into a scratch copy of the checkout, runs `engine.py check` and `tools/tests` (`-n auto`) on that copy, and only if all is green replaces the series of the checkout with it. A red leaves the checkout untouched. Two failures of `check` that only a later step can close (the empty text of a record the export derived, the churn rows of the hunks it moved) are printed as `TODO after export` and do not stop it; `check` itself still refuses them.
 3. `verify`: it must say `identical`.
 4. `hook-debt` drops the resolved debt; `shrink-budget` after logic moved; a (file, folder) new to the series gets its row in `tools/hook-budget.json` from `export` (at most 5 lines: more is a failure of `check`).
 5. A folder `export` made anew has no `FOLDER.json`: write it (`product`, or `defect` with its `upstream`). Fill the hand fields of the touched `HOOKS.json` (`test`; `anchor` and `why` for an anchor) and the `Test:` line of `FEATURE.md`.

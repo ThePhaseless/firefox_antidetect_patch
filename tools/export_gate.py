@@ -28,13 +28,23 @@ tests the build job runs and refuses to write anything into the checkout if one 
           after the write, not from a list of names, so nothing the export writes can be left stale. A re-export that changes
           nothing touches nothing.
      A red leaves the checkout as it was, byte for byte, and the scratch tree is removed; the stop names which test or check is red.
+     What only a step after the export can close does not make the gate red, and only what THIS export made (News, tolerated): an empty
+     `anchor`, `notes` or `hookable` of an inventory record the export derived (its (file, folder) is not in the checkout's
+     tools/inventory.json), and a missing churn row (C18) of a hunk the export moved or created (its churn key is in the scratch
+     hooks.patch files and not in the checkout's; tools/churn.py writes the rows and needs the release tags). Each is printed as
+     `TODO after export: <file>: <what>. Fix: <command or hand step>`; an empty field of any other record, a missing row of a hunk the
+     export did not touch, and every other failure of check stay red. check itself is not changed: on the pull request it refuses both.
+     The one test of tools/tests that says the churn rule again over the whole series (RESTATES_CHURN) is red for the same hunks, so it is let
+     through, as a TODO line, exactly when check's own churn failure was and nothing else is red.
 There is no switch to skip the gate.
 """
 from __future__ import annotations
 
 import glob
 import importlib.util
+import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -44,7 +54,7 @@ from pathlib import Path
 from typing import Callable
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from failure import fail  # noqa: E402
+from failure import Failure, fail  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 # The decision that owns the gate: the export is the one writer, and it writes nothing while a test is red (series-01).
@@ -209,28 +219,159 @@ def _run(command: list, cwd: Path) -> subprocess.CompletedProcess:
     return subprocess.run(command, cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace")
 
 
-def run_series_check(tree: Path) -> list:
-    """`tools/engine.py check` of the scratch tree, as the command line runs it."""
+FAILURE_LINE = re.compile(r"^FAIL ")
+# A failure prints as `FAIL <where>: <what>. Fix: <fix>. Rule: docs/decisions/<rule>.md`, and a `where` may hold ": " (a hook is found by its
+# C++ context: `class NrSocket : public NrSocketBase {`). So the two failures the gate reads are cut where their `what` begins, and any
+# other line at its first ": "; a split that does not rebuild the line is refused (parse_failure).
+FAIL_LINES = tuple(re.compile(r"^FAIL " + head + r"\. Fix: (?P<fix>.+)\. Rule: docs/decisions/(?P<rule>.+)\.md$") for head in (
+    r"(?P<where>.+?): (?P<what>C18: the hook .+)",
+    r"(?P<where>tools/inventory\.json, the record of .+?): (?P<what>its `.+)",
+    r"(?P<where>.+?): (?P<what>.+)"))
+INVENTORY_WHERE = re.compile(r"^tools/inventory\.json, the record of (?P<file>.+) in (?P<folder>.+)$")
+EMPTY_HAND_FIELD = re.compile(r"^its `(?:anchor|notes|hookable)` is ")
+HOOK_WHERE = re.compile(r"^(?P<folder>.+)/hooks\.patch, (?P<file>[^,]+)(?:, .*)?$")
+NO_CHURN_ROW = re.compile(r"^C18: the hook `.*`(?:, hunk (?P<hunk>\d+),)? has no churn row in tools/churn\.json$")
+CHURN_FIX = "python tools/churn.py --source <repo with the tags> --write, then commit tools/churn.json"
+
+
+def parse_failure(line: str):
+    """The Failure that `check` printed as `line` (it runs in a subprocess, so only the text comes back), or None when the line is not
+    the rendering of one: a line that does not rebuild into itself is not trusted."""
+    for pattern in FAIL_LINES:
+        found = pattern.match(line)
+        if not found:
+            continue
+        try:
+            rebuilt = Failure(found["where"], found["what"], found["fix"], found["rule"])      # the rule is read from the line: Failure, not fail()
+        except ValueError:
+            continue
+        if str(rebuilt) == line:
+            return rebuilt
+    return None
+
+
+class News:
+    """What this export itself made new in the series, against the checkout it will replace: the only things the gate lets `check` miss.
+      derived: (file, folder) of the inventory records the export derived (absent from the checkout's tools/inventory.json);
+      moved:   (folder, file, hunk) of the hunks whose churn key is in the scratch hooks.patch files and not in the checkout's;
+      files:   (folder, file) with a hunk in the scratch hooks.patch files and none in the checkout's (a whole file moved to a folder)."""
+
+    def __init__(self, derived: set, moved: set, files: set):
+        self.derived, self.moved, self.files = derived, moved, files
+
+    @classmethod
+    def of(cls, root: Path, tree: Path) -> "News":
+        before, after = _churn_hunks(root), _churn_hunks(tree)
+        keys_before = set(before.values())
+        return cls(_inventory_keys(tree) - _inventory_keys(root),
+                   {hunk for hunk, key in after.items() if key not in keys_before},
+                   {(folder, path) for folder, path, _ in after} - {(folder, path) for folder, path, _ in before})
+
+
+def _inventory_keys(root: Path) -> set:
+    """(file, folder) of every record of tools/inventory.json under `root` (folder: the one of the record's feature, None if it has none)."""
+    import layout
+    try:
+        records = json.loads((Path(root) / "tools" / "inventory.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return set()
+    keys = set()
+    for record in records:
+        try:
+            folder = layout.feature_folder(record["feature"])
+        except KeyError:
+            folder = None
+        keys.add((record["file"], folder))
+    return keys
+
+
+def _churn_hunks(root: Path) -> dict:
+    """(folder, file, hunk number) -> churn key, of the hooks.patch files of the series under `root` (tools/churn.py reads them)."""
+    import churn
+    try:
+        return churn.hunk_keys(root)
+    except (OSError, ValueError, KeyError):
+        return {}
+
+
+def tolerated(failure, news: News):
+    """The `TODO after export` line for a failure of `check` that only a step after the export can close, or None when the gate keeps it
+    red. Two classes, and only for what this export made:
+      1. an empty hand field (`anchor`, `notes`, `hookable`) of an inventory record the export derived (`news.derived`): a human writes
+         it;
+      2. a hook with no churn row (C18) in a hunk the export moved or created (`news.moved`, or `news.files` for a whole file):
+         tools/churn.py writes the rows and needs the release tags, which the export does not have.
+    Anything else, among it an empty field of another record and a missing churn row of a hunk the export did not touch, is red."""
+    record = INVENTORY_WHERE.match(failure.where)
+    if record and EMPTY_HAND_FIELD.match(failure.what):
+        if (record["file"], record["folder"]) in news.derived:
+            return "TODO after export: %s: the record in %s: %s. Fix: %s" % (record["file"], record["folder"], failure.what, failure.fix)
+        return None
+    hook, row = HOOK_WHERE.match(failure.where), NO_CHURN_ROW.match(failure.what)
+    if hook and row:
+        mine = ((hook["folder"], hook["file"], int(row["hunk"])) in news.moved if row["hunk"]
+                else (hook["folder"], hook["file"]) in news.files)
+        if mine:
+            return "TODO after export: %s: %s. Fix: %s" % (hook["file"], failure.what, CHURN_FIX)
+    return None
+
+
+def run_series_check(tree: Path, news: News | None = None) -> tuple:
+    """engine.py check of the scratch tree, as the command line runs it: (problems, todo). Every `FAIL` line is a failure; with `news`,
+    the ones `tolerated` names are TODO lines (printed by the gate), the rest are problems. A red exit with no failure line to show for
+    it is a problem. check itself is the one the pull request runs: it refuses every one of these."""
     done = _run([sys.executable, "tools/engine.py", "check"], tree)
-    print("export gate: engine.py check: " + (done.stdout.strip().splitlines() or ["no output"])[0])
-    if done.returncode:
-        return [fail("engine.py check", "the series the export wrote breaks a rule: %s" % (done.stdout + done.stderr).strip()[-800:],
-                     "fix the tool or the source so that what export writes passes check", RULE)]
-    return []
+    lines = done.stdout.strip().splitlines()
+    print("export gate: engine.py check: " + (lines or ["no output"])[0])
+    if not done.returncode:
+        return [], []
+    problems, todo = [], []
+    for line in lines:
+        if not FAILURE_LINE.match(line):
+            continue
+        failure = parse_failure(line)
+        text = tolerated(failure, news) if failure is not None and news is not None else None
+        if text:
+            todo.append(text)
+        else:
+            problems.append(failure if failure is not None else fail(
+                "engine.py check", "it printed a line that is not the rendering of a failure of the series: %s" % line,
+                "run python tools/engine.py check on the series and fix what it says, then run the export again", RULE))
+    if done.stderr.strip() or (not problems and not todo):
+        problems.append(fail("engine.py check", "the check of the series written is red and does not end in failure lines: %s" % (done.stdout + done.stderr).strip()[-1500:],
+                             "run python tools/engine.py check on the series, fix what is red, then run the export again", RULE))
+    return problems, todo
 
 
-def run_series_tests(tree: Path) -> list:
-    """The series' own tests, `python -m pytest -q -n auto tools/tests`, in the scratch tree: their root is the scratch tree."""
+# A test of tools/tests that says again, over the whole series, what a tolerated failure of check says about its hooks: it is red for the same
+# rows, so it is let through exactly when check's own failure is (a named test that is renamed or gone is a test of its own: see the tests).
+RESTATES_CHURN = {"tools/tests/test_quiet_anchors.py::test_every_hook_of_the_series_has_its_churn":
+                  ("it is red for the same hunks as check's C18 (no churn row)", CHURN_FIX)}
+FAILED_TEST = re.compile(r"^FAILED (\S+)", re.MULTILINE)
+SUMMARY_FAILED = re.compile(r"\b(\d+) (failed|error)")
+
+
+def run_series_tests(tree: Path, tolerate: dict | None = None, todo: list | None = None) -> list:
+    """The series' own tests, `python -m pytest -q -n auto tools/tests`, in the scratch tree: their root is the scratch tree.
+    `tolerate` {test id: (why, fix)}: when the tests that are red are all in it (and nothing else is red, no error), they are TODO lines in `todo`
+    and not problems."""
     if importlib.util.find_spec("xdist") is None:
         raise SystemExit(_with_next(fail(
             "python module xdist", "export refused: pytest-xdist is not installed, so tools/tests cannot run in parallel here",
             "install it with `python -m pip install pytest-xdist`", RULE), "run the export again"))
     done = _run([sys.executable, "-m", "pytest", "-q", "-n", "auto", "-p", "no:cacheprovider", "tools/tests"], tree)
     print("export gate: tools/tests: " + (done.stdout.strip().splitlines() or ["no output"])[-1])
-    if done.returncode:
-        return [fail("tools/tests", "a test of the series is red: %s" % (done.stdout + done.stderr).strip()[-1500:],
-                     "run `python -m pytest -q tools/tests`, fix what is red, then run the export again", RULE)]
-    return []
+    if not done.returncode:
+        return []
+    red = FAILED_TEST.findall(done.stdout)
+    counted = {kind: int(n) for n, kind in SUMMARY_FAILED.findall((done.stdout.strip().splitlines() or [""])[-1])}
+    if tolerate and red and set(red) <= set(tolerate) and counted == {"failed": len(red)} and not done.stderr.strip():
+        for test in sorted(set(red)):
+            if todo is not None:
+                todo.append("TODO after export: %s: %s. Fix: %s" % (test, tolerate[test][0], tolerate[test][1]))
+        return []
+    return [fail("tools/tests", "a test of the series is red: %s" % (done.stdout + done.stderr).strip()[-1500:],
+                 "run `python -m pytest -q tools/tests`, fix what is red, then run the export again", RULE)]
 
 
 # The CI scripts' own tests (platform/ci/src/scripts, run by the job `tree` of checks.yml on the materialized tree) that hold what the export writes into
@@ -296,11 +437,15 @@ def run_engine_tree_tests(source: Path, head: str) -> list:
     return run_node_tests(tree, node) + run_tree_python_tests(tree)
 
 
-def gate(source: Path, head: str, write: Callable[[Path], None], root: Path = ROOT) -> None:
+def gate(source: Path, head: str, write: Callable[[Path], None], root: Path = ROOT) -> list:
     """The whole export: the engine tree's tests, then `write(scratch)` writes the series into a scratch copy of the checkout, the
     copy is checked and tested, and only if all is green does the checkout take what was written. Exits (SystemExit) on a red, with
-    the checkout untouched."""
-    again = "python tools/engine.py export --source <source> --head %s" % head
+    the checkout untouched, and ends with `next:` (repo-05).
+
+    Green is green except for what only a step after the export can close, and only what this export made (News): an empty hand field
+    of a record it derived, a missing churn row of a hunk it moved or created. Each is printed as `TODO after export: <file>: <what>.
+    Fix: <command or hand step>` and returned (the list of lines); `check`, which the pull request runs, still refuses them."""
+    again = "python tools/engine.py export --source %s --head %s" % ("<source>", head)
     try:
         problems = run_engine_tree_tests(source, head)
     except SystemExit as stopped:        # the tree or Node is missing: the stop of gate_tree()/node_binary(), then the way on (repo-05)
@@ -316,7 +461,10 @@ def gate(source: Path, head: str, write: Callable[[Path], None], root: Path = RO
         written, removed = series_delta(tree, root, before)
         # the scratch tree has its own index: the tests that read `git ls-files` see the files the export wrote
         git("-C", str(tree), "add", "-A")
-        problems = run_series_check(tree) + run_series_tests(tree) + run_ci_script_tests(tree, written, removed)
+        problems, todo = run_series_check(tree, News.of(root, tree))
+        # a test that restates a tolerated class is let through only when check's own failure of that class was (and no other C18 is red)
+        mine = RESTATES_CHURN if any("no churn row" in t for t in todo) and not any("C18" in str(p) for p in problems) else None
+        problems += run_series_tests(tree, mine, todo) + run_ci_script_tests(tree, written, removed)
         if problems:
             raise SystemExit(_with_next(fail(
                 "the series the export wrote (%d files written, %d removed)" % (len(written), len(removed)),
@@ -324,6 +472,13 @@ def gate(source: Path, head: str, write: Callable[[Path], None], root: Path = RO
                 "fix the tool or the source so that what export writes passes check and tools/tests", RULE),
                 again))
         replace_series(tree, root, written, removed)
-        print("export gate: green on the series written; the checkout took %d files and dropped %d" % (len(written), len(removed)))
+        for line in todo:
+            print(line)
+        print("export gate: green on the series written; the checkout took %d files and dropped %d%s"
+              % (len(written), len(removed), "; %d TODO after export (check is red on them until they are done)" % len(todo) if todo else ""))
+        return todo
+    except SystemExit as stopped:
+        message = str(stopped.code)
+        raise SystemExit(message if "\nnext: " in message else _with_next(message, again)) from None
     finally:
         remove_scratch(tree, root)

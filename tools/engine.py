@@ -1142,7 +1142,7 @@ def inventory_hand_problems(records: list, diffs: dict) -> list:
             if not (isinstance(r.get(field), str) and r[field].strip()):
                 found.append(fail(
                     "tools/inventory.json, the record of %s in %s" % (r["file"], record_folder(r) or r.get("feature")),
-                    "its `%s` is empty: a record that the export derived has its text written by hand" % field,
+                    "its `%s` is empty: the text of an inventory record is written by hand" % field,
                     "write `%s` in the record (what the hook is, in words; read the folder's part of the file in its hooks.patch)" % field, R_ONE_FACT))
         if r.get("hookable") not in INVENTORY_HOOKABLE:
             found.append(fail(

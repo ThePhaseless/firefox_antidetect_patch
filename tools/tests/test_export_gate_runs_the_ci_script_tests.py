@@ -70,8 +70,8 @@ def test_an_export_that_writes_no_ci_file_does_not_run_the_step(tmp_path, capsys
 def test_the_gate_refuses_the_export_that_adds_a_job_and_leaves_the_checkout_as_it_was(world, monkeypatch):
     series, source, head = world
     real_ci_tree(series)
-    monkeypatch.setattr(export_gate, "run_series_check", lambda tree: [])        # the subject is the step, not check or tools/tests
-    monkeypatch.setattr(export_gate, "run_series_tests", lambda tree: [])
+    monkeypatch.setattr(export_gate, "run_series_check", lambda tree, news=None: ([], []))        # the subject is the step, not check or tools/tests
+    monkeypatch.setattr(export_gate, "run_series_tests", lambda tree, tolerate=None, todo=None: [])
     before = snapshot(series)
 
     def write(scratch):
