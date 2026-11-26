@@ -98,7 +98,7 @@ index 80be46d83cc04eb081ce58b4e322c8da15143c1c..bd6f71d4a25103a8e90fd80d78bfd7b8
  
  # Whether to add padding in the doh dns queries (rfc 7830)
 diff --git a/netwerk/base/TRRLoadInfo.cpp b/netwerk/base/TRRLoadInfo.cpp
-index 0cba54550072adc8a0ad11b1c9a502ff97a7bd7e..5990180a7c1941856e09046861cb55411861c2af 100644
+index 0cba54550072adc8a0ad11b1c9a502ff97a7bd7e..cf7afa26bc9e0131aef1195e923c998a491e5fa4 100644
 --- a/netwerk/base/TRRLoadInfo.cpp
 +++ b/netwerk/base/TRRLoadInfo.cpp
 @@ -11,6 +11,8 @@
@@ -110,15 +110,16 @@ index 0cba54550072adc8a0ad11b1c9a502ff97a7bd7e..5990180a7c1941856e09046861cb5541
  using namespace mozilla::dom;
  
  namespace mozilla {
-@@ -26,6 +28,7 @@ TRRLoadInfo::TRRLoadInfo(nsIURI* aResultPrincipalURI,
+@@ -25,7 +27,7 @@ TRRLoadInfo::TRRLoadInfo(nsIURI* aResultPrincipalURI,
+ 
  already_AddRefed<nsILoadInfo> TRRLoadInfo::Clone() const {
    nsCOMPtr<nsILoadInfo> loadInfo =
-       new TRRLoadInfo(mResultPrincipalURI, mInternalContentPolicyType);
-+  static_cast<TRRLoadInfo*>(loadInfo.get())->mOriginAttributes = mOriginAttributes;  // STEALTH-HOOK(network/doh)
+-      new TRRLoadInfo(mResultPrincipalURI, mInternalContentPolicyType);
++      StealthTRRCloneContext(this, new TRRLoadInfo(mResultPrincipalURI, mInternalContentPolicyType));  // STEALTH-HOOK(network/doh)
  
    return loadInfo.forget();
  }
-@@ -302,6 +305,7 @@ nsresult TRRLoadInfo::GetOriginAttributes(
+@@ -302,6 +304,7 @@ nsresult TRRLoadInfo::GetOriginAttributes(
  
  nsresult TRRLoadInfo::SetOriginAttributes(
      const mozilla::OriginAttributes& aOriginAttributes) {
@@ -516,7 +517,7 @@ index 64aaffae3064b43bde144b8f3f9076b02ffa54e9..361352db9f11ba2fe6e86de8093d5da7
    /**
     * The completion is complete.  This method is called once per
 diff --git a/toolkit/components/url-classifier/nsUrlClassifierDBService.cpp b/toolkit/components/url-classifier/nsUrlClassifierDBService.cpp
-index 02a2030c2480ccc9c2fa007239025d1e563c03b5..41b5d9ba371399615b97deda805fdd478e246a9c 100644
+index 02a2030c2480ccc9c2fa007239025d1e563c03b5..da1eac09d222a7af486343967f8153f469c18a38 100644
 --- a/toolkit/components/url-classifier/nsUrlClassifierDBService.cpp
 +++ b/toolkit/components/url-classifier/nsUrlClassifierDBService.cpp
 @@ -61,6 +61,8 @@
@@ -539,18 +540,18 @@ index 02a2030c2480ccc9c2fa007239025d1e563c03b5..41b5d9ba371399615b97deda805fdd47
  
  NS_IMPL_ISUPPORTS(nsUrlClassifierHashCompleterBase,
                    nsIUrlClassifierHashCompleterCallback)
-+NS_IMETHODIMP nsUrlClassifierHashCompleterBase::GetUserContextId(uint32_t* aId) { return mozilla::net::StealthLookupContextOut(mStealthUserContextId, aId); }  // STEALTH-HOOK(network/doh)
++#include "StealthHashCompleterContext.inc.h"  // STEALTH-HOOK(network/doh)
  
  nsUrlClassifierHashCompleterBase::~nsUrlClassifierHashCompleterBase() {
    if (mCallback) {
-@@ -2154,6 +2158,7 @@ nsUrlClassifierDBService::Classify(nsIPrincipal* aPrincipal,
-     return NS_OK;
-   }
- 
+@@ -2108,6 +2112,7 @@ nsresult nsUrlClassifierDBService::Init() {
+ NS_IMETHODIMP
+ nsUrlClassifierDBService::Classify(nsIPrincipal* aPrincipal,
+                                    nsIURIClassifierCallback* c, bool* aResult) {
 +  mozilla::net::StealthLookupContextScope stealthScope(aPrincipal);  // STEALTH-HOOK(network/doh)
-   if (Classifier::IsRealTimeModeEnabled()) {
-     RefPtr<nsUrlClassifierClassifyCallback> callback =
-         new (fallible) nsUrlClassifierClassifyCallback(c);
+   NS_ENSURE_ARG(aPrincipal);
+   MOZ_ASSERT(c);
+   NS_ENSURE_ARG(aResult);
 diff --git a/toolkit/components/url-classifier/tests/unit/xpcshell.toml b/toolkit/components/url-classifier/tests/unit/xpcshell.toml
 index 6e8890525dd1b40860c170704e17a7d7797e4855..1432fe51c04958409df21716f368317c7b1774e9 100644
 --- a/toolkit/components/url-classifier/tests/unit/xpcshell.toml
@@ -562,14 +563,14 @@ index 6e8890525dd1b40860c170704e17a7d7797e4855..1432fe51c04958409df21716f368317c
 +
 +["test_stealth_hashcompleter_context.js"]  # STEALTH-HOOK(network/doh)
 diff --git a/toolkit/profile/moz.build b/toolkit/profile/moz.build
-index 3e9aed6283bbfec4771b5b7343bf4b0d9f896ac1..2417e30ef98aff53f33d785d86199c18fff5bdc0 100644
+index 3e9aed6283bbfec4771b5b7343bf4b0d9f896ac1..0f566117c2e593d87b583e041df25f97aa23b1a7 100644
 --- a/toolkit/profile/moz.build
 +++ b/toolkit/profile/moz.build
 @@ -34,6 +34,7 @@ UNIFIED_SOURCES += [
      "nsProfileLock.cpp",
      "nsToolkitProfileService.cpp",
  ]
-+DEFINES["MOZ_PROXY_BYPASS_PROTECTION"] = True  # STEALTH-HOOK(network/doh)
++include("StealthProfile.mozbuild")  # STEALTH-HOOK(network/doh)
  
  if CONFIG["OS_ARCH"] == "Darwin" and CONFIG["NIGHTLY_BUILD"]:
      UNIFIED_SOURCES += [

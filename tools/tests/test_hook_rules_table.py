@@ -25,11 +25,11 @@ import hooks_list as hl  # noqa: E402
 ROOT = TOOLS.parent
 FILES = {name: (TOOLS / name).read_text(encoding="utf-8") for name in ("hook_contract.py", "hooks_list.py")}
 PREBUILD = (TOOLS / "prebuild.py").read_text(encoding="utf-8")      # prints G19
-RULE_IDS = ["C%d" % i for i in range(1, 19)] + ["C20", "T1", "T2", "T3"]      # C19 is retired: its id is not reused
+RULE_IDS = ["C%d" % i for i in range(1, 19)] + ["C20", "C21", "T1", "T2", "T3"]      # C19 is retired: its id is not reused
 
 
 # --------------------------------------------------------------------------- the RULES table
-def test_the_rules_are_the_hook_rules_c1_to_c18_and_t1_to_t3():
+def test_the_rules_are_the_hook_rules_c1_to_c18_c20_c21_and_t1_to_t3():
     assert list(hc.RULES) == RULE_IDS
 
 

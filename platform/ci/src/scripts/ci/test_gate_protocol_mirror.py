@@ -37,7 +37,7 @@ def test_it_runs_on_one_leg_the_linux_one():
 
 
 def test_it_comes_after_the_core_under_test_is_installed_and_before_the_binary_is_driven():
-    installed = _index("The core under test (core_ref, from git)")
+    installed = _index("The core under test (core_ref, from the wheelhouse)")
     checked = _index("The core's protocol mirror")
     driven = _index("DRIVE GATE")
     assert installed < checked < driven

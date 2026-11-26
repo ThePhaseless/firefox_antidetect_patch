@@ -11,68 +11,10 @@
   "file": "toolkit/xre/dllservices/UntrustedModulesData.cpp",
   "function": "void ModuleRecord::GetVersionAndVendorInfo(const nsAString& aPath) {",
   "kind": "rewrite",
-  "form": "unknown",
-  "line": "  UniquePtr<wchar_t[]> signedBy = StealthSignatureLookupUnlessOwn(aPath, [&]() {  // STEALTH-HOOK(platform/untrusted-modules)",
-  "removed": "  UniquePtr<wchar_t[]> signedBy(dllSvc->GetBinaryOrgName(\n      PromiseFlatString(aPath).get(), &hasNestedMicrosoftSignature,\n      AuthenticodeFlags::SkipTrustVerification));",
-  "test": "gtest:StealthOwnBinaries.ModuleRecordSkipsTheSignatureLookupOfTheRunningExecutableOnly",
-  "exception": "GetVersionAndVendorInfo must not run Mozilla's signature lookup, GetBinaryOrgName, for this build's own unsigned binaries: it can only fall through to the catalog search, which hashes the whole file and walks every system catalog (1.26 s of CPU per launch in the Untrusted Modules thread), for an answer that cannot exist. The statement is a declaration that the lines after it read (signedBy), so no prefix if, guard or if/else can skip it without moving it out of scope. Its text stays verbatim in a thunk handed to StealthSignatureLookupUnlessOwn, which calls it for every other module; for an own binary the answer is null, as the lookup would have returned after its search. Our function reads the version resource itself; the second read of the same file is invisible to a page.",
-  "reason_kind": "skip",
-  "pm": "approvato"
- },
- {
-  "file": "toolkit/xre/dllservices/UntrustedModulesData.cpp",
-  "function": "void ModuleRecord::GetVersionAndVendorInfo(const nsAString& aPath) {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    UniquePtr<wchar_t[]> signedBy(dllSvc->GetBinaryOrgName(  // STEALTH-HOOK(platform/untrusted-modules)",
-  "test": "gtest:StealthOwnBinaries.ModuleRecordSkipsTheSignatureLookupOfTheRunningExecutableOnly",
-  "exception": "GetVersionAndVendorInfo must not run Mozilla's signature lookup, GetBinaryOrgName, for this build's own unsigned binaries: it can only fall through to the catalog search, which hashes the whole file and walks every system catalog (1.26 s of CPU per launch in the Untrusted Modules thread), for an answer that cannot exist. The statement is a declaration that the lines after it read (signedBy), so no prefix if, guard or if/else can skip it without moving it out of scope. Its text stays verbatim in a thunk handed to StealthSignatureLookupUnlessOwn, which calls it for every other module; for an own binary the answer is null, as the lookup would have returned after its search. Our function reads the version resource itself; the second read of the same file is invisible to a page.",
-  "reason_kind": "skip",
-  "pm": "approvato"
- },
- {
-  "file": "toolkit/xre/dllservices/UntrustedModulesData.cpp",
-  "function": "void ModuleRecord::GetVersionAndVendorInfo(const nsAString& aPath) {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "        PromiseFlatString(aPath).get(), &hasNestedMicrosoftSignature,  // STEALTH-HOOK(platform/untrusted-modules)",
-  "test": "gtest:StealthOwnBinaries.ModuleRecordSkipsTheSignatureLookupOfTheRunningExecutableOnly",
-  "exception": "GetVersionAndVendorInfo must not run Mozilla's signature lookup, GetBinaryOrgName, for this build's own unsigned binaries: it can only fall through to the catalog search, which hashes the whole file and walks every system catalog (1.26 s of CPU per launch in the Untrusted Modules thread), for an answer that cannot exist. The statement is a declaration that the lines after it read (signedBy), so no prefix if, guard or if/else can skip it without moving it out of scope. Its text stays verbatim in a thunk handed to StealthSignatureLookupUnlessOwn, which calls it for every other module; for an own binary the answer is null, as the lookup would have returned after its search. Our function reads the version resource itself; the second read of the same file is invisible to a page.",
-  "reason_kind": "skip",
-  "pm": "approvato"
- },
- {
-  "file": "toolkit/xre/dllservices/UntrustedModulesData.cpp",
-  "function": "void ModuleRecord::GetVersionAndVendorInfo(const nsAString& aPath) {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "        AuthenticodeFlags::SkipTrustVerification));  // STEALTH-HOOK(platform/untrusted-modules)",
-  "test": "gtest:StealthOwnBinaries.ModuleRecordSkipsTheSignatureLookupOfTheRunningExecutableOnly",
-  "exception": "GetVersionAndVendorInfo must not run Mozilla's signature lookup, GetBinaryOrgName, for this build's own unsigned binaries: it can only fall through to the catalog search, which hashes the whole file and walks every system catalog (1.26 s of CPU per launch in the Untrusted Modules thread), for an answer that cannot exist. The statement is a declaration that the lines after it read (signedBy), so no prefix if, guard or if/else can skip it without moving it out of scope. Its text stays verbatim in a thunk handed to StealthSignatureLookupUnlessOwn, which calls it for every other module; for an own binary the answer is null, as the lookup would have returned after its search. Our function reads the version resource itself; the second read of the same file is invisible to a page.",
-  "reason_kind": "skip",
-  "pm": "approvato"
- },
- {
-  "file": "toolkit/xre/dllservices/UntrustedModulesData.cpp",
-  "function": "void ModuleRecord::GetVersionAndVendorInfo(const nsAString& aPath) {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "    return signedBy;  // STEALTH-HOOK(platform/untrusted-modules)",
-  "test": "gtest:StealthOwnBinaries.ModuleRecordSkipsTheSignatureLookupOfTheRunningExecutableOnly",
-  "exception": "GetVersionAndVendorInfo must not run Mozilla's signature lookup, GetBinaryOrgName, for this build's own unsigned binaries: it can only fall through to the catalog search, which hashes the whole file and walks every system catalog (1.26 s of CPU per launch in the Untrusted Modules thread), for an answer that cannot exist. The statement is a declaration that the lines after it read (signedBy), so no prefix if, guard or if/else can skip it without moving it out of scope. Its text stays verbatim in a thunk handed to StealthSignatureLookupUnlessOwn, which calls it for every other module; for an own binary the answer is null, as the lookup would have returned after its search. Our function reads the version resource itself; the second read of the same file is invisible to a page.",
-  "reason_kind": "skip",
-  "pm": "approvato"
- },
- {
-  "file": "toolkit/xre/dllservices/UntrustedModulesData.cpp",
-  "function": "void ModuleRecord::GetVersionAndVendorInfo(const nsAString& aPath) {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  });  // STEALTH-HOOK(platform/untrusted-modules)",
-  "test": "gtest:StealthOwnBinaries.ModuleRecordSkipsTheSignatureLookupOfTheRunningExecutableOnly",
-  "exception": "GetVersionAndVendorInfo must not run Mozilla's signature lookup, GetBinaryOrgName, for this build's own unsigned binaries: it can only fall through to the catalog search, which hashes the whole file and walks every system catalog (1.26 s of CPU per launch in the Untrusted Modules thread), for an answer that cannot exist. The statement is a declaration that the lines after it read (signedBy), so no prefix if, guard or if/else can skip it without moving it out of scope. Its text stays verbatim in a thunk handed to StealthSignatureLookupUnlessOwn, which calls it for every other module; for an own binary the answer is null, as the lookup would have returned after its search. Our function reads the version resource itself; the second read of the same file is invisible to a page.",
-  "reason_kind": "skip",
-  "pm": "approvato"
+  "form": "wrap-expression",
+  "line": "  UniquePtr<wchar_t[]> signedBy(StealthSignatureLookupUnlessOwn(aPath, dllSvc)->GetBinaryOrgName(  // STEALTH-HOOK(platform/untrusted-modules)",
+  "removed": "  UniquePtr<wchar_t[]> signedBy(dllSvc->GetBinaryOrgName(",
+  "test": "gtest:StealthOwnBinaries.ModuleRecordSkipsTheSignatureLookupOfTheRunningExecutableOnly"
  },
  {
   "file": "toolkit/xre/dllservices/moz.build",

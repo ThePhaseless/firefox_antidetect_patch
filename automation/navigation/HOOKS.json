@@ -47,7 +47,7 @@
   "file": "docshell/base/nsDocShell.cpp",
   "function": "nsresult nsDocShell::InternalLoad(nsDocShellLoadState* aLoadState,",
   "kind": "add",
-  "form": "unknown",
+  "form": "anchor",
   "line": "  StealthNavigationLoad stealthLoad(this, aLoadState);  // STEALTH-HOOK(automation/navigation)",
   "test": "node:juggler/tests/navigation_hook_runs_only_for_a_load_that_leaves_the_document.test.mjs#InternalLoad returns before the hook whenever sameDocument is still true, and nothing writes it after",
   "anchor": "nsCOMPtr<nsIRequest> req; (in InternalLoad, before rv = DoURILoad(...))",
@@ -107,7 +107,7 @@
   "file": "docshell/base/nsDocShell.cpp",
   "function": "class OnLinkClickEvent : public CancelableRunnable, public SupportsWeakPtr {",
   "kind": "add",
-  "form": "unknown",
+  "form": "member",
   "line": "  StealthLinkClickAfter mStealth;  // STEALTH-HOOK(automation/navigation)",
   "test": "wrapper:tests/test_a_click_waits_for_the_navigation_it_plans_e2e.py::test_a_click_that_submits_a_form_returns_on_the_posted_page"
  },
@@ -125,7 +125,7 @@
   "file": "docshell/base/test/gtest/moz.build",
   "function": "",
   "kind": "add",
-  "form": "unknown",
+  "form": "registration",
   "line": "include(\"stealth.build\")  # STEALTH-HOOK(automation/navigation)",
   "test": "gtest:TestStealthLinkClickAfter.DoneSendsTheAfterOnce"
  },

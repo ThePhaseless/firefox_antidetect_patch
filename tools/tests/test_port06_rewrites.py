@@ -236,6 +236,8 @@ def _series(tmp_path, patch_text, hooks_fields=None):
         gen = hl.generated(tmp_path, FOLDER)
         for e in gen:
             e.update(hooks_fields)
+            if e["form"] == "unknown" and not hc.excepted_lacks(e):
+                e["form"] = "excepted"          # what the export writes (G63)
         (d / "HOOKS.json").write_text(hl.render(gen), encoding="utf-8", newline="")
     return tmp_path
 

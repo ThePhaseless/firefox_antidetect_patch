@@ -121,6 +121,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import backport_replay  # noqa: E402
 import births  # noqa: E402
+import export_paths  # noqa: E402
 import folders  # noqa: E402
 import gtest_list  # noqa: E402
 import hook_contract  # noqa: E402
@@ -130,9 +131,10 @@ import split  # noqa: E402
 from failure import fail  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
-UPSTREAM = ROOT / "UPSTREAM.json"
-BUDGET = ROOT / "tools" / "hook-budget.json"
-REMOVED_BUDGET = ROOT / "tools" / "removed-budget.json"
+# The names of what the export writes are tools/export_paths.py's (the series rule «export commits are named export:» reads them there).
+UPSTREAM = ROOT / export_paths.UPSTREAM
+BUDGET = ROOT / export_paths.BUDGET
+REMOVED_BUDGET = ROOT / export_paths.REMOVED_BUDGET
 HOOK_DEBT = ROOT / "tools" / "hook-debt.json"
 # Declared raises of a hook budget above main's (a hook that is a wanted growth, decided by the pm):
 # the register only grows, and a branch raises a budget only with the row it adds (budget_raise_problems).
@@ -140,9 +142,9 @@ RAISES = ROOT / "tools" / "hook-budget-raises.json"
 # The workflows live in the series (the tree's tests read them beside scripts/), and
 # GitHub runs them from this repository's root: export copies them there and check
 # requires the two identical. series.yml and noreply-identity.yml are the root's own.
-WORKFLOWS_SERIES = ROOT / "platform" / "ci" / "src" / ".github" / "workflows"
-WORKFLOWS_ROOT = ROOT / ".github" / "workflows"
-ROOT_ONLY_WORKFLOWS = {"series.yml", "noreply-identity.yml"}
+WORKFLOWS_SERIES = ROOT / export_paths.WORKFLOWS_SERIES
+WORKFLOWS_ROOT = ROOT / export_paths.WORKFLOWS_ROOT
+ROOT_ONLY_WORKFLOWS = set(export_paths.ROOT_ONLY_WORKFLOWS)
 
 # The decisions that own the checks of this file (repo-04: every failure names one).
 R_SERIES = "series-01-export-is-the-only-writer"

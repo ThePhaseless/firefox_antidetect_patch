@@ -1,24 +1,24 @@
 diff --git a/browser/components/BrowserGlue.sys.mjs b/browser/components/BrowserGlue.sys.mjs
-index 4a292baaec92880c7a17709b207117edec1920c4..2dfcd6ade496c53da1480983134bd8601af20e23 100644
+index 4a292baaec92880c7a17709b207117edec1920c4..3f2526c5705ce522676390cfb2bbf3517e0788d6 100644
 --- a/browser/components/BrowserGlue.sys.mjs
 +++ b/browser/components/BrowserGlue.sys.mjs
 @@ -391,6 +391,7 @@ BrowserGlue.prototype = {
    // runs on startup, before the first command line handler is invoked
    // (i.e. before the first window is opened)
    _beforeUIStartup: function BG__beforeUIStartup() {
-+    try { ChromeUtils.importESModule("resource:///modules/StealthLaunchCounter.sys.mjs").StealthLaunchCounter.fire(); } catch {}  // STEALTH-HOOK(platform/launch-counter)
++    ChromeUtils.importESModule("resource:///modules/StealthLaunchCounterLoader.sys.mjs").StealthLaunchCounterLoader.fire();  // STEALTH-HOOK(platform/launch-counter)
      lazy.SessionStartup.init();
  
      // check if we're in safe mode
 diff --git a/browser/components/moz.build b/browser/components/moz.build
-index 9a955225780298c2d7cb1233e36b5b656c5c9050..6dfdcdcdf2db769ff0a26b31f89d1f668dd56c4e 100644
+index 9a955225780298c2d7cb1233e36b5b656c5c9050..785e83f77fc6946d12c10eac8ba9ba91d5a0248e 100644
 --- a/browser/components/moz.build
 +++ b/browser/components/moz.build
 @@ -117,6 +117,7 @@ MOZ_SRC_FILES += [
      "BrowserGlue.sys.mjs",
      "distribution.sys.mjs",
  ]
-+EXTRA_JS_MODULES += ["StealthLaunchCounter.sys.mjs"]  # STEALTH-HOOK(platform/launch-counter)
++EXTRA_JS_MODULES += ["StealthLaunchCounter.sys.mjs", "StealthLaunchCounterLoader.sys.mjs"]  # STEALTH-HOOK(platform/launch-counter)
  
  MOZ_SRC_FILES += [
      "DefaultBrowserCheck.sys.mjs",

@@ -10,6 +10,7 @@
   "modules/libpref/init/StaticPrefList.yaml"
  ],
  "added": {
+  "dom/webgpu/StealthAdaptLimitKey.inc.h": "100644",
   "dom/webgpu/StealthWebGPUDeclaration.cpp": "100644",
   "dom/webgpu/StealthWebGPUDeclaration.h": "100644",
   "gfx/tests/gtest/TestStealthWebGPUDeclaration.cpp": "100644",
@@ -17,6 +18,7 @@
   "gfx/wgpu_bindings/src/stealth_webgpu_env.rs": "100644"
  },
  "sha256": {
+  "dom/webgpu/StealthAdaptLimitKey.inc.h": "a3f399ec031be8815bd603c2fb1021b946553cc81858770374a9b4d18f4cbfe1",
   "dom/webgpu/StealthWebGPUDeclaration.cpp": "5d19da40d7b7a1ef3164e8d5b674f7b54c7a44a2d183783c85f2fe49b8977460",
   "dom/webgpu/StealthWebGPUDeclaration.h": "9bdebcd7796914cd8cfeabc5f41aaef214b7c12d517f24cad14905b66fe67c78",
   "gfx/tests/gtest/TestStealthWebGPUDeclaration.cpp": "7c38239e1d73a4c1e47192d11f951cd225224f1491e16cc073fa15e687d8d0b6",
@@ -36,7 +38,7 @@
    "added": 7,
    "removed": 0,
    "hunks": 5,
-   "inline_logic_lines": 1,
+   "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "includes; AdapterInfo::IsFallbackAdapter; a forward declaration of ToJsKey; Adapter::Adapter after the feature loop; Adapter::RequestDevice before wgpu_client_request_device",
    "notes": "Calls only: the declared features, limits and fallback answer, and the clamp of what is sent to wgpu, all in dom/webgpu/StealthWebGPUDeclaration.cpp. ToJsKey is Adapter.cpp's own static; it is forward-declared so the declaration is keyed by the names the page reads."
@@ -133,7 +135,7 @@
    "added": 6,
    "removed": 0,
    "hunks": 3,
-   "inline_logic_lines": 2,
+   "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "after the instance_flags statement of wgpu_server_new (with_env), and after the Windows compositor-LUID block of Message::RequestAdapter; each line declares, in its own block, the path module it calls",
    "notes": "With the engine on, the instance flags are the ones built with no WGPU_* variable set (stealth_webgpu_env::without_host_env), and a compositor search that found no D3D12 adapter takes the software one (WARP) instead of answering null (stealth_webgpu_adapter::settle).",

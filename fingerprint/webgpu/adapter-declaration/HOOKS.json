@@ -19,8 +19,8 @@
   "file": "dom/webgpu/Adapter.cpp",
   "function": "struct FeatureImplementationStatus {",
   "kind": "add",
-  "form": "unknown",
-  "line": "static std::string_view ToJsKey(const Limit limit);  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
+  "form": "registration",
+  "line": "#include \"StealthAdaptLimitKey.inc.h\"  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
   "test": "wrapper:tests/test_webgpu_adapter_is_declared_e2e.py::test_the_page_sees_the_declared_adapter_e2e"
  },
  {
@@ -125,7 +125,7 @@
   "file": "gfx/thebes/gfxPlatform.cpp",
   "function": "void gfxPlatform::InitWebGPUConfig() {",
   "kind": "rewrite",
-  "form": "unknown",
+  "form": "excepted",
   "line": "  mozilla::webgpu::StealthWebGPUPlatformInit();  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
   "removed": "#if !defined(XP_WIN) && !defined(XP_MACOSX)",
   "test": "gtest:StealthWebGPUBundledVulkan.AllowWebGPUFollowsTheBundledVulkan",
@@ -139,7 +139,7 @@
   "file": "gfx/thebes/gfxPlatform.cpp",
   "function": "void gfxPlatform::InitWebGPUConfig() {",
   "kind": "rewrite",
-  "form": "unknown",
+  "form": "excepted",
   "line": "#if !defined(XP_WIN) && !defined(XP_MACOSX) && 0  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
   "test": "wrapper:tests/test_webgpu_external_texture_e2e.py::test_importexternaltexture_exists_on_every_os_e2e",
   "exception": "the #if of Mozilla's ForceDisable of WebGPU external textures off Windows and macOS is rewritten with && 0: restoring it and wrapping SetAllowWebGPUExternalTexture is not provably identical (user pref false, gfxInfo blocklist)",
@@ -150,7 +150,7 @@
   "file": "gfx/wgpu_bindings/src/server.rs",
   "function": "use windows::Win32::{Foundation, Graphics::Direct3D12};",
   "kind": "add",
-  "form": "unknown",
+  "form": "registration",
   "line": "#[path = \"stealth_webgpu_env.rs\"] mod stealth_webgpu_env; // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
   "test": "gtest:StealthWebGPUInstanceEnv.TheHostsVariablesDoNotReachTheInstance"
  },
@@ -158,7 +158,7 @@
   "file": "gfx/wgpu_bindings/src/server.rs",
   "function": "use windows::Win32::{Foundation, Graphics::Direct3D12};",
   "kind": "add",
-  "form": "unknown",
+  "form": "registration",
   "line": "#[path = \"stealth_webgpu_adapter.rs\"] mod stealth_webgpu_adapter; // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
   "test": "gtest:StealthWebGPUAdapter.NoCompositorAdapterIsTheSoftwareOne"
  },

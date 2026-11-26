@@ -3,7 +3,7 @@
   "file": "browser/fonts/moz.build",
   "function": "",
   "kind": "add",
-  "form": "unknown",
+  "form": "registration",
   "line": "include(\"StealthFonts.mozbuild\")  # STEALTH-HOOK(fingerprint/fonts/bundle)",
   "test": "wrapper:tests/test_the_font_list_is_the_bundle_e2e.py::test_the_font_list_is_the_bundle_and_nothing_else"
  },
@@ -43,16 +43,8 @@
   "file": "gfx/tests/gtest/moz.build",
   "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
   "kind": "add",
-  "form": "unknown",
-  "line": "if CONFIG[\"OS_TARGET\"] == \"WINNT\":  # STEALTH-HOOK(fingerprint/fonts/bundle)",
-  "test": "gtest:StealthBundledCollection.ContentProcessUnderBundleOnlyBuildsNone"
- },
- {
-  "file": "gfx/tests/gtest/moz.build",
-  "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
-  "kind": "add",
   "form": "registration",
-  "line": "    UNIFIED_SOURCES += [\"TestStealthBundledCollection.cpp\"]  # STEALTH-HOOK(fingerprint/fonts/bundle)",
+  "line": "include(\"StealthBundleTests.mozbuild\")  # STEALTH-HOOK(fingerprint/fonts/bundle)",
   "test": "gtest:StealthBundledCollection.ContentProcessUnderBundleOnlyBuildsNone"
  },
  {
@@ -140,7 +132,7 @@
   "file": "gfx/thebes/gfxFontEntry.h",
   "function": "class gfxFontEntry {",
   "kind": "rewrite",
-  "form": "unknown",
+  "form": "excepted",
   "line": "    operator hb_face_t*() const& { return mFace; }  // STEALTH-HOOK(fingerprint/fonts/bundle)",
   "removed": "    operator hb_face_t*() const { return mFace; }",
   "test": "wrapper:tests/test_screenshot_of_text_returns_linux_e2e.py::test_a_screenshot_of_a_page_with_text_returns",
@@ -152,7 +144,7 @@
   "file": "gfx/thebes/gfxFontEntry.h",
   "function": "class gfxFontEntry {",
   "kind": "rewrite",
-  "form": "unknown",
+  "form": "excepted",
   "line": "    operator hb_face_t*() const&& = delete;  // STEALTH-HOOK(fingerprint/fonts/bundle)",
   "test": "wrapper:tests/test_screenshot_of_text_returns_linux_e2e.py::test_a_screenshot_of_a_page_with_text_returns",
   "exception": "second line of the same change of type (see the line above); stays as it is today (G35, G24)",
@@ -245,7 +237,7 @@
   "file": "gfx/thebes/moz.build",
   "function": "USE_LIBS += [",
   "kind": "add",
-  "form": "unknown",
+  "form": "registration",
   "line": "include(\"StealthBundleFontList.mozbuild\")  # STEALTH-HOOK(fingerprint/fonts/bundle)",
   "test": "wrapper:tests/test_the_font_list_is_the_bundle_e2e.py::test_the_font_list_is_the_bundle_and_nothing_else"
  }

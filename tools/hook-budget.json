@@ -216,7 +216,7 @@
  "js/xpconnect/src/Sandbox.cpp|automation/hybrid-xrays": 8,
  "js/xpconnect/src/Sandbox.cpp|fingerprint/locale-time/timezone": 2,
  "js/xpconnect/src/nsXPConnect.cpp|fingerprint/locale-time/timezone": 3,
- "js/xpconnect/src/xpcprivate.h|automation/hybrid-xrays": 4,
+ "js/xpconnect/src/xpcprivate.h|automation/hybrid-xrays": 5,
  "js/xpconnect/tests/unit/xpcshell.toml|automation/hybrid-xrays": 2,
  "js/xpconnect/wrappers/WrapperFactory.cpp|automation/hybrid-xrays": 9,
  "js/xpconnect/wrappers/XrayWrapper.h|automation/hybrid-xrays": 1,

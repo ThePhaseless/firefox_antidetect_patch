@@ -55,7 +55,7 @@
   "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
   "function": "const MAX_NAME_LENGTH: usize = 255;",
   "kind": "add",
-  "form": "unknown",
+  "form": "registration",
   "line": "#[cfg(test)] mod stealth_tests;  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
   "test": "cargo:mdns_service::stealth_tests::stealth_responder_on_the_loopback_hears_its_own_query"
  },
@@ -70,20 +70,21 @@
  {
   "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
   "function": "impl MDNSService {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "        let stealth_if = addrs.first().copied();  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
-  "test": "cargo:mdns_service::stealth_tests::stealth_responder_on_the_loopback_hears_its_own_query"
+  "kind": "rewrite",
+  "form": "wrap-expression",
+  "line": "        for addr in stealth_interface::stealth_note_first(addrs) {  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "removed": "        for addr in addrs {",
+  "test": "cargo:mdns_service::stealth_tests::stealth_the_first_interface_of_the_list_is_the_one_set_after_the_loop"
  },
  {
   "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
   "function": "impl MDNSService {",
   "kind": "add",
   "form": "anchor",
-  "line": "        stealth_interface::set_multicast_if(&socket, stealth_if);  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "line": "        stealth_interface::set_multicast_if(&socket);  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
   "test": "cargo:mdns_service::stealth_tests::stealth_responder_on_the_loopback_hears_its_own_query",
   "anchor": "Mozilla's join loop `for addr in addrs { if let Err(err) = socket.join_multicast_v4(...) { warn!(...) } }`",
-  "why": "the call needs `socket` and `stealth_if`, locals of the constructor (the socket Mozilla has just configured and the first interface address taken before the loop); it follows the join loop so that the order of the two socket options is Mozilla's, and a guard at the head of the function has neither local"
+  "why": "the call needs `socket`, a local of the constructor (the socket Mozilla has just configured); it follows the join loop so that the order of the two socket options is Mozilla's, and it takes the first interface that the loop line noted; a guard at the head of the function has no socket"
  },
  {
   "file": "dom/media/webrtc/transport/moz.build",
@@ -154,7 +155,7 @@
   "file": "dom/media/webrtc/transport/nr_socket_prsock.cpp",
   "function": "int NrSocket::sendto(const void* msg, size_t len, int flags,",
   "kind": "add",
-  "form": "unknown",
+  "form": "rewire",
   "line": "  to = StealthOwnPeerToKernel(&my_addr_, to);  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
   "test": "gtest:StealthNrSocketBirth.ACreateThatFailsAtTheLastStepLeavesNoPortOfOursBehind",
   "anchor": "int32_t status; (the locals of NrSocket::sendto)",
@@ -207,7 +208,7 @@
   "file": "dom/media/webrtc/transport/nricectx.h",
   "function": "class NrIceCtx {",
   "kind": "add",
-  "form": "unknown",
+  "form": "member",
   "line": "  StealthHostPorts& StealthPorts() { return host_ports_; }  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
   "test": "gtest:StealthDeclaredNetwork.TheHostSocketsOfAConnectionTakeItsPortsInOrderAndSkipARefusedOne"
  },

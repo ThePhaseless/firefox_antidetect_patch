@@ -312,13 +312,16 @@ jobs:
     steps:
       # The repository being judged, with all its history: the range of commits is
       # computed against its refs. Commits and tags only (`tree:0`) and no file but
-      # .github: with its trees this repository is about 5 GB and the clone did not
+      # .github, the script of the export rule and its classes: with its trees this repository is about 5 GB and the clone did not
       # finish in 5 minutes (run 44708578369); without them about 300 MB.
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
           filter: tree:0
-          sparse-checkout: /.github/
+          sparse-checkout: |
+            /.github/
+            /platform/ci/src/scripts/ci/export_commit_names.py
+            /tools/export_paths.py
           sparse-checkout-cone-mode: false
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
@@ -358,6 +361,46 @@ jobs:
               python3 "$script" --event other --head "$SHA" --default-ref "$DEFAULT_BRANCH"
               ;;
           esac
+      # RULE export commits are named export: a commit that touches only paths the export writes and nobody edits (pure: <folder>/src/**, hooks.patch, SERIES,
+      # UPSTREAM.json, the budget files, gtest-suites.json, the workflow copies) has a subject that starts with `export: `, and a commit whose subject starts with `export:`
+      # touches only pure paths or mixed ones, the files the export writes and a hand adds to (HOOKS.json, MANIFEST.json, FEATURE.md) (scripts/ci/export_commit_names.py,
+      # called by its exported path: the series' own copy of this file is the same one; the classes are tools/export_paths.py, which the sparse checkout above holds). The range is the commits THIS event adds: a pull request, base..head; a push, before..after (the
+      # last commit when the branch is new); a schedule or a dispatch, what the ref adds to the default branch, as the judge above takes `other`. A merge and
+      # a commit with no file are not judged; a range that cannot be read is red, never a pass.
+      - name: export commits are named export:, and only they
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.event.after }}
+          SHA: ${{ github.sha }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch || 'main' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          script=platform/ci/src/scripts/ci/export_commit_names.py
+          if [ ! -f "$script" ]; then
+            echo "the rule's script $script is missing from this commit" >&2
+            exit 1
+          fi
+          case "$EVENT" in
+            pull_request|pull_request_target)
+              range="$BASE_SHA..$HEAD_SHA"
+              ;;
+            push)
+              if [ -n "$BEFORE" ] && [ "$BEFORE" != "0000000000000000000000000000000000000000" ]; then
+                range="$BEFORE..$AFTER"
+              else
+                range="HEAD~1..HEAD"
+              fi
+              ;;
+            *)
+              range="origin/$DEFAULT_BRANCH..$SHA"
+              ;;
+          esac
+          echo "judging $range"
+          python3 "$script" --repo . --range "$range"
 
   # Everything that does not depend on the binary, BEFORE a node is turned on: a server is an hour paid whatever it does, and a run whose
   # asset names disagree, whose Juggler's tests are red or whose release scripts do not refuse what they must, used to learn it on the node,

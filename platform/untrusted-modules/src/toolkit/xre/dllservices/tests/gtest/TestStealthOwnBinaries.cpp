@@ -9,6 +9,7 @@
 // cannot exist, 1.26 s of CPU per launch.
 
 #include <iterator>
+#include <wchar.h>
 #include <windows.h>
 
 #include "gtest/gtest.h"
@@ -60,20 +61,37 @@ TEST(StealthOwnBinaries, StealthSkipsSignatureLookup)
                                            mozilla::ModuleVersionInfo(), false));
 }
 
-// GetVersionAndVendorInfo hands the signature lookup of Mozilla to our function as a thunk: it is made for a module that
-// is not one of this build's own, and never made for one that is (the running exe's own file is one: its directory and its
-// version). The count of the thunk is the observable; the control is the module of the system, for which it is made once.
+namespace {
+
+// A stand-in for the DllServices of Mozilla: it counts the lookups made and answers each with an organisation.
+struct CountingDllServices {
+  int lookups = 0;
+  mozilla::UniquePtr<wchar_t[]> GetBinaryOrgName(const wchar_t* aFilePath, bool* aHasNestedMicrosoftSignature, int aFlags) {
+    ++lookups;
+    auto org = mozilla::MakeUnique<wchar_t[]>(4);
+    wcscpy_s(org.get(), 4, L"Org");
+    return org;
+  }
+};
+
+}  // namespace
+
+// GetVersionAndVendorInfo makes Mozilla's call through the object StealthSignatureLookupUnlessOwn(aPath, dllSvc) stands in for
+// dllSvc with: the lookup is made for a module that is not one of this build's own, with the answer of the services, and
+// never made for one that is (the running exe's own file is one: its directory and its version), which has no signature. The
+// count of the services is the observable; the control is the module of the system, for which it is made once.
 TEST(StealthOwnBinaries, TheSignatureLookupIsMadeOnlyForAModuleThatIsNotOurOwn)
 {
-  int lookups = 0;
-  auto lookup = [&]() {
-    ++lookups;
-    return mozilla::UniquePtr<wchar_t[]>();
-  };
+  CountingDllServices services;
+  bool nested = false;
 
   // The control: a module of the system, the lookup is made, once, and its answer is the one returned.
-  mozilla::StealthSignatureLookupUnlessOwn(u"C:\\Windows\\System32\\ntdll.dll"_ns, lookup);
-  EXPECT_EQ(lookups, 1);
+  mozilla::UniquePtr<wchar_t[]> answer =
+      mozilla::StealthSignatureLookupUnlessOwn(u"C:\Windows\System32\ntdll.dll"_ns, &services)
+          ->GetBinaryOrgName(L"C:\Windows\System32\ntdll.dll", &nested, 0);
+  EXPECT_EQ(services.lookups, 1);
+  ASSERT_TRUE(answer);
+  EXPECT_STREQ(answer.get(), L"Org");
 
   wchar_t exePath[MAX_PATH * 4];
   const DWORD exeLen = ::GetModuleFileNameW(nullptr, exePath, std::size(exePath));
@@ -82,9 +100,13 @@ TEST(StealthOwnBinaries, TheSignatureLookupIsMadeOnlyForAModuleThatIsNotOurOwn)
   if (!mozilla::StealthSkipsSignatureLookupOf(exe)) {
     GTEST_SKIP() << "the test process has no version resource of its own";
   }
-  lookups = 0;
-  mozilla::StealthSignatureLookupUnlessOwn(exe, lookup);
-  EXPECT_EQ(lookups, 0);
+  services.lookups = 0;
+  const uint32_t skips = mozilla::StealthOwnBinarySkips();
+  answer = mozilla::StealthSignatureLookupUnlessOwn(exe, &services)->GetBinaryOrgName(exePath, &nested, 0);
+  EXPECT_EQ(services.lookups, 0);
+  EXPECT_FALSE(answer);
+  EXPECT_FALSE(nested);
+  EXPECT_EQ(mozilla::StealthOwnBinarySkips(), skips + 1);
 }
 
 namespace {
@@ -116,7 +138,7 @@ nsString NtPathOfModule(HMODULE aModule) {
 }  // namespace
 
 // hook-04 for the line in Mozilla's file: the test goes through Mozilla's own ModuleRecord, whose constructor runs
-// GetVersionAndVendorInfo, and so the hook line of untrusted-modules there (the signature lookup handed to
+// GetVersionAndVendorInfo, and so the hook line of untrusted-modules there (the signature lookup made through
 // StealthSignatureLookupUnlessOwn). For the running executable's own file the lookup is skipped: the counter of our file goes
 // up by exactly one and the vendor, when there is one, comes from the version resource and not from a signature. For a module
 // of the system (the control) the lookup is made and the counter does not move. Without the hook line Mozilla's statement does

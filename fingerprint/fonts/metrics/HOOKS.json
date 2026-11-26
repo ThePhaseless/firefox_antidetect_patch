@@ -38,16 +38,8 @@
   "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
   "kind": "add",
   "form": "registration",
-  "line": "    UNIFIED_SOURCES += [\"TestStealthFontMetrics.cpp\"]  # STEALTH-HOOK(fingerprint/fonts/metrics)",
+  "line": "include(\"StealthFontMetricsTests.mozbuild\")  # STEALTH-HOOK(fingerprint/fonts/metrics)",
   "test": "gtest:StealthFontMetrics.ClearTypeTakesTheOS2AverageUnrounded"
- },
- {
-  "file": "gfx/tests/gtest/moz.build",
-  "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
-  "kind": "add",
-  "form": "registration",
-  "line": "    UNIFIED_SOURCES += [\"TestStealthTextQuality.cpp\"]  # STEALTH-HOOK(fingerprint/fonts/metrics)",
-  "test": "gtest:StealthTextQuality.TheDeclarationIsReadAndTheHostIsNot"
  },
  {
   "file": "gfx/thebes/gfxDWriteFonts.cpp",
@@ -191,7 +183,7 @@
   "file": "gfx/thebes/moz.build",
   "function": "include(\"/ipc/chromium/chromium-config.mozbuild\")",
   "kind": "add",
-  "form": "unknown",
+  "form": "registration",
   "line": "include(\"StealthDesignMetrics.mozbuild\")  # STEALTH-HOOK(fingerprint/fonts/metrics)",
   "test": "gtest:StealthFontMetrics.DesignAdvanceAtAFractionalSize"
  }

@@ -27,8 +27,8 @@
   "docshell/base/test/gtest/TestStealthNavigation.cpp": "4afb64a3f3a89a0a9081fcc345a528085095f5c368048c00de1bc6777016032f",
   "docshell/base/test/gtest/stealth.build": "a5e1bfca9f349c4ebdbe50d09c0708280ce2715f71faa62720cf95b0dffbbc24",
   "juggler/tests/navigation_hook_runs_only_for_a_load_that_leaves_the_document.test.mjs": "ea5bb4a50350eb587acb650b94b3880b5a4ad4b1a2db13c42ba9736467ae2858",
-  "netwerk/base/StealthLoadInfo.cpp": "088bd43f2053f41c459ba268af7442d2a278e867d69789eabb7b1b9ebbaa2041",
-  "netwerk/base/StealthLoadInfo.h": "65873d382b0f2babf4c53191f5a17ab9c1761bc21655f2ebbe071dd204081809"
+  "netwerk/base/StealthLoadInfo.cpp": "bf1aa20ef69cc657794fdaba2f449fb0cf0fce3b965e8f9d39e610f64f3a69d0",
+  "netwerk/base/StealthLoadInfo.h": "8bf176e56130c30c54ef39827340bb608f930d337828e90409582851acd15b5d"
  },
  "inventory": [
   {
@@ -69,7 +69,7 @@
    "added": 10,
    "removed": 0,
    "hunks": 7,
-   "inline_logic_lines": 2,
+   "inline_logic_lines": 0,
    "hookable": "movable",
    "anchor": "nsDocShell::nsDocShell (constructor); nsDocShell::Get/SetFileInputInterceptionEnabled; nsDocShell::Get/SetBypassCSPEnabled; nsDocShell::InternalLoad; NotifyJugglerLinkClick (static); OnLinkClickEvent::Run / Cancel / NotifyJugglerDone; nsDocShell::OnLinkClickWithLoadState",
    "notes": "Three features share this file (the notes said four, but only three are listed); feature field is the largest. (a) juggler-docshell-attrs, hunks 1-2: constructor init of the two bit-fields (must stay, fixes uninitialised bits) and the four accessors (about 16 logic lines, movable to an own docshell source file). (b) juggler-navigation-events, hunk 3: InternalLoad builds a StealthNavigationLoad (StealthNavigation.cpp) right before DoURILoad, which notifies juggler-navigation-started-renderer, and calls its Failed(rv) when DoURILoad fails, before DisplayLoadError, which notifies juggler-navigation-failed-renderer with the load identifier and the status: a navigation refused before any channel (a restricted port, an unknown protocol) ends there (juggler/tests/navigation_refused_before_a_channel.test.mjs). (c) juggler-link-click-events, hunks 4-8: static NotifyJugglerLinkClick (hunk 4), OnLinkClickEvent::Run (5), Cancel plus NotifyJugglerDone (6), fields mRunning/mJugglerNotified (7), OnLinkClickWithLoadState (8). OnLinkClickEvent is a Mozilla class, so its two fields and the Run/Cancel calls stay in this file while the notify helper can move out. The comments promise one \"after\" per \"before\": confirmed for the Run and Cancel paths by the mJugglerNotified guard (hunk 6); a runnable dropped without Run or Cancel is unverified. Page.linkClicked is handled at juggler/content/PageAgent.js:98-99 and :281 (confirmed).",
@@ -88,7 +88,7 @@
    "added": 1,
    "removed": 0,
    "hunks": 1,
-   "inline_logic_lines": 1,
+   "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "after the closing bracket of UNIFIED_SOURCES",
    "notes": "One line includes docshell/base/test/gtest/stealth.build, our file, which lists TestStealthNavigation.cpp and the local include of docshell/base.",

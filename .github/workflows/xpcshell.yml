@@ -310,11 +310,17 @@ jobs:
           retention-days: 14
 
   # ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-  # prefs: EVERY preference the packaged engine has, the latest published firefox-<N> against the candidate, ZERO differences allowed.
+  # prefs: EVERY preference the packaged engine has, the latest published firefox-<N> against the candidate, ZERO differences allowed after the declared rows.
   #
   # scripts/ci/prefs_dump.js runs in `firefox -xpcshell` (the same command line and environment as the legs above, a fresh empty profile folder) and
   # writes the default branch (name, type, value, locked) and the user branch of that fresh profile. `xpcshell_run.py prefs-compare` is red on every
-  # added, missing or changed preference and says its name and both values: there is no list of expected differences.
+  # added, missing or changed preference and says its name and both values.
+  #
+  # WHAT A RELEASE DECLARES. The one list is tools/prefs-declared.json of the series checkout of this run (engine-series, the commit the run is on): rows
+  # {name, branch, type, value, reason, decided_by}, written by hand, every row read by the pm in its pull request. They are a delta against the latest
+  # published engine: `prefs-compare --declared` applies them to the BASELINE (the published dump) and then still allows zero differences. A row the candidate
+  # does not hold as declared (no such pref, another type or value, locked) is red, and so is a STALE row, one that the baseline already holds: once a release
+  # has published the change the row is removed, and the next candidate is red until it is. The control (the published engine twice) takes no row.
   #
   # THE CONTROL COMES FIRST. The published engine is dumped TWICE and the two are compared (the A/A): a difference there is "broken control" (exit 2),
   # the dump is not repeatable, and nothing is read from the candidate. Both engines are extracted to the same folder (`ff`) and dumped with the same
@@ -357,6 +363,7 @@ jobs:
             /platform/ci/src/scripts/ci/xpcshell_*
             /platform/ci/src/scripts/ci/published_release.py
             /platform/ci/src/scripts/ci/prefs_dump.js
+            /tools/prefs-declared.json
           sparse-checkout-cone-mode: false
       - name: Set up Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
@@ -454,9 +461,9 @@ jobs:
           chmod +x "$EXE" 2>/dev/null || true
           PREFIX=""; [ "${{ matrix.kind }}" = linux ] && PREFIX="xvfb-run -a"
           $PREFIX python "$PREFS_PY" prefs --binary "$EXE" --out prefs-out/candidate.json --root prefs-profile
-      - name: Published against candidate - zero differences
+      - name: Published against candidate - zero differences after the declared rows
         shell: bash
-        run: python "$PREFS_PY" prefs-compare prefs-out/published-1.json prefs-out/candidate.json --out prefs-out/diff.json
+        run: python "$PREFS_PY" prefs-compare prefs-out/published-1.json prefs-out/candidate.json --declared engine-series/tools/prefs-declared.json --out prefs-out/diff.json
       - name: The differences
         if: always()
         shell: bash

@@ -62,10 +62,113 @@ jobs:
       name: e2e
       packages: xvfb strace gdb elfutils
       playwright_wrapper_ref: ${{ inputs.wrapper_ref }}
+  # THE PYTHON PACKAGES OF EVERY LEG (ci-03), from the index once per runner image, Python and lock (py-deps.yml), never by a leg. The lock is the wrapper's
+  # (ci/py-lock/gate.txt at wrapper_ref: the wrapper's dependencies and its `dev` extra, the core's, the stock client of the pin, the lab's PKI) and the wheelhouse
+  # holds, next to every file the lock names, the wheels of the core at core_ref and of the wrapper at wrapper_ref (built there, --no-deps) and refs.json, which says
+  # which commit each was built from. A leg installs the lock with its hashes and the two wheels by name, offline: `pip install --no-index --find-links`, nothing else.
+  py-deps-gate:
+    name: py-deps-gate
+    uses: ./.github/workflows/py-deps.yml
+    with:
+      name: gate
+      python: "3.11"
+      lock_repository: oss-invisible/playwright
+      lock_ref: ${{ inputs.wrapper_ref }}
+      lock: ci/py-lock/gate.txt
+      core_ref: ${{ inputs.core_ref }}
+      wrapper_ref: ${{ inputs.wrapper_ref }}
+      wrapper_extras: dev
+      runners: '["ubuntu-24.04", "windows-latest"]'
+  # PLAYWRIGHT'S OWN FIREFOX for the legs that drive a stock browser (the fake web's control, the host oracle's on Windows), from a hash-checked archive (ci-03).
+  # `playwright install firefox` itself checks only the Content-Length of what it downloads. The wrapper pins the archives it fetches (ci/py-lock/playwright-browsers.json
+  # at wrapper_ref: Firefox, FFmpeg and, on Windows, winldd, each with its path on the CDN and its sha256); this job downloads them from Playwright's own hosts, checks every
+  # one against the pin and hands them to the legs as an artifact. A leg serves that folder on the loopback and lets `playwright install firefox` read it
+  # (PLAYWRIGHT_DOWNLOAD_HOST), so that Playwright's own installer does the unpacking from bytes already proved, and nothing is fetched by a leg.
+  playwright-firefox:
+    name: playwright-firefox (${{ matrix.os }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    # TEMP and TMP on D:\a\_temp (the runner's temp folder), as every other Windows job here (test_gate_windows_temp.py).
+    env:
+      TEMP: ${{ startsWith(matrix.runner, 'windows') && 'D:\a\_temp' || '/tmp' }}
+      TMP: ${{ startsWith(matrix.runner, 'windows') && 'D:\a\_temp' || '/tmp' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-24.04, os: linux, platform: ubuntu24.04-x64 }
+          - { runner: windows-latest, os: windows, platform: win64 }
+    steps:
+      - name: Checkout wrapper (its pin of the browser archives and of the Playwright)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          repository: oss-invisible/playwright
+          ref: ${{ inputs.wrapper_ref }}
+          path: wrapper
+          fetch-depth: 1
+          persist-credentials: false
+          sparse-checkout: |
+            ci/py-lock/playwright-browsers.json
+            scripts/playwright_pin.txt
+          sparse-checkout-cone-mode: false
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with: { python-version: '3.11' }
+      # The archives are downloaded from the three hosts Playwright itself uses, in its order, and only a download that FAILS goes on to the next one: a file that
+      # downloads and has another hash is red, whatever host it came from. Written to the folder the leg serves (builds/<browser>/<revision>/<file>.zip).
+      - name: The archives, checked against the wrapper's pin
+        shell: bash
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib, json, os, re, sys, urllib.request
+          pin_file = "wrapper/ci/py-lock/playwright-browsers.json"
+          if not os.path.isfile(pin_file):
+              sys.exit("ERROR: no %s at the wrapper_ref of this run: the file that pins the browser archives Playwright installs (path and sha256 of each)" % pin_file)
+          pin = json.load(open(pin_file, encoding="utf-8"))
+          want = open("wrapper/scripts/playwright_pin.txt", encoding="utf-8").read().strip()
+          if pin.get("playwright") != want:
+              sys.exit("ERROR: %s is for Playwright %s and scripts/playwright_pin.txt is %s: the browsers were not pinned again after the version moved" % (pin_file, pin.get("playwright"), want))
+          entries = (pin.get("platforms") or {}).get(os.environ["PLATFORM"])
+          if not entries:
+              sys.exit("ERROR: %s has no archives for %s" % (pin_file, os.environ["PLATFORM"]))
+          serve = os.path.join(os.environ["RUNNER_TEMP"], "playwright-firefox")
+          mirrors = ["https://cdn.playwright.dev/dbazure/download/playwright", "https://playwright.download.prss.microsoft.com/dbazure/download/playwright", "https://cdn.playwright.dev"]
+          for entry in entries:
+              path, sha = entry["path"], entry["sha256"]
+              if not re.fullmatch(r"builds/[a-z0-9-]+/[0-9]+/[A-Za-z0-9._-]+\.zip", path) or not re.fullmatch(r"[0-9a-f]{64}", sha):
+                  sys.exit("ERROR: %s: an entry that is not a path under builds/ with a sha256: %r" % (pin_file, entry))
+              target = os.path.join(serve, *path.split("/"))
+              os.makedirs(os.path.dirname(target), exist_ok=True)
+              data, errors = None, []
+              for mirror in mirrors:
+                  try:
+                      with urllib.request.urlopen("%s/%s" % (mirror, path), timeout=120) as resp:
+                          data = resp.read()
+                      break
+                  except Exception as exc:  # a failed download goes on to the next host; a wrong hash below does not
+                      errors.append("%s: %s" % (mirror, exc))
+              if data is None:
+                  sys.exit("ERROR: %s could not be downloaded from any host: %s" % (path, "; ".join(errors)))
+              got = hashlib.sha256(data).hexdigest()
+              if got != sha:
+                  sys.exit("ERROR: %s has sha256 %s, %s pins %s" % (path, got, pin_file, sha))
+              open(target, "wb").write(data)
+              print("ok %s %s (%d bytes)" % (sha, path, len(data)))
+          PY
+      - name: The archives for the legs of this run
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: playwright-firefox-${{ matrix.os }}
+          path: ${{ runner.temp }}/playwright-firefox
+          retention-days: 1
+          if-no-files-found: error
 
   gate:
     name: gate-${{ matrix.leg }}
-    needs: linux-deps-gate
+    needs: [linux-deps-gate, py-deps-gate]
     runs-on: ${{ matrix.runner }}
     # TEMP and TMP on D:\a\_temp (the runner's temp folder): the Firefox profiles land in TEMP and on C: they saturate the disk (queue up to 144,
     # latencies up to 4 s, parent main thread still 40-60 s). On the job, not in a step: `runner.temp` is not readable in a job's `env`.
@@ -147,14 +250,19 @@ jobs:
       - name: The security state (set by the repository, same bytes every run)
         shell: bash
         run: python scripts/ci_lab_security_state.py set --pin ci/security-state.pin.json
-      - name: Install Playwright driver (no bundled browser — we override executable_path)
-        # Pin from a SINGLE source (scripts/playwright_pin.txt) so release.yml and
-        # verify-assets.yml can't drift to different versions. The drive gate then
-        # ENFORCES playwright↔juggler compatibility: an incompatible pin fails the
-        # launch/drive (TargetClosedError / protocol error) and nothing publishes.
-        # Bump the pin file in lockstep when the juggler is re-synced from upstream.
+      - name: The wheelhouse of the run's py-deps-gate job
+        # THE PYTHON PACKAGES, from the run's wheelhouse and nothing else (ci-03, job py-deps-gate): the Playwright driver (no bundled browser: we override
+        # executable_path) at the version the wrapper's pin names, the lab's PKI (cryptography), and every dependency of the wrapper and of the core, each with the
+        # sha256 the lock holds. The Playwright pin is ONE source (scripts/playwright_pin.txt, which the lock follows: the wrapper's test holds them together); the
+        # drive gate then ENFORCES playwright<->juggler compatibility: an incompatible pin fails the launch/drive (TargetClosedError / protocol error) and nothing
+        # publishes. The core and the wrapper themselves go in at the step of the core under test, below.
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: py-deps-gate-${{ matrix.kind == 'win' && 'windows' || 'linux' }}
+          path: ${{ runner.temp }}/py-deps
+      - name: The Python packages, from the wheelhouse alone (no index)
         shell: bash
-        run: python -m pip install --quiet "playwright==$(cat scripts/playwright_pin.txt)"
+        run: python -m pip install --quiet --no-index --find-links "$RUNNER_TEMP/py-deps" --require-hashes -r "$RUNNER_TEMP/py-deps/lock.txt"
       - name: The Linux packages (the run's linux-deps-gate job, no mirror)
         if: matrix.kind == 'linux'
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
@@ -249,7 +357,6 @@ jobs:
       - name: THE DECLARED SECURITY STATE - the engine generates it from the files, makes no request for the collections
         shell: bash
         run: |
-          python -m pip install --quiet "cryptography==44.0.3"
           python engine-series/stillborn/security-state/src/security/manager/ssl/stealth/test/run_stealth_security_state_gate.py "$FF_EXE" --junit junit-py/security-state-${{ matrix.leg }}/run_stealth_security_state_gate.xml
       # THE JUNIT OF THAT STEP, a testcase `case:<name>` per case, for the named hook tests judge: the part `junitpart-py-security-state-<leg>` of the artifact
       # `junit-py` (the job `junit-py` of release.yml puts every junitpart-py-* together; the judge reads `junit-*` by name, so a part is `junitpart-*`). It is
@@ -269,23 +376,25 @@ jobs:
       # THE CORE UNDER TEST AND THE SEAL OF THE BINARY, BEFORE ANYTHING DRIVES IT. The drive gate launches through the
       # wrapper and the core, not through bare Playwright: since firefox-63 the engine holds every channel that asks the
       # proxy service until the client says how the session leaves the host, and only the core's launch says it first
-      # (run 43134774602: Page.goto timed out on both legs). What follows is the install of core_ref from git, the
-      # assertion that it is the core under test, and the seal of the binary; the guards below reuse them. The reasons
-      # for each switch are written at the guards.
-      - name: The core under test (core_ref, from git), the wrapper, and the seal of the binary
+      # (run 43134774602: Page.goto timed out on both legs). What follows is the install of core_ref (the wheel the job
+      # py-deps-gate built from that commit of git: no index, no wrapper pin involved), the assertion that it is the core under test (refs.json of the
+      # wheelhouse names the commit it was built from and its sha256, and the installed files are that wheel's), and the seal of the binary; the guards
+      # below reuse them. The reasons for each switch are written at the guards.
+      - name: The core under test (core_ref, from the wheelhouse), the wrapper, and the seal of the binary
         shell: bash
         env:
           CORE_REF: ${{ inputs.core_ref }}
           SEAL_TAG: ${{ inputs.seal_tag }}
         run: |
           export INVISIBLE_CORE_AUTOFIX=off INVISIBLE_CORE_PIN=allow
-          CORE_GIT="git+https://github.com/oss-invisible/core@$CORE_REF"
-          python -m pip install --quiet "$CORE_GIT"
-          python -m pip install --quiet ".[dev]"
-          python -m pip install --quiet --force-reinstall "$CORE_GIT"
+          # The wheels of the run's wheelhouse, by name, offline and without a dependency of their own (the lock's packages went in above): the core built from
+          # core_ref and the wrapper built from wrapper_ref, so that neither the wrapper's pin of the core nor an index can put another core in its place.
+          python -m pip install --quiet --no-index --no-deps --find-links "$RUNNER_TEMP/py-deps" invisible_core invisible_playwright
           python - <<'PY'
-          import json, os, re, subprocess, sys
+          import hashlib, json, os, re, subprocess, sys, zipfile
           from importlib.metadata import distribution, version
+          house = os.path.join(os.environ["RUNNER_TEMP"], "py-deps")
+          refs = json.load(open(os.path.join(house, "refs.json"), encoding="utf-8"))
           ref = os.environ["CORE_REF"]
           if re.fullmatch(r"[0-9a-f]{40}", ref):
               want = ref
@@ -295,17 +404,34 @@ jobs:
                   capture_output=True, text=True, check=True).stdout.splitlines() if line.strip()]
               peeled = [s for s, r in rows if r.endswith("^{}")]  # an annotated tag: its commit, not the tag object
               want = (peeled or [s for s, _ in rows] or [""])[0]
+          head = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()
+          # Read AFTER the import of the wrapper, so that a repair that put another core over this one (an install after, or the wrapper's import-time repair with
+          # INVISIBLE_CORE_AUTOFIX not off) is caught here and named.
           import invisible_playwright  # noqa: F401 - the import-time pin repair runs here, as under pytest
-          raw = distribution("invisible-core").read_text("direct_url.json")
-          got = (json.loads(raw).get("vcs_info") or {}).get("commit_id") if raw else None
-          print("core under test: %s from %s" % (version("invisible-core"), got or "the index"))
-          if not want or got != want:
-              sys.exit("THE CORE UNDER TEST IS NOT core_ref: installed %s from %s, core_ref %r is %s. "
-                       "Something put another core over the git install (an install after it, or the wrapper's "
-                       "import-time repair with INVISIBLE_CORE_AUTOFIX not off), and with the published core "
-                       "the engine refuses the launch on the declarations that core does not emit."
-                       % (version("invisible-core"), got or "the index", ref,
-                          want or "not a full sha nor a ref of invisible_core"))
+          # What was installed is the wheelhouse's wheel of each (its sha256 is refs.json's, and every file of its package is in the installed RECORD), the wheel of the
+          # core was built from the commit core_ref names, the wheel of the wrapper from the commit this job checked out: py-deps.yml wrote refs.json when it built them.
+          for kind, name in (("core", "invisible-core"), ("wrapper", "invisible-playwright")):
+              row = refs.get(kind)
+              if not row:
+                  sys.exit("THE WHEELHOUSE HAS NO %s WHEEL: refs.json lists %s" % (kind, sorted(refs)))
+              wheel = os.path.join(house, row["wheel"])
+              if hashlib.sha256(open(wheel, "rb").read()).hexdigest() != row["sha256"]:
+                  sys.exit("THE %s WHEEL IS NOT THE ONE THE RESOLVER BUILT: %s has another sha256 than refs.json" % (kind.upper(), row["wheel"]))
+              package = row["dist"] + "/"
+              with zipfile.ZipFile(wheel) as z:
+                  record = z.read(next(n for n in z.namelist() if n.endswith(".dist-info/RECORD"))).decode("utf-8")
+              built = {l.strip() for l in record.splitlines() if l.startswith(package)}
+              installed = {l.strip() for l in (distribution(name).read_text("RECORD") or "").splitlines() if l.startswith(package)}
+              if not built or built - installed:
+                  sys.exit("THE INSTALLED %s IS NOT ITS WHEEL: %d of its %d files are not in the installed RECORD, e.g. %s" % (name, len(built - installed), len(built), sorted(built - installed)[:3]))
+              print("%s under test: %s from %s" % (kind, version(name), row["commit"]))
+          if not want or refs["core"]["commit"] != want:
+              sys.exit("THE CORE UNDER TEST IS NOT core_ref: the wheelhouse's core (%s) was built from %s, core_ref %r is %s. "
+                       "Something moved the ref between the wheelhouse job and this one, or the ref is not a branch, a tag or a full sha of invisible_core, "
+                       "and with the published core the engine refuses the launch on the declarations that core does not emit."
+                       % (refs["core"]["wheel"], refs["core"]["commit"], ref, want or "not a full sha nor a ref of invisible_core"))
+          if refs["wrapper"]["commit"] != head:
+              sys.exit("THE WRAPPER UNDER TEST IS NOT THIS CHECKOUT: the wheelhouse's wrapper was built from %s, this job checked out %s" % (refs["wrapper"]["commit"], head))
           PY
           python -m invisible_core seal --binary "$FF_EXE" \
             --tag "$SEAL_TAG" \
@@ -319,6 +445,27 @@ jobs:
         if: matrix.leg == 'linux-x86_64'
         shell: bash
         run: python -m invisible_core.juggler._gen_protocol --check --binary "$(dirname "$FF_EXE")"
+      # The native crash of the pytest worker (python.exe, "Windows fatal exception: access violation" in a thread Python has no state for): Windows Error Reporting writes a
+      # full dump of any python.exe that dies from an unhandled exception, into a folder the job uploads. faulthandler (pytest enables it) is a vectored handler that prints
+      # the Python stacks and returns EXCEPTION_CONTINUE_SEARCH, so the exception goes on to the unhandled-exception path and WER still sees it. BEFORE the first pytest step.
+      - name: Windows Error Reporting keeps a full dump of a python.exe that crashes
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $dumps = Join-Path $env:RUNNER_TEMP 'crash-dumps'
+          New-Item -ItemType Directory -Force -Path $dumps | Out-Null
+          $wer = 'HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting'
+          New-Item -Force -Path $wer | Out-Null
+          New-ItemProperty -Force -Path $wer -Name Disabled -PropertyType DWord -Value 0 | Out-Null
+          New-ItemProperty -Force -Path $wer -Name DontShowUI -PropertyType DWord -Value 1 | Out-Null
+          $key = "$wer\LocalDumps\python.exe"
+          New-Item -Force -Path $key | Out-Null
+          New-ItemProperty -Force -Path $key -Name DumpFolder -PropertyType ExpandString -Value $dumps | Out-Null
+          New-ItemProperty -Force -Path $key -Name DumpType -PropertyType DWord -Value 2 | Out-Null
+          New-ItemProperty -Force -Path $key -Name DumpCount -PropertyType DWord -Value 10 | Out-Null
+          Get-ItemProperty -Path $key | Format-List DumpFolder, DumpType, DumpCount
+          Get-ItemProperty -Path $wer | Format-List Disabled, DontShowUI
       - name: DRIVE GATE — the wrapper launches the binary via juggler + real page (+ interaction on --full)
         shell: bash
         run: |
@@ -339,6 +486,8 @@ jobs:
       # that it still renders; Linux self-skips (Xvfb is the e2e.yml path).
       # The webgl guard catches a regression of the gamma readPixels noise back to
       # the scanner-maskable ±1 spike form (covered on Linux + Windows).
+      # (Since ci-03 "from git" reads "built from git by py-deps-gate and installed by name from its wheelhouse": the commit is the same, the index is still
+      # not asked, and neither is git by a leg.)
       # ⛔ THE CORE COMES FROM GIT, NOT FROM THE INDEX, and this is not a
       # convenience. `pip install ".[dev]"` installs the WRAPPER, which pins
       # invisible-core exactly, so pip resolves the PUBLISHED core - and during a
@@ -396,9 +545,10 @@ jobs:
       # broke firefox-47 is switched off for the whole step with the core's own
       # switches, INVISIBLE_CORE_AUTOFIX=off (no repair) and INVISIBLE_CORE_PIN=
       # allow (the pin mismatch warns instead of refusing the import). Then the
-      # core under test is ASSERTED before any browser starts: the git install of
-      # exactly core_ref (direct_url.json, which pip writes for a VCS install and
-      # an index install does not have), read AFTER importing the wrapper, so a
+      # core under test is ASSERTED before any browser starts: the wheel built
+      # from exactly core_ref (the commit refs.json of the wheelhouse names; a
+      # pip install by name leaves no record of its source, so the installed files are held
+      # to that wheel's), read AFTER importing the wrapper, so a
       # repair that came back any other way is caught here and named.
       # Measured locally on firefox-51's engine: without the two switches the
       # repair reinstalls 50.48.0 and the assertion stops the step with that
@@ -442,6 +592,14 @@ jobs:
           name: host-dump-${{ matrix.leg }}
           path: host-dump
           retention-days: 14
+      - name: Upload the crash dumps of python.exe
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: crash-dumps-gate-${{ matrix.leg }}
+          path: ${{ runner.temp }}/crash-dumps
+          if-no-files-found: ignore
+          retention-days: 14
 
   # THE UDP LINE'S E2E, on the leg's own runner and in parallel with the gate above (not behind it): the suites the wrapper
   # lists in ci/required-suites.json, run with the leg's freshly built binary. A required suite cannot be skipped or dropped
@@ -452,7 +610,7 @@ jobs:
   # on an engine older than firefox-63) run here and are never skipped.
   wrapper-e2e:
     name: ${{ matrix.suite }}-${{ matrix.leg }}
-    needs: linux-deps-e2e
+    needs: [linux-deps-e2e, py-deps-gate, playwright-firefox]
     runs-on: ${{ matrix.runner }}
     # TEMP and TMP on D:\a\_temp (the runner's temp folder): the Firefox profiles land in TEMP and on C: they saturate the disk (queue up to 144,
     # latencies up to 4 s, parent main thread still 40-60 s). On the job, not in a step: `runner.temp` is not readable in a job's `env`.
@@ -683,21 +841,30 @@ jobs:
           [ -e "$EXE" ] || { echo "ERROR: firefox binary not found at $EXE"; exit 1; }
           chmod +x "$EXE" 2>/dev/null || true
           echo "FF_EXE=$PWD/$EXE" >> "$GITHUB_ENV"
-      # The core under test is exactly core_ref, from git, over what the wrapper's pin resolves (the gate above explains why
-      # and asserts it; the same switches here).
-      - name: The core under test (core_ref, from git) and the wrapper with its dev extra
+      # THE PYTHON PACKAGES, from the run's wheelhouse and nothing else (ci-03, job py-deps-gate): the lock's packages with their hashes, then the core and the wrapper
+      # (with its dev extra: it is in the lock) built from core_ref and wrapper_ref, by name.
+      - name: The wheelhouse of the run's py-deps-gate job
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: py-deps-gate-${{ matrix.os }}
+          path: ${{ runner.temp }}/py-deps
+      - name: The Python packages, from the wheelhouse alone (no index)
+        shell: bash
+        run: python -m pip install --quiet --no-index --find-links "$RUNNER_TEMP/py-deps" --require-hashes -r "$RUNNER_TEMP/py-deps/lock.txt"
+      # The core under test is exactly core_ref, from the wheelhouse (built from core_ref there), over what the wrapper's pin resolves (the gate above explains why
+      # and asserts it; the same switches and the same assertion here).
+      - name: The core under test (core_ref, from the wheelhouse) and the wrapper with its dev extra
         shell: bash
         env:
           CORE_REF: ${{ inputs.core_ref }}
         run: |
           export INVISIBLE_CORE_AUTOFIX=off INVISIBLE_CORE_PIN=allow
-          CORE_GIT="git+https://github.com/oss-invisible/core@$CORE_REF"
-          python -m pip install --quiet "$CORE_GIT"
-          python -m pip install --quiet ".[dev]"
-          python -m pip install --quiet --force-reinstall "$CORE_GIT"
+          python -m pip install --quiet --no-index --no-deps --find-links "$RUNNER_TEMP/py-deps" invisible_core invisible_playwright
           python - <<'PY'
-          import json, os, re, subprocess, sys
+          import hashlib, json, os, re, subprocess, sys, zipfile
           from importlib.metadata import distribution, version
+          house = os.path.join(os.environ["RUNNER_TEMP"], "py-deps")
+          refs = json.load(open(os.path.join(house, "refs.json"), encoding="utf-8"))
           ref = os.environ["CORE_REF"]
           if re.fullmatch(r"[0-9a-f]{40}", ref):
               want = ref
@@ -705,15 +872,36 @@ jobs:
               rows = [line.split() for line in subprocess.run(
                   ["git", "ls-remote", "https://github.com/oss-invisible/core", ref, ref + "^{}"],
                   capture_output=True, text=True, check=True).stdout.splitlines() if line.strip()]
-              peeled = [s for s, r in rows if r.endswith("^{}")]
+              peeled = [s for s, r in rows if r.endswith("^{}")]  # an annotated tag: its commit, not the tag object
               want = (peeled or [s for s, _ in rows] or [""])[0]
-          import invisible_playwright  # noqa: F401
-          raw = distribution("invisible-core").read_text("direct_url.json")
-          got = (json.loads(raw).get("vcs_info") or {}).get("commit_id") if raw else None
-          print("core under test: %s from %s" % (version("invisible-core"), got or "the index"))
-          if not want or got != want:
-              sys.exit("THE CORE UNDER TEST IS NOT core_ref: installed %s from %s, core_ref %r is %s"
-                       % (version("invisible-core"), got or "the index", ref, want or "not a ref of invisible_core"))
+          head = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()
+          # Read AFTER the import of the wrapper, so that a repair that put another core over this one (an install after, or the wrapper's import-time repair with
+          # INVISIBLE_CORE_AUTOFIX not off) is caught here and named.
+          import invisible_playwright  # noqa: F401 - the import-time pin repair runs here, as under pytest
+          # What was installed is the wheelhouse's wheel of each (its sha256 is refs.json's, and every file of its package is in the installed RECORD), the wheel of the
+          # core was built from the commit core_ref names, the wheel of the wrapper from the commit this job checked out: py-deps.yml wrote refs.json when it built them.
+          for kind, name in (("core", "invisible-core"), ("wrapper", "invisible-playwright")):
+              row = refs.get(kind)
+              if not row:
+                  sys.exit("THE WHEELHOUSE HAS NO %s WHEEL: refs.json lists %s" % (kind, sorted(refs)))
+              wheel = os.path.join(house, row["wheel"])
+              if hashlib.sha256(open(wheel, "rb").read()).hexdigest() != row["sha256"]:
+                  sys.exit("THE %s WHEEL IS NOT THE ONE THE RESOLVER BUILT: %s has another sha256 than refs.json" % (kind.upper(), row["wheel"]))
+              package = row["dist"] + "/"
+              with zipfile.ZipFile(wheel) as z:
+                  record = z.read(next(n for n in z.namelist() if n.endswith(".dist-info/RECORD"))).decode("utf-8")
+              built = {l.strip() for l in record.splitlines() if l.startswith(package)}
+              installed = {l.strip() for l in (distribution(name).read_text("RECORD") or "").splitlines() if l.startswith(package)}
+              if not built or built - installed:
+                  sys.exit("THE INSTALLED %s IS NOT ITS WHEEL: %d of its %d files are not in the installed RECORD, e.g. %s" % (name, len(built - installed), len(built), sorted(built - installed)[:3]))
+              print("%s under test: %s from %s" % (kind, version(name), row["commit"]))
+          if not want or refs["core"]["commit"] != want:
+              sys.exit("THE CORE UNDER TEST IS NOT core_ref: the wheelhouse's core (%s) was built from %s, core_ref %r is %s. "
+                       "Something moved the ref between the wheelhouse job and this one, or the ref is not a branch, a tag or a full sha of invisible_core, "
+                       "and with the published core the engine refuses the launch on the declarations that core does not emit."
+                       % (refs["core"]["wheel"], refs["core"]["commit"], ref, want or "not a full sha nor a ref of invisible_core"))
+          if refs["wrapper"]["commit"] != head:
+              sys.exit("THE WRAPPER UNDER TEST IS NOT THIS CHECKOUT: the wheelhouse's wrapper was built from %s, this job checked out %s" % (refs["wrapper"]["commit"], head))
           PY
       - name: Seal of the binary under test
         shell: bash
@@ -749,11 +937,61 @@ jobs:
       # The fake web's control is Playwright's own Firefox (the same pin as the wrapper's fakeweb.yml), and so is the host oracle's stock control on Windows
       # (the geolocation step on stock Firefox, scripts/ci_ab_host.py `run_stock`: run 45121964904 was red because the executable was not there); the other
       # suites do not need it. On Linux the libraries Firefox loads are already installed by the system deps step above.
+      # The archives are the ones the job playwright-firefox downloaded and checked against the wrapper's pin (ci/py-lock/playwright-browsers.json: the sha256 of
+      # each). Playwright's own installer unpacks them: it reads them from a server of the loopback (PLAYWRIGHT_DOWNLOAD_HOST), so no host of the internet is
+      # asked, and this step checks again, against the pin of THIS checkout, every file the installer is about to read (the dry run names them) before it does.
+      - name: Playwright's own Firefox archives (the run's playwright-firefox job, checked against the pin)
+        if: matrix.suite == 'wrapper.e2e.fakeweb' || (matrix.suite == 'wrapper.e2e.ab_host' && matrix.os == 'windows')
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: playwright-firefox-${{ matrix.os }}
+          path: ${{ runner.temp }}/playwright-firefox
       - name: Playwright's own Firefox (the controls, the fake web and the host oracle on Windows)
         if: matrix.suite == 'wrapper.e2e.fakeweb' || (matrix.suite == 'wrapper.e2e.ab_host' && matrix.os == 'windows')
         shell: bash
         run: |
-          python -m pip install --quiet "playwright==$(cat scripts/playwright_pin.txt)"
+          set -euo pipefail
+          SERVE="$RUNNER_TEMP/playwright-firefox"
+          PORT="$(python -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')"
+          python -m http.server "$PORT" --bind 127.0.0.1 --directory "$SERVE" > "$RUNNER_TEMP/playwright-firefox-server.log" 2>&1 &
+          SERVER=$!
+          trap 'kill "$SERVER" 2>/dev/null || true' EXIT
+          export PLAYWRIGHT_DOWNLOAD_HOST="http://127.0.0.1:$PORT"
+          python - "$PORT" <<'PY'
+          import hashlib, json, os, re, socket, subprocess, sys, time
+          port = int(sys.argv[1])
+          host = "http://127.0.0.1:%d" % port
+          serve = os.path.join(os.environ["RUNNER_TEMP"], "playwright-firefox")
+          pin_file = "ci/py-lock/playwright-browsers.json"
+          if not os.path.isfile(pin_file):
+              sys.exit("ERROR: no %s at the wrapper_ref of this run: the file that pins the browser archives Playwright installs (path and sha256 of each)" % pin_file)
+          platform = "win64" if os.environ["RUNNER_OS"] == "Windows" else "ubuntu24.04-x64"
+          pinned = {e["path"]: e["sha256"] for e in (json.load(open(pin_file, encoding="utf-8")).get("platforms") or {}).get(platform) or []}
+          if not pinned:
+              sys.exit("ERROR: %s has no archives for %s" % (pin_file, platform))
+          for _ in range(50):
+              try:
+                  socket.create_connection(("127.0.0.1", port), 1).close()
+                  break
+              except OSError:
+                  time.sleep(0.2)
+          else:
+              sys.exit("ERROR: the loopback server did not start: " + open(os.path.join(os.environ["RUNNER_TEMP"], "playwright-firefox-server.log")).read())
+          out = subprocess.run([sys.executable, "-m", "playwright", "install", "--dry-run", "firefox"], capture_output=True, text=True, check=True).stdout
+          urls = re.findall(r"Download (?:url|fallback \d+):\s+(\S+)", out)
+          if not urls:
+              sys.exit("ERROR: `playwright install --dry-run firefox` names no download:\n" + out)
+          for url in urls:
+              if not url.startswith(host + "/"):
+                  sys.exit("ERROR: Playwright would download %s, not from %s" % (url, host))
+              path = url[len(host) + 1:]
+              if path not in pinned:
+                  sys.exit("ERROR: Playwright would read %s, and %s pins no such archive for %s (it pins %s)" % (path, pin_file, platform, sorted(pinned)))
+              got = hashlib.sha256(open(os.path.join(serve, *path.split("/")), "rb").read()).hexdigest()
+              if got != pinned[path]:
+                  sys.exit("ERROR: %s has sha256 %s, %s pins %s" % (path, got, pin_file, pinned[path]))
+              print("ok %s %s" % (got, path))
+          PY
           python -m playwright install firefox
       # The laboratory of the host oracle's geolocation step, before any launch (the published engine, the candidate and the stock control then run on the same machine in
       # the same state): the runner image has the Windows location service off and denied for the machine (run 45153612447: lfsvc Disabled and Stopped, the machine's
@@ -795,6 +1033,27 @@ jobs:
           "CheckAccess(location) after: $after"
           if ($after -ne 'Allowed') { $bad += "Windows answers CheckAccess(location) = $after, not Allowed" }
           if ($bad) { throw ("the location service of the runner is not on: " + ($bad -join '; ')) }
+      # The native crash of the pytest worker (python.exe, "Windows fatal exception: access violation" in a thread Python has no state for): Windows Error Reporting writes a
+      # full dump of any python.exe that dies from an unhandled exception, into a folder the job uploads. faulthandler (pytest enables it) is a vectored handler that prints
+      # the Python stacks and returns EXCEPTION_CONTINUE_SEARCH, so the exception goes on to the unhandled-exception path and WER still sees it. BEFORE the first pytest step.
+      - name: Windows Error Reporting keeps a full dump of a python.exe that crashes
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $dumps = Join-Path $env:RUNNER_TEMP 'crash-dumps'
+          New-Item -ItemType Directory -Force -Path $dumps | Out-Null
+          $wer = 'HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting'
+          New-Item -Force -Path $wer | Out-Null
+          New-ItemProperty -Force -Path $wer -Name Disabled -PropertyType DWord -Value 0 | Out-Null
+          New-ItemProperty -Force -Path $wer -Name DontShowUI -PropertyType DWord -Value 1 | Out-Null
+          $key = "$wer\LocalDumps\python.exe"
+          New-Item -Force -Path $key | Out-Null
+          New-ItemProperty -Force -Path $key -Name DumpFolder -PropertyType ExpandString -Value $dumps | Out-Null
+          New-ItemProperty -Force -Path $key -Name DumpType -PropertyType DWord -Value 2 | Out-Null
+          New-ItemProperty -Force -Path $key -Name DumpCount -PropertyType DWord -Value 10 | Out-Null
+          Get-ItemProperty -Path $key | Format-List DumpFolder, DumpType, DumpCount
+          Get-ItemProperty -Path $wer | Format-List Disabled, DontShowUI
       - name: The suite - every listed test runs and passes
         shell: bash
         run: |
@@ -979,6 +1238,14 @@ jobs:
         with:
           name: ${{ matrix.suite == 'wrapper.e2e.ab_oracle' && 'ab-oracle' || matrix.suite }}-${{ matrix.os }}
           path: ab-oracle
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Upload the crash dumps of python.exe
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: crash-dumps-${{ matrix.suite }}-${{ matrix.leg }}
+          path: ${{ runner.temp }}/crash-dumps
           if-no-files-found: ignore
           retention-days: 14
       - name: Keep the result

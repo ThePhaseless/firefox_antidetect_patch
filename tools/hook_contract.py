@@ -23,7 +23,7 @@ step requires its declaration.
 Two things about the rules that the table cannot say. A HOOKS.json entry with the hand fields `exception` and `pm: "approvato"` is
 a declared exception (G35): contract_violations leaves out every violation of such a hook (C1..C11, T1, T2, T3), and `check`
 counts them ("declared exceptions: N"); C12..C15 (port-06) are the opposite: they judge the exception itself, by its `reason_kind`.
-C12..C18 and C20 never enter the debt list, and a declared exception does not leave them out.
+C12..C18, C20 and C21 never enter the debt list, and a declared exception does not leave them out.
 """
 from __future__ import annotations
 
@@ -39,8 +39,9 @@ HUNK_RE = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@ ?(.*)$")
 MARKER_RE = re.compile(r"STEALTH-HOOK\(([^)]*)\)")
 REWRITE_FORMS = ("wrap-expression", "wrap-call", "wrap-function", "declared-value", "shadow")
 REASON_KINDS = ("expression", "declaration", "macro", "skip")
+PM_APPROVED = "approvato"         # the value of the HOOKS.json hand field `pm` that grants an exception (G35)
 FORMS = ("guard", "notice", "wrap-expression", "wrap-call", "wrap-function", "declared-value", "registration",
-         "member", "shadow", "anchor", "unknown")
+         "member", "shadow", "scope", "rewire", "parameter", "anchor", "excepted", "unknown")
 
 # The decisions the rules belong to (the id of a file in docs/decisions/, without .md).
 D_HOOK02 = "hook-02-shape-and-contract"
@@ -136,6 +137,11 @@ RULES = _rules(
     Rule("C20", "a hook line's marker STEALTH-HOOK(<folder>) names another folder than the one whose hooks.patch holds the line (a file of category backport has no markers and is left out)",
          "run `python tools/engine.py export`: it writes each hook line into the hooks.patch of the folder its marker names",
          D_HOOK02, "the marker names `{detail}`"),
+    Rule("C21", "a hook line has the form `unknown`: no form of FORMS_TABLE takes it, and no complete exception row (`exception`, `reason_kind`, `pm`) makes it `excepted`",
+         "write the line as one of the forms (docs/STRUCTURE.md, hook forms), or move the logic it carries into a function of ours in {folder}/src and "
+         "call it from one line of a form; a rewrite of Mozilla's lines that no form can express is declared in its HOOKS.json entry (`exception` with the "
+         "reason, `reason_kind` in %s, `pm`) and its form is then `excepted` (G63)" % _KINDS_LIST,
+         D_HOOK02, "{detail}"),
     Rule("T1", "a hook has no test (the `test` of its HOOKS.json entry is empty)",
          "write the test, with a negative control, and name it in the `test` field of the HOOKS.json entry of this hook (grammar: docs/STRUCTURE.md, test references)",
          D_HOOK04),
@@ -153,14 +159,16 @@ INTRODUCED_RULES = {"T1", "T2", "T3"}
 # port-06: these rules are fixed by the engine change and the HOOKS.json fields, never by the debt list (debt_problems refuses them)
 PORT06_RULES = ("C12", "C13", "C14", "C15", "C16", "C17")      # C16 and C17 are hook-02 rules: fixed by the hook, never by the debt
 PORT07_RULES = ("C18",)         # port-07: fixed by moving the hook or by its reason in HOOKS.json, never by the debt
-HOOK02_NEVER_DEBT = ("C20",)    # fixed by the export (a line in the hooks.patch of its marker's folder), never by the debt
+HOOK02_NEVER_DEBT = ("C20", "C21")    # C20: fixed by the export (a line in the hooks.patch of its marker's folder); C21: by a form or an exception row; never by the debt
 NEVER_DEBT_RULES = PORT06_RULES + PORT07_RULES + HOOK02_NEVER_DEBT
 QUIET_KINDS = ("only-place", "deferred")        # the two forms of the HOOKS.json hand field `quiet_anchor_why`
 
 # The forms of a hook line, in the order of STRUCTURE.md: (form, where, looks like). The one table of the forms.
 FORMS_TABLE = (
-    ("guard", "First statement of a function", "`if (StealthX(this, aArg, &rv)) return rv;`; with a value to return (G15) the guard returns it"),
-    ("notice", "First statement of a function", "`StealthX(this, aArg);`"),
+    ("guard", "First statement of a function", "`if (StealthX(this, aArg, &rv)) return rv;`; with a value to return (G15) the guard returns it; in "
+     "JavaScript `if (stealthX(this, aArg)) { return; }` (G66); it may leave by `goto <label>;` of Mozilla's own cleanup (G67)"),
+    ("notice", "First statement of a function", "`StealthX(this, aArg);`, in JavaScript `stealthX(this, aArg);`: one call and nothing else (a `try { ... } catch {}` "
+     "around it is more than the call and is no notice)"),
     ("wrap-expression", "The line where the value is born",
      "Mozilla's expression, unchanged, inside our call (the whole expression, or a sub-expression of the line, with our extra leading "
      "arguments such as `this, `): `return StealthX(<expression>);`; over several lines (G53) one line of ours opens the call with the "
@@ -173,15 +181,31 @@ FORMS_TABLE = (
      "The called identifier `Foo` becomes `StealthFoo`, same arguments (G29); or one argument of ours, a Stealth call, is added to a "
      "call of Mozilla's line (G9)"),
     ("declared-value", "The line that gives a default",
-     "The value on Mozilla's line is replaced: a literal in place of a literal, or one STEALTH_ macro in place of one literal or one macro of Mozilla's"),
+     "The value on Mozilla's line is replaced: a literal in place of a literal (in any language: a Python line too), or one STEALTH_ macro in place of one literal "
+     "or one macro of Mozilla's"),
     ("registration", "Includes, build files, declarative files",
      "`#include \"StealthX.h\"` in a block of ours after Mozilla's; `VAR += [\"StealthX.cpp\"]` after the closing `]` of a `moz.build`; one "
-     "line in `.ipdl`, `.webidl`, `components.conf`, `jar.mn`; a forward declaration `class X;` or a file-scope declaration of a function of ours (G40)"),
-    ("member", "A Mozilla class", "One declaration after an existing member, never the last in the block"),
+     "line in `.ipdl`, `.webidl`, `components.conf`, `jar.mn`; a forward declaration `class X;` or a file-scope declaration of a function of ours (G40); "
+     "and, of ours (G64): a moz.build `include(\"StealthX.mozbuild\")` or `include(\"stealth.build\")`, a line of a test manifest `.toml` that names a test "
+     "of ours (`[\"test_stealth_x.js\"]`), a Rust module declaration of ours (`pub mod stealth_x;`, `#[path = \"stealth_x.rs\"] mod stealth_x;`, "
+     "`#[cfg(test)] mod stealth_tests;`), one line of a `.md` that imports or links our own file (`@STEALTH_X.md`, `[text](STEALTH_X.md)`)"),
+    ("member", "A Mozilla class", "One declaration after an existing member, never the last in the block; of ours (G65): a data member of a Stealth type or "
+     "named `mStealth...`, whose initializer, if any, is only a call of ours (`StealthX mStealth;`, `uint32_t mStealthId = StealthId();`), a Rust field "
+     "of ours with its initializer (`stealth_x: T,` and `stealth_x: T::empty(),`, both in the file), a one-line accessor of ours "
+     "(`bool StealthIsX() const { return mX; }`)"),
     ("shadow", "Top of a function", "`const auto GetX = StealthGetX;` (G21: our value under a Mozilla name)"),
+    ("scope", "First statement of a function", "One local of a Stealth-named type, built by its arguments, that lives to the end of the function: "
+     "`StealthXScope s(this, aArg);`, `const StealthXAnswer a(*this, aArg);` (G60); mid-function the same line is an anchor"),
+    ("rewire", "A new line after the line where the value is born", "One line of ours that passes a variable through one call of ours and assigns "
+     "it back: `x = StealthX(this, x);`, `out = stealth_long_path(out)` (G61); a line that replaces a Mozilla line is no rewire, it is a rewrite (C12)"),
+    ("parameter", "A declaration of a chain: definition, declaration, `.idl`, `.webidl`", "Exactly one trailing parameter of ours added to Mozilla's "
+     "parameter list on its line (`(nsIPrincipal& aSubject)`, `, double aLatency`), or the extended attribute `[NeedsSubjectPrincipal]` that makes the "
+     "binding add it (G62); the recogniser is the one of rule C15, and the rewrite is judged by C12 and C15 as before"),
     ("anchor", "Right after a named Mozilla statement, mid-function (last resort)",
      "`StealthX(this, &locale);` or `if (StealthX(this)) return rv;`; as the last line of a block or of a JS module (G30, G33) it "
      "carries its `anchor` and `why` in HOOKS.json"),
+    ("excepted", "A line that no other form takes", "The line has no form and its HOOKS.json entry has the complete exception row: "
+     "`exception` (why), `reason_kind` (expression, declaration, macro or skip) and `pm` (G63, G35); with the row incomplete the form is `unknown` (rule C21)"),
 )
 
 # What each G code means, in words. A G code is a case that the code accepts or prints; the code itself is all the
@@ -199,10 +223,18 @@ EXPLAIN = {
     "G30": "An anchor may be the last line of a block; it carries its `anchor` and `why` in HOOKS.json (rule T2).",
     "G33": "An anchor may be the last line of a JS module; it carries its `anchor` and `why` in HOOKS.json (rule T2).",
     "G35": "A declared exception: a HOOKS.json entry with the hand fields `exception` (the reason) and `pm: \"approvato\"` is a rewritten line no form can express; its violations of C1..C11, T1, T2 and T3 are left out and counted.",
-    "G40": "A forward declaration `class X;` or a file-scope declaration of a function of ours is a registration.",
+    "G40": "A forward declaration `class X;` (alone, or inside one namespace on one line: `namespace net { class X; }`) or a file-scope declaration of a function of ours is a registration.",
     "G41": "tools/hook-names.json lists the functions that existed when rule C10 came; a hook may call them without the Stealth prefix, and a new function takes a Stealth name.",
     "G50": "In a preprocessed pref file or a JSON file, where a trailing comment is impossible, a marker comment alone on the line before a directive is the marker of the directive: one hook.",
     "G51": "Per Mozilla file, the lines the head removes or rewrites (the `-` lines of the diff against the tag) are not more than the base's, unless a HOOKS.json entry of the file carries `replaces` (one rewritten line standing for several hooks); prebuild check 8.",
+    "G60": "A scope: the first statement of a function is one local of a Stealth-named type built by its arguments (`StealthXScope s(this, aArg);`); the same line mid-function is an anchor (it carries its `anchor` and `why`, rule T2).",
+    "G61": "A rewire: an added line of ours (never a rewrite of a Mozilla line) that assigns a variable the result of one call of ours that takes the variable itself (`x = StealthX(this, x);`, `out = stealth_long_path(out)`); it names the variable it reassigns, so rule C16 does not read it as a local passed by a hook.",
+    "G62": "A parameter: one trailing parameter of ours is added to Mozilla's parameter list on its line, or the extended attribute `NeedsSubjectPrincipal` is added to a WebIDL member; rule C15 finds the parameter (the same insertion), and C12 and C15 judge the rewrite as before, so it still needs its exception row.",
+    "G63": "An excepted line: a line that no form takes and whose HOOKS.json entry has `exception`, `reason_kind` (one of expression, declaration, macro, skip) and `pm: \"approvato\"`; the form is written `excepted` by the tool, and C12 to C15 judge the exception itself.",
+    "G64": "Registrations of ours: a moz.build `include()` of a file named stealth (`.mozbuild` or `.build`), a test manifest `.toml` line that names a test with stealth in its name, a Rust module declaration of a module named stealth_*, and one `.md` line that imports or links a file named STEALTH_*.",
+    "G65": "Members of ours: a data member of a Stealth-named type, or named `mStealth...`, whose initializer is only a call of ours; a Rust field `stealth_x:` that has its initializer in the same file (and the initializer that has its field); a one-line accessor of ours `T StealthX() const { return mY; }` in a header.",
+    "G66": "A guard in JavaScript: `if (stealthX(this, aArg)) { return; }`, the call named stealth<What> or Stealth<What> and a block holding only the return.",
+    "G67": "A guard may leave by `goto <label>;` of Mozilla's own cleanup of the function instead of a return.",
     "G53": "A wrap-expression over several lines: one line of ours opens the call (marker on it), Mozilla's lines between stay unchanged, the closing line is Mozilla's plus our `)` and the marker.",
 }
 
@@ -390,18 +422,39 @@ PP_DIRECTIVE = re.compile(r"^\s*#\s*(include|if|ifdef|ifndef|else|elif|endif|def
 CONTROL = re.compile(r"^(\}\s*)?(if|else|for|while|switch|do|try|catch|namespace|struct|class|enum|union|extern|case|default)\b")
 OPENERS = ("//", "/*", "<!--", "#", ";")
 CLOSERS = ("", "*/", "-->")
-STEALTH_NAME = re.compile(r"^(?:nr_)?(?:Stealth|stealth_)\w*")
+OURS = r"(?:Stealth|stealth_)"        # the name of a function or type of ours: Stealth<What>, stealth_<what>
+STEALTH_NAME = re.compile(r"^(?:nr_)?" + OURS + r"\w*")
+STEALTH_NAME_JS = re.compile(r"^(?:Stealth|stealth_|stealth(?=[A-Z]))\w*")      # G66: JavaScript names a function stealth<What>
 CALL = re.compile(r"((?:[A-Za-z_]\w*(?:::|\.|->))*[A-Za-z_]\w*)\s*\(")
 KEYWORDS = {"if", "while", "for", "switch", "return", "sizeof", "catch", "else", "do"}
 BUILD_ADD = re.compile(r"^[A-Za-z_][\w.\[\]\"']*\s*\+=\s*\[.*\]$")
-GUARD_C = re.compile(r"^if\s*\(.*\)\s*return\b[^;{}]*;$")        # a guard: a call in its condition
+GUARD_C = re.compile(r"^if\s*\(.*\)\s*(?:return\b[^;{}]*|goto\s+\w+);$")        # a guard: a call in its condition; it may leave by goto (G67)
+GUARD_JS = re.compile(r"^if\s*\(.*\)\s*\{\s*return\b[^;{}]*;\s*\}$")       # G66: the guard of JavaScript, a block holding only the return
+JS_TYPES = {"js", "mjs", "jsm", "jsx", "ts"}
 GUARD_PY = re.compile(r"^if\s+.*:\s*return\b.*$")
 NOTICE = re.compile(r"^([\w:.\->]+)\s*\(.*\)\s*;?$")
 BLOCK_CONTINUATION = re.compile(r"^\*(\s|$)")      # ` * text` inside a block comment; `*aSurface = x;` is code
-STEALTH_CALL = re.compile(r"(?:[A-Za-z_]\w*::)*(?:nr_stealth_|Stealth|stealth_)\w*\s*\(")
-STEALTH_CHAIN = re.compile(r"(?:[A-Za-z_]\w*::)*(?:nr_stealth_|Stealth|stealth_)\w*")
+STEALTH_CALL = re.compile(r"(?:[A-Za-z_]\w*::)*(?:nr_stealth_|" + OURS + r")\w*\s*\(")
+STEALTH_CHAIN = re.compile(r"(?:[A-Za-z_]\w*::)*(?:nr_stealth_|" + OURS + r")\w*")
 IDENT = re.compile(r"^[A-Za-z_]\w*$")
-FORWARD_DECL = re.compile(r"^(?:class|struct)\s+\w+\s*;$")
+FORWARD_DECL = re.compile(r"^(?:class|struct)\s+\w+\s*;$|^namespace\s+\w+\s*\{\s*(?:class|struct)\s+\w+\s*;\s*\}$")      # G40, also inside one namespace on one line
+# G64: registrations of ours outside C++ includes. A file of ours is named stealth (a build file, a test) or STEALTH_ (a doc).
+BUILD_INCLUDE_OURS = re.compile(r"""^include\(\s*["'](?:[^"'\n]*/)?[Ss]tealth[^"'/\n]*\.(?:mozbuild|build)["']\s*\)$""")
+TEST_MANIFEST_OURS = re.compile(r"""^\[\s*["'][^"'\]\n]*stealth[^"'\]\n]*["']\s*\]$""", re.I)
+RUST_MOD_OURS = re.compile(r"^(?:#\[[^\n]*?\]\s*)*(?:pub(?:\([^)]*\))?\s+)?mod\s+stealth_\w+\s*;$")
+DOC_IMPORT_OURS = re.compile(r"^(?:@STEALTH_\w+\.md|\[[^\]\n]+\]\((?:\./)?STEALTH_\w+\.md\))$")
+# G60: a local of a Stealth-named type built by its arguments; G61: a variable passed through one call of ours and assigned back;
+# G65: a data member of ours, a one-line accessor of ours, a Rust field of ours.
+SCOPE_LOCAL = re.compile(r"^(?:const\s+)?(?:[A-Za-z_]\w*::)*Stealth\w*(?:<[^;()]*>)?\s+[A-Za-z_]\w*\s*(\(.*\))\s*;$")
+REWIRE_LHS = re.compile(r"^([A-Za-z_]\w*)\s*=\s*")
+DATA_MEMBER = re.compile(r"^(?:(?:static|mutable|const|constexpr|inline)\s+)*(?P<type>[A-Za-z_][\w:]*(?:<[^;=()]*>)?(?:\s*[*&]+\s*|\s+))"
+                         r"(?P<name>[A-Za-z_]\w*)\s*(?:=\s*(?P<init>.+?))?;$")
+OUR_MEMBER_NAME = re.compile(r"^(?:[ms]?Stealth\w*|stealth(?:_|(?=[A-Z]))\w*)$")
+MOZILLA_MEMBER_NAME = re.compile(r"^(?:m|s)[A-Z]")
+ACCESSOR_OURS = re.compile(r"^(?:(?:static|inline|virtual|constexpr)\s+)*[\w:<>,]+(?:\s*[*&]+\s*|\s+)(?:[A-Za-z_]\w*::)*" + OURS + r"\w*\s*\(\s*\)\s*(?:const\s*)?"
+                           r"\{\s*return\s+[A-Za-z_]\w*(?:(?:->|\.|::)[A-Za-z_]\w*)*\s*;\s*\}$")
+RUST_FIELD = re.compile(r"^(stealth_\w+)\s*:\s*\S.*,$")
+PARAMETER_ATTRIBUTES = {"NeedsSubjectPrincipal", "NeedsCallerType"}     # G62: the WebIDL extended attributes that make the binding add a parameter
 OWN_DECL = re.compile(r"^(?:[\w:<>,\[\]]+[\s*&]+)+(?:[A-Za-z_]\w*::)*(?:nr_stealth_|Stealth|stealth_)\w*\s*\([^;{}]*\)\s*(?:const\s*)?;$")
 SHADOW = re.compile(r"^(?:const\s+)?(?:auto|[\w:<>,*]+)\s*&?\s*[A-Za-z_]\w*\s*=\s*(?:[A-Za-z_]\w*::)*(?:nr_stealth_|Stealth|stealth_)\w*\s*;$")
 CONST_LINE = re.compile(r"^\s*const\s")
@@ -473,9 +526,10 @@ def calls(code: str) -> list:
     return [c for c in CALL.findall(code) if c.rsplit("::", 1)[-1] not in KEYWORDS and c not in KEYWORDS]
 
 
-def is_stealth_chain(chain: str) -> bool:
-    """`StealthX`, `Class::StealthX`, `ns::Class::StealthX`, `obj->StealthX`: some segment is Stealth-named."""
-    return any(STEALTH_NAME.match(seg) for seg in re.split(r"::|\.|->", chain))
+def is_stealth_chain(chain: str, ft: str = "") -> bool:
+    """`StealthX`, `Class::StealthX`, `ns::Class::StealthX`, `obj->StealthX`: some segment is Stealth-named (in a JavaScript file `stealthX` too)."""
+    named = STEALTH_NAME_JS if ft in JS_TYPES else STEALTH_NAME
+    return any(named.match(seg) for seg in re.split(r"::|\.|->", chain))
 
 
 MOZILLA_CALLS = {"MOZ_RELEASE_ASSERT", "ABORT", "NS_ENSURE_SUCCESS", "Services.prefs.getBoolPref",
@@ -874,10 +928,70 @@ def declared_by_macro(removed: str, code: str) -> bool:
     return len(r) == len(c) and len(diff) == 1 and bool(MACRO_VALUE.match(diff[0][0]) or LITERAL.match(diff[0][0])) and bool(OUR_MACRO.match(diff[0][1]))
 
 
-def line_form(ft: str, base: str, code: str, removed: str, kind: str, placement: str, pair: bool, renames=()):
+def own_registration(ft: str, base: str, code: str) -> bool:
+    """G64: a line of a build file, a test manifest, a Rust file or a Markdown file that registers a file of ours."""
+    if ft == "build":
+        return bool(BUILD_INCLUDE_OURS.match(code))
+    if ft == "toml":
+        return bool(TEST_MANIFEST_OURS.match(code))
+    if ft == "rs":
+        return bool(RUST_MOD_OURS.match(code))
+    return ft == "md" and bool(DOC_IMPORT_OURS.match(code))
+
+
+def _whole_call(text: str):
+    """The argument list `(...)` of `text` when `text` is exactly one call of ours (`StealthX(...)`, `ns::StealthX(...)`), else None."""
+    m = STEALTH_CALL.match(text)
+    if not m:
+        return None
+    o = m.end() - 1
+    return text[o:] if _close_paren(text, o) == len(text) - 1 else None
+
+
+def scope_arguments(ft: str, code: str):
+    """G60: the argument list of a line that is one local of a Stealth-named type built by its arguments (`StealthXScope s(this, aArg);`), else None."""
+    m = SCOPE_LOCAL.match(code) if ft in C_FAMILY else None
+    return m.group(1) if m and _close_paren(m.group(1), 0) == len(m.group(1)) - 1 else None
+
+
+def rewire_arguments(code: str):
+    """G61: the argument list of a line `x = StealthF(..., x, ...);` (the `;` may be absent: Python), a variable assigned the result of one
+    call of ours that takes the variable itself, else None."""
+    m = REWIRE_LHS.match(code)
+    if not m:
+        return None
+    rest = code[m.end():].rstrip()
+    args = _whole_call(rest[:-1].rstrip() if rest.endswith(";") else rest)
+    if args is None or not re.search(r"(?<![\w.>:])%s(?!\w)" % re.escape(m.group(1)), args):
+        return None
+    return args
+
+
+def member_of_ours(ft: str, code: str, fields=()) -> bool:
+    """G65: a data member of a Stealth type or named for ours whose initializer, if any, is only a call of ours; a Rust field of ours that has
+    its initializer in the file (`fields`: the names that occur twice); a one-line accessor of ours in a header."""
+    if ft == "rs":
+        m = RUST_FIELD.match(code)
+        return bool(m) and m.group(1) in fields
+    if ft not in C_FAMILY:
+        return False
+    if ft in ("h", "hpp") and ACCESSOR_OURS.match(code):
+        return True
+    m = DATA_MEMBER.match(code)
+    if not m:
+        return False
+    name, init = m.group("name"), m.group("init")
+    ours = OUR_MEMBER_NAME.match(name) or any(STEALTH_NAME.match(seg) for seg in re.split(r"::|[<>,\s*&]", m.group("type")) if seg)
+    return bool(ours) and (ft in HEADERS or bool(MOZILLA_MEMBER_NAME.match(name))) and (init is None or _whole_call(init.strip()) is not None)
+
+
+def line_form(ft: str, base: str, code: str, removed: str, kind: str, placement: str, pair: bool, renames=(), value_pair: bool = False,
+              fields=()):
     """-> (form, remainder): the form of one added code line. remainder: for wrap-expression, the
     line without Mozilla's expression (what the logic and name rules look at), else the code.
-    renames: the new names of the renames of the whole patch (G1): a one-line declaration of one is part of the wrap."""
+    renames: the new names of the renames of the whole patch (G1): a one-line declaration of one is part of the wrap.
+    value_pair: the rewrite is a block of as many lines as it removes (a literal changed on each: declared-value).
+    fields: the Rust field names of ours that occur twice in the file (G65)."""
     if not code or is_comment_line(code, ft):
         return "unknown", code
     if kind == "rewrite":
@@ -904,8 +1018,11 @@ def line_form(ft: str, base: str, code: str, removed: str, kind: str, placement:
                 # logic is judged in the part that is ours: the values that changed, not Mozilla's own text around them
                 r, c = _toks(removed), _toks(code)
                 return "declared-value", " ".join(y for x, y in zip(r, c) if x != y)
+        elif value_pair and removed and _value_change(removed, code):
+            r, c = _toks(removed), _toks(code)
+            return "declared-value", " ".join(y for x, y in zip(r, c) if x != y)
         return "unknown", code
-    if is_include(code) or (ft in PP_FILE_TYPES and PP_DIRECTIVE.match(code)):
+    if is_include(code) or (ft in PP_FILE_TYPES and PP_DIRECTIVE.match(code)) or own_registration(ft, base, code):
         return "registration", code
     if ft in ("ipdl", "ipdlh", "webidl") or base in ("components.conf", "jar.mn"):
         return "registration", code
@@ -919,11 +1036,19 @@ def line_form(ft: str, base: str, code: str, removed: str, kind: str, placement:
         return "wrap-function", code
     if ft in CLIKE and placement == "function_top" and SHADOW.match(code):
         return "shadow", code
-    guard = GUARD_PY.match(code) if ft == "py" else GUARD_C.match(code)
+    args = scope_arguments(ft, code)
+    if args is not None:
+        return ("scope" if placement == "function_top" else "anchor"), args       # G60; the remainder is the arguments: the logic rule reads them
+    args = rewire_arguments(code) if ft in CLIKE or ft == "py" else None
+    if args is not None:
+        return "rewire", args       # G61
+    guard = GUARD_PY.match(code) if ft == "py" else (GUARD_C.match(code) or (ft in JS_TYPES and GUARD_JS.match(code)))
     if guard and calls(code):
         return ("guard" if placement == "function_top" else "anchor"), code
     if NOTICE.match(code) and not re.match(r"^(return|else|do|goto|delete|throw|co_return)\b", code):
         return ("notice" if placement == "function_top" else "anchor"), code
+    if member_of_ours(ft, code, fields):
+        return "member", code       # G65
     if ft in HEADERS and re.search(r"[;,]$", code) and not NOTICE.match(code):
         return "member", code
     return "unknown", code
@@ -933,6 +1058,7 @@ def _is_multi_ok(ft: str, code: str) -> bool:
     return is_include(code) or (ft == "build" and bool(BUILD_ADD.match(code)))
 
 
+PY_HEADER = re.compile(r"^(?:if|elif|else|for|while|with|try|except|finally|def|class)\b.*:$")
 INCOMPLETE_CONTROL = re.compile(r"^(?:\}\s*)?(?:else(?:\s+if\s*\(.*\))?|if\s*\(.*\)|for\s*\(.*\)|while\s*\(.*\)|do|try)$")
 
 
@@ -952,6 +1078,8 @@ def _complete(ft: str, code: str) -> bool:
     """A complete statement or declaration on one line: brackets closed, not ending on an operator, a comma or an
     opening, not a bare `if (...)` / `else` that waits for its statement."""
     c = code.strip()
+    if ft == "py" and PY_HEADER.match(c):
+        return _balanced(c)         # `if x > 30:` is complete: its body is the next line
     if not c or not _balanced(c) or c[-1] in ",(+-*/&|=?:\\.<":
         return False
     return not INCOMPLETE_CONTROL.match(c)
@@ -1139,6 +1267,7 @@ def _analyse_patch(folder: str, text: str):
             continue
         file_blocks = [_blocks(h["lines"]) for h in f["hunks"]]
         file_roles = _wrap_roles(ft, file_blocks)
+        fields = rust_fields(file_blocks) if ft == "rs" else frozenset()
         for hno, h in enumerate(f["hunks"], 1):
             lines, section = h["lines"], h["section"]
             new_side = [(t, x) for t, x in lines if t != "-"]
@@ -1168,6 +1297,7 @@ def _analyse_patch(folder: str, text: str):
                 paired = bool(rem) and len(rem) == len(nonblank)       # a rewrite line for line
                 single_pair = paired and len(rem) == 1
                 forms, nb, block_hooks = [], 0, []
+                block_parameter = bool(rem) and kind == "rewrite" and not role and threaded_parameter(ft, rem, add) is not None
                 for run in _runs(nonblank):
                     codes = [marker_split(x) for _, x in run]
                     if _marker_before_directive(ft, run, codes):
@@ -1183,11 +1313,13 @@ def _analyse_patch(folder: str, text: str):
                         if kind == "rewrite":
                             rm = rem[nb] if paired else ("\n".join(rem) if nb == 0 else "")
                         nb += 1
-                        form, remainder = line_form(ft, base, code, rm, kind, placement, single_pair, renames)
+                        form, remainder = line_form(ft, base, code, rm, kind, placement, single_pair, renames, paired, fields)
                         if role:            # G53: the two ends of a multi-line wrap of Mozilla's expression
                             form, remainder = "wrap-expression", (code if role == "open" else ")")
                         if len(run) > 1 and not multi_ok:        # a form is the form of a one-line hook
                             form, remainder = "unknown", code
+                        if block_parameter and form == "unknown":       # G62: every line of the block belongs to the one parameter
+                            form = "parameter"
                         run_forms.append((form, remainder))
                         hk = Hook(folder, path, section, form, x, rm, kind, placement, len(run), j, mk, hno)
                         hooks.append(hk)
@@ -1212,17 +1344,18 @@ def _analyse_patch(folder: str, text: str):
                     if not any(mk is not None for _, mk, _ in codes) and not all(is_include(c) for c, _, _ in codes):
                         violate("C2", path, section, run_text, hooks=run_hooks)
                     for (form, remainder), hk, (_, x) in zip(run_forms, run_hooks, run) if multi_ok else ():
-                        if (form in ("guard", "notice", "anchor", "wrap-expression", "declared-value")
+                        if (form in ("guard", "notice", "anchor", "wrap-expression", "declared-value", "scope", "rewire")
                                 or (form == "unknown" and any(is_stealth_chain(c) for c in calls(remainder))))                                 and has_logic(remainder, ft):
                             violate("C5", path, section, x, hooks=[hk])
                         if form in ("guard", "notice", "anchor", "wrap-expression"):
                             # C10 is about the function of ours a hook calls: Mozilla's own macros and APIs are not read as it
                             cs = [c for c in calls(remainder) if c not in MOZILLA_CALLS]
-                            if cs and not is_stealth_chain(cs[0]) and not is_known_name(cs[0]):
+                            if cs and not is_stealth_chain(cs[0], ft) and not is_known_name(cs[0]):
                                 violate("C10", path, section, x, hooks=[hk], fact=cs[0])
                 add_text = "\n".join(x for _, x in nonblank)
                 if rem:
-                    is_form = bool(single_pair and forms and forms[0] in REWRITE_FORMS)
+                    is_form = bool(forms and ((single_pair and forms[0] in REWRITE_FORMS)
+                                              or (paired and all(f_ == "declared-value" for f_ in forms))))
                     rewrites.append(Rewrite(folder, path, hno, section, tuple(rem), tuple(x for _, x in nonblank),
                                             tuple(x for t, x in lines if t == "+"), is_form, tuple(block_hooks)))
                     if not is_form:
@@ -1266,7 +1399,7 @@ DIRECTIVE_LINE = re.compile(r"^\s*#")
 
 def _is_exception_entry(e) -> bool:
     """G35: an entry with the reason (`exception`) and the pm's approval (tools/hooks_list.py is_declared_exception)."""
-    return bool(e) and isinstance(e.get("exception"), str) and bool(e["exception"].strip()) and e.get("pm") == "approvato"
+    return bool(e) and isinstance(e.get("exception"), str) and bool(e["exception"].strip()) and e.get("pm") == PM_APPROVED
 
 
 def _code_of(line: str) -> str:
@@ -1354,6 +1487,59 @@ def _is_parameter(prev, seg: list, nxt) -> bool:
     return prev in ("(", ",") and nxt in (")", ",") and not ops
 
 
+def parameter_insertions(rem_t: list, add_t: list) -> list:
+    """The one recogniser of a threaded parameter, shared by rule C15 and the form `parameter` (G62): the insertions (previous matched token,
+    inserted tokens, next matched token) of the added tokens into Mozilla's removed ones that add an argument or a parameter to a list."""
+    sig = _significant(rem_t)
+    if len(sig) < 2:
+        return []
+    return [(prev, seg, nxt) for prev, seg, nxt in (_insertions(sig, add_t) or []) if _is_parameter(prev, seg, nxt)]
+
+
+PARAM_TOKEN = re.compile(r"^(?:[A-Za-z_]\w*|\*|&|<|>|:|\[|\])$")
+
+
+def _declares_parameter(seg: list) -> bool:
+    """The inserted tokens, a leading comma aside, declare exactly one parameter: a type and a name made of identifiers, `*`, `&`, `::`, `<...>`
+    and the brackets of an IDL attribute (`[optional] in double aLatency`); no call, no operator, no literal."""
+    t = list(seg)
+    if t and t[0] == ",":
+        t = t[1:]
+    if not t or _depth0_comma(t) or not all(PARAM_TOKEN.match(x) for x in t):
+        return False
+    return sum(1 for x in t if re.match(r"[A-Za-z_]", x)) >= 2 and bool(re.match(r"[A-Za-z_]", t[-1]))
+
+
+def threaded_parameter(ft: str, rem, add):
+    """G62, the form `parameter`: the removed Mozilla lines `rem` and the added lines `add` differ by exactly one insertion that rule C15's recogniser
+    (parameter_insertions) takes for a parameter, and it is ONE trailing parameter of ours in a C, C++ or IDL parameter list (its type and its name),
+    or, in a WebIDL file, the extended attribute that makes the binding add the parameter. -> the inserted parameter, or None."""
+    if ft not in C_FAMILY and ft not in ("idl", "webidl"):
+        return None
+    rem_t = _toks(" ".join(x.strip() for x in rem))
+    add_t = _significant(_toks(" ".join(_code_of(x).strip() for x in add if x.strip())))
+    found = parameter_insertions(rem_t, add_t)
+    if len(found) != 1 or len(_insertions(_significant(rem_t), add_t) or ()) != 1:
+        return None
+    _, seg, nxt = found[0]
+    if ft == "webidl":
+        names = [t for t in seg if t != ","]
+        return names[0] if len(names) == 1 and names[0] in PARAMETER_ATTRIBUTES else None
+    return " ".join(t for t in seg if t != ",") if nxt == ")" and _declares_parameter(seg) else None
+
+
+def rust_fields(file_blocks: list) -> frozenset:
+    """G65: the names of the `stealth_x: ...,` lines that a Rust file adds twice, the field and its initializer (`file_blocks`: the blocks of every hunk)."""
+    count = {}
+    for blocks in file_blocks:
+        for b in blocks:
+            for x in b["add"]:
+                m = RUST_FIELD.match(marker_split(x.rstrip())[0])
+                if m:
+                    count[m.group(1)] = count.get(m.group(1), 0) + 1
+    return frozenset(n for n, c in count.items() if c >= 2)
+
+
 def _rewrite_tokens(r: Rewrite):
     rem_t = _toks(" ".join(x.strip() for x in r.rem))
     add_t = _toks(" ".join(_code_of(x).strip() for x in r.add))
@@ -1434,13 +1620,7 @@ def rule_c15(r: Rewrite, entry):
     if file_type_of(r.file) not in C_FAMILY:
         return None
     rem_t, add_t = _rewrite_tokens(r)
-    sig = _significant(rem_t)
-    if len(sig) < 2:
-        return None
-    ins = _insertions(sig, add_t)
-    if not ins:
-        return None
-    if not any(_is_parameter(prev, seg, nxt) for prev, seg, nxt in ins):
+    if not parameter_insertions(rem_t, add_t):
         return None
     if (entry or {}).get("reason_kind") == "declaration" and SIDE_STATE.search(entry.get("exception", "")):
         return None
@@ -1521,7 +1701,7 @@ LOCAL_DECL_C = (
 LOCAL_DECL_JS = re.compile(r"\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)")
 LOCALS_FILES = {"cpp", "cc", "c", "mm", "m", "js", "mjs", "jsm", "jsx", "ts"}        # not headers (members and parameters), not rust
 TYPE_WORDS = {"bool", "int", "auto", "void", "char", "unsigned", "const"}
-EXEMPT_FOR_LOCALS = ("anchor", "registration", "member", "shadow")
+EXEMPT_FOR_LOCALS = ("anchor", "registration", "member", "shadow", "rewire")        # a rewire names the variable it reassigns (G61)
 
 
 def declared_locals(ft: str, lines) -> set:
@@ -1993,6 +2173,34 @@ def marker_violations(root) -> list:
     return _unique(found)
 
 
+def excepted_lacks(entry: dict) -> list:
+    """G63: what the HOOKS.json entry lacks to be an `excepted` line: the reason (`exception`), its `reason_kind` and the pm's `pm`; [] when it has all three."""
+    lacks = []
+    if not (isinstance(entry.get("exception"), str) and entry["exception"].strip()):
+        lacks.append("`exception` (the reason, in words)")
+    if entry.get("reason_kind") not in REASON_KINDS:
+        lacks.append("`reason_kind` (one of %s)" % _KINDS_LIST)
+    if entry.get("pm") != PM_APPROVED:
+        lacks.append("`pm: \"%s\"`" % PM_APPROVED)
+    return lacks
+
+
+def unknown_form_violations(root) -> list:
+    """C21 of every HOOKS.json entry (merged with its hand fields) whose form is `unknown`: no form takes the line, and its exception row, if it
+    has one, is not complete (G63). Not left out by a declared exception: the exception row is what turns `unknown` into `excepted`."""
+    import hooks_list      # imports this module: loaded here, not at the top
+    root, found = Path(root), []
+    for folder in hooks_list.folders(root):
+        for e in hooks_list.expected(root, folder):
+            if e["form"] != "unknown":
+                continue
+            text = e["line"].strip() or "<%s> %s" % (e["kind"], _squeeze(e.get("removed", "")))
+            row = any(k in e for k in ("exception", "reason_kind"))
+            detail = ("its exception row is incomplete, it lacks %s" % ", ".join(excepted_lacks(e))) if row else "no form takes it and its entry has no exception row"
+            found.append(Violation("C21", folder, e["file"], e["function"], text, _key("C21", folder, e["file"], e["function"], text), detail))
+    return _unique(found)
+
+
 def contract_violations(root) -> list:
     """Every rule the series breaks now, ordered by key. See the module's rules C1..C11, T1..T3. The violations of a
     declared exception (G35: HOOKS.json entry with `exception` and `pm: "approvato"`) are left out: a violation is
@@ -2010,7 +2218,7 @@ def contract_violations(root) -> list:
             if not (v.ids and all((v.folder, i) in excepted for i in v.ids)) and not end_anchor(v)]
     # port-06: a declared exception does not leave these out; they judge the exception itself (C20 too: no exception moves a line)
     return sorted(kept + hooks_list.missing_test_violations(root) + marker_violations(root) + rewrite_violations(root)
-                  + locals_violations(root) + namespace_violations(root), key=lambda v: v.key)
+                  + locals_violations(root) + namespace_violations(root) + unknown_form_violations(root), key=lambda v: v.key)
 
 
 # --------------------------------------------------------------------------- the debt list

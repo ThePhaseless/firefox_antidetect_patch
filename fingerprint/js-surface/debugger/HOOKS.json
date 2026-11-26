@@ -41,7 +41,9 @@
   "line": "  if (!invisibleDebuggee_)  // STEALTH-HOOK(fingerprint/js-surface/debugger)",
   "test": "gtest:StealthDebugger.ARealmShowsNoDebuggerOnlyWhenTheDebuggerIsInStealthMode",
   "anchor": "auto& globalDebuggers = global->getDebuggers(nogc);",
-  "why": "the line conditions Mozilla's untouched append to the global's debugger vector (step 1), which an invisible debuggee must not make; globalDebuggers is a local reference born on the line above and the member it reads is set in the middle of the function, so a guard at the head of addDebuggeeGlobal has neither"
+  "why": "the line conditions Mozilla's untouched append to the global's debugger vector (step 1), which an invisible debuggee must not make; globalDebuggers is a local reference born on the line above and the member it reads is set in the middle of the function, so a guard at the head of addDebuggeeGlobal has neither",
+  "exception": "removeDebuggeeGlobal: the erase of a Mozilla statement is skipped for a stealth debuggee (it never kept an entry; findDebuggerInVector asserts p != end); the unbraced prefix keeps Mozilla's two erase lines intact",
+  "pm": "approvato"
  },
  {
   "file": "js/src/debugger/Debugger.cpp",

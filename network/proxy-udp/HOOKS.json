@@ -64,11 +64,11 @@
   "file": "dom/media/webrtc/transport/nr_socket_proxy_config.cpp",
   "function": "",
   "kind": "add",
-  "form": "unknown",
-  "line": "  RefPtr<net::PcUdpProxy> mUdpProxy;  // STEALTH-HOOK(network/proxy-udp)",
+  "form": "member",
+  "line": "  RefPtr<net::PcUdpProxy> mStealthUdpProxy;  // STEALTH-HOOK(network/proxy-udp)",
   "test": "gtest:StealthPcUdpProxyKinds.ASocks5ProxyMeasuredCoherentIsTheRoadOfTheUdpWithItsCredentials",
-  "exception": "last line of the Private block: the aggregate initialisation Private({aProxyConfig}) needs mProxyConfig first and there is no other place",
-  "pm": "approvato"
+  "anchor": "net::WebrtcProxyConfig mProxyConfig; (the first member of the class Private)",
+  "why": "the last member of the aggregate Private: Private is initialized as `Private({aProxyConfig})`, which gives the first member its value, so our member must follow mProxyConfig and takes its default; there is no other place in the class"
  },
  {
   "file": "dom/media/webrtc/transport/nr_socket_proxy_config.cpp",
@@ -83,9 +83,9 @@
   "file": "dom/media/webrtc/transport/nr_socket_proxy_config.cpp",
   "function": "const net::WebrtcProxyConfig& NrSocketProxyConfig::GetConfig() const {",
   "kind": "add",
-  "form": "unknown",
-  "line": "RefPtr<net::PcUdpProxy> NrSocketProxyConfig::UdpProxy() const { return mPrivate->mUdpProxy; }  // STEALTH-HOOK(network/proxy-udp)",
-  "test": "gtest:StealthPcUdpProxyKinds.ASocks5ProxyMeasuredCoherentIsTheRoadOfTheUdpWithItsCredentials"
+  "form": "registration",
+  "line": "#include \"StealthNrSocketProxyConfig.inc.h\"  // STEALTH-HOOK(network/proxy-udp)",
+  "test": "gtest:StealthNrSocketBirth.TheControlASocketOfAPeerConnectionWithNoProxyIsHeardDirect"
  },
  {
   "file": "dom/media/webrtc/transport/nr_socket_proxy_config.h",
@@ -99,7 +99,7 @@
   "file": "dom/media/webrtc/transport/nr_socket_proxy_config.h",
   "function": "",
   "kind": "add",
-  "form": "unknown",
+  "form": "registration",
   "line": "namespace net { class PcUdpProxy; }  // STEALTH-HOOK(network/proxy-udp)",
   "test": "gtest:StealthPcUdpProxyKinds.ASocks5ProxyMeasuredCoherentIsTheRoadOfTheUdpWithItsCredentials"
  },
@@ -168,14 +168,6 @@
  },
  {
   "file": "dom/media/webrtc/transport/nr_socket_prsock.h",
-  "function": "class NrSocketBase {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  explicit NrSocket(const std::shared_ptr<NrSocketProxyConfig>& aProxyConfig) : fd_(nullptr), mProxyConfig(aProxyConfig) {}  // STEALTH-HOOK(network/proxy-udp)",
-  "test": "gtest:StealthUdpProxyBirth.TheLayerIsOnEverySocketOfAPeerConnectionWithAProxyAnswer"
- },
- {
-  "file": "dom/media/webrtc/transport/nr_socket_prsock.h",
   "function": "class NrSocket : public NrSocketBase, public nsASocketHandler {",
   "kind": "add",
   "form": "member",
@@ -236,7 +228,7 @@
   "file": "netwerk/base/nsUDPSocket.cpp",
   "function": "nsUDPSocket::InitWithAddress(const NetAddr* aAddr, nsIPrincipal* aPrincipal,",
   "kind": "add",
-  "form": "unknown",
+  "form": "anchor",
   "line": "  if (StealthSocksUdpLayerFailed(mFD, mSocksProxy)) goto fail;  // STEALTH-HOOK(network/proxy-udp)",
   "test": "gtest:StealthSocksUdpLayer.ASocketWithNoProxyIsLeftPlainAndALayerThatCannotBePushedFailsTheSocket",
   "anchor": "the `if (!mFD) {...}` check of the socket just opened in nsUDPSocket::InitWithAddress",

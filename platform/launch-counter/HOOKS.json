@@ -3,23 +3,23 @@
   "file": "browser/components/BrowserGlue.sys.mjs",
   "function": "BrowserGlue.prototype = {",
   "kind": "add",
-  "form": "unknown",
-  "line": "    try { ChromeUtils.importESModule(\"resource:///modules/StealthLaunchCounter.sys.mjs\").StealthLaunchCounter.fire(); } catch {}  // STEALTH-HOOK(platform/launch-counter)",
-  "test": "wrapper:tests/test_the_launch_counter_is_one_plain_get_before_any_page_e2e.py::test_the_browser_sends_one_plain_get_to_the_counter_before_any_page"
+  "form": "notice",
+  "line": "    ChromeUtils.importESModule(\"resource:///modules/StealthLaunchCounterLoader.sys.mjs\").StealthLaunchCounterLoader.fire();  // STEALTH-HOOK(platform/launch-counter)",
+  "test": "node:juggler/tests/the_launch_counter_starts_from_one_hook_at_final_ui_startup.test.mjs#BrowserGlue starts the launch counter from one line, the first statement of _beforeUIStartup, and from nowhere else"
  },
  {
   "file": "browser/components/moz.build",
   "function": "MOZ_SRC_FILES += [",
   "kind": "add",
   "form": "registration",
-  "line": "EXTRA_JS_MODULES += [\"StealthLaunchCounter.sys.mjs\"]  # STEALTH-HOOK(platform/launch-counter)",
-  "test": "wrapper:tests/test_the_launch_counter_is_one_plain_get_before_any_page_e2e.py::test_the_browser_sends_one_plain_get_to_the_counter_before_any_page"
+  "line": "EXTRA_JS_MODULES += [\"StealthLaunchCounter.sys.mjs\", \"StealthLaunchCounterLoader.sys.mjs\"]  # STEALTH-HOOK(platform/launch-counter)",
+  "test": "node:juggler/tests/the_launch_counter_starts_from_one_hook_at_final_ui_startup.test.mjs#the module and its loader are one tagged line of moz.build"
  },
  {
   "file": "browser/components/tests/unit/xpcshell.toml",
   "function": "run-if = [",
   "kind": "add",
-  "form": "unknown",
+  "form": "registration",
   "line": "[\"test_stealth_launch_counter.js\"]  # STEALTH-HOOK(platform/launch-counter)",
   "test": "wrapper:tests/test_the_launch_counter_is_one_plain_get_before_any_page_e2e.py::test_the_browser_sends_one_plain_get_to_the_counter_before_any_page"
  }

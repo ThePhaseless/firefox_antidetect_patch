@@ -10,6 +10,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import engine  # noqa: E402
 import hook_contract as hc  # noqa: E402
@@ -59,6 +61,9 @@ def read_list(root):
 
 
 def commit_list(root, entries):
+    for e in entries:
+        if e.get("form") == "unknown" and not hc.excepted_lacks(e):
+            e["form"] = "excepted"          # what the export writes for a line whose exception row is complete (G63)
     hl.list_path(root, FOLDER).write_text(hl.render(entries), encoding="utf-8", newline="")
 
 
@@ -244,6 +249,17 @@ def test_a_node_reference_must_exist_with_its_title(tmp_path):
     assert hl.problems(root) == []
 
 
+def test_a_node_title_with_an_escaped_quote_resolves(tmp_path):
+    root = series(tmp_path, top(G1))
+    d = root / FOLDER / "src" / "juggler" / "tests"
+    d.mkdir(parents=True)
+    (d / "q.test.mjs").write_text("test('the last line of Marionette\\'s module', () => {});\ntest(\"say \\\"hi\\\" once\", () => {});\n", encoding="utf-8")
+    for ref, ok in (("node:juggler/tests/q.test.mjs#the last line of Marionette's module", True),
+                    ('node:juggler/tests/q.test.mjs#say "hi" once', True),
+                    ("node:juggler/tests/q.test.mjs#the last line of Marionette's other module", False)):
+        assert (hl.reference_problem(root, ref) is None) == ok, ref
+
+
 def test_a_py_reference_and_a_wrapper_reference(tmp_path):
     root = series(tmp_path, top(G1))
     d = root / FOLDER / "src" / "modules" / "test"
@@ -384,7 +400,7 @@ def exception_series(tmp_path):
 
 def test_a_declared_exception_is_left_out_of_the_contract_and_counted(tmp_path):
     root, entries = exception_series(tmp_path)
-    assert sorted(v.rule for v in hc.contract_violations(root)) == ["C12", "C6"]     # the rewrite no form expresses, and no exception covers it
+    assert sorted(v.rule for v in hc.contract_violations(root)) == ["C12", "C21", "C6"]     # the rewrite no form expresses, and no exception covers it
     assert hl.declared_exceptions(root) == []
     entries[0].update(exception="a value of ours in a Mozilla call", reason_kind="expression", pm="approvato")
     commit_list(root, entries)
@@ -403,7 +419,7 @@ def test_an_exception_without_the_pm_is_a_failure_and_no_exception(tmp_path):
         commit_list(root, [dict(entries[0], **fields)])
         assert hl.problems(root), fields
         assert hl.declared_exceptions(root) == [], fields
-        assert sorted(v.rule for v in hc.contract_violations(root)) == ["C12", "C6"], fields      # nothing is excluded
+        assert sorted(v.rule for v in hc.contract_violations(root)) == ["C12", "C21", "C6"], fields      # nothing is excluded
     commit_list(root, [dict(entries[0], exception="why", reason_kind="expression", pm="approvato")])
     assert hl.problems(root) == []
 
@@ -632,7 +648,7 @@ def anchor_series(tmp_path, lines):
 
 def test_c9_a_declared_anchor_at_the_end_of_a_block_or_of_a_constructor_is_allowed(tmp_path):
     cases = {
-        "if-branch": ["   // lead", " " + FN, "   if (a) {", "     int x = 1;", "+    priv->x = options.x;" + MARK, "   }", "   return NS_OK;", " }"],
+        "if-branch": ["   // lead", " " + FN, "   if (a) {", "     int x = 1;", "+    x = StealthApply(x, options);" + MARK, "   }", "   return NS_OK;", " }"],
         "constructor": ["   // lead", " Foo::Foo(const Foo& aRhs) {", "+  StealthCopied(this, aRhs);" + MARK, " }"],
     }
     for name, lines in cases.items():
@@ -649,7 +665,7 @@ def test_c9_a_declared_anchor_at_the_end_of_a_block_or_of_a_constructor_is_allow
                                                           "+    " + "3," + MARK, "   };"])
     entries[0].update(anchor="a", why="b")
     commit_list(root, entries)
-    assert [v.rule for v in hc.contract_violations(root)] == ["C9"]
+    assert [v.rule for v in hc.contract_violations(root) if v.rule != "C21"] == ["C9"]        # the line `3,` is no form: C21 says so too
 
 
 def test_a_markdown_line_before_agents_md_is_not_the_last_line_of_a_block(tmp_path):

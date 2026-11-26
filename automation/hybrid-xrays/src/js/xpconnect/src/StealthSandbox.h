@@ -18,6 +18,15 @@
 #include "js/RootingAPI.h"
 #include "js/TypeDecls.h"
 
+// The step of SandboxOptions::Parse that reads `hybridXrays`: a member of
+// Mozilla's class, defined here by its qualified name (it needs ParseBoolean,
+// which is protected in OptionsBase). Parse's chain wraps the `wantXrays` read
+// in it, so it runs right after that read and only when that read worked, as
+// the line it replaced did: aParsed is the result of the `wantXrays` read.
+inline bool xpc::SandboxOptions::StealthParseHybridXrays(bool aParsed) {
+  return aParsed && ParseBoolean("hybridXrays", &hybridXrays);
+}
+
 namespace mozilla {
 
 /**
@@ -31,11 +40,15 @@ namespace mozilla {
  *   getPropertyDescriptorImpl (SandboxProxyHandler): StealthGetPropertyDescriptor.
  *
  *   CreateSandboxObject: StealthCheckHybridXrays (before the options are
- *   used). The compartment flag is checked (reused compartment) or stored
- *   (new compartment) in place, next to wantXrays.
+ *   used). The compartment flag is checked (reused compartment) in place, next
+ *   to wantXrays.
  *
- *   SandboxOptions::Parse reads the option in place (hybridXrays, in
- *   xpcprivate.h, defaults to false).
+ *   SandboxOptions::Parse: StealthParseHybridXrays (above), a member of the
+ *   class that wraps the read of `wantXrays` and reads the option after it
+ *   (hybridXrays, in xpcprivate.h, defaults to false).
+ *
+ *   CreateSandboxObject, new compartment: StealthSetHybridXrays stores the
+ *   option in the compartment (the reused compartment is checked in place).
  *
  * Main thread.
  */
@@ -81,6 +94,14 @@ inline bool StealthCheckHybridXrays(JSContext* aCx, nsIPrincipal* aPrincipal,
     return false;
   }
   return true;
+}
+
+// Stores the option in the compartment of a sandbox just created, next to
+// Mozilla's own flags (CreateSandboxObject, new compartment). A reused
+// compartment keeps its flag: it is checked against the option in place.
+inline void StealthSetHybridXrays(xpc::CompartmentPrivate* aPriv,
+                                  const xpc::SandboxOptions& aOptions) {
+  aPriv->hybridXrays = aOptions.hybridXrays;
 }
 
 }  // namespace mozilla

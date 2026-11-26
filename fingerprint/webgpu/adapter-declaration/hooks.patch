@@ -1,5 +1,5 @@
 diff --git a/dom/webgpu/Adapter.cpp b/dom/webgpu/Adapter.cpp
-index 2814b6354a43690a2550e13a0bc312183609bb97..1d7b318a97fb5281da0468bc0d2c53d74a9e0357 100644
+index 2814b6354a43690a2550e13a0bc312183609bb97..ad966a4c17e7053c1576c9a06b0cc754b1bde1cb 100644
 --- a/dom/webgpu/Adapter.cpp
 +++ b/dom/webgpu/Adapter.cpp
 @@ -17,6 +17,8 @@
@@ -23,7 +23,7 @@ index 2814b6354a43690a2550e13a0bc312183609bb97..1d7b318a97fb5281da0468bc0d2c53d7
    }
  };
  
-+static std::string_view ToJsKey(const Limit limit);  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)
++#include "StealthAdaptLimitKey.inc.h"  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)
 +
  Adapter::Adapter(Instance* const aParent, WebGPUChild* const aChild,
                   const std::shared_ptr<ffi::WGPUAdapterInformation>& aInfo)
@@ -104,7 +104,7 @@ index a0d0ceba2c0d4615e259d7a04bed61adaff26203..1007a9714304e0c383c2b7ba242b4fef
  IPDL_SOURCES += [
      "ipc/PWebGPU.ipdl",
 diff --git a/gfx/tests/gtest/moz.build b/gfx/tests/gtest/moz.build
-index 6e5fc96e0c3a3df348f17fbfe37bc3d1b30f6564..806fc376b3dd0a6bf4f4a635f9a092ae4cc3dfae 100644
+index 610bce7e0d57cdcbed8815b09e509c28cdbe05b7..80cf1e9c355eed6ad6e07f622018318dc4be78a2 100644
 --- a/gfx/tests/gtest/moz.build
 +++ b/gfx/tests/gtest/moz.build
 @@ -33,6 +33,7 @@ UNIFIED_SOURCES += [

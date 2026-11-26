@@ -3,24 +3,8 @@
   "file": "gfx/tests/gtest/moz.build",
   "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
   "kind": "add",
-  "form": "unknown",
-  "line": "if CONFIG[\"MOZ_WIDGET_TOOLKIT\"] == \"gtk\":  # STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": "gtest:StealthFcFontList.DeclareFontFile"
- },
- {
-  "file": "gfx/tests/gtest/moz.build",
-  "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
-  "kind": "add",
   "form": "registration",
-  "line": "    UNIFIED_SOURCES += [\"TestStealthFcFontList.cpp\"]  # STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": "gtest:StealthFcFontList.DeclareFontFile"
- },
- {
-  "file": "gfx/tests/gtest/moz.build",
-  "function": "if CONFIG[\"OS_TARGET\"] != \"Android\":",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    CXXFLAGS += CONFIG[\"CAIRO_FT_CFLAGS\"]  # STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "line": "include(\"StealthFcFontListTests.mozbuild\")  # STEALTH-HOOK(fingerprint/fonts/font-list)",
   "test": "gtest:StealthFcFontList.DeclareFontFile"
  },
  {
@@ -173,7 +157,7 @@
   "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
   "function": "gfxFontconfigFontEntry::AutoHBFace gfxFontconfigFontEntry::GetHBFace() {",
   "kind": "rewrite",
-  "form": "unknown",
+  "form": "excepted",
   "line": "      face = StealthBaseHBFaceRef(this);  // STEALTH-HOOK(fingerprint/fonts/font-list)",
   "removed": "      face = hb_face_reference(gfxFontEntry::GetHBFace());",
   "test": "wrapper:tests/test_the_parent_reads_the_bundle_from_fontconfig_s_cache_linux_e2e.py::test_the_warm_parent_reads_the_bundle_from_fontconfig_cache_and_does_not_scan_it",
@@ -218,7 +202,7 @@
   "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
   "function": "hb_blob_t* gfxFontconfigFontEntry::GetFontTableInternal(uint32_t aTableTag) {",
   "kind": "rewrite",
-  "form": "unknown",
+  "form": "excepted",
   "line": "  auto* table = StealthHBFaceTable(this, aTableTag);  // STEALTH-HOOK(fingerprint/fonts/font-list)",
   "removed": "  auto* table = hb_face_reference_table(GetHBFace(), aTableTag);",
   "test": "wrapper:tests/test_the_parent_reads_the_bundle_from_fontconfig_s_cache_linux_e2e.py::test_the_warm_parent_reads_the_bundle_from_fontconfig_cache_and_does_not_scan_it",
@@ -496,7 +480,7 @@
   "file": "gfx/thebes/moz.build",
   "function": "USE_LIBS += [",
   "kind": "add",
-  "form": "unknown",
+  "form": "registration",
   "line": "include(\"StealthFcFontList.mozbuild\")  # STEALTH-HOOK(fingerprint/fonts/font-list)",
   "test": "wrapper:tests/test_bundle_font_names_e2e.py::test_src_local_resolves_a_bundled_postscript_name_and_not_a_host_only_name"
  }

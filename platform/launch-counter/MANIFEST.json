@@ -6,10 +6,12 @@
  ],
  "added": {
   "browser/components/StealthLaunchCounter.sys.mjs": "100644",
+  "browser/components/StealthLaunchCounterLoader.sys.mjs": "100644",
   "browser/components/tests/unit/test_stealth_launch_counter.js": "100644"
  },
  "sha256": {
   "browser/components/StealthLaunchCounter.sys.mjs": "7e5db57f912751dd0af834ac4436cf866edfba9ca4f5b4b2bb5f51a43fee70e8",
+  "browser/components/StealthLaunchCounterLoader.sys.mjs": "a314a79afc885853afefa3f1bb04b91ceaae8a270954d430e7879d467f66c188",
   "browser/components/tests/unit/test_stealth_launch_counter.js": "ca0c933e96880e093e1ada39682c152c1154d137c7a56bbef98027bb89ff206b"
  },
  "inventory": [
@@ -24,7 +26,7 @@
    "added": 1,
    "removed": 0,
    "hunks": 1,
-   "inline_logic_lines": 1,
+   "inline_logic_lines": 0,
    "hookable": "movable",
    "anchor": "BrowserGlue.prototype._beforeUIStartup (before lazy.SessionStartup.init())",
    "notes": "Adds a network request (GET, no payload) on every browser process start, gated by the pref, errors swallowed. It adds traffic of our own and removes nothing of Firefox's, hence category other rather than stillborn. Movable: move the block into an own module and leave a one-line call here. The compiled fallback URL (the wrapper's repository, BrowserGlue.sys.mjs:426) is effectively dead because browser/app/profile/firefox.js:3869 always defines the pref (CONFIRMED); three different repos are named across README.md:63, firefox.js:3869 and this file.",
@@ -61,7 +63,7 @@
    "added": 2,
    "removed": 0,
    "hunks": 1,
-   "inline_logic_lines": 1,
+   "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "hook added by the 2026-10-29 move to our files",
    "notes": "Hook registering or calling our own code.",

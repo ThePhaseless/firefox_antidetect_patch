@@ -770,15 +770,18 @@ def cases() -> list:
                 d["default"][n] = entry
         return d
 
-    def compare(a, b, control=False):
-        """(exit code, output, the diff JSON) of prefs-compare on two dumps written to a temporary folder."""
+    def compare(a, b, control=False, declared=None):
+        """(exit code, output, the diff JSON) of prefs-compare on two dumps written to a temporary folder; `declared` (rows, or the text of the file) is the
+        series' file of declared changes."""
         with tempfile.TemporaryDirectory() as tmpd:
-            pa, pb, po = Path(tmpd) / "a.json", Path(tmpd) / "b.json", Path(tmpd) / "diff.json"
+            pa, pb, po, pd = Path(tmpd) / "a.json", Path(tmpd) / "b.json", Path(tmpd) / "diff.json", Path(tmpd) / "prefs-declared.json"
             pa.write_text(json.dumps(a), encoding="utf-8")
             pb.write_text(json.dumps(b), encoding="utf-8")
+            if declared is not None:
+                pd.write_text(declared if isinstance(declared, str) else json.dumps(declared), encoding="utf-8")
             buf = io.StringIO()
             with contextlib.redirect_stdout(buf):
-                code = x.prefs_compare(pa, pb, po, control)
+                code = x.prefs_compare(pa, pb, po, control, pd if declared is not None else None)
             return code, buf.getvalue(), json.loads(po.read_text(encoding="utf-8")) if po.is_file() else None
 
     code, text, diff = compare(dump(), dump(meta={"seconds": 9, "os": "linux"}))
@@ -827,6 +830,65 @@ def cases() -> list:
     code, text, _ = compare(dump(), changed(app_x={"type": "error", "value": "NS_ERROR_UNEXPECTED"}))
     add("prefs-compare: a pref the dump could not read is a difference when only one engine has it, and is listed as unreadable",
         code == 1 and "app.x" in text and "could not read" in text)
+
+    # --- the declared changes: rows of the series' tools/prefs-declared.json, applied to the baseline, still zero differences to allow
+    def row(name, value=-1, kind="int", branch="default", **edits):
+        return dict({"name": name, "branch": branch, "type": kind, "value": value, "reason": "window frame of a restored window: sentinels the core sets; -1 = not declared",
+                     "decided_by": "pm, 26/11"}, **edits)
+
+    SENTINELS = ["zoom.stealth.screen.compact_below_css", "zoom.stealth.screen.min_inner_height_css", "zoom.stealth.screen.min_inner_width_css",
+                 "zoom.stealth.screen.restored_position", "zoom.stealth.screen.ui_compact", "zoom.stealth.screen.ui_normal"]
+
+    def with_prefs(base, **prefs):
+        d = json.loads(json.dumps(base))
+        for name, entry in prefs.items():
+            d["default"][name.replace("__", ".")] = entry
+        return d
+
+    NEW = {"type": "int", "value": -1, "locked": False}
+    code, text, diff = compare(dump(), with_prefs(dump(), app__n=NEW), declared=[])
+    add("declared: a pref the candidate adds that no row declares is red, with an empty declared file too, and it is named", code == 1 and "only in b: int:-1" in text and "app.n" in text)
+    code, text, diff = compare(dump(), with_prefs(dump(), app__n=NEW), declared=[row("app.n")])
+    add("declared: a row that the candidate holds as declared and the baseline lacks is green, exit 0, zero differences, and the report names the declared change",
+        code == 0 and diff["verdict"] == "green" and diff["differences"] == [] and [r["name"] for r in diff["declared"]] == ["app.n"] and "1 declared changes applied" in text)
+    code, text, diff = compare(dump(), with_prefs(dump(), **{n.replace(".", "__"): NEW for n in SENTINELS}), declared=[row(n) for n in SENTINELS])
+    add("declared: the six sentinels of the window frame (default branch, int, -1) declared by their rows are green", code == 0 and len(diff["declared"]) == 6 and diff["differences"] == [])
+    code, text, diff = compare(dump(), with_prefs(dump(), **{n.replace(".", "__"): NEW for n in SENTINELS}), declared=[row(n) for n in SENTINELS[:5]])
+    add("declared: one of the six left undeclared is red and is the only difference", code == 1 and len(diff["differences"]) == 1 and SENTINELS[5] in text)
+    code, text, diff = compare(with_prefs(dump(), app__n=NEW), with_prefs(dump(), app__n=NEW), declared=[row("app.n")])
+    add("declared: a STALE row (the baseline already holds exactly what it declares) is red, exit 1, and says to remove it",
+        code == 1 and diff["verdict"] == "red" and "stale row: default app.n" in text and "remove the row" in text and diff["differences"] == [])
+    code, text, diff = compare(dump(), with_prefs(dump(), app__n={"type": "int", "value": -2, "locked": False}), declared=[row("app.n")])
+    add("declared: a row whose value is not the candidate's is red (wrong value), and the line has both values",
+        code == 1 and "row matches nothing: default app.n: the candidate holds int:-2 locked=false, the row declares int:-1 locked=false" in text)
+    code, text, diff = compare(dump(), dump(), declared=[row("app.n")])
+    add("declared: a row that matches nothing (the candidate has no such pref) is red", code == 1 and "the candidate has no such preference" in text and diff["verdict"] == "red")
+    code, text, diff = compare(dump(), with_prefs(dump(), app__n={"type": "int", "value": -1, "locked": True}), declared=[row("app.n")])
+    add("declared: a row says nothing of the lock, so a locked candidate pref is not what it declares: red", code == 1 and "row matches nothing" in text and "locked=true" in text)
+    code, text, diff = compare(dump(), with_prefs(dump(), app__n=NEW), declared=[row("app.n", value="-1", kind="string")])
+    add("declared: a row of another type than the candidate's (string against int) is red", code == 1 and "row matches nothing" in text)
+    code, text, diff = compare(dump(), dump(user={"app.u": {"type": "bool", "value": True}}), declared=[row("app.u", True, "bool", "user")])
+    add("declared: a row of the user branch is applied to the user branch of the baseline, green", code == 0 and diff["differences"] == [])
+    code, text, diff = compare(dump(), with_prefs(dump(), app__n=NEW, app__b={"type": "int", "value": 6, "locked": False}), declared=[row("app.n")])
+    add("declared: a row does not excuse another difference: app.b changed is still red", code == 1 and "app.b" in text and len(diff["differences"]) == 1)
+    for label, bad in (("a file that is not a list", "{}"), ("a row without its reason", json.dumps([{k: v for k, v in row("app.n").items() if k != "reason"}])),
+                       ("a row with an empty decided_by", json.dumps([row("app.n", decided_by=" ")])), ("a value of another type than the row's", json.dumps([row("app.n", value="x")])),
+                       ("a branch that is neither default nor user", json.dumps([row("app.n", branch="locked")])), ("a pref declared twice", json.dumps([row("app.n"), row("app.n")])),
+                       ("text that is not JSON", "[")):
+        code, text, diff = compare(dump(), with_prefs(dump(), app__n=NEW), declared=bad)
+        add("declared: %s is not a declared file: red, nothing is applied" % label, code == 1 and "not usable" in text and diff is None)
+    code, text, diff = compare(dump(), dump(), declared=None)
+    add("declared: no declared file is the comparison as before: zero differences or red", code == 0)
+    with tempfile.TemporaryDirectory() as tmpd:
+        for name in ("a.json", "b.json"):
+            (Path(tmpd) / name).write_text(json.dumps(dump()), encoding="utf-8")
+        (Path(tmpd) / "d.json").write_text("[]", encoding="utf-8")
+        try:
+            x.main(["prefs-compare", str(Path(tmpd) / "a.json"), str(Path(tmpd) / "b.json"), "--control", "--declared", str(Path(tmpd) / "d.json")])
+            refused = False
+        except SystemExit as stop:
+            refused = stop.code == 2
+    add("declared: --declared with --control is refused (the control is one engine dumped twice: nothing is declared against itself)", refused)
 
     code, text, diff = compare(dump(), dump(), control=True)
     add("control (A/A): the same engine twice with no difference is green, exit 0", code == 0 and diff["control"] is True and diff["verdict"] == "green")
@@ -983,6 +1045,13 @@ def cases() -> list:
                 for i in (control_i[0], cand_i[0], cmp_i[0]))
             and "--out prefs-out/diff.json" in runs_text[cmp_i[0]] and "--out prefs-out/control-diff.json" in runs_text[control_i[0]]
             and any(st.get("uses", "").startswith("actions/upload-artifact") and "always()" in st.get("if", "") and st["with"]["path"] == "prefs-out" for st in ps))
+        sparse_of_run = " ".join(str((st.get("with") or {}).get("sparse-checkout", "")) for st in ps)
+        add("xpcshell.yml prefs: the comparison reads the series' declared file from the checkout of this run (--declared engine-series/tools/prefs-declared.json, which the sparse checkout "
+            "holds), the control takes none, and no step of the job writes it",
+            "--declared engine-series/tools/prefs-declared.json" in runs_text[cmp_i[0]] and "/tools/prefs-declared.json" in sparse_of_run
+            and "--declared" not in runs_text[control_i[0]] and not any("prefs-declared" in t for i, t in enumerate(runs_text) if i != cmp_i[0]))
+        add("xpcshell.yml prefs: the comment says what is declared and where, and no longer says there is no list of expected differences",
+            "tools/prefs-declared.json" in text and "STALE row" in text and "there is no list of expected differences" not in text)
         add("xpcshell.yml prefs: the checkout reaches the dump script", any("/platform/ci/src/scripts/ci/prefs_dump.js" in str((st.get("with") or {}).get("sparse-checkout", "")) for st in ps))
         add("xpcshell.yml prefs: the existing xpcshell job is still the one the cases above read (three jobs: the prefs job does not replace it, and the junit job only puts the legs' junit together)", set(doc["jobs"]) == {"xpcshell", "prefs", "junit", "linux-deps"})
     except Exception as exc:  # noqa: BLE001

@@ -1,0 +1,9 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+# The gtest of the bundled DirectWrite collection (Windows only). Read by gfx/tests/gtest/moz.build (one include
+# line), so the platform condition is ours and not a line of Mozilla's file.
+
+if CONFIG["OS_TARGET"] == "WINNT":
+    UNIFIED_SOURCES += ["TestStealthBundledCollection.cpp"]

@@ -166,7 +166,7 @@ def cases() -> list:
         and 'echo "INVPW_CORE_DIR=$RUNNER_TEMP/cores" >> "$GITHUB_ENV"' in cores[0]["run"] and "matrix.os" not in cond and names.index(cores[0]["name"]) < suite)
     deps = " ".join(str(s.get("run", "")) for s in steps if s.get("name") == "Linux system deps (Firefox runtime libs, a virtual display)")
     add("gate legs: the host oracle's leg and the recorder's leg have strace, as the fontconfig ones (the linux-deps-e2e list, installed by the system deps step of every Linux leg)",
-        "strace" in e2e_list and "sudo apt-get $APT install -y --no-download --no-install-recommends $(cat /tmp/linux-deps/roots.txt)" in deps and gate["jobs"]["wrapper-e2e"].get("needs") == "linux-deps-e2e")
+        "strace" in e2e_list and "sudo apt-get $APT install -y --no-download --no-install-recommends $(cat /tmp/linux-deps/roots.txt)" in deps and "linux-deps-e2e" in gate["jobs"]["wrapper-e2e"].get("needs"))
 
     # a leg first, its row second: a suite the wrapper's list does not have yet is said, not failed, and nothing else is skipped
     listed = [i for i, s in enumerate(steps) if "LISTED=1" in str(s.get("run", ""))]
@@ -231,6 +231,253 @@ def cases() -> list:
     out.extend(display_cases(gate))
     # the package manifest A/B: the published engine's archives against a build's, a reusable workflow like the cargo one
     out.extend(package_cases(gate))
+    # ci-03: no leg of the gate (nor verify-assets, nor linux-deps) reads the index, a mirror or an unchecked archive
+    out.extend(ci03_cases())
+    return out
+
+
+def _heredoc(run: str, which: int = 0) -> str:
+    """The Python of the `which`th `python - <<'PY'` block of a step's script, as the shell hands it to the interpreter."""
+    blocks = re.findall(r"<<'PY'\n(.*?)\n[ \t]*PY\n", run if run.endswith("\n") else run + "\n", re.S)
+    return blocks[which]
+
+
+def _run_python(code: str, args=(), cwd=None, env=None, isolated=True):
+    with tempfile.TemporaryDirectory() as tmp:
+        script = Path(tmp) / "step.py"
+        script.write_text(code, encoding="utf-8")
+        return subprocess.run([sys.executable] + (["-I"] if isolated else []) + [str(script), *args], capture_output=True, text=True, cwd=cwd, env=env)
+
+
+def _fake_house(tmp: Path, core_commit: str, wrapper_commit: str, drift: str = ""):
+    """A wheelhouse as py-deps.yml leaves it (two wheels, refs.json) and a site-packages with the same two distributions installed, as pip leaves them: the
+    wheel's files in the installed RECORD. `drift` changes one thing: core-commit, wrapper-commit, core-file, core-wheel."""
+    import hashlib
+    import json
+    import zipfile
+
+    house, site = tmp / "py-deps", tmp / "site"
+    house.mkdir()
+    site.mkdir()
+    refs = {}
+    for kind, dist, commit in (("core", "invisible_core", core_commit), ("wrapper", "invisible_playwright", wrapper_commit)):
+        files = {"%s/__init__.py" % dist: ("VERSION = 1\n" * 3).encode()}
+        record = "".join("%s,sha256=%s,%d\n" % (n, hashlib.sha256(b).hexdigest(), len(b)) for n, b in sorted(files.items()))
+        wheel = house / ("%s-1.0-py3-none-any.whl" % dist)
+        with zipfile.ZipFile(wheel, "w") as z:
+            for n, b in files.items():
+                z.writestr(n, b)
+            z.writestr("%s-1.0.dist-info/METADATA" % dist, "Metadata-Version: 2.1\nName: %s\nVersion: 1.0\n" % dist.replace("_", "-"))
+            z.writestr("%s-1.0.dist-info/RECORD" % dist, record + "%s-1.0.dist-info/RECORD,,\n" % dist)
+        refs[kind] = {"dist": dist, "wheel": wheel.name, "sha256": hashlib.sha256(wheel.read_bytes()).hexdigest(), "commit": commit, "extras": ""}
+        # the installation: the files, and a dist-info whose RECORD has the wheel's lines (and more, as pip writes them)
+        for n, b in files.items():
+            (site / n).parent.mkdir(exist_ok=True)
+            (site / n).write_bytes(b if not (drift == "core-file" and kind == "core") else b + b"# patched\n")
+        info = site / ("%s-1.0.dist-info" % dist)
+        info.mkdir()
+        (info / "METADATA").write_text("Metadata-Version: 2.1\nName: %s\nVersion: 1.0\n" % dist.replace("_", "-"), encoding="utf-8")
+        (info / "RECORD").write_text(record + "%s-1.0.dist-info/INSTALLER,,\n%s-1.0.dist-info/RECORD,,\n" % (dist, dist), encoding="utf-8")
+    if drift == "core-file":
+        # pip records what it wrote: the patched file has another hash than the wheel's line
+        info = site / "invisible_core-1.0.dist-info" / "RECORD"
+        body = "invisible_core/__init__.py,sha256=%s,%d\n" % (hashlib.sha256(b"VERSION = 1\n" * 3 + b"# patched\n").hexdigest(), 40)
+        info.write_text(body + "invisible_core-1.0.dist-info/RECORD,,\n", encoding="utf-8")
+    if drift == "core-wheel":
+        wheel = house / refs["core"]["wheel"]
+        wheel.write_bytes(wheel.read_bytes() + b"\0")
+    (house / "refs.json").write_text(json.dumps(refs, indent=2), encoding="utf-8")
+    return house, site
+
+
+def _core_under_test_runs(code: str) -> dict:
+    """The assertion of the core under test, run against a fake wheelhouse and a fake installation, in a repository whose HEAD is the wrapper's commit."""
+    import os
+
+    sha = "a" * 40
+    results = {}
+    for drift in ("", "core-commit", "wrapper-commit", "core-file", "core-wheel"):
+        with tempfile.TemporaryDirectory() as raw:
+            tmp = Path(raw)
+            repo = tmp / "wrapper"
+            repo.mkdir()
+            git = ["git", "-c", "user.name=t", "-c", "user.email=t@users.noreply.github.com"]
+            subprocess.run(git + ["init", "-q"], cwd=repo, check=True, capture_output=True)
+            (repo / "f").write_text("x", encoding="utf-8")
+            subprocess.run(git + ["add", "f"], cwd=repo, check=True, capture_output=True)
+            subprocess.run(git + ["commit", "-q", "-m", "x"], cwd=repo, check=True, capture_output=True)
+            head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True).stdout.strip()
+            house, site = _fake_house(tmp, "b" * 40 if drift == "core-commit" else sha, "c" * 40 if drift == "wrapper-commit" else head, drift)
+            env = dict(os.environ, RUNNER_TEMP=str(tmp), CORE_REF=sha, PYTHONPATH=str(site))
+            results[drift] = _run_python(code, cwd=repo, env=env, isolated=False)
+    return results
+
+
+def ci03_cases() -> list:
+    """ci-03 over gate.yml, verify-assets.yml and linux-deps.yml: every pip install reads only the run's wheelhouse (--no-index --find-links, --require-hashes on the lock), the
+    core under test is the wheel built from core_ref, Playwright's browser comes from a hash-checked archive, the Ubuntu packages of verify-assets from linux-deps."""
+    import yaml
+
+    out = []
+
+    def add(name, ok):
+        out.append((name, bool(ok)))
+
+    gate = yaml.safe_load((WORKFLOWS / "gate.yml").read_text(encoding="utf-8"))
+    gate_text = (WORKFLOWS / "gate.yml").read_text(encoding="utf-8")
+    verify = yaml.safe_load((WORKFLOWS / "verify-assets.yml").read_text(encoding="utf-8"))
+    deps = yaml.safe_load((WORKFLOWS / "linux-deps.yml").read_text(encoding="utf-8"))
+    LOCK_INSTALL = 'python -m pip install --quiet --no-index --find-links "$RUNNER_TEMP/py-deps" --require-hashes -r "$RUNNER_TEMP/py-deps/lock.txt"'
+    WHEELS_INSTALL = 'python -m pip install --quiet --no-index --no-deps --find-links "$RUNNER_TEMP/py-deps" invisible_core invisible_playwright'
+
+    # --- the wheelhouse of the gate: one call, the wrapper's lock, the two refs -----------------------------------------------------------------------------
+    call = gate["jobs"].get("py-deps-gate") or {}
+    w = call.get("with") or {}
+    add("ci-03 gate.yml: py-deps-gate calls py-deps.yml with the wrapper's gate lock at the wrapper_ref of the run, Python 3.11, the core at core_ref, the wrapper at wrapper_ref with its dev extra, "
+        "Linux and Windows",
+        call.get("uses") == "./.github/workflows/py-deps.yml" and w.get("lock_repository") == "oss-invisible/playwright" and w.get("lock_ref") == "${{ inputs.wrapper_ref }}"
+        and w.get("lock") == "ci/py-lock/gate.txt" and w.get("python") == "3.11" and w.get("name") == "gate" and w.get("core_ref") == "${{ inputs.core_ref }}"
+        and w.get("wrapper_ref") == "${{ inputs.wrapper_ref }}" and w.get("wrapper_extras") == "dev" and "core_extras" not in w
+        and sorted(re.findall(r"[a-z0-9.-]+", w.get("runners", "")) ) == ["ubuntu-24.04", "windows-latest"])
+    for job_name, artifact in (("gate", "py-deps-gate-${{ matrix.kind == 'win' && 'windows' || 'linux' }}"), ("wrapper-e2e", "py-deps-gate-${{ matrix.os }}")):
+        job = gate["jobs"][job_name]
+        steps = job["steps"]
+        need = job.get("needs")
+        need = [need] if isinstance(need, str) else list(need or [])
+        fetch = [i for i, s in enumerate(steps) if str(s.get("uses", "")).startswith("actions/download-artifact") and (s.get("with") or {}).get("name") == artifact]
+        lock = [i for i, s in enumerate(steps) if str(s.get("run", "")).strip() == LOCK_INSTALL]
+        wheels = [i for i, s in enumerate(steps) if WHEELS_INSTALL in str(s.get("run", ""))]
+        pips = [l.strip() for s in steps for l in str(s.get("run", "")).splitlines() if re.search(r"\bpip3?\s+install\b", l) and not l.strip().startswith("#")]
+        add("ci-03 gate.yml %s: it needs py-deps-gate, downloads the wheelhouse of its OS, installs the lock with its hashes, then the core and the wrapper wheels by name (no index, no dependency); "
+            "no other pip install" % job_name,
+            "py-deps-gate" in need and len(fetch) == 1 and len(lock) == 1 and len(wheels) == 1 and fetch[0] < lock[0] < wheels[0]
+            and sorted(pips) == sorted([LOCK_INSTALL, WHEELS_INSTALL]) and (steps[fetch[0]].get("with") or {}).get("path") == "${{ runner.temp }}/py-deps")
+    add("ci-03 gate.yml: no install from git or from a version, no direct_url.json: the core under test is read from the wheelhouse's refs.json",
+        "git+https" not in gate_text and "direct_url" not in gate_text and "playwright==" not in gate_text and "cryptography==" not in gate_text and gate_text.count("refs.json") >= 2)
+    os_values = {r.get("os") for r in gate["jobs"]["wrapper-e2e"]["strategy"]["matrix"]["include"]}
+    add("ci-03 gate.yml: every leg of wrapper-e2e names its OS, linux or windows (the wheelhouse artifact is py-deps-gate-<os>)", os_values == {"linux", "windows"})
+
+    # --- the core under test: the same assertion in both jobs, and it is red on every drift --------------------------------------------------------------------
+    texts = []
+    for job_name in ("gate", "wrapper-e2e"):
+        steps = [s for s in gate["jobs"][job_name]["steps"] if WHEELS_INSTALL in str(s.get("run", ""))]
+        texts.append(_heredoc(steps[0]["run"]) if len(steps) == 1 else "")
+    add("ci-03 gate.yml: the core-under-test assertion of the gate and of the e2e legs is the same code", texts[0] == texts[1] and "refs.json" in texts[0] and "THE CORE UNDER TEST IS NOT core_ref" in texts[0])
+    runs = _core_under_test_runs(texts[0]) if texts[0] else {}
+    add("ci-03 gate.yml: the assertion is green when the wheelhouse's core is built from core_ref's commit, the wrapper from the checkout's, and the installed files are the wheels'%s"
+        % ("" if runs.get("", None) is None or runs[""].returncode == 0 else ": " + runs[""].stderr[-300:]),
+        bool(runs) and runs[""].returncode == 0 and "core under test: 1.0 from " + "a" * 40 in runs[""].stdout)
+    add("ci-03 gate.yml: the assertion is RED when the core's wheel was built from another commit than core_ref's, naming it",
+        bool(runs) and runs["core-commit"].returncode != 0 and "THE CORE UNDER TEST IS NOT core_ref" in runs["core-commit"].stderr and "b" * 40 in runs["core-commit"].stderr)
+    add("ci-03 gate.yml: the assertion is RED when the wrapper's wheel was built from another commit than the checkout's",
+        bool(runs) and runs["wrapper-commit"].returncode != 0 and "THE WRAPPER UNDER TEST IS NOT THIS CHECKOUT" in runs["wrapper-commit"].stderr)
+    add("ci-03 gate.yml: the assertion is RED when what is installed is not the wheel's files (something put another core over it)",
+        bool(runs) and runs["core-file"].returncode != 0 and "THE INSTALLED invisible-core IS NOT ITS WHEEL" in runs["core-file"].stderr)
+    add("ci-03 gate.yml: the assertion is RED when the wheel in the wheelhouse is not the one the resolver built (sha256)",
+        bool(runs) and runs["core-wheel"].returncode != 0 and "THE CORE WHEEL IS NOT THE ONE THE RESOLVER BUILT" in runs["core-wheel"].stderr)
+
+    # --- Playwright's browser: a hash-checked archive, served on the loopback ---------------------------------------------------------------------------------
+    pf = gate["jobs"].get("playwright-firefox") or {}
+    pf_steps = pf.get("steps") or []
+    pf_run = [s for s in pf_steps if "urlopen" in str(s.get("run", ""))]
+    pf_code = _heredoc(pf_run[0]["run"]) if len(pf_run) == 1 else ""
+    co = [s for s in pf_steps if str(s.get("uses", "")).startswith("actions/checkout")]
+    add("ci-03 gate.yml: playwright-firefox reads the wrapper's pin of the archives (ci/py-lock/playwright-browsers.json) at wrapper_ref, on Linux and on Windows, and uploads playwright-firefox-<os>",
+        len(co) == 1 and co[0]["with"].get("ref") == "${{ inputs.wrapper_ref }}" and "ci/py-lock/playwright-browsers.json" in co[0]["with"].get("sparse-checkout", "")
+        and {(m["os"], m["platform"]) for m in pf["strategy"]["matrix"]["include"]} == {("linux", "ubuntu24.04-x64"), ("windows", "win64")}
+        and any((s.get("with") or {}).get("name") == "playwright-firefox-${{ matrix.os }}" for s in pf_steps))
+    add("ci-03 gate.yml: playwright-firefox puts TEMP and TMP on D:\\a\\_temp on Windows, as every Windows job",
+        "D:\\a\\_temp" in str((pf.get("env") or {}).get("TEMP", "")) and "D:\\a\\_temp" in str((pf.get("env") or {}).get("TMP", "")))
+    with tempfile.TemporaryDirectory() as raw:
+        tmp = Path(raw)
+        (tmp / "wrapper" / "scripts").mkdir(parents=True)
+        (tmp / "wrapper" / "scripts" / "playwright_pin.txt").write_text("1.61.0\n", encoding="utf-8")
+        env = {"RUNNER_TEMP": str(tmp / "rt"), "PLATFORM": "win64", "SYSTEMROOT": __import__("os").environ.get("SYSTEMROOT", "")}
+        missing = _run_python(pf_code, cwd=tmp, env=env) if pf_code else None
+        pin = tmp / "wrapper" / "ci" / "py-lock"
+        pin.mkdir(parents=True)
+        (pin / "playwright-browsers.json").write_text(json.dumps({"playwright": "1.60.0", "platforms": {"win64": [{"path": "builds/firefox/1/firefox-win64.zip", "sha256": "0" * 64}]}}), encoding="utf-8")
+        moved = _run_python(pf_code, cwd=tmp, env=env) if pf_code else None
+        (pin / "playwright-browsers.json").write_text(json.dumps({"playwright": "1.61.0", "platforms": {"ubuntu24.04-x64": []}}), encoding="utf-8")
+        none = _run_python(pf_code, cwd=tmp, env=env) if pf_code else None
+        (pin / "playwright-browsers.json").write_text(json.dumps({"playwright": "1.61.0", "platforms": {"win64": [{"path": "builds/../x.zip", "sha256": "0" * 64}]}}), encoding="utf-8")
+        badpath = _run_python(pf_code, cwd=tmp, env=env) if pf_code else None
+    add("ci-03 gate.yml: playwright-firefox is RED, naming ci/py-lock/playwright-browsers.json, when the wrapper_ref has no such file",
+        missing is not None and missing.returncode != 0 and "no wrapper/ci/py-lock/playwright-browsers.json" in missing.stderr)
+    add("ci-03 gate.yml: playwright-firefox is RED when the pin is for another Playwright than scripts/playwright_pin.txt, when the platform has no archive, and on a path that is not under builds/",
+        moved is not None and moved.returncode != 0 and "is for Playwright 1.60.0" in moved.stderr
+        and none is not None and none.returncode != 0 and "no archives for win64" in none.stderr
+        and badpath is not None and badpath.returncode != 0 and "not a path under builds/" in badpath.stderr)
+    add("ci-03 gate.yml: playwright-firefox compares every download with the pinned sha256 and goes on to another host only when a download FAILS, never on another hash",
+        "hashlib.sha256(data).hexdigest()" in pf_code and "if got != sha:" in pf_code and "except Exception" in pf_code and pf_code.count("break") == 1
+        and pf_code.index("if got != sha:") > pf_code.index("except Exception"))
+    e2e = gate["jobs"]["wrapper-e2e"]
+    e2e_steps = e2e["steps"]
+    names = [s.get("name", "") for s in e2e_steps]
+    cond = "matrix.suite == 'wrapper.e2e.fakeweb' || (matrix.suite == 'wrapper.e2e.ab_host' && matrix.os == 'windows')"
+    fetch = [i for i, s in enumerate(e2e_steps) if (s.get("with") or {}).get("name") == "playwright-firefox-${{ matrix.os }}"]
+    inst = [i for i, s in enumerate(e2e_steps) if re.search(r"\bplaywright install firefox\b", str(s.get("run", "")))]
+    suite = names.index(SUITE_STEP)
+    install_run = str(e2e_steps[inst[0]].get("run", "")) if len(inst) == 1 else ""
+    install_code = _heredoc(install_run) if install_run else ""
+    add("ci-03 gate.yml: the e2e legs that need Playwright's Firefox need playwright-firefox, download its archives and let Playwright's installer read them from a server on 127.0.0.1 "
+        "(PLAYWRIGHT_DOWNLOAD_HOST), checked first against the pin of the checkout, before the suite",
+        "playwright-firefox" in e2e["needs"] and len(fetch) == 1 and len(inst) == 1 and fetch[0] < inst[0] < suite and e2e_steps[fetch[0]].get("if") == cond and e2e_steps[inst[0]].get("if") == cond
+        and 'export PLAYWRIGHT_DOWNLOAD_HOST="http://127.0.0.1:$PORT"' in install_run and "--bind 127.0.0.1" in install_run and "hashlib.sha256" in install_code
+        and install_run.index("hashlib.sha256") < install_run.index("python -m playwright install firefox") and "trap 'kill \"$SERVER\"" in install_run)
+    with tempfile.TemporaryDirectory() as raw:
+        tmp = Path(raw)
+        env = {"RUNNER_TEMP": str(tmp), "RUNNER_OS": "Windows", "SYSTEMROOT": __import__("os").environ.get("SYSTEMROOT", "")}
+        nopin = _run_python(install_code, ["1"], cwd=tmp, env=env) if install_code else None
+    add("ci-03 gate.yml: the leg is RED, naming ci/py-lock/playwright-browsers.json, when its checkout has no pin of the archives",
+        nopin is not None and nopin.returncode != 0 and "no ci/py-lock/playwright-browsers.json" in nopin.stderr)
+
+    # --- verify-assets.yml ---------------------------------------------------------------------------------------------------------------------------------------
+    vtext = (WORKFLOWS / "verify-assets.yml").read_text(encoding="utf-8")
+    vj = verify["jobs"]
+    vcall = vj.get("py-deps-assets") or {}
+    vdeps = vj.get("linux-deps-assets") or {}
+    drive = vj["drive"]
+    vsteps = drive["steps"]
+    vrun = "\n".join(str(s.get("run", "")) for s in vsteps)
+    add("ci-03 verify-assets.yml: the Python packages come from the gate lock's wheelhouse (py-deps.yml, the wrapper's ci/py-lock/gate.txt at main, which is the wrapper it checks out), "
+        "installed offline with their hashes",
+        vcall.get("uses") == "./.github/workflows/py-deps.yml" and vcall["with"].get("lock_repository") == "oss-invisible/playwright" and vcall["with"].get("lock_ref") == "main"
+        and vcall["with"].get("lock") == "ci/py-lock/gate.txt" and "py-deps-assets" in drive["needs"] and LOCK_INSTALL in vrun
+        and any((s.get("with") or {}).get("name") == "py-deps-assets-${{ matrix.kind == 'win' && 'windows' || 'linux' }}" for s in vsteps)
+        and not re.search(r"\bpip3?\s+install\b(?!.*--no-index)", vrun) and "playwright==" not in vtext)
+    add("ci-03 verify-assets.yml: the Ubuntu packages of Firefox's runtime come from linux-deps.yml (the roots of install-deps from the locked Playwright's table), by name with --no-download; no install-deps",
+        vdeps.get("uses") == "./.github/workflows/linux-deps.yml" and vdeps["with"].get("playwright_wrapper_ref") == "main" and "linux-deps-assets" in drive["needs"]
+        and "install-deps" not in vrun and "sudo apt-get $APT install -y --no-download --no-install-recommends $(cat /tmp/linux-deps/roots.txt)" in vrun
+        and "sudo apt-get $APT update" in vrun and "sudo apt-get update" not in vrun
+        and any((s.get("with") or {}).get("name") == "${{ needs.linux-deps-assets.outputs.artifact }}" and (s.get("with") or {}).get("path") == "/tmp/linux-deps" for s in vsteps))
+
+    # --- linux-deps.yml: the table is read from the locked wheel ---------------------------------------------------------------------------------------------
+    dsteps = deps["jobs"]["debs"]["steps"]
+    spec = [s for s in dsteps if s.get("id") == "spec"][0]
+    miss = [s for s in dsteps if "apt-get download" in str(s.get("run", ""))][0]
+    dco = [s for s in dsteps if str(s.get("uses", "")).startswith("actions/checkout")]
+    add("ci-03 linux-deps.yml: the Playwright whose table names install-deps' roots is the wrapper's locked one: its gate lock is checked out, no `pip install playwright`, the one wheel is downloaded "
+        "with --require-hashes --no-deps (on a miss only) and coreBundle.js is read from the zip; the stanza is part of the entry's key",
+        len(dco) == 1 and dco[0]["with"].get("sparse-checkout") == "ci/py-lock/gate.txt" and "playwright==" not in miss["run"] and not re.search(r"pip3?\s+install", miss["run"])
+        and "pip download --quiet --disable-pip-version-check --only-binary=:all: --no-deps --require-hashes" in miss["run"] and "zipfile.ZipFile(wheels[0])" in miss["run"]
+        and "playwright/driver/package/lib/coreBundle.js" in miss["run"] and "playwright-lock-stanza: sha256" in spec["run"]
+        and miss.get("if") == "steps.restore.outputs.cache-hit != 'true'" and "no ci/py-lock/gate.txt at $PW_REF" in spec["run"])
+    code = _heredoc(spec["run"])
+    good = "aiohttp==3.9.0 \\\n    --hash=sha256:" + "1" * 64 + "\nplaywright==1.61.0 \\\n    --hash=sha256:" + "2" * 64 + " \\\n    --hash=sha256:" + "3" * 64 + "\npluggy==1.0 \\\n    --hash=sha256:" + "4" * 64 + "\n"
+    cases_ = {"good": good, "none": "pluggy==1.0 \\\n    --hash=sha256:" + "4" * 64 + "\n", "nohash": "playwright==1.61.0 \\\n\npluggy==1.0\n",
+              "badhash": "playwright==1.61.0 \\\n    --hash=sha256:xyz\n", "open": "playwright==1.61.0 \\\n    --hash=sha256:" + "2" * 64 + " \\\n"}
+    got = {}
+    with tempfile.TemporaryDirectory() as raw:
+        tmp = Path(raw)
+        for k, text in cases_.items():
+            (tmp / (k + ".txt")).write_text(text, encoding="utf-8")
+            got[k] = _run_python(code, [str(tmp / (k + ".txt")), str(tmp / (k + ".out"))])
+        stanza = (tmp / "good.out").read_text(encoding="utf-8") if (tmp / "good.out").exists() else ""
+    add("ci-03 linux-deps.yml: the playwright stanza is read from the lock (version and every hash, as a requirements file) and the step is RED on a lock with no playwright, with no hash, "
+        "a line that is not a hash, or a stanza that does not end",
+        got["good"].returncode == 0 and got["good"].stdout.strip() == "1.61.0" and stanza == "playwright==1.61.0 \\\n    --hash=sha256:" + "2" * 64 + " \\\n    --hash=sha256:" + "3" * 64 + "\n"
+        and all(got[k].returncode != 0 for k in ("none", "nohash", "badhash", "open")))
     return out
 
 
@@ -290,8 +537,8 @@ def cargo_cases(gate: dict) -> list:
     # mdns_service: src/stealth_tests.rs is a file of ours (declared in lib.rs by `#[cfg(test)] mod stealth_tests;`), so its floor is held to its count of #[test] too.
     # Where the tree does not have the file (a tree without hooks/fingerprint__webrtc__declared-network) there is nothing to count here, and the job is red (`0 passed`).
     ms = ROOT / "dom" / "media" / "webrtc" / "transport" / "mdns_service" / "src"
-    two = "#[test]\nfn a() {}\n#[test]\nfn b() {}\n"
-    add("cargo: a stealth_tests.rs with a second #[test] does not match the floor (the count check below is red on it)", two.count("#[test]") != floor[mdns])
+    three = "#[test]\nfn a() {}\n#[test]\nfn b() {}\n#[test]\nfn c() {}\n"
+    add("cargo: a stealth_tests.rs with a test more than the floor does not match it (the count check below is red on it)", three.count("#[test]") != floor[mdns])
     if (ms / "stealth_tests.rs").exists():
         body = (ms / "stealth_tests.rs").read_text(encoding="utf-8")
         add("cargo: the floor of %s is the number of #[test] in mdns_service/src/stealth_tests.rs (%d)" % (mdns, floor[mdns]), body.count("#[test]") == floor[mdns])

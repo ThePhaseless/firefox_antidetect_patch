@@ -10,7 +10,9 @@ An entry, in this order of keys:
     file      the Mozilla file
     function  the host function (git's hunk header)
     kind      add | rewrite | delete | file   (a deletion and a whole-file removal are listed too: nothing is invisible)
-    form      guard | notice | wrap-expression | wrap-call | wrap-function | declared-value | registration | member | shadow | anchor | unknown
+    form      guard | notice | wrap-expression | wrap-call | wrap-function | declared-value | registration | member | shadow | scope | rewire |
+              parameter | anchor | excepted | unknown (`unknown` is rule C21; `excepted` is written for an `unknown` line whose entry has the
+              complete exception row, see below)
     line      the added text ('' for a deletion)
     removed   the Mozilla line a rewrite replaces, or what a deletion takes away (left out for a pure addition)
     ---- written by hand, kept by the export ----
@@ -19,7 +21,9 @@ An entry, in this order of keys:
     why       (form anchor only) why the guard, wrap-function and wrap-expression forms are not enough (rule T2)
     exception (G35, only when the pm granted it) why no form can express this rewritten line
     reason_kind (port-06, with `exception` on a rewrite) the kind of the reason: expression | declaration | macro | skip
-              (tools/hook_contract.py C12..C15 judge a rewrite by it; the exception text says why)
+              (tools/hook_contract.py C12..C15 judge a rewrite by it; the exception text says why). A line that no form takes and whose
+              entry has `exception`, `reason_kind` and `pm` all three is written with the form `excepted` (G63); with one missing it stays
+              `unknown` and rule C21 says which
     quiet_anchor_why  (port-07, a hook whose hunk is in the churn band of tools/churn.py) why no quieter anchor serves:
               {"kind": "only-place", "why": "<words>"} or {"kind": "deferred", "quieter": "<mozilla file>:<anchor text>"}
               (`deferred` only while tools/churn.json is for the series' tag); rule C18 of tools/hook_contract.py judges it
@@ -159,6 +163,8 @@ def _with_hand_fields(e: dict, old: dict | None) -> dict:
             out[k] = old[k]
     if "quiet_anchor_why" in old:        # port-07: why no quieter anchor serves (a hook in the churn band); the shape is C18's to judge
         out["quiet_anchor_why"] = old["quiet_anchor_why"]
+    if out["form"] == "unknown" and not hc.excepted_lacks(out):
+        out["form"] = "excepted"         # G63: no form takes the line, and its exception row is complete
     return out
 
 
@@ -317,6 +323,11 @@ def _ref_failure(where: str, ref: str, why: str, fix: str) -> Failure:
     return fail(where, "the test `%s` does not resolve: %s" % (ref, why), fix, D_HOOK04)
 
 
+def _title_in(text: str, title: str) -> bool:
+    """The title of a node test is in the file: as it is, or as a JavaScript string literal writes it (a quote of its own quote kind escaped)."""
+    return any(c in text for c in (title, title.replace("'", "\\'"), title.replace('"', '\\"'), title.replace("`", "\\`")))
+
+
 def reference_problem(root: Path, ref: str, index: _Index | None = None, where: str | None = None) -> Failure | None:
     """None if the test reference resolves, else the failure that says why it does not (grammar in the module docstring);
     `where` is the hook's place in HOOKS.json (`_where`)."""
@@ -339,7 +350,7 @@ def reference_problem(root: Path, ref: str, index: _Index | None = None, where: 
         p = index.src_file(path)
         if p is None:
             return _ref_failure(where, ref, "%s is in no folder's src/" % path, "name a path that exists as <folder>/src/%s, or write the test there" % path)
-        if title and title not in p.read_text(encoding="utf-8", errors="replace"):
+        if title and not _title_in(p.read_text(encoding="utf-8", errors="replace"), title):
             return _ref_failure(where, ref, "the title %r is not in %s" % (title, path), "name a title that the file has, or add the test with that title")
         return None
     if kind == "py":
@@ -431,6 +442,9 @@ def exception_problems(folder: str, e: dict) -> list:
                           grant, D_PORT06))
     elif "pm" in e and e["pm"] != PM_APPROVED:
         found.append(fail(where, "the hook `%s` has pm %r, which is not \"%s\"" % (label, e["pm"], PM_APPROVED), grant, D_PORT06))
+    if e.get("form") == "excepted" and hc.excepted_lacks(e):
+        found.append(fail(where, "C21: the hook `%s` has the form `excepted` and its exception row is incomplete, it lacks %s" % (label, ", ".join(hc.excepted_lacks(e))),
+                          "write the missing fields of the row (the reason in `exception`, `reason_kind`, and the pm's `pm`), or make the line one of the forms", D_HOOK02))
     if "reason_kind" in e:
         if e["reason_kind"] not in hc.REASON_KINDS:
             found.append(fail(where, "the reason_kind of the hook `%s` is %r, not one of %s" % (label, e["reason_kind"], "/".join(hc.REASON_KINDS)),
@@ -494,7 +508,7 @@ def problems(root: Path) -> list:
             found.append(fail(_where(folder), "it is not a list of hook entries (each with file, function, kind and line)", regen, D_HOOK02))
             continue
         gen = generated(root, folder)
-        diff = _diff(folder, gen, committed)
+        diff = _diff(folder, merge(gen, committed), committed)         # the form of an excepted line comes from its hand fields
         found += diff
         if not diff and render(merge(gen, committed)) != render(committed):
             found.append(fail(_where(folder), "it differs from what the series generates (the order of the entries or of their keys)", regen, D_HOOK02))

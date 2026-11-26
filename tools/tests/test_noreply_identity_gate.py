@@ -8,6 +8,7 @@ main of the core.
 
     python -m pytest tools/tests
 """
+import re
 import sys
 from pathlib import Path
 
@@ -56,7 +57,7 @@ def test_the_identity_job_of_checks_yml_is_inline_and_reads_the_judge_from_main_
     assert checkouts[0]["fetch-depth"] == 0
     # Commits and tags only: the full clone of this repository did not fit the job.
     assert checkouts[0]["filter"] == "tree:0"
-    assert checkouts[0]["sparse-checkout"].split() == ["/.github/"]
+    assert checkouts[0]["sparse-checkout"].split() == ["/.github/", "/platform/ci/src/scripts/ci/export_commit_names.py", "/tools/export_paths.py"]   # the workflows, the script of the export-commit rule and its classes
     assert checkouts[0]["sparse-checkout-cone-mode"] is False
     judge = [c for c in checkouts if c.get("repository") == "oss-invisible/core"]
     assert len(judge) == 1 and judge[0]["ref"] == "main"
@@ -71,4 +72,5 @@ def test_branches_and_tags_series_yml_does_not_see_are_judged_by_the_core_workfl
     on = doc.get(True, doc.get("on"))
     assert set(on) == {"push"}, "a pull_request trigger would break the rule against `uses:`"
     assert on["push"]["branches-ignore"] == ["main"] and on["push"]["tags"] == ["**"]
-    assert doc["jobs"]["noreply-identity"]["uses"] == "oss-invisible/core/.github/workflows/noreply-identity.yml@main"
+    # the core's reusable workflow, pinned to a core commit (actions pinned by commit SHA: tools/tests/test_every_action_is_pinned_by_commit_sha.py)
+    assert re.fullmatch(r"oss-invisible/core/\.github/workflows/noreply-identity\.yml@[0-9a-f]{40}", doc["jobs"]["noreply-identity"]["uses"])

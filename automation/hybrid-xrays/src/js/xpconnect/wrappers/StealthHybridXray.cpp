@@ -651,6 +651,12 @@ const js::Wrapper* StealthHybridWrapper(XrayType xrayType) {
 
 const js::Wrapper* StealthSelectedWrapper(JSContext* aCx,
                                           const js::Wrapper* aMozillaWrapper) {
+  // A caller's object read by the page it shares a principal with (the
+  // decision StealthNoteCallerObject made for this Rewrap, which the web-object
+  // case stepped aside for): the regular case ends here with its wrapper.
+  if (StealthCallerObjectApplies()) {
+    return StealthCallerObjectWrapper();
+  }
   if (!StealthTargetIsHybrid(aCx)) {
     return aMozillaWrapper;
   }
@@ -673,6 +679,10 @@ bool StealthTargetWantsXrays(JSContext* aCx, bool aWantXrays) {
 
 bool StealthTargetIsHybrid(JSContext* aCx) {
   return CompartmentPrivate::Get(js::GetContextRealm(aCx))->hybridXrays;
+}
+
+bool StealthRealmWantsXrays(JS::Realm* aRealm, bool aWantXrays) {
+  return aWantXrays || CompartmentPrivate::Get(aRealm)->hybridXrays;
 }
 
 // The decision of StealthNoteCallerObject for the Rewrap that is running on this
@@ -698,6 +708,10 @@ void StealthNoteCallerObject(JS::Realm* origin, JS::Realm* target,
   StealthRecordCallerObject(StealthCallerObjectDecision(
       originPrivate->hybridXrays, targetPrivate->hybridXrays,
       targetPrivate->wantXrays, targetIsChrome, targetSubsumesOrigin));
+}
+
+bool StealthNotCallerObject(bool aMozillaCondition) {
+  return aMozillaCondition && !sCallerObjectApplies;
 }
 
 bool StealthCallerObjectApplies() {

@@ -18,6 +18,13 @@
                                   refuse a seal that differs from T's published one
   symbols-match --package P --symbols Z
                                   refuse crash symbols that describe other binaries than P's
+  symbols-fetch --tag T --repo R --build-run N --dest DIR
+                                  every leg's crash symbols into DIR/<leg>/: the release's own assets when it has them, else the build run's artifacts
+  symbols-release --leg L --package P --symbols DIR --out DIR
+                                  a release keeps L's crash symbols: checked again against P, copied to OUT as symbols-<os>-<arch>-<BuildID>.zip
+  symbols-seal --dir DIR          symbols.sha256 of the symbols-*.zip in DIR
+  symbols-guard --dir DIR... [--checksums F]
+                                  refuse a symbols name that `firefox-*-stealth-*` matches, and a checksums.txt that lists one
   input-watch --file F --log L [--verify [--strict]]
                                   log who moves build input F; after the build, refuse a changed F
   sccache-build --tag T --patches DIR --out DIR
@@ -82,6 +89,21 @@ def main(argv) -> int:
     s = sub.add_parser("symbols-match")
     s.add_argument("--package", type=Path, required=True)
     s.add_argument("--symbols", type=Path, required=True)
+    f = sub.add_parser("symbols-fetch")
+    f.add_argument("--tag", required=True)
+    f.add_argument("--repo", required=True)
+    f.add_argument("--build-run", required=True)
+    f.add_argument("--dest", type=Path, required=True)
+    y = sub.add_parser("symbols-release")
+    y.add_argument("--leg", required=True)
+    y.add_argument("--package", type=Path, required=True)
+    y.add_argument("--symbols", type=Path, required=True)
+    y.add_argument("--out", type=Path, required=True)
+    z = sub.add_parser("symbols-seal")
+    z.add_argument("--dir", type=Path, required=True)
+    q = sub.add_parser("symbols-guard")
+    q.add_argument("--dir", type=Path, action="append", required=True)
+    q.add_argument("--checksums", type=Path)
     w = sub.add_parser("input-watch")
     w.add_argument("--file", type=Path, required=True)
     w.add_argument("--log", type=Path, required=True)
@@ -129,6 +151,22 @@ def main(argv) -> int:
         try:
             print("\n".join(symbols_match.run(args.package, args.symbols)))
         except symbols_match.MismatchError as exc:
+            print("ERROR: %s" % exc, file=sys.stderr)
+            return 1
+    elif args.cmd in ("symbols-fetch", "symbols-release", "symbols-seal", "symbols-guard"):
+        import release_symbols
+        try:
+            if args.cmd == "symbols-fetch":
+                print("crash symbols from " + release_symbols.fetch([l.leg for l in legs.LEGS], args.tag, args.repo, args.build_run, args.dest))
+            elif args.cmd == "symbols-release":
+                print(release_symbols.release(args.leg, args.package, args.symbols, args.out))
+            elif args.cmd == "symbols-seal":
+                print(release_symbols.seal(args.dir), end="")
+            else:
+                names = [p.name for d in args.dir for p in sorted(d.iterdir())]
+                release_symbols.guard(names, args.checksums.read_text(encoding="utf-8") if args.checksums else "")
+                print("no symbols name matches %s, none is in checksums.txt" % release_symbols.ENGINE_GLOB)
+        except release_symbols.SymbolsError as exc:
             print("ERROR: %s" % exc, file=sys.stderr)
             return 1
     elif args.cmd == "input-watch":
