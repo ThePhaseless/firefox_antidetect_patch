@@ -29,11 +29,12 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import export_paths  # noqa: E402
 import hooks_list  # noqa: E402
 from failure import fail  # noqa: E402
 
 RULE = "repo-06-what-a-tool-can-write-a-tool-writes"
-FILE = "tools/gtest-suites.json"
+FILE = export_paths.GTEST_SUITES
 PLATFORMS = ("windows", "linux")
 
 # What the two platforms define (1) and do not (0); a macro that is in neither table is unknown, and unknown keeps a test on both.

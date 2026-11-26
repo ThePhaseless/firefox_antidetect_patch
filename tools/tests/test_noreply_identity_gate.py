@@ -57,7 +57,7 @@ def test_the_identity_job_of_checks_yml_is_inline_and_reads_the_judge_from_main_
     assert checkouts[0]["fetch-depth"] == 0
     # Commits and tags only: the full clone of this repository did not fit the job.
     assert checkouts[0]["filter"] == "tree:0"
-    assert checkouts[0]["sparse-checkout"].split() == ["/.github/", "/platform/ci/src/scripts/ci/export_commit_names.py"]   # the workflows, and the script of the export-commit rule
+    assert checkouts[0]["sparse-checkout"].split() == ["/.github/", "/platform/ci/src/scripts/ci/export_commit_names.py", "/tools/export_paths.py"]   # the workflows, the script of the export-commit rule and its classes
     assert checkouts[0]["sparse-checkout-cone-mode"] is False
     judge = [c for c in checkouts if c.get("repository") == "oss-invisible/core"]
     assert len(judge) == 1 and judge[0]["ref"] == "main"
