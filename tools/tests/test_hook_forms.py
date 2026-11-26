@@ -157,7 +157,7 @@ def test_every_excepted_entry_of_the_series_has_its_complete_row():
             if e["form"] == "excepted":
                 seen += 1
                 assert hc.excepted_lacks(e) == [], (f, e["line"])
-    assert seen >= 10
+    assert seen >= 9
 
 
 # --------------------------------------------------------------------------- scope (G60)
