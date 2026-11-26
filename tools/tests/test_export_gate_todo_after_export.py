@@ -172,8 +172,8 @@ def test_the_gate_before_the_tolerance_refuses_the_same_export(world, monkeypatc
     with pytest.raises(SystemExit) as stopped:
         run_gate(world)
     message = str(stopped.value)
-    assert "export refused: red on the series it would write" in message and "its `anchor` is empty" in message and "has no churn row" in message
-    assert "\nnext: " in message and snapshot(series) == before
+    assert "export refused: red on the series it would write" in message and "its `anchor` is empty" in message and "has no churn row" in message, message
+    assert "\nnext: " in message and snapshot(series) == before, message
 
 
 # ------------------------------------------------------------------------------------------------ everything else stays red
@@ -191,7 +191,7 @@ def test_an_empty_field_of_a_record_the_export_did_not_derive_is_red(world):
         run_gate(world)
     message = str(stopped.value)
     assert "FAIL %s/MANIFEST.json, the record of %s in %s: its `anchor` is empty" % (A, FILE, A) in message, message
-    assert "the record of %s in %s" % (FILE, B) not in message, "the record the export derived is not what stops it"
+    assert "the record of %s in %s" % (FILE, B) not in message, "the record the export derived is not what stops it: " + message
     assert snapshot(series) == before
 
 
@@ -209,7 +209,7 @@ def test_a_missing_churn_row_of_a_hunk_the_export_did_not_touch_is_red(world):
         run_gate(world)
     message = str(stopped.value)
     assert "FAIL %s/hooks.patch, %s" % (A, FILE) in message and "C18: the hook `" in message and "has no churn row" in message, message
-    assert "FAIL %s/hooks.patch" % B not in message, "the rows of the folder the export made are not what stops it"
+    assert "FAIL %s/hooks.patch" % B not in message, "the rows of the folder the export made are not what stops it: " + message
     assert snapshot(series) == before
 
 
@@ -220,7 +220,7 @@ def test_another_failure_of_check_stays_red_beside_the_todo_lines(world, check_b
     with pytest.raises(SystemExit) as stopped:
         run_gate(world)
     message = str(stopped.value)
-    assert "FAIL SERIES: it lists a folder that is not there" in message and "TODO after export" not in message
+    assert "FAIL SERIES: it lists a folder that is not there" in message and "TODO after export" not in message, message
     assert snapshot(series) == before
 
 
@@ -277,7 +277,7 @@ def test_a_test_beside_the_one_that_restates_churn_is_red_when_it_fails(world):
     with pytest.raises(SystemExit) as stopped:
         run_gate(world)
     message = str(stopped.value)
-    assert "FAIL tools/tests: " in message and "not about churn" in message and "\nnext: " in message
+    assert "FAIL tools/tests: " in message and "not about churn" in message and "\nnext: " in message, message
     assert snapshot(series) == before
 
 
@@ -290,7 +290,7 @@ def test_the_restating_test_is_red_when_check_made_no_churn_todo(world, monkeypa
     monkeypatch.setattr(export_gate, "run_series_check", lambda tree, news=None: ([], []))
     with pytest.raises(SystemExit) as stopped:
         run_gate(world)
-    assert "FAIL tools/tests: " in str(stopped.value) and "test_every_hook_of_the_series_has_its_churn" in str(stopped.value)
+    assert "FAIL tools/tests: " in str(stopped.value) and "test_every_hook_of_the_series_has_its_churn" in str(stopped.value), str(stopped.value)
 
 
 def test_the_tests_the_gate_lets_through_exist():

@@ -175,7 +175,7 @@ def test_the_engine_tree_tests_run_before_anything_is_written(world, monkeypatch
     with pytest.raises(SystemExit, match="a node test is red") as stopped:
         export_gate.gate(source, head, lambda scratch: order.append("write"), series)
     assert order == ["engine tree"], "a red node test stops the export before the scratch copy and the write"
-    assert "\nnext: " in str(stopped.value) and snapshot(series) == before
+    assert "\nnext: " in str(stopped.value) and snapshot(series) == before, str(stopped.value)
 
 
 def test_the_engine_tree_tests_come_first_when_all_is_green(world, monkeypatch):

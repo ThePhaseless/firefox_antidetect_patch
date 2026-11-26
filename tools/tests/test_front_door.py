@@ -285,13 +285,13 @@ def test_a_missing_origin_main_ends_with_next(tmp_path, monkeypatch):
 def test_the_export_gate_ends_with_next_export(monkeypatch, tmp_path):
     monkeypatch.delenv("ENGINE_NODE_GATE_TREE", raising=False)
     text = stop_text(lambda: export_gate.gate(tmp_path, "work", lambda scratch: None, tmp_path))
-    assert "ENGINE_NODE_GATE_TREE" in text and "Rule: docs/decisions/series-01" in text
-    assert last_line(text) == "next: python tools/engine.py export --source <source> --head work" and assert_next(text) == "export"
+    assert "ENGINE_NODE_GATE_TREE" in text and "Rule: docs/decisions/series-01" in text, text
+    assert last_line(text) == "next: python tools/engine.py export --source <source> --head work" and assert_next(text) == "export", text
     monkeypatch.setenv("ENGINE_NODE_GATE_TREE", str(tmp_path / "tree"))
     monkeypatch.setenv("ENGINE_NODE", str(tmp_path / "no-node"))
     monkeypatch.setattr(export_gate.shutil, "which", lambda name: None)
     text = stop_text(lambda: export_gate.gate(tmp_path, "work", lambda scratch: None, tmp_path))
-    assert "no Node" in text and assert_next(text) == "export"
+    assert "no Node" in text and assert_next(text) == "export", text
 
 
 def test_a_failed_git_command_is_a_failure_with_next(monkeypatch, tmp_path):

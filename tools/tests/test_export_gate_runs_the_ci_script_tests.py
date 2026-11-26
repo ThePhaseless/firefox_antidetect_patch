@@ -57,7 +57,7 @@ def test_a_job_added_to_checks_yml_without_its_name_in_the_release_checks_is_ref
     found = export_gate.run_ci_script_tests(tree, list(CHECKS), [])
     text = "\n".join(str(f) for f in found)
     assert found and "the jobs the two rounds share, by name" in text and "named in test_release_checks.py" in text, text
-    assert text.startswith("FAIL scripts/ci") and "Rule: docs/decisions/series-01-export-is-the-only-writer.md" in text
+    assert text.startswith("FAIL scripts/ci") and "Rule: docs/decisions/series-01-export-is-the-only-writer.md" in text, text
 
 
 def test_an_export_that_writes_no_ci_file_does_not_run_the_step(tmp_path, capsys):
