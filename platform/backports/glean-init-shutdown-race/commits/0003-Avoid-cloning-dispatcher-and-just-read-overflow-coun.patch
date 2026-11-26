@@ -1,0 +1,30 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Travis Long <tlong@mozilla.com>
+Date: Fri, 30 Oct 2026 06:24:48 -0500
+Subject: [PATCH] Avoid cloning dispatcher and just read overflow count
+ directly
+
+(cherry picked from commit 2874dc1ef164a09f1424a7c4578ec92a1eec4fe0)
+(narrowed to glean-core/src/: the files outside the vendored crate are left out)
+---
+ glean-core/src/dispatcher/mod.rs | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
+
+diff --git a/glean-core/src/dispatcher/mod.rs b/glean-core/src/dispatcher/mod.rs
+index 2684869..1e9618e 100644
+--- a/glean-core/src/dispatcher/mod.rs
++++ b/glean-core/src/dispatcher/mod.rs
+@@ -233,11 +233,9 @@ impl DispatchGuard {
+ 
+         // Queue the final task behind all other pre-init tasks.
+         // We explicitly don't use `self.launch` here, which would discard it if the buffer is full.
+-        let guard = self.clone();
++        let overflow_count = self.overflow_count.load(Ordering::SeqCst);
+         self.preinit_sender
+-            .send(Command::Task(Box::new(move || {
+-                final_task(guard.overflow_count.load(Ordering::SeqCst))
+-            })))
++            .send(Command::Task(Box::new(move || final_task(overflow_count))))
+             .map_err(|_| DispatchError::SendError)?;
+ 
+         // Single-use channel to communicate with the worker thread.

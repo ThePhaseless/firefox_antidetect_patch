@@ -1,0 +1,35 @@
+{
+ "upstream": "https://github.com/mozilla/glean",
+ "vendored": "1208715a85f7e9611729a199dc8955ec1bf3162d",
+ "vendored_crate": {
+  "name": "glean-core",
+  "version": "70.2.1",
+  "tag_prefix": "v"
+ },
+ "bug": 2072668,
+ "pull_request": "https://github.com/mozilla/glean/pull/3727",
+ "commits": [
+  {
+   "file": "commits/0001-Bug-2072668-Fix-race-between-init-and-shutdown.patch",
+   "sha256": "683642a4c90e7b23e2698d8fc7fb6968c6a91775c0ca1dcbbb778c18ee9181de",
+   "kind": "upstream",
+   "upstream_sha": "72deef6ba52719a3808a41c4f1e0ba7d577ca7c8",
+   "contained_in": null
+  },
+  {
+   "file": "commits/0002-Record-overflow-and-health-ping-as-the-final-pre-ini.patch",
+   "sha256": "f892851d71a1e40da61758bd6e3bd4fd11470e82a7cf13545c15de9101e74231",
+   "kind": "upstream",
+   "upstream_sha": "d9fa34a3f1e48eb2cbddd88bdd3cfc386ca3172c",
+   "contained_in": null
+  },
+  {
+   "file": "commits/0003-Avoid-cloning-dispatcher-and-just-read-overflow-coun.patch",
+   "sha256": "13487b23552bf67e7783c6569ebaae4597820bdf9306c6bbf1a3e9600067af2e",
+   "kind": "upstream",
+   "upstream_sha": "2874dc1ef164a09f1424a7c4578ec92a1eec4fe0",
+   "contained_in": null
+  }
+ ],
+ "drop_when": "Mozilla vendors a glean-core that has commit 2874dc1ef164 (mozilla/glean PR 3727, bug 2072668): at that port the replay drops the three commits by itself (contained_in), and the folder goes"
+}

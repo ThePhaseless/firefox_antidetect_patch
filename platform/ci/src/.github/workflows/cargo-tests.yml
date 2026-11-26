@@ -19,6 +19,12 @@
 # [workspace] table (it is its own root), and the optional gecko-profiler (a path crate of Gecko, feature `profiler`, never built here) is dropped. Its log is
 # appended to the same file as WebRender's, so one verdict reads both. Mozilla's other tests of the crate (they bind port 5353 too) do not run: the filter is our module.
 # A tree without the test has `0 passed` and the verdict is red: the job is for the tree where hooks/fingerprint__webrtc__declared-network is merged.
+# THE THIRD RUN: glean-core (third_party/rust/glean-core, a vendored crate, not a member of anything on the runner) is the test of upstream's that the backport
+# platform/backports/glean-init-shutdown-race carries (mozilla/glean PR 3727, bug 2072668: dispatcher::test::flush_init_runs_final_task_after_full_preinit_buffer, in
+# src/dispatcher/mod.rs). Its own `cargo test --lib`, in its directory, standalone like mdns_service: an empty [workspace] table, and the dev-dependencies the lib tests
+# never read dropped (criterion, pulldown-cmark, pulldown-cmark-to-cmark, xshell, yaml-rust2: for its benches and its tests/ directory; env_logger, tempfile and ctor stay, the lib
+# tests use them). The crate's own Cargo.lock (every source is crates.io) is the lock. Its log is appended to the same file. The filter is the one test by its full path: the tree without
+# the backport has no such test, cargo says `0 passed` and the verdict is red (the floor of scripts/ci/cargo_oracles.py), with the backport it runs and is green.
 # THE DEV-DEPENDENCIES the tests never use are dropped from the runner's copy of two manifests: mozangle (builds ANGLE's C++, for webrender/tests/
 # angle_shader_validation.rs) and glutin/winit (the examples of wr_glyph_rasterizer). Cargo builds every dev-dependency for any test target, `--lib`
 # included, and none of ours reads them.
@@ -50,9 +56,12 @@ jobs:
   cargo-tests:
     name: cargo-tests-${{ matrix.leg }}
     runs-on: ${{ matrix.runner }}
-    # measured: max 12m22s over 24 runs (45025164169..45423466521), margin 21% (win-x86_64, the slower leg; the one cancel, 45423466521, had
-    # every step done at 14m53s: a compile at 6m03 against 2m33-3m56, on top of the tree's 6 minutes that build_stack's batching removes)
-    timeout-minutes: 15
+    # measured: max 12m22s over 24 runs (45025164169..45423466521) before the third run (win-x86_64, the slower leg; the one cancel, 45423466521, had
+    # every step done at 14m53s: a compile at 6m03 against 2m33-3m56, on top of the tree's 6 minutes that build_stack's batching removes). The glean-core run is the
+    # third run of the job: measured once, run 45718525016 (latitude/port-06-r4-oracles): win-x86_64 job 9m41s (the glean-core step 123 s), linux-x86_64 job 6m02s (73 s).
+    # Worst case estimated as the old max plus the glean-core step: 12m22s + 2m03s = about 14.5 minutes; plus 25% = 18 minutes. One run is not a distribution:
+    # when three runs of this job have the third run, set the budget again to the largest measured time plus 25%.
+    timeout-minutes: 18
     strategy:
       fail-fast: false
       matrix:
@@ -87,7 +96,7 @@ jobs:
           date +%s > .t0
           git config --global core.longpaths true
           git init -q .
-          git sparse-checkout set --no-cone '/gfx/wr/' '/scripts/' '/browser/config/' '/Cargo.lock' '/dom/media/webrtc/transport/mdns_service/'
+          git sparse-checkout set --no-cone '/gfx/wr/' '/scripts/' '/browser/config/' '/Cargo.lock' '/dom/media/webrtc/transport/mdns_service/' '/third_party/rust/glean-core/'
           python .series/tools/engine.py materialize --into .
           test -f gfx/wr/Cargo.lock
           echo "tree: $(( $(date +%s) - $(cat .t0) )) s" | tee -a "$GITHUB_STEP_SUMMARY"
@@ -132,12 +141,31 @@ jobs:
           fi
           date +%s > ../../../../../.t2
           cargo test --lib -- stealth_tests:: 2>&1 | tee -a ../../../../../gfx/wr/cargo-test.log
+      # The crate of the backport, standalone (see THE THIRD RUN). Runs even when the runs before were red, so the one log has all three; its own exit code is this step's.
+      - name: The test of the glean-core backport (its own cargo run, the final task of the dispatcher after a full pre-init buffer)
+        id: cargo-glean
+        if: ${{ !cancelled() }}
+        working-directory: third_party/rust/glean-core
+        run: |
+          set -eo pipefail
+          # LF only: a checkout that wrote CRLF would keep the `$` of the ranges below from matching
+          sed -i 's/\r$//' Cargo.toml
+          echo >> Cargo.toml
+          echo '[workspace]' >> Cargo.toml
+          for dep in criterion pulldown-cmark pulldown-cmark-to-cmark xshell yaml-rust2; do
+            sed -i "/^\[dev-dependencies\.$dep\]\$/,/^\$/d" Cargo.toml
+          done
+          if grep -n 'dev-dependencies.criterion\|dev-dependencies.pulldown\|dev-dependencies.xshell\|dev-dependencies.yaml-rust2' Cargo.toml; then
+            echo "ERROR: a dev-dependency is still in the manifest"; exit 1
+          fi
+          date +%s > ../../../.t3
+          cargo test --lib -- dispatcher::test::flush_init_runs_final_task_after_full_preinit_buffer 2>&1 | tee -a ../../../gfx/wr/cargo-test.log
       # THE JUNIT for the named hook tests judge (hook-tests-judge.yml reads the artifact `junit-cargo`): one file per test binary, a testcase per test named
       # as cargo prints it, written from the log above (scripts/ci/cargo_junit.py, libtest's text: no nightly flag). It runs whatever cargo said, and its own
       # failure (a log with no test binary in it: the tests did not run) is a red of the leg; the upload below runs whatever this step said.
       - name: The junit of the cargo tests (one file per test binary)
         if: always()
-        run: python scripts/ci/cargo_junit.py gfx/wr/cargo-test.log --out junit-cargo/${{ matrix.leg }} --packages webrender,mdns_service
+        run: python scripts/ci/cargo_junit.py gfx/wr/cargo-test.log --out junit-cargo/${{ matrix.leg }} --packages webrender,mdns_service,glean-core
       - name: Keep the junit (this leg's part of junit-cargo)
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -151,6 +179,7 @@ jobs:
         run: |
           if [ -f .t1 ]; then echo "cargo test: $(( $(date +%s) - $(cat .t1) )) s" | tee -a "$GITHUB_STEP_SUMMARY"; fi
           if [ -f .t2 ]; then echo "cargo test mdns_service: $(( $(date +%s) - $(cat .t2) )) s" | tee -a "$GITHUB_STEP_SUMMARY"; fi
+          if [ -f .t3 ]; then echo "cargo test glean-core: $(( $(date +%s) - $(cat .t3) )) s" | tee -a "$GITHUB_STEP_SUMMARY"; fi
           [ -f gfx/wr/cargo-test.log ] || { echo "RED: cargo wrote no log"; exit 1; }
           python scripts/ci/cargo_oracles.py verdict gfx/wr/cargo-test.log | tee -a "$GITHUB_STEP_SUMMARY"
           exit "${PIPESTATUS[0]}"
