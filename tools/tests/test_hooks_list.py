@@ -364,6 +364,7 @@ def _port06_is_not_under_test(monkeypatch):
     monkeypatch.setattr(hc, "locals_violations", lambda root, base=None: [])
     monkeypatch.setattr(hc, "namespace_violations", lambda root: [])
     monkeypatch.setattr(hc, "churn_violations", lambda root: [])         # C18 (port-07): the reasons of the band are another test's
+    monkeypatch.setattr(engine.folders, "problems", lambda root: [])      # series-02: the FOLDER.json of every folder has its own tests (test_folders.py)
 
 
 def exception_series(tmp_path):

@@ -16,6 +16,7 @@ Read this first; open a decision only when your change touches it.
 | Id | Rule |
 |---|---|
 | [series-01](decisions/series-01-export-is-the-only-writer.md) | The series is generated from the source branch by `export` and proven by `verify`; only the hand-edited files are changed here directly. |
+| [series-02](decisions/series-02-every-folder-states-its-relation-to-mozilla.md) | Every folder says in `FOLDER.json` whether it is a product or a defect of Mozilla's (a backport is derived from `BACKPORT.json`), `check` fails any other state, `port` stops when a `fixed_in` is in the new tag, and every port carries `ports/range-diff.txt`, regenerated in CI from a partial clone of the two tags. |
 | [product-01](decisions/product-01-no-value-from-the-host.md) | No value a page can read comes from the host: it is declared by the core or computed by Firefox's own code, and a host dependency is removed where Firefox reads the host. |
 | [product-02](decisions/product-02-same-seed-same-bytes.md) | The same seed gives the same bytes on every machine (Windows and Linux x86_64): text, canvas, WebGL, audio, media. |
 | [product-03](decisions/product-03-windows-retail-is-the-reference.md) | The reference is retail Firefox on Windows; Linux converges to Windows, never the reverse. |

@@ -11,6 +11,10 @@
 #   churn             port-07 (docs/decisions/port-07-quiet-anchors.md): tools/churn.json is what the series gives now. No tree: the Mozilla tags of the
 #                     last eight releases and the base, one commit deep and with only the files the series patches, in a repository of their own (a small cache of this job), each checked against the
 #                     commit tools/churn.json records; `churn.py --check`, and the real-series test of tools/tests/test_churn.py.
+#   range-diff        series-02 (docs/decisions/series-02-every-folder-states-its-relation-to-mozilla.md): on a port, that is a pull request (or a
+#                     candidate) that moves mozilla_tag away from main's, ports/range-diff.txt is the range-diff of main's layers on main's tag against this
+#                     series' layers on its tag, regenerated here from the two tags (a partial clone of Mozilla's repository, no tree) and compared byte for
+#                     byte; on anything else it decides that, says so in its log and is green.
 #   rebuilds          the Mozilla tag + the series = the tree declared in UPSTREAM.json (`engine.py materialize` stops when it is another
 #                     tree: this is the CI form of `engine.py verify`, which needs the source repository), the birth points against the ledger, and
 #                     the core's checks that read the engine's source.
@@ -181,6 +185,42 @@ jobs:
           CHURN_TAGS_REPO: ${{ runner.temp }}/churn-tags.git
           CHURN_REQUIRE_TAGS: "1"
         run: python -m pytest -q -rs -p no:cacheprovider tools/tests/test_churn.py
+
+  # series-02: the range-diff of a port. `engine.py range-diff --decide` says whether this run is a port: mozilla_tag of this series is not main's. If it
+  # is not, the job's other steps are skipped by their own condition and the job is green, with the decision in its log (`decision=not a port: ...`). If it
+  # is, `range-diff --fetch --check` makes a bare repository of its own with the two tags one commit deep and no file content (`--filter=blob:none`, the
+  # fetch of tools/churn.py) and the content of the files the two series patch (and the `.gitattributes` above them), builds the layer stack of main's series
+  # on main's tag and of this one on its tag from those objects alone (GIT_NO_LAZY_FETCH, so nothing else is fetched), regenerates ports/range-diff.txt and
+  # compares it with the committed file: red when it is missing, stale, or its first line is not `<main's tag>..<this tag>`. Main's series is read from
+  # git, origin/main, never from the branch. It reads no tree and needs no package (git and the standard library), so it does not wait for the
+  # wheelhouse; it is a job of its own, parallel to the others, because it is slow where `rules` is not (ci-08), and a red that needs no binary shows within
+  # the first 3 minutes.
+  # TIMING (to be measured on the first port PR, cold; nothing is cached). Measured on a development PC (Windows, the tags already fetched): the two stacks 60 s
+  # each, the whole command 126 s, 341 and 340 files for the two series. On a runner, estimated: a pull request that is not a port is the checkout, Python, the
+  # fetch of main and the decision, about 20 s; a port adds the two tags (about 15 s), the files of the two series (about 30 s each, tens of megabytes), the two
+  # stacks (about 40 s each) and the range-diff (about 10 s), about 3 minutes in all. Neither is behind `rules` or `rebuilds`, so the round stays within 8 minutes.
+  range-diff:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+      # main's series is the old series of the range-diff: it must exist on pull requests and on a candidate's branch too.
+      - name: Main's series
+        run: git fetch --no-tags --depth=1 origin +refs/heads/main:refs/remotes/origin/main
+      - name: Is this a port (mozilla_tag moved away from main's)?
+        id: decide
+        shell: bash
+        run: python tools/engine.py range-diff --decide --old-series origin/main | tee -a "$GITHUB_OUTPUT"
+      - name: Not a port, nothing to compare
+        if: steps.decide.outputs.port != 'true'
+        run: echo "range-diff - not a port, this run does not move mozilla_tag, so ports/range-diff.txt is not checked (the decision is above)"
+      - name: The two tags and the files of the two series, from Mozilla's repository, and ports/range-diff.txt is what they give (byte for byte)
+        if: steps.decide.outputs.port == 'true'
+        shell: bash
+        run: python tools/engine.py range-diff --source "$RUNNER_TEMP/range-diff-tags.git" --old-series origin/main --fetch --check
 
   rebuilds:
     needs: [core-ref, py-deps-core]

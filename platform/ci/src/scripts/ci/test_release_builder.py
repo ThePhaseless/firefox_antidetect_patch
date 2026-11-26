@@ -417,7 +417,7 @@ def group_pull_requests(doc, jobs, build, steps) -> list:
                 and jobs_of_pull_requests({"x.yml": {"on": ["pull_request"], "jobs": {"c": {"uses": "o/r/.github/workflows/y.yml@main"}}}}) == ["x.yml:c:o/r/.github/workflows/y.yml@main"]))
     out.append(("pull requests: the jobs of checks.yml, called by series.yml, are held to it, and so is release.yml's call of it (a candidate: no pull request starts release.yml)",
                 "checks.yml" in live and live["series.yml"]["jobs"]["checks"]["uses"] == "./.github/workflows/checks.yml"
-                and set(live["checks.yml"]["jobs"]) == {"py-deps-tools", "core-ref", "py-deps-core", "rules", "churn", "rebuilds", "noreply-identity", "tree"}
+                and set(live["checks.yml"]["jobs"]) == {"py-deps-tools", "core-ref", "py-deps-core", "rules", "churn", "range-diff", "rebuilds", "noreply-identity", "tree"}
                 and all(HOSTED.match(j["runs-on"]) for j in live["checks.yml"]["jobs"].values() if "uses" not in j)
                 and all(j["uses"] == "./.github/workflows/py-deps.yml" and "runners" not in j["with"] for j in live["checks.yml"]["jobs"].values() if "uses" in j)
                 and triggers(live["checks.yml"]) == {"workflow_call"}))

@@ -23,6 +23,7 @@ python tools/engine.py hook-debt [--summary]     # drop resolved entries of tool
 python tools/engine.py shrink-budget   # lower the budgets to the lines the patches carry now
 python tools/engine.py drift --to <tag>          # our patched Mozilla files that Mozilla changed up to the new tag
 python tools/engine.py port --to <tag>           # every folder merged three-way onto the new tag, then the birth points
+python tools/engine.py range-diff --source <repo> [--old-series <ref>] [--fetch] [--write|--check]   # ports/range-diff.txt: the old series' layers on its tag against this series' on its tag (partial clone)
 python tools/engine.py births --tree <dir>       # same as tools/births.py: birth points against tools/birth-ledger.json
 python tools/births.py --tree <dir> [--skeleton | --accept-changed | --prune | --tsv out.tsv]   # birth-point scan and ledger upkeep
 python tools/prebuild.py --head <branch> [--base <branch>] [--folder <folder>] [--checks 1,3] [--json out.json]   # static checks before a build (also `engine.py prebuild`)

@@ -40,6 +40,8 @@ CHECK_COMMANDS = {
                  "tests/test_webgl_extensions_follow_the_engine.py"],
     # port-07: tools/churn.json is what the series and the Mozilla tags give now (the tags of its own: no tree)
     "churn": ["tools/churn.py --cache-key", 'churn-tags.git" --fetch', 'churn-tags.git" --check', "tools/tests/test_churn.py"],
+    # series-02: on a port, ports/range-diff.txt is what the two series give (the job decides first, and is green on any run that is not a port)
+    "range-diff": ["tools/engine.py range-diff --decide", "tools/engine.py range-diff --source"],
     # the core the wrapper pins, resolved once for the wheelhouse and the checkout of rebuilds (ci-05)
     "core-ref": ["release_plan.py --resolve-core-ref"],
     # series.yml's `noreply-identity`

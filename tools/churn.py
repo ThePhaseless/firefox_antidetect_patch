@@ -249,6 +249,21 @@ def fetch_blobs(source, tags: list, paths: list, say=print, sleep=time.sleep) ->
                                                                   len(set(blobs.values())) - len(need)))
 
 
+def fetch_tag(source, tag: str, url: str, say=print, sleep=time.sleep) -> None:
+    """One release tag of the remote into `source` (a partial clone, see `partial_clone`): its commit one deep and its trees, no file
+    content, tried again after FETCH_WAITS. The caller says which commit it must be (`churn.fetch` against tools/churn.json,
+    tools/range_diff.py against the tree the series declares)."""
+    for attempt in range(len(FETCH_WAITS) + 1):
+        done = git(source, "fetch", "-q", "--depth=1", "--no-tags", "--filter=blob:none", REMOTE,
+                   "refs/tags/%s:refs/tags/%s" % (tag, tag), check=False)
+        if done.returncode == 0:
+            return
+        if attempt == len(FETCH_WAITS):
+            raise ChurnError("git fetch %s %s: %s" % (url, tag, done.stderr.decode(errors="replace").strip()[-300:]))
+        say("%s: the fetch failed, again in %d s" % (tag, FETCH_WAITS[attempt]))
+        sleep(FETCH_WAITS[attempt])
+
+
 def fetch(source, data: dict, paths: list, url=None, say=print, sleep=time.sleep) -> None:
     """Fills `source` (a repository, made bare when it is not one yet) with what the churn reads, from `url` (default: the Mozilla
     repository of UPSTREAM.json): every release tag of `data` as a commit and its trees, one commit deep and without file content, each
@@ -265,15 +280,7 @@ def fetch(source, data: dict, paths: list, url=None, say=print, sleep=time.sleep
         if have is not None:
             raise ChurnError("%s is %s in %s, tools/churn.json recorded %s" % (tag, have, source, commit))
         began = time.monotonic()
-        for attempt in range(len(FETCH_WAITS) + 1):
-            done = git(source, "fetch", "-q", "--depth=1", "--no-tags", "--filter=blob:none", REMOTE,
-                       "refs/tags/%s:refs/tags/%s" % (tag, tag), check=False)
-            if done.returncode == 0:
-                break
-            if attempt == len(FETCH_WAITS):
-                raise ChurnError("git fetch %s %s: %s" % (url, tag, done.stderr.decode(errors="replace").strip()[-300:]))
-            say("%s: the fetch failed, again in %d s" % (tag, FETCH_WAITS[attempt]))
-            sleep(FETCH_WAITS[attempt])
+        fetch_tag(source, tag, url, say, sleep)
         got = commit_of(source, tag)
         if got != commit:
             raise ChurnError("%s is %s in %s, tools/churn.json recorded %s" % (tag, got, url, commit))

@@ -1762,7 +1762,20 @@ def churn_violations(root) -> list:
                 out.append(mine("%s: a `deferred` reason holds only for the port that wrote it (tools/churn.json is for %s, the series is on %s): "
                                 "move the hook to %s, or give it an `only-place` reason (rule: %s)"
                                 % (where, (data or {}).get("base"), tag, value["quieter"], PORT07_DECISION)))
+    # a backport folder has no hooks, but its hunks are in tools/churn.json too (churn.py --check compares every hunk of every
+    # hooks.patch): a hunk with no row is as red here as it is in the churn job, so `check` finds it before a pull request does
+    for folder in _backport_folders(root):
+        for (f, path, no), key in sorted(keys.items()):
+            if f == folder and key not in by_key and not problem:
+                text = "a hunk of the backport's patch"
+                out.append(Violation("C18", folder, path, "", text, _key("C18", folder, path, "", text),
+                                     "`%s`, hunk %d: a hunk of a backport has no churn row in tools/churn.json: %s (rule: %s)" % (path, no, fix, PORT07_DECISION), ()))
     return _unique(out)
+
+
+def _backport_folders(root: Path) -> list:
+    names = (root / "SERIES").read_text(encoding="utf-8").split()
+    return [f for f in names if (root / f / "hooks.patch").is_file() and (root / f / "BACKPORT.json").exists()]
 
 
 def _folders(root: Path) -> list:

@@ -10,7 +10,7 @@ Where each kind of change goes. The engine is Firefox as a patch series on a Moz
 | Hooks | One-line changes to Mozilla files, each with `STEALTH-HOOK(<folder>)` on the line | `<folder>/hooks.patch` | `tools/inventory.json` (one record per Mozilla file) and `layout.FEATURES` |
 | Backports | Upstream code carried until the tag has it | `platform/backports/<name>/` (a Mozilla commit, or the upstream commits of a vendored crate that no feature of ours needs); vendored code under `third_party/rust/` in the folder that needs it | `BACKPORT.json` in the folder |
 
-A folder holds `hooks.patch`, `src/`, `MANIFEST.json`, `FEATURE.md` and `HOOKS.json`; a folder with a `BACKPORT.json` has no `HOOKS.json`. Rule: [backport-01](decisions/backport-01-upstream-code-as-is.md).
+A folder holds `hooks.patch`, `src/`, `MANIFEST.json`, `FEATURE.md`, `HOOKS.json` and `FOLDER.json`; a folder with a `BACKPORT.json` has no `HOOKS.json` and no `FOLDER.json`. Rules: [backport-01](decisions/backport-01-upstream-code-as-is.md), [series-02](decisions/series-02-every-folder-states-its-relation-to-mozilla.md).
 
 ## Which folder
 
@@ -85,6 +85,19 @@ A hook is identified by file, function, kind and normalized text. A hook whose t
 
 A test no round runs is debt T3. Rule: [hook-04](decisions/hook-04-one-test-per-hook.md).
 
+## FOLDER.json
+
+One per folder without `BACKPORT.json`, directly in the folder, written by hand, once. It says whether the change is ours for good or a defect of Mozilla's, so that a port knows which folders should die when Mozilla fixes the defect. Rule: [series-02](decisions/series-02-every-folder-states-its-relation-to-mozilla.md).
+
+| Shape | Meaning |
+|---|---|
+| `{"relation": "product"}` | Ours for good: Mozilla would not make the change |
+| `{"relation": "defect", "upstream": "not-filed"}` | A defect of Mozilla's that nobody has reported |
+| `{"relation": "defect", "upstream": "https://bugzilla.mozilla.org/show_bug.cgi?id=<N>"}` | The same, with the bug Mozilla has |
+| the defect shapes plus `"fixed_in": "FIREFOX_<N>_<M>_RELEASE"` | The release that ships Mozilla's fix: at or before `mozilla_tag` `check` is red, at or before the target of a port `port` stops |
+
+No other key, no other value, no path and no other URL. A backport is derived from its `BACKPORT.json`, never written here. `export` neither creates nor edits the file.
+
 ## Budgets and debt
 
 Rule: [hook-03](decisions/hook-03-budgets-and-debt-only-go-down.md).
@@ -105,6 +118,7 @@ Rule: [hook-03](decisions/hook-03-budgets-and-debt-only-go-down.md).
 | `tools/layout.py` | `GROUP_ORDER`; `FEATURES`: inventory feature name to folder; `OWN_FILES`: path pattern of a file of ours to folder |
 | `tools/inventory.json` | One record per Mozilla file we modify: file, category, feature, prefs, added / removed / hunk counts, anchor, notes. `check` compares the counts with `hooks.patch` |
 | `tools/hook_contract.py`, `tools/hooks_list.py` | The contract and the `HOOKS.json` generator |
+| `tools/folders.py`, `tools/range_diff.py` | The `FOLDER.json` check; the range-diff of a port |
 | `tools/prebuild.py`, `tools/births.py` | Static checks before a build; the birth-point scan |
 | `tools/tests/` | The tests of the series itself |
 
@@ -120,6 +134,8 @@ Rule: [hook-03](decisions/hook-03-budgets-and-debt-only-go-down.md).
 | `.github/workflows/*.yml` at the root | `export`: copies of `platform/ci/src/.github/workflows/`, except `series.yml` and `noreply-identity.yml`; `check` requires them identical |
 | `<folder>/FEATURE.md` | `export` creates it once from the inventory; then by hand |
 | `HOOKS.json`: hand fields | By hand |
+| `<folder>/FOLDER.json` | By hand (a folder without a `BACKPORT.json`); `export` never writes or edits it |
+| `ports/range-diff.txt` | `range-diff --write`, at every port |
 | `<folder>/BACKPORT.json` and the upstream diff beside it | By hand |
 | `UPSTREAM.json`: `mozilla_tag`, `source_branch` | By hand |
 | `tools/layout.py`, `tools/inventory.json`, `tools/hook-budget-raises.json`, `tools/hook-names.json`, `tools/birth-ledger.json` | By hand |
@@ -134,6 +150,6 @@ Rule: [hook-03](decisions/hook-03-budgets-and-debt-only-go-down.md).
 2. Here: `export`. It first runs the node tests and the tree's python tests on the head's tree; then it writes the series into a scratch copy of the checkout, runs `engine.py check` and `tools/tests` (`-n auto`) on that copy, and only if all is green replaces the series of the checkout with it. A red leaves the checkout untouched.
 3. `verify`: it must say `identical`.
 4. `hook-debt` drops the resolved debt; `shrink-budget` after logic moved; a Mozilla file new to the series needs its row in `tools/hook-budget.json` (at most 5 lines).
-5. Fill the hand fields of the touched `HOOKS.json` (`test`; `anchor` and `why` for an anchor) and the `Test:` line of `FEATURE.md`.
+5. A folder `export` made anew has no `FOLDER.json`: write it (`product`, or `defect` with its `upstream`). Fill the hand fields of the touched `HOOKS.json` (`test`; `anchor` and `why` for an anchor) and the `Test:` line of `FEATURE.md`.
 6. `check`, and `python -m pytest -q tools/tests`.
 7. Commit here with the same title as the source commit.
