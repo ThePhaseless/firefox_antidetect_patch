@@ -53,6 +53,34 @@ def pattern_downloads(doc):
                 found.append("%s / %s" % (job_name, step.get("name", step.get("id", "?"))))
     return found
 
+#: A step that runs scripts/release_plan.py (scripts/test_release_plan.py is not one: the name before `release_plan` is a word character).
+RELEASE_PLAN = re.compile(r"(?<![\w])release_plan\.py")
+
+
+def release_plan_problems(docs: dict) -> list:
+    """Every step of the workflows `docs` ({file name: document}) that runs release_plan.py without what the plan needs, as "file / job / step: what".
+
+    The plan resolves the core from the wrapper's pin by reading the wrapper's pyproject.toml through the API (scripts/release_plan.py): it needs the
+    `--wrapper-ref` it reads at, a `GH_TOKEN` for the API (the runner has none in its environment: `gh` refuses without it) and, when it plans a run
+    (`--event`), the `--core-ref` of the run too (empty is the pin). `--resolve-core-ref` alone takes the core_ref as optional. republish.yml's plan ran
+    without all three (run 45874749497: «cannot be read: set the GH_TOKEN environment variable»)."""
+    problems = []
+    for name, doc in sorted(docs.items()):
+        for job_name, job in (doc.get("jobs") or {}).items():
+            for step in job.get("steps") or []:
+                run = "\n".join(l for l in str(step.get("run", "")).splitlines() if not l.strip().startswith("#"))
+                if not RELEASE_PLAN.search(run):
+                    continue
+                where = "%s / %s / %s" % (name, job_name, step.get("name", step.get("id", "?")))
+                if "--wrapper-ref" not in run:
+                    problems.append("%s: no --wrapper-ref" % where)
+                if "--event" in run and "--core-ref" not in run:
+                    problems.append("%s: no --core-ref" % where)
+                if "GH_TOKEN" not in (step.get("env") or {}):
+                    problems.append("%s: no GH_TOKEN in the step's env" % where)
+    return problems
+
+
 #: Workflows that are Mozilla's, not ours: on no branch of ours, never run (test_release_builder.py), so they are not ours to annotate.
 UPSTREAM_WORKFLOWS = ("pr-handler.yml",)
 #: What makes a step a test or a judge, read from its `run` (comment lines left out) and its `uses`: a failure of it is a red, never hidden by `continue-on-error`.
@@ -326,6 +354,34 @@ def _cases() -> list:
     out.append(("concurrency: republish.yml, which publishes a run's archives, has none: no push touches it", "concurrency" not in load("republish.yml")))
     out.append(("concurrency: no other workflow of the build got one by mistake",
                 all("concurrency" not in load(n) for n in ("gate.yml", "publish.yml"))))
+
+    # --- the plan's inputs: every step that runs release_plan.py gives it the refs and a token (republish run 45874749497) -------------------------------
+    every = {w.name: load(w.name) for w in sorted(WORKFLOWS.glob("*.yml"))}
+    plan_files = {n for n, d in every.items() for j in (d.get("jobs") or {}).values() for s in j.get("steps") or [] if RELEASE_PLAN.search(str(s.get("run", "")))}
+    plan_step = {"name": "Plan", "env": {"GH_TOKEN": "${{ github.token }}"},
+                 "run": 'python3 scripts/release_plan.py --event workflow_dispatch --kind release --core-ref "$CORE_REF" --wrapper-ref "$WRAPPER_REF"'}
+    bare = {"name": "Plan", "env": {"RELEASE_TAG": "x"}, "run": 'python3 scripts/release_plan.py --event workflow_dispatch --kind release --release-tag "$RELEASE_TAG"'}
+
+    def one(step):
+        return {"w.yml": {"jobs": {"plan": {"steps": [step]}}}}
+    out.append(("plan inputs: every step of every workflow that runs release_plan.py gives it --wrapper-ref, --core-ref (a plan) and a GH_TOKEN; release.yml, republish.yml and checks.yml run it",
+                release_plan_problems(every) == [] and {"release.yml", "republish.yml", "checks.yml"} <= plan_files))
+    out.append(("plan inputs: red for a plan with neither ref nor token (republish.yml's plan step as it was), each one named; green for one with all three",
+                release_plan_problems(one(bare)) == ["w.yml / plan / Plan: no --wrapper-ref", "w.yml / plan / Plan: no --core-ref", "w.yml / plan / Plan: no GH_TOKEN in the step's env"]
+                and release_plan_problems(one(plan_step)) == []))
+    out.append(("plan inputs: red for each one missing alone; scripts/test_release_plan.py is not a plan and a comment that names release_plan.py is not a step",
+                release_plan_problems(one(dict(plan_step, env={}))) == ["w.yml / plan / Plan: no GH_TOKEN in the step's env"]
+                and release_plan_problems(one(dict(plan_step, run=plan_step["run"].replace(' --core-ref "$CORE_REF"', "")))) == ["w.yml / plan / Plan: no --core-ref"]
+                and release_plan_problems(one(dict(plan_step, run=plan_step["run"].replace(' --wrapper-ref "$WRAPPER_REF"', "")))) == ["w.yml / plan / Plan: no --wrapper-ref"]
+                and release_plan_problems(one({"name": "t", "run": "python3 scripts/test_release_plan.py"})) == []
+                and release_plan_problems(one({"name": "c", "run": "# release_plan.py says why\ntrue"})) == []))
+    out.append(("plan inputs: --resolve-core-ref takes the wrapper's ref and the token and no core_ref (the job core-ref of checks.yml)",
+                release_plan_problems(one({"name": "core", "env": {"GH_TOKEN": "t"}, "run": 'python3 release_plan.py --resolve-core-ref --wrapper-ref "$W"'})) == []))
+    rep = load("republish.yml")
+    out.append(("plan inputs: republish.yml's gate and publish take the refs the plan resolved, not the inputs: the core the gate installs is the one the plan checked against the pin",
+                all(rep["jobs"]["gate"]["with"][k] == "${{ needs.plan.outputs.%s }}" % k for k in ("core_ref", "wrapper_ref"))
+                and rep["jobs"]["publish"]["with"]["wrapper_ref"] == "${{ needs.plan.outputs.wrapper_ref }}"
+                and set(rep["jobs"]["plan"]["outputs"]) >= {"core_ref", "wrapper_ref"}))
 
     # --- the guard --------------------------------------------------------------------------------------------------------------------------------
     def head(value):

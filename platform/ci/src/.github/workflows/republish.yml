@@ -37,8 +37,8 @@ on:
         description: 'invisible_playwright ref the gate drives with (as in release.yml)'
         default: 'main'
       core_ref:
-        description: 'invisible_core ref the gate installs (as in release.yml)'
-        default: 'main'
+        description: 'invisible_core ref the gate installs (as in release.yml: empty is the core the wrapper pins, which the plan resolves)'
+        default: ''
 
 jobs:
   # Always a release, so the plan only checks the tag and names what comes out
@@ -50,6 +50,9 @@ jobs:
       tag: ${{ steps.plan.outputs.tag }}
       num: ${{ steps.plan.outputs.num }}
       prevtag: ${{ steps.plan.outputs.prevtag }}
+      # The refs the plan resolved (scripts/release_plan.py), the ones the gate installs: as release.yml's plan hands them on.
+      core_ref: ${{ steps.plan.outputs.core_ref }}
+      wrapper_ref: ${{ steps.plan.outputs.wrapper_ref }}
     steps:
       - name: The series (this repository, this commit)
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -62,11 +65,16 @@ jobs:
       - name: Plan
         id: plan
         env:
+          # The plan reads the wrapper's pyproject.toml through the API to find the core it pins (scripts/release_plan.py), as release.yml's plan does.
+          GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.release_tag }}
+          CORE_REF: ${{ inputs.core_ref }}
+          WRAPPER_REF: ${{ inputs.wrapper_ref }}
         run: |
           set -e
           python3 scripts/release_plan.py --event workflow_dispatch --kind release \
-            --release-tag "$RELEASE_TAG" > plan.txt
+            --release-tag "$RELEASE_TAG" \
+            --core-ref "$CORE_REF" --wrapper-ref "$WRAPPER_REF" > plan.txt
           cat plan.txt
           cat plan.txt >> "$GITHUB_OUTPUT"
 
@@ -79,8 +87,8 @@ jobs:
     with:
       build_run_id: ${{ inputs.build_run_id }}
       seal_tag: ${{ needs.plan.outputs.tag }}
-      wrapper_ref: ${{ inputs.wrapper_ref }}
-      core_ref: ${{ inputs.core_ref }}
+      wrapper_ref: ${{ needs.plan.outputs.wrapper_ref }}
+      core_ref: ${{ needs.plan.outputs.core_ref }}
 
   publish:
     needs: [plan, gate]
@@ -91,4 +99,4 @@ jobs:
       tag: ${{ needs.plan.outputs.tag }}
       num: ${{ needs.plan.outputs.num }}
       prevtag: ${{ needs.plan.outputs.prevtag }}
-      wrapper_ref: ${{ inputs.wrapper_ref }}
+      wrapper_ref: ${{ needs.plan.outputs.wrapper_ref }}
