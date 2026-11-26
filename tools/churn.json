@@ -199,6 +199,14 @@
    "which": []
   },
   {
+   "key": "H|automation/element-atoms|remote/marionette/atom.sys.mjs|function executeInContent(name, element, window) {|b09803d6194f",
+   "folder": "automation/element-atoms",
+   "file": "remote/marionette/atom.sys.mjs",
+   "hunk": 1,
+   "churn": 0,
+   "which": []
+  },
+  {
    "key": "H|automation/file-chooser|dom/html/HTMLInputElement.cpp||3446fed68976",
    "folder": "automation/file-chooser",
    "file": "dom/html/HTMLInputElement.cpp",
@@ -263,6 +271,14 @@
    "which": []
   },
   {
+   "key": "H|automation/hybrid-xrays|js/xpconnect/src/Sandbox.cpp|nsresult xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp,|e9c88f436114",
+   "folder": "automation/hybrid-xrays",
+   "file": "js/xpconnect/src/Sandbox.cpp",
+   "hunk": 5,
+   "churn": 0,
+   "which": []
+  },
+  {
    "key": "H|automation/hybrid-xrays|js/xpconnect/src/Sandbox.cpp|bool SandboxOptions::Parse() {|abb61d000626",
    "folder": "automation/hybrid-xrays",
    "file": "js/xpconnect/src/Sandbox.cpp",
@@ -273,7 +289,25 @@
    ]
   },
   {
+   "key": "H|automation/hybrid-xrays|js/xpconnect/src/Sandbox.cpp|bool SandboxOptions::Parse() {|fc95205fc779",
+   "folder": "automation/hybrid-xrays",
+   "file": "js/xpconnect/src/Sandbox.cpp",
+   "hunk": 6,
+   "churn": 1,
+   "which": [
+    "156"
+   ]
+  },
+  {
    "key": "H|automation/hybrid-xrays|js/xpconnect/src/xpcprivate.h|class MOZ_STACK_CLASS SandboxOptions : public OptionsBase {|14915a423101",
+   "folder": "automation/hybrid-xrays",
+   "file": "js/xpconnect/src/xpcprivate.h",
+   "hunk": 1,
+   "churn": 0,
+   "which": []
+  },
+  {
+   "key": "H|automation/hybrid-xrays|js/xpconnect/src/xpcprivate.h|class MOZ_STACK_CLASS SandboxOptions : public OptionsBase {|63af00400516",
    "folder": "automation/hybrid-xrays",
    "file": "js/xpconnect/src/xpcprivate.h",
    "hunk": 1,
@@ -323,6 +357,14 @@
    "which": []
   },
   {
+   "key": "H|automation/hybrid-xrays|js/xpconnect/wrappers/WrapperFactory.cpp|static void DEBUG_CheckUnwrapSafety(HandleObject obj,|030f3c7755f4",
+   "folder": "automation/hybrid-xrays",
+   "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
+   "hunk": 2,
+   "churn": 0,
+   "which": []
+  },
+  {
    "key": "H|automation/hybrid-xrays|js/xpconnect/wrappers/WrapperFactory.cpp|JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,|fc68e5ea7f37",
    "folder": "automation/hybrid-xrays",
    "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
@@ -339,7 +381,23 @@
    "which": []
   },
   {
+   "key": "H|automation/hybrid-xrays|js/xpconnect/wrappers/WrapperFactory.cpp|JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,|f8461349e29f",
+   "folder": "automation/hybrid-xrays",
+   "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
+   "hunk": 4,
+   "churn": 0,
+   "which": []
+  },
+  {
    "key": "H|automation/hybrid-xrays|js/xpconnect/wrappers/WrapperFactory.cpp|JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,|9a3207078a20",
+   "folder": "automation/hybrid-xrays",
+   "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
+   "hunk": 5,
+   "churn": 0,
+   "which": []
+  },
+  {
+   "key": "H|automation/hybrid-xrays|js/xpconnect/wrappers/WrapperFactory.cpp|JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,|53be4e33552a",
    "folder": "automation/hybrid-xrays",
    "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
    "hunk": 5,
@@ -1503,6 +1561,14 @@
    "which": []
   },
   {
+   "key": "H|fingerprint/fonts/bundle|gfx/tests/gtest/moz.build|if CONFIG[\"OS_TARGET\"] != \"Android\":|c8c8162dedc1",
+   "folder": "fingerprint/fonts/bundle",
+   "file": "gfx/tests/gtest/moz.build",
+   "hunk": 1,
+   "churn": 0,
+   "which": []
+  },
+  {
    "key": "H|fingerprint/fonts/bundle|gfx/thebes/FontData.h|class FontData final {|71ee01ec7450",
    "folder": "fingerprint/fonts/bundle",
    "file": "gfx/thebes/FontData.h",
@@ -1637,6 +1703,14 @@
   },
   {
    "key": "H|fingerprint/fonts/font-list|gfx/tests/gtest/moz.build|if CONFIG[\"OS_TARGET\"] != \"Android\":|b2177f31a33e",
+   "folder": "fingerprint/fonts/font-list",
+   "file": "gfx/tests/gtest/moz.build",
+   "hunk": 1,
+   "churn": 0,
+   "which": []
+  },
+  {
+   "key": "H|fingerprint/fonts/font-list|gfx/tests/gtest/moz.build|if CONFIG[\"OS_TARGET\"] != \"Android\":|4b4c7127e3ae",
    "folder": "fingerprint/fonts/font-list",
    "file": "gfx/tests/gtest/moz.build",
    "hunk": 1,
@@ -2094,6 +2168,14 @@
   },
   {
    "key": "H|fingerprint/fonts/metrics|gfx/tests/gtest/moz.build|if CONFIG[\"OS_TARGET\"] != \"Android\":|fc878b2c1212",
+   "folder": "fingerprint/fonts/metrics",
+   "file": "gfx/tests/gtest/moz.build",
+   "hunk": 1,
+   "churn": 0,
+   "which": []
+  },
+  {
+   "key": "H|fingerprint/fonts/metrics|gfx/tests/gtest/moz.build|if CONFIG[\"OS_TARGET\"] != \"Android\":|6a588539bbd9",
    "folder": "fingerprint/fonts/metrics",
    "file": "gfx/tests/gtest/moz.build",
    "hunk": 1,
@@ -3572,6 +3654,28 @@
    "which": []
   },
   {
+   "key": "H|fingerprint/screen-window/geometry|docshell/base/BrowsingContext.h|struct EmbedderColorSchemes {|23c0e6116a7c",
+   "folder": "fingerprint/screen-window/geometry",
+   "file": "docshell/base/BrowsingContext.h",
+   "hunk": 1,
+   "churn": 5,
+   "which": [
+    "153",
+    "156",
+    "157",
+    "158",
+    "159"
+   ]
+  },
+  {
+   "key": "H|fingerprint/screen-window/geometry|docshell/base/CanonicalBrowsingContext.cpp|void CanonicalBrowsingContext::ReplacedBy(|5f9f492cda58",
+   "folder": "fingerprint/screen-window/geometry",
+   "file": "docshell/base/CanonicalBrowsingContext.cpp",
+   "hunk": 1,
+   "churn": 0,
+   "which": []
+  },
+  {
    "key": "H|fingerprint/screen-window/geometry|dom/base/nsGlobalWindowOuter.cpp||3acdfcab294b",
    "folder": "fingerprint/screen-window/geometry",
    "file": "dom/base/nsGlobalWindowOuter.cpp",
@@ -3825,6 +3929,14 @@
    "folder": "fingerprint/screen-window/screen",
    "file": "layout/base/nsPresContext.cpp",
    "hunk": 2,
+   "churn": 0,
+   "which": []
+  },
+  {
+   "key": "H|fingerprint/screen-window/screen|layout/base/nsPresContext.cpp|void nsPresContext::UpdateInnerSizeSpoofedForRFP() {|6c9137261f70",
+   "folder": "fingerprint/screen-window/screen",
+   "file": "layout/base/nsPresContext.cpp",
+   "hunk": 3,
    "churn": 0,
    "which": []
   },
@@ -4186,6 +4298,14 @@
   },
   {
    "key": "H|fingerprint/webgpu/adapter-declaration|dom/webgpu/Adapter.cpp|struct FeatureImplementationStatus {|6ab25aa83fb1",
+   "folder": "fingerprint/webgpu/adapter-declaration",
+   "file": "dom/webgpu/Adapter.cpp",
+   "hunk": 3,
+   "churn": 0,
+   "which": []
+  },
+  {
+   "key": "H|fingerprint/webgpu/adapter-declaration|dom/webgpu/Adapter.cpp|struct FeatureImplementationStatus {|1560780f77da",
    "folder": "fingerprint/webgpu/adapter-declaration",
    "file": "dom/webgpu/Adapter.cpp",
    "hunk": 3,
@@ -5334,7 +5454,23 @@
    "which": []
   },
   {
+   "key": "H|fingerprint/webrtc/declared-network|dom/media/webrtc/transport/mdns_service/src/lib.rs|impl MDNSService {|2da14afcff51",
+   "folder": "fingerprint/webrtc/declared-network",
+   "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
+   "hunk": 2,
+   "churn": 0,
+   "which": []
+  },
+  {
    "key": "H|fingerprint/webrtc/declared-network|dom/media/webrtc/transport/mdns_service/src/lib.rs|impl MDNSService {|f2ecd1162e51",
+   "folder": "fingerprint/webrtc/declared-network",
+   "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
+   "hunk": 3,
+   "churn": 0,
+   "which": []
+  },
+  {
+   "key": "H|fingerprint/webrtc/declared-network|dom/media/webrtc/transport/mdns_service/src/lib.rs|impl MDNSService {|992ab72881f4",
    "folder": "fingerprint/webrtc/declared-network",
    "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
    "hunk": 3,
@@ -5618,6 +5754,14 @@
   },
   {
    "key": "H|network/doh|netwerk/base/TRRLoadInfo.cpp|TRRLoadInfo::TRRLoadInfo(nsIURI* aResultPrincipalURI,|25a8995cad52",
+   "folder": "network/doh",
+   "file": "netwerk/base/TRRLoadInfo.cpp",
+   "hunk": 2,
+   "churn": 0,
+   "which": []
+  },
+  {
+   "key": "H|network/doh|netwerk/base/TRRLoadInfo.cpp|TRRLoadInfo::TRRLoadInfo(nsIURI* aResultPrincipalURI,|00f2cda5fce8",
    "folder": "network/doh",
    "file": "netwerk/base/TRRLoadInfo.cpp",
    "hunk": 2,
@@ -5979,7 +6123,23 @@
    "which": []
   },
   {
+   "key": "H|network/doh|toolkit/components/url-classifier/nsUrlClassifierDBService.cpp|class nsUrlClassifierHashCompleterBase|078fc89f0da1",
+   "folder": "network/doh",
+   "file": "toolkit/components/url-classifier/nsUrlClassifierDBService.cpp",
+   "hunk": 2,
+   "churn": 0,
+   "which": []
+  },
+  {
    "key": "H|network/doh|toolkit/components/url-classifier/nsUrlClassifierDBService.cpp|nsUrlClassifierDBService::Classify(nsIPrincipal* aPrincipal,|57b0a6ad94b3",
+   "folder": "network/doh",
+   "file": "toolkit/components/url-classifier/nsUrlClassifierDBService.cpp",
+   "hunk": 3,
+   "churn": 0,
+   "which": []
+  },
+  {
+   "key": "H|network/doh|toolkit/components/url-classifier/nsUrlClassifierDBService.cpp|nsresult nsUrlClassifierDBService::Init() {|57b0a6ad94b3",
    "folder": "network/doh",
    "file": "toolkit/components/url-classifier/nsUrlClassifierDBService.cpp",
    "hunk": 3,
@@ -5996,6 +6156,14 @@
   },
   {
    "key": "H|network/doh|toolkit/profile/moz.build|UNIFIED_SOURCES += [|15f7a479e61c",
+   "folder": "network/doh",
+   "file": "toolkit/profile/moz.build",
+   "hunk": 1,
+   "churn": 0,
+   "which": []
+  },
+  {
+   "key": "H|network/doh|toolkit/profile/moz.build|UNIFIED_SOURCES += [|db50e8043698",
    "folder": "network/doh",
    "file": "toolkit/profile/moz.build",
    "hunk": 1,
@@ -6119,7 +6287,23 @@
    "which": []
   },
   {
+   "key": "H|network/proxy-udp|dom/media/webrtc/transport/nr_socket_proxy_config.cpp||c171047a4bb3",
+   "folder": "network/proxy-udp",
+   "file": "dom/media/webrtc/transport/nr_socket_proxy_config.cpp",
+   "hunk": 1,
+   "churn": 0,
+   "which": []
+  },
+  {
    "key": "H|network/proxy-udp|dom/media/webrtc/transport/nr_socket_proxy_config.cpp|const net::WebrtcProxyConfig& NrSocketProxyConfig::GetConfig() const {|b6e128de25f9",
+   "folder": "network/proxy-udp",
+   "file": "dom/media/webrtc/transport/nr_socket_proxy_config.cpp",
+   "hunk": 2,
+   "churn": 0,
+   "which": []
+  },
+  {
+   "key": "H|network/proxy-udp|dom/media/webrtc/transport/nr_socket_proxy_config.cpp|const net::WebrtcProxyConfig& NrSocketProxyConfig::GetConfig() const {|3b15d6c7490c",
    "folder": "network/proxy-udp",
    "file": "dom/media/webrtc/transport/nr_socket_proxy_config.cpp",
    "hunk": 2,
@@ -6968,7 +7152,23 @@
    "which": []
   },
   {
+   "key": "H|platform/launch-counter|browser/components/BrowserGlue.sys.mjs|BrowserGlue.prototype = {|3ae04775e1cb",
+   "folder": "platform/launch-counter",
+   "file": "browser/components/BrowserGlue.sys.mjs",
+   "hunk": 1,
+   "churn": 0,
+   "which": []
+  },
+  {
    "key": "H|platform/launch-counter|browser/components/moz.build|MOZ_SRC_FILES += [|d5d11de92fde",
+   "folder": "platform/launch-counter",
+   "file": "browser/components/moz.build",
+   "hunk": 1,
+   "churn": 0,
+   "which": []
+  },
+  {
+   "key": "H|platform/launch-counter|browser/components/moz.build|MOZ_SRC_FILES += [|043a6d8e004a",
    "folder": "platform/launch-counter",
    "file": "browser/components/moz.build",
    "hunk": 1,
@@ -7178,6 +7378,14 @@
   },
   {
    "key": "H|platform/untrusted-modules|toolkit/xre/dllservices/UntrustedModulesData.cpp|void ModuleRecord::GetVersionAndVendorInfo(const nsAString& aPath) {|7768e396fc27",
+   "folder": "platform/untrusted-modules",
+   "file": "toolkit/xre/dllservices/UntrustedModulesData.cpp",
+   "hunk": 2,
+   "churn": 0,
+   "which": []
+  },
+  {
+   "key": "H|platform/untrusted-modules|toolkit/xre/dllservices/UntrustedModulesData.cpp|void ModuleRecord::GetVersionAndVendorInfo(const nsAString& aPath) {|8d5ab6aa4f9c",
    "folder": "platform/untrusted-modules",
    "file": "toolkit/xre/dllservices/UntrustedModulesData.cpp",
    "hunk": 2,
