@@ -39,6 +39,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 from typing import Callable
 
@@ -232,6 +233,61 @@ def run_series_tests(tree: Path) -> list:
     return []
 
 
+# The CI scripts' own tests (platform/ci/src/scripts, run by the job `tree` of checks.yml on the materialized tree) that hold what the export writes into
+# platform/ci and into .github/workflows: the jobs of checks.yml and release.yml by name, and what a pull request starts. PR 79 added a job to checks.yml and
+# only the tree job, an hour after the push, said that the two lists naming the jobs did not. Run on the scratch tree, when the export touched a CI file;
+# the whole of scripts/ci/test_ci.py needs Linux (symlinks, sched_setaffinity, bash), these modules run anywhere and take under a second.
+CI_SCRIPT_MODULES = ("test_release_checks", "test_release_builder")
+CI_PATHS = ("platform/ci/", ".github/")
+CI_RUNNER = (
+    "import sys\n"
+    "sys.path[:0] = ['scripts/ci', 'scripts']\n"
+    "bad = 0\n"
+    "for name in sys.argv[1:]:\n"
+    "    cases = __import__(name).cases()\n"
+    "    for case, ok in cases:\n"
+    "        if not ok:\n"
+    "            bad += 1\n"
+    "            print('RED ' + name + ': ' + case)\n"
+    "    print('%s: %d cases' % (name, len(cases)))\n"
+    "sys.exit(1 if bad else 0)\n")
+
+
+def run_ci_script_tests(tree: Path, written: list, removed: list) -> list:
+    """The cases of CI_SCRIPT_MODULES on the scratch tree: a tree as the job `tree` makes it (scripts/ and .github/ of platform/ci/src at its root, the
+    series in .series), built in a scratch directory. Not run when the export touched no file of platform/ci or .github, or the tree has no platform/ci/src."""
+    touched = [p for p in list(written) + list(removed) if p.startswith(CI_PATHS)]
+    src = tree / "platform" / "ci" / "src"
+    if not touched or not (src / "scripts").is_dir():
+        print("export gate: CI scripts' tests: no file of platform/ci or .github written, not run")
+        return []
+    home = Path(tempfile.mkdtemp(prefix="ci-scripts-"))
+    started = time.time()
+    try:
+        for part in ("scripts", ".github"):
+            if (src / part).is_dir():
+                shutil.copytree(src / part, home / part, ignore=shutil.ignore_patterns("__pycache__"))
+        series = home / ".series"
+        for part in (".github", "tools"):
+            if (tree / part).is_dir():
+                shutil.copytree(tree / part, series / part, ignore=shutil.ignore_patterns("__pycache__", "tests"))
+        for part in ("UPSTREAM.json", "SERIES"):
+            if (tree / part).is_file():
+                series.mkdir(exist_ok=True)
+                shutil.copyfile(tree / part, series / part)
+        done = _run([sys.executable, "-c", CI_RUNNER, *CI_SCRIPT_MODULES], home)
+    finally:
+        shutil.rmtree(home, ignore_errors=True)
+    print("export gate: CI scripts' tests (%s): %s in %.1f s" % (", ".join(CI_SCRIPT_MODULES), (done.stdout.strip().splitlines() or ["no output"])[-1], time.time() - started))
+    if done.returncode:
+        found = [line[len("RED "):] for line in done.stdout.splitlines() if line.startswith("RED ")]
+        return [fail("scripts/ci (the CI scripts' tests, %d file(s) of platform/ci or .github written)" % len(touched),
+                     "a case is red: %s" % (case if found else (done.stdout + done.stderr).strip()[-800:]),
+                     "fix the case or the file it holds (a job added to checks.yml is named in test_release_checks.py and test_release_builder.py), "
+                     "in the source, then run the export again", RULE) for case in (found or [""])]
+    return []
+
+
 def run_engine_tree_tests(source: Path, head: str) -> list:
     """The tests of the source head on its whole tree (node tests, the engine's python tests): they test the head, not the series."""
     gate_tree()          # refuses, naming the variable, before anything else is looked at
@@ -260,7 +316,7 @@ def gate(source: Path, head: str, write: Callable[[Path], None], root: Path = RO
         written, removed = series_delta(tree, root, before)
         # the scratch tree has its own index: the tests that read `git ls-files` see the files the export wrote
         git("-C", str(tree), "add", "-A")
-        problems = run_series_check(tree) + run_series_tests(tree)
+        problems = run_series_check(tree) + run_series_tests(tree) + run_ci_script_tests(tree, written, removed)
         if problems:
             raise SystemExit(_with_next(fail(
                 "the series the export wrote (%d files written, %d removed)" % (len(written), len(removed)),
