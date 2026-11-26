@@ -11,7 +11,7 @@ index aaf31169b44149bd6042cea4eb2e08c87c1378e7..3efdf2f5dc5616f1902d165f0c3520f7
  LOCAL_INCLUDES += ["/dom/base"]
  
 diff --git a/js/xpconnect/src/Sandbox.cpp b/js/xpconnect/src/Sandbox.cpp
-index 34e0724f35b69447027d0791ee3755719f8a9803..ab61b42f1ff09bb7793f400e68adeb9be5756f7b 100644
+index 34e0724f35b69447027d0791ee3755719f8a9803..021bef0f0c28315678a3417d64532cce7e7c7824 100644
 --- a/js/xpconnect/src/Sandbox.cpp
 +++ b/js/xpconnect/src/Sandbox.cpp
 @@ -112,6 +112,8 @@
@@ -52,32 +52,35 @@ index 34e0724f35b69447027d0791ee3755719f8a9803..ab61b42f1ff09bb7793f400e68adeb9b
      priv->isUAWidgetCompartment = options.isUAWidgetScope;
      priv->hasExclusiveExpandos = hasExclusiveExpandos;
      priv->wantXrays = wantXrays;
-+    priv->hybridXrays = options.hybridXrays;  // STEALTH-HOOK(automation/hybrid-xrays)
++    mozilla::StealthSetHybridXrays(priv, options);  // STEALTH-HOOK(automation/hybrid-xrays)
    }
  
    {
-@@ -2040,6 +2045,8 @@ bool SandboxOptions::Parse() {
+@@ -2039,7 +2044,7 @@ bool SandboxOptions::Parse() {
+   /* All option names must be ASCII-only. */
    bool ok = ParseObject("sandboxPrototype", &proto) &&
              ParseObject("associatedWindow", &associatedWindow) &&
-             ParseBoolean("wantXrays", &wantXrays) &&
-+            // STEALTH-HOOK(automation/hybrid-xrays)
-+            ParseBoolean("hybridXrays", &hybridXrays) &&
+-            ParseBoolean("wantXrays", &wantXrays) &&
++            StealthParseHybridXrays(ParseBoolean("wantXrays", &wantXrays)) &&  // STEALTH-HOOK(automation/hybrid-xrays)
              ParseBoolean("allowWaivers", &allowWaivers) &&
              ParseBoolean("wantComponents", &wantComponents) &&
              ParseBoolean("wantExportHelpers", &wantExportHelpers) &&
 diff --git a/js/xpconnect/src/xpcprivate.h b/js/xpconnect/src/xpcprivate.h
-index 4e9ab1c7a65171a7605963714cc18c6635e3e51a..8f792f307859150addc000be158f369357ff5979 100644
+index 4e9ab1c7a65171a7605963714cc18c6635e3e51a..34c9bb1a39e861594f8b217daa6c8855b4e166a0 100644
 --- a/js/xpconnect/src/xpcprivate.h
 +++ b/js/xpconnect/src/xpcprivate.h
-@@ -2274,6 +2274,7 @@ class MOZ_STACK_CLASS SandboxOptions : public OptionsBase {
+@@ -2272,8 +2272,10 @@ class MOZ_STACK_CLASS SandboxOptions : public OptionsBase {
+         alwaysUseFdlibm(false) {}
+ 
    virtual bool Parse() override;
++  bool StealthParseHybridXrays(bool aParsed);  // STEALTH-HOOK(automation/hybrid-xrays)
  
    bool wantXrays;
 +  bool hybridXrays = false;  // STEALTH-HOOK(automation/hybrid-xrays)
    bool allowWaivers;
    bool wantComponents;
    bool wantExportHelpers;
-@@ -2555,8 +2556,10 @@ class CompartmentPrivate {
+@@ -2555,8 +2557,10 @@ class CompartmentPrivate {
      JS::Compartment* compartment = JS::GetCompartment(object);
      return Get(compartment);
    }
@@ -88,7 +91,7 @@ index 4e9ab1c7a65171a7605963714cc18c6635e3e51a..8f792f307859150addc000be158f3693
      // Only share if we're same-origin with the principal.
      if (!originInfo.IsSameOrigin(principal)) {
        return false;
-@@ -2573,6 +2576,7 @@ class CompartmentPrivate {
+@@ -2573,6 +2577,7 @@ class CompartmentPrivate {
    // is deprecated, but is still the default for sandboxes for compatibity
    // reasons.
    bool wantXrays;
@@ -110,7 +113,7 @@ index c33c0962bb247bf0b3d2fc1cdb92048404eaef0e..0bbcb6f79da31b54369d3797465d8484
  
  ["test_structuredClone.js"]
 diff --git a/js/xpconnect/wrappers/WrapperFactory.cpp b/js/xpconnect/wrappers/WrapperFactory.cpp
-index 1d7fbf8922b654f9e4dbb1d7871dbe284668eec6..c3b8f1f46625740272a948a79e56874d20c30dd4 100644
+index 1d7fbf8922b654f9e4dbb1d7871dbe284668eec6..3c94ec1ced5e6526b903724cebb291ef239394f3 100644
 --- a/js/xpconnect/wrappers/WrapperFactory.cpp
 +++ b/js/xpconnect/wrappers/WrapperFactory.cpp
 @@ -26,6 +26,8 @@
@@ -122,15 +125,16 @@ index 1d7fbf8922b654f9e4dbb1d7871dbe284668eec6..c3b8f1f46625740272a948a79e56874d
  using namespace JS;
  using namespace js;
  using namespace mozilla;
-@@ -375,6 +377,7 @@ static void DEBUG_CheckUnwrapSafety(HandleObject obj,
+@@ -374,7 +376,7 @@ static void DEBUG_CheckUnwrapSafety(HandleObject obj,
+       CompartmentPrivate* targetCompartmentPrivate =
            CompartmentPrivate::Get(target);
        if (!originCompartmentPrivate->wantXrays &&
-           !targetCompartmentPrivate->wantXrays &&
-+          !targetCompartmentPrivate->hybridXrays &&  // STEALTH-HOOK(automation/hybrid-xrays)
+-          !targetCompartmentPrivate->wantXrays &&
++          !mozilla::StealthRealmWantsXrays(target, targetCompartmentPrivate->wantXrays) &&  // STEALTH-HOOK(automation/hybrid-xrays)
            CompartmentsMayHaveHadTransparentCCWs(originCompartmentPrivate,
                                                  targetCompartmentPrivate)) {
          // We should have a transparent CCW, unless we have a cross-origin
-@@ -468,6 +471,7 @@ JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,
+@@ -468,6 +470,7 @@ JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,
            ? AccessCheck::subsumesConsideringDomain(target, origin)
            : AccessCheck::subsumesConsideringDomainIgnoringFPD(target, origin);
    bool sameOrigin = targetSubsumesOrigin && originSubsumesTarget;
@@ -138,7 +142,7 @@ index 1d7fbf8922b654f9e4dbb1d7871dbe284668eec6..c3b8f1f46625740272a948a79e56874d
  
    const Wrapper* wrapper;
  
-@@ -516,9 +520,10 @@ JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,
+@@ -516,7 +519,7 @@ JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,
             // the more-likely-to-pass checks for wantXrays.
             IsCrossOriginAccessibleObject(obj) &&
             (!targetSubsumesOrigin || (!originCompartmentPrivate->wantXrays &&
@@ -146,20 +150,20 @@ index 1d7fbf8922b654f9e4dbb1d7871dbe284668eec6..c3b8f1f46625740272a948a79e56874d
 +                                      !mozilla::StealthTargetWantsXrays(cx, targetCompartmentPrivate->wantXrays)))) {  // STEALTH-HOOK(automation/hybrid-xrays)
      wrapper = &CrossOriginObjectWrapper::singleton;
    }
-+  else if (mozilla::StealthCallerObjectApplies()) wrapper = mozilla::StealthCallerObjectWrapper();  // STEALTH-HOOK(automation/hybrid-xrays)
  
-   // Special handling for other web objects.  Again, we only want this in
+@@ -524,9 +527,9 @@ JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,
    // web-like contexts (symmetric security relationships, no forced Xrays).  In
-@@ -526,7 +531,7 @@ JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,
+   // this situation, if the two compartments may ever have had transparent CCWs
    // between them, we want to keep using transparent CCWs.
-   else if (originSubsumesTarget == targetSubsumesOrigin &&
+-  else if (originSubsumesTarget == targetSubsumesOrigin &&
++  else if (mozilla::StealthNotCallerObject(originSubsumesTarget == targetSubsumesOrigin) &&  // STEALTH-HOOK(automation/hybrid-xrays)
             !originCompartmentPrivate->wantXrays &&
 -           !targetCompartmentPrivate->wantXrays &&
 +           !mozilla::StealthTargetWantsXrays(cx, targetCompartmentPrivate->wantXrays) &&  // STEALTH-HOOK(automation/hybrid-xrays)
             CompartmentsMayHaveHadTransparentCCWs(originCompartmentPrivate,
                                                   targetCompartmentPrivate)) {
      isTransparentWrapperDueToDocumentDomain = true;
-@@ -551,7 +556,7 @@ JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,
+@@ -551,7 +554,7 @@ JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,
      // Xrays are a bidirectional protection, since it affords clarity to the
      // caller and privacy to the callee.
      bool sameOriginXrays = originCompartmentPrivate->wantXrays ||
@@ -168,7 +172,7 @@ index 1d7fbf8922b654f9e4dbb1d7871dbe284668eec6..c3b8f1f46625740272a948a79e56874d
      bool wantXrays = !sameOrigin || sameOriginXrays;
  
      XrayType xrayType = wantXrays ? GetXrayType(obj) : NotXray;
-@@ -562,7 +567,7 @@ JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,
+@@ -562,7 +565,7 @@ JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,
                        targetCompartmentPrivate->allowWaivers &&
                        HasWaiveXrayFlag(obj);
  

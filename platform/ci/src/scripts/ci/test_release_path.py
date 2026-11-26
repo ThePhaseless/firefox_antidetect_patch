@@ -896,8 +896,8 @@ def group_stage_package(doc) -> list:
     # The artifact quota filled on 04/11 (81 GB, ~950 MB a candidate) and every new run
     # failed at its first upload: a candidate's symbols (~400 MB) are kept 2 days.
     symbols = next(s for s in doc["jobs"]["build"]["steps"] if s.get("name") == "Upload crash symbols")
-    out.append(("artifacts: a candidate's crash symbols are kept 2 days, a release's 14",
-                str(symbols["with"]["retention-days"]).replace(" ", "") == "${{needs.plan.outputs.kind=='release'&&14||2}}"))
+    out.append(("artifacts: a candidate's crash symbols are kept 2 days, a release's 30 (publish.yml publishes them as release assets, from this run)",
+                str(symbols["with"]["retention-days"]).replace(" ", "") == "${{needs.plan.outputs.kind=='release'&&30||2}}"))
     if not sys.platform.startswith("linux"):
         print("skip  stage_package.sh: bash, Linux only")
         return out

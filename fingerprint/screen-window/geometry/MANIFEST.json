@@ -1,5 +1,7 @@
 {
  "modified": [
+  "docshell/base/BrowsingContext.h",
+  "docshell/base/CanonicalBrowsingContext.cpp",
   "dom/base/nsGlobalWindowOuter.cpp",
   "dom/events/Event.cpp",
   "dom/events/test/gtest/moz.build",
@@ -24,9 +26,9 @@
   "widget/windows/StealthFullscreenWin.h": "100644"
  },
  "sha256": {
-  "dom/base/StealthWindowGeometry.h": "77d6c8e40803f0b74aba5eea29a49447e881b56a0d2c1647dc02c3b9e9e8ce97",
-  "dom/events/StealthScreenCoords.h": "3f25310b99b1a4270ce5af94481794c8ea62aa9eeead29abfb1d3bfc8432f775",
-  "dom/events/test/gtest/TestStealthWindowGeometry.cpp": "85bb5a00b1243cca68e958e74fed682e90103a7cccfad969984d6f200bbea10d",
+  "dom/base/StealthWindowGeometry.h": "2df2db099fb6243093f72074599f434d37d4cab6cd8e9f37db90709ccebe2a6a",
+  "dom/events/StealthScreenCoords.h": "b7d39865a555d4a12d6bb8ddac59d9d24d09a0475a65f33e71dc73643ccea840",
+  "dom/events/test/gtest/TestStealthWindowGeometry.cpp": "308860546a881b88dd3dece1f2351cc16afb7e9c37ac6f4a349631c3bb2ea0c2",
   "widget/StealthFullscreen.cpp": "dc70186a64ce74e7b6884b4b9070c138a205ae8aecadc61726d939e25b0208cf",
   "widget/StealthFullscreen.h": "729c754fe0556d42eb0c4b260778704b18e6589bd45cdacd22139828d4d64b8d",
   "widget/gtk/StealthFullscreenGtk.cpp": "87662eb8eaecec034517ed7aed2241aa0bfbc4b9e29583271ec3a13fe8d6c713",
@@ -43,7 +45,7 @@
    "added": 1,
    "removed": 0,
    "hunks": 1,
-   "inline_logic_lines": 0,
+   "inline_logic_lines": 1,
    "hookable": "already-hook",
    "anchor": "MOZ_EACH_BC_FIELD list (the FIELD of InnerSizeSpoofedForRFP; the new FIELD follows it)",
    "notes": "One FIELD, StealthWindowState (uint64_t, top only, CanSet::Unrestricted), the main window's restored state: restored or not, outer size in device pixels, UI density. It is synced to every process on the top BrowsingContext with the same policy as Mozilla's InnerSizeSpoofedForRFP, and set from the same place (nsPresContext::UpdateInnerSizeSpoofedForRFP, in the process that owns the top document). outerWidth/outerHeight, screenX/Y, mozInnerScreenX/Y and the screenX - clientX of every event are derived from it."

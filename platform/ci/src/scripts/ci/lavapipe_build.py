@@ -1,8 +1,11 @@
 """Firefox's own lavapipe: the software Vulkan driver WebGPU uses on Linux,
 built from pinned sources and our patches, shipped in the package.
 
-    python3 scripts/ci/lavapipe_build.py --out DIR --clang DIR --sysroot DIR [--jobs N]
+    python3 scripts/ci/lavapipe_build.py --out DIR --clang DIR --sysroot DIR --pip-house DIR [--jobs N]
     python3 scripts/ci/lavapipe_build.py --key --clang DIR
+
+--pip-house is the wheelhouse of scripts/ci/locks/lavapipe.txt (py-deps.yml, ci-03): Mesa's build tools (meson, mako, pyyaml, packaging and what they
+need) are installed from it, offline and by hash (--no-index --find-links --require-hashes), and nothing here reads the index.
 
 Writes DIR/libvulkan_lvp.so and DIR/VERSION.json and prints the library's
 path. A library already in DIR built from the same inputs (the workflow caches
@@ -64,11 +67,23 @@ sys.path.insert(0, str(HERE.parent))  # upstream_toolchain.py
 
 from upstream_toolchain import http_get  # noqa: E402
 
+# The tree root, and every file inputs_key() reads: tree paths and globs (POSIX, relative to the root). The key hashes these and nothing else, and
+# scripts/ci/ab_package.py reads this list to say which changed source explains lavapipe/VERSION.json (its "inputs" line is the key).
+TREE = HERE.parent.parent
+INPUTS = (
+    "scripts/ci/lavapipe/VERSIONS.json",
+    "scripts/ci/locks/lavapipe.txt",
+    "scripts/ci/lavapipe/*.patch",
+    "scripts/ci/lavapipe/proof/*",
+    "scripts/ci/lavapipe_build.py",
+)
 PATCHES = HERE / "lavapipe"
 # A Vulkan program that uses, beyond what lavapipe used to advertise, the limits
 # patch 0008 raises: every build runs it before the library is kept.
 PROOF = PATCHES / "proof"
 VERSIONS = PATCHES / "VERSIONS.json"
+# What the build tools resolve to, exactly: every file's sha256 (scripts/ci/py_deps.py lock lavapipe, from VERSIONS.json "pip").
+PIP_LOCK = HERE / "locks" / "lavapipe.txt"
 LIB = "libvulkan_lvp.so"
 SONAME = "libvulkan.so.1"
 EXPORTS = ("vkGetInstanceProcAddr", "vk_icdGetInstanceProcAddr")
@@ -141,17 +156,26 @@ def version_tuple(text: str) -> tuple:
     return tuple(int(x) for x in text.split("."))
 
 
-def inputs_key(clang_version: str, versions: Path = VERSIONS, patches: Path = PATCHES,
-               script: Path = Path(__file__)) -> str:
-    """Everything the library is built from: pins, patches, this script and the
-    compiler. The workflow caches the library under it."""
+def input_files(root: Path = TREE) -> list:
+    """The files INPUTS names, under `root`: tree paths (POSIX), sorted. A pattern without a wildcard names one file and it must exist;
+    one with a wildcard may match nothing."""
+    found = []
+    for pattern in INPUTS:
+        if any(c in pattern for c in "*?["):
+            found += [p.relative_to(root).as_posix() for p in root.glob(pattern) if p.is_file()]
+        elif (root / pattern).is_file():
+            found.append(pattern)
+        else:
+            raise FileNotFoundError("lavapipe's input %s is not in %s" % (pattern, root))
+    return sorted(set(found))
+
+
+def inputs_key(clang_version: str, root: Path = TREE) -> str:
+    """Everything the library is built from, as INPUTS names it: pins, the exact files of the build tools, patches, the proof and this script,
+    and the compiler. The workflow caches the library under it."""
     h = hashlib.sha256()
-    h.update(versions.read_bytes())
-    for p in sorted(patches.glob("*.patch")):
-        h.update(p.name.encode() + b"\0" + p.read_bytes())
-    for p in sorted((patches / "proof").glob("*")):
-        h.update(b"proof/" + p.name.encode() + b"\0" + p.read_bytes())
-    h.update(script.read_bytes())
+    for path in input_files(root):
+        h.update(path.encode() + b"\0" + (root / path).read_bytes())
     h.update(clang_version.encode())
     return h.hexdigest()[:32]
 
@@ -343,12 +367,20 @@ def cached(out: Path, key: str) -> Path | None:
     return None
 
 
-def build(out: Path, clang: Path, sysroot: Path, jobs: int, run=subprocess.run, get=http_get) -> Path:
+def pip_install_command(venv: Path, house: Path, lock: Path = PIP_LOCK) -> list:
+    """Mesa's build tools, as a command: the files the lock names, from the wheelhouse of that lock and nowhere else (no index), each checked by its sha256."""
+    return [str(venv / "bin" / "pip"), "install", "--quiet", "--disable-pip-version-check", "--no-index", "--find-links", str(house),
+            "--require-hashes", "-r", str(lock)]
+
+
+def build(out: Path, clang: Path, sysroot: Path, jobs: int, run=subprocess.run, get=http_get, pip_house: Path | None = None) -> Path:
     versions = json.loads(VERSIONS.read_text("utf-8"))
     key = inputs_key(clang_version(clang, run))
     hit = cached(out, key)
     if hit:
         return hit
+    if pip_house is None or not (Path(pip_house) / "lock.txt").is_file():
+        raise ValueError("no wheelhouse for the build tools (--pip-house DIR with the lock's files, from py-deps.yml): lavapipe's pip never reads the index")
     glslang = run(["glslangValidator", "--version"], check=True, capture_output=True, text=True).stdout
     if glslang_version(glslang) < tuple(versions["glslang_min"]):
         raise RuntimeError("glslangValidator older than %s: lavapipe's shaders need it" % versions["glslang_min"])
@@ -368,8 +400,7 @@ def build(out: Path, clang: Path, sysroot: Path, jobs: int, run=subprocess.run, 
         # Mesa's build tools, pinned.
         venv = tmp / "venv"
         run([sys.executable, "-m", "venv", str(venv)], check=True)
-        pip = [str(venv / "bin" / "pip"), "install", "--quiet", "--disable-pip-version-check"]
-        run(pip + ["%s==%s" % kv for kv in versions["pip"].items()], check=True)
+        run(pip_install_command(venv, Path(pip_house)), check=True)
         env["PATH"] = "%s:%s" % (venv / "bin", env["PATH"])
 
         # LLVM at the pinned commit, static, X86 only.
@@ -463,6 +494,7 @@ def main(argv=None) -> int:
     ap.add_argument("--clang", type=Path, default=Path.home() / ".mozbuild" / "clang")
     ap.add_argument("--sysroot", type=Path, default=Path.home() / ".mozbuild" / "sysroot-x86_64-linux-gnu")
     ap.add_argument("--out", type=Path)
+    ap.add_argument("--pip-house", type=Path, help="the wheelhouse of scripts/ci/locks/lavapipe.txt (py-deps.yml)")
     ap.add_argument("--jobs", type=int, default=os.cpu_count() or 4)
     ap.add_argument("--key", action="store_true", help="print the inputs key and exit")
     args = ap.parse_args(argv)
@@ -471,7 +503,7 @@ def main(argv=None) -> int:
         return 0
     if not args.out:
         ap.error("--out is required")
-    print(build(args.out, args.clang, args.sysroot, args.jobs))
+    print(build(args.out, args.clang, args.sysroot, args.jobs, pip_house=args.pip_house))
     return 0
 
 

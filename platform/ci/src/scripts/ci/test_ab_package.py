@@ -21,6 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import ab_package  # noqa: E402
+import lavapipe_build  # noqa: E402
 import published_release  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -119,7 +120,7 @@ def test_a_changed_binary_is_reported_and_green():
 def test_a_changed_text_that_a_source_explains_is_green():
     new = package(**{"defaults/pref/channel-prefs.js": b'pref("app.update.channel", "esr");\n'})
     report = compare(package(), new, sources=["browser/app/profile/channel-prefs.js"])
-    assert report["verdict"] == "green" and report["changed_non_binary"][0]["explained"] is True
+    assert report["verdict"] == "green" and report["changed_non_binary"][0]["explained"] == ["browser/app/profile/channel-prefs.js"]
 
 
 def test_a_changed_text_that_no_source_explains_is_red():
@@ -164,7 +165,7 @@ def test_the_members_of_the_ja_follow_the_rule_of_explained_sources_and_build_id
     helper = dict(JA_FILES, **{"modules/juggler/Helper.js": b"helper v2\n"})
     report = compare(package(), package(ja=helper), sources=["juggler/Helper.js"])
     assert report["verdict"] == "green", report["red"]
-    assert [r["path"] for r in report["changed_ja_entry"]] == ["omni.ja!modules/juggler/Helper.js"] and report["changed_ja_entry"][0]["explained"] is True
+    assert [r["path"] for r in report["changed_ja_entry"]] == ["omni.ja!modules/juggler/Helper.js"] and report["changed_ja_entry"][0]["explained"] == ["juggler/Helper.js"]
     assert [r["path"] for r in report["changed_binary"]] == ["omni.ja"]
     report = compare(package(), package(ja=helper))  # no source of ours explains it
     assert report["verdict"] == "red" and report["red"] == {"changed_ja_entry_unexplained": 1}
@@ -181,7 +182,7 @@ def test_appconstants_with_only_a_buildid_line_changed_is_build_identity_and_gre
     report = compare(old, new)
     assert report["verdict"] == "green", report["red"]
     row = report["changed_ja_entry"][0]
-    assert row["path"] == "omni.ja!modules/AppConstants.sys.mjs" and row["build_identity"] == ["MOZ_BUILDID"] and row["explained"] is False
+    assert row["path"] == "omni.ja!modules/AppConstants.sys.mjs" and row["build_identity"] == ["MOZ_BUILDID"] and row["explained"] == []
     assert '-  MOZ_BUILDID: "20261118120000",' in row["diff"] and '+  MOZ_BUILDID: "20261121090000",' in row["diff"]
     assert "(build identity: MOZ_BUILDID)" in ab_package.summary(report) and '| -  MOZ_BUILDID: "20261118120000",' in ab_package.summary(report)
     # the source url is a token too, with a commit in it; a repository that is not a url of a revision is not
@@ -207,7 +208,7 @@ def test_stealthpingsender_changed_and_explained_is_green_unexplained_is_red():
     old = package(ja=dict(JA_FILES, **{"modules/StealthPingsender.sys.mjs": b"export const a = 1;\n"}))
     new = package(ja=dict(JA_FILES, **{"modules/StealthPingsender.sys.mjs": b"export const a = 2;\n"}))
     report = compare(old, new, sources=["toolkit/components/telemetry/pings/StealthPingsender.sys.mjs"])
-    assert report["verdict"] == "green" and report["changed_ja_entry"][0]["explained"] is True
+    assert report["verdict"] == "green" and report["changed_ja_entry"][0]["explained"] == ["toolkit/components/telemetry/pings/StealthPingsender.sys.mjs"]
     report = compare(old, new, sources=["toolkit/modules/AppConstants.sys.mjs"])
     assert report["verdict"] == "red" and report["red"] == {"changed_ja_entry_unexplained": 1}
 
@@ -238,8 +239,8 @@ def test_the_a_a_expects_nothing_changed_in_any_class():
 
 def test_the_juggler_source_explains_its_file_by_path_in_either_layout():
     for path in ("omni.ja!modules/juggler/Helper.js", "modules/juggler/Helper.js"):
-        assert ab_package._is_explained(path, ["juggler/Helper.js"])
-    assert not ab_package._is_explained("modules/juggler/Other.js", ["juggler/Helper.js"])
+        assert ab_package._explained_by(path, ["juggler/Helper.js"]) == ["juggler/Helper.js"]
+    assert not ab_package._explained_by("modules/juggler/Other.js", ["juggler/Helper.js"])
 
 
 def test_a_zip_with_both_layouts_of_ja_is_read_the_same():
@@ -1119,6 +1120,89 @@ def test_a_table_the_candidate_cannot_read_is_red_unless_the_published_one_could
     assert report["red"] == {"linkage_unreadable": 1}, report["red"]
     report = compare(windows(**{"xul.dll": PE + b"1"}), windows(**{"xul.dll": PE + b"2"}), zipped=True)
     assert report["verdict"] == "green" and report["linkage_unreadable"][0]["red"] is False
+
+
+def lavapipe_record(inputs):
+    """lavapipe/VERSION.json as the build writes it: only the "inputs" line (the cache key) depends on our sources."""
+    return ('{\n "compiler": "clang version 22",\n "inputs": "%s",\n "mesa": "26.2.6"\n}\n' % inputs).encode()
+
+
+def lavapipe_ab(sources):
+    old = package(**{"lavapipe/VERSION.json": lavapipe_record("a" * 32)})
+    new = package(**{"lavapipe/VERSION.json": lavapipe_record("b" * 32)})
+    return compare(old, new, sources=sources)
+
+
+def test_a_lavapipe_record_is_explained_by_the_script_that_builds_it():
+    report = lavapipe_ab({"scripts/ci/lavapipe_build.py"})
+    assert report["verdict"] == "green" and not report["red"], report["red"]
+    assert [r["path"] for r in report["changed_non_binary"]] == ["lavapipe/VERSION.json"]
+    assert report["changed_non_binary"][0]["explained"] == ["scripts/ci/lavapipe_build.py"]
+
+
+def test_a_lavapipe_record_is_explained_by_its_lock_its_patches_and_its_proof_and_by_nothing_else():
+    for source in ("scripts/ci/locks/lavapipe.txt", "scripts/ci/lavapipe/VERSIONS.json", "scripts/ci/lavapipe/0003-x.patch", "scripts/ci/lavapipe/proof/proof.c"):
+        report = lavapipe_ab({source})
+        assert report["verdict"] == "green" and report["changed_non_binary"][0]["explained"] == [source], source
+    for source in ("scripts/ci/some_other.py", "scripts/ci/locks/mach.txt", "scripts/ci/lavapipe/README", "scripts/ci/lavapipe/proof/sub/deep.c",
+                   "other/scripts/ci/lavapipe_build.py", "scripts/ci/lavapipe/sub/0003-x.patch"):
+        report = lavapipe_ab({source})
+        assert report["verdict"] == "red" and report["red"] == {"changed_non_binary_unexplained": 1}, (source, report["red"])
+
+
+def test_the_rule_of_the_own_build_records_does_not_reach_other_files():
+    new = package(**{"defaults/pref/channel-prefs.js": b"changed\n"})
+    assert compare(package(), new, sources={"scripts/ci/lavapipe_build.py"})["verdict"] == "red"
+    assert ab_package.OWN_BUILD_RECORDS["lavapipe/VERSION.json"] is ab_package.lavapipe_build.INPUTS
+
+
+def test_an_explained_file_names_its_sources_in_the_summary():
+    report = lavapipe_ab({"scripts/ci/locks/lavapipe.txt", "scripts/ci/lavapipe_build.py", "scripts/ci/some_other.py"})
+    assert report["changed_non_binary"][0]["explained"] == ["scripts/ci/lavapipe_build.py", "scripts/ci/locks/lavapipe.txt"]
+    text = ab_package.summary(report)
+    assert "lavapipe/VERSION.json [text]  (explained by scripts/ci/lavapipe_build.py, scripts/ci/locks/lavapipe.txt)" in text, text
+    one = ab_package.summary(lavapipe_ab({"scripts/ci/locks/lavapipe.txt"}))
+    assert "(explained by scripts/ci/locks/lavapipe.txt)" in one and "(explained)" not in one, one
+    new = package(**{"defaults/pref/channel-prefs.js": b'pref("app.update.channel", "esr");\n'})
+    juggler = ab_package.summary(compare(package(), new, sources=["browser/app/profile/channel-prefs.js"]))
+    assert "(explained by browser/app/profile/channel-prefs.js)" in juggler, juggler
+
+
+def lavapipe_tree(root):
+    """A tree with every file lavapipe_build.INPUTS names (a glob: two files), plus files next to them that no input names."""
+    paths = [p for p in lavapipe_build.INPUTS if "*" not in p] + [
+        "scripts/ci/lavapipe/0001-a.patch", "scripts/ci/lavapipe/0002-b.patch", "scripts/ci/lavapipe/proof/proof.c", "scripts/ci/lavapipe/proof/big.comp"]
+    for path in paths + ["scripts/ci/lavapipe/README", "scripts/ci/locks/mach.txt", "scripts/ci/ab_package.py"]:
+        target = root / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("v1 " + path, encoding="utf-8")
+    return paths
+
+
+def test_the_cache_key_of_lavapipe_changes_with_each_input_and_with_nothing_else():
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        inputs = lavapipe_tree(root)
+        assert sorted(lavapipe_build.input_files(root)) == sorted(inputs)
+        key = lavapipe_build.inputs_key("clang 22", root)
+        assert key == lavapipe_build.inputs_key("clang 22", root) and key != lavapipe_build.inputs_key("clang 23", root)
+        for path in inputs:
+            (root / path).write_text("v2", encoding="utf-8")
+            assert lavapipe_build.inputs_key("clang 22", root) != key, "%s is an input and does not change the key" % path
+            (root / path).write_text("v1 " + path, encoding="utf-8")
+            assert lavapipe_build.inputs_key("clang 22", root) == key
+        for path in ("scripts/ci/lavapipe/README", "scripts/ci/locks/mach.txt", "scripts/ci/ab_package.py"):
+            (root / path).write_text("v2", encoding="utf-8")
+            assert lavapipe_build.inputs_key("clang 22", root) == key, "%s is no input and changes the key" % path
+        (root / "scripts/ci/lavapipe/0003-c.patch").write_text("new", encoding="utf-8")
+        assert lavapipe_build.inputs_key("clang 22", root) != key, "a new patch is an input"
+        (root / "scripts/ci/locks/lavapipe.txt").unlink()
+        try:
+            lavapipe_build.inputs_key("clang 22", root)
+            assert False, "an input that is missing is an error"
+        except FileNotFoundError:
+            pass
+    assert lavapipe_build.TREE == ROOT and lavapipe_build.inputs_key("clang 22") == lavapipe_build.inputs_key("clang 22", ROOT)
 
 
 def cases() -> list:

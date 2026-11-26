@@ -50,3 +50,33 @@ fn stealth_responder_on_the_loopback_hears_its_own_query() {
         "the query of the responder did not come back to its own socket"
     );
 }
+
+// The loop of MDNSService::start goes through stealth_note_first and the call after it takes the note: the list is handed back as
+// it came, the first interface of it is the one set on the socket, the note is taken (a second socket gets none), and an empty
+// list sets nothing.
+#[test]
+fn stealth_the_first_interface_of_the_list_is_the_one_set_after_the_loop() {
+    let loopback: std::net::Ipv4Addr = "127.0.0.1".parse().unwrap();
+    let list = vec![loopback, "10.255.255.254".parse().unwrap()];
+    let given = stealth_interface::stealth_note_first(list.clone());
+    assert_eq!(given, list);
+    let mut joined = 0;
+    for _ in given {
+        joined += 1;
+    }
+    assert_eq!(joined, 2);
+
+    let socket = std::net::UdpSocket::bind((loopback, 0)).unwrap();
+    stealth_interface::set_multicast_if(&socket);
+    assert_eq!(socket2::SockRef::from(&socket).multicast_if_v4().unwrap(), loopback);
+
+    // Taken: another socket, with no list noted since, keeps the default interface.
+    let other = std::net::UdpSocket::bind((loopback, 0)).unwrap();
+    stealth_interface::set_multicast_if(&other);
+    assert_ne!(socket2::SockRef::from(&other).multicast_if_v4().unwrap(), loopback);
+
+    // An empty list notes nothing and sets nothing.
+    assert!(stealth_interface::stealth_note_first(Vec::new()).is_empty());
+    stealth_interface::set_multicast_if(&other);
+    assert_ne!(socket2::SockRef::from(&other).multicast_if_v4().unwrap(), loopback);
+}

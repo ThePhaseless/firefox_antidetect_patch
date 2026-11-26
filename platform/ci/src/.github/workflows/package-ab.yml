@@ -153,7 +153,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p published
-          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir published -p checksums.txt -p seal.json -p '*.tar.gz' -p '*.zip'
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir published -p checksums.txt -p seal.json -p 'firefox-*-stealth-*'
           (cd published && sha256sum -c checksums.txt)
           python engine-series/platform/ci/src/scripts/ci/ab_package.py seal-check published --github-output "$GITHUB_OUTPUT"
       - name: The candidate release, verified against its seal and checksums.txt, its archives in place of the artifacts of a run
@@ -165,7 +165,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p candidate-release candidate/linux-x86_64 candidate/win-x86_64
-          gh release download "$CAND_TAG" --repo "$GITHUB_REPOSITORY" --dir candidate-release -p checksums.txt -p seal.json -p '*.tar.gz' -p '*.zip'
+          gh release download "$CAND_TAG" --repo "$GITHUB_REPOSITORY" --dir candidate-release -p checksums.txt -p seal.json -p 'firefox-*-stealth-*'
           (cd candidate-release && sha256sum -c checksums.txt)
           python engine-series/platform/ci/src/scripts/ci/ab_package.py seal-check candidate-release --github-output "$GITHUB_OUTPUT" --output-name candidate_series_commit
           for LEG in linux-x86_64 win-x86_64; do

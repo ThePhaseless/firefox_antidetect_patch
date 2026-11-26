@@ -17,12 +17,12 @@
   "juggler/tests/caller_object_decision_is_written_before_its_branch_reads_it.test.mjs": "100644"
  },
  "sha256": {
-  "dom/base/test/gtest/TestStealthCallerObject.cpp": "cc11223e7d64edc4c042b8323edff888a7ce32531cd51af1f9fdb52917e41423",
-  "js/xpconnect/src/StealthSandbox.h": "1f3069d3f38b078f32f48d8dd3cd1c3f039500588f9c61c375066d6a798ebdba",
-  "js/xpconnect/tests/unit/test_stealth_hybrid_xrays_options.js": "6598e2b37d536047b4d62c4e90df0b2026a517f56a78fd1c53bf1e97c10b16de",
-  "js/xpconnect/wrappers/StealthHybridXray.cpp": "f3f865fb17f5be976fb8b97ce318c7ff8515ee22d7b123a8d8b77aee060770fb",
-  "js/xpconnect/wrappers/StealthHybridXray.h": "40762b2c50351164b12d3d4275b2fa239632c940ab629a928058832d2fe6721c",
-  "juggler/tests/caller_object_decision_is_written_before_its_branch_reads_it.test.mjs": "9a33c086d3eb8d77cd97f229fcc5e14e790753955dc7579046bd8c14620e0809"
+  "dom/base/test/gtest/TestStealthCallerObject.cpp": "3f52682a35e0dd61823da99cbaabaa19997fc06c22551ee8f66be5ff7028b2ad",
+  "js/xpconnect/src/StealthSandbox.h": "e6b10819ed07a7091c4b9cca5483e0a38bdd778c65ebda35da344e7643b39ed0",
+  "js/xpconnect/tests/unit/test_stealth_hybrid_xrays_options.js": "e4983bf5bd588f4475b1a3d5af520d3f7c30c020d692087e793da701f6d8d7f4",
+  "js/xpconnect/wrappers/StealthHybridXray.cpp": "3c04112ec72a51d5d14188873cbef36c1cf62f16ba033d2810e98721fca1a289",
+  "js/xpconnect/wrappers/StealthHybridXray.h": "860953468b7ce4081038a69d36f01ed3c2d895460db76883e5df253fd516542a",
+  "juggler/tests/caller_object_decision_is_written_before_its_branch_reads_it.test.mjs": "4978ccb1ffb3839c69703cf6fd4b90f6c041d471a125f7de726a07bea4fd16cd"
  },
  "inventory": [
   {
@@ -43,10 +43,10 @@
    "category": "juggler",
    "feature": "hybrid-xrays",
    "prefs": [],
-   "added": 8,
-   "removed": 1,
+   "added": 7,
+   "removed": 2,
    "hunks": 6,
-   "inline_logic_lines": 3,
+   "inline_logic_lines": 0,
    "hookable": "movable",
    "anchor": "SandboxProxyHandler::getPropertyDescriptorImpl; xpc::CreateSandboxObject; SandboxOptions::Parse",
    "notes": "Support for Juggler's caller world only (the hybridXrays sandbox option, which only Juggler passes); the page-visible effect lives in WrapperFactory.cpp (spoof). Movable parts: the hybridXrays validation (about 7 lines) and the locale block (about 8 lines). The locale block reimplements the primary-tag step (FindChar, Truncate, Trim) instead of calling intl::PrimaryLanguageTag, which BrowsingContext.cpp already uses and which is declared in intl/locale/StealthSessionPrefs.h. Two copies of the same rule can diverge; it should call the helper. Feature field is hybrid-xrays; the locale part is timezone-locale-override. Hunk map: hybrid-xrays = hunks 1 (include), 2 (getPropertyDescriptorImpl), 3 (CreateSandboxObject validation), 5-6 (compartment flag assert and set), 7 (Parse); timezone-locale-override = hunk 4 (locale primary-tag block, about 8 lines). Verified: only Juggler passes hybridXrays (juggler/content/FrameTree.js:753); the duplicated primary-tag block versus intl::PrimaryLanguageTag (intl/locale/StealthSessionPrefs.cpp:41-48) is confirmed identical in behaviour.",
@@ -62,7 +62,7 @@
    "category": "juggler",
    "feature": "hybrid-xrays",
    "prefs": [],
-   "added": 4,
+   "added": 5,
    "removed": 0,
    "hunks": 3,
    "inline_logic_lines": 0,
@@ -97,9 +97,9 @@
    "feature": "hybrid-xrays",
    "prefs": [],
    "added": 9,
-   "removed": 4,
+   "removed": 6,
    "hunks": 7,
-   "inline_logic_lines": 2,
+   "inline_logic_lines": 0,
    "hookable": "hard",
    "anchor": "DEBUG_CheckUnwrapSafety; SelectHybridWrapper (new, before WrapperFactory::Rewrap); CallerObjectWrapper::getPrototype / getPrototypeIfOrdinary (new); WrapperFactory::Rewrap",
    "notes": "Page-observable: an object the caller's world hands to the page keeps its identity, but its standard prototypes are the page's own (instanceof Array holds, constructor is the page's Function). The new CallerObjectWrapper class (about 60 lines) and CallerIntrinsicKey could move to our own file behind a declaration. Hard because Rewrap's own predicates are edited in place: wantXrays is replaced by originForcesXrays / targetForcesXrays in three places (the cross-origin condition, the web-objects condition and sameOriginXrays), plus a hybridXrays term in DEBUG_CheckUnwrapSafety and the wrapper choice is branched. Those edits must stay in the Mozilla function. Category is spoof because the page reads these objects; the caller side is juggler.",

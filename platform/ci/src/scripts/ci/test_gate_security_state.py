@@ -17,7 +17,7 @@ COMMAND = "python scripts/ci_lab_security_state.py set --pin ci/security-state.p
 GEOIP = "python scripts/ci_lab_geoip.py build --pin ci/geoip.json"
 STEP = "      - name: The security state (set by the repository, same bytes every run)\n"
 GEOIP_STEP = "      - name: The GeoIP database (made by the repository, same bytes every run)\n"
-JOBS = (("gate", "      - name: Install Playwright driver"), ("wrapper-e2e", "      - name: Linux system deps"))
+JOBS = (("gate", "      - name: The wheelhouse of the run's py-deps-gate job"), ("wrapper-e2e", "      - name: Linux system deps"))
 
 
 def _job(name):

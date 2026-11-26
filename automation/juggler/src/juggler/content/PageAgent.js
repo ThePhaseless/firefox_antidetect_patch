@@ -601,8 +601,8 @@ export class PageAgent {
   _elementAtom({frameId, objectId, atom}) {
     const element = this._xrayElement(frameId, objectId);
     const win = element.documentGlobal;
-    const {ATOM_SOURCES} = ChromeUtils.importESModule(
-        'chrome://remote/content/marionette/atom.sys.mjs');
+    const ATOM_SOURCES = ChromeUtils.importESModule(
+        'resource://gre/modules/juggler/StealthAtoms.sys.mjs').stealthAtomSources();
     const sandbox = Cu.Sandbox(win, {sandboxPrototype: win, sameZoneAs: win,
                                      wantXrays: true, wantComponents: false});
     const run = Cu.evalInSandbox('(' + ATOM_SOURCES[atom] + ')', sandbox);

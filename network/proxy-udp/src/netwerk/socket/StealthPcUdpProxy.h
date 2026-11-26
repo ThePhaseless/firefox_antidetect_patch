@@ -84,12 +84,12 @@ class PcUdpProxy final {
 void StealthPcUdpProxyLookup(RefPtr<PcUdpProxy>& aProxy, const WebrtcProxyConfig& aConfig);
 
 /**
- * The same, as the expression of NrSocketProxyConfig's constructor that makes its Private: aPrivate is the new Private (mUdpProxy is its
+ * The same, as the expression of NrSocketProxyConfig's constructor that makes its Private: aPrivate is the new Private (mStealthUdpProxy is its
  * member), the lookup is started on it and it is handed back, for mPrivate to own.
  */
 template <typename PrivateT>
 PrivateT* StealthPcUdpProxyOf(const WebrtcProxyConfig& aConfig, PrivateT* aPrivate) {
-  StealthPcUdpProxyLookup(aPrivate->mUdpProxy, aConfig);
+  StealthPcUdpProxyLookup(aPrivate->mStealthUdpProxy, aConfig);
   return aPrivate;
 }
 

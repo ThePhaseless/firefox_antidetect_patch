@@ -1,19 +1,15 @@
 diff --git a/gfx/tests/gtest/moz.build b/gfx/tests/gtest/moz.build
-index 722f623d861ed44fed382835e9e89f50dcbf6315..63c31d0b5b13e44c003fa793d4f503709139b35f 100644
+index fb0475a94208630b54f7385255b1719fd4b45cf8..013cc7390d08b632b514f32d8585c3bdd7c371c3 100644
 --- a/gfx/tests/gtest/moz.build
 +++ b/gfx/tests/gtest/moz.build
-@@ -43,6 +43,11 @@ if CONFIG["OS_TARGET"] != "Android":
+@@ -43,6 +43,7 @@ if CONFIG["OS_TARGET"] != "Android":
          "TestRect.cpp",
      ]
  
-+if CONFIG["MOZ_WIDGET_TOOLKIT"] == "gtk":  # STEALTH-HOOK(fingerprint/fonts/font-list)
-+
-+    UNIFIED_SOURCES += ["TestStealthFcFontList.cpp"]  # STEALTH-HOOK(fingerprint/fonts/font-list)
-+    CXXFLAGS += CONFIG["CAIRO_FT_CFLAGS"]  # STEALTH-HOOK(fingerprint/fonts/font-list)
-+
- if CONFIG["OS_TARGET"] == "WINNT":  # STEALTH-HOOK(fingerprint/fonts/bundle)
- 
-     UNIFIED_SOURCES += ["TestStealthBundledCollection.cpp"]  # STEALTH-HOOK(fingerprint/fonts/bundle)
++include("StealthFcFontListTests.mozbuild")  # STEALTH-HOOK(fingerprint/fonts/font-list)
+ include("StealthBundleTests.mozbuild")  # STEALTH-HOOK(fingerprint/fonts/bundle)
+ if CONFIG["OS_TARGET"] == "Darwin":
+     # Not in UNIFIED_SOURCES: MacIOSurface.h includes Carbon headers (MacTypes.h)
 diff --git a/gfx/thebes/gfxDWriteFontList.cpp b/gfx/thebes/gfxDWriteFontList.cpp
 index a804e7154b7182fe73a37a94b186b50275971f5e..36f5b9c6f88267af7929d1adb29b00d88e5ae1da 100644
 --- a/gfx/thebes/gfxDWriteFontList.cpp

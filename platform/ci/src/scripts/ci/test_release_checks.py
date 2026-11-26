@@ -118,10 +118,12 @@ def count_continue_on_error(text: str) -> int:
 
 
 #: ci-03 (a list of packages is resolved once per state, by one job; the legs install from its result, offline, by name; no leg reads a mirror). The jobs it is
-#: held over so far, by file: every job of checks.yml and package-ab.yml, and the Linux gtest job of release.yml. The rule over every workflow comes with the
-#: conversion of gate.yml and of the node.
-CI03_SCOPE = {"checks.yml": None, "package-ab.yml": None, "release.yml": ("gtest-linux",)}
+#: held over so far, by file: every job of checks.yml, package-ab.yml, gate.yml and verify-assets.yml, and the Linux gtest and build jobs of release.yml. The rule over every
+#: workflow comes with the conversion of the node. A third-party download is checked by a hash pinned in a repository.
+CI03_SCOPE = {"checks.yml": None, "package-ab.yml": None, "gate.yml": None, "verify-assets.yml": None, "release.yml": ("gtest-linux", "build")}
 PIP_COMMAND = re.compile(r"\bpip3?\s+(install|download|wheel)\b|\buv\s+pip\b")
+PLAYWRIGHT_INSTALL = re.compile(r"\bplaywright\s+install(-deps)?\b")
+DOWNLOAD_COMMAND = re.compile(r"\b(curl|wget|Invoke-WebRequest|iwr)\b|urllib\.request\.urlopen")
 APT_INSTALL = re.compile(r"\bapt(-get)?\b[^\n|;&]*\binstall\b")
 APT_UPDATE = re.compile(r"\bapt(-get)?\b[^\n|;&]*\bupdate\b")
 
@@ -129,7 +131,8 @@ APT_UPDATE = re.compile(r"\bapt(-get)?\b[^\n|;&]*\bupdate\b")
 def ci03_problems(docs: dict, scope: dict = CI03_SCOPE) -> list:
     """Every place in the jobs of `scope` where a leg reads a mirror, as "<file> / <job>: <what>": a `pip install` (or download, wheel, uv pip) without --no-index
     and --find-links, a pip job that does not need a call of py-deps.yml and download its wheelhouse, an `apt-get install` without --no-download, an `apt-get update`
-    that is not on the run's local repository ($APT)."""
+    that is not on the run's local repository ($APT), a `playwright install-deps` (an apt read), a `playwright install` that is not served from the loopback after a sha256 check
+    against the wrapper's pin, and a download (curl, wget, urlopen) in a step that checks no sha256."""
     found = []
     for name, jobs_wanted in scope.items():
         for job_name, job in (docs[name].get("jobs") or {}).items():
@@ -142,6 +145,9 @@ def ci03_problems(docs: dict, scope: dict = CI03_SCOPE) -> list:
                        and str((st.get("with") or {}).get("name", "")).startswith("py-deps-")]
             pips = 0
             for step in job.get("steps") or []:
+                whole = str(step.get("run", ""))
+                if DOWNLOAD_COMMAND.search(whole) and "hashlib.sha256" not in whole and "sha256sum" not in whole:
+                    found.append("%s / %s: a step downloads from a third party and checks no sha256" % (name, job_name))
                 run = re.sub(r"\\\n\s*", " ", str(step.get("run", "")))   # a line continued with a backslash is one command
                 for line in (l.strip() for l in run.splitlines() if not l.strip().startswith("#")):
                     if PIP_COMMAND.search(line):
@@ -152,9 +158,63 @@ def ci03_problems(docs: dict, scope: dict = CI03_SCOPE) -> list:
                         found.append("%s / %s: `%s` can fetch from a mirror (no --no-download)" % (name, job_name, line))
                     if APT_UPDATE.search(line) and "$APT" not in line:
                         found.append("%s / %s: `%s` reads a mirror's lists (not on the local repository)" % (name, job_name, line))
+                    m = PLAYWRIGHT_INSTALL.search(line)
+                    if m and m.group(1):
+                        found.append("%s / %s: `%s` installs from an apt mirror (use linux-deps.yml)" % (name, job_name, line))
+                    elif m and not ('PLAYWRIGHT_DOWNLOAD_HOST="http://127.0.0.1:' in whole and "ci/py-lock/playwright-browsers.json" in whole
+                                    and "hashlib.sha256" in whole and whole.index("hashlib.sha256") < whole.rindex(m.group(0))):
+                        found.append("%s / %s: `%s` downloads a browser that only its Content-Length checks (no archive checked against the wrapper's pin first)" % (name, job_name, line))
             if pips and not (deps and fetched):
                 found.append("%s / %s: it installs packages but does not need a py-deps.yml call and download its wheelhouse" % (name, job_name))
     return found
+
+
+#: The command lines that run a test (pytest) or drive the browser from python.exe: what a python.exe crash can happen in (a comment line is not one).
+PYTHON_TEST_STEP = re.compile(r"python\S* (-u )?-m pytest\b|scripts/ci_(drive_gate|suite_run)\.py")
+
+
+def crash_dump_problems(doc: dict, jobs=("gate", "wrapper-e2e")) -> list:
+    """One line per job of gate.yml that has a Windows leg and does not keep a full dump of a python.exe that crashes: Windows Error Reporting LocalDumps for python.exe
+    (DumpType 2, a DumpCount, a DumpFolder in the runner's temp) set by a pwsh step that runs on Windows only and comes BEFORE the first step that runs pytest, and the folder
+    uploaded with always() as crash-dumps-<...>, kept 14 days, nothing if there is none."""
+    out = []
+    for job_id in jobs:
+        job = doc["jobs"][job_id]
+        steps = job.get("steps") or []
+        legs = (job.get("strategy") or {}).get("matrix", {}).get("include") or []
+        if not any("win" in str(leg.get("runner", "")) or leg.get("os") == "windows" or leg.get("kind") == "win" for leg in legs):
+            out.append("%s has no Windows leg in its matrix (the rule reads the wrong job)" % job_id)
+            continue
+        setting = [i for i, st in enumerate(steps) if "LocalDumps" in str(st.get("run", ""))]
+        if not setting:
+            out.append("%s: no step sets LocalDumps for python.exe" % job_id)
+            continue
+        i = setting[0]
+        run = str(steps[i]["run"])
+        what = "%s: the step %r" % (job_id, steps[i].get("name"))
+        if steps[i].get("shell") != "pwsh":
+            out.append("%s does not run in pwsh" % what)
+        if "Windows" not in str(steps[i].get("if", "")):
+            out.append("%s is not on `if: runner.os == 'Windows'`" % what)
+        for needle in (r"LocalDumps\python.exe", "-Name DumpFolder -PropertyType ExpandString", "-Name DumpType -PropertyType DWord -Value 2 ",
+                       "-Name DumpCount -PropertyType DWord", "-Name Disabled -PropertyType DWord -Value 0", "-Name DontShowUI -PropertyType DWord -Value 1", "RUNNER_TEMP", "Get-ItemProperty"):
+            if needle not in run:
+                out.append("%s does not have `%s`" % (what, needle))
+        first_test = [k for k, st in enumerate(steps) if any(PYTHON_TEST_STEP.search(l) for l in str(st.get("run", "")).splitlines() if not l.lstrip().startswith("#"))]
+        if first_test and i > first_test[0]:
+            out.append("%s comes after the first step that runs a test (%r)" % (what, steps[first_test[0]].get("name")))
+        ups = [st for st in steps if str(st.get("uses", "")).startswith("actions/upload-artifact@") and str((st.get("with") or {}).get("name", "")).startswith("crash-dumps-")]
+        if len(ups) != 1:
+            out.append("%s: %d crash-dumps upload steps, not one" % (job_id, len(ups)))
+        else:
+            w = ups[0].get("with") or {}
+            if str(ups[0].get("if", "")).replace(" ", "") != "always()":
+                out.append("%s: the crash-dumps upload is not on `if: always()`" % job_id)
+            if "runner.temp" not in str(w.get("path", "")) or not str(w.get("path", "")).endswith("/crash-dumps"):
+                out.append("%s: the crash-dumps upload does not take <runner temp>/crash-dumps" % job_id)
+            if w.get("retention-days") != 14 or w.get("if-no-files-found") != "ignore":
+                out.append("%s: the crash-dumps upload is not retention 14, if-no-files-found ignore" % job_id)
+    return out
 
 
 def group_of(doc, inputs, ref="refs/heads/main", run_id=7):
@@ -177,7 +237,8 @@ def _cases() -> list:
     out.append(("checks: a job of its own that CALLS checks.yml (no `if`: every candidate, a release, the weekly run and a dispatch from a latitude/* branch run it), "
                 "in parallel with the plan (it needs nothing); the node waits for the plan, the checks and the guard",
                 checks.get("uses") == "./.github/workflows/checks.yml" and "needs" not in checks and "if" not in checks
-                and node["needs"] == ["plan", "checks", "still-head"] and build["needs"] == ["plan", "node"]))
+                and node["needs"] == ["plan", "checks", "still-head"]
+                and build["needs"] == ["plan", "node", "py-deps-build-core", "py-deps-build-mach", "py-deps-build-lavapipe"]))
     out.append(("checks: the call hands over the wrapper_ref the run has (main by default), reads and nothing else",
                 checks["with"] == {"wrapper_ref": "${{ inputs.wrapper_ref || 'main' }}"} and checks["permissions"] == {"contents": "read"}
                 and called[True]["workflow_call"]["inputs"]["wrapper_ref"]["default"] == "main"))
@@ -205,6 +266,29 @@ def _cases() -> list:
     out.append(("checks: the jobs the two rounds share, by name: rules, churn (port-07), range-diff (series-02), rebuilds, noreply-identity, tree, and the three that give them their packages "
                 "(ci-03): py-deps-tools, core-ref, py-deps-core",
                 list(called["jobs"]) == ["py-deps-tools", "core-ref", "py-deps-core", "rules", "churn", "range-diff", "rebuilds", "noreply-identity", "tree"]))
+    # The series rule «export commits are named export:» is judged in the job `noreply-identity` (its checkout, its range of the event), not in a job of its own.
+    noreply_steps = called["jobs"]["noreply-identity"]["steps"]
+    rule_steps = [st for st in noreply_steps if "export_commit_names.py" in str(st.get("run", ""))]
+    rule_run = str(rule_steps[0].get("run", "")) if rule_steps else ""
+    rule_env = rule_steps[0].get("env", {}) if rule_steps else {}
+    judge_index = next((i for i, st in enumerate(noreply_steps) if "ci_noreply_identity.py" in str(st.get("run", ""))), -1)
+    out.append(("export rule: one step of the job `noreply-identity` runs scripts/ci/export_commit_names.py by its exported path, after the noreply judge, and no job of its own",
+                len(rule_steps) == 1 and noreply_steps.index(rule_steps[0]) > judge_index >= 0
+                and "platform/ci/src/scripts/ci/export_commit_names.py" in rule_run and "--repo ." in rule_run and '--range "$range"' in rule_run
+                and not any("export_commit_names.py" in str(job.get("steps")) for name, job in called["jobs"].items() if name != "noreply-identity")))
+    sparse = str(noreply_steps[0]["with"]["sparse-checkout"]).split()
+    out.append(("export rule: the sparse checkout of the series holds the script beside .github, in the same style, and still no tree",
+                sparse == ["/.github/", "/platform/ci/src/scripts/ci/export_commit_names.py"] and noreply_steps[0]["with"]["filter"] == "tree:0"
+                and noreply_steps[0]["with"]["fetch-depth"] == 0))
+    out.append(("export rule: a pull request judges base..head, a push before..after (HEAD~1..HEAD when before is all zeros), a schedule or a dispatch what the ref adds to the default branch",
+                '$BASE_SHA..$HEAD_SHA' in rule_run and '$BEFORE..$AFTER' in rule_run and "0000000000000000000000000000000000000000" in rule_run
+                and "HEAD~1..HEAD" in rule_run and 'origin/$DEFAULT_BRANCH..$SHA' in rule_run
+                and rule_env.get("BASE_SHA") == "${{ github.event.pull_request.base.sha }}" and rule_env.get("HEAD_SHA") == "${{ github.event.pull_request.head.sha }}"
+                and rule_env.get("BEFORE") == "${{ github.event.before }}" and rule_env.get("AFTER") == "${{ github.event.after }}"
+                and rule_env.get("SHA") == "${{ github.sha }}" and rule_env.get("EVENT") == "${{ github.event_name }}"))
+    out.append(("export rule: a script that is missing is an error, not a pass, and the rule is written beside the step",
+                'exit 1' in rule_run and "[ ! -f" in rule_run and "set -euo pipefail" in rule_run
+                and "# RULE export commits are named export:" in (WORKFLOWS / "checks.yml").read_text(encoding="utf-8")))
     gnames = [s.get("name") for s in guard_job["steps"]]
     out.append(("guard: a job `still-head` of release.yml, after the checks (it needs nothing else), with the token that may cancel this very run and read; "
                 "the guard that a newer push has not replaced the run is its LAST step, the one that can cancel",
@@ -400,7 +484,7 @@ def _cases() -> list:
                                                       {"run": 'python -m pip install --no-index --find-links "$RUNNER_TEMP/py-deps" --require-hashes -r "$RUNNER_TEMP/py-deps/lock.txt"\n'
                                                               'sudo apt-get $APT update\nsudo apt-get $APT install -y --no-download xvfb'}]}}}
     scope_x = {"x.yml": None}
-    out.append(("ci-03 in checks.yml, package-ab.yml and release.yml's gtest-linux: every `pip install` carries --no-index and --find-links and its job needs a py-deps.yml call and "
+    out.append(("ci-03 in checks.yml, package-ab.yml, gate.yml, verify-assets.yml and release.yml's gtest-linux and build: every `pip install` carries --no-index and --find-links and its job needs a py-deps.yml call and "
                 "downloads its wheelhouse; every `apt-get install` carries --no-download and every `apt-get update` is on the local repository (%s)"
                 % ("; ".join(ci03_problems(real)) or "none does otherwise"),
                 ci03_problems(real) == []
@@ -412,10 +496,44 @@ def _cases() -> list:
                 and ci03_problems({"x.yml": good}, scope_x) == []
                 and set(real["release.yml"]["jobs"]) >= {"gtest-linux", "linux-deps-gtest"}
                 and all(real[n]["jobs"].get(j) for n, js in CI03_SCOPE.items() for j in (js or ()))))
-    out.append(("ci-03: the jobs that install Python packages in those files are the ones that need a py-deps.yml call: rules, rebuilds and tree (checks.yml), package-ab (package-ab.yml)",
+    out.append(("ci-03: the jobs that install Python packages in those files are the ones that need a py-deps.yml call: rules, rebuilds and tree (checks.yml), package-ab (package-ab.yml), build (release.yml)",
                 all(any(str(real[f]["jobs"][d].get("uses", "")) == "./.github/workflows/py-deps.yml"
                         for d in ([real[f]["jobs"][j]["needs"]] if isinstance(real[f]["jobs"][j]["needs"], str) else real[f]["jobs"][j]["needs"]))
-                    for f, j in (("checks.yml", "rules"), ("checks.yml", "rebuilds"), ("checks.yml", "tree"), ("package-ab.yml", "package-ab")))))
+                    for f, j in (("checks.yml", "rules"), ("checks.yml", "rebuilds"), ("checks.yml", "tree"), ("package-ab.yml", "package-ab"), ("release.yml", "build")))))
+    # gate.yml, verify-assets.yml (ci-03): what the old files had, quoted, is red; the shape that replaced it is green
+    old_gate = {"jobs": {"gate": {"steps": [{"run": 'python -m pip install --quiet "playwright==$(cat scripts/playwright_pin.txt)"'},
+                                            {"run": 'CORE_GIT="git+https://github.com/oss-invisible/core@$CORE_REF"\npython -m pip install --quiet "$CORE_GIT"\n'
+                                                    'python -m pip install --quiet ".[dev]"\npython -m pip install --quiet --force-reinstall "$CORE_GIT"'},
+                                            {"run": 'python -m pip install --quiet "cryptography==44.0.3"'}]}}}
+    old_browser = {"jobs": {"wrapper-e2e": {"steps": [{"run": 'python -m playwright install firefox'}]}}}
+    old_deps = {"jobs": {"drive": {"steps": [{"run": 'sudo "$(which python)" -m playwright install-deps firefox'}]}}}
+    old_curl = {"jobs": {"j": {"steps": [{"run": 'curl -fsSL https://example.org/browser.zip -o browser.zip'}]}}}
+    old_urlopen = {"jobs": {"j": {"steps": [{"run": "python - <<'PY'\nimport urllib.request\nurllib.request.urlopen('https://example.org/x').read()\nPY\n"}]}}}
+    served = ('export PLAYWRIGHT_DOWNLOAD_HOST="http://127.0.0.1:$PORT"\n'
+              "python - <<'PY'\nimport hashlib\npin = 'ci/py-lock/playwright-browsers.json'\nhashlib.sha256(b'').hexdigest()\nPY\npython -m playwright install firefox\n")
+    new_browser = {"jobs": {"wrapper-e2e": {"steps": [{"run": served}]}}}
+    scope_y = {"x.yml": None}
+    out.append(("ci-03 gate.yml and verify-assets.yml: the old steps are red, quoted: `pip install \"playwright==$(cat scripts/playwright_pin.txt)\"`, `pip install \"$CORE_GIT\"` and `.[dev]`, "
+                "`pip install \"cryptography==44.0.3\"` read the index; `python -m playwright install firefox` has only a Content-Length for a check; "
+                "`playwright install-deps firefox` is an apt mirror; a curl or an urlopen with no sha256 is an unchecked download; the served and hash-checked install is green",
+                sum("reads the index" in p for p in ci03_problems({"x.yml": old_gate}, scope_y)) == 5
+                and any("playwright==$(cat scripts/playwright_pin.txt)" in p for p in ci03_problems({"x.yml": old_gate}, scope_y))
+                and any("it installs packages but does not need a py-deps.yml call" in p for p in ci03_problems({"x.yml": old_gate}, scope_y))
+                and any("downloads a browser that only its Content-Length checks" in p for p in ci03_problems({"x.yml": old_browser}, scope_y))
+                and any("installs from an apt mirror" in p for p in ci03_problems({"x.yml": old_deps}, scope_y))
+                and any("downloads from a third party and checks no sha256" in p for p in ci03_problems({"x.yml": old_curl}, scope_y))
+                and any("downloads from a third party and checks no sha256" in p for p in ci03_problems({"x.yml": old_urlopen}, scope_y))
+                and ci03_problems({"x.yml": new_browser}, scope_y) == []
+                and set(real["gate.yml"]["jobs"]) >= {"py-deps-gate", "playwright-firefox", "gate", "wrapper-e2e"}
+                and set(real["verify-assets.yml"]["jobs"]) >= {"py-deps-assets", "linux-deps-assets", "drive"}))
+    out.append(("ci-03: the jobs that install Python packages in gate.yml (gate, wrapper-e2e) and verify-assets.yml (drive) need a py-deps.yml call, and no job of those two files "
+                "runs `pip install` without --no-index or `playwright install-deps`",
+                all(any(str(real[f]["jobs"][d].get("uses", "")) == "./.github/workflows/py-deps.yml"
+                        for d in ([real[f]["jobs"][j]["needs"]] if isinstance(real[f]["jobs"][j]["needs"], str) else real[f]["jobs"][j]["needs"]))
+                    for f, j in (("gate.yml", "gate"), ("gate.yml", "wrapper-e2e"), ("verify-assets.yml", "drive")))
+                and not any(re.search(r"\bpip3?\s+install\b(?!.*--no-index)|install-deps\b", l) and not l.lstrip().startswith("#")
+                            for f in ("gate.yml", "verify-assets.yml") for job in real[f]["jobs"].values() for st in job.get("steps") or []
+                            for l in str(st.get("run", "")).splitlines())))
 
     # --- no `continue-on-error` on a test or a judge (ci-04): the rule, over every workflow of ours --------------------------------------------------
     import yaml
@@ -449,6 +567,42 @@ def _cases() -> list:
                 continue_on_error_violations("new.yml", fine) == [] and count_continue_on_error(fine) == 2))
     out.append(("the rule reads every continue-on-error key: as many in the text as the YAML parser finds (pr-handler.yml aside: Mozilla's, on no branch of ours)",
                 total_coe == parsed_coe))
+    # gate.yml: a python.exe that crashes on a Windows leg leaves a full dump in an artifact (the crash of a pytest worker is native: a Python stack alone does not say where)
+    import copy
+
+    gate_doc = load("gate.yml")
+    wer_good = crash_dump_problems(gate_doc)
+
+    def without(doc, keep):
+        d = copy.deepcopy(doc)
+        for job in d["jobs"].values():
+            job["steps"] = [st for st in job.get("steps") or [] if keep(st)]
+        return d
+
+    def edited(doc, job_id, fn):
+        d = copy.deepcopy(doc)
+        for st in d["jobs"][job_id]["steps"]:
+            fn(st)
+        return d
+
+    def move_last(doc, job_id):
+        d = copy.deepcopy(doc)
+        steps = d["jobs"][job_id]["steps"]
+        k = next(n for n, st in enumerate(steps) if "LocalDumps" in str(st.get("run", "")))
+        steps.append(steps.pop(k))
+        return d
+
+    old_gate = without(gate_doc, lambda st: "LocalDumps" not in str(st.get("run", "")) and not str((st.get("with") or {}).get("name", "")).startswith("crash-dumps-"))
+    out.append(("gate.yml: the Windows legs of gate and wrapper-e2e set Windows Error Reporting LocalDumps for python.exe (DumpType 2, DumpCount, DumpFolder in the runner's temp) in a pwsh step "
+                "on Windows only, before the first pytest step, and upload the folder with always() as crash-dumps-*, retention 14, nothing if none; red on the old gate.yml, on a DumpType 1, on a step "
+                "that comes after the tests, on an upload without always() and on a step that is not limited to Windows%s" % ("" if not wer_good else ": " + "; ".join(wer_good)),
+                wer_good == []
+                and len(crash_dump_problems(old_gate)) == 2
+                and any("DumpType" in p for p in crash_dump_problems(edited(gate_doc, "wrapper-e2e", lambda st: st.update(run=str(st.get("run", "")).replace("-Name DumpType -PropertyType DWord -Value 2 ", "-Name DumpType -PropertyType DWord -Value 1 ")))))
+                and any("comes after the first step that runs a test" in p for p in crash_dump_problems(move_last(gate_doc, "wrapper-e2e")))
+                and any("comes after the first step that runs a test" in p for p in crash_dump_problems(move_last(gate_doc, "gate")))
+                and any("not on `if: always()`" in p for p in crash_dump_problems(edited(gate_doc, "gate", lambda st: st.pop("if", None) if str((st.get("with") or {}).get("name", "")).startswith("crash-dumps-") else None)))
+                and any("is not on `if: runner.os == 'Windows'`" in p for p in crash_dump_problems(edited(gate_doc, "gate", lambda st: st.pop("if", None) if "LocalDumps" in str(st.get("run", "")) else None)))))
     return out
 
 

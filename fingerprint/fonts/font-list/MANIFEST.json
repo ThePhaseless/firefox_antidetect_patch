@@ -10,6 +10,7 @@
   "gfx/thebes/moz.build"
  ],
  "added": {
+  "gfx/tests/gtest/StealthFcFontListTests.mozbuild": "100644",
   "gfx/tests/gtest/TestStealthBundledCollection.cpp": "100644",
   "gfx/tests/gtest/TestStealthFcFontList.cpp": "100644",
   "gfx/tests/gtest/TestStealthFontListHooks.h": "100644",
@@ -20,6 +21,7 @@
   "gfx/thebes/StealthFontListHooks.h": "100644"
  },
  "sha256": {
+  "gfx/tests/gtest/StealthFcFontListTests.mozbuild": "068713022a1acc7a5f690d45a25da155223c8f661874da1cce291b14ab45e050",
   "gfx/tests/gtest/TestStealthBundledCollection.cpp": "bfa844598753259f9dd7caaffefb7c15490ca945ef87aabdfbbdd1abf649957e",
   "gfx/tests/gtest/TestStealthFcFontList.cpp": "0d4bceb1d4d73bab8b07b1009bc6581df8b1e95aa8744dcb5615887a671a8a00",
   "gfx/tests/gtest/TestStealthFontListHooks.h": "74521cbb07cc2b94e02ace8b4772295320261c2938c2b47826c5a037f89d1f88",
@@ -35,10 +37,10 @@
    "category": "build",
    "feature": "font-list-bundle-only",
    "prefs": [],
-   "added": 5,
+   "added": 1,
    "removed": 0,
    "hunks": 1,
-   "inline_logic_lines": 2,
+   "inline_logic_lines": 0,
    "hookable": "movable",
    "anchor": "if block for MOZ_WIDGET_TOOLKIT gtk (before the WINNT block)",
    "notes": "A gtk-only block that registers TestStealthFcFontList.cpp, the fontconfig half of the bundle-only font list, and adds CAIRO_FT_CFLAGS to CXXFLAGS for it. The condition and two lines are inline in Mozilla's file; they could sit in a .build file of ours behind one include line."

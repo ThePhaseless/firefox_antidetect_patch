@@ -379,9 +379,45 @@ jobs:
             --run "$GITHUB_RUN_ID" --attempt "$GITHUB_RUN_ATTEMPT" --work "$RUNNER_TEMP/build-node" \
             --debs "$RUNNER_TEMP/node-debs" --upstream .series/UPSTREAM.json
 
+  # The Python packages of the build job, from the index ONCE per runner image, Python and lock (py-deps.yml, ci-03), never by the leg: the node reads no index.
+  # Ubuntu 24.04, Python 3.11 (the node's CPython 3.11, scripts/ci/node_bootstrap.sh): the node IS Ubuntu 24.04 like the hosted image, and a wheel is chosen
+  # by the Python's minor, the CPU and the glibc floor, not by the image's build, so what the resolver's pip downloads there installs on the node, and the
+  # leg proves it before the build (`pip install --dry-run`, below). They start with the node and are skipped as it is (a rerun, a reused build).
+  #   core:     the core at core_ref (the page-surface gate's branding) with the dependencies and the dev set of the lock core-checks
+  #   mach:     what ./mach build installs from the index (python/sites/mach.txt and build.txt), and the vendored fallback pyyaml
+  #   lavapipe: Mesa's build tools (scripts/ci/lavapipe/VERSIONS.json "pip")
+  py-deps-build-core:
+    needs: [plan, checks, still-head]
+    if: needs.plan.outputs.attempt == github.run_attempt && needs.plan.outputs.reuse_run_id == ''
+    uses: ./.github/workflows/py-deps.yml
+    permissions: { contents: read }
+    with:
+      name: build-core
+      python: "3.11"
+      lock: scripts/ci/locks/core-checks.txt
+      core_ref: ${{ needs.plan.outputs.core_ref }}
+  py-deps-build-mach:
+    needs: [plan, checks, still-head]
+    if: needs.plan.outputs.attempt == github.run_attempt && needs.plan.outputs.reuse_run_id == ''
+    uses: ./.github/workflows/py-deps.yml
+    permissions: { contents: read }
+    with:
+      name: build-mach
+      python: "3.11"
+      lock: scripts/ci/locks/mach.txt
+  py-deps-build-lavapipe:
+    needs: [plan, checks, still-head]
+    if: needs.plan.outputs.attempt == github.run_attempt && needs.plan.outputs.reuse_run_id == ''
+    uses: ./.github/workflows/py-deps.yml
+    permissions: { contents: read }
+    with:
+      name: build-lavapipe
+      python: "3.11"
+      lock: scripts/ci/locks/lavapipe.txt
+
   build:
     name: build-${{ matrix.leg }}
-    needs: [plan, node]
+    needs: [plan, node, py-deps-build-core, py-deps-build-mach, py-deps-build-lavapipe]
     # The label of this run and attempt, one per leg. A leg names no runner
     # (scripts/ci/legs.py), so there is nothing else for it to run on. A rerun of failed
     # jobs reuses the plan's outputs, with the nodes deleted: empty, and GitHub drops the
@@ -405,9 +441,21 @@ jobs:
       # written here by hand, one per entry, with the version in each.
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     steps:
+      # The node's CPython is installed by scripts/ci/node_bootstrap.sh (CPYTHON there: version, release and sha256 of the tarball actions/python-versions
+      # publishes) into the tool cache, and setup-python finds it there and downloads nothing. setup-python has no switch that says "never download":
+      # a version missing from the cache it would fetch from the net, and run `pip install pip` after it (both unpinned). So the exact version is asked for, and a node
+      # without it stops HERE, by name, before setup-python could reach for it (scripts/ci/test_release_builder.py holds these versions to the bootstrap's).
+      - name: The node's CPython 3.12.16 is in the tool cache, never downloaded
+        shell: bash
+        run: |
+          PY="${RUNNER_TOOL_CACHE:?}/Python/3.12.16"
+          if [ ! -f "$PY/x64.complete" ] || [ "$("$PY/x64/bin/python" --version 2>&1)" != "Python 3.12.16" ]; then
+            echo "ERROR: no CPython 3.12.16 in the node's tool cache ($PY): scripts/ci/node_bootstrap.sh installs it, and the job never downloads one"
+            exit 1
+          fi
       - name: Python for the series tool
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
-        with: { python-version: '3.12' }
+        with: { python-version: '3.12.16', check-latest: false }
       - name: The series (this repository, this commit)
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with: { path: .series, fetch-depth: 1 }
@@ -494,9 +542,50 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: The node's CPython 3.11.18 is in the tool cache, never downloaded
+        shell: bash
+        run: |
+          PY="${RUNNER_TOOL_CACHE:?}/Python/3.11.18"
+          if [ ! -f "$PY/x64.complete" ] || [ "$("$PY/x64/bin/python" --version 2>&1)" != "Python 3.11.18" ]; then
+            echo "ERROR: no CPython 3.11.18 in the node's tool cache ($PY): scripts/ci/node_bootstrap.sh installs it, and the job never downloads one"
+            exit 1
+          fi
       - name: Set up Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
-        with: { python-version: '3.11' }
+        with: { python-version: '3.11.18', check-latest: false }
+
+      # The packages of this job, by name, from the three wheelhouses of the py-deps jobs above (py-deps.yml): the node never reads the index. The wheelhouse
+      # is proved installable on THIS Python first (`--dry-run`: a wheel its tags do not fit is named here, in the first minutes, not by mach in the build), then
+      # pip is told, for every command of the job that follows (mach's own `pip install` into its venvs, which inherits the environment: python/mach/mach/site.py
+      # pip_install passes os.environ and no --isolated), to read no index and the mach wheelhouse: an `orjson>=3.10` or a `pyyaml==6.0.3` that mach asks for is
+      # the file the lock names and its resolver hashed. uv (mach prefers it when it is on the PATH; the node has none) reads the same two variables under its names.
+      - name: The wheelhouse of the run's py-deps-build-core job
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: py-deps-build-core-linux
+          path: ${{ runner.temp }}/py-deps-core
+      - name: The wheelhouse of the run's py-deps-build-mach job
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: py-deps-build-mach-linux
+          path: ${{ runner.temp }}/py-deps-mach
+      - name: The wheelhouse of the run's py-deps-build-lavapipe job
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: py-deps-build-lavapipe-linux
+          path: ${{ runner.temp }}/py-deps-lavapipe
+      - name: Python packages - the wheelhouses install on this Python, and pip reads no index from here on
+        shell: bash
+        run: |
+          for house in core mach lavapipe; do
+            python3 -m pip install --quiet --dry-run --no-index --find-links "$RUNNER_TEMP/py-deps-$house" --require-hashes -r "$RUNNER_TEMP/py-deps-$house/lock.txt"
+          done
+          {
+            echo "PIP_NO_INDEX=1"
+            echo "PIP_FIND_LINKS=$RUNNER_TEMP/py-deps-mach"
+            echo "UV_NO_INDEX=1"
+            echo "UV_FIND_LINKS=$RUNNER_TEMP/py-deps-mach"
+          } >> "$GITHUB_ENV"
 
       # The page-surface gate at the packaging step asks the core which
       # branding archive it declares (validate_release.declared_branding): an
@@ -517,11 +606,9 @@ jobs:
       # there, because core 49.46.0 refuses a profile translated without a
       # session zone and the gate did not pass one.
       - name: Install the invisible_core the page-surface gate asks for its branding
-        env:
-          CORE_REF: ${{ needs.plan.outputs.core_ref }}
         run: |
-          python3 -m pip install --quiet \
-            "git+https://github.com/oss-invisible/core@$CORE_REF"
+          python3 -m pip install --quiet --no-index --find-links "$RUNNER_TEMP/py-deps-core" --require-hashes -r "$RUNNER_TEMP/py-deps-core/lock.txt"
+          python3 -m pip install --quiet --no-index --no-deps --find-links "$RUNNER_TEMP/py-deps-core" invisible_core
           python3 -c "from importlib.metadata import version; print('core asked for the branding:', version('invisible-core'))"
           ( cd scripts && python3 -c "import validate_release; print('branding it declares:', validate_release.declared_branding())" )
 
@@ -616,7 +703,7 @@ jobs:
           path: ~/.cache/sccache-bin
           # The node's binary has an entry of its own, even on the same Ubuntu as GitHub's runners. Compile hits do not depend on it: neither sccache's version nor
           # its path enters their key.
-          key: sccache-bin-${{ runner.os }}-${{ runner.arch }}${{ runner.environment != 'github-hosted' && '-node' || '' }}-v0.18.0-${{ hashFiles('scripts/ci/sccache/*.patch') }}
+          key: sccache-bin-${{ runner.os }}-${{ runner.arch }}${{ runner.environment != 'github-hosted' && '-node' || '' }}-v0.18.0-${{ hashFiles('scripts/ci/sccache/*.patch', 'scripts/ci/sccache_build.py') }}
       - name: Compile cache - build the one sccache this build uses
         if: needs.plan.outputs.compile_cache == 'gha'
         shell: bash
@@ -817,7 +904,7 @@ jobs:
         if: matrix.leg == 'linux-x86_64' && steps.build.outputs.compiled == 'true'
         run: |
           python3 scripts/ci/background.py start lavapipe --nice 19 -- \
-            python3 scripts/ci phase lavapipe -- python3 scripts/ci/lavapipe_build.py --out "$HOME/.cache/lavapipe" --jobs "${CI_PARALLEL:-4}"
+            python3 scripts/ci phase lavapipe -- python3 scripts/ci/lavapipe_build.py --out "$HOME/.cache/lavapipe" --pip-house "$RUNNER_TEMP/py-deps-lavapipe" --jobs "${CI_PARALLEL:-4}"
       # On every leg: the newest entry is the one the next run restores, and the node
       # uploads at about 5 MB/s. A build that added little leaves the last entry as it is
       # (scripts/ci/cache_rules.py).
@@ -1010,8 +1097,8 @@ jobs:
       # Crash dumps of this build turn into file:line only with its symbols, and
       # until 2026-10-27 no build had any: a content-process crash at shutdown on
       # the 157 candidates was a list of offsets in xul.dll. The archive is a
-      # separate artifact, never part of the asset (gate.yml and publish.yml take
-      # asset-* only).
+      # separate artifact, never part of the asset (gate.yml takes asset-* only; publish.yml publishes
+      # the symbols of a release beside the archives, never inside them).
       - name: Crash symbols (never shipped)
         if: needs.plan.outputs.stop_after != 'objects'
         # A ceiling of its own: in run 40593659072 this step recompiled Rust
@@ -1046,7 +1133,9 @@ jobs:
           if-no-files-found: error
           # ~400 MB a run: a candidate's are checked in the run and not kept. The artifact
           # quota filled on 04/11 (81 GB) and every new run failed at its first upload.
-          retention-days: ${{ needs.plan.outputs.kind == 'release' && 14 || 2 }}
+          # A release's are published by publish.yml as release assets (symbols-<os>-<arch>-<BuildID>.zip), which fetches them from this run, even
+          # on a republish a few weeks later: 30 days.
+          retention-days: ${{ needs.plan.outputs.kind == 'release' && 30 || 2 }}
 
       # The engine's own tests, on request (input gtests): the stealth hooks each have one (StealthStartupCache, the bundled-font and own-binary rules)
       # and nothing else runs them. They run in the jobs gtest-linux and gtest-cross, on GitHub's runners, from the binaries this job builds (the step below).

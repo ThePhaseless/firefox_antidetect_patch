@@ -62,7 +62,7 @@ index c6324a4745b2c7c8ce188d2566054963802ef081..bcb2fa8c872795bf9d9c806cd1ae377c
    void SetTabId(dom::TabId aTabId);
    nsresult Open(const nsACString& aHost, const int& aPort,
 diff --git a/dom/media/webrtc/transport/nr_socket_proxy_config.cpp b/dom/media/webrtc/transport/nr_socket_proxy_config.cpp
-index e9a7db5899e4bbc299ea3015d48faeb731bd4b15..3d10807d73605528c6c1830d67b53821faa70044 100644
+index e9a7db5899e4bbc299ea3015d48faeb731bd4b15..068bd4e3076c003a3842570c09cc105ff8414b5f 100644
 --- a/dom/media/webrtc/transport/nr_socket_proxy_config.cpp
 +++ b/dom/media/webrtc/transport/nr_socket_proxy_config.cpp
 @@ -6,16 +6,19 @@
@@ -76,7 +76,7 @@ index e9a7db5899e4bbc299ea3015d48faeb731bd4b15..3d10807d73605528c6c1830d67b53821
  class NrSocketProxyConfig::Private {
   public:
    net::WebrtcProxyConfig mProxyConfig;
-+  RefPtr<net::PcUdpProxy> mUdpProxy;  // STEALTH-HOOK(network/proxy-udp)
++  RefPtr<net::PcUdpProxy> mStealthUdpProxy;  // STEALTH-HOOK(network/proxy-udp)
  };
  
  NrSocketProxyConfig::NrSocketProxyConfig(
@@ -90,7 +90,7 @@ index e9a7db5899e4bbc299ea3015d48faeb731bd4b15..3d10807d73605528c6c1830d67b53821
    return mPrivate->mProxyConfig;
  }
  
-+RefPtr<net::PcUdpProxy> NrSocketProxyConfig::UdpProxy() const { return mPrivate->mUdpProxy; }  // STEALTH-HOOK(network/proxy-udp)
++#include "StealthNrSocketProxyConfig.inc.h"  // STEALTH-HOOK(network/proxy-udp)
 +
  bool NrSocketProxyConfig::GetForceProxy() const {
    return mPrivate->mProxyConfig.forceProxy();
@@ -173,18 +173,10 @@ index f15df437c8b6bbe76fb701ad62dbb6308b07456a..c8fbcc1071931912bbf41d10698566ac
      }
    }
 diff --git a/dom/media/webrtc/transport/nr_socket_prsock.h b/dom/media/webrtc/transport/nr_socket_prsock.h
-index 929c68ce81478894578ad2dca1fb2e7b73ca19af..b4671f3175439c38f875387d5b0852d97fc25845 100644
+index 929c68ce81478894578ad2dca1fb2e7b73ca19af..e595622ceac8364eb8c6bbc9c1ec36422e2c0dd7 100644
 --- a/dom/media/webrtc/transport/nr_socket_prsock.h
 +++ b/dom/media/webrtc/transport/nr_socket_prsock.h
-@@ -146,6 +146,7 @@ class NrSocketBase {
- class NrSocket : public NrSocketBase, public nsASocketHandler {
-  public:
-   NrSocket() : fd_(nullptr) {}
-+  explicit NrSocket(const std::shared_ptr<NrSocketProxyConfig>& aProxyConfig) : fd_(nullptr), mProxyConfig(aProxyConfig) {}  // STEALTH-HOOK(network/proxy-udp)
- 
-   // Implement nsASocket
-   virtual void OnSocketReady(PRFileDesc* fd, int16_t outflags) override;
-@@ -188,6 +189,8 @@ class NrSocket : public NrSocketBase, public nsASocketHandler {
+@@ -188,6 +188,8 @@ class NrSocket : public NrSocketBase, public nsASocketHandler {
    DISALLOW_COPY_ASSIGN(NrSocket);
  
    PRFileDesc* fd_;

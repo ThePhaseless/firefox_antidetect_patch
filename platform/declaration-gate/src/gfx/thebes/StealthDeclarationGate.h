@@ -142,6 +142,19 @@ struct StealthWindowFrame {
   int32_t mPopupUi;
   // A popup opened without left/top: where it is put, on both axes.
   int32_t mPopupPosition;
+  // The browser UI height (window client top to content top) of a RESTORED
+  // main window: it depends on the UI density only, normal, or compact when the
+  // window's chrome height is under mCompactBelowCss CSS pixels. The maximized
+  // window's own bar is mMaximizedUi, declared with the same rule.
+  int32_t mUiNormal;
+  int32_t mUiCompact;
+  int32_t mCompactBelowCss;
+  // A restored main window sits at (mRestoredPosition, mRestoredPosition) on
+  // the screen, device pixels.
+  int32_t mRestoredPosition;
+  // The smallest chrome (client area) a window can have, in CSS pixels.
+  int32_t mMinInnerWidthCss;
+  int32_t mMinInnerHeightCss;
 };
 Maybe<StealthWindowFrame> StealthDeclaredWindowFrame();
 
@@ -150,6 +163,82 @@ Maybe<StealthWindowFrame> StealthDeclaredWindowFrame();
  * each side. Device pixels; the caller divides by its window's scale.
  */
 Maybe<LayoutDeviceIntRect> StealthDeclaredMaximizedWindow();
+
+/**
+ * What the main window is, as ONE value kept on the top BrowsingContext
+ * (StealthWindowState, synced to every process) and updated in one place, when
+ * the top-level inner size changes: StealthNextWindowState.
+ *
+ * Maximized (mRestored false, mOuter and mCompact unused) is the declared
+ * maximized window. Restored is what the main window becomes when
+ * Page.setViewportSize resizes it (retail leaves the maximized size mode on
+ * that resize): its outer size in device pixels, and the UI density it has, so
+ * the content origin does not depend on anything but this value. Every reader
+ * (outerWidth/outerHeight, screenX/screenY, mozInnerScreenX/Y, event screenX -
+ * clientX) derives from it through StealthRestoredWindowRect and
+ * StealthRestoredContentOrigin.
+ */
+struct StealthWindowState {
+  bool mRestored = false;
+  bool mCompact = false;
+  LayoutDeviceIntSize mOuter;
+
+  bool operator==(const StealthWindowState& aOther) const {
+    return mRestored == aOther.mRestored && mCompact == aOther.mCompact &&
+           mOuter == aOther.mOuter;
+  }
+};
+
+/**
+ * The state as the 64-bit value the BrowsingContext field carries: bit 0
+ * restored, bit 1 compact, bits 2-25 the outer width, bits 26-49 the outer
+ * height. The maximized state is 0, the field's default.
+ */
+uint64_t StealthPackWindowState(const StealthWindowState& aState);
+StealthWindowState StealthUnpackWindowState(uint64_t aPacked);
+
+/**
+ * The state after the top-level inner size went from aOldInner to aNewInner
+ * (CSS pixels): the one place the state changes. aMaximized is
+ * StealthDeclaredMaximizedWindow(), aFrame StealthDeclaredWindowFrame(), aScale
+ * the window's own device pixels per CSS pixel.
+ *
+ * aOld unchanged for an inner size with a non-positive side (no layout yet) and
+ * for an unchanged inner size, and for a window that was never restored and
+ * shows the maximized content size (the maximized window's content in device
+ * pixels divided by aScale, rounded as Gecko rounds). Any other size is a
+ * Page.setViewportSize resize, which Juggler makes with resizeBy on the
+ * window's outer size in CSS pixels: the deltas are the new inner size minus the
+ * chrome's inner size (width) and plus the bar over it (height), both
+ * fractional CSS pixels, truncated toward zero; the outer size is rounded to
+ * CSS pixels, moved by them, converted back to device pixels and not under the
+ * minimum chrome. A restored window is never maximized again, whatever size it
+ * is resized to, the maximized content size included: it goes through the same
+ * resize. The UI density is decided again from the new chrome height. The
+ * chrome of a maximized window is the work area; of a restored one the outer
+ * size less a border on each side and the bottom.
+ */
+StealthWindowState StealthNextWindowState(const StealthWindowState& aOld,
+                                          const CSSIntSize& aOldInner,
+                                          const CSSIntSize& aNewInner,
+                                          const LayoutDeviceIntRect& aMaximized,
+                                          const StealthWindowFrame& aFrame,
+                                          float aScale);
+
+/**
+ * The restored main window in device pixels: at the restored position, the
+ * state's outer size. Nothing() for the maximized state.
+ */
+Maybe<LayoutDeviceIntRect> StealthRestoredWindowRect(
+    const StealthWindowState& aState, const StealthWindowFrame& aFrame);
+
+/**
+ * Where the content of the restored main window starts on the screen, in device
+ * pixels: the restored position plus the border, and plus the bar of the
+ * state's density. The one formula for it. Nothing() for the maximized state.
+ */
+Maybe<LayoutDeviceIntPoint> StealthRestoredContentOrigin(
+    const StealthWindowState& aState, const StealthWindowFrame& aFrame);
 
 /**
  * Does a window answer the DECLARED outer size, or its own real one?
@@ -187,6 +276,11 @@ bool StealthOuterSizeIsDeclared(const LayoutDeviceIntSize& aRealOuter);
  * for one) and whose content starts at p + (border, popup UI). In device
  * pixels; `aAppUnitsPerDevPixel` is the one of the caller's pres context.
  *
+ * `aRestoredContentOrigin` is StealthRestoredContentOrigin() for the
+ * maximized-window case: when it is Some, the main window is restored and its
+ * content starts there instead of at (0, UI). Ignored for a popup and in
+ * fullscreen.
+ *
  * One function only, because the shift is a fact and facts live in one place:
  * when it was computed in three places, the fourth consumer was forgotten.
  */
@@ -197,7 +291,8 @@ bool StealthOuterSizeIsDeclared(const LayoutDeviceIntSize& aRealOuter);
 // in fullscreen, content 85 below the top while the page filled the screen.
 Maybe<nsPoint> StealthDeclaredOriginShift(
     const nsPoint& aRealContentOrigin,
-    const Maybe<LayoutDeviceIntPoint>& aPopupWindowOrigin, bool aFullscreen,
+    const Maybe<LayoutDeviceIntPoint>& aPopupWindowOrigin,
+    const Maybe<LayoutDeviceIntPoint>& aRestoredContentOrigin, bool aFullscreen,
     int32_t aAppUnitsPerDevPixel);
 
 /**

@@ -27,8 +27,8 @@
   "docshell/base/test/gtest/TestStealthNavigation.cpp": "4afb64a3f3a89a0a9081fcc345a528085095f5c368048c00de1bc6777016032f",
   "docshell/base/test/gtest/stealth.build": "a5e1bfca9f349c4ebdbe50d09c0708280ce2715f71faa62720cf95b0dffbbc24",
   "juggler/tests/navigation_hook_runs_only_for_a_load_that_leaves_the_document.test.mjs": "ea5bb4a50350eb587acb650b94b3880b5a4ad4b1a2db13c42ba9736467ae2858",
-  "netwerk/base/StealthLoadInfo.cpp": "088bd43f2053f41c459ba268af7442d2a278e867d69789eabb7b1b9ebbaa2041",
-  "netwerk/base/StealthLoadInfo.h": "65873d382b0f2babf4c53191f5a17ab9c1761bc21655f2ebbe071dd204081809"
+  "netwerk/base/StealthLoadInfo.cpp": "bf1aa20ef69cc657794fdaba2f449fb0cf0fce3b965e8f9d39e610f64f3a69d0",
+  "netwerk/base/StealthLoadInfo.h": "8bf176e56130c30c54ef39827340bb608f930d337828e90409582851acd15b5d"
  },
  "inventory": [
   {

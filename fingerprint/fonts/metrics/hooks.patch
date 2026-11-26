@@ -41,20 +41,14 @@ index 85edc26a3f7930ec9ffff752141ffacb881e7e23..fc723ae64a416c7f067590a156a983ff
          // k3D_Format should not be mask filtered.
          SkASSERT(SkMask::k3D_Format != unfilteredGlyph->fMaskFormat);
 diff --git a/gfx/tests/gtest/moz.build b/gfx/tests/gtest/moz.build
-index 63c31d0b5b13e44c003fa793d4f503709139b35f..6e5fc96e0c3a3df348f17fbfe37bc3d1b30f6564 100644
+index 013cc7390d08b632b514f32d8585c3bdd7c371c3..610bce7e0d57cdcbed8815b09e509c28cdbe05b7 100644
 --- a/gfx/tests/gtest/moz.build
 +++ b/gfx/tests/gtest/moz.build
-@@ -46,11 +46,14 @@ if CONFIG["OS_TARGET"] != "Android":
- if CONFIG["MOZ_WIDGET_TOOLKIT"] == "gtk":  # STEALTH-HOOK(fingerprint/fonts/font-list)
+@@ -45,6 +45,8 @@ if CONFIG["OS_TARGET"] != "Android":
  
-     UNIFIED_SOURCES += ["TestStealthFcFontList.cpp"]  # STEALTH-HOOK(fingerprint/fonts/font-list)
-+    UNIFIED_SOURCES += ["TestStealthFontMetrics.cpp"]  # STEALTH-HOOK(fingerprint/fonts/metrics)
-     CXXFLAGS += CONFIG["CAIRO_FT_CFLAGS"]  # STEALTH-HOOK(fingerprint/fonts/font-list)
- 
- if CONFIG["OS_TARGET"] == "WINNT":  # STEALTH-HOOK(fingerprint/fonts/bundle)
- 
-     UNIFIED_SOURCES += ["TestStealthBundledCollection.cpp"]  # STEALTH-HOOK(fingerprint/fonts/bundle)
-+    UNIFIED_SOURCES += ["TestStealthTextQuality.cpp"]  # STEALTH-HOOK(fingerprint/fonts/metrics)
+ include("StealthFcFontListTests.mozbuild")  # STEALTH-HOOK(fingerprint/fonts/font-list)
+ include("StealthBundleTests.mozbuild")  # STEALTH-HOOK(fingerprint/fonts/bundle)
++include("StealthFontMetricsTests.mozbuild")  # STEALTH-HOOK(fingerprint/fonts/metrics)
 +
  if CONFIG["OS_TARGET"] == "Darwin":
      # Not in UNIFIED_SOURCES: MacIOSurface.h includes Carbon headers (MacTypes.h)

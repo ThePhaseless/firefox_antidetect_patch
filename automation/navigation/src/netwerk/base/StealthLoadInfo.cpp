@@ -27,6 +27,14 @@ bool StealthTRRSetOriginAttributes(OriginAttributes& aField,
   return true;
 }
 
+TRRLoadInfo* StealthTRRCloneContext(const TRRLoadInfo* aFrom,
+                                    TRRLoadInfo* aClone) {
+  OriginAttributes attributes;
+  (void)const_cast<TRRLoadInfo*>(aFrom)->GetOriginAttributes(&attributes);
+  (void)aClone->SetOriginAttributes(attributes);
+  return aClone;
+}
+
 // nsILoadInfo.jugglerLoadIdentifier of LoadInfo: the member holds the
 // identifier of the load (0 when the load never got one).
 NS_IMETHODIMP

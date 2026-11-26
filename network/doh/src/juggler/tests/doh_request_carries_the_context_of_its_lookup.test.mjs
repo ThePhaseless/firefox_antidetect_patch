@@ -114,7 +114,15 @@ test('a TRR load info keeps the context, and its clone (a redirect) too', () => 
   assert.match(set.slice(0, set.indexOf('\n}\n') + 3),
       /\{\n  if \(nsresult rv; StealthTRRSetOriginAttributes\(mOriginAttributes, aOriginAttributes, &rv\)\) return rv;  \/\/ STEALTH-HOOK\(network\/doh\)\n  return NS_ERROR_NOT_IMPLEMENTED;\n\}\n/);
   const clone = text.slice(text.indexOf('TRRLoadInfo::Clone()'), text.indexOf('TRRLoadInfo::GetLoadingPrincipal'));
-  assert.match(clone, /->mOriginAttributes = mOriginAttributes;  \/\/ STEALTH-HOOK\(network\/doh\)/);
+  // One line wraps the object Clone makes, in our function (StealthTRRCloneContext, StealthLoadInfo.cpp), which gives it the
+  // attributes through the public accessors; Mozilla's own statement is otherwise as in the tag.
+  assert.match(clone, /nsCOMPtr<nsILoadInfo> loadInfo =\n      StealthTRRCloneContext\(this, new TRRLoadInfo\(mResultPrincipalURI, mInternalContentPolicyType\)\);  \/\/ STEALTH-HOOK\(network\/doh\)\n/);
+  assert.doesNotMatch(clone, /mOriginAttributes/);
+  const ours = read('netwerk/base/StealthLoadInfo.cpp');
+  const cloneContext = ours.slice(ours.indexOf('TRRLoadInfo* StealthTRRCloneContext('), ours.indexOf('// nsILoadInfo.jugglerLoadIdentifier of LoadInfo'));
+  assert.match(cloneContext, /GetOriginAttributes\(&attributes\)/);
+  assert.match(cloneContext, /aClone->SetOriginAttributes\(attributes\)/);
+  assert.match(cloneContext, /return aClone;/);
 });
 
 test('our file and its gtest are registered', () => {

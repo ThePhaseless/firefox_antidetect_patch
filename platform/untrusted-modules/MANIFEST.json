@@ -11,8 +11,8 @@
  },
  "sha256": {
   "toolkit/xre/dllservices/StealthOwnBinaries.cpp": "9e4318123395cb71a39d227408b657e5a6051a90ccd93dbf4487c8594c166c71",
-  "toolkit/xre/dllservices/StealthOwnBinaries.h": "870ee94a28b0c8e513f278c68beb9a9f98cb7c8003d57f61f41315ee65948eec",
-  "toolkit/xre/dllservices/tests/gtest/TestStealthOwnBinaries.cpp": "b62e1dbd49f3f56fe72708aebfb882265b95e4c7ad157f9e94bcb535a0ac669a"
+  "toolkit/xre/dllservices/StealthOwnBinaries.h": "5310ae515eb93ffd33a02323b3bf94f50a63f7993dc378688dbfcfb12e872fa7",
+  "toolkit/xre/dllservices/tests/gtest/TestStealthOwnBinaries.cpp": "87e6f718c306333e6cb70899ac36f86699e69674243ff069ce316b0a3e0b20a2"
  },
  "inventory": [
   {
@@ -20,10 +20,10 @@
    "category": "other",
    "feature": "untrusted-modules-own-binaries",
    "prefs": [],
-   "added": 8,
-   "removed": 3,
+   "added": 3,
+   "removed": 1,
    "hunks": 2,
-   "inline_logic_lines": 6,
+   "inline_logic_lines": 0,
    "hookable": "movable",
    "anchor": "ModuleRecord::GetVersionAndVendorInfo; ModuleRecord::IsInDirectoryOf (new); IsOwnUnsignedBinary (new)",
    "notes": "Performance fix (commit 26e54ca1b1): the Untrusted Modules processor skips the Authenticode lookup for this build's own unsigned binaries (beside firefox.exe and with its version), which always fell through to the catalog search: 1.26 s of CPU per launch. Classification unchanged (FirefoxDirectory + version). IsOwnUnsignedBinary is inline logic that can move to an own file."

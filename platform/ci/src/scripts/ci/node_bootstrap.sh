@@ -44,6 +44,16 @@ NODE_VERSION=22.23.4
 NODE_SHA256=1805bcd35e6815559bd2eb97db438d3fdb0eb3a5e6a977b7c1badca76337e9ce
 RUSTUP_VERSION=1.29.3
 RUSTUP_SHA256=b1c8cb14e30889e7e2999e6b69e62d9e9b9ffc0f4df8180564d306d9680e6c55
+# CPython, the two the build job's steps ask of actions/setup-python (release.yml: "Python for the series tool" and "Set up Python"): the very tarball
+# actions/python-versions publishes for Ubuntu 24.04 and setup-python downloads on a hosted runner, by exact version, release and sha256, here, so that
+# setup-python finds them in the tool cache and downloads nothing (ci-03: no download of ours that a hash of ours does not decide, and no `pip install
+# pip` after it). Each is `version release-id sha256`; the release's tag is <version>-<release-id> and the file python-<version>-linux-24.04-x64.tar.gz,
+# addressed like the other release files (the API first, the direct address second, the sha256 decides). release.yml asks for these exact versions
+# (scripts/ci/test_latitude_node.py holds the two to each other).
+CPYTHON=(
+  "3.11.18 40260280589 099ef30fc27f0d7067a67be5a5fb7fd66154cfa1e4186c88f71c3a3070c81abc"
+  "3.12.16 40260402378 dec61ed20cd3e71143f1642ef9966945dea8ae4f3e96b306205a710da4f2191a"
+)
 # What apt installs, from the closure only (node_deps_resolve.sh reads this list).
 PACKAGES=(
   # the job's steps; sudo is for this script's as_runner
@@ -184,6 +194,31 @@ if [ "$(as_runner rustup --version 2>/dev/null | awk 'NR==1{print $2}')" != "$RU
   rm -f /tmp/rustup-init
 fi
 
+# What the tarball's own setup.sh does to put it in the tool cache (the folder Python/<version>/x64 and, beside it, the file x64.complete that
+# actions/setup-python looks for), without its last step, `pip install --upgrade pip` from the index. The pip in the tarball is the one that stays.
+install_cpython() { # version release-id sha256
+  local version="$1" release="$1-$2" file="python-$1-linux-24.04-x64.tar.gz" root="/opt/hostedtoolcache/Python/$1" minor
+  minor="${1%.*}"
+  if [ -f "$root/x64.complete" ] && [ "$(as_runner "$root/x64/bin/python" --version 2>/dev/null)" = "Python $version" ]; then
+    return 0
+  fi
+  fetch "$(asset_api_url actions/python-versions "$release" "$file")" "$3" /tmp/cpython.tar.gz \
+    "https://github.com/actions/python-versions/releases/download/$release/$file"
+  rm -rf "$root"
+  install -d -o runner -g runner "$root" "$root/x64"
+  as_runner tar -xzf /tmp/cpython.tar.gz -C "$root/x64"
+  rm -f /tmp/cpython.tar.gz
+  as_runner sh -ec 'cd "$1"; rm -f setup.sh; ln -s "./bin/python$2" python; cd bin; ln -s "python$2" "python${2%%.*}${2#*.}"; [ -e python ] || ln -s "python$2" python
+                    chmod +x ../python "python$2"' sh "$root/x64" "$minor"
+  as_runner touch "$root/x64.complete"
+}
+
+echo "== CPython, in the tool cache (${CPYTHON[*]%% *})"
+for entry in "${CPYTHON[@]}"; do
+  # shellcheck disable=SC2086 # three words
+  install_cpython $entry
+done
+
 echo "== glslang $GLSLANG_VERSION, in /usr/local/bin"
 GLSLANG_URL="${GLSLANG_URL:-$(asset_api_url oss-invisible/firefox_antidetect_patch "$GLSLANG" "$GLSLANG.tar")}"
 fetch "$GLSLANG_URL" "$GLSLANG_SHA256" /tmp/glslang.tar "$GLSLANG_WEB_URL"
@@ -224,6 +259,13 @@ as_runner test -w /opt/hostedtoolcache || missing+=("a writable tool cache")
 [ "$(as_runner "$R/bin/Runner.Listener" --version 2>/dev/null)" = "$RUNNER_VERSION" ] \
   || missing+=("a runner that starts ($(as_runner "$R/bin/Runner.Listener" --version 2>&1 | head -1))")
 [ "$(as_runner node --version)" = "v$NODE_VERSION" ] || missing+=("Node.js $NODE_VERSION")
+for entry in "${CPYTHON[@]}"; do
+  version="${entry%% *}"
+  cache="/opt/hostedtoolcache/Python/$version"
+  [ -f "$cache/x64.complete" ] && [ "$(as_runner "$cache/x64/bin/python" --version 2>&1)" = "Python $version" ] \
+    && as_runner "$cache/x64/bin/python" -c 'import ssl, zlib, venv, ensurepip' 2>/dev/null \
+    || missing+=("CPython $version in the tool cache")
+done
 /usr/local/bin/glslangValidator --version | grep -q ":$GLSLANG_VERSION\$" || missing+=("glslang $GLSLANG_VERSION")
 # What node_runner.sh runs each leg in, as root.
 for tool in systemd-run unshare mount runuser useradd; do
@@ -247,4 +289,4 @@ for _ in $(seq 30); do
 done
 [ "$served" = "$host_key" ] || die "sshd does not serve the host key just made"
 echo "node_bootstrap: host key: $host_key"
-echo "node_bootstrap: ready (runner $RUNNER_VERSION, node $NODE_VERSION, rustup $RUSTUP_VERSION, glslang $GLSLANG_VERSION, apt from the closure)"
+echo "node_bootstrap: ready (runner $RUNNER_VERSION, node $NODE_VERSION, CPython ${CPYTHON[*]%% *}, rustup $RUSTUP_VERSION, glslang $GLSLANG_VERSION, apt from the closure)"

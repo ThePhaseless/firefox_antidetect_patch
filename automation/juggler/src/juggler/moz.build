@@ -34,6 +34,7 @@ FINAL_TARGET_FILES.modules.juggler += [
     "Say.js",
     "SessionRoute.js",
     "SimpleChannel.js",
+    "StealthAtoms.sys.mjs",
     "StealthCursor.js",
     "StrokeBirth.js",
     "TargetRegistry.js",

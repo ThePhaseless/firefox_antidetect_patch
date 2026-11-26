@@ -1,0 +1,10 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+# The gtest of the fontconfig font list, and the flags it is built with. Read by gfx/tests/gtest/moz.build (one
+# include line), so the platform conditions are ours and not lines of Mozilla's file.
+
+if CONFIG["MOZ_WIDGET_TOOLKIT"] == "gtk":
+    UNIFIED_SOURCES += ["TestStealthFcFontList.cpp"]
+    CXXFLAGS += CONFIG["CAIRO_FT_CFLAGS"]

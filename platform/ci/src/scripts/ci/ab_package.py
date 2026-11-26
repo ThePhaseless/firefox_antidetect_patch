@@ -39,8 +39,11 @@ whose section of the patch differs between the two commits. A package file is ex
      Windows: the "<container>!" prefix is dropped before the comparison)
   2. any other source that is not C, C++, Rust, build or script code  ->  the package files with the same basename (jar.mn and moz.build flatten and move
      files, so the basename is what is stable: StealthPingsender.sys.mjs, firefox.js, ...)
+  3. a record that one of our builds writes (OWN_BUILD_RECORDS: lavapipe/VERSION.json, whose "inputs" line is the build's cache key)  ->  a source that is
+     one of the files that build's key reads (lavapipe_build.INPUTS: tree paths and globs, `*` never crosses `/`); the whole file is explained
 A changed source that maps to nothing is no reason: a package file that changed and that no source maps to is red. A hooks.patch is named by its files,
-not by its hunks: a section that changed explains its whole file.
+not by its hunks: a section that changed explains its whole file. An explained file always says which source explained it: "explained" is the list of
+those sources (empty when none does), and the report and the summary print it: "(explained by <source>, <source>)".
 """
 from __future__ import annotations
 
@@ -57,6 +60,10 @@ import sys
 import tarfile
 import zipfile
 import zlib
+from pathlib import PurePosixPath
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # the sibling module, whichever directory the script is run from
+import lavapipe_build  # noqa: E402
 
 JA_EXTS = (".ja", ".xpi", ".jar")
 BINARY_KINDS = {"elf", "so", "pe", "dll", "exe", "chk", "ja"}
@@ -523,15 +530,29 @@ def explain(series: str, old: str, new: str) -> dict:
     return {"from": old, "to": new, "changed_files_of_the_series": len(names), "sources": sorted(sources)}
 
 
-def _is_explained(path: str, sources) -> bool:
+# Records one of our builds writes into the package, and the files that build's key reads: a changed source among them explains the record.
+OWN_BUILD_RECORDS = {"lavapipe/VERSION.json": lavapipe_build.INPUTS}
+
+
+def _matches(src: str, pattern: str) -> bool:
+    """A tree path against a tree path or a glob: segment by segment, so `*` never crosses `/` and the pattern is anchored at the root."""
+    return len(PurePosixPath(src).parts) == len(PurePosixPath(pattern).parts) and PurePosixPath(src).match(pattern)
+
+
+def _explained_by(path: str, sources) -> list:
+    """The sources that explain a package file, sorted; [] when none does."""
     inside = path.rsplit("!", 1)[-1]
     base = posixpath.basename(inside)
+    own = OWN_BUILD_RECORDS.get(inside, ())
+    by = set()
     for src in sources:
         if src.startswith("juggler/") and inside == "modules/" + src:
-            return True
-        if posixpath.basename(src) == base and base not in NOT_SHIPPED_NAMES and not src.lower().endswith(NOT_SHIPPED_AS_TEXT):
-            return True
-    return False
+            by.add(src)
+        elif posixpath.basename(src) == base and base not in NOT_SHIPPED_NAMES and not src.lower().endswith(NOT_SHIPPED_AS_TEXT):
+            by.add(src)
+        elif any(_matches(src, pattern) for pattern in own):
+            by.add(src)
+    return sorted(by)
 
 
 # ---------------------------------------------------------------- the content of a changed file: its diff, and the proof that it is build identity
@@ -605,9 +626,9 @@ def compare(published: dict, candidate: dict, sources=(), published_archive=None
     for path in sorted(set(pub) | set(cand)):
         a, b = pub.get(path), cand.get(path)
         if a is None:
-            out["added"].append({"path": path, "kind": b["kind"], "explained": _is_explained(path, sources)})
+            out["added"].append({"path": path, "kind": b["kind"], "explained": _explained_by(path, sources)})
         elif b is None:
-            out["missing"].append({"path": path, "kind": a["kind"], "explained": _is_explained(path, sources)})
+            out["missing"].append({"path": path, "kind": a["kind"], "explained": _explained_by(path, sources)})
         elif a["sha256"] == b["sha256"] and a["kind"] == b["kind"]:
             same += 1
         else:
@@ -617,7 +638,7 @@ def compare(published: dict, candidate: dict, sources=(), published_archive=None
     old_data = read_entries(published_archive, texts) if published_archive and texts else {}
     new_data = read_entries(candidate_archive, texts) if candidate_archive and texts else {}
     for path, a, b in changed:
-        row = {"path": path, "kind": b["kind"], "was": a["kind"], "size": [a["size"], b["size"]], "explained": _is_explained(path, sources)}
+        row = {"path": path, "kind": b["kind"], "was": a["kind"], "size": [a["size"], b["size"]], "explained": _explained_by(path, sources)}
         compiled = a["kind"] in BINARY_KINDS and b["kind"] in BINARY_KINDS
         row["build_identity"] = []
         if path in old_data and path in new_data:
@@ -663,7 +684,7 @@ def summary(report: dict, limit: int = 40) -> str:
             elif row.get("build_identity"):
                 mark = "  (build identity: %s)" % ", ".join(row["build_identity"])
             elif row["explained"]:
-                mark = "  (explained)"
+                mark = "  (explained by %s)" % ", ".join(row["explained"])
             elif row["red"]:
                 mark = "  <-- RED: no source of ours explains it and its differing lines are not build identity"
             else:

@@ -34,9 +34,12 @@ test('the lookup of the host name in the symlink lock is compiled out for the di
   assert.doesNotMatch(rest, /PR_GetHostByName|PR_SI_HOSTNAME|gethostbyname|getaddrinfo/);
   // The signature still starts from the loopback address.
   assert.match(text.slice(0, open), /inaddr\.s_addr = htonl\(INADDR_LOOPBACK\);/);
-  // The symbol is defined for the sources of that directory, by one line of its moz.build.
+  // The symbol is defined for the sources of that directory, by the build file of ours that one line of its moz.build includes.
   const build = fs.readFileSync(path.join(ROOT, 'toolkit/profile/moz.build'), 'utf8');
-  assert.match(build, /\]\nDEFINES\["MOZ_PROXY_BYPASS_PROTECTION"\] = True  # STEALTH-HOOK\(network\/doh\)\n/);
+  assert.match(build, /\]\ninclude\("StealthProfile\.mozbuild"\)  # STEALTH-HOOK\(network\/doh\)\n/);
+  assert.doesNotMatch(build, /MOZ_PROXY_BYPASS_PROTECTION/);
+  const defines = fs.readFileSync(path.join(ROOT, 'toolkit/profile/StealthProfile.mozbuild'), 'utf8');
+  assert.match(defines, /^DEFINES\["MOZ_PROXY_BYPASS_PROTECTION"\] = True$/m);
   // The only entry: no other source of the directory reads the symbol, so the define changes nothing else.
   const readers = fs.readdirSync(path.join(ROOT, 'toolkit/profile'))
       .filter(f => /\.(cpp|h|mm|c)$/.test(f))

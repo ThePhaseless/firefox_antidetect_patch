@@ -67,7 +67,7 @@ index 59912b1f41195811707a27f6dccc3bc8876b01fc..b69c9071f938743ef3a2ecdbf9ad675d
    rv = mTransport->Bind(&addr);
    if (NS_WARN_IF(NS_FAILED(rv))) {
 diff --git a/dom/media/webrtc/transport/mdns_service/src/lib.rs b/dom/media/webrtc/transport/mdns_service/src/lib.rs
-index 82d3609ed94472e02ab3a7b9b291824160e8a79b..3b08d4adb8bfbf548b210ee03165fc04501d0f98 100644
+index 82d3609ed94472e02ab3a7b9b291824160e8a79b..09a782761aec07c0bbefca09a564b7498e33b19d 100644
 --- a/dom/media/webrtc/transport/mdns_service/src/lib.rs
 +++ b/dom/media/webrtc/transport/mdns_service/src/lib.rs
 @@ -27,6 +27,8 @@ const MAX_NAME_LENGTH: usize = 255;
@@ -79,19 +79,20 @@ index 82d3609ed94472e02ab3a7b9b291824160e8a79b..3b08d4adb8bfbf548b210ee03165fc04
  
  struct Callback {
      data: *const c_void,
-@@ -459,6 +461,7 @@ impl MDNSService {
+@@ -459,7 +461,7 @@ impl MDNSService {
          socket.set_multicast_loop_v4(true)?;
          socket.set_read_timeout(Some(time::Duration::from_millis(1)))?;
          socket.set_write_timeout(Some(time::Duration::from_millis(1)))?;
-+        let stealth_if = addrs.first().copied();  // STEALTH-HOOK(fingerprint/webrtc/declared-network)
-         for addr in addrs {
+-        for addr in addrs {
++        for addr in stealth_interface::stealth_note_first(addrs) {  // STEALTH-HOOK(fingerprint/webrtc/declared-network)
              if let Err(err) = socket.join_multicast_v4(&mdns_addr, &addr) {
                  warn!(
-@@ -467,6 +470,7 @@ impl MDNSService {
+                     "Could not join multicast group on interface: {:?}: {}",
+@@ -467,6 +469,7 @@ impl MDNSService {
                  );
              }
          }
-+        stealth_interface::set_multicast_if(&socket, stealth_if);  // STEALTH-HOOK(fingerprint/webrtc/declared-network)
++        stealth_interface::set_multicast_if(&socket);  // STEALTH-HOOK(fingerprint/webrtc/declared-network)
  
          let thread_name = "mdns_service";
          let builder = thread::Builder::new().name(thread_name.into());
@@ -188,10 +189,10 @@ index c8fbcc1071931912bbf41d10698566aceaa70b28..f3662e04a37987170d515b7478154fd5
    mCondition = NS_BASE_STREAM_CLOSED;
    cancel(NR_ASYNC_WAIT_READ);
 diff --git a/dom/media/webrtc/transport/nr_socket_prsock.h b/dom/media/webrtc/transport/nr_socket_prsock.h
-index b4671f3175439c38f875387d5b0852d97fc25845..f9588b2a28443327e7561824667576082e49c220 100644
+index e595622ceac8364eb8c6bbc9c1ec36422e2c0dd7..45f02740c48b30bf2a611192a5c0eaf24e0d2828 100644
 --- a/dom/media/webrtc/transport/nr_socket_prsock.h
 +++ b/dom/media/webrtc/transport/nr_socket_prsock.h
-@@ -191,6 +191,7 @@ class NrSocket : public NrSocketBase, public nsASocketHandler {
+@@ -190,6 +190,7 @@ class NrSocket : public NrSocketBase, public nsASocketHandler {
    PRFileDesc* fd_;
    std::shared_ptr<NrSocketProxyConfig> mProxyConfig;  // STEALTH-HOOK(network/proxy-udp)
    friend struct StealthNrSocketAccess;  // STEALTH-HOOK(network/proxy-udp)

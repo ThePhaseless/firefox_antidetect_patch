@@ -7,7 +7,7 @@
   "layout/base/StealthInnerSizeSync.h": "100644"
  },
  "sha256": {
-  "layout/base/StealthInnerSizeSync.h": "216389e4c8a0eea61c0ba995b9915af12f1957ea00f7920dfc8629fbd0984476"
+  "layout/base/StealthInnerSizeSync.h": "71201d174a6e29b59a96aa279b41b74b9c880824a2a9c9123b646a0b7ac79055"
  },
  "inventory": [
   {
@@ -40,9 +40,9 @@
    "category": "spoof",
    "feature": "screen-metrics",
    "prefs": [],
-   "added": 3,
-   "removed": 1,
-   "hunks": 2,
+   "added": 4,
+   "removed": 2,
+   "hunks": 3,
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "nsPresContext::UpdateInnerSizeSpoofedForRFP",
