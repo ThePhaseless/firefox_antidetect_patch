@@ -193,16 +193,6 @@
   "budget": "removed"
  },
  {
-  "file": "docshell/base/CanonicalBrowsingContext.cpp",
-  "from": 4,
-  "to": 5,
-  "folder": "fingerprint/screen-window/geometry",
-  "reason": "one line: the synced field StealthWindowState is carried across a BrowsingContext replacement like Mozilla's own fields",
-  "decided_by": "pm, 26/11, read with the combined export",
-  "date": "2026-11-26",
-  "test": "gtest:StealthWindowGeometry.TheWindowStateRoundTripsThroughItsField"
- },
- {
   "file": "layout/base/nsPresContext.cpp",
   "from": 3,
   "to": 4,
@@ -268,8 +258,8 @@
  },
  {
   "file": "js/xpconnect/src/Sandbox.cpp",
-  "from": 2,
-  "to": 3,
+  "from": 1,
+  "to": 2,
   "folder": "automation/hybrid-xrays",
   "reason": "Mozilla's read of wantXrays in the Parse chain is wrapped in StealthParseHybridXrays (the rewritten line of Mozilla's replaces the line that read hybridXrays inside the chain)",
   "decided_by": "pm, 26/11, read with the combined export",
