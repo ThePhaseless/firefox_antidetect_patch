@@ -93,5 +93,14 @@
    "kind": "only-place",
    "why": "A moz.build registration goes directly after the closing `]` of the UNIFIED_SOURCES list it registers in, and that list is the churning one: Mozilla edits that list and the lines around it in releases 157, 158 and 159. The other places (after an unrelated list, or at the end of the file) are not the list the line registers in."
   }
+ },
+ {
+  "file": "toolkit/xre/dllservices/UntrustedModulesData.cpp",
+  "function": "void ModuleRecord::GetVersionAndVendorInfo(const nsAString& aPath) {",
+  "kind": "rewrite",
+  "form": "wrap-expression",
+  "line": "  UniquePtr<wchar_t[]> signedBy(StealthSignatureLookupUnlessOwn(aPath, dllSvc)->GetBinaryOrgName(  // STEALTH-HOOK(platform/untrusted-modules)",
+  "removed": "  UniquePtr<wchar_t[]> signedBy(dllSvc->GetBinaryOrgName(",
+  "test": "gtest:StealthOwnBinaries.ModuleRecordSkipsTheSignatureLookupOfTheRunningExecutableOnly"
  }
 ]

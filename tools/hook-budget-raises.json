@@ -191,5 +191,48 @@
   "date": "2026-11-25",
   "test": "node:juggler/tests/updater_refuses_what_follows_the_check.test.mjs#whatever the answer offered, the check reports none",
   "budget": "removed"
+ },
+ {
+  "file": "js/xpconnect/src/xpcprivate.h",
+  "from": 4,
+  "to": 5,
+  "folder": "automation/hybrid-xrays",
+  "reason": "one member declaration (SandboxOptions::StealthParseHybridXrays) replaces the option's read inside Mozilla's chain",
+  "decided_by": "pm, 26/11, read with the combined export",
+  "date": "2026-11-26",
+  "test": "xpcshell:js/xpconnect/tests/unit/test_stealth_hybrid_xrays_options.js#run_test"
+ },
+ {
+  "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
+  "from": 4,
+  "to": 6,
+  "folder": "automation/hybrid-xrays",
+  "reason": "two one-line wraps (the web-objects predicate and DEBUG_CheckUnwrapSafety) replace the inline branch and the added term",
+  "decided_by": "pm, 26/11, read with the combined export",
+  "date": "2026-11-26",
+  "test": "gtest:StealthCallerObject.TheWebObjectCaseStepsAsideForAWaitingDecisionWithoutTakingIt",
+  "budget": "removed"
+ },
+ {
+  "file": "netwerk/base/TRRLoadInfo.cpp",
+  "from": 0,
+  "to": 1,
+  "folder": "network/doh",
+  "reason": "the object Clone makes is wrapped in StealthTRRCloneContext: the rewritten line of Mozilla's replaces the inline assignment",
+  "decided_by": "pm, 26/11, read with the combined export",
+  "date": "2026-11-26",
+  "test": "gtest:TestStealthTRRContext.TheCloneOfATRRLoadInfoKeepsTheContext",
+  "budget": "removed"
+ },
+ {
+  "file": "dom/media/webrtc/transport/mdns_service/src/lib.rs",
+  "from": 0,
+  "to": 1,
+  "folder": "fingerprint/webrtc/declared-network",
+  "reason": "the join loop of the mDNS responder is wrapped in one call (stealth_note_first): the rewritten line of Mozilla's replaces the local that noted the first interface",
+  "decided_by": "part 2 of the unknown forms; the pm reads this raise with the combined export",
+  "date": "2026-11-26",
+  "test": "cargo:mdns_service::stealth_tests::stealth_the_first_interface_of_the_list_is_the_one_set_after_the_loop",
+  "budget": "removed"
  }
 ]
