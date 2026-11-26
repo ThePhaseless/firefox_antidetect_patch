@@ -65,7 +65,7 @@ def world(tmp_path):
     (source / "README").write_bytes(b"mozilla\n")
     git(source, "add", ".")
     git(source, "commit", "-qm", "upstream")
-    git(source, "tag", "TAG")
+    git(source, "tag", "FIREFOX_159_0_RELEASE")
     (source / OURS).parent.mkdir(parents=True)
     (source / OURS).write_bytes(b"// ours\n")
     git(source, "add", ".")
@@ -82,9 +82,11 @@ def world(tmp_path):
     ledger = json.loads((TOOLS / "birth-ledger.json").read_text(encoding="utf-8"))
     ledger.update(entries=[], chrome_js_http={})
     (series / "tools" / "birth-ledger.json").write_text(json.dumps(ledger), encoding="utf-8")
-    (series / "UPSTREAM.json").write_text(json.dumps({"mozilla_tag": "TAG", "source_branch": "main", "exported_from": "",
+    (series / "UPSTREAM.json").write_text(json.dumps({"mozilla_tag": "FIREFOX_159_0_RELEASE", "source_branch": "main", "exported_from": "",
                                                       "exported_tree": ""}), encoding="utf-8")
     (series / "SERIES").write_text("", encoding="utf-8")
+    (series / FOLDER).mkdir(parents=True)                  # series-02: the folder states its relation to Mozilla, by hand
+    (series / FOLDER / "FOLDER.json").write_text(json.dumps({"relation": "product"}, indent=1) + chr(10), encoding="utf-8")
     (series / ".gitignore").write_text("__pycache__/\n", encoding="utf-8")
     git(series, "init", "-q")
     git(series, "add", "-A")
@@ -99,7 +101,7 @@ def run_gate(world, gate=None):
     """`engine.py export` of the series of `world`: the engine of this module, pointed at the series, through the gate."""
     series, source, head = world
     with engine.rebased(series):
-        (gate or export_gate.gate)(source, head, lambda scratch: engine.export_into(scratch, source, "TAG", head), series)
+        (gate or export_gate.gate)(source, head, lambda scratch: engine.export_into(scratch, source, "FIREFOX_159_0_RELEASE", head), series)
 
 
 @pytest.fixture(autouse=True)
@@ -126,7 +128,7 @@ def test_the_rehearsal_case_is_refused_by_the_old_order_and_written_by_the_new_o
     # the old order: the tests of the tools commit are red on the old series, so the export that turns them green is refused
     with pytest.raises(SystemExit, match="(?s)red before the write.*test_the_export_wrote_the_folder_of_our_file"):
         run_gate(world, gate=old_order)
-    assert snapshot(series) == before and not (series / FOLDER).exists()
+    assert snapshot(series) == before and not (series / FOLDER / "src").exists()
     # the new order: the same tests run on the series the export writes, and they are green
     run_gate(world)
     assert (series / FOLDER / "src" / OURS).read_bytes() == b"// ours\n"
@@ -148,7 +150,7 @@ def test_a_red_on_the_series_it_writes_leaves_the_checkout_byte_identical(world,
     message = str(stopped.value)
     assert message.startswith("FAIL ") and "red on what export writes" in message, message
     assert "\nnext: " in message and "Rule: docs/decisions/series-01-export-is-the-only-writer.md" in message, message
-    assert snapshot(series) == before and not (series / FOLDER).exists()
+    assert snapshot(series) == before and not (series / FOLDER / "src").exists()
     assert git(series, "status", "--porcelain", "--ignored").replace("__pycache__/", "") == status.replace("__pycache__/", "")
     assert len(worktrees(series)) == 1, "the scratch tree is removed on a red"
     assert not any(Path(line.split()[0]).name == "s" for line in worktrees(series)[1:])
