@@ -14,6 +14,7 @@
 #include "js/RootingAPI.h"  // JS::Handle, JS::MutableHandle
 #include "js/TypeDecls.h"   // JS::Latin1Char
 #include "vm/SavedFrame.h"  // js::SavedFrame
+#include "vm/SavedStacks.h"  // js::UnwrapSavedFrame
 #include "vm/StringType.h"  // JSAtom, JSLinearString accessors
 
 // Stealth: skip Juggler's frames from stack traces visible to web content.
@@ -51,24 +52,82 @@ inline bool StealthIsJugglerFrameSource(JSAtom* source) {
   return true;
 }
 
-// BuildStackString, in its walk over the frames, right after it has found the
-// next frame to show (|aNextFrame|): when the current frame |aFrame| is one of
-// Juggler's, the walk moves on to the next frame, carrying the async flag of
-// that step, and this answers true so that the hook's `continue` skips the
-// frame in Mozilla's own loop. Otherwise it changes nothing and answers false.
-// The three effects (|aFrame| = |aNextFrame|, |*aSkippedAsync| =
-// |aSkippedNextAsync|, the loop's `continue`) are the three statements the hook
-// used to carry inline.
-inline bool StealthSkipJugglerFrame(JS::MutableHandle<js::SavedFrame*> aFrame,
-                                    JS::Handle<js::SavedFrame*> aNextFrame,
-                                    bool* aSkippedAsync,
-                                    bool aSkippedNextAsync) {
-  if (!StealthIsJugglerFrameSource(aFrame->getSource())) {
-    return false;
+// BuildStackString walks the frames of a stack and shows every one the reader
+// may see. Juggler's frames are not shown, and the walk never meets one: the
+// two places where it takes a frame to show are replaced by these functions,
+// which give back the first frame that is not Juggler's.
+//
+// The async flag is the one of the step that found the frame that is given back:
+// the step from the last of Juggler's frames to it, or the step Mozilla's own
+// call made when none was skipped. The flag of a step over a frame of
+// Juggler's is not carried, as when the walk skipped such a frame itself: the
+// frame was shown to nobody, and what it stood for (an async link above it, its
+// own asyncCause) is not told by the frame that follows.
+//
+// Mozilla's own call that the hook replaces is js::UnwrapSavedFrame for the
+// first frame (public, declared in vm/SavedStacks.h), and for the next frame
+// js::GetFirstSubsumedFrame, which is private to SavedStacks.cpp: the next frame
+// after a frame of Juggler's is found with js::UnwrapSavedFrame of its parent,
+// which is the same search (it unwraps the frame it is given, which is a plain
+// SavedFrame here, and then calls GetFirstSubsumedFrame) with the same flag.
+//
+// The first frame of the stack: js::UnwrapSavedFrame, as Mozilla's call, then,
+// while the frame is Juggler's, the first subsumed frame of its parent.
+//
+// V8 format marks the last frame by the absence of a next one. When Juggler's
+// frames end the stack, Mozilla's loop met the first of them as the next frame
+// of the last one shown, so that frame was not the last and kept its newline.
+// StealthFirstVisibleFrame notes, for the frame it is asked about, that it
+// dropped such a tail, and StealthIsLastFrame answers the loop's `!nextFrame`
+// with that in mind: the same output as the loop that skipped the frames itself.
+inline bool& StealthJugglerTailDropped() {
+  static thread_local bool sDropped = false;
+  return sDropped;
+}
+
+inline js::SavedFrame* StealthUnwrapVisibleFrame(
+    JSContext* aCx, JSPrincipals* aPrincipals, JS::Handle<JSObject*> aStack,
+    JS::SavedFrameSelfHosted aSelfHosted, bool& aSkippedAsync,
+    bool* aDroppedJuggler = nullptr) {
+  JS::Rooted<js::SavedFrame*> frame(
+      aCx,
+      js::UnwrapSavedFrame(aCx, aPrincipals, aStack, aSelfHosted, aSkippedAsync));
+  while (frame && StealthIsJugglerFrameSource(frame->getSource())) {
+    if (aDroppedJuggler) {
+      *aDroppedJuggler = true;
+    }
+    JS::Rooted<JSObject*> parent(aCx, frame->getParent());
+    // GetFirstSubsumedFrame of no frame says "no async frame skipped": so does this.
+    aSkippedAsync = false;
+    frame = js::UnwrapSavedFrame(aCx, aPrincipals, parent, aSelfHosted,
+                                 aSkippedAsync);
   }
-  aFrame.set(aNextFrame.get());
-  *aSkippedAsync = aSkippedNextAsync;
-  return true;
+  return frame;
+}
+
+// The next frame of the walk: the first frame from |aFrame| (the parent of the
+// frame being shown) that the reader may see and that is not Juggler's.
+// |aFirstSubsumed| is Mozilla's own search for it, js::GetFirstSubsumedFrame,
+// which this function cannot name (it is private to SavedStacks.cpp); the hook
+// passes the same arguments Mozilla's call had.
+inline js::SavedFrame* StealthFirstVisibleFrame(
+    JSContext* aCx, JSPrincipals* aPrincipals, JS::Handle<js::SavedFrame*> aFrame,
+    JS::SavedFrameSelfHosted aSelfHosted, bool& aSkippedAsync) {
+  JS::Rooted<JSObject*> from(aCx, aFrame.get());
+  // GetFirstSubsumedFrame of no frame says "no async frame skipped", and
+  // UnwrapSavedFrame of no frame leaves the flag alone: so the flag is set here.
+  aSkippedAsync = false;
+  bool droppedJuggler = false;
+  js::SavedFrame* const next = StealthUnwrapVisibleFrame(
+      aCx, aPrincipals, from, aSelfHosted, aSkippedAsync, &droppedJuggler);
+  StealthJugglerTailDropped() = droppedJuggler && !next;
+  return next;
+}
+
+// BuildStackString's `!nextFrame` for the V8 format, right after the call above for the same frame: no next frame, and no
+// tail of Juggler's frames dropped after this one.
+inline bool StealthIsLastFrame(bool aNoNextFrame) {
+  return aNoNextFrame && !StealthJugglerTailDropped();
 }
 
 #endif  // vm_StealthStackFrames_h

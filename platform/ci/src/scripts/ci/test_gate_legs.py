@@ -227,6 +227,8 @@ def cases() -> list:
         add("gate legs: the command exits 0 and says ok on a gate with them", res.returncode == 0 and res.stdout.startswith("ok:"))
     # the cargo job: the unit tests of OUR Rust in WebRender run on a GitHub runner, and a run in which none of ours ran is red
     out.extend(cargo_cases(gate))
+    # the runner's screen on Windows: the wrapper's e2e legs declare 1920x1080 and read it back, as the wrapper's own e2e jobs do
+    out.extend(display_cases(gate))
     # the package manifest A/B: the published engine's archives against a build's, a reusable workflow like the cargo one
     out.extend(package_cases(gate))
     return out
@@ -252,16 +254,26 @@ def cargo_cases(gate: dict) -> list:
 
     mod_b = "render_backend::stealth_shared_fonts::tests::"
     mdns = "stealth_tests::"
-    assert set(cargo_oracles.OURS) == {mod_b, mdns}
+    glean = cargo_oracles.GLEAN_TEST
+    assert set(cargo_oracles.OURS) == {mod_b, mdns, glean}
     floor = cargo_oracles.OURS
-    rows = [(mod_b + "t%d" % i, "ok") for i in range(floor[mod_b])] + [(mdns + "t%d" % i, "ok") for i in range(floor[mdns])]
+    rows = ([(mod_b + "t%d" % i, "ok") for i in range(floor[mod_b])] + [(mdns + "t%d" % i, "ok") for i in range(floor[mdns])]
+            + [(glean, "ok")] * floor[glean])
     add("cargo: a log with every module of ours at its floor is green", cargo_oracles.judge(_log(*rows)) == [])
     add("cargo: a log with no test of ours is red (cargo itself is green on `0 passed`)", len(cargo_oracles.judge(_log(("tests::other", "ok")))) == len(cargo_oracles.OURS))
     short = [r for r in rows if r != (mod_b + "t0", "ok")]
     add("cargo: a module one test below its floor is red and names the module", any(mod_b in r for r in cargo_oracles.judge(_log(*short))))
     add("cargo: a log without the test of mdns_service (a tree that does not have it: cargo says `0 passed`) is red and names it",
         any(mdns in r for r in cargo_oracles.judge(_log(*[r for r in rows if not r[0].startswith(mdns)]))))
-    add("cargo: the test of mdns_service that failed is red", any("FAILED" in r for r in cargo_oracles.judge(_log(*rows[:-1], (mdns + "t0", "FAILED")))))
+    add("cargo: the test of mdns_service that failed is red",
+        any("FAILED" in r for r in cargo_oracles.judge(_log(*[r for r in rows if r[0] != mdns + "t0"], (mdns + "t0", "FAILED")))))
+    # the test of upstream's that the glean-core backport carries: a tree without the backport has no such test (cargo says `0 passed`: red, the row is red on the code as
+    # vendored), with it the row is green; a failure of it is red
+    add("cargo: a log without the glean-core test (the crate as vendored, without the backport: cargo says `0 passed` for the filter) is red and names it",
+        any(glean in r for r in cargo_oracles.judge(_log(*[r for r in rows if r[0] != glean]))))
+    add("cargo: the glean-core test that failed is red", any("FAILED" in r for r in cargo_oracles.judge(_log(*[r for r in rows if r[0] != glean], (glean, "FAILED")))))
+    add("cargo: the glean-core filter is the full path of the one test, a path under its module (dispatcher::test::), and the row's floor is 1",
+        cargo_oracles.GLEAN_FILTERS == (glean,) and glean.startswith("dispatcher::test::") and floor[glean] == 1)
     failing = [(rows[0][0], "FAILED")] + rows[1:]
     add("cargo: a test of ours that failed is red", any("FAILED" in r for r in cargo_oracles.judge(_log(*failing))))
     ignored = [(rows[0][0], "ignored")] + rows[1:]
@@ -291,6 +303,11 @@ def cargo_cases(gate: dict) -> list:
             and not decl.search("#[cfg(test)] mod stealth_tests;\n"))
         add("cargo: lib.rs of mdns_service declares the module of ours, for the tests only, on one registration line (`#[cfg(test)] mod stealth_tests;` and its marker)",
             bool(decl.search((ms / "lib.rs").read_text(encoding="utf-8").replace("\r\n", "\n"))))
+    # glean-core: the test the backport carries is in the vendored crate's dispatcher tests, once, as a #[test] fn
+    gd = (ROOT / "third_party" / "rust" / "glean-core" / "src" / "dispatcher" / "mod.rs").read_text(encoding="utf-8").replace("\r\n", "\n")
+    name = glean.rsplit("::", 1)[1]
+    add("cargo: the glean-core test named by the row is a #[test] fn of mod test in glean-core's dispatcher/mod.rs, once (the backport carries it)",
+        gd.count("    #[test]\n    fn %s()" % name) == 1 and gd.count("fn %s(" % name) == 1 and "\nmod test {" in gd)
     wb = (wr / "webrender" / "Cargo.toml").read_text(encoding="utf-8")
     gr = (wr / "wr_glyph_rasterizer" / "Cargo.toml").read_text(encoding="utf-8")
     add("cargo: the dev-dependencies the job drops are in the manifests (mozangle once; glutin, glutin-winit, winit)",
@@ -309,8 +326,10 @@ def cargo_cases(gate: dict) -> list:
         and sum(1 for j in gate["jobs"].values() if "cargo-tests.yml" in str(j.get("uses", ""))) == 1)
     add("cargo: cargo-tests.yml is a reusable workflow, and runs on its own only for a push to latitude/*-oracles",
         set(on) == {"workflow_call", "push"} and on["push"].get("branches") == ["latitude/*-oracles"])
-    add("cargo: the job has 15 minutes a leg, on a GitHub runner of each system (the Latitude node is for compiling)",
-        job.get("timeout-minutes") == 15 and {r["runner"] for r in job["strategy"]["matrix"]["include"]} == {"ubuntu-24.04", "windows-latest"}
+    # 18 minutes: the old max of 12m22s plus the glean-core step (2m03 on win, run 45718525016: job 9m41s win, 6m02s linux) is about 14.5 minutes, plus 25%; to be set
+    # again to the largest measured time plus 25% when three runs have the third run
+    add("cargo: the job has 18 minutes a leg (15 before the glean-core run: its worst case is about 14.5 minutes, plus 25%), on a GitHub runner of each system (the Latitude node is for compiling)",
+        job.get("timeout-minutes") == 18 and {r["runner"] for r in job["strategy"]["matrix"]["include"]} == {"ubuntu-24.04", "windows-latest"}
         and "latitude-" not in str(job.get("runs-on")) and "self-hosted" not in text)
     add("cargo: no cache is written (a target/ entry would evict release.yml's compile cache) and none is restored",
         "actions/cache" not in text and "Swatinem" not in text and "SCCACHE" not in text)
@@ -332,7 +351,19 @@ def cargo_cases(gate: dict) -> list:
         len(verdict) == 1 and len(test) == 1 and steps.index(verdict[0]) > steps.index(test[0]) and "always()" in str(verdict[0].get("if", ""))
         and "continue-on-error" not in verdict[0] and "|| true" not in verdict[0]["run"] and "set +e" not in verdict[0]["run"]
         and "gfx/wr/cargo-test.log" in verdict[0]["run"])
-    second = [s for s in steps if "cargo test --lib" in str(s.get("run", ""))]
+    second = [s for s in steps if "cargo test --lib" in str(s.get("run", "")) and s.get("working-directory") == "dom/media/webrtc/transport/mdns_service"]
+    third = [s for s in steps if "cargo test --lib" in str(s.get("run", "")) and s.get("working-directory") == "third_party/rust/glean-core"]
+    tcmd = str(third[0]["run"]) if len(third) == 1 else ""
+    add("cargo: the test of the glean-core backport has its own cargo run (`--lib`, in third_party/rust/glean-core, standalone: [workspace], the unused dev-dependencies dropped and checked), after mdns_service's, even if that was red",
+        len(third) == 1 and len(second) == 1 and steps.index(third[0]) > steps.index(second[0]) and "!cancelled()" in str(third[0].get("if", ""))
+        and "set -eo pipefail" in tcmd and "[workspace]" in tcmd and "exit 1" in tcmd and "continue-on-error" not in third[0]
+        and all(d in tcmd for d in ("criterion", "pulldown-cmark-to-cmark", "xshell", "yaml-rust2"))
+        and "env_logger" not in tcmd and "tempfile" not in tcmd and "ctor" not in tcmd
+        and tcmd.split(" -- ", 1)[-1].split(" 2>&1")[0].split() == list(cargo_oracles.GLEAN_FILTERS)
+        and "-p " not in tcmd and "--workspace" not in tcmd and "--no-fail-fast" not in tcmd and "tee -a" in tcmd and "gfx/wr/cargo-test.log" in tcmd
+        and len(verdict) == 1 and steps.index(verdict[0]) > steps.index(third[0]))
+    add("cargo: the sparse tree has the directory of glean-core",
+        len(tree) == 1 and "'/third_party/rust/glean-core/'" in run[tree[0]])
     scmd = str(second[0]["run"]) if len(second) == 1 else ""
     add("cargo: the test of mdns_service has its own cargo run (`--lib`, in its directory, standalone: [workspace], no gecko-profiler), after WebRender's, even if that was red",
         len(second) == 1 and len(test) == 1 and steps.index(second[0]) > steps.index(test[0]) and "if" in second[0] and "!cancelled()" in str(second[0]["if"])
@@ -349,6 +380,127 @@ def cargo_cases(gate: dict) -> list:
         len(drop) == 1 and len(test) == 1 and drop[0] < steps.index(test[0]) and "exit 1" in str(steps[drop[0]]["run"]))
     keep = [s for s in steps if (s.get("with") or {}).get("path") == "gfx/wr/cargo-test.log"]
     add("cargo: the log is kept after a red run too", len(keep) == 1 and "always()" in str(keep[0].get("if", "")))
+    return out
+
+
+# ---------------------------------------------------------------------------------------------------- the runner's screen on Windows
+
+#: The step every Windows leg of the wrapper's e2e carries (wrapper PR 609, run 45730213378 of oss-invisible/playwright): the runner's screen is 1024x768 and the
+#: browser window of the e2e is 1936x1048, so the OS cursor cannot be parked outside the window (tests/_os_cursor.py) and a native move for it reaches the page.
+DISPLAY_STEP = "The runner's screen is 1920x1080, larger than the browser window is tall (read back)"
+DISPLAY_SET = "Set-DisplayResolution -Width 1920 -Height 1080 -Force"
+DISPLAY_READBACK = "if ($b.Width -lt 1920 -or $b.Height -lt 1080) {"
+
+
+def _condition(expr, leg: dict) -> bool:
+    """The `if:` of a step for one leg of the matrix: the forms gate.yml uses (`matrix.<key>`, ==, &&, ||, !, startsWith)."""
+    if expr is None:
+        return True
+    text = str(expr).strip()
+    if text.startswith("${{") and text.endswith("}}"):
+        text = text[3:-2].strip()
+    text = re.sub(r"startsWith\(\s*matrix\.(\w+)\s*,\s*('[^']*')\s*\)", lambda m: "(str(leg.get(%r, '')).startswith(%s))" % (m.group(1), m.group(2)), text)
+    text = re.sub(r"matrix\.(\w+)", lambda m: "leg.get(%r)" % m.group(1), text)
+    text = text.replace("&&", " and ").replace("||", " or ")
+    text = re.sub(r"!(?!=)", " not ", text)
+    return bool(eval(text, {"__builtins__": {}, "str": str}, {"leg": leg}))
+
+
+def display_problems(job: dict) -> list:
+    """What is wrong with the screen step of a job like `wrapper-e2e`: every Windows leg whose suite is a wrapper.e2e.* one runs a step of exactly that name and body, before the
+    step of the suite, and no Linux leg runs it; the read-back exits 1 below 1920x1080."""
+    steps = job.get("steps") or []
+    legs = [leg for leg in job["strategy"]["matrix"]["include"]]
+    named = [s for s in steps if s.get("name") == DISPLAY_STEP]
+    suite_at = next((i for i, s in enumerate(steps) if str(s.get("name", "")).startswith(SUITE_STEP)), -1)
+    found = []
+    if len(named) != 1:
+        return ["the job has %d steps named %r, one is expected" % (len(named), DISPLAY_STEP)]
+    step = named[0]
+    body = str(step.get("run", ""))
+    if step.get("shell") != "pwsh":
+        found.append("the step does not run in pwsh")
+    if DISPLAY_SET not in body:
+        found.append("the step does not set the mode with `%s`" % DISPLAY_SET)
+    if DISPLAY_READBACK not in body or "exit 1" not in body.split(DISPLAY_READBACK, 1)[-1] or "Write-Error" not in body.split(DISPLAY_READBACK, 1)[-1]:
+        found.append("the read-back does not fail (Write-Error, exit 1) below 1920x1080")
+    if "VirtualScreen" not in body:
+        found.append("the screen is not read back from the VirtualScreen")
+    if suite_at < 0 or steps.index(step) > suite_at:
+        found.append("the step is not before the step of the suite")
+    for leg in legs:
+        windows_e2e = leg.get("os") == "windows" and str(leg.get("suite", "")).startswith("wrapper.e2e.")
+        runs = _condition(step.get("if"), leg)
+        if windows_e2e and not runs:
+            found.append("the Windows leg %s does not run it" % leg.get("suite"))
+        if not windows_e2e and runs:
+            found.append("the leg %s (%s) runs it, and is not a Windows wrapper.e2e leg" % (leg.get("suite"), leg.get("os")))
+    return found
+
+
+def display_cases(gate: dict) -> list:
+    import copy
+
+    out = []
+
+    def add(name, ok):
+        out.append((name, bool(ok)))
+
+    job = gate["jobs"]["wrapper-e2e"]
+    legs = job["strategy"]["matrix"]["include"]
+    windows_e2e = [l["suite"] for l in legs if l.get("os") == "windows" and str(l["suite"]).startswith("wrapper.e2e.")]
+    add("screen: gate.yml has Windows wrapper.e2e legs (the step is for them)", len(windows_e2e) >= 10)
+    add("screen: every Windows wrapper.e2e leg of gate.yml has the step, in the right place, and no other leg has it: %s" % (", ".join(display_problems(job)) or "ok"),
+        display_problems(job) == [])
+    add("screen: the wrapper.unit.* legs of Windows, which run no browser, do not get it", any(str(l["suite"]).startswith("wrapper.unit.") and l.get("os") == "windows" for l in legs)
+        and not any(_condition(next(s for s in job["steps"] if s.get("name") == DISPLAY_STEP).get("if"), l) for l in legs if str(l["suite"]).startswith("wrapper.unit.")))
+
+    def mutated(change):
+        j = copy.deepcopy(job)
+        change(j)
+        return display_problems(j)
+
+    def drop(j):
+        j["steps"] = [s for s in j["steps"] if s.get("name") != DISPLAY_STEP]
+
+    def late(j):
+        step = next(s for s in j["steps"] if s.get("name") == DISPLAY_STEP)
+        j["steps"].remove(step)
+        j["steps"].append(step)
+
+    def weak(j):
+        step = next(s for s in j["steps"] if s.get("name") == DISPLAY_STEP)
+        step["run"] = step["run"].replace("$b.Width -lt 1920 -or $b.Height -lt 1080", "$b.Width -lt 1024 -or $b.Height -lt 768")
+
+    def no_exit(j):
+        step = next(s for s in j["steps"] if s.get("name") == DISPLAY_STEP)
+        step["run"] = step["run"].replace("exit 1", "")
+
+    def other_mode(j):
+        step = next(s for s in j["steps"] if s.get("name") == DISPLAY_STEP)
+        step["run"] = step["run"].replace("-Width 1920 -Height 1080", "-Width 1280 -Height 1024")
+
+    def renamed(j):
+        next(s for s in j["steps"] if s.get("name") == DISPLAY_STEP)["name"] = "The runner's screen"
+
+    def everywhere(j):
+        next(s for s in j["steps"] if s.get("name") == DISPLAY_STEP).pop("if")
+
+    def linux_only(j):
+        next(s for s in j["steps"] if s.get("name") == DISPLAY_STEP)["if"] = "matrix.os == 'linux'"
+
+    def one_leg_short(j):
+        next(s for s in j["steps"] if s.get("name") == DISPLAY_STEP)["if"] = "matrix.os == 'windows' && matrix.suite != 'wrapper.e2e.page'"
+
+    add("screen: a job without the step is red", mutated(drop) != [])
+    add("screen: the step after the suite is red", mutated(late) != [])
+    add("screen: a read-back that accepts 1024x768 is red", mutated(weak) != [])
+    add("screen: a read-back that does not exit 1 is red", mutated(no_exit) != [])
+    add("screen: another mode than 1920x1080 is red", mutated(other_mode) != [])
+    add("screen: another name is red", mutated(renamed) != [])
+    add("screen: the step on every leg, Linux included, is red", mutated(everywhere) != [])
+    add("screen: the step for Linux only is red", mutated(linux_only) != [])
+    add("screen: a Windows wrapper.e2e leg without it is red and names it", any("wrapper.e2e.page" in p for p in mutated(one_leg_short)))
     return out
 
 

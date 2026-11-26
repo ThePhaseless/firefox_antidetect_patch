@@ -24,51 +24,59 @@ const HOOK = 'STEALTH-HOOK(stillborn/telemetry)';
 test('the only child the pingsender road starts is started by our runAsync', () => {
   const text = fs.readFileSync(path.join(APP, 'TelemetrySend.sys.mjs'), 'utf8');
   // The only start of the pingsender in TelemetrySend.sys.mjs goes through
-  // StealthPingsender.runAsync: a second `.runAsync(` that Mozilla adds to a
-  // new version would start a child with no road in its environment.
+  // StealthRoutedProcess(process).runAsync, with Mozilla's own arguments: a
+  // second `.runAsync(` that Mozilla adds to a new version would start a child
+  // with no road in its environment.
   const starts = text.split('\n').filter(l => /\.runAsync\(/.test(l));
   assert.deepEqual(starts.map(l => l.trim()),
-    [`StealthPingsender.runAsync(process, params, observer); // ${HOOK}`]);
+    [`StealthRoutedProcess(process).runAsync(params, params.length, observer); // ${HOOK}`]);
   // Near-miss guard: the call exists.
   assert.ok(starts.length === 1, 'the start of the pingsender moved');
 });
 
-test('the program is chosen by our invocation() before it is used', () => {
+test('Mozilla chooses its program and never starts it: the only start is the routed one', () => {
   const text = fs.readFileSync(path.join(APP, 'TelemetrySend.sys.mjs'), 'utf8');
-  // The only place `exeName` is turned into a file to start comes after the
-  // override that makes it `firefox --backgroundtask pingsender`: a second use
-  // of it before the override (a program of Mozilla's choice) fails here.
-  const override = text.indexOf('({ exeName, params } = StealthPingsender.invocation());');
-  assert.ok(override > 0, 'the override of the program is gone');
-  const uses = [...text.matchAll(/exe\.append\(exeName\)/g)].map(m => m.index);
-  assert.equal(uses.length, 1, 'a second place starts a program');
-  assert.ok(uses[0] > override, 'the program is used before our override');
+  // Mozilla's choice of the program (`exeName`, `params`) stays as Mozilla wrote
+  // it, with no override of ours after it; what starts is the routed child.
+  assert.ok(!text.includes('StealthPingsender.invocation'), "an override of Mozilla's program is back");
+  const uses = [...text.matchAll(/exe\.append\(exeName\)/g)];
+  assert.equal(uses.length, 1, 'a second place builds a program');
+  assert.ok(text.includes('StealthRoutedProcess(process).runAsync('), 'the routed start is gone');
 });
 
 // Load the own file on stubs: the one import is replaced by a stub object and
 // `export` is dropped.
-function load(platform, globals) {
-  let src = fs.readFileSync(path.join(APP, 'StealthPingsender.sys.mjs'), 'utf8');
+function load(platform, globals, mutate = s => s) {
+  let src = mutate(fs.readFileSync(path.join(APP, 'StealthPingsender.sys.mjs'), 'utf8'));
   src = src.replace(/^import \{ AppConstants \}.*$/m, 'const AppConstants = __AppConstants;');
   src = src.replace(/^export /gm, '');
-  src += '\nmodule.exports = { PINGSENDER_ROUTE_ENV, attachCallbacks, invocation, runAsync };\n';
+  src += '\nmodule.exports = { PINGSENDER_ROUTE_ENV, attachCallbacks, invocation, StealthRoutedProcess };\n';
   const sandbox = {
     __AppConstants: { MOZ_APP_NAME: 'firefox', platform },
     module: { exports: {} },
-    Ci: { nsIFile: 'nsIFile' },
+    Ci: { nsIFile: 'nsIFile', nsIProcess: 'nsIProcess' },
     ...globals,
   };
   vm.runInNewContext(src, sandbox);
   return sandbox.module.exports;
 }
 
-function stubs({ loaded = false, registry = null, log = [] } = {}) {
+function stubs({ loaded = false, registry = null, log = [], throwOnStart = false } = {}) {
+  // The child the routed start makes: a process of its own, logged.
+  const child = {
+    init(file) { log.push(['init', file.appended]); },
+    runAsync(args, n, obs) {
+      if (throwOnStart) throw new Error('no start');
+      log.push(['run', JSON.stringify(args), n, obs]);
+    },
+  };
   return {
     log,
     globals: {
+      Cc: { '@mozilla.org/process/util;1': { createInstance: () => child } },
       Services: {
         env: { set: (k, v) => log.push(['env', k, v]), get: () => '' },
-        dirsvc: { get: () => ({ append() {}, path: 'P/prefs.js' }) },
+        dirsvc: { get: () => ({ append(n) { this.appended = n; }, path: 'P/prefs.js' }) },
       },
       Cu: { isESModuleLoaded: () => loaded },
       ChromeUtils: { importESModule: () => ({ TargetRegistry: registry }) },
@@ -97,39 +105,128 @@ test('the callbacks reach the channel only when given', () => {
   assert.equal(req.channel.notificationCallbacks, cb);
 });
 
-test('the road is in the environment only around the start of the child', () => {
+test("the child is firefox --backgroundtask pingsender with Mozilla's parameters, and Mozilla's own process is never started", () => {
   const s = stubs();
   const m = load('win', s.globals);
   const observer = {};
-  const proc = {
-    runAsync(params, n, obs) {
-      s.log.push(['run', JSON.stringify(params), n, obs === observer]);
-    },
-  };
-  m.runAsync(proc, ['a'], observer);
-  assert.equal(s.log.length, 3);
-  assert.equal(s.log[0][0], 'env');
-  assert.equal(s.log[0][1], 'STEALTHFOX_PINGSENDER_ROUTE');
-  assert.equal(s.log[0][2], JSON.stringify({ proxy: null, prefs: 'P/prefs.js' }));
-  assert.deepEqual(s.log[1], ['run', '["a"]', 1, true]);
-  assert.deepEqual(s.log[2], ['env', 'STEALTHFOX_PINGSENDER_ROUTE', '']);
+  // Mozilla's process: the program it chose (pingsender), init'd and never run.
+  const proc = { runAsync() { s.log.push(['mozilla-process-started']); } };
+  m.StealthRoutedProcess(proc).runAsync(['u', 'p'], 2, observer);
+  // Control: taking the routing away (calling Mozilla's process) is what this
+  // would see instead.
+  assert.ok(!s.log.some(e => e[0] === 'mozilla-process-started'), "Mozilla's own program was started");
+  const runs = s.log.filter(e => e[0] === 'run');
+  assert.equal(runs.length, 1);
+  assert.deepEqual(s.log.find(e => e[0] === 'init'), ['init', 'firefox.exe']);
+  assert.equal(runs[0][1], '["--backgroundtask","pingsender","u","p"]');
+  assert.equal(runs[0][2], 4);
+  assert.equal(runs[0][3], observer);
+});
+
+test('the road is in the environment only around the start of the child', () => {
+  const s = stubs();
+  const m = load('win', s.globals);
+  m.StealthRoutedProcess({ runAsync() {} }).runAsync(['a'], 1, {});
+  const env = s.log.filter(e => e[0] === 'env');
+  assert.equal(env.length, 2);
+  assert.equal(env[0][1], 'STEALTHFOX_PINGSENDER_ROUTE');
+  assert.equal(env[0][2], JSON.stringify({ proxy: null, prefs: 'P/prefs.js' }));
+  assert.deepEqual(env[1], ['env', 'STEALTHFOX_PINGSENDER_ROUTE', '']);
+  const at = k => s.log.findIndex(e => e[0] === k);
+  assert.ok(s.log.indexOf(env[0]) < at('run') && at('run') < s.log.indexOf(env[1]));
 });
 
 test('the environment is reset when the child cannot be started', () => {
-  const s = stubs();
+  const s = stubs({ throwOnStart: true });
   const m = load('win', s.globals);
-  const proc = { runAsync() { throw new Error('no start'); } };
-  assert.throws(() => m.runAsync(proc, [], {}), /no start/);
+  const proc = { runAsync() {} };
+  assert.throws(() => m.StealthRoutedProcess(proc).runAsync([], 0, {}), /no start/);
   assert.deepEqual(s.log.at(-1), ['env', 'STEALTHFOX_PINGSENDER_ROUTE', '']);
 });
 
 test('the proxy record comes from the target registry when Juggler loaded it', () => {
   const run = registry => {
     const s = stubs({ loaded: true, registry });
-    load('win', s.globals).runAsync({ runAsync() {} }, [], {});
-    return JSON.parse(s.log[0][2]).proxy;
+    load('win', s.globals).StealthRoutedProcess({ runAsync() {} }).runAsync([], 0, {});
+    return JSON.parse(s.log.find(e => e[0] === 'env')[2]).proxy;
   };
   const road = proxy => ({ roadOfSession: id => ({ decided: true, proxy: proxy && { id } }) });
   assert.deepEqual(run(road(true)), { id: 0 });
   assert.equal(run(road(null)), null);
+});
+
+// ---- Mozilla's own process is never run ----
+// Mozilla's runPingSender initialises `process` on its own program (pingsender[.exe], or the background task when a Nimbus
+// variable says so) and the hook hands it to StealthRoutedProcess, which starts a child of its own. No run of Mozilla's
+// process may follow its init: not run, runAsync, runw nor runwAsync, in TelemetrySend.sys.mjs or in our file.
+
+const RUNS = /\bprocess\.(run|runAsync|runw|runwAsync)\(/g;
+const runsOfMozillasProcess = text => [...text.matchAll(RUNS)].map(m => m[0]);
+
+test("no run of Mozilla's process follows its init, in TelemetrySend.sys.mjs or in our file", () => {
+  const send = fs.readFileSync(path.join(APP, 'TelemetrySend.sys.mjs'), 'utf8');
+  const ours = fs.readFileSync(path.join(APP, 'StealthPingsender.sys.mjs'), 'utf8');
+  assert.deepEqual(runsOfMozillasProcess(send), []);
+  assert.deepEqual(runsOfMozillasProcess(ours), []);
+  // The init is there (Mozilla's own line), so the rule is about something.
+  assert.ok(/process\.init\(exe\)/.test(send), "Mozilla's init of the process is gone");
+});
+
+test("negative control: a run of Mozilla's process is found in either file", () => {
+  const send = fs.readFileSync(path.join(APP, 'TelemetrySend.sys.mjs'), 'utf8');
+  const ours = fs.readFileSync(path.join(APP, 'StealthPingsender.sys.mjs'), 'utf8');
+  const unhooked = send.replace('StealthRoutedProcess(process).runAsync(', 'process.runAsync(');
+  assert.notEqual(unhooked, send);
+  assert.deepEqual(runsOfMozillasProcess(unhooked), ['process.runAsync(']);
+  const routedToMozilla = ours.replace('child.runAsync(args, args.length, observer);', 'process.runAsync(params, count, observer);');
+  assert.notEqual(routedToMozilla, ours);
+  assert.deepEqual(runsOfMozillasProcess(routedToMozilla), ['process.runAsync(']);
+});
+
+test("the routed start never calls Mozilla's process, whatever the road", () => {
+  for (const loaded of [false, true]) {
+    const s = stubs({ loaded, registry: loaded ? { roadOfSession: () => ({ decided: true, proxy: null }) } : null });
+    const m = load('win', s.globals);
+    const ran = [];
+    const mozilla = Object.fromEntries(['run', 'runAsync', 'runw', 'runwAsync'].map(k => [k, () => ran.push(k)]));
+    m.StealthRoutedProcess(mozilla).runAsync(['u', 'p'], 2, {});
+    assert.deepEqual(ran, [], "Mozilla's process was run");
+    assert.equal(s.log.filter(e => e[0] === 'run').length, 1, 'only the routed child runs');
+  }
+});
+
+test("negative control: a start that goes back to Mozilla's process is seen by the behaviour test", () => {
+  const s = stubs();
+  const m = load('win', s.globals, src => src.replace('child.runAsync(args, args.length, observer);', 'process.runAsync(params, count, observer);'));
+  const ran = [];
+  m.StealthRoutedProcess({ runAsync: () => ran.push('runAsync') }).runAsync(['u', 'p'], 2, {});
+  assert.deepEqual(ran, ['runAsync']);
+});
+
+// ---- Mozilla's own choice is already the background task ----
+// With toolkit.telemetry.shutdownPingSender.backgroundtask.enabled (or the Nimbus variable) true, Mozilla's params start with
+// `--backgroundtask pingsender`. The child is `firefox --backgroundtask pingsender <urls and paths>` in both states: the pair
+// is not given twice (BackgroundTask_pingsender would read the second one as an endpoint and reject the task).
+
+const childArgs = params => {
+  const s = stubs();
+  load('win', s.globals).StealthRoutedProcess({ runAsync() {} }).runAsync(params, params.length, {});
+  return JSON.parse(s.log.find(e => e[0] === 'run')[1]);
+};
+
+test('pref off: Mozilla\'s params are the urls and paths, the child gets our pair once', () => {
+  assert.deepEqual(childArgs(['u1', 'p1', 'u2', 'p2']),
+    ['--backgroundtask', 'pingsender', 'u1', 'p1', 'u2', 'p2']);
+});
+
+test('pref on: Mozilla\'s params already start with the pair, the child still gets it once', () => {
+  assert.deepEqual(childArgs(['--backgroundtask', 'pingsender', 'u1', 'p1']),
+    ['--backgroundtask', 'pingsender', 'u1', 'p1']);
+  // The same child in both states.
+  assert.deepEqual(childArgs(['--backgroundtask', 'pingsender', 'u1', 'p1']), childArgs(['u1', 'p1']));
+});
+
+test('a url or path that looks like the pair later in the list is left alone', () => {
+  assert.deepEqual(childArgs(['u1', '--backgroundtask', 'pingsender']),
+    ['--backgroundtask', 'pingsender', 'u1', '--backgroundtask', 'pingsender']);
 });

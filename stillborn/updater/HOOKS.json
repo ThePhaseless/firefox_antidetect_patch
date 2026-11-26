@@ -79,6 +79,14 @@
  },
  {
   "file": "toolkit/mozapps/update/UpdateService.sys.mjs",
+  "function": "import {",
+  "kind": "add",
+  "form": "registration",
+  "line": "import { StealthNoneOffered } from \"resource://gre/modules/StealthUpdate.sys.mjs\"; // STEALTH-HOOK(stillborn/updater)",
+  "test": "node:juggler/tests/updater_refuses_what_follows_the_check.test.mjs#whatever the answer offered, the check reports none"
+ },
+ {
+  "file": "toolkit/mozapps/update/UpdateService.sys.mjs",
   "function": "export class UpdateService {",
   "kind": "add",
   "form": "anchor",
@@ -90,12 +98,11 @@
  {
   "file": "toolkit/mozapps/update/UpdateService.sys.mjs",
   "function": "export class CheckerService {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "    updates = StealthUpdate.noneOffered(updates); // STEALTH-HOOK(stillborn/updater)",
-  "test": "node:juggler/tests/updater_refuses_what_follows_the_check.test.mjs#whatever the answer offered, the check reports none",
-  "anchor": "the closing } of the try/catch of CheckerService.#updateCheck (updates = this.#parseUpdates(request);)",
-  "why": "updates is a local assigned inside the try; the hook needs the value Mozilla's parse produced and a catch handles parse errors, so it is a line after the catch (as before), not a guard or a wrap"
+  "kind": "rewrite",
+  "form": "wrap-expression",
+  "line": "      updates = StealthNoneOffered(this.#parseUpdates(request)); // STEALTH-HOOK(stillborn/updater)",
+  "removed": "      updates = this.#parseUpdates(request);",
+  "test": "node:juggler/tests/updater_refuses_what_follows_the_check.test.mjs#whatever the answer offered, the check reports none"
  },
  {
   "file": "toolkit/mozapps/update/moz.build",

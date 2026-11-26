@@ -2,7 +2,7 @@
 
 Category: other, spoof
 Prefs: none
-Test: gtest StealthPcProxyConfig.*, StealthTcpProxyRoad.*, StealthPcUdpProxyKinds.*, StealthUdpProxyBirth.*, StealthNrSocketBirth.* (dom/media/webrtc/transport/test/gtest), StealthSessionUdpProxy.* (netwerk/test/gtest/TestStealthSocksCredentials.cpp); StealthHttp3Socks.*, StealthNsProxyInfoKinds.*, StealthSocksUdpLayer.* (netwerk/test/gtest/TestStealthHttp3Socks.cpp, the HTTP/3 truth tables and the layer of an HTTP/3 socket, each with its control); the node tests the_udp_of_a_socks5_proxy_is_a_flag_of_its_proxy_info, the_flag_of_the_coherent_udp_has_a_bit_of_its_own, a_peer_connection_of_a_torn_down_window_keeps_its_proxy_config, a_tcp_socket_of_a_peer_connection_is_refused_when_its_proxy_lookup_fails, the_ice_name_is_resolved_in_the_context_of_the_peer_connection (the last three assert the only entry); modules/libpref/test/test_stealth_ice_prefs_locked.py (the only call of the lock); the e2e of invisible_playwright (srflx through the relay, proxy without UDP, TURN over TCP per context, two contexts, HTTP/3)
+Test: gtest StealthPcProxyConfig.*, StealthTcpProxyRoad.*, StealthPcUdpProxyKinds.*, StealthUdpProxyBirth.*, StealthNrSocketBirth.* (dom/media/webrtc/transport/test/gtest), StealthSessionUdpProxy.* (netwerk/test/gtest/TestStealthSocksCredentials.cpp); TestStealthLookupLoadInfo.* (netwerk/test/gtest/TestStealthLookupLoadInfo.cpp, the socket process and the parent replayed in the order of sending, with the control: a constructor without its message has no load info), and TestStealthTRRContext.* (network/doh) for the message of the origin attributes; StealthHttp3Socks.*, StealthNsProxyInfoKinds.*, StealthSocksUdpLayer.* (netwerk/test/gtest/TestStealthHttp3Socks.cpp, the HTTP/3 truth tables and the layer of an HTTP/3 socket, each with its control); the node tests the_udp_of_a_socks5_proxy_is_a_flag_of_its_proxy_info, the_flag_of_the_coherent_udp_has_a_bit_of_its_own, a_peer_connection_of_a_torn_down_window_keeps_its_proxy_config, a_tcp_socket_of_a_peer_connection_is_refused_when_its_proxy_lookup_fails, the_ice_name_is_resolved_in_the_context_of_the_peer_connection (the last three assert the only entry; the second of them also asserts that the channel the swap drops is never opened and that both lookups swap through one function); modules/libpref/test/test_stealth_ice_prefs_locked.py (the only call of the lock); the e2e of invisible_playwright (srflx through the relay, proxy without UDP, TURN over TCP per context, two contexts, HTTP/3)
 
 ## What it does
 
@@ -16,11 +16,21 @@ process with the proxy. A "socks" proxy without it, SOCKS4 and HTTP are a router
 HTTP/3 falls back to h2 by itself.
 
 The proxy is the one of the document, found by the same lookup Firefox uses for its TCP (ProxyConfigLookup, with the load
-info of the page, so the filters of the Juggler answer for the context of the page). `PcUdpProxy` (netwerk/socket/StealthPcUdpProxy)
+info of the page, so the filters of the Juggler answer for the context of the page). The load info is state of ours
+(netwerk/ipc/StealthDocumentChannel): the caller sets it on the statement before `ProxyConfigLookup::Create` (`StealthSetLookupLoadInfo`,
+"pending"), the first statement of `Create` takes it (`StealthEnterLookupLoadInfo`: pending becomes "active"), and it is read only by that
+one call, so a lookup never sees the load info of another; no Mozilla signature carries it. In the parent process, after Mozilla made the
+stand-in channel of the lookup, `StealthSwapLookupChannel` replaces it with the channel of the load info when the lookup has one; the channel
+Mozilla made is a stand-in nobody opened and nobody opens. In the socket process `ProxyConfigLookupChild::Create` sends the load info in a
+message of PSocketProcess, `StealthProxyLookupLoadInfo`, always (empty when empty), right before the constructor of PProxyConfigLookup; the parent parks
+it in the slot of the socket process actor (`SocketProcessParent::RecvStealthProxyLookupLoadInfo`) and the first statement of
+`RecvPProxyConfigLookupConstructor` takes it (`StealthTakeParkedLookupLoadInfo`). The messages of one protocol arrive in the order they were sent,
+the take empties the slot and the next message overwrites it, so a constructor takes the message sent for it and a lookup made in the parent process
+in between never reads it. The origin attributes of a DoH request travel the same way in a message of network/doh (`StealthProxyLookupOrigin`). `PcUdpProxy` (netwerk/socket/StealthPcUdpProxy)
 keeps the answer for one PeerConnection: no proxy (direct), SOCKS5, or a proxy that carries no UDP (blocked). A lookup that
 fails, or a document with no URI, is blocked: it never opens a road around the proxy.
 
-The TCP sockets of a PeerConnection follow the same rule. `WebrtcTCPSocket::OnProxyAvailable` opened the socket plain when the
+The TCP sockets of a PeerConnection follow the same rule. At the end of `WebrtcTCPSocket::OnProxyAvailable` Mozilla opens the socket plain when the
 lookup failed or gave a proxy of a type it does not know; `StealthTcpDirectRefused` (StealthIceResolverContext.cpp) closes it
 instead: only the answer "no proxy" opens a plain socket. And a PeerConnection always has a proxy config: Mozilla's
 `GetProxyConfig` returns none for a window that was torn down (a detached iframe, a closed popup), and a PeerConnection with no
@@ -42,8 +52,9 @@ The SOCKS5 connections of Necko tell the layer's pool the proxy (nsSOCKSIOLayer)
 socket asks for it. The sockets of the PeerConnections are made in the socket process, which opens no SOCKS5 connection of Necko's, so the
 parent also tells it: one message, `PSocketProcess::StealthWarmSocksUdp` (host, port, user, pass), at most once per proxy and per socket
 process and only for a proxy measured coherent, whose receiver (`SocketProcessChild::RecvStealthWarmSocksUdp`) calls the same
-`nsSOCKSUDPIOLayerWarm`. Endpoint and credentials travel in this message only. TURN over TCP and the HTTP tunnel build their lookup channel with the same function
-(`StealthNewChannelOfLoadInfo`, netwerk/ipc/StealthDocumentChannel).
+`nsSOCKSUDPIOLayerWarm`. Endpoint and credentials travel in this message only. TURN over TCP and the lookup of `ProxyConfigLookup` swap their channel through one function
+(`StealthSwapChannelOfLoadInfo`, netwerk/ipc/StealthDocumentChannel), which only makes the channel of the load info
+(`StealthNewChannelOfLoadInfo`) and replaces the old one in the caller's pointer.
 
 HTTP/3 through SOCKS5: the h3 Alt-Svc is kept, the host name is resolved (QUIC needs the address) and the socket carries the
 proxy; through a proxy that carries no UDP the handshake never completes and Firefox falls back to h2 by itself. neqo's own I/O
@@ -59,20 +70,22 @@ document's load info, so a page on the loopback, a `file:`, a `data:` or a docum
 
 Every hook is one line with the marker, in a form of the contract; the explanations are here and next to our functions.
 
-- `dom/media/webrtc/jsapi/PeerConnectionImpl.cpp`: one call of `StealthProxyConfigOf` (network/doh, StealthIceResolverContext.h) right after Mozilla's
-  `auto proxyConfig = GetProxyConfig();`, handing the config on in place (the window and the flag are the PeerConnection's private fields, passed by the
-  call), and one include in a block of ours.
-- `dom/media/webrtc/transport/ipc/WebrtcTCPSocket.{h,cpp}`: Mozilla's `OpenWithHttpProxy` is back. In `DoProxyConfigLookup` our code answers in place of Mozilla's channel
-  creation (`StealthNewChannelOfLoadInfo(mURI, flags, loadInfoArgs, &channel)`, with `flags` a local that also feeds `AsyncResolve`): the channel of the lookup carries the load
-  info of the document, so the proxy filters see the context of the page and not context 0. Two anchors call into `ipc/StealthWebrtcTcpSocket.h` through its one friend
-  (`StealthWebrtcTcpSocketAccess`, a `friend struct` line in the class): at the end of `OnProxyAvailable`, after the dispatch on the proxy type (a failed lookup or an unknown
-  type is refused, only "no proxy" opens the socket plain; a guard on top would have to copy the list of proxy types), and in `OpenWithoutHttpProxy` after Mozilla parsed the
-  local address (the name context of the transport and the wildcard bind address, `StealthTcpSocketBorn`; marker of fingerprint/webrtc/declared-network).
+- `dom/media/webrtc/jsapi/PeerConnectionImpl.cpp`: Mozilla's initializer inside one call of `StealthProxyConfigOf` (network/doh, StealthIceResolverContext.h),
+  `auto proxyConfig = StealthProxyConfigOf(mWindow.get(), mForceProxy, GetProxyConfig());` (a wrap of the expression: the window and the flag are the
+  PeerConnection's private fields, passed in front of Mozilla's expression), and one include in a block of ours.
+- `dom/media/webrtc/transport/ipc/WebrtcTCPSocket.{h,cpp}`: Mozilla's `OpenWithHttpProxy` and `AsyncResolve` are as Mozilla wrote them. Three anchors call into
+  `ipc/StealthWebrtcTcpSocket.h` through its one friend (`StealthWebrtcTcpSocketAccess`, a `friend struct` line in the class). In `DoProxyConfigLookup`, after Mozilla's check of the
+  channel it made, `if (StealthSwapTcpLookupChannel(this, channel, &rv)) return rv;` swaps it for the channel of the load info of the document (`StealthSwapChannelOfLoadInfo`,
+  with the proxy flags the lookup is asked with, computed inside the friend): the proxy filters see the context of the page and not context 0, and the channel Mozilla made is never opened.
+  At the end of `OnProxyAvailable`, after the dispatch on the proxy type, `if (StealthTcpSocketRefusesDirect(this, aResult, aProxyinfo)) return NS_OK;` (a failed lookup or an unknown
+  type is refused, only "no proxy" opens the socket plain; a guard on top would have to copy the list of proxy types). In `OpenWithoutHttpProxy`, after Mozilla parsed the
+  local address, `StealthTcpSocketBorn(this, &prAddr);` (the name context of the transport and the wildcard bind address; marker of fingerprint/webrtc/declared-network).
 - `dom/media/webrtc/transport/nr_socket_proxy_config.{h,cpp}`: `UdpProxy()` and the member `mUdpProxy` (the last line of the `Private` block: the aggregate initialisation
-  needs `mProxyConfig` first, an approved exception), and the lookup started in the body of the constructor (`StealthPcUdpProxyLookup`, netwerk/socket; a hook in a constructor
-  stays in its body, and the lookup has to start before the first socket of the gather asks for the proxy).
+  needs `mProxyConfig` first, an approved exception), and the lookup started where the `Private` is made: Mozilla's `new Private({aProxyConfig})` inside
+  `net::StealthPcUdpProxyOf(aProxyConfig, <it>)` in the initialiser of `mPrivate` (a wrap of the expression, netwerk/socket; it starts the lookup on the new `Private`
+  and hands it back, and the lookup has to start before the first socket of the gather asks for the proxy).
 - `dom/media/webrtc/transport/nr_socket_prsock.{h,cpp}`: the NrSocket takes the proxy config of its PeerConnection (`NrSocket(config)` is an added constructor, Mozilla's default
-  one is back); `StealthNrSocketOf(config, new NrSocket())` in `CreateSocket` (parent and socket process); `StealthUdpProxyAttachRefused(fd_, mProxyConfig)` in `create`
+  one is as Mozilla wrote it, and `friend struct StealthNrSocketAccess` gives our functions its fields); Mozilla's `new NrSocket()` inside `StealthNrSocketOf(config, new NrSocket())` in `CreateSocket` (parent and socket process, two wraps); `StealthUdpProxyAttachRefused(fd_, mProxyConfig)` in `create`
   right after the socket is opened (the layer is pushed before options and bind; a refused layer is R_INTERNAL: the socket must not exist); `StealthPRBind` for Mozilla's
   `PR_Bind` (a call wrap: the bind with its test seam, and the birth of the socket after a bind that worked); and `if (config) ABORT(R_REJECTED);` in the content-process
   branch of `CreateSocket` (a UDP socket of a PeerConnection made there would go out direct; the socket is made where the proxy is known and the layer can go on). The file also
@@ -92,12 +105,17 @@ Every hook is one line with the marker, in a form of the contract; the explanati
   line with a condition); the include block of ours; and the rewritten connect of the IPv6-literal gate (marker network/ipv6-literal, an approved exception).
 - `netwerk/ipc/PSocketProcess.ipdl`, `SocketProcessChild.h`: the message `StealthWarmSocksUdp` and its receiver (defined in `netwerk/socket/nsSOCKSUDPIOLayer.cpp`);
   `SocketProcessChild.cpp` is Mozilla's again.
-- `netwerk/ipc/ProxyConfigLookup*.{h,cpp}`, `PSocketProcess.ipdl`, `SocketProcessParent.{h,cpp}`: the optional load info of the document goes with the lookup, and the DoH origin
-  attributes (marker network/doh): two parameters through 12 signatures of Mozilla, an approved exception until the lookup gets its own message (a later release, with its own
-  design and tests). The includes are in a block of ours.
+- The load info of the lookup (and, tagged network/doh, the origin attributes of a DoH request) goes with the lookup in two messages of ours, with no parameter in a Mozilla signature
+  and no Mozilla line rewritten. `PSocketProcess.ipdl`: `StealthProxyLookupLoadInfo` (this folder) and `StealthProxyLookupOrigin` (network/doh), parent-bound, declared after
+  `PProxyConfigLookup`; one message per folder, so that each marker names its owner. `ProxyConfigLookup.cpp`: `StealthEnterLookupLoadInfo();` as the first statement of `Create`
+  and, after Mozilla's channel creation in `DoProxyResolve`, `if (StealthSwapLookupChannel(mURI, mProxyResolveFlags, channel, &rv)) return rv;`.
+  `ProxyConfigLookupChild.cpp`: `StealthSendLookupLoadInfo(socketChild);` right before Mozilla's `SendPProxyConfigLookupConstructor` (the one sender of the constructor).
+  `SocketProcessParent.{h,cpp}`: the declaration of `RecvStealthProxyLookupLoadInfo` (defined in `StealthDocumentChannel.cpp`, it parks the load info) and
+  `StealthTakeParkedLookupLoadInfo(this);` as the first statement of `RecvPProxyConfigLookupConstructor`. `ProxyConfigLookup.h`, `ProxyConfigLookupParent.*` and
+  `ProxyConfigLookupChild.h` are Mozilla's. The includes are in a block of ours.
 - `toolkit/xre/nsAppRunner.cpp`: `StealthLockIcePrefs()` right after `mDirProvider.InitializeUserPrefs()` (an anchor: the lock has to see the user values) and an include in a block
   of ours; `toolkit/xre/moz.build` lists `StealthIcePrefs.cpp`.
-- `moz.build` of netwerk/ipc, netwerk/socket, netwerk/protocol/http: our sources and headers, one line each after the closing bracket.
+- `moz.build` of netwerk/ipc, netwerk/socket, netwerk/protocol/http: our sources and headers, one line each after the closing bracket (`StealthDocumentChannel.{h,cpp}` in netwerk/ipc).
 
 ## Our own files
 

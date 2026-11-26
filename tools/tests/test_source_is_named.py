@@ -53,7 +53,7 @@ def test_prebuild_without_a_source_names_how_to_give_it():
 def test_the_export_gate_without_a_tree_refuses_naming_the_variable(monkeypatch):
     monkeypatch.delenv("ENGINE_NODE_GATE_TREE", raising=False)
     with pytest.raises(SystemExit, match="ENGINE_NODE_GATE_TREE"):
-        export_gate.gate(Path("src"), "head")
+        export_gate.gate(Path("src"), "head", lambda scratch: None)
 
 
 def test_the_export_refuses_before_it_writes_when_the_tree_is_not_named(tmp_path):

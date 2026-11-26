@@ -17,7 +17,7 @@
  },
  {
   "file": "dom/base/TextInputProcessor.cpp",
-  "function": "nsresult TextInputProcessor::InitEditCommands(",
+  "function": "TextInputProcessor::Keydown(Event* aDOMKeyEvent, uint32_t aKeyFlags,",
   "kind": "add",
   "form": "unknown",
   "line": "  StealthKeyBirthScope stealthBirth(mStealthKeyBirth);  // STEALTH-HOOK(fingerprint/input/event-birth)",
@@ -35,7 +35,7 @@
  },
  {
   "file": "dom/base/TextInputProcessor.cpp",
-  "function": "nsresult TextInputProcessor::KeydownInternal(",
+  "function": "TextInputProcessor::Keyup(Event* aDOMKeyEvent, uint32_t aKeyFlags,",
   "kind": "add",
   "form": "unknown",
   "line": "  StealthKeyBirthScope stealthBirth(mStealthKeyBirth);  // STEALTH-HOOK(fingerprint/input/event-birth)",
@@ -104,6 +104,14 @@
   "test": "wrapper:tests/test_a_pointer_event_is_handled_before_the_call_returns_e2e.py::test_each_pointer_call_answers_after_the_page_handled_its_event",
   "anchor": "mouseOrPointerEvent.mFlags.mIsAsyncSynthesizedForTests = aOptions.mIsDOMEventSynthesized;",
   "why": "it takes back the flag Mozilla has just set, so it runs right after that assignment, inside the `if (aOptions.mToWindow)` block, before the event is dispatched"
+ },
+ {
+  "file": "dom/base/test/gtest/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"TestStealthCallerObject.cpp\"]  # STEALTH-HOOK(automation/hybrid-xrays)",
+  "test": "gtest:StealthCallerObject.ADecisionIsReadOnceAndAReadWithNoDecisionIsFalse"
  },
  {
   "file": "dom/base/test/gtest/moz.build",

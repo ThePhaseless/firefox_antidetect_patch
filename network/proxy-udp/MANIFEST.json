@@ -14,11 +14,7 @@
   "netwerk/base/nsUDPSocket.h",
   "netwerk/ipc/PSocketProcess.ipdl",
   "netwerk/ipc/ProxyConfigLookup.cpp",
-  "netwerk/ipc/ProxyConfigLookup.h",
   "netwerk/ipc/ProxyConfigLookupChild.cpp",
-  "netwerk/ipc/ProxyConfigLookupChild.h",
-  "netwerk/ipc/ProxyConfigLookupParent.cpp",
-  "netwerk/ipc/ProxyConfigLookupParent.h",
   "netwerk/ipc/SocketProcessChild.h",
   "netwerk/ipc/SocketProcessParent.cpp",
   "netwerk/ipc/SocketProcessParent.h",
@@ -55,6 +51,7 @@
   "netwerk/socket/nsSOCKSUDPIOLayer.cpp": "100644",
   "netwerk/socket/nsSOCKSUDPIOLayer.h": "100644",
   "netwerk/test/gtest/TestStealthHttp3Socks.cpp": "100644",
+  "netwerk/test/gtest/TestStealthLookupLoadInfo.cpp": "100644",
   "toolkit/xre/StealthIcePrefs.cpp": "100644",
   "toolkit/xre/StealthIcePrefs.h": "100644"
  },
@@ -65,7 +62,7 @@
    "feature": "proxy-udp-egress",
    "prefs": [],
    "added": 3,
-   "removed": 0,
+   "removed": 1,
    "hunks": 2,
    "inline_logic_lines": 0,
    "hookable": "movable",
@@ -85,8 +82,8 @@
    "category": "other",
    "feature": "proxy-udp-egress",
    "prefs": [],
-   "added": 11,
-   "removed": 8,
+   "added": 6,
+   "removed": 0,
    "hunks": 4,
    "inline_logic_lines": 9,
    "hookable": "movable",
@@ -127,7 +124,7 @@
    "category": "other",
    "feature": "proxy-udp-egress",
    "prefs": [],
-   "added": 8,
+   "added": 6,
    "removed": 1,
    "hunks": 2,
    "inline_logic_lines": 9,
@@ -321,8 +318,8 @@
    "category": "other",
    "feature": "proxy-udp-egress",
    "prefs": [],
-   "added": 5,
-   "removed": 1,
+   "added": 4,
+   "removed": 0,
    "hunks": 2,
    "inline_logic_lines": 1,
    "hookable": "already-hook",
@@ -343,8 +340,8 @@
    "category": "other",
    "feature": "proxy-udp-egress",
    "prefs": [],
-   "added": 22,
-   "removed": 6,
+   "added": 7,
+   "removed": 0,
    "hunks": 3,
    "inline_logic_lines": 10,
    "hookable": "movable",
@@ -361,34 +358,12 @@
    }
   },
   {
-   "file": "netwerk/ipc/ProxyConfigLookup.h",
-   "category": "other",
-   "feature": "proxy-udp-egress",
-   "prefs": [],
-   "added": 12,
-   "removed": 2,
-   "hunks": 3,
-   "inline_logic_lines": 2,
-   "hookable": "already-hook",
-   "anchor": "ProxyConfigLookup::Create, mLoadInfo",
-   "evidence": [
-    "+#include \"mozilla/Maybe.h\"  // STEALTH-HOOK(network/proxy-udp)",
-    "+#include \"mozilla/OriginAttributes.h\"  // STEALTH-HOOK(network/doh)",
-    "+#include \"mozilla/net/NeckoChannelParams.h\"  // STEALTH-HOOK(network/proxy-udp)"
-   ],
-   "notes": "The lookup can be made for a document: an optional LoadInfoArgs. Also (feature doh-trr-context, network/doh): the lookup carries the origin attributes of the DoH context next to the load info, and the stand-in channel presents them to the proxy filters.",
-   "verifier": {
-    "changed": [],
-    "why": "Written from the diff against the tag."
-   }
-  },
-  {
    "file": "netwerk/ipc/ProxyConfigLookupChild.cpp",
    "category": "other",
    "feature": "proxy-udp-egress",
    "prefs": [],
-   "added": 6,
-   "removed": 2,
+   "added": 5,
+   "removed": 0,
    "hunks": 2,
    "inline_logic_lines": 2,
    "hookable": "already-hook",
@@ -399,72 +374,6 @@
     "+    const Maybe<OriginAttributes>& aOriginAttributes) {  // STEALTH-HOOK(network/doh)"
    ],
    "notes": "Sends the optional LoadInfoArgs with the PProxyConfigLookup constructor. Also (feature doh-trr-context, network/doh): the lookup carries the origin attributes of the DoH context next to the load info, and the stand-in channel presents them to the proxy filters.",
-   "verifier": {
-    "changed": [],
-    "why": "Written from the diff against the tag."
-   }
-  },
-  {
-   "file": "netwerk/ipc/ProxyConfigLookupChild.h",
-   "category": "other",
-   "feature": "proxy-udp-egress",
-   "prefs": [],
-   "added": 5,
-   "removed": 1,
-   "hunks": 2,
-   "inline_logic_lines": 1,
-   "hookable": "already-hook",
-   "anchor": "ProxyConfigLookupChild::Create",
-   "evidence": [
-    "+#include \"mozilla/OriginAttributes.h\"  // STEALTH-HOOK(network/doh)",
-    "+                     std::function<void(nsIProxyInfo*, nsresult)>&& aCallback,",
-    "+                     const Maybe<LoadInfoArgs>& aLoadInfo = Nothing(),  // STEALTH-HOOK(network/proxy-udp)"
-   ],
-   "notes": "Carries the optional LoadInfoArgs to the parent. Also (feature doh-trr-context, network/doh): the lookup carries the origin attributes of the DoH context next to the load info, and the stand-in channel presents them to the proxy filters.",
-   "verifier": {
-    "changed": [],
-    "why": "Written from the diff against the tag."
-   }
-  },
-  {
-   "file": "netwerk/ipc/ProxyConfigLookupParent.cpp",
-   "category": "other",
-   "feature": "proxy-udp-egress",
-   "prefs": [],
-   "added": 10,
-   "removed": 5,
-   "hunks": 2,
-   "inline_logic_lines": 4,
-   "hookable": "movable",
-   "anchor": "ProxyConfigLookupParent constructor and DoProxyLookup",
-   "evidence": [
-    "+ProxyConfigLookupParent::ProxyConfigLookupParent(",
-    "+    nsIURI* aURI, uint32_t aProxyResolveFlags, bool aIsTRRServiceChannel,",
-    "+    const Maybe<LoadInfoArgs>& aLoadInfo,  // STEALTH-HOOK(network/proxy-udp)"
-   ],
-   "notes": "Gives the LoadInfoArgs on to ProxyConfigLookup::Create. Also (feature doh-trr-context, network/doh): the lookup carries the origin attributes of the DoH context next to the load info, and the stand-in channel presents them to the proxy filters.",
-   "verifier": {
-    "changed": [],
-    "why": "Written from the diff against the tag."
-   }
-  },
-  {
-   "file": "netwerk/ipc/ProxyConfigLookupParent.h",
-   "category": "other",
-   "feature": "proxy-udp-egress",
-   "prefs": [],
-   "added": 7,
-   "removed": 1,
-   "hunks": 3,
-   "inline_logic_lines": 1,
-   "hookable": "already-hook",
-   "anchor": "ProxyConfigLookupParent constructor, mLoadInfo",
-   "evidence": [
-    "+#include \"mozilla/OriginAttributes.h\"  // STEALTH-HOOK(network/doh)",
-    "+                          bool aIsTRRServiceChannel,",
-    "+                          const Maybe<LoadInfoArgs>& aLoadInfo,  // STEALTH-HOOK(network/proxy-udp)"
-   ],
-   "notes": "Holds the optional LoadInfoArgs of the lookup. Also (feature doh-trr-context, network/doh): the lookup carries the origin attributes of the DoH context next to the load info, and the stand-in channel presents them to the proxy filters.",
    "verifier": {
     "changed": [],
     "why": "Written from the diff against the tag."
@@ -496,9 +405,9 @@
    "category": "other",
    "feature": "proxy-udp-egress",
    "prefs": [],
-   "added": 9,
-   "removed": 3,
-   "hunks": 1,
+   "added": 5,
+   "removed": 0,
+   "hunks": 2,
    "inline_logic_lines": 3,
    "hookable": "movable",
    "anchor": "AllocPProxyConfigLookupParent, RecvPProxyConfigLookupConstructor",
@@ -518,8 +427,8 @@
    "category": "other",
    "feature": "proxy-udp-egress",
    "prefs": [],
-   "added": 6,
-   "removed": 3,
+   "added": 2,
+   "removed": 0,
    "hunks": 1,
    "inline_logic_lines": 2,
    "hookable": "already-hook",

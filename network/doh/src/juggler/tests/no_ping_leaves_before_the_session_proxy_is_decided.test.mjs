@@ -130,11 +130,17 @@ function loadPingsender(TargetRegistry, log) {
   let src = fs.readFileSync(path.join(APP, 'StealthPingsender.sys.mjs'), 'utf8');
   src = src.replace(/^import \{ AppConstants \}.*$/m, 'const AppConstants = __AppConstants;');
   src = src.replace(/^export /gm, '');
-  src += '\nmodule.exports = { runAsync };\n';
+  src += '\nmodule.exports = { StealthRoutedProcess };\n';
   const sandbox = {
     __AppConstants: { MOZ_APP_NAME: 'firefox', platform: 'win' },
     module: { exports: {} },
     Ci,
+    // The child the routed start makes (a process of its own).
+    Cc: {
+      '@mozilla.org/process/util;1': {
+        createInstance: () => ({ init() {}, runAsync(params) { log.push(['run', params.length]); } }),
+      },
+    },
     Services: {
       env: { set: (k, v) => log.push(['env', k, v]), get: () => '' },
       dirsvc: { get: () => ({ append() {}, path: 'P/prefs.js' }) },
@@ -151,7 +157,9 @@ function start(TargetRegistry) {
   const observed = [];
   const process = { runAsync(params) { log.push(['run', params.length]); } };
   const observer = { observe: (subject, topic) => observed.push(topic) };
-  loadPingsender(TargetRegistry, log).runAsync(process, ['--backgroundtask', 'pingsender'], observer);
+  const params = ['--backgroundtask', 'pingsender'];
+  // The call of TelemetrySend.sys.mjs, with Mozilla's own arguments.
+  loadPingsender(TargetRegistry, log).StealthRoutedProcess(process).runAsync(params, params.length, observer);
   return { log, observed };
 }
 
@@ -175,7 +183,7 @@ test('undecided without an observer: nothing is started and nothing throws', () 
   TargetRegistry.markDriven();
   instance(TargetRegistry);
   const log = [];
-  loadPingsender(TargetRegistry, log).runAsync({ runAsync() { log.push(['run']); } }, [], undefined);
+  loadPingsender(TargetRegistry, log).StealthRoutedProcess({ runAsync() { log.push(['run']); } }).runAsync([], 0, undefined);
   assert.deepEqual(log, []);
 });
 

@@ -127,14 +127,15 @@ index e40c9fef90e5a0b4a6df73a5d7a2ed74304ecdaa..3863517363d150e611aed0bbc0c51e29
    return nullptr;
  }
 diff --git a/dom/html/HTMLCanvasElement.h b/dom/html/HTMLCanvasElement.h
-index 4280abcde7c0449e3c6ce5ddd5b4e6664dc0c628..5b0a7ac4c8c17c79caa251ee901cfe0295c3058b 100644
+index 4280abcde7c0449e3c6ce5ddd5b4e6664dc0c628..e6e137b105f29232617b54d8878f9c085a028a48 100644
 --- a/dom/html/HTMLCanvasElement.h
 +++ b/dom/html/HTMLCanvasElement.h
-@@ -225,6 +225,8 @@ class HTMLCanvasElement final : public nsGenericHTMLElement,
+@@ -225,6 +225,9 @@ class HTMLCanvasElement final : public nsGenericHTMLElement,
        gfxAlphaType* aOutAlphaType = nullptr,
        gfx::DrawTarget* aTarget = nullptr);
  
 +  already_AddRefed<gfx::SourceSurface> GetSurfaceSnapshotAsDrawn(gfxAlphaType* aOutAlphaType = nullptr, gfx::DrawTarget* aTarget = nullptr);  // STEALTH-HOOK(fingerprint/canvas/noise-projection)
++  already_AddRefed<gfx::SourceSurface> StealthGetSurfaceSnapshot(uint32_t aSurfaceFlags, gfxAlphaType* aOutAlphaType = nullptr, gfx::DrawTarget* aTarget = nullptr);  // STEALTH-HOOK(fingerprint/canvas/as-drawn)
 +
    using SurfaceSnapshotPromise =
        MozPromise<RefPtr<gfx::SourceSurface>, nsresult, true>;

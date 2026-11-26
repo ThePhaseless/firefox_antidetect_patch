@@ -7,7 +7,7 @@
 
 A Mozilla file new to the series gets at most 5 hook lines and 5 removed lines. After logic moves into our files, `python tools/engine.py shrink-budget` lowers the budgets. `python tools/engine.py hook-debt` removes the entries that no longer occur and adds none (`--summary` counts them; `--init` rewrites the list from every violation of now, and the comparison with main still refuses the entries main does not have).
 
-A budget rises above main's only when the branch adds a row to `tools/hook-budget-raises.json`: a register that only grows, one row per file and branch, with `file`, `from` (main's budget), `to`, `folder`, `reason`, `decided_by`, `date` and `test`. A row that raises nothing, or one for a file main does not patch, fails.
+A budget rises above main's only when the branch adds a row to `tools/hook-budget-raises.json`: a register that only grows, one row per file and branch, with `file`, `from` (main's budget), `to`, `folder`, `reason`, `decided_by`, `date` and `test`. A row that raises nothing, or one for a file main does not patch, fails. The removed budget goes above main's the same way: a row with `budget: "removed"`, `from` main's removed budget (0 when it has none), one row per file and budget.
 
 **Why.** A hook line is a place that can conflict at each tag, so the total only buys more risk when it grows. Fixing the ceiling per file forces the next change to move logic into our files instead of adding lines. Comparing with main stops a branch from raising its own limit.
 

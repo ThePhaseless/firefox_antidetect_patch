@@ -38,5 +38,158 @@
   "decided_by": "the owner",
   "date": "2026-11-23",
   "test": "gtest:StealthGfxFeatureStatus.TheHostProbeIsLaunchedAsSoonAsThePrefsAreReadWithTheEngineOff"
+ },
+ {
+  "file": "dom/base/test/gtest/moz.build",
+  "from": 4,
+  "to": 5,
+  "folder": "fingerprint/input/event-birth",
+  "reason": "port-06: registration of the gtest/declaration that tests the reshaped hook",
+  "decided_by": "pm",
+  "date": "2026-11-25",
+  "test": "gtest:StealthCallerObject.ADecisionIsReadOnceAndAReadWithNoDecisionIsFalse"
+ },
+ {
+  "file": "dom/canvas/gtest/moz.build",
+  "from": 1,
+  "to": 2,
+  "folder": "fingerprint/webgl/parameters",
+  "reason": "port-06: registration of the gtest/declaration that tests the reshaped hook",
+  "decided_by": "pm",
+  "date": "2026-11-25",
+  "test": "gtest:StealthCanvasPageSnapshot.TheSnapshotOfTheContextIsNotTakenWhenItHasAnElement"
+ },
+ {
+  "file": "dom/html/HTMLCanvasElement.h",
+  "from": 2,
+  "to": 3,
+  "folder": "fingerprint/canvas/noise-projection",
+  "reason": "port-06: registration of the gtest/declaration that tests the reshaped hook",
+  "decided_by": "pm",
+  "date": "2026-11-25",
+  "test": "wrapper:tests/test_moz_element_paints_a_webgl_canvas_as_drawn_e2e.py::test_moz_element_paints_a_webgl_canvas_as_drawn"
+ },
+ {
+  "file": "dom/media/gtest/moz.build",
+  "from": 2,
+  "to": 3,
+  "folder": "fingerprint/audio/noise",
+  "reason": "port-06: registration of the gtest/declaration that tests the reshaped hook",
+  "decided_by": "pm",
+  "date": "2026-11-25",
+  "test": "gtest:StealthMediaEnumeration.WithADeclarationTheCallbackRunsLaterWithTheSameValue"
+ },
+ {
+  "file": "dom/media/webrtc/transport/ipc/StunAddrsRequestParent.cpp",
+  "from": 3,
+  "to": 4,
+  "folder": "fingerprint/webrtc/declared-network",
+  "reason": "port-06 (design-70): a rewrite of Mozilla text converted to an add-only form",
+  "decided_by": "pm",
+  "date": "2026-11-25",
+  "test": "wrapper:tests/test_declared_host_network_e2e.py::test_two_connections_on_one_page_connect_in_the_time_of_retail"
+ },
+ {
+  "file": "dom/xslt/xslt/txEXSLTFunctions.cpp",
+  "from": 3,
+  "to": 4,
+  "folder": "fingerprint/locale-time/timezone",
+  "reason": "port-06: registration of the gtest/declaration that tests the reshaped hook",
+  "decided_by": "pm",
+  "date": "2026-11-25",
+  "test": "node:juggler/tests/exslt_time_finds_the_source_document_as_the_file_does.test.mjs#ours finds the source document the way getSourceDocument does, and explodes in its zone"
+ },
+ {
+  "file": "gfx/thebes/gfxDWriteFontList.h",
+  "from": 6,
+  "to": 7,
+  "folder": "fingerprint/fonts/bundle",
+  "reason": "port-06: registration of the gtest/declaration that tests the reshaped hook",
+  "decided_by": "pm",
+  "date": "2026-11-25",
+  "test": "wrapper:tests/test_the_font_list_is_the_bundle_e2e.py::test_the_font_list_is_the_bundle_and_nothing_else"
+ },
+ {
+  "file": "js/src/vm/SavedStacks.cpp",
+  "from": 3,
+  "to": 5,
+  "folder": "fingerprint/js-surface/stack-frames",
+  "reason": "port-06 (design-70): a rewrite of Mozilla text converted to an add-only form",
+  "decided_by": "pm",
+  "date": "2026-11-25",
+  "test": "gtest:StealthStackFrames.JugglersFrameIsNotInTheStackAPageReads"
+ },
+ {
+  "file": "layout/base/gtest/moz.build",
+  "from": 1,
+  "to": 2,
+  "folder": "automation/input",
+  "reason": "port-06: registration of the gtest/declaration that tests the reshaped hook",
+  "decided_by": "pm",
+  "date": "2026-11-25",
+  "test": "gtest:StealthSurfaceFlags.OnlyOurFlagAsksForTheCanvasAsDrawn"
+ },
+ {
+  "file": "toolkit/mozapps/update/UpdateService.sys.mjs",
+  "from": 4,
+  "to": 5,
+  "folder": "stillborn/updater",
+  "reason": "port-06 (design-70): a rewrite of Mozilla text converted to an add-only form",
+  "decided_by": "pm",
+  "date": "2026-11-25",
+  "test": "node:juggler/tests/updater_refuses_what_follows_the_check.test.mjs#whatever the answer offered, the check reports none"
+ },
+ {
+  "file": "widget/moz.build",
+  "from": 1,
+  "to": 2,
+  "folder": "fingerprint/screen-window/geometry",
+  "reason": "port-06: registration of the gtest/declaration that tests the reshaped hook",
+  "decided_by": "pm",
+  "date": "2026-11-25",
+  "test": "gtest:StealthMouseEventIPC.TheIdSurvivesTheMessage"
+ },
+ {
+  "file": "widget/nsGUIEventIPC.h",
+  "from": 3,
+  "to": 4,
+  "folder": "automation/input",
+  "reason": "port-06: registration of the gtest/declaration that tests the reshaped hook",
+  "decided_by": "pm",
+  "date": "2026-11-25",
+  "test": "gtest:StealthMouseEventIPC.TheIdSurvivesTheMessage"
+ },
+ {
+  "file": "dom/media/webrtc/jsapi/PeerConnectionImpl.cpp",
+  "from": 0,
+  "to": 1,
+  "folder": "network/proxy-udp",
+  "reason": "port-06: a one-line rewrite in an allowed form (wrap) replaces a longer hook",
+  "decided_by": "pm",
+  "date": "2026-11-25",
+  "test": "gtest:StealthPcProxyConfig.AWindowWithoutAConfigGetsTheConfigOfItsPrincipalAndItsContext",
+  "budget": "removed"
+ },
+ {
+  "file": "js/src/vm/SavedStacks.cpp",
+  "from": 0,
+  "to": 3,
+  "folder": "fingerprint/js-surface/stack-frames",
+  "reason": "port-06: a one-line rewrite in an allowed form (wrap) replaces a longer hook",
+  "decided_by": "pm",
+  "date": "2026-11-25",
+  "test": "gtest:StealthStackFrames.JugglersFrameIsNotInTheStackAPageReads",
+  "budget": "removed"
+ },
+ {
+  "file": "toolkit/mozapps/update/UpdateService.sys.mjs",
+  "from": 0,
+  "to": 1,
+  "folder": "stillborn/updater",
+  "reason": "port-06: a one-line rewrite in an allowed form (wrap) replaces a longer hook",
+  "decided_by": "pm",
+  "date": "2026-11-25",
+  "test": "node:juggler/tests/updater_refuses_what_follows_the_check.test.mjs#whatever the answer offered, the check reports none",
+  "budget": "removed"
  }
 ]

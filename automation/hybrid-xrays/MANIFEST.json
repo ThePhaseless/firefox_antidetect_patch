@@ -8,10 +8,12 @@
   "js/xpconnect/wrappers/moz.build"
  ],
  "added": {
+  "dom/base/test/gtest/TestStealthCallerObject.cpp": "100644",
   "js/xpconnect/src/StealthSandbox.h": "100644",
   "js/xpconnect/tests/unit/test_stealth_hybrid_xrays_options.js": "100644",
   "js/xpconnect/wrappers/StealthHybridXray.cpp": "100644",
-  "js/xpconnect/wrappers/StealthHybridXray.h": "100644"
+  "js/xpconnect/wrappers/StealthHybridXray.h": "100644",
+  "juggler/tests/caller_object_decision_is_written_before_its_branch_reads_it.test.mjs": "100644"
  },
  "inventory": [
   {
@@ -19,8 +21,8 @@
    "category": "juggler",
    "feature": "hybrid-xrays",
    "prefs": [],
-   "added": 13,
-   "removed": 3,
+   "added": 10,
+   "removed": 2,
    "hunks": 7,
    "inline_logic_lines": 22,
    "hookable": "movable",
@@ -85,9 +87,9 @@
    "category": "spoof",
    "feature": "hybrid-xrays",
    "prefs": [],
-   "added": 11,
+   "added": 9,
    "removed": 4,
-   "hunks": 6,
+   "hunks": 7,
    "inline_logic_lines": 80,
    "hookable": "hard",
    "anchor": "DEBUG_CheckUnwrapSafety; SelectHybridWrapper (new, before WrapperFactory::Rewrap); CallerObjectWrapper::getPrototype / getPrototypeIfOrdinary (new); WrapperFactory::Rewrap",

@@ -28,9 +28,9 @@
     "zoom.stealth.webgl2.extensions",
     "webgl.sanitize-unmasked-renderer"
    ],
-   "added": 14,
+   "added": 12,
    "removed": 2,
-   "hunks": 12,
+   "hunks": 10,
    "inline_logic_lines": 300,
    "hookable": "movable",
    "anchor": "ClientWebGLContext::GetParameter, GetShaderPrecisionFormat, ReadPixels (both forms), DoReadPixels, DoReadPixelsAsync, IsSupported, GetSupportedExtensions, BufferParameter; static LookupStealthParamEntry and GetStealthExtensionWhitelist; GetImageBuffer and GetInputStream (toDataURL/toBlob projection); comment-only hunk in GetSurfaceSnapshot",
@@ -138,7 +138,7 @@
    "prefs": [
     "zoom.stealth.webgl.shader_precisions"
    ],
-   "added": 1,
+   "added": 2,
    "removed": 0,
    "hunks": 1,
    "inline_logic_lines": 0,

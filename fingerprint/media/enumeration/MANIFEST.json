@@ -3,7 +3,8 @@
   "dom/media/MediaManager.cpp"
  ],
  "added": {
-  "dom/media/StealthMediaEnumeration.h": "100644"
+  "dom/media/StealthMediaEnumeration.h": "100644",
+  "dom/media/gtest/TestStealthMediaEnumeration.cpp": "100644"
  },
  "inventory": [
   {
@@ -13,9 +14,9 @@
    "prefs": [
     "zoom.stealth.media.enumeration_ms"
    ],
-   "added": 20,
-   "removed": 12,
-   "hunks": 6,
+   "added": 8,
+   "removed": 5,
+   "hunks": 7,
    "inline_logic_lines": 23,
    "hookable": "movable",
    "anchor": "MediaManager::EnumerationParams::RealDeviceRequested; HostSpeakersMayBeAsked (new); EnumerationParams::HostSpeakersRequested (new); MediaManager::MaybeRequestPermissionAndEnumerateRawDevices; MediaManager::EnumerateRawDevices; MediaManager::GetPhysicalDevices",

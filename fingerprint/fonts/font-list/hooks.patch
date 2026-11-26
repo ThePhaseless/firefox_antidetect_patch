@@ -1,5 +1,5 @@
 diff --git a/gfx/thebes/gfxDWriteFontList.cpp b/gfx/thebes/gfxDWriteFontList.cpp
-index a804e7154b7182fe73a37a94b186b50275971f5e..a57733d6bddaf81b0b25f74d3a26338c555ea5c1 100644
+index a804e7154b7182fe73a37a94b186b50275971f5e..36f5b9c6f88267af7929d1adb29b00d88e5ae1da 100644
 --- a/gfx/thebes/gfxDWriteFontList.cpp
 +++ b/gfx/thebes/gfxDWriteFontList.cpp
 @@ -33,6 +33,8 @@
@@ -70,23 +70,19 @@ index a804e7154b7182fe73a37a94b186b50275971f5e..a57733d6bddaf81b0b25f74d3a26338c
    if (!aFamily->IsInitialized()) {
      if (!InitializeFamily(aFamily)) {
        return;
-@@ -1697,9 +1703,13 @@ void gfxDWriteFontList::InitSharedFontListForPlatform() {
+@@ -1697,9 +1703,9 @@ void gfxDWriteFontList::InitSharedFontListForPlatform() {
        forceClassicFams.Sort();
      }
      nsTArray<fontlist::Family::InitData> families;
 -    AppendFamiliesFromCollection(mSystemFonts, families, &forceClassicFams);
-+    if (mStealthBundleOnly) {  // STEALTH-HOOK(fingerprint/fonts/font-list)
-+      families = StealthBundleFontList::Get()->Families().Clone();
-+    } else {
-+      AppendFamiliesFromCollection(mSystemFonts, families, &forceClassicFams);
-+    }
++    StealthAppendFamiliesFromCollection(mSystemFonts, families, &forceClassicFams);  // STEALTH-HOOK(fingerprint/fonts/font-list)
  #ifdef MOZ_BUNDLED_FONTS
 -    if (mBundledFonts) {
-+    if (mBundledFonts && !mStealthBundleOnly) {
++    if (StealthBundledFontsApply(this, mBundledFonts)) {  // STEALTH-HOOK(fingerprint/fonts/font-list)
        TimeStamp start2 = TimeStamp::Now();
        AppendFamiliesFromCollection(mBundledFonts, families);
        TimeStamp end2 = TimeStamp::Now();
-@@ -1769,7 +1779,7 @@ nsresult gfxDWriteFontList::InitFontListForPlatform() {
+@@ -1769,7 +1775,7 @@ nsresult gfxDWriteFontList::InitFontListForPlatform() {
    const uint32_t kBundledCount = mFontFamilies.Count();
  
    GetFontsFromCollection(mSystemFonts);
@@ -95,7 +91,7 @@ index a804e7154b7182fe73a37a94b186b50275971f5e..a57733d6bddaf81b0b25f74d3a26338c
      // If no fonts are found, something is out of whack, so bail.
      NS_ERROR("no fonts found in the system fontlist -- holy crap batman!");
      glean::fontlist::dwritefont_init_problem.AccumulateSingleSample(
-@@ -1908,6 +1918,7 @@ nsresult gfxDWriteFontList::InitFontListForPlatform() {
+@@ -1908,6 +1914,7 @@ nsresult gfxDWriteFontList::InitFontListForPlatform() {
  
  void gfxDWriteFontList::GetFontsFromCollection(
      IDWriteFontCollection* aCollection) {
@@ -103,7 +99,7 @@ index a804e7154b7182fe73a37a94b186b50275971f5e..a57733d6bddaf81b0b25f74d3a26338c
    for (UINT32 i = 0; i < aCollection->GetFontFamilyCount(); i++) {
      RefPtr<IDWriteFontFamily> family;
      aCollection->GetFontFamily(i, getter_AddRefs(family));
-@@ -2007,6 +2018,7 @@ static void RemoveCharsetFromFontSubstitute(nsACString& aName) {
+@@ -2007,6 +2014,7 @@ static void RemoveCharsetFromFontSubstitute(nsACString& aName) {
  #define MAX_VALUE_DATA 512
  
  nsresult gfxDWriteFontList::GetFontSubstitutes() {
@@ -111,7 +107,7 @@ index a804e7154b7182fe73a37a94b186b50275971f5e..a57733d6bddaf81b0b25f74d3a26338c
    for (const FontSubstitute& fs : kFontSubstitutes) {
      nsAutoCString substituteName(fs.substituteName);
      nsAutoCString actualFontName(fs.actualFontName);
-@@ -2112,6 +2124,7 @@ static const FontSubstitution sDirectWriteSubs[] = {
+@@ -2112,6 +2120,7 @@ static const FontSubstitution sDirectWriteSubs[] = {
      {"Script", "Mistral"}};
  
  void gfxDWriteFontList::GetDirectWriteSubstitutes() {
@@ -119,7 +115,7 @@ index a804e7154b7182fe73a37a94b186b50275971f5e..a57733d6bddaf81b0b25f74d3a26338c
    for (const auto& sub : sDirectWriteSubs) {
      nsAutoCString substituteName(sub.aliasName);
      BuildKeyNameFromFontName(substituteName);
-@@ -2716,6 +2729,7 @@ BundledFontLoader::CreateEnumeratorFromKey(
+@@ -2716,6 +2725,7 @@ BundledFontLoader::CreateEnumeratorFromKey(
  
  already_AddRefed<IDWriteFontCollection>
  gfxDWriteFontList::CreateBundledFontsCollection(IDWriteFactory* aFactory) {

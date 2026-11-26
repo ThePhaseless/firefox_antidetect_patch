@@ -8,7 +8,9 @@
 
 #include <stdint.h>
 
-#include <utility>
+#include "mozilla/RefPtr.h"
+#include "mozilla/dom/HTMLCanvasElement.h"
+#include "nsLayoutUtils.h"
 
 // Our flag for nsLayoutUtils::SurfaceFromElement's aSurfaceFlags
 // (fingerprint/canvas/as-drawn): the canvas as drawn, without the noise a
@@ -21,18 +23,35 @@
 constexpr uint32_t kStealthSfeAsDrawn = 1u << 31;
 
 // Who asks for it: nsImageRenderer::PrepareImage, because -moz-element SHOWS
-// the element, like the screen, so a canvas is shown as drawn; and the
-// chrome-only compareCanvases test hook (dom/base/StealthCanvasAsDrawn.h).
+// the element, like the screen, so a canvas is shown as drawn. It calls
+// nsLayoutUtils::StealthSurfaceFromElementAsDrawn.
+
+// Whether a caller of nsLayoutUtils::SurfaceFromElement asked for the canvas as
+// drawn. The one place that reads the flag.
+constexpr bool StealthWantsAsDrawn(uint32_t aSurfaceFlags) {
+  return (aSurfaceFlags & kStealthSfeAsDrawn) != 0;
+}
+
+// nsLayoutUtils::SurfaceFromElement(aElement, kStealthSfeAsDrawn) for the
+// browser's own readers: the overload is the one the static type of aElement
+// picks (Element* or HTMLCanvasElement*).
+template <class ElementT>
+mozilla::SurfaceFromElementResult nsLayoutUtils::StealthSurfaceFromElementAsDrawn(
+    ElementT* aElement) {
+  return SurfaceFromElement(aElement, kStealthSfeAsDrawn);
+}
 
 // nsLayoutUtils::SurfaceFromElement's snapshot of a canvas: as drawn when the
-// caller set kStealthSfeAsDrawn, else what Mozilla takes. A template so that
-// this header needs no canvas include.
-template <class Canvas, class... Args>
-auto StealthCanvasSnapshot(Canvas* aCanvas, uint32_t aSurfaceFlags,
-                           Args&&... aArgs) {
-  return (aSurfaceFlags & kStealthSfeAsDrawn)
-             ? aCanvas->GetSurfaceSnapshotAsDrawn(std::forward<Args>(aArgs)...)
-             : aCanvas->GetSurfaceSnapshot(std::forward<Args>(aArgs)...);
+// caller set kStealthSfeAsDrawn, else what Mozilla takes. Exactly one of the two
+// is called, with the same arguments; the snapshot with the noise is never taken
+// first.
+inline already_AddRefed<mozilla::gfx::SourceSurface>
+mozilla::dom::HTMLCanvasElement::StealthGetSurfaceSnapshot(
+    uint32_t aSurfaceFlags, gfxAlphaType* aOutAlphaType,
+    gfx::DrawTarget* aTarget) {
+  return StealthWantsAsDrawn(aSurfaceFlags)
+             ? GetSurfaceSnapshotAsDrawn(aOutAlphaType, aTarget)
+             : GetSurfaceSnapshot(aOutAlphaType, aTarget);
 }
 
 #endif  // StealthSurfaceFlags_h

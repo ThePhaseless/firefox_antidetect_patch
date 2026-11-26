@@ -101,6 +101,41 @@ OriginAttributes StealthTRRConnectionAttributes(
     nsIChannel* aChannel, const OriginAttributes& aUpstream);
 
 /**
+ * The context of a proxy lookup (ProxyConfigLookup::Create), without a parameter of Mozilla's signatures. The same
+ * course as the load info of StealthDocumentChannel.h, one slot for the context of the DoH request that caused the
+ * lookup (main thread only):
+ *
+ *  - TRRServiceChannel::ResolveProxy sets the context of its load info on the statement before Create
+ *    (StealthSetTRRLookupContext); it is "pending". Any other caller sets none.
+ *  - The first statement of Create takes it (StealthEnterTRRLookupContext): pending becomes "active" and pending is
+ *    empty again; a Create nobody set a context for makes the active one empty. A context never reaches a lookup it was
+ *    not set for.
+ *  - Where Create builds the stand-in channel (parent process) the active context is given to it
+ *    (StealthApplyTRRLookupContext). In the socket process ProxyConfigLookupChild::Create sends it in a message of
+ *    PSocketProcess (always, empty when empty) right before the constructor of PProxyConfigLookup; the parent keeps it
+ *    in the slot of the socket process actor (StealthParkTRRLookupContext, from
+ *    SocketProcessParent::RecvStealthProxyLookupOrigin) and the constructor takes it
+ *    (StealthTakeParkedTRRLookupContext, first statement of RecvPProxyConfigLookupConstructor). The messages of one
+ *    protocol arrive in the order they were sent; the take empties the slot and the next message overwrites it.
+ */
+void StealthSetTRRLookupContext(const Maybe<OriginAttributes>& aContext);
+void StealthSetTRRLookupContext(nsIChannel* aChannel);
+void StealthEnterTRRLookupContext();
+Maybe<OriginAttributes> StealthActiveTRRLookupContext();
+// True: the context could not be given, *aRv is the error and the caller returns it (a lookup never goes on with a stand-in
+// channel of the wrong context: it would leave by the wrong proxy).
+bool StealthApplyTRRLookupContext(nsIChannel* aChannel, nsresult* aRv);
+void StealthParkTRRLookupContext(const void* aOwner,
+                                 const Maybe<OriginAttributes>& aContext);
+void StealthTakeParkedTRRLookupContext(const void* aOwner);
+
+// ProxyConfigLookupChild::Create (socket process), as StealthSendLookupLoadInfo. aActor is the SocketProcessChild.
+template <typename ActorT>
+void StealthSendTRRLookupContext(ActorT* aActor) {
+  (void)aActor->SendStealthProxyLookupOrigin(StealthActiveTRRLookupContext());
+}
+
+/**
  * Fail closed. When the proxy of a DoH request could not be learned, upstream
  * goes on DIRECT ("we just failover to DIRECT when proxy resolution fails"),
  * which would send the name from the host's own address while the session is

@@ -24,19 +24,19 @@ index c05f835489beab0ef0ac3d7581223930b5d6cec8..ed1a759987c0e78f32e302ed2098dbbe
    std::unique_ptr<webgl::ShaderValidator> CreateShaderValidator(
        GLenum shaderType) const;
 diff --git a/dom/canvas/WebGLShader.cpp b/dom/canvas/WebGLShader.cpp
-index 2969307257181915e675a4d1b23a40282b619e48..243c589efedb77fc817c4d6c015e84ca684889e8 100644
+index 2969307257181915e675a4d1b23a40282b619e48..51e9fe1250e85c41f70283a5d5c683b14e9b82de 100644
 --- a/dom/canvas/WebGLShader.cpp
 +++ b/dom/canvas/WebGLShader.cpp
 @@ -106,6 +106,7 @@ void WebGLShader::CompileShader() {
      printf_stderr("\n==== end ====\n");
    }
  
-+  mObjectCodeForPage = StealthPerPageObjectCode(success);  // STEALTH-HOOK(fingerprint/webgl/shader-language)
++  StealthSetObjectCodeForPage();  // STEALTH-HOOK(fingerprint/webgl/shader-language)
    if (!success) return;
  
    const std::array<const char*, 1> parts = {
 diff --git a/dom/canvas/WebGLShader.h b/dom/canvas/WebGLShader.h
-index 2fbffc4442274b679c8849643341b445b6060d08..67f40ca96a348245558bd91251710907032df8dc 100644
+index 2fbffc4442274b679c8849643341b445b6060d08..0e42e0c42d4bf3e6a217451635017b449dc18b62 100644
 --- a/dom/canvas/WebGLShader.h
 +++ b/dom/canvas/WebGLShader.h
 @@ -42,11 +42,13 @@ class WebGLShader final : public WebGLContextBoundObject {
@@ -49,7 +49,7 @@ index 2fbffc4442274b679c8849643341b445b6060d08..67f40ca96a348245558bd91251710907
   private:
    void BindAttribLocation(GLuint prog, const std::string& userName,
                            GLuint index) const;
-+  std::string StealthPerPageObjectCode(bool aValid);  // STEALTH-HOOK(fingerprint/webgl/shader-language)
++  void StealthSetObjectCodeForPage();  // STEALTH-HOOK(fingerprint/webgl/shader-language)
    void MapTransformFeedbackVaryings(
        const std::vector<std::string>& varyings,
        std::vector<std::string>* out_mappedVaryings) const;

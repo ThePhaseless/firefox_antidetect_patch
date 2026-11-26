@@ -11,23 +11,19 @@
   "file": "dom/canvas/CanvasRenderingContext2D.cpp",
   "function": "already_AddRefed<CanvasPattern> CanvasRenderingContext2D::CreatePattern(",
   "kind": "rewrite",
-  "form": "unknown",
-  "line": "      RefPtr<SourceSurface> srcSurf = canvas->GetSurfaceSnapshot();  // STEALTH-HOOK(fingerprint/canvas/text-metrics)",
+  "form": "wrap-call",
+  "line": "      RefPtr<SourceSurface> srcSurf = srcCanvas->StealthGetSurfaceSnapshot();  // STEALTH-HOOK(fingerprint/canvas/text-metrics)",
   "removed": "      RefPtr<SourceSurface> srcSurf = srcCanvas->GetSurfaceSnapshot();",
-  "test": "wrapper:tests/test_canvas_create_pattern_projection_e2e.py::test_create_pattern_from_a_webgl_canvas_carries_the_projection",
-  "exception": "the receiver of Mozilla's call is replaced (srcCanvas->GetSurfaceSnapshot() on the context -> the element's own GetSurfaceSnapshot, where canvas/noise-projection projects the noise on WebGL/WebGPU canvases); no wrap keeps Mozilla's expression without evaluating it (a raw WebGL readback thrown away per call)",
-  "pm": "approvato"
+  "test": "wrapper:tests/test_canvas_create_pattern_projection_e2e.py::test_create_pattern_from_a_webgl_canvas_carries_the_projection"
  },
  {
   "file": "dom/canvas/CanvasRenderingContext2D.cpp",
   "function": "already_AddRefed<CanvasPattern> CanvasRenderingContext2D::CreatePattern(",
   "kind": "rewrite",
-  "form": "unknown",
-  "line": "      RefPtr<SourceSurface> srcSurf = offscreenCanvas->GetSurfaceSnapshot();  // STEALTH-HOOK(fingerprint/canvas/text-metrics)",
+  "form": "wrap-call",
+  "line": "      RefPtr<SourceSurface> srcSurf = srcCanvas->StealthGetSurfaceSnapshot();  // STEALTH-HOOK(fingerprint/canvas/text-metrics)",
   "removed": "      RefPtr<SourceSurface> srcSurf = srcCanvas->GetSurfaceSnapshot();",
-  "test": "wrapper:tests/test_canvas_create_pattern_projection_e2e.py::test_create_pattern_from_an_offscreen_webgl_canvas_carries_the_projection",
-  "exception": "the receiver of Mozilla's call is replaced (srcCanvas->GetSurfaceSnapshot() on the context -> the element's own GetSurfaceSnapshot, where canvas/noise-projection projects the noise on WebGL/WebGPU canvases); no wrap keeps Mozilla's expression without evaluating it (a raw WebGL readback thrown away per call)",
-  "pm": "approvato"
+  "test": "wrapper:tests/test_canvas_create_pattern_projection_e2e.py::test_create_pattern_from_a_webgl_canvas_carries_the_projection"
  },
  {
   "file": "dom/canvas/CanvasRenderingContext2D.cpp",
@@ -38,5 +34,13 @@
   "test": "wrapper:tests/test_canvas_measure_text_metrics_e2e.py::test_measure_text_vertical_metrics_are_whole_and_retail",
   "anchor": "double actualBoundingBoxDescent =\n        processor.mBoundingBox.YMost() + baselineAnchor;",
   "why": "the call replaces the function's return value and needs six locals that exist only inside DrawOrMeasureText (font, fontOrientation, totalWidth and the four actualBoundingBox values); a guard at the top finds them unborn, a wrap of MakeUnique<TextMetrics> would build and discard it and still needs the locals, copying the baseline switch already cost one bug (see StealthCanvasTextMetrics.h)"
+ },
+ {
+  "file": "dom/canvas/nsICanvasRenderingContextInternal.h",
+  "function": "class nsICanvasRenderingContextInternal : public nsISupports,",
+  "kind": "add",
+  "form": "member",
+  "line": "  already_AddRefed<mozilla::gfx::SourceSurface> StealthGetSurfaceSnapshot();  // STEALTH-HOOK(fingerprint/canvas/text-metrics)",
+  "test": "wrapper:tests/test_canvas_create_pattern_projection_e2e.py::test_create_pattern_from_a_webgl_canvas_carries_the_projection"
  }
 ]

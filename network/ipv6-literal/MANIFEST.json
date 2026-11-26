@@ -1,6 +1,7 @@
 {
  "modified": [
-  "netwerk/base/nsSocketTransport2.cpp"
+  "netwerk/base/nsSocketTransport2.cpp",
+  "netwerk/base/nsSocketTransport2.h"
  ],
  "added": {
   "juggler/tests/ipv6_literal_fails_like_a_host_with_no_ipv6_route.test.mjs": "100644",
@@ -26,6 +27,26 @@
     "-  status = PR_Connect(fd, &prAddr, NS_SOCKET_CONNECT_TIMEOUT);"
    ],
    "notes": "Every direct TCP connection passes InitiateSocket: PR_Connect becomes StealthIPv6Connect, which, with IPv6 declared off, fails a routable IPv6 destination like a host with no IPv6 route (network unreachable, nothing sent). A destination behind a SOCKS proxy is left alone: the proxy reaches it, not this host. One line of Mozilla replaced.",
+   "verifier": {
+    "changed": [],
+    "why": "Written from the diff against the tag."
+   }
+  },
+  {
+   "file": "netwerk/base/nsSocketTransport2.h",
+   "category": "spoof",
+   "feature": "ipv6-literal-connect",
+   "prefs": [],
+   "added": 1,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "class nsSocketTransport, among the friend declarations",
+   "evidence": [
+    "+  friend struct StealthSocketTransportAccess;  // STEALTH-HOOK(network/ipv6-literal)"
+   ],
+   "notes": "Lets our access struct read the transport's private connect state, so the connect hook passes the transport itself; a rename by Mozilla fails at compile time.",
    "verifier": {
     "changed": [],
     "why": "Written from the diff against the tag."

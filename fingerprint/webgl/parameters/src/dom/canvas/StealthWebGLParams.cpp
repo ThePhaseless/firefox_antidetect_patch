@@ -12,11 +12,13 @@
 #include "ClientWebGLContext.h"
 #include "GLContext.h"
 #include "WebGLContext.h"
+#include "js/String.h"
 #include "js/Value.h"
 #include "mozilla/RefPtr.h"
 #include "mozilla/StaticPrefs_webgl.h"
 #include "mozilla/StaticPrefs_zoom.h"
 #include "mozilla/dom/TypedArray.h"
+#include "mozilla/dom/WebGLRenderingContextBinding.h"
 #include "nsDependentSubstring.h"
 
 namespace mozilla {
@@ -160,6 +162,49 @@ bool StealthWebGLParameterOverride(ClientWebGLContext& aCtx, JSContext* aCx,
     }
   }
   return false;
+}
+
+bool StealthWebGLParameterString(const GLenum aPname,
+                                 const bool aDebugRendererInfoEnabled,
+                                 Maybe<std::string>& aAnswer) {
+  switch (aPname) {
+    case LOCAL_GL_RENDERER:
+      return StealthWebGLRendererOverride(aAnswer);
+    case dom::WEBGL_debug_renderer_info_Binding::UNMASKED_RENDERER_WEBGL:
+      return aDebugRendererInfoEnabled &&
+             StealthWebGLUnmaskedRendererOverride(aAnswer);
+    case dom::WEBGL_debug_renderer_info_Binding::UNMASKED_VENDOR_WEBGL:
+      return aDebugRendererInfoEnabled &&
+             StealthWebGLUnmaskedVendorOverride(aAnswer);
+    default:
+      return false;
+  }
+}
+
+bool StealthWebGLParameter(ClientWebGLContext& aCtx, JSContext* aCx,
+                           const GLenum aPname,
+                           JS::MutableHandle<JS::Value> aRetval,
+                           ErrorResult& aRv, const bool aDebug) {
+  if (aDebug || aCtx.IsContextLost()) {
+    return false;
+  }
+  Maybe<std::string> answer;
+  if (!StealthWebGLParameterString(
+          aPname,
+          aCtx.IsExtensionEnabled(WebGLExtensionID::WEBGL_debug_renderer_info),
+          answer)) {
+    return false;
+  }
+  // As Mozilla's StringValue: a string, or null with the error when there is no memory.
+  JSString* const str = JS_NewStringCopyN(aCx, answer->data(), answer->size());
+  if (!str) {
+    aRv.Throw(NS_ERROR_OUT_OF_MEMORY);
+    aRetval.setNull();
+    return true;
+  }
+  aRetval.setString(str);
+  StealthWebGLParameterOverride(aCtx, aCx, aPname, aRetval, aRv);
+  return true;
 }
 
 bool StealthWebGLRendererOverride(Maybe<std::string>& aRet) {

@@ -99,19 +99,19 @@ const std::string& StealthPageObjectCode(const WebGLShader& aShader,
   return forPage.empty() ? aDriverObjectCode : forPage;
 }
 
-// Called by WebGLShader::CompileShader with the outcome of the validation for
-// the driver; the result replaces `mObjectCodeForPage` (so an empty result also
-// clears the value of a previous compilation: after a failed compilation no old
-// string is left).
+// Called by WebGLShader::CompileShader once the validation for the driver is
+// final (mCompileResults), before Mozilla's `if (!success) return;`: sets
+// `mObjectCodeForPage`, the value the page reads. It is cleared first, so a
+// compilation with nothing to declare, or one that failed, leaves no string of
+// a previous compilation.
 //
 // A member of WebGLShader and not a free function because
 // `WebGLContext::CreateShaderValidator` is protected and WebGLContext declares
 // only `WebGLShader` as a friend (WebGLContext.h `friend class WebGLShader`).
-std::string WebGLShader::StealthPerPageObjectCode(const bool aValid) {
-  MOZ_ASSERT(aValid == mCompileResults->mValid);
-
-  if (!aValid) {
-    return {};
+void WebGLShader::StealthSetObjectCodeForPage() {
+  mObjectCodeForPage.clear();
+  if (!mCompileResults->mValid) {
+    return;
   }
 
   // The rendering for the PAGE, when the declared language is not the one the
@@ -135,7 +135,7 @@ std::string WebGLShader::StealthPerPageObjectCode(const bool aValid) {
   gl::GLContext* const gl = mContext->gl;
   const auto declared = webgl::StealthDeclaredShaderOutput();
   if (!declared || *declared == ShaderOutputForDriver(gl)) {
-    return {};
+    return;
   }
 
   // The bit "this is the translation for the page" travels in a field of the
@@ -155,20 +155,20 @@ std::string WebGLShader::StealthPerPageObjectCode(const bool aValid) {
     forPage = mContext->CreateShaderValidator(mType);
   }
   if (!forPage) {
-    return {};
+    return;
   }
 
   const auto translation = forPage->ValidateAndTranslate(mSource.c_str());
   // If the second translation fails, the driver's is kept: an answer in the
   // wrong language is a realness defect, an empty answer is a broken page.
   if (translation && translation->mValid) {
-    return translation->mObjectCode;
+    mObjectCodeForPage = translation->mObjectCode;
+    return;
   }
 
   NS_WARNING(
       "the rendering in the declared language did not validate; "
       "getTranslatedShaderSource will return the driver's one");
-  return {};
 }
 
 }  // namespace mozilla

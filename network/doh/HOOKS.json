@@ -155,13 +155,12 @@
  {
   "file": "netwerk/protocol/http/TRRServiceChannel.cpp",
   "function": "nsresult TRRServiceChannel::ResolveProxy() {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "      getter_AddRefs(proxyRequest), Nothing(), StealthTRRContextOf(this));  // STEALTH-HOOK(network/doh)",
-  "removed": "      getter_AddRefs(proxyRequest));",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  StealthSetTRRLookupContext(this);  // STEALTH-HOOK(network/doh)",
   "test": "gtest:TestStealthTRRContext.TheContextOfAChannelIsTheContextOfItsLoadInfo",
-  "exception": "adds two arguments to ProxyConfigLookup::Create: no form of the contract adds arguments to a call (PM-DECISIONS network/doh 1, G9)",
-  "pm": "approvato"
+  "anchor": "Mozilla's `nsCOMPtr<nsICancelable> proxyRequest;` in ResolveProxy, right before `ProxyConfigLookup::Create(`",
+  "why": "the context is set on the statement before Mozilla's call of ProxyConfigLookup::Create, whose first statement takes it; at the head of ResolveProxy it would also be set on the paths that return before the lookup, and nothing would take it there"
  },
  {
   "file": "netwerk/protocol/http/TRRServiceChannel.cpp",
@@ -246,7 +245,7 @@
  },
  {
   "file": "toolkit/components/parentalcontrols/nsParentalControlsServiceWin.cpp",
-  "function": "static nsAutoString GetUserSid() {",
+  "function": "nsParentalControlsService::nsParentalControlsService()",
   "kind": "add",
   "form": "guard",
   "line": "  if (StealthParentalControlsDeclared()) return;  // STEALTH-HOOK(network/doh)",
@@ -312,7 +311,7 @@
  },
  {
   "file": "toolkit/components/url-classifier/nsUrlClassifierDBService.cpp",
-  "function": "class nsUrlClassifierHashCompleterBase",
+  "function": "NS_IMPL_ISUPPORTS(nsUrlClassifierHashCompleterBase,",
   "kind": "add",
   "form": "unknown",
   "line": "NS_IMETHODIMP nsUrlClassifierHashCompleterBase::GetUserContextId(uint32_t* aId) { return mozilla::net::StealthLookupContextOut(mStealthUserContextId, aId); }  // STEALTH-HOOK(network/doh)",

@@ -5,6 +5,7 @@
 #ifndef mozilla_StealthOwnBinaries_h
 #define mozilla_StealthOwnBinaries_h
 
+#include "mozilla/UniquePtr.h"
 #include "nsStringFwd.h"
 
 namespace mozilla {
@@ -34,6 +35,32 @@ bool StealthIsInDirectoryOf(const nsAString& aModulePath,
 bool StealthSkipsSignatureLookup(const nsAString& aPath,
                                  const ModuleVersionInfo& aVerInfo,
                                  bool aHasVersion);
+
+// The same decision from the path alone: reads the version resource of the
+// module itself (ModuleVersionInfo::GetFromImage, the read Mozilla makes a few
+// lines later; a second read of the same file is invisible to a page).
+bool StealthSkipsSignatureLookupOf(const nsAString& aPath);
+
+// How many times the signature lookup was skipped for one of this build's own
+// binaries, since the process started. It only counts: the gtest that goes
+// through Mozilla's ModuleRecord reads it to know that the hook line of
+// ModuleRecord::GetVersionAndVendorInfo reached our function and decided.
+uint32_t StealthOwnBinarySkips();
+void StealthNoteOwnBinarySkip();
+
+// GetVersionAndVendorInfo: the signature lookup of Mozilla, handed over as a
+// thunk (its text stays in the hook), is made unless the module is one of this
+// build's own unsigned binaries; then there is no signature (null), as the
+// lookup would have answered after its catalog search.
+template <typename SignatureLookupT>
+UniquePtr<wchar_t[]> StealthSignatureLookupUnlessOwn(
+    const nsAString& aPath, SignatureLookupT&& aSignatureLookup) {
+  if (StealthSkipsSignatureLookupOf(aPath)) {
+    StealthNoteOwnBinarySkip();
+    return nullptr;
+  }
+  return aSignatureLookup();
+}
 
 }  // namespace mozilla
 

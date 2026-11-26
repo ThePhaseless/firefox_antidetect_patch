@@ -18,9 +18,12 @@ An entry, in this order of keys:
     anchor    (form anchor only) the Mozilla statement the hook follows
     why       (form anchor only) why the guard, wrap-function and wrap-expression forms are not enough (rule T2)
     exception (G35, only when the pm granted it) why no form can express this rewritten line
+    reason_kind (port-06, with `exception` on a rewrite) the kind of the reason: expression | declaration | macro | skip
+              (tools/hook_contract.py C12..C15 judge a rewrite by it; the exception text says why)
     untestable  (only when the pm granted it) why the hook has no test: `test` stays '' and rule T1 does not apply
     pm        exactly "approvato": the pm granted the exception (G35) or the untestable. `exception` and `pm` make a
-              declared exception: the hook is left out of contract_violations (its C-rules, T1, T2, T3) and counted
+              declared exception: the hook is left out of contract_violations (its C-rules C1..C11, T1, T2, T3; not C12..C15,
+              which judge the exception itself) and counted
               apart by `check`; `untestable` and `pm` leave out T1 only, counted apart too. `exception` or `untestable`
               without `pm: "approvato"` is a failure of `check`, and so is `untestable` beside a `test`
 
@@ -78,7 +81,7 @@ from pathlib import Path
 
 import hook_contract as hc
 
-HAND_FIELDS = ("test", "anchor", "why", "exception", "untestable", "pm")
+HAND_FIELDS = ("test", "anchor", "why", "exception", "reason_kind", "untestable", "pm")
 PM_APPROVED = "approvato"
 WORKFLOWS = "platform/ci/src/.github/workflows"
 CANDIDATE_WORKFLOW = "release.yml"
@@ -142,7 +145,7 @@ def _with_hand_fields(e: dict, old: dict | None) -> dict:
         for k in ("anchor", "why"):
             if old.get(k):
                 out[k] = old[k]
-    for k in ("exception", "untestable", "pm"):          # the pm's decisions (G35): only where they were written
+    for k in ("exception", "reason_kind", "untestable", "pm"):          # the pm's decisions (G35): only where they were written
         if k in old:
             out[k] = old[k]
     return out
@@ -321,6 +324,12 @@ def exception_problems(folder: str, e: dict) -> list:
                      % (folder, _label(e), PM_APPROVED))
     elif "pm" in e and e["pm"] != PM_APPROVED:
         found.append("%s/HOOKS.json: the hook %s has pm %r, which is not \"%s\"" % (folder, _label(e), e["pm"], PM_APPROVED))
+    if "reason_kind" in e:
+        if e["reason_kind"] not in hc.REASON_KINDS:
+            found.append("%s/HOOKS.json: the reason_kind of the hook %s is %r, not one of %s"
+                         % (folder, _label(e), e["reason_kind"], "/".join(hc.REASON_KINDS)))
+        if "exception" not in e:
+            found.append("%s/HOOKS.json: the hook %s has a reason_kind and no exception: it qualifies the exception" % (folder, _label(e)))
     if "untestable" in e:
         if not (isinstance(e["untestable"], str) and e["untestable"].strip()):
             found.append("%s/HOOKS.json: the untestable of the hook %s has no reason (a non-empty text)" % (folder, _label(e)))

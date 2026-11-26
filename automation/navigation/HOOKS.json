@@ -40,10 +40,10 @@
   "function": "nsresult nsDocShell::InternalLoad(nsDocShellLoadState* aLoadState,",
   "kind": "add",
   "form": "unknown",
-  "line": "  StealthNavigationLoad stealthLoad(this, aLoadState, !isJavaScript && !sameDocument);  // STEALTH-HOOK(automation/navigation)",
-  "test": "wrapper:tests/test_a_goto_to_a_refused_port_ends_with_its_reason_e2e.py::test_a_goto_to_a_refused_port_ends_with_its_reason",
+  "line": "  StealthNavigationLoad stealthLoad(this, aLoadState);  // STEALTH-HOOK(automation/navigation)",
+  "test": "node:juggler/tests/navigation_hook_runs_only_for_a_load_that_leaves_the_document.test.mjs#InternalLoad returns before the hook whenever sameDocument is still true, and nothing writes it after",
   "anchor": "nsCOMPtr<nsIRequest> req; (in InternalLoad, before rv = DoURILoad(...))",
-  "why": "needs isJavaScript and sameDocument, two locals Mozilla computes in InternalLoad: a wrap of DoURILoad would recompute them and follow Mozilla's rule silently only until it changes"
+  "why": "FIREFOX_159_0_RELEASE docshell/base/nsDocShell.cpp:8584 `bool sameDocument = ...` is its only declaration; its only writes are the by-reference argument of HandleSameDocumentNavigation at 8726-8727 (the callee sets it at 7971 and 7999); the block at 8725 returns at 8732-8741 whenever sameDocument is still true; no later line writes it; the hook sits before DoURILoad at 9002."
  },
  {
   "file": "docshell/base/nsDocShell.cpp",
@@ -157,7 +157,7 @@
  },
  {
   "file": "netwerk/base/TRRLoadInfo.cpp",
-  "function": "TRRLoadInfo::TRRLoadInfo(nsIURI* aResultPrincipalURI,",
+  "function": "already_AddRefed<nsILoadInfo> TRRLoadInfo::Clone() const {",
   "kind": "add",
   "form": "unknown",
   "line": "  static_cast<TRRLoadInfo*>(loadInfo.get())->mOriginAttributes = mOriginAttributes;  // STEALTH-HOOK(network/doh)",
@@ -167,7 +167,7 @@
  },
  {
   "file": "netwerk/base/TRRLoadInfo.cpp",
-  "function": "nsresult TRRLoadInfo::GetOriginAttributes(",
+  "function": "nsresult TRRLoadInfo::SetOriginAttributes(",
   "kind": "add",
   "form": "guard",
   "line": "  if (nsresult rv; StealthTRRSetOriginAttributes(mOriginAttributes, aOriginAttributes, &rv)) return rv;  // STEALTH-HOOK(network/doh)",
@@ -201,7 +201,7 @@
  },
  {
   "file": "netwerk/ipc/DocumentLoadListener.cpp",
-  "function": "bool DocumentLoadListener::MaybeTriggerProcessSwitch(",
+  "function": "void DocumentLoadListener::TriggerProcessSwitch(",
   "kind": "add",
   "form": "notice",
   "line": "  StealthNotifyNavigationMoved(aContext, mContentParent, mLoadIdentifier, mIsDocumentLoad, aIsNewTab);  // STEALTH-HOOK(automation/navigation)",

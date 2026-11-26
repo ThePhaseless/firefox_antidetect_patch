@@ -9,7 +9,7 @@
  },
  {
   "file": "gfx/2d/ScaledFontDWrite.cpp",
-  "function": "static bool GetFontFileName(RefPtr<IDWriteFontFace> aFontFace,",
+  "function": "bool UnscaledFontDWrite::GetFontDescriptor(FontDescriptorOutput aCb,",
   "kind": "add",
   "form": "guard",
   "line": "  if (StealthGetSeededDescriptor(aCb, aBaton)) return true;  // STEALTH-HOOK(fingerprint/fonts/bundle)",
@@ -109,6 +109,14 @@
   "function": "class gfxDWriteFontList final : public gfxPlatformFontList {",
   "kind": "add",
   "form": "member",
+  "line": "  void StealthAppendFamiliesFromCollection(IDWriteFontCollection* aCollection, nsTArray<mozilla::fontlist::Family::InitData>& aFamilies, const nsTArray<nsCString>* aForceClassicFams) MOZ_REQUIRES(mLock);  // STEALTH-HOOK(fingerprint/fonts/font-list)",
+  "test": "wrapper:tests/test_the_font_list_is_the_bundle_e2e.py::test_the_font_list_is_the_bundle_and_nothing_else"
+ },
+ {
+  "file": "gfx/thebes/gfxDWriteFontList.h",
+  "function": "class gfxDWriteFontList final : public gfxPlatformFontList {",
+  "kind": "add",
+  "form": "member",
   "line": "  already_AddRefed<gfxFontEntry> CreateStealthBundleFontEntry(mozilla::fontlist::Face* aFace, const mozilla::fontlist::Family* aFamily);  // STEALTH-HOOK(fingerprint/fonts/bundle)",
   "test": "wrapper:tests/test_the_font_list_is_the_bundle_e2e.py::test_the_font_list_is_the_bundle_and_nothing_else"
  },
@@ -129,6 +137,7 @@
   "removed": "    operator hb_face_t*() const { return mFace; }",
   "test": "wrapper:tests/test_screenshot_of_text_returns_linux_e2e.py::test_a_screenshot_of_a_page_with_text_returns",
   "exception": "a change of type, not a hook: the conversion of AutoHBFace is ref-qualified (const& and const&& = delete), so binding the result of GetHBFace() to a raw pointer is a compile error. Introduced by 098cf5f777 (fingerprint/fonts/bundle, 2026-10-05) after the one wrong caller of fourteen, gfxHarfBuzzShaper::GetDesignFont, left a dangling pointer: 6 of 10 browsing sessions died against 0 after the fix. The two lines stay as they are today (G35, G24); the pm decides later whether to restore Mozilla's line",
+  "reason_kind": "declaration",
   "pm": "approvato"
  },
  {
@@ -139,6 +148,7 @@
   "line": "    operator hb_face_t*() const&& = delete;  // STEALTH-HOOK(fingerprint/fonts/bundle)",
   "test": "wrapper:tests/test_screenshot_of_text_returns_linux_e2e.py::test_a_screenshot_of_a_page_with_text_returns",
   "exception": "second line of the same change of type (see the line above); stays as it is today (G35, G24)",
+  "reason_kind": "declaration",
   "pm": "approvato"
  },
  {
@@ -159,7 +169,7 @@
  },
  {
   "file": "gfx/thebes/gfxFontUtils.cpp",
-  "function": "static int DirEntryCmp(const void* aKey, const void* aItem) {",
+  "function": "TableDirEntry* gfxFontUtils::FindTableDirEntry(const void* aFontData,",
   "kind": "rewrite",
   "form": "wrap-expression",
   "line": "  const SFNTHeader* header = StealthSfntHeader(reinterpret_cast<const SFNTHeader*>(aFontData));  // STEALTH-HOOK(fingerprint/fonts/bundle)",
@@ -200,7 +210,7 @@
  },
  {
   "file": "gfx/thebes/gfxPlatformGtk.cpp",
-  "function": "static const char kFontNotoSansSymbols2[] = \"Noto Sans Symbols2\";",
+  "function": "void gfxPlatformGtk::GetCommonFallbackFonts(uint32_t aCh, Script aRunScript,",
   "kind": "add",
   "form": "notice",
   "line": "  StealthAppendWindowsFallbackNames(aPresentation, aFontList);  // STEALTH-HOOK(fingerprint/fonts/bundle)",

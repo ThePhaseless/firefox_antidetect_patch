@@ -1,19 +1,18 @@
 diff --git a/dom/base/nsDOMWindowUtils.cpp b/dom/base/nsDOMWindowUtils.cpp
-index b39212b1c9710b3530502c8a39932f0523f46875..c17c662b141613658b2ebe2defb090ad047c2535 100644
+index b39212b1c9710b3530502c8a39932f0523f46875..d315ffa27c8bc083972ad7651ab69977d1c4c79e 100644
 --- a/dom/base/nsDOMWindowUtils.cpp
 +++ b/dom/base/nsDOMWindowUtils.cpp
-@@ -145,6 +145,10 @@
+@@ -145,6 +145,9 @@
  #  undef GetClassName
  #endif
  
-+#include "StealthCanvasAsDrawn.h"  // STEALTH-HOOK(fingerprint/canvas/as-drawn)
 +#include "StealthInputEventBirth.h"  // STEALTH-HOOK(fingerprint/input/event-birth)
 +#include "StealthJugglerInput.h"  // STEALTH-HOOK(automation/input)
 +
  using namespace mozilla;
  using namespace mozilla::dom;
  using namespace mozilla::ipc;
-@@ -723,7 +727,8 @@ nsDOMWindowUtils::SendWheelEvent(float aX, float aY, double aDeltaX,
+@@ -723,7 +726,8 @@ nsDOMWindowUtils::SendWheelEvent(float aX, float aY, double aDeltaX,
                                   uint32_t aDeltaMode, int32_t aModifiers,
                                   int32_t aLineOrPageDeltaX,
                                   int32_t aLineOrPageDeltaY, uint32_t aOptions,
@@ -23,7 +22,7 @@ index b39212b1c9710b3530502c8a39932f0523f46875..c17c662b141613658b2ebe2defb090ad
    if (XRE_IsContentProcess() && aCallback &&
        ((aOptions & WHEEL_EVENT_ASYNC_ENABLED) ||
         StaticPrefs::test_events_async_enabled())) {
-@@ -758,6 +763,7 @@ nsDOMWindowUtils::SendWheelEvent(float aX, float aY, double aDeltaX,
+@@ -758,6 +762,7 @@ nsDOMWindowUtils::SendWheelEvent(float aX, float aY, double aDeltaX,
    wheelEvent.mCallbackId = notifier.SaveCallback();
    wheelEvent.mFlags.mIsSynthesizedForTests = true;
  
@@ -31,15 +30,6 @@ index b39212b1c9710b3530502c8a39932f0523f46875..c17c662b141613658b2ebe2defb090ad
    nsPresContext* presContext = GetPresContext();
    NS_ENSURE_TRUE(presContext, NS_ERROR_FAILURE);
  
-@@ -1403,7 +1409,7 @@ nsDOMWindowUtils::NodesFromRect(float aX, float aY, float aTopSize,
- static already_AddRefed<DataSourceSurface> CanvasToDataSourceSurface(
-     HTMLCanvasElement* aCanvas) {
-   MOZ_ASSERT(aCanvas);
--  SurfaceFromElementResult result = nsLayoutUtils::SurfaceFromElement(aCanvas);
-+  SurfaceFromElementResult result = StealthSurfaceFromCanvasAsDrawn(aCanvas);  // STEALTH-HOOK(fingerprint/canvas/as-drawn)
-   const RefPtr<SourceSurface> surf = result.GetSourceSurface();
-   if (!surf) {
-     return nullptr;
 diff --git a/dom/events/EventStateManager.cpp b/dom/events/EventStateManager.cpp
 index 294b486e9666fce45bcb2bc13231441ede997784..bde71517f79693408dcf86d76c89cf5d564d8fbb 100644
 --- a/dom/events/EventStateManager.cpp
@@ -170,14 +160,15 @@ index ca58605fd207e17050ead0f37bd63aa3f7edb7e7..3f6314fab50536cc78fcdd688fb3814b
  
    RecordModifiers(aGUIEvent);
 diff --git a/layout/base/gtest/moz.build b/layout/base/gtest/moz.build
-index 9e7558fe897f28502c58901995b39609067d20ef..44f6c56d852b2d71f49830627837f750fd922634 100644
+index 9e7558fe897f28502c58901995b39609067d20ef..50d00e67fb317760ffea7bdfbd6019a8215930ff 100644
 --- a/layout/base/gtest/moz.build
 +++ b/layout/base/gtest/moz.build
-@@ -8,6 +8,7 @@ UNIFIED_SOURCES += [
+@@ -8,6 +8,8 @@ UNIFIED_SOURCES += [
      "TestAccessibleCaretManager.cpp",
      "TestUniqueOrNonOwningPtr.cpp",
  ]
 +UNIFIED_SOURCES += ["TestStealthJugglerMouseAck.cpp"]  # STEALTH-HOOK(automation/input)
++UNIFIED_SOURCES += ["TestStealthSurfaceFlags.cpp"]  # STEALTH-HOOK(fingerprint/canvas/as-drawn)
  
  # THE MOCK_METHOD2 macro from gtest triggers this clang warning and it's hard
  # to work around, so we just ignore it.
@@ -202,10 +193,19 @@ index e0e3b70f718140d313bb5d54fdc9679a42804df6..6f046cc3615773e1aa5c02d11f1823f0
  
      mButton = aEvent.mButton;
 diff --git a/widget/nsGUIEventIPC.h b/widget/nsGUIEventIPC.h
-index 2ecd78035575b074f6b2ac798162188c4d02e0d5..3b1b623e902d0a923a6560f7f1bedac85aa5ed96 100644
+index 2ecd78035575b074f6b2ac798162188c4d02e0d5..dd60a2df7dd06c984301b139101c8a836290adf1 100644
 --- a/widget/nsGUIEventIPC.h
 +++ b/widget/nsGUIEventIPC.h
-@@ -165,6 +165,7 @@ struct ParamTraits<mozilla::WidgetMouseEventBase> {
+@@ -24,6 +24,8 @@
+ #include "mozilla/ipc/URIUtils.h"  // for ParamTraits<nsIURI*>
+ #include "mozilla/layers/LayersMessageUtils.h"
+ 
++#include "ipc/StealthMouseEventIPC.h"  // STEALTH-HOOK(automation/input)
++
+ namespace IPC {
+ 
+ template <>
+@@ -165,6 +167,7 @@ struct ParamTraits<mozilla::WidgetMouseEventBase> {
      WriteParam(aWriter, aParam.mButtons);
      WriteParam(aWriter, aParam.mPressure);
      WriteParam(aWriter, aParam.mInputSource);
@@ -213,13 +213,12 @@ index 2ecd78035575b074f6b2ac798162188c4d02e0d5..3b1b623e902d0a923a6560f7f1bedac8
    }
  
    static bool ReadForDerivedClass(MessageReader* aReader,
-@@ -175,7 +176,8 @@ struct ParamTraits<mozilla::WidgetMouseEventBase> {
+@@ -175,7 +178,7 @@ struct ParamTraits<mozilla::WidgetMouseEventBase> {
             ReadParam(aReader, &aResult->mButton) &&
             ReadParam(aReader, &aResult->mButtons) &&
             ReadParam(aReader, &aResult->mPressure) &&
 -           ReadParam(aReader, &aResult->mInputSource);
-+           ReadParam(aReader, &aResult->mInputSource) &&
-+           ReadParam(aReader, &aResult->mJugglerEventId);  // STEALTH-HOOK(automation/input)
++           StealthReadJugglerEventId(aReader, aResult, ReadParam(aReader, &aResult->mInputSource));  // STEALTH-HOOK(automation/input)
    }
  };
  

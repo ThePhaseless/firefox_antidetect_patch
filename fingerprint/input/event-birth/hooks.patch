@@ -102,13 +102,14 @@ index 7929fcdeb59c47dbd2bee9e8d8bfd7ef2e8db87b..ff2d17735369d2b63043b28430e6a995
    } else {
      status = aWidget->DispatchEvent(&mouseOrPointerEvent);
 diff --git a/dom/base/test/gtest/moz.build b/dom/base/test/gtest/moz.build
-index aaf31169b44149bd6042cea4eb2e08c87c1378e7..2a44b40a543947caf396ab1be5b6bbcf167a5742 100644
+index aaf31169b44149bd6042cea4eb2e08c87c1378e7..572c787950574a9ab5801547ef1882f1c615d62e 100644
 --- a/dom/base/test/gtest/moz.build
 +++ b/dom/base/test/gtest/moz.build
-@@ -13,6 +13,10 @@ UNIFIED_SOURCES += [
+@@ -13,6 +13,11 @@ UNIFIED_SOURCES += [
      "TestXMLSerializerNoBreakLink.cpp",
      "TestXPathGenerator.cpp",
  ]
++UNIFIED_SOURCES += ["TestStealthCallerObject.cpp"]  # STEALTH-HOOK(automation/hybrid-xrays)
 +UNIFIED_SOURCES += ["TestStealthDocumentLanguage.cpp"]  # STEALTH-HOOK(fingerprint/locale-time/session-declaration)
 +UNIFIED_SOURCES += ["TestStealthInputEventBirth.cpp"]  # STEALTH-HOOK(fingerprint/input/event-birth)
 +UNIFIED_SOURCES += ["TestStealthStackFrames.cpp"]  # STEALTH-HOOK(fingerprint/js-surface/stack-frames)

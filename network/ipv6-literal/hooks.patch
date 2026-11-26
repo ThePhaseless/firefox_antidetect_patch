@@ -1,5 +1,5 @@
 diff --git a/netwerk/base/nsSocketTransport2.cpp b/netwerk/base/nsSocketTransport2.cpp
-index 440e4b8dfd0ad23d2b91b8f84cc8074dd0e1ed5c..5237feb50abd264aa827c23e9e2bcb38cdfa3968 100644
+index 440e4b8dfd0ad23d2b91b8f84cc8074dd0e1ed5c..12d47b679facb89f189c7fd51d60e83ea12b6c3d 100644
 --- a/netwerk/base/nsSocketTransport2.cpp
 +++ b/netwerk/base/nsSocketTransport2.cpp
 @@ -70,6 +70,8 @@
@@ -16,7 +16,19 @@ index 440e4b8dfd0ad23d2b91b8f84cc8074dd0e1ed5c..5237feb50abd264aa827c23e9e2bcb38
  #endif
  
 -  status = PR_Connect(fd, &prAddr, NS_SOCKET_CONNECT_TIMEOUT);
-+  status = StealthConnect(mNetAddr, mProxyTransparent, mProxyHost, fd, &prAddr, NS_SOCKET_CONNECT_TIMEOUT);  // STEALTH-HOOK(network/ipv6-literal)
++  status = StealthConnect(this, fd, &prAddr, NS_SOCKET_CONNECT_TIMEOUT);  // STEALTH-HOOK(network/ipv6-literal)
    PRErrorCode code = PR_GetError();
    if (status == PR_SUCCESS) {
      PR_SetFDInheritable(fd, false);
+diff --git a/netwerk/base/nsSocketTransport2.h b/netwerk/base/nsSocketTransport2.h
+index ed81b052e28a78315dfc21115e2f794e11c5b146..47461bf28529609f80c0788fa317a97ac1ecd4e2 100644
+--- a/netwerk/base/nsSocketTransport2.h
++++ b/netwerk/base/nsSocketTransport2.h
+@@ -336,6 +336,7 @@ class nsSocketTransport final : public nsASocketHandler,
+   UniquePtr<nsSocketOutputStream> mOutput;
+ 
+   friend class nsSocketInputStream;
++  friend struct StealthSocketTransportAccess;  // STEALTH-HOOK(network/ipv6-literal)
+   friend class nsSocketOutputStream;
+   friend class TLSServerSocket;
+ 

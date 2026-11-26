@@ -19,8 +19,11 @@ class nsISupports;
 // machinery. Observer notifications: nothing a page can see.
 
 // One navigation as nsDocShell::InternalLoad starts it, built right before
-// DoURILoad. When aNotify is true (a navigation that is neither a javascript:
-// URL nor a same-document one):
+// DoURILoad. It notifies when the navigation is not a javascript: URL (the
+// scheme of the load state's URI, read here). A same-document navigation never
+// gets here: InternalLoad returns before DoURILoad when `sameDocument` is still
+// true after HandleSameDocumentNavigation, and nothing writes it after. In a
+// notifying one:
 // - building it reports 'juggler-navigation-started-renderer' for aDocShell,
 //   which drives the Juggler protocol's Page.navigationStarted and,
 //   ultimately, Page.ready;
@@ -32,8 +35,7 @@ class nsISupports;
 // It lives on InternalLoad's stack, as aDocShell and aLoadState do.
 class StealthNavigationLoad final {
  public:
-  StealthNavigationLoad(nsDocShell* aDocShell, nsDocShellLoadState* aLoadState,
-                        bool aNotify);
+  StealthNavigationLoad(nsDocShell* aDocShell, nsDocShellLoadState* aLoadState);
   void Failed(nsresult aStatus);
 
  private:

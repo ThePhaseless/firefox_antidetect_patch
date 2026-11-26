@@ -30,9 +30,9 @@
   "file": "docshell/base/BrowsingContext.cpp",
   "function": "void BrowsingContext::DidSet(FieldIndex<IDX_LanguageOverride>,",
   "kind": "rewrite",
-  "form": "wrap-expression",
-  "line": "              realm, StealthRealmLocale(realm, PromiseFlatCString(languageOverride)).get());  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
-  "removed": "              realm, PromiseFlatCString(languageOverride).get());",
+  "form": "wrap-call",
+  "line": "          StealthSetRealmLocaleOverride(  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "removed": "          JS::SetRealmLocaleOverride(",
   "test": "wrapper:tests/test_context_locale_e2e.py::test_a_context_locale_reaches_navigator_intl_and_the_header"
  },
  {
@@ -64,34 +64,22 @@
  },
  {
   "file": "dom/base/Document.cpp",
-  "function": "void Document::SetDocumentURI(nsIURI* aURI) {",
-  "kind": "add",
-  "form": "unknown",
-  "line": "                                   const Document* aDocument,  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
-  "test": "wrapper:tests/test_a_launch_and_a_context_timezone_reach_the_page_e2e.py::test_a_launch_and_a_context_timezone_reach_the_page",
-  "exception": "a parameter of ours in the signature of Mozilla's static GetFormattedTimeString, which does not receive the document and cannot be wrapped; the line is a pure addition between two Mozilla lines (G35, approved by the pm in PM-DECISIONS.md: fingerprint/locale-time/timezone)",
-  "pm": "approvato"
- },
- {
-  "file": "dom/base/Document.cpp",
-  "function": "void Document::SetDocumentURI(nsIURI* aURI) {",
+  "function": "static void GetFormattedTimeString(PRTime aTime, bool aUniversal,",
   "kind": "rewrite",
-  "form": "unknown",
-  "line": "  StealthExplodeTime(aDocument, aTime, aUniversal ? PR_GMTParameters : PR_LocalTimeParameters, &prtime);  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
-  "removed": "  PR_ExplodeTime(aTime, aUniversal ? PR_GMTParameters : PR_LocalTimeParameters,\n                 &prtime);",
-  "test": "wrapper:tests/test_a_launch_and_a_context_timezone_reach_the_page_e2e.py::test_a_launch_and_a_context_timezone_reach_the_page",
-  "exception": "the explode call of the same static takes our document in front of Mozilla's own arguments; the two Mozilla lines of the call become one (G35, approved by the pm in PM-DECISIONS.md)",
-  "pm": "approvato"
+  "form": "wrap-call",
+  "line": "  StealthExplodeTime(aTime, aUniversal ? PR_GMTParameters : PR_LocalTimeParameters,  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "removed": "  PR_ExplodeTime(aTime, aUniversal ? PR_GMTParameters : PR_LocalTimeParameters,",
+  "test": "wrapper:tests/test_a_launch_and_a_context_timezone_reach_the_page_e2e.py::test_a_launch_and_a_context_timezone_reach_the_page"
  },
  {
   "file": "dom/base/Document.cpp",
   "function": "void Document::GetLastModified(nsAString& aLastModified) const {",
-  "kind": "rewrite",
-  "form": "wrap-call",
-  "line": "                           this, aLastModified);  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
-  "removed": "                           aLastModified);",
+  "kind": "add",
+  "form": "anchor",
+  "line": "    StealthNoteTimeDocument(this);  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
   "test": "wrapper:tests/test_a_launch_and_a_context_timezone_reach_the_page_e2e.py::test_a_launch_and_a_context_timezone_reach_the_page",
-  "why": "G9: the call of Mozilla's static gains the document, `this`, as its argument (the parameter itself is the G35 exception above); the line stays rewritten"
+  "anchor": "the `} else {` of Mozilla's `if (!mLastModified.IsEmpty())`, right before `GetFormattedTimeString(PR_Now(), ...)`",
+  "why": "the caller's `this` is noted before Mozilla's static GetFormattedTimeString runs; the static function has no access to the document and a wrap of it cannot see it, and the note belongs on the paths that call it, not at the head of the member function, which also returns the stored header without calling it"
  },
  {
   "file": "dom/base/Document.cpp",
@@ -106,19 +94,20 @@
  {
   "file": "dom/base/Document.cpp",
   "function": "void Document::RetrieveRelevantHeaders(nsIChannel* aChannel) {",
-  "kind": "rewrite",
-  "form": "wrap-call",
-  "line": "                           this, mLastModified);  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
-  "removed": "                           mLastModified);",
+  "kind": "add",
+  "form": "anchor",
+  "line": "    StealthNoteTimeDocument(this);  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
   "test": "wrapper:tests/test_a_launch_and_a_context_timezone_reach_the_page_e2e.py::test_a_launch_and_a_context_timezone_reach_the_page",
-  "why": "G9: the call of Mozilla's static gains the document, `this`, as its argument (the parameter itself is the G35 exception above); the line stays rewritten"
+  "anchor": "Mozilla's `if (modDate != 0) {`, right before `GetFormattedTimeString(modDate, ...)`",
+  "why": "the caller's `this` is noted before Mozilla's static GetFormattedTimeString runs; the static function has no access to the document and a wrap of it cannot see it, and the note belongs on the paths that call it, not at the head of the member function, which also returns the stored header without calling it"
  },
  {
   "file": "dom/base/Document.cpp",
-  "function": "const LangGroupFontPrefs* Document::GetFontPrefsForLang(",
-  "kind": "add",
-  "form": "unknown",
-  "line": "  language = DocumentCharsetLanguage(this, language);  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "function": "void Document::RecomputeLanguageFromCharset() {",
+  "kind": "rewrite",
+  "form": "wrap-expression",
+  "line": "  nsAtom* language = StealthDocumentCharsetLanguage(this, mozilla::intl::EncodingToLang::Lookup(mCharacterSet));  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "removed": "  nsAtom* language = mozilla::intl::EncodingToLang::Lookup(mCharacterSet);",
   "test": "gtest:StealthDocumentLanguage.WithNoContextTheSessionsLanguageIsTheDocumentsOne"
  },
  {
@@ -139,14 +128,20 @@
  },
  {
   "file": "dom/xslt/xslt/txEXSLTFunctions.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthExsltTime.h\"  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "test": "node:juggler/tests/exslt_time_finds_the_source_document_as_the_file_does.test.mjs#ours finds the source document the way getSourceDocument does, and explodes in its zone"
+ },
+ {
+  "file": "dom/xslt/xslt/txEXSLTFunctions.cpp",
   "function": "nsresult txEXSLTFunctionCall::evaluate(txIEvalContext* aContext,",
   "kind": "rewrite",
   "form": "wrap-call",
-  "line": "      StealthExplodeTime(sourceDoc, time, timezone, &prtime);  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "line": "      StealthExplodeTime(aContext, time, timezone, &prtime);  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
   "removed": "      PR_ExplodeTime(time, timezone, &prtime);",
-  "test": "wrapper:tests/test_a_launch_and_a_context_timezone_reach_the_page_e2e.py::test_a_launch_and_a_context_timezone_reach_the_page",
-  "exception": "the call of EXSLT's date:date-time() gains sourceDoc, a local born by getSourceDocument (a static of the file), so it is neither `this` nor a parameter (G9 does not cover it): G35, approved by the pm in PM-DECISIONS.md",
-  "pm": "approvato"
+  "test": "node:juggler/tests/exslt_time_finds_the_source_document_as_the_file_does.test.mjs#ours finds the source document the way getSourceDocument does, and explodes in its zone"
  },
  {
   "file": "js/xpconnect/src/nsXPConnect.cpp",

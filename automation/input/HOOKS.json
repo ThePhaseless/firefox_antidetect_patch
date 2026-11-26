@@ -4,14 +4,6 @@
   "function": "",
   "kind": "add",
   "form": "registration",
-  "line": "#include \"StealthCanvasAsDrawn.h\"  // STEALTH-HOOK(fingerprint/canvas/as-drawn)",
-  "test": "wrapper:tests/test_canvas_reads_as_drawn.py::test_random_pixels_read_back_as_drawn"
- },
- {
-  "file": "dom/base/nsDOMWindowUtils.cpp",
-  "function": "",
-  "kind": "add",
-  "form": "registration",
   "line": "#include \"StealthInputEventBirth.h\"  // STEALTH-HOOK(fingerprint/input/event-birth)",
   "test": "wrapper:tests/test_input_is_born_before_the_page_sees_it_e2e.py::test_every_key_and_move_is_born_before_its_handler_runs"
  },
@@ -31,7 +23,8 @@
   "line": "                                 nsISynthesizedEventCallback* aCallback,",
   "removed": "                                 nsISynthesizedEventCallback* aCallback) {",
   "test": "wrapper:tests/test_input_is_born_before_the_page_sees_it_e2e.py::test_every_key_and_move_is_born_before_its_handler_runs",
-  "exception": "G35, approved in PM-DECISIONS (automation/input): aLatency is a parameter of ours in the signature of a Mozilla method; the C++ signature of an XPIDL method is generated from the IDL, so the IDL line and this one are one change; it is the interface that Juggler and the minimal driver use",
+  "exception": "G35, approved in PM-DECISIONS (automation/input): aLatency is a parameter of ours in the signature of a Mozilla method; the C++ signature of an XPIDL method is generated from the IDL, so the IDL line and this one are one change; it is the interface that Juggler and the minimal driver use the C++ signature is generated from the XPIDL line; a side state cannot change a generated signature.",
+  "reason_kind": "declaration",
   "pm": "approvato"
  },
  {
@@ -41,7 +34,8 @@
   "form": "unknown",
   "line": "                                 double aLatency) {  // STEALTH-HOOK(fingerprint/input/event-birth)",
   "test": "wrapper:tests/test_input_is_born_before_the_page_sees_it_e2e.py::test_every_key_and_move_is_born_before_its_handler_runs",
-  "exception": "G35, approved in PM-DECISIONS (automation/input): aLatency is a parameter of ours in the signature of a Mozilla method; the C++ signature of an XPIDL method is generated from the IDL, so the IDL line and this one are one change; it is the interface that Juggler and the minimal driver use",
+  "exception": "G35, approved in PM-DECISIONS (automation/input): aLatency is a parameter of ours in the signature of a Mozilla method; the C++ signature of an XPIDL method is generated from the IDL, so the IDL line and this one are one change; it is the interface that Juggler and the minimal driver use the C++ signature is generated from the XPIDL line; a side state cannot change a generated signature.",
+  "reason_kind": "declaration",
   "pm": "approvato"
  },
  {
@@ -53,17 +47,6 @@
   "test": "wrapper:tests/test_input_is_born_before_the_page_sees_it_e2e.py::test_every_key_and_move_is_born_before_its_handler_runs",
   "anchor": "wheelEvent.mFlags.mIsSynthesizedForTests = true;",
   "why": "the hook stamps the local wheelEvent, which exists only inside SendWheelEvent: a guard at the top has nothing to stamp, a function wrap cannot reach a local, and the event is a constructor declaration, not an expression to wrap; GetDocument() is a protected member of this, so the template cannot take this"
- },
- {
-  "file": "dom/base/nsDOMWindowUtils.cpp",
-  "function": "nsDOMWindowUtils::NodesFromRect(float aX, float aY, float aTopSize,",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "  SurfaceFromElementResult result = StealthSurfaceFromCanvasAsDrawn(aCanvas);  // STEALTH-HOOK(fingerprint/canvas/as-drawn)",
-  "removed": "  SurfaceFromElementResult result = nsLayoutUtils::SurfaceFromElement(aCanvas);",
-  "test": "wrapper:tests/test_canvas_reads_as_drawn.py::test_random_pixels_read_back_as_drawn",
-  "exception": "G29 (PM-DECISIONS 22/11 morning, read by the pm against the tag): one Mozilla line, only the called function changes",
-  "pm": "approvato"
  },
  {
   "file": "dom/events/EventStateManager.cpp",
@@ -109,7 +92,8 @@
   "line": "                      [optional] in nsISynthesizedEventCallback aCallback,",
   "removed": "                      [optional] in nsISynthesizedEventCallback aCallback);",
   "test": "wrapper:tests/test_input_is_born_before_the_page_sees_it_e2e.py::test_every_key_and_move_is_born_before_its_handler_runs",
-  "exception": "G35, approved in PM-DECISIONS (automation/input): aLatency is a parameter of ours in the signature of a Mozilla method; the C++ signature of an XPIDL method is generated from the IDL, so the IDL line and this one are one change; it is the interface that Juggler and the minimal driver use",
+  "exception": "G35, approved in PM-DECISIONS (automation/input): aLatency is a parameter of ours in the signature of a Mozilla method; the C++ signature of an XPIDL method is generated from the IDL, so the IDL line and this one are one change; it is the interface that Juggler and the minimal driver use the C++ signature is generated from the XPIDL line; a side state cannot change a generated signature.",
+  "reason_kind": "declaration",
   "pm": "approvato"
  },
  {
@@ -119,7 +103,8 @@
   "form": "unknown",
   "line": "                      [optional] in double aLatency);  // STEALTH-HOOK(fingerprint/input/event-birth)",
   "test": "wrapper:tests/test_input_is_born_before_the_page_sees_it_e2e.py::test_every_key_and_move_is_born_before_its_handler_runs",
-  "exception": "G35, approved in PM-DECISIONS (automation/input): aLatency is a parameter of ours in the signature of a Mozilla method; the C++ signature of an XPIDL method is generated from the IDL, so the IDL line and this one are one change; it is the interface that Juggler and the minimal driver use",
+  "exception": "G35, approved in PM-DECISIONS (automation/input): aLatency is a parameter of ours in the signature of a Mozilla method; the C++ signature of an XPIDL method is generated from the IDL, so the IDL line and this one are one change; it is the interface that Juggler and the minimal driver use the C++ signature is generated from the XPIDL line; a side state cannot change a generated signature.",
+  "reason_kind": "declaration",
   "pm": "approvato"
  },
  {
@@ -197,6 +182,14 @@
   "test": "gtest:StealthJugglerMouseAck.AnEventWithAnIdIsAckedOnceWhenTheScopeEnds"
  },
  {
+  "file": "layout/base/gtest/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"TestStealthSurfaceFlags.cpp\"]  # STEALTH-HOOK(fingerprint/canvas/as-drawn)",
+  "test": "gtest:StealthSurfaceFlags.OnlyOurFlagAsksForTheCanvasAsDrawn"
+ },
+ {
   "file": "widget/MouseEvents.h",
   "function": "class WidgetMouseEventBase : public WidgetInputEvent {",
   "kind": "add",
@@ -214,6 +207,14 @@
  },
  {
   "file": "widget/nsGUIEventIPC.h",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"ipc/StealthMouseEventIPC.h\"  // STEALTH-HOOK(automation/input)",
+  "test": "gtest:StealthMouseEventIPC.TheIdSurvivesTheMessage"
+ },
+ {
+  "file": "widget/nsGUIEventIPC.h",
   "function": "struct ParamTraits<mozilla::WidgetMouseEventBase> {",
   "kind": "add",
   "form": "anchor",
@@ -226,22 +227,10 @@
   "file": "widget/nsGUIEventIPC.h",
   "function": "struct ParamTraits<mozilla::WidgetMouseEventBase> {",
   "kind": "rewrite",
-  "form": "unknown",
-  "line": "           ReadParam(aReader, &aResult->mInputSource) &&",
+  "form": "wrap-expression",
+  "line": "           StealthReadJugglerEventId(aReader, aResult, ReadParam(aReader, &aResult->mInputSource));  // STEALTH-HOOK(automation/input)",
   "removed": "           ReadParam(aReader, &aResult->mInputSource);",
-  "test": "gtest:StealthMouseEventIPC.TheIdSurvivesTheMessage",
-  "exception": "G44 (approved in PM-DECISIONS): the read of the id must be the last link of the && chain of ReadForDerivedClass, a single return expression; a read at the head would not match the write and would move the id in the stream",
-  "pm": "approvato"
- },
- {
-  "file": "widget/nsGUIEventIPC.h",
-  "function": "struct ParamTraits<mozilla::WidgetMouseEventBase> {",
-  "kind": "rewrite",
-  "form": "unknown",
-  "line": "           ReadParam(aReader, &aResult->mJugglerEventId);  // STEALTH-HOOK(automation/input)",
-  "test": "gtest:StealthMouseEventIPC.TheIdSurvivesTheMessage",
-  "exception": "G44 (approved in PM-DECISIONS): the read of the id must be the last link of the && chain of ReadForDerivedClass, a single return expression; a read at the head would not match the write and would move the id in the stream",
-  "pm": "approvato"
+  "test": "gtest:StealthMouseEventIPC.TheIdSurvivesTheMessage"
  },
  {
   "file": "xpcom/reflect/xptinfo/xptinfo.h",

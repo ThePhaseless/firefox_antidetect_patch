@@ -19,7 +19,7 @@ window in full from a thread on its own desktop (measured 2026-09-20), so the
 window capturer is the only path that can deliver. The hook excludes the
 window from the screen capturer, so it goes to the window capturer.
 
-StealthIsWindowOnInputDesktop (StealthWindowInputDesktop.h) compares, by name
+StealthIsWindowOnInputDesktop (StealthWindowInputDesktop.h, namespace mozilla) compares, by name
 and case-insensitively, the desktop of the window's own thread with the input
 desktop. Only a thread of this process can be asked which desktop it was
 created on: a window of another process, a window without a thread, a thread
@@ -30,7 +30,7 @@ negation, the one the hook calls.
 
 ## Hooks in Mozilla files
 
-- `third_party/libwebrtc/modules/desktop_capture/cropping_window_capturer_win.cc`: our include in a block of ours after Mozilla's (registration); in `CroppingWindowCapturerWin::ShouldUseScreenCapturer`, an anchor guard `if (StealthIsOffInputDesktop(selected)) return false;` right after the `IsWindowVisibleOnCurrentDesktop` check (it needs the local `selected` and the order of the Windows calls of today).
+- `third_party/libwebrtc/modules/desktop_capture/cropping_window_capturer_win.cc`: our include in a block of ours after Mozilla's (registration); in `CroppingWindowCapturerWin::ShouldUseScreenCapturer`, an anchor guard `if (mozilla::StealthIsOffInputDesktop(selected)) return false;` right after the `IsWindowVisibleOnCurrentDesktop` check (it needs the local `selected` and the order of the Windows calls as Mozilla has it).
 - `dom/media/webrtc/moz.build`: `TEST_DIRS += ["tests/gtest"]` (registration of the gtest below).
 - `window_capture_utils.{h,cc}` of libwebrtc are as in the tag: the member `WindowCaptureHelperWin::IsWindowOnInputDesktop` that only forwarded to our function is gone.
 

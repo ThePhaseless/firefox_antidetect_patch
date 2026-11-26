@@ -18,7 +18,7 @@
 #include "js/RootingAPI.h"
 #include "js/TypeDecls.h"
 
-namespace xpc {
+namespace mozilla {
 
 /**
  * STEALTHFOX [B322]: what js/xpconnect/src/Sandbox.cpp needs for the caller's
@@ -69,7 +69,7 @@ inline bool StealthGetPropertyDescriptor(
 // false; the caller returns NS_ERROR_INVALID_ARG. Without the option it
 // returns true and does nothing.
 inline bool StealthCheckHybridXrays(JSContext* aCx, nsIPrincipal* aPrincipal,
-                                    const SandboxOptions& aOptions) {
+                                    const xpc::SandboxOptions& aOptions) {
   if (aOptions.hybridXrays &&
       (aPrincipal->IsSystemPrincipal() ||
        mozilla::BasePrincipal::Cast(aPrincipal)
@@ -83,6 +83,6 @@ inline bool StealthCheckHybridXrays(JSContext* aCx, nsIPrincipal* aPrincipal,
   return true;
 }
 
-}  // namespace xpc
+}  // namespace mozilla
 
 #endif  // xpc_StealthSandbox_h

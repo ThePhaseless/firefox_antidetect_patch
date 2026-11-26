@@ -1,4 +1,5 @@
 platform/backports/fontconfig-face-index
+platform/backports/glean-init-shutdown-race
 platform/build-config
 platform/build-tools
 platform/ci

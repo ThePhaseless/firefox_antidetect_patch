@@ -1,5 +1,5 @@
 diff --git a/dom/base/Element.cpp b/dom/base/Element.cpp
-index b0f08fd6241f36b7a499d33613030f27a63aab96..26f19a995fe24f36e089c0bd759af24bf7024c40 100644
+index b0f08fd6241f36b7a499d33613030f27a63aab96..581a760b72edefd87849b770f9a825d98b4a12ad 100644
 --- a/dom/base/Element.cpp
 +++ b/dom/base/Element.cpp
 @@ -219,6 +219,8 @@
@@ -24,7 +24,7 @@ index b0f08fd6241f36b7a499d33613030f27a63aab96..26f19a995fe24f36e089c0bd759af24b
    ShadowRoot* shadowRoot = GetShadowRoot();
    if (!shadowRoot || shadowRoot->IsClosed()) {
 -    return nullptr;
-+    return StealthClosedShadowRootForBindings(shadowRoot, aSubject);  // STEALTH-HOOK(automation/shadow-root)
++    return StealthClosedShadowRootForBindings(this, aSubject, nullptr);  // STEALTH-HOOK(automation/shadow-root)
    }
  
    /**

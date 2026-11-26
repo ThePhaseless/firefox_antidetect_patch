@@ -10,6 +10,7 @@
 #include "StealthDeclarationGate.h"
 #include "mozilla/Assertions.h"
 #include "mozilla/BasePrincipal.h"
+#include "mozilla/dom/Element.h"
 #include "mozilla/dom/ShadowRoot.h"
 
 class nsIPrincipal;
@@ -18,7 +19,7 @@ namespace mozilla::dom {
 
 /**
  * The answer of Element::GetShadowRootForBindings (the `shadowRoot` getter)
- * for a root the spec says to hide: `aShadowRoot` is null or closed, and
+ * for a root the spec says to hide: `shadowRoot` is null or closed, and
  * Element.cpp has already tested that. Returns the root only for the
  * automation sandbox, nullptr for everybody else.
  *
@@ -51,12 +52,15 @@ namespace mozilla::dom {
  * the principal test), so it must compile to what it did when it sat inside
  * Element.cpp.
  */
-inline ShadowRoot* StealthClosedShadowRootForBindings(
-    ShadowRoot* aShadowRoot, nsIPrincipal& aSubject) {
-  if (!aShadowRoot) {
+inline ShadowRoot* StealthClosedShadowRootException(
+    const Element* aElement, nsIPrincipal& aSubject) {
+  // The same inline getter Mozilla's line two above called; the hook is on the
+  // branch where there is no shadow root or it is closed.
+  ShadowRoot* shadowRoot = aElement->GetShadowRoot();
+  if (!shadowRoot) {
     return nullptr;
   }
-  MOZ_ASSERT(aShadowRoot->IsClosed());
+  MOZ_ASSERT(shadowRoot->IsClosed());
 
   // Content is the overwhelmingly common caller here and it must not pay for
   // an exception it never takes, because what it pays is READABLE FROM JS. The
@@ -99,7 +103,7 @@ inline ShadowRoot* StealthClosedShadowRootForBindings(
   // content path stays byte for byte what was measured against retail. Only
   // the sandbox pays the extra test, and the sandbox is not what a page can
   // time.
-  if (aShadowRoot->IsUAWidget()) {
+  if (shadowRoot->IsUAWidget()) {
     return nullptr;
   }
 
@@ -114,7 +118,16 @@ inline ShadowRoot* StealthClosedShadowRootForBindings(
     return nullptr;  // stock Firefox
   }
 
-  return aShadowRoot;
+  return shadowRoot;
+}
+
+// What the hook in GetShadowRootForBindings returns: the root for the automation
+// sandbox where the spec hides it, else Mozilla's own answer (aMozilla, the
+// `nullptr` of its line).
+inline ShadowRoot* StealthClosedShadowRootForBindings(
+    const Element* aElement, nsIPrincipal& aSubject, ShadowRoot* aMozilla) {
+  ShadowRoot* shadowRoot = StealthClosedShadowRootException(aElement, aSubject);
+  return shadowRoot ? shadowRoot : aMozilla;
 }
 
 }  // namespace mozilla::dom

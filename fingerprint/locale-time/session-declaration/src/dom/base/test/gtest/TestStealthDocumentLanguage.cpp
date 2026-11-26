@@ -5,7 +5,7 @@
 // The language of a document's text that declares none is the language of its
 // context. Document::mLanguageFromCharset is EncodingToLang's answer, which for
 // an encoding without a language of its own is the process's locale language;
-// DocumentCharsetLanguage replaces that answer, and only that answer, with the
+// StealthDocumentCharsetLanguage replaces that answer, and only that answer, with the
 // language the context declares (or, with no context, the session's).
 
 #include <thread>
@@ -88,16 +88,42 @@ TEST(StealthDocumentLanguage, WithNoContextTheSessionsLanguageIsTheDocumentsOne)
   nsAtom* process = nsLanguageAtomService::GetService()->GetLocaleLanguage();
   {
     DeclaredLanguage declared("ko-KR, ko, en-US, en");
-    nsAtom* got = DocumentCharsetLanguage(nullptr, process);
+    nsAtom* got = StealthDocumentCharsetLanguage(nullptr, process);
     nsAutoCString tag;
     got->ToUTF8String(tag);
     EXPECT_TRUE(tag.EqualsLiteral("ko-kr")) << tag.get();
     // An encoding with a language of its own keeps it.
-    EXPECT_EQ(DocumentCharsetLanguage(nullptr, nsGkAtoms::x_cyrillic),
+    EXPECT_EQ(StealthDocumentCharsetLanguage(nullptr, nsGkAtoms::x_cyrillic),
               nsGkAtoms::x_cyrillic);
   }
   // Nothing declared: the process's answer stands.
-  EXPECT_EQ(DocumentCharsetLanguage(nullptr, process), process);
+  EXPECT_EQ(StealthDocumentCharsetLanguage(nullptr, process), process);
+}
+
+// The realm of a window's global (GetDeclaredRealmLanguage / GetDeclaredRealmTimezone,
+// which CreateNativeGlobalForInner reads in place of the context's own values)
+// asks these two for the document's context. With no context there is nothing
+// to ask but the session: its values, and nothing when nothing is declared.
+
+TEST(StealthDocumentLanguage, WithNoContextTheRealmTakesTheSessionsValues)
+{
+  nsAutoCString language;
+  nsAutoString zone;
+  // The overload the realm's hook reads: Document::GetBrowsingContext()'s type.
+  BrowsingContext* noContext = nullptr;
+  // Nothing declared (negative control for the declared case below).
+  GetDeclaredLanguage(noContext, language);
+  GetDeclaredTimezone(noContext, zone);
+  EXPECT_TRUE(language.IsEmpty());
+  EXPECT_TRUE(zone.IsEmpty());
+
+  DeclaredLanguage session("ja-JP, ja");
+  Preferences::SetCString("juggler.timezone.override", "Asia/Tokyo");
+  GetDeclaredLanguage(noContext, language);
+  GetDeclaredTimezone(noContext, zone);
+  EXPECT_TRUE(language.EqualsLiteral("ja-JP, ja"));
+  EXPECT_TRUE(zone.EqualsLiteral("Asia/Tokyo"));
+  Preferences::ClearUser("juggler.timezone.override");
 }
 
 // SetDeclaredRealmTimeAndLanguage on a thread that is not the main one: the

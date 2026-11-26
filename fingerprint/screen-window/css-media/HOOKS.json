@@ -9,7 +9,7 @@
  },
  {
   "file": "layout/style/nsMediaFeatures.cpp",
-  "function": "static nsSize GetSize(const Document& aDocument) {",
+  "function": "static nsSize GetDeviceSize(const Document& aDocument) {",
   "kind": "add",
   "form": "guard",
   "line": "  if (nsSize stealth; StealthDeclaredDeviceSize(&stealth)) return stealth;  // STEALTH-HOOK(fingerprint/screen-window/css-media)",

@@ -496,3 +496,167 @@ def test_a_commit_is_contained_only_by_a_reverse_apply_with_full_context(world):
     assert second.status == "conflict" and second.conflicts[0][0] == path
     assert "does not apply" in second.conflicts[0][1]
     assert second not in result.dropped
+
+
+# ---------------------------------------------------------------------------------------------------- a crate vendored as a release
+
+V1 = "a" * 40
+V2 = "b" * 40
+CRATE_LIB = "pub fn init() {\n    one();\n    two();\n}\n"
+CRATE_LIB_FIXED = "pub fn init() {\n    one();\n    fixed();\n}\n"
+CRATE_MOD = "pub fn flush() {}\n\npub fn shutdown() {}\n"
+CRATE_MOD_FIXED = "pub fn flush(last: fn()) { last(); }\n\npub fn shutdown() {}\n"
+
+
+def make_crate_tree(root: Path, version: str, revision: str, lib: str = CRATE_LIB, mod: str = CRATE_MOD) -> None:
+    """Mozilla's form of a crates.io crate (no gfx/wgpu_bindings, no git source in Cargo.lock): the version in Cargo.toml and the
+    git revision of the release in the .cargo_vcs_info.json that `cargo package` wrote."""
+    write(root, "third_party/rust/glean-a/Cargo.toml", '[package]\nname = "glean-a"\nversion = "%s"\n' % version)
+    write(root, "third_party/rust/glean-a/.cargo_vcs_info.json", json.dumps({"git": {"sha1": revision}, "path_in_vcs": "glean-a"}, indent=2))
+    write(root, "third_party/rust/glean-a/src/lib.rs", lib)
+    write(root, "third_party/rust/glean-a/src/dispatcher/mod.rs", mod)
+    write(root, "Cargo.lock", "version = 4\n")
+    checksummed(root, "glean-a")
+
+
+def build_crate_world(tmp_path) -> dict:
+    source = tmp_path / "source"
+    source.mkdir()
+    git(source, "init", "-q")
+    make_crate_tree(source, "1.0.0", V1)
+    commit_tag(source, "C1")
+    make_crate_tree(source, "1.1.0", V2, CRATE_LIB_FIXED)
+    commit_tag(source, "C2")
+    up = tmp_path / "upstream"
+    up.mkdir()
+    git(up, "init", "-q")
+    write(up, "glean-a/src/lib.rs", CRATE_LIB)
+    write(up, "glean-a/src/dispatcher/mod.rs", CRATE_MOD)
+    write(up, "CHANGELOG.md", "# changes\n")
+    write(up, "benchmark/benches/b.rs", "fn bench() { flush(); }\n")
+    git(up, "add", "-A")
+    git(up, "commit", "-q", "-m", "base")
+    base = git(up, "rev-parse", "HEAD").decode().strip()
+    # 1: the library, and a changelog line that Mozilla does not vendor
+    write(up, "glean-a/src/lib.rs", CRATE_LIB_FIXED)
+    write(up, "CHANGELOG.md", "# changes\n* fixed\n")
+    git(up, "commit", "-qam", "fix: init calls fixed")
+    # 2: the dispatcher, and the benchmark that calls it
+    write(up, "glean-a/src/dispatcher/mod.rs", CRATE_MOD_FIXED)
+    write(up, "benchmark/benches/b.rs", "fn bench() { flush(|| {}); }\n")
+    git(up, "commit", "-qam", "fix: flush takes the last task")
+    shas = git(up, "rev-list", "--reverse", "%s..HEAD" % base).decode().split()
+    folder = tmp_path / "series" / "platform" / "backports" / "glean-a-race"
+    (folder / "commits").mkdir(parents=True)
+    entries = []
+    for i, sha in enumerate(shas, 1):
+        chunk = git(up, "format-patch", "-1", "--no-signature", "--stdout", sha)
+        name = "commits/%04d-fix.patch" % i
+        (folder / name).write_bytes(chunk)
+        entries.append({"file": name, "sha256": hashlib.sha256(chunk).hexdigest(), "kind": "upstream", "upstream_sha": sha,
+                        "contained_in": None})
+    record = {"upstream": "https://example.invalid/glean", "vendored": V1,
+              "vendored_crate": {"name": "glean-a", "version": "1.0.0", "tag_prefix": "v"}, "commits": entries, "drop_when": "never"}
+    (folder / "BACKPORT.json").write_text(json.dumps(record), encoding="utf-8")
+    return {"source": source, "folder": folder, "record": record, "series": tmp_path / "series"}
+
+
+@pytest.fixture(scope="module")
+def built_crate_world(tmp_path_factory):
+    root = tmp_path_factory.mktemp("crate")
+    build_crate_world(root)
+    return root
+
+
+@pytest.fixture
+def crate_world(built_crate_world, tmp_path):
+    shutil.copytree(built_crate_world, tmp_path / "w")
+    root = tmp_path / "w"
+    folder = root / "series" / "platform" / "backports" / "glean-a-race"
+    record = json.loads((folder / "BACKPORT.json").read_text(encoding="utf-8"))
+    return {"source": root / "source", "folder": folder, "record": record, "series": root / "series"}
+
+
+def write_crate_folder(w, tag="C1"):
+    result = br.replay(w["source"], tag, w["folder"])
+    (w["folder"] / "hooks.patch").write_bytes(br.expected_patch(result, b""))
+    manifest = {"modified": sorted(result.sections), "added": {}, "inventory": []}
+    (w["folder"] / "MANIFEST.json").write_text(json.dumps(manifest), encoding="utf-8")
+    return result
+
+
+def test_a_crate_vendored_as_a_release_is_replayed_on_the_revision_and_version_of_its_own_files(crate_world):
+    """No wgpu_bindings/Cargo.toml in the tag: the revision is the one of the crate's .cargo_vcs_info.json, the version its
+    Cargo.toml's. The files outside the crate's src/ (the changelog, the benchmark) are skipped and reported."""
+    assert not (crate_world["source"] / "gfx").exists()
+    result = br.replay(crate_world["source"], "C1", crate_world["folder"])
+    assert (result.revision, result.version, result.crate) == (V1, "1.0.0", "glean-a")
+    assert [c.status for c in result.commits] == ["applied", "applied"]
+    assert result.conflicts == []
+    assert result.commits[0].skipped == ["CHANGELOG.md"] and result.commits[1].skipped == ["benchmark/benches/b.rs"]
+    assert sorted(result.sections) == ["third_party/rust/glean-a/.cargo-checksum.json", "third_party/rust/glean-a/src/dispatcher/mod.rs",
+                                       "third_party/rust/glean-a/src/lib.rs"]
+    assert "vendors glean-a 1.0.0 (revision %s)" % V1 in result.summary()
+
+
+def test_the_folder_of_a_crate_as_the_replay_writes_it_breaks_no_rule(crate_world):
+    result = write_crate_folder(crate_world)
+    assert br.record_problems(crate_world["folder"], crate_world["record"]) == []
+    assert br.folder_problems(result, crate_world["folder"], crate_world["record"]) == []
+    assert br.check_folders(crate_world["source"], "C1", [crate_world["folder"]]) == []
+    patch = (crate_world["folder"] / "hooks.patch").read_bytes()
+    (crate_world["folder"] / "hooks.patch").write_bytes(patch.replace(b"+    fixed();\n", b"+    other();\n", 1))
+    assert any("differs from the replay" in p for p in br.check_folders(crate_world["source"], "C1", [crate_world["folder"]]))
+
+
+def test_a_tag_that_vendors_another_version_of_the_crate_needs_the_record_updated(crate_world):
+    write_crate_folder(crate_world)
+    result = br.replay(crate_world["source"], "C2", crate_world["folder"])
+    found = br.folder_problems(result, crate_world["folder"], crate_world["record"])
+    assert any("vendored is %s, the tag C2 vendors %s" % (V1, V2) in p for p in found), found
+    assert any("vendored_crate.version is 1.0.0, the tag C2 vendors glean-a 1.1.0" in p for p in found), found
+    # the version alone moving is a problem too, the revision being the same
+    record = json.loads(json.dumps(crate_world["record"]))
+    record["vendored"] = V2
+    assert any("vendored_crate.version is 1.0.0" in p for p in br.folder_problems(result, crate_world["folder"], record))
+    # `record` writes both
+    br.record_drops(crate_world["folder"], result)
+    written = json.loads((crate_world["folder"] / "BACKPORT.json").read_text(encoding="utf-8"))
+    assert written["vendored"] == V2 and written["vendored_crate"] == {"name": "glean-a", "version": "1.1.0", "tag_prefix": "v"}
+
+
+def test_a_tag_that_does_not_vendor_the_crate_stops_the_replay(crate_world):
+    git(crate_world["source"], "rm", "-rq", "third_party/rust/glean-a/.cargo_vcs_info.json")
+    git(crate_world["source"], "commit", "-qm", "no vcs info")
+    git(crate_world["source"], "tag", "C3")
+    with pytest.raises(br.Stop, match="has no third_party/rust/glean-a/.cargo_vcs_info.json"):
+        br.replay(crate_world["source"], "C3", crate_world["folder"])
+    record = json.loads(json.dumps(crate_world["record"]))
+    record["vendored_crate"]["name"] = "no-such-crate"
+    with pytest.raises(br.Stop, match="does not vendor the crate no-such-crate"):
+        br.replay(crate_world["source"], "C1", crate_world["folder"], record)
+    assert any("has no third_party/rust/glean-a/.cargo_vcs_info.json" in p
+               for p in br.check_folders(crate_world["source"], "C3", [crate_world["folder"]]))
+
+
+def test_the_vendored_crate_of_a_record_has_its_shape(crate_world):
+    for bad in ("glean-a", {"name": "glean-a"}, {"name": "glean-a", "version": "1.0.0", "tag": "v1.0.0"}, {"name": 3, "version": "1"}):
+        record = json.loads(json.dumps(crate_world["record"]))
+        record["vendored_crate"] = bad
+        assert any("vendored_crate is {name, version, tag_prefix}" in p for p in br.record_problems(crate_world["folder"], record)), bad
+
+
+def test_check_does_not_ask_a_crate_released_to_show_its_revision_in_the_patch(crate_world, monkeypatch):
+    """A wgpu record is held to its revision appearing in hooks.patch (the lock names it); a crate vendored as a release has the
+    revision in a file the patch does not touch, and `check --against` compares it with the tag's."""
+    write_crate_folder(crate_world)
+    monkeypatch.setattr(engine, "ROOT", crate_world["series"])
+    folder = "platform/backports/glean-a-race"
+    patch = crate_world["folder"] / "hooks.patch"
+    code = {"third_party/rust/glean-a/src/lib.rs"}
+    assert V1.encode() not in patch.read_bytes()
+    assert engine.backport_problems(folder, code, patch) == []
+    record = json.loads(json.dumps(crate_world["record"]))
+    del record["vendored_crate"]
+    (crate_world["folder"] / "BACKPORT.json").write_text(json.dumps(record), encoding="utf-8")
+    assert any("says the vendored revision is %s" % V1 in p for p in engine.backport_problems(folder, code, patch))

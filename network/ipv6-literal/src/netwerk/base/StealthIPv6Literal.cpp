@@ -5,6 +5,7 @@
 #include "StealthIPv6Literal.h"
 
 #include "mozilla/StaticPrefs_network.h"
+#include "nsSocketTransport2.h"
 #include "nsString.h"
 #include "nsXULAppAPI.h"
 #include "prerr.h"
@@ -74,6 +75,31 @@ PRStatus StealthConnect(const NetAddr& aAddr, bool aProxyTransparent,
                                     ? StealthConnectTarget::kBehindSocksProxy
                                     : StealthConnectTarget::kDirect;
   return StealthConnect(aFd, aAddr, target, aPrAddr, aTimeout);
+}
+
+struct StealthSocketTransportAccess {
+  static PRStatus Connect(nsSocketTransport* aTransport, PRFileDesc* aFd,
+                          const PRNetAddr* aPrAddr, PRIntervalTime aTimeout) {
+    return StealthConnect(aTransport->mNetAddr, aTransport->mProxyTransparent,
+                          aTransport->mProxyHost, aFd, aPrAddr, aTimeout);
+  }
+};
+
+PRStatus StealthConnect(nsSocketTransport* aTransport, PRFileDesc* aFd,
+                        const PRNetAddr* aPrAddr, PRIntervalTime aTimeout) {
+  return StealthSocketTransportAccess::Connect(aTransport, aFd, aPrAddr,
+                                               aTimeout);
+}
+
+static PRStatus StealthHopConnectCall(PRFileDesc* aFd, const PRNetAddr* aPrAddr,
+                                      PRIntervalTime aTimeout) {
+  return StealthConnect(aFd, NetAddr(aPrAddr),
+                        StealthConnectTarget::kSocksProxyHop, aPrAddr,
+                        aTimeout);
+}
+
+PRConnectFN StealthHopConnect(nsSOCKSSocketInfo*, PRConnectFN) {
+  return StealthHopConnectCall;
 }
 
 void StealthApplyDeclaredNetwork() {

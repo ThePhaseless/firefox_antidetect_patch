@@ -74,6 +74,30 @@ class MOZ_RAII StealthWebGLParameterAnswer final {
   ErrorResult& mRv;
 };
 
+// The first statement of ClientWebGLContext::GetParameter: RENDERER,
+// UNMASKED_RENDERER_WEBGL and UNMASKED_VENDOR_WEBGL answered from the declared
+// values, before Mozilla's code runs; true and aRetval set, or false and the
+// call goes on as Mozilla wrote it. The answer is what Mozilla's own code gave
+// once the pref was set: the string, in aRetval, and the entries of
+// StealthWebGLParameterOverride applied after it (what the guard
+// StealthWebGLParameterAnswer did on the way out). False, so Mozilla answers,
+// when: aDebug is set (the debug-only parameters), the context is lost
+// (Mozilla returns null), the pref for the pname is empty (the answer is then
+// Mozilla's own, host or resist-fingerprinting), the pname is any other, or
+// it is an UNMASKED_* one and WEBGL_debug_renderer_info is not enabled
+// (Mozilla queues INVALID_ENUM). Reads no member of the context but through its
+// public accessors.
+bool StealthWebGLParameter(ClientWebGLContext& aCtx, JSContext* aCx,
+                           GLenum aPname, JS::MutableHandle<JS::Value> aRetval,
+                           ErrorResult& aRv, bool aDebug);
+
+// What the guard above decides from the pname alone: true and aAnswer set when
+// the pname is RENDERER, or UNMASKED_RENDERER_WEBGL / UNMASKED_VENDOR_WEBGL with
+// WEBGL_debug_renderer_info enabled (aDebugRendererInfoEnabled), and the pref
+// for it is set; false, and aAnswer left as it was, otherwise.
+bool StealthWebGLParameterString(GLenum aPname, bool aDebugRendererInfoEnabled,
+                                 Maybe<std::string>& aAnswer);
+
 // gl.RENDERER when zoom.stealth.webgl.renderer is set: the pref, through
 // SanitizeRenderer, as a retail browser does with the real renderer. True and
 // aRet set when the pref is set.

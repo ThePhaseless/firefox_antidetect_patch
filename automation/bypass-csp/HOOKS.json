@@ -19,7 +19,7 @@
  },
  {
   "file": "dom/security/nsCSPUtils.h",
-  "function": "class nsCSPSrcVisitor;",
+  "function": "bool CSP_ShouldResponseInheritCSP(nsIChannel* aChannel);",
   "kind": "add",
   "form": "member",
   "line": "bool CSP_IsBypassedFor(const mozilla::dom::Document& aDoc);  // STEALTH-HOOK(automation/bypass-csp)",

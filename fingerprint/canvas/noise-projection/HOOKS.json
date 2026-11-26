@@ -43,7 +43,7 @@
  },
  {
   "file": "dom/canvas/OffscreenCanvasDisplayHelper.cpp",
-  "function": "OffscreenCanvasDisplayHelper::GetSurfaceSnapshot() {",
+  "function": "already_AddRefed<layers::Image> OffscreenCanvasDisplayHelper::GetAsImage() {",
   "kind": "rewrite",
   "form": "wrap-function",
   "line": "  RefPtr<gfx::SourceSurface> surface = GetSurfaceSnapshotAsDrawn();  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
@@ -109,7 +109,7 @@
  },
  {
   "file": "dom/html/HTMLCanvasElement.cpp",
-  "function": "void HTMLCanvasElement::SetFrameCapture(",
+  "function": "already_AddRefed<SourceSurface> HTMLCanvasElement::GetSurfaceSnapshot(",
   "kind": "rewrite",
   "form": "wrap-function",
   "line": "    return mOffscreenDisplay->GetSurfaceSnapshotAsDrawn();  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
@@ -123,6 +123,14 @@
   "form": "wrap-function",
   "line": "  already_AddRefed<gfx::SourceSurface> GetSurfaceSnapshotAsDrawn(gfxAlphaType* aOutAlphaType = nullptr, gfx::DrawTarget* aTarget = nullptr);  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
   "test": "wrapper:tests/test_every_reader_of_a_webgl_canvas_agrees_e2e.py::test_every_reader_of_a_webgl_canvas_element_reads_the_same_bytes"
+ },
+ {
+  "file": "dom/html/HTMLCanvasElement.h",
+  "function": "class HTMLCanvasElement final : public nsGenericHTMLElement,",
+  "kind": "add",
+  "form": "member",
+  "line": "  already_AddRefed<gfx::SourceSurface> StealthGetSurfaceSnapshot(uint32_t aSurfaceFlags, gfxAlphaType* aOutAlphaType = nullptr, gfx::DrawTarget* aTarget = nullptr);  // STEALTH-HOOK(fingerprint/canvas/as-drawn)",
+  "test": "wrapper:tests/test_moz_element_paints_a_webgl_canvas_as_drawn_e2e.py::test_moz_element_paints_a_webgl_canvas_as_drawn"
  },
  {
   "file": "dom/html/moz.build",

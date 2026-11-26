@@ -96,9 +96,11 @@ def cases() -> list:
         and "gfx/wr/cargo-test.log" in convert[0]["run"] and "--out junit-cargo/${{ matrix.leg }}" in convert[0]["run"])
     cmd = str(steps[cargo_at]["run"]) if cargo_at >= 0 else ""
     mdns_run = [s for s in steps if s.get("id") == "cargo-mdns"]
-    packages = [w for w in cmd.split() if w in ("webrender", "wr_glyph_rasterizer")] + (["mdns_service"] if mdns_run else [])
-    add("cargo: --packages names the packages cargo ran (-p webrender, and the standalone crate mdns_service), so a crate keeps its package name in the junit",
-        len(convert) == 1 and "--packages %s" % ",".join(packages) in convert[0]["run"] and len(packages) == 2)
+    glean_run = [s for s in steps if s.get("id") == "cargo-glean"]
+    packages = ([w for w in cmd.split() if w in ("webrender", "wr_glyph_rasterizer")] + (["mdns_service"] if mdns_run else [])
+                + (["glean-core"] if glean_run else []))
+    add("cargo: --packages names the packages cargo ran (-p webrender, and the standalone crates mdns_service and glean-core), so a crate keeps its package name in the junit",
+        len(convert) == 1 and "--packages %s" % ",".join(packages) in convert[0]["run"] and len(packages) == 3)
     add("cargo: each leg uploads its part, junitpart-cargo-<leg>, from junit-cargo, whatever the tests said (if: always())",
         len(parts) == 1 and always(parts[0]) and parts[0]["with"]["name"] == "junitpart-cargo-${{ matrix.leg }}" and parts[0]["with"]["path"] == "junit-cargo"
         and steps.index(parts[0]) > steps.index(convert[0]))

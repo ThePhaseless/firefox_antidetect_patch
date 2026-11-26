@@ -207,7 +207,7 @@
    "feature": "doh-trr-context",
    "prefs": [],
    "added": 7,
-   "removed": 4,
+   "removed": 3,
    "hunks": 6,
    "inline_logic_lines": 10,
    "hookable": "movable",

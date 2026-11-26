@@ -139,8 +139,8 @@ test('an IPv4 destination is AF_INET, never mapped: nothing in the resolver or t
   assert.match(fix, /memset\(proxyp \+ 10, 0xff, 2\);/);
   assert.match(fix, /\(char\*\)&mInternalProxyAddr\.inet\.ip/);
   const connect = body(socks, 'PRStatus nsSOCKSSocketInfo::ConnectToProxy(PRFileDesc* fd) {');
-  assert.ok(connect.indexOf('FixupAddressFamily(fd, &proxy)') < connect.indexOf('StealthConnect('));
-  assert.match(connect, /StealthConnect\(fd->lower, proxy, StealthConnectTarget::kSocksProxyHop,/);
+  assert.ok(connect.indexOf('FixupAddressFamily(fd, &proxy)') < connect.indexOf('StealthHopConnect(this, '));
+  assert.match(connect, /StealthHopConnect\(this, fd->lower->methods->connect\)\(fd->lower, &prProxy, mTimeout\)/);
   for (const rel of ['netwerk/dns/nsHostResolver.cpp', 'netwerk/dns/DNSUtils.cpp', 'netwerk/dns/nsDNSService2.cpp', 'netwerk/dns/TRR.cpp', 'netwerk/dns/DNSPacket.cpp'])
     assert.doesNotMatch(read(rel), /u8\[10\] = 0xff|memset\([^)]*0xff, 2\)|IPv6ADDR_IS_V4MAPPED|PR_IpAddrV4Mapped/, rel);
 });
@@ -167,8 +167,13 @@ test('nsSocketTransport::InitiateSocket connects only through the wrapper; a SOC
   assert.equal(lines.length, 1);
   assert.ok(lines[0].includes(HOOK), 'the hook is on the line');
   assert.equal(sock.match(/StealthConnect\(/g).length, 1);
-  // The destination handed over is the one the socket resolved, with the transport's own proxy fields.
-  assert.match(lines[0], /StealthConnect\(mNetAddr, mProxyTransparent, mProxyHost, /);
+  // The transport itself is handed over: PR_Connect's own arguments, and one of ours in front.
+  assert.match(lines[0], /status = StealthConnect\(this, fd, &prAddr, NS_SOCKET_CONNECT_TIMEOUT\);/);
+  // One line of ours in the class: the friend that reads the three fields (the destination the socket resolved, and
+  // the transport's own proxy fields).
+  const header = read('netwerk/base/nsSocketTransport2.h');
+  assert.match(header, /  friend class nsSocketInputStream;\n  friend struct StealthSocketTransportAccess;  \/\/ STEALTH-HOOK\(network\/ipv6-literal\)\n  friend class nsSocketOutputStream;\n/);
+  assert.match(read('netwerk/base/StealthIPv6Literal.cpp'), /static PRStatus Connect\(nsSocketTransport\* aTransport, PRFileDesc\* aFd,\s+const PRNetAddr\* aPrAddr, PRIntervalTime aTimeout\) \{\s+return StealthConnect\(aTransport->mNetAddr, aTransport->mProxyTransparent,\s+aTransport->mProxyHost, aFd, aPrAddr, aTimeout\);/);
   // The failure is read like a connect() failure, on the very next line.
   const at = init.indexOf('StealthConnect(');
   assert.match(init.slice(at, at + 400), /PRErrorCode code = PR_GetError\(\);/);
@@ -184,11 +189,18 @@ test('the SOCKS layer reaches its proxy through the wrapper: the route rule appl
   const socks = read('netwerk/socket/nsSOCKSIOLayer.cpp');
   assert.match(socks, /#include "StealthIPv6Literal\.h"\s+\/\/ STEALTH-HOOK\(network\/ipv6-literal\)/);
   const fn = body(socks, 'PRStatus nsSOCKSSocketInfo::ConnectToProxy(PRFileDesc* fd) {');
-  const lines = fn.split('\n').filter(l => l.includes('StealthConnect('));
+  const lines = fn.split('\n').filter(l => l.includes('StealthHopConnect('));
   assert.equal(lines.length, 1);
   assert.ok(lines[0].includes(HOOK), 'the hook is on the line');
-  assert.match(lines[0], /StealthConnect\(fd->lower, proxy, StealthConnectTarget::kSocksProxyHop, &prProxy, mTimeout\)/);
-  assert.equal(fn.match(/methods->connect\(/g), null);
+  // Mozilla's own sub-expression, the layer's connect, inside our call with `this` in front: the function that is called is
+  // chosen before anything is sent, and Mozilla's arguments stay as Mozilla wrote them.
+  assert.match(lines[0], /status = StealthHopConnect\(this, fd->lower->methods->connect\)\(fd->lower, &prProxy, mTimeout\);/);
+  assert.equal(fn.match(/StealthConnect\(/g), null);
+  // The function it returns: the connect with the target of the hop (the proxy's own address, never a page's literal), the
+  // address taken from the PRNetAddr the call carries.
+  const hop = read('netwerk/base/StealthIPv6Literal.cpp');
+  assert.match(hop, /static PRStatus StealthHopConnectCall\(PRFileDesc\* aFd, const PRNetAddr\* aPrAddr,\s+PRIntervalTime aTimeout\) \{\s+return StealthConnect\(aFd, NetAddr\(aPrAddr\),\s+StealthConnectTarget::kSocksProxyHop, aPrAddr,\s+aTimeout\);/);
+  assert.match(hop, /PRConnectFN StealthHopConnect\(nsSOCKSSocketInfo\*, PRConnectFN\) \{\s+return StealthHopConnectCall;/);
 });
 
 test('no other code decides: neither the HTTP channel, nor the DNS service, nor the resolver is hooked', () => {

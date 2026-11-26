@@ -8,7 +8,7 @@ Where each kind of change goes. The engine is Firefox as a patch series on a Moz
 |---|---|---|---|
 | Our own files | `Stealth*` code and its tests, stored byte for byte | `<folder>/src/<tree path>` | `layout.OWN_FILES` (first match wins) |
 | Hooks | One-line changes to Mozilla files, each with `STEALTH-HOOK(<folder>)` on the line | `<folder>/hooks.patch` | `tools/inventory.json` (one record per Mozilla file) and `layout.FEATURES` |
-| Backports | Upstream code carried until the tag has it | `platform/backports/<name>/` (a Mozilla commit); vendored code under `third_party/rust/` in the folder that needs it | `BACKPORT.json` in the folder |
+| Backports | Upstream code carried until the tag has it | `platform/backports/<name>/` (a Mozilla commit, or the upstream commits of a vendored crate that no feature of ours needs); vendored code under `third_party/rust/` in the folder that needs it | `BACKPORT.json` in the folder |
 
 A folder holds `hooks.patch`, `src/`, `MANIFEST.json`, `FEATURE.md` and `HOOKS.json`; a folder with a `BACKPORT.json` has no `HOOKS.json`. Rule: [backport-01](decisions/backport-01-upstream-code-as-is.md).
 
@@ -65,7 +65,7 @@ One per folder without `BACKPORT.json`, beside `hooks.patch`, one entry per hook
 
 | Fields | Written by | Meaning |
 |---|---|---|
-| `file`, `function`, `kind`, `form`, `line`, `removed` | `export` or `hooks-list` | The Mozilla file, the host function, `add` / `rewrite` / `delete` / `file`, the form, the added line, the Mozilla line it replaces |
+| `file`, `function`, `kind`, `form`, `line`, `removed` | `export` or `hooks-list` | The Mozilla file, the host function (the function whose signature is nearest above the block: git's section header of the hunk, or in a C or C++ file a nearer signature inside the hunk), `add` / `rewrite` / `delete` / `file`, the form, the added line, the Mozilla line it replaces |
 | `test` | Hand | The test that proves the hook (grammar below); a hook with none is debt T1 |
 | `anchor`, `why` | Hand | Form `anchor` only: the Mozilla statement it follows, and why a guard or a wrap is not enough (debt T2) |
 | `own_function`, `renamed`, `calls_mozilla` | Hand | Read by `prebuild`: our functions to link-check besides `Stealth*`, a renamed Mozilla body besides `*_Mozilla`, a direct call of a renamed body that is allowed |
@@ -130,7 +130,7 @@ Rule: [hook-03](decisions/hook-03-budgets-and-debt-only-go-down.md).
 ## Every change
 
 1. In the source repository, on the source branch: the change, its test, the commit.
-2. Here: `export`. It first runs the node tests, the tree's python tests and `tools/tests`, and writes nothing if one is red.
+2. Here: `export`. It first runs the node tests and the tree's python tests on the head's tree; then it writes the series into a scratch copy of the checkout, runs `engine.py check` and `tools/tests` (`-n auto`) on that copy, and only if all is green replaces the series of the checkout with it. A red leaves the checkout untouched.
 3. `verify`: it must say `identical`.
 4. `hook-debt` drops the resolved debt; `shrink-budget` after logic moved; a Mozilla file new to the series needs its row in `tools/hook-budget.json` (at most 5 lines).
 5. Fill the hand fields of the touched `HOOKS.json` (`test`; `anchor` and `why` for an anchor) and the `Test:` line of `FEATURE.md`.

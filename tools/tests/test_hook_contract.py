@@ -190,7 +190,8 @@ def test_a_backport_folder_is_exempt(tmp_path):
 
 # --------------------------------------------------------------------------- the debt list
 def test_the_debt_as_committed_is_exactly_the_violations_of_the_series():
-    now = sorted(v.key for v in hc.contract_violations(engine.ROOT))
+    # port-06 rules (C12..C15) are never debt: they are fixed by the engine change and the HOOKS.json fields
+    now = sorted(v.key for v in hc.contract_violations(engine.ROOT) if v.rule not in hc.PORT06_RULES)
     debt = [e["key"] for e in json.loads(engine.HOOK_DEBT.read_text(encoding="utf-8"))]
     assert debt == sorted(debt), "tools/hook-debt.json is not sorted"
     assert now == debt
@@ -230,7 +231,7 @@ def test_hook_debt_removes_and_never_adds():
 
 def test_check_refuses_a_new_violation_and_a_stale_entry(tmp_path, monkeypatch, capsys):
     # whatever debt the series has, none at all once it is paid: one violation is added to the series' own
-    real = hc.contract_violations(engine.ROOT)
+    real = [v for v in hc.contract_violations(engine.ROOT) if v.rule not in hc.PORT06_RULES]     # port-06 rules are never debt
     text = "  x = StealthX(this) + 1;"
     extra = hc.Violation("C5", "fingerprint/x", "dom/X.cpp", "void X()", text,
                          hc._key("C5", "fingerprint/x", "dom/X.cpp", "void X()", text))
@@ -627,3 +628,182 @@ def test_g41_a_wrap_whose_callee_is_an_existing_name_of_ours_is_the_same_form_as
                            ("  Foo(a, b);", "  Foo(a, b, NotListed(this));"),
                            ("  rv = MozFn(a);", "  rv = NotListed(a);")):
         assert rules(rewrite(removed, added)) != [], added
+
+
+# --------------------------------------------------------------------------- G53 across two hunks of one file
+G53H_OPEN = "      StealthDeclaredEnumeration(  // STEALTH-HOOK(fingerprint/x)"
+G53H_CLOSE_OLD = "          },"
+G53H_CLOSE_NEW = "          }),  // STEALTH-HOOK(fingerprint/x)"
+G53H_A = ["       GetCurrentSerialEventTarget(), __func__,"]
+G53H_MID = ["          [self = RefPtr(this)](RefPtr<D> aDevices) mutable {", "            Work();", "            More();"]
+G53H_B = ["          [](RefPtr<E>&& reason) {", "            Unreachable();", "          });"]
+
+
+def hunk_at(old_start, new_start, lines, section="RefPtr<P> M::GetPhysicalDevices() {"):
+    old = sum(1 for l in lines if l[0] in " -")
+    new = sum(1 for l in lines if l[0] in " +")
+    return "@@ -%d,%d +%d,%d @@ %s\n%s\n" % (old_start, old, new_start, new, section, "\n".join(lines))
+
+
+def g53_two_hunks(open_line=G53H_OPEN, close_new=G53H_CLOSE_NEW, with_open=True, with_close=True, between=None):
+    """The two ends of a G53 wrap in two hunks of one file, as git cuts them when the lines between are far apart."""
+    f = "dom/media/MediaManager.cpp"
+    out = "diff --git a/%s b/%s\n--- a/%s\n+++ b/%s\n" % (f, f, f, f)
+    new_off = 0
+    if with_open:
+        out += hunk_at(100, 100, ["   Then(", *[" " + a for a in G53H_A], "+" + open_line, *[" " + m for m in G53H_MID[:1]]])
+        new_off += 1
+    if between:
+        out += hunk_at(110 + 0, 110 + new_off, [" " + G53H_MID[1], "-" + G53H_MID[2], "+" + between, " " + G53H_B[0]])
+    if with_close:
+        out += hunk_at(130, 130 + new_off, [" " + G53H_MID[2], " " + "          }", "-" + G53H_CLOSE_OLD,
+                                            "+" + close_new, *[" " + b for b in G53H_B]])
+    return out
+
+
+def test_g53_pairs_the_two_ends_across_two_hunks_of_one_file():
+    text = g53_two_hunks()
+    assert text.count("\n@@ ") == 2 and rules(text) == [] and forms_of(text) == ["wrap-expression", "wrap-expression"]
+
+
+def test_g53_an_unpaired_end_across_hunks_fails():
+    assert rules(g53_two_hunks(with_close=False)), "an opener with no closer"
+    only_close = g53_two_hunks(with_open=False)
+    assert "C6" in rules(only_close), "a closer with no opener"
+    assert rules(g53_two_hunks(open_line="      StealthDeclaredEnumeration(")), "no marker on the opener"
+    assert "C6" in rules(g53_two_hunks(open_line="      OtherCall(  // STEALTH-HOOK(fingerprint/x)"))
+
+
+def test_g53_a_changed_mozilla_line_between_the_ends_fails():
+    text = g53_two_hunks(between="            Changed();")
+    assert text.count("\n@@ ") == 3
+    assert "C6" in rules(text)
+
+
+# --------------------------------------------------------------------------- G29, the qualifier of the called name may change to ours; C17
+def test_g29_the_qualifier_may_change_when_the_new_last_component_is_ours():
+    for added in ("  mozilla::StealthFoo(a, b);", "  StealthFoo(a, b);", "  mozilla::stealth::StealthFoo(a, b);",
+                  "  JS::StealthFoo(a, b);"):          # a form here; C17 refuses the last one
+        text = rewrite("  JS::Foo(a, b);", added)
+        assert rules(text) == [] and forms_of(text) == ["wrap-call"], (added, rules(text), forms_of(text))
+    # red: the new name is not ours; the arguments change; a receiver is dropped; two names change
+    for added in ("  mozilla::Foo2(a, b);", "  mozilla::StealthFoo(a, c);", "  mozilla::StealthFoo(a);", "  mozilla::StealthFoo(b, a);"):
+        assert "C6" in rules(rewrite("  JS::Foo(a, b);", added)), added
+    assert "C6" in rules(rewrite("  x->Foo(a);", "  StealthFoo(a);"))
+    assert "C6" in rules(rewrite("  x.Foo(a);", "  mozilla::StealthFoo(a);"))
+    # the rest of the line stays Mozilla's
+    assert rules(rewrite("  rv = JS::Foo(a, b);", "  rv = mozilla::StealthFoo(a, b);")) == []
+    assert "C6" in rules(rewrite("  rv = JS::Foo(a, b);", "  rv = mozilla::StealthFoo(a, b) + 1;"))
+
+
+def test_g29_the_one_plain_argument_rules_still_apply_when_the_qualifier_changes():
+    text = rewrite("  JS::Foo(a, b);", "  mozilla::StealthFoo(this, a, b);")
+    assert rules(text) == [] and forms_of(text) == ["wrap-call"]
+    assert "C6" in rules(rewrite("  JS::Foo(a, b);", "  mozilla::StealthFoo(this, extra, a, b);"))      # two arguments of ours
+    assert "C6" in rules(rewrite("  JS::Foo(a, b);", "  mozilla::StealthFoo(this, a, c);"))              # one of Mozilla's changed
+    # a name of ours that exists already keeps Mozilla's qualifier (G41): the qualifier may not change for it
+    assert "C6" in rules(rewrite("  JS::Foo(a, b);", "  mozilla::SessionSystemLocales(this, a, b);"))
+
+
+def _c17(text):
+    return [v.detail for v in hc.analyse_namespaces(FOLDER, text)]
+
+
+def test_c17_a_stealth_function_never_lives_in_the_top_level_namespace_of_someone_else():
+    for added, ns in (("  JS::StealthFoo(a, b);", "JS"), ("  js::StealthFoo(a, b);", "js"), ("  xpc::StealthFoo(a);", "xpc"),
+                      ("  rv = std::StealthFoo();", "std"), ("  webrtc::StealthFoo(a);", "webrtc"),
+                      ("  if (xpc::StealthFoo(a)) return;", "xpc")):
+        got = _c17(top(added + MARK))
+        assert len(got) == 1 and ("namespace " + ns) in got[0], (added, got)
+    # ours: unqualified, mozilla and what is nested in it (written in full or relative to it), a class
+    for added in ("  StealthFoo(a, b);", "  mozilla::StealthFoo(a, b);", "  mozilla::stealth::StealthFoo(a);",
+                  "  mozilla::net::StealthFoo(a);", "  mozilla::dom::StealthFoo(a);", "  net::StealthFoo(a);", "  gfx::StealthFoo(a);",
+                  "  CanvasUtils::StealthFoo(a);", "  mozilla::CanvasUtils::StealthFoo(a);",
+                  "  if (gfxPlatformFontList::StealthBundleOnly()) return;", "  nsFoo::StealthBar(a);", "  nr_stealth_foo(a);"):
+        assert _c17(top(added + MARK)) == [], added
+    assert _c17(top('  #include "js::StealthFoo.h"' + MARK)) == []
+    assert _c17(top("  JS::StealthFoo(a);" + MARK, file="build/foo.rs")) == []          # C and C++ files only
+    assert _c17(rewrite("  JS::Foo(a, b);", "  JS::StealthFoo(a, b);")) != []          # the rewrite G29 accepts is refused by C17
+    assert _c17(rewrite("  JS::Foo(a, b);", "  mozilla::StealthFoo(a, b);")) == []
+
+
+def test_c17_an_unqualified_name_is_judged_where_our_sources_declare_it(tmp_path):
+    lines = ["#include <x>", "namespace mozilla {", "namespace net {", "bool StealthInMozilla(int a);", "}  // namespace net", "}",
+             "namespace xpc {", "bool StealthInXpc(JSContext* aCx);", "class C {", "  bool StealthMember() const;", "};", "}  // namespace xpc",
+             "bool StealthGlobal(int a);", "int StealthDefined(int a) { return 1; }",
+             "namespace JS {", "void StealthInJS() {", "  StealthCall(1);", "}", "}", "namespace {", "void StealthAnon();", "}"]
+    d = tmp_path / FOLDER / "src" / "dom"
+    d.mkdir(parents=True)
+    (d / "StealthX.h").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    (tmp_path / "SERIES").write_text(FOLDER + "\n", encoding="utf-8")
+    (tmp_path / FOLDER / "hooks.patch").write_text("", encoding="utf-8")
+    own = hc.own_function_namespaces(tmp_path)
+    assert own["StealthInMozilla"] == {"mozilla"} and own["StealthInXpc"] == {"xpc"} and own["StealthGlobal"] == {""}
+    assert own["StealthInJS"] == {"JS"} and "StealthCall" not in own and own["StealthAnon"] == {""}
+    assert "StealthMember" not in own                 # a member of a class is not a function of the namespace
+    assert own["StealthDefined"] == {""}
+    for name, bad in (("StealthInXpc", True), ("StealthInJS", True), ("StealthInMozilla", False), ("StealthGlobal", False),
+                      ("StealthAnon", False), ("StealthUnknown", False)):
+        got = [v.detail for v in hc.analyse_namespaces(FOLDER, top("  %s(a);" % name + MARK), own)]
+        assert bool(got) == bad, (name, got)
+        assert hc.analyse_namespaces(FOLDER, top("  %s(a);" % name + MARK)) == []          # without `own` an unqualified name is not judged
+    # the hook is in a `namespace xpc {` block of Mozilla's file: that alone says nothing (the call may reach ours through mozilla)
+    assert [v.rule for v in hc.analyse_namespaces(FOLDER, top("  StealthInMozilla(a);" + MARK), own)] == []
+
+
+def test_c17_the_namespace_stacks_read_the_braces_outside_comments_and_literals():
+    got = hc.namespace_stacks(["namespace a::b {", "void f() {", "  // } namespace", '  const char* s = "}";', "}", "}", "x;"])
+    assert got[1] == ["a", "b"] and got[2] == ["a", "b"] and got[4] == ["a", "b"] and got[6] == []
+    assert hc.namespace_stacks(["/* namespace q {", "*/ namespace z {", "int g;"])[2] == ["z"]
+
+
+def test_c17_is_in_the_contract_never_debt_and_a_backport_is_exempt(tmp_path):
+    d = tmp_path / FOLDER
+    d.mkdir(parents=True)
+    (d / "hooks.patch").write_text(top("  JS::StealthFoo(a);" + MARK), encoding="utf-8", newline="")
+    (tmp_path / "SERIES").write_text(FOLDER + "\n", encoding="utf-8")
+    v = hc.namespace_violations(tmp_path)
+    assert [x.rule for x in v] == ["C17"] and "C17" in hc.PORT06_RULES and "C17" in hc.RULES
+    assert hc.update_debt([], v, init=True) == []
+    (d / "BACKPORT.json").write_text("{}", encoding="utf-8")
+    assert hc.namespace_violations(tmp_path) == []
+
+
+# `function` of a hook is the function the block is in: the section header git prints for the hunk is the one above the
+# hunk's first line, and a hunk that starts in the previous function holds the signature of the real one in its own lines.
+def _function_of(path, header, signature, hook_lines):
+    body = [signature] + hook_lines
+    lines = [l if l.startswith(("+", "-")) else " " + l for l in body]
+    old_len = sum(1 for l in lines if not l.startswith("+"))
+    new_len = sum(1 for l in lines if not l.startswith("-"))
+    text = ("diff --git a/%s b/%s\nindex 1111111..2222222 100644\n--- a/%s\n+++ b/%s\n@@ -100,%d +100,%d @@ %s\n%s\n"
+            % (path, path, path, path, old_len, new_len, header, "\n".join(lines)))
+    hooks, _ = hc.analyse_patch("f/x", text)
+    return [h.function for h in hooks]
+
+
+def test_the_function_of_a_hook_is_the_one_whose_signature_the_hunk_shows_above_it():
+    # GetString ends just above GetParameter: git names the first, the hook is in the second
+    got = _function_of("dom/canvas/ClientWebGLContext.cpp", "Maybe<std::string> ClientWebGLContext::GetString(const GLenum pname) {",
+                       "void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,",
+                       ["                                      JS::MutableHandle<JS::Value> retval,",
+                        "                                      ErrorResult& rv, const bool debug) {",
+                        "+  if (StealthWebGLParameter(*this, cx, pname, retval, rv, debug)) return;  // STEALTH-HOOK(f/x)",
+                        "   const auto& state = State();"])
+    assert got == ["void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,"], got
+    # LookupLanguage ends just above GetLocaleLanguage
+    got = _function_of("intl/locale/nsLanguageAtomService.cpp", "nsStaticAtom* nsLanguageAtomService::LookupLanguage(",
+                       "nsAtom* nsLanguageAtomService::GetLocaleLanguage() {",
+                       ["+  if (nsAtom* worker = intl::WorkerLocaleLanguage()) return worker;  // STEALTH-HOOK(f/x)",
+                        "   {"])
+    assert got == ["nsAtom* nsLanguageAtomService::GetLocaleLanguage() {"], got
+
+
+def test_the_header_stays_when_no_signature_is_above_the_block_or_the_file_is_not_c():
+    got = _function_of("dom/base/Foo.cpp", "void Foo::Bar() {", "  int a = 1;",
+                       ["+  Stealth();  // STEALTH-HOOK(f/x)", "   int b = 2;"])
+    assert got == ["void Foo::Bar() {"], got
+    # a call at column 0 of a moz.build is not a definition
+    got = _function_of("gfx/thebes/moz.build", "USE_LIBS += [", 'include("/ipc/chromium/chromium-config.mozbuild")',
+                       ['+UNIFIED_SOURCES += ["StealthX.cpp"]  # STEALTH-HOOK(f/x)', "   FINAL = 1"])
+    assert got == ["USE_LIBS += ["], got

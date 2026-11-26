@@ -80,7 +80,7 @@ index d1a4d801b5ceb70defd1df9dea8a939306ddb703..ece053cac22e48a18a2bf831c949c55c
  };
  
 diff --git a/gfx/thebes/gfxDWriteFontList.h b/gfx/thebes/gfxDWriteFontList.h
-index 93bd8c8d01c3b5c339d6b4ff8e4ae670ceb313dc..c0f294db13dd6acc29478169961c3fee751ed097 100644
+index 93bd8c8d01c3b5c339d6b4ff8e4ae670ceb313dc..07d63c1b44147ffdbcefce8e287a2c06f97f0a7b 100644
 --- a/gfx/thebes/gfxDWriteFontList.h
 +++ b/gfx/thebes/gfxDWriteFontList.h
 @@ -18,6 +18,8 @@
@@ -103,7 +103,15 @@ index 93bd8c8d01c3b5c339d6b4ff8e4ae670ceb313dc..c0f294db13dd6acc29478169961c3fee
  
  #if MOZ_FONTATIONS
    // File fragment backing our Skrifa font, if unable to mmap the file.
-@@ -471,6 +475,8 @@ class gfxDWriteFontList final : public gfxPlatformFontList {
+@@ -461,6 +465,7 @@ class gfxDWriteFontList final : public gfxPlatformFontList {
+       nsTArray<mozilla::fontlist::Family::InitData>& aFamilies,
+       const nsTArray<nsCString>* aForceClassicFams = nullptr)
+       MOZ_REQUIRES(mLock);
++  void StealthAppendFamiliesFromCollection(IDWriteFontCollection* aCollection, nsTArray<mozilla::fontlist::Family::InitData>& aFamilies, const nsTArray<nsCString>* aForceClassicFams) MOZ_REQUIRES(mLock);  // STEALTH-HOOK(fingerprint/fonts/font-list)
+ 
+   void AddSubstitute(const nsCString& aSubstituteName,
+                      const nsCString& aActualFontName, bool aIsHardcoded)
+@@ -471,6 +476,8 @@ class gfxDWriteFontList final : public gfxPlatformFontList {
        IDWriteFactory* aFactory);
  #endif
  
