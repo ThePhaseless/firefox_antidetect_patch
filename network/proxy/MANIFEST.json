@@ -3,5 +3,8 @@
  "added": {
   "juggler/tests/system_proxy_is_off_by_default.test.mjs": "100644"
  },
+ "sha256": {
+  "juggler/tests/system_proxy_is_off_by_default.test.mjs": "998de1868a316eb50f2782f78c9b5caa7800783901a7a436825a0bc19cd1aa5e"
+ },
  "inventory": []
 }

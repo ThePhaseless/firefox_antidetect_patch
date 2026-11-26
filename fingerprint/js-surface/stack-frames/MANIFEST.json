@@ -6,6 +6,10 @@
   "dom/base/test/gtest/TestStealthStackFrames.cpp": "100644",
   "js/src/vm/StealthStackFrames.h": "100644"
  },
+ "sha256": {
+  "dom/base/test/gtest/TestStealthStackFrames.cpp": "4e717e28cb9dec86a4f288b25b94df9412f39e8fba19b5be92b78924b3d9720b",
+  "js/src/vm/StealthStackFrames.h": "34faa99be8cd4c1251fc89a4d6c1855bd92c0c49c90139c3f148322d8ea47ed0"
+ },
  "inventory": [
   {
    "file": "js/src/vm/SavedStacks.cpp",
@@ -18,11 +22,6 @@
    "inline_logic_lines": 22,
    "hookable": "movable",
    "anchor": "BuildStackString",
-   "evidence": [
-    "+        static constexpr char kJuggler[] = \"resource://gre/modules/juggler/\";",
-    "+          if (skip) {",
-    "+            frame = nextFrame;"
-   ],
    "notes": "Page-observable: frames whose source starts with the Juggler resource path are dropped from every stack string built for content. The filter is a URL prefix, so it breaks silently if Juggler's resource path changes; juggler/moz.build is the owner of that path. The frame-skip (frame = nextFrame, skippedAsync, continue) must stay inside Mozilla's walk loop; only the source-prefix test (about 15 lines) can move to our file behind a bool-returning call.",
    "verifier": {
     "changed": [],

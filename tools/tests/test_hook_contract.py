@@ -213,11 +213,12 @@ def test_debt_against_the_series_and_main():
     debt = [hc.entry_of(a), hc.entry_of(b)]
     assert hc.debt_problems([a, b], debt, None) == []
     assert hc.debt_problems([a, b], debt, [hc.entry_of(a), hc.entry_of(b), hc.entry_of(c)]) == []
-    new = hc.debt_problems([a, b, c], debt, None)
-    assert len(new) == 1 and "not in the debt list" in new[0] and "C4" in new[0]
-    gone = hc.debt_problems([a], debt, None)
-    assert len(gone) == 1 and b.key in gone[0] and "remove it: python tools/engine.py hook-debt" in gone[0]
-    grown = hc.debt_problems([a, b], debt, [hc.entry_of(a)])
+    new = [str(x) for x in hc.debt_problems([a, b, c], debt, None)]
+    assert len(new) == 1 and "C4" in new[0] and "`// three`" in new[0] and "hooks.patch, a.cpp" in new[0]
+    assert "debt" not in new[0].split("Fix: ")[1], new[0]       # the list never adds: its fix is not to add an entry
+    gone = [str(x) for x in hc.debt_problems([a], debt, None)]
+    assert len(gone) == 1 and b.key in gone[0] and "run `python tools/engine.py hook-debt`" in gone[0]
+    grown = [str(x) for x in hc.debt_problems([a, b], debt, [hc.entry_of(a)])]
     assert len(grown) == 1 and b.key in grown[0] and "main" in grown[0]
 
 
@@ -243,7 +244,7 @@ def test_check_refuses_a_new_violation_and_a_stale_entry(tmp_path, monkeypatch, 
     monkeypatch.setattr(hc, "contract_violations", lambda root: real + [extra])
     hc.write_debt(path, debt)                           # one violation not listed
     assert engine.check() == 1
-    assert "not in the debt list" in capsys.readouterr().out
+    assert "C5" in capsys.readouterr().out
     monkeypatch.setattr(hc, "contract_violations", lambda root: real)
     hc.write_debt(path, debt + hc.update_debt([], [extra], init=True))     # one entry gone
     assert engine.check() == 1

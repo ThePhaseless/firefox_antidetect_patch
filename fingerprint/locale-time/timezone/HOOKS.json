@@ -54,16 +54,6 @@
  },
  {
   "file": "dom/base/Document.cpp",
-  "function": "nsresult Document::InitCSP(nsIChannel* aChannel) {",
-  "kind": "add",
-  "form": "anchor",
-  "line": "  if (CSP_IsBypassedFor(*this)) return NS_OK;  // STEALTH-HOOK(automation/bypass-csp)",
-  "test": "wrapper:tests/test_bypass_csp_e2e.py::test_bypass_csp_lifts_the_page_policy_and_its_absence_keeps_it",
-  "anchor": "the block `if (principal->IsSystemPrincipal() ...) {...}` of Document::InitCSP (the statement just before)",
-  "why": "an early return that must come after the baseline CSP block, which still runs even when the automation lifts the page's policies; a guard at the head of the function would skip it"
- },
- {
-  "file": "dom/base/Document.cpp",
   "function": "static void GetFormattedTimeString(PRTime aTime, bool aUniversal,",
   "kind": "rewrite",
   "form": "wrap-call",
@@ -160,5 +150,30 @@
   "test": "wrapper:tests/test_context_locale_e2e.py::test_a_context_locale_reaches_navigator_intl_and_the_header",
   "anchor": "the if (aLocaleEnUS) {...} else if (!aLanguageOverride.IsEmpty()) {...} chain (the last statement of xpc::InitGlobalObjectOptions)",
   "why": "G30: the declaration of the realm's zone and language must follow Mozilla's own choices, which end the function"
+ },
+ {
+  "file": "js/xpconnect/src/Sandbox.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"mozilla/intl/StealthSessionPrefs.h\"  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "test": "wrapper:tests/test_context_locale_e2e.py::test_a_context_locale_reaches_navigator_intl_and_the_header"
+ },
+ {
+  "file": "js/xpconnect/src/Sandbox.cpp",
+  "function": "nsresult xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp,",
+  "kind": "rewrite",
+  "form": "wrap-expression",
+  "line": "            mozilla::intl::StealthPrimaryLanguageTag(PromiseFlatCString(localeOverride)).get());  // STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "removed": "            PromiseFlatCString(localeOverride).get());",
+  "test": "wrapper:tests/test_context_locale_e2e.py::test_a_context_locale_reaches_navigator_intl_and_the_header"
+ },
+ {
+  "file": "dom/base/test/gtest/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"TestStealthTimezone.cpp\"]  # STEALTH-HOOK(fingerprint/locale-time/timezone)",
+  "test": "gtest:StealthTimezone.LocalTimeIsTheDeclaredZonesWallClock"
  }
 ]

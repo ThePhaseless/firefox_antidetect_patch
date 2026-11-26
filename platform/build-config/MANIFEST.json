@@ -3,5 +3,8 @@
  "added": {
   ".mozconfig": "100644"
  },
+ "sha256": {
+  ".mozconfig": "f87d0326414330ab675219c7764f690ee9c279252bde185d630464c00e3895d5"
+ },
  "inventory": []
 }

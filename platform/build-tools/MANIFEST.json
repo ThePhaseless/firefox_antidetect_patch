@@ -13,6 +13,14 @@
   "scripts/ci/test_stealth_download_watchdog.py": "100644",
   "third_party/python/vsdownload/stealth_download_watchdog.py": "100644"
  },
+ "sha256": {
+  "build/stealth_check_build_files.py": "f5c36242984bd8afd03f7848e29120072962f8247b2119465ac6a8f5d7fc9bfa",
+  "build/stealth_check_sources.py": "dd827118a62f0667e9a24cc02d1713f4d02773425e08d4e3d55753573fa7bac3",
+  "python/mozbuild/mozbuild/stealth_build_tools.py": "3b2e0f839949fa3a0df89098b0d49e9c16ee919e553ead10d8332193f3e78c35",
+  "scripts/ci/test_stealth_build_tools.py": "84a62c0de2593e9acbff992f306d499d3af06ce198aea0385d58b46d2e433266",
+  "scripts/ci/test_stealth_download_watchdog.py": "75d0fa09c34f87b94dc0cfd9ce584f690b83cc9c6acafd35625d6ff163e055cd",
+  "third_party/python/vsdownload/stealth_download_watchdog.py": "1924f8b830a9057675a2ca25b56694eb23c172699aea129a064945d684f39dae"
+ },
  "inventory": [
   {
    "file": "python/mozbuild/mozbuild/backend/recursivemake.py",
@@ -25,10 +33,6 @@
    "inline_logic_lines": 1,
    "hookable": "already-hook",
    "anchor": "class RecursiveMakeBackend, the objs_ref assignment near line 1607 (enclosing def name not extracted)",
-   "evidence": [
-    "-        objs_ref = \" \\\\\\n    \".join(os.path.relpath(o, obj.objdir) for o in objs)",
-    "+        objs_ref = \" \\\\\\n    \".join(o for o in objs)"
-   ],
    "notes": "Applies to every platform and every build, not only Win32: relative object paths are replaced by absolute ones unconditionally. The comment blames mozmake 4.4.1 on Win32 for paths over about 150 chars; that claim is the author's and was not checked here. Could be a helper call in our own file, but a one-line change is already small.",
    "verifier": {
     "changed": [
@@ -48,11 +52,6 @@
    "inline_logic_lines": 2,
    "hookable": "already-hook",
    "anchor": "UnifiedSources.__init__ (class UnifiedSources, hunk header line 1181)",
-   "evidence": [
-    "-            if len(unified_prefix) > 20:",
-    "+            if len(unified_prefix) > 30:",
-    "+                unified_prefix = unified_prefix[-30:].split(\"/\", 1)[-1]"
-   ],
    "notes": "Magic number change (20 to 30). It changes unified source file names for all builds, so generated unified file names change even outside Windows. The comment cites collisions in libwebrtc (FF150) as the reason; the collision claim was not verified here.",
    "verifier": {
     "changed": [],
@@ -70,11 +69,6 @@
    "inline_logic_lines": 2,
    "hookable": "already-hook",
    "anchor": "JarMaker.getOutput (def getOutput(self, name, mode=\"wb\"), line 557)",
-   "evidence": [
-    "+            # Stealthfox fix: webcompat builtin-addons CSS files have",
-    "+            if os.name == \"nt\":",
-    "+                out = \"\\\\\\\\?\\\\\" + os.path.abspath(out).replace(\"/\", \"\\\\\")"
-   ],
    "notes": "UNSURE between build and port-fix: the comment blames long CSS file names overflowing MAX_PATH, with no version mention. It is packaging code, so build is used. The long-path prefix is applied to every output of getOutput on Windows, not only to the webcompat files.",
    "verifier": {
     "changed": [],
@@ -92,11 +86,6 @@
    "inline_logic_lines": 12,
    "hookable": "movable",
    "anchor": "_downloadPayload (def at line 634), plus import signal at the top of the file",
-   "evidence": [
-    "-            urllib.request.urlretrieve(payload[\"url\"], destname)",
-    "+            def _dl_watchdog(signum, frame):",
-    "+                signal.alarm(120)"
-   ],
    "notes": "Per-file SIGALRM watchdog for slow downloads in the cross-compile build. The comment ties it to a flaky CDN, not to a Firefox version, so it is build and not port-fix. On native Windows, SIGALRM does not exist and the watchdog is skipped; the comment says main() sets a socket default timeout instead. Process-wide signal handler: not safe in threaded use. Move the watchdog into an own helper and keep one call line here.",
    "verifier": {
     "changed": [],

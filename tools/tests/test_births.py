@@ -62,7 +62,7 @@ def entry(site, **kw):
 
 def ledger_of(*texts, **kw):
     sites = [s for path, text in texts for s in births.scan_text(path, text)]
-    return {"tag": "T", "scanner": 1, "chrome_js_http": {}, "entries": sorted((entry(s, **kw) for s in sites), key=births.entry_key)}, sites
+    return {"scanner": 1, "chrome_js_http": {}, "entries": sorted((entry(s, **kw) for s in sites), key=births.entry_key)}, sites
 
 
 def judge(ledger, sites, read=None):
@@ -162,29 +162,29 @@ def test_an_entry_with_no_site_is_gone_and_not_red():
 # ------------------------------------------------------------------------------------------- the rule: no context and a page can reach it
 def test_no_context_and_page_reachable_is_red_unless_accepted_hooked_or_dead():
     _, sites = ledger_of((FILE, SYSTEM))
-    ok_but_no = {"tag": "T", "entries": [entry(sites[0], carries="no", reach="yes", verdict="ok")]}
+    ok_but_no = {"entries": [entry(sites[0], carries="no", reach="yes", verdict="ok")]}
     assert any("is ok but carries 'no'" in p for p in judge(ok_but_no, sites).invalid)
     for verdict, extra in (("accepted", {}), ("hooked", {"hook": "network/doh"}), ("dead", {"proof": "pref-off:network.x"})):
-        ledger = {"tag": "T", "entries": [entry(sites[0], carries="no", reach="yes", verdict=verdict, reason="a reason that is long enough", **extra)]}
+        ledger = {"entries": [entry(sites[0], carries="no", reach="yes", verdict=verdict, reason="a reason that is long enough", **extra)]}
         assert judge(ledger, sites, read=lambda p: "STEALTH-HOOK(network/doh)").status == 0, verdict
 
 
 def test_an_accepted_entry_needs_a_real_reason_and_a_dead_one_a_proof():
     _, sites = ledger_of((FILE, SYSTEM))
     base = dict(carries="no", reach="no")
-    short = {"tag": "T", "entries": [entry(sites[0], verdict="accepted", reason="because", **base)]}
+    short = {"entries": [entry(sites[0], verdict="accepted", reason="because", **base)]}
     assert any("no reason" in p for p in judge(short, sites).invalid)
-    unproven = {"tag": "T", "entries": [entry(sites[0], verdict="dead", proof="trust me", **base)]}
+    unproven = {"entries": [entry(sites[0], verdict="dead", proof="trust me", **base)]}
     assert any("proof" in p for p in judge(unproven, sites).invalid)
 
 
 def test_a_hook_that_a_port_lost_is_red():
     _, sites = ledger_of((FILE, SYSTEM))
-    hooked = {"tag": "T", "entries": [entry(sites[0], carries="no", verdict="hooked", hook="network/doh", reason="the hook sets the attributes on the channel")]}
+    hooked = {"entries": [entry(sites[0], carries="no", verdict="hooked", hook="network/doh", reason="the hook sets the attributes on the channel")]}
     assert judge(hooked, sites, read=lambda p: "STEALTH-HOOK(network/doh)").status == 0
     lost = judge(hooked, sites, read=lambda p: "nothing of ours in this file")
     assert lost.status == 1 and any("the hook is gone" in p for p in lost.invalid)
-    elsewhere = {"tag": "T", "entries": [entry(sites[0], carries="no", verdict="hooked", hook="network/doh", reason="the config is made where the PeerConnection is",
+    elsewhere = {"entries": [entry(sites[0], carries="no", verdict="hooked", hook="network/doh", reason="the config is made where the PeerConnection is",
                                               hook_at={"file": "dom/Other.cpp", "contains": "StealthProxyConfigOf"})]}
     texts = {"dom/Other.cpp": "STEALTH-HOOK(network/doh) auto c = StealthProxyConfigOf(x);"}
     assert judge(elsewhere, sites, read=lambda p: texts.get(p, "")).status == 0
@@ -193,13 +193,13 @@ def test_a_hook_that_a_port_lost_is_red():
 
 def test_a_hook_must_be_a_folder_of_the_series():
     _, sites = ledger_of((FILE, SYSTEM))
-    ledger = {"tag": "T", "entries": [entry(sites[0], carries="no", verdict="hooked", hook="network/nowhere", reason="a hook that names no folder of SERIES")]}
+    ledger = {"entries": [entry(sites[0], carries="no", verdict="hooked", hook="network/nowhere", reason="a hook that names no folder of SERIES")]}
     assert any("not a folder of SERIES" in p for p in judge(ledger, sites).invalid)
 
 
 def test_an_open_item_is_counted_and_exits_2_and_a_new_site_beside_it_exits_1():
     _, sites = ledger_of((FILE, SYSTEM))
-    opened = {"tag": "T", "entries": [entry(sites[0], carries="no", verdict="fix", reason="a request a page causes leaves in context 0",
+    opened = {"entries": [entry(sites[0], carries="no", verdict="fix", reason="a request a page causes leaves in context 0",
                                            open={"since": "2026-11-13", "item": "the hash completer", "owner": "pm"})]}
     report = judge(opened, sites)
     assert (report.status, len(report.open), report.red) == (2, 1, False)
@@ -213,7 +213,7 @@ def test_a_fix_with_no_dated_open_state_is_invalid():
         entry_ = entry(sites[0], carries="no", verdict="fix", reason="a request a page causes leaves in context 0")
         if opened is not None:
             entry_["open"] = opened
-        assert any("dated open state" in p for p in judge({"tag": "T", "entries": [entry_]}, sites).invalid), opened
+        assert any("dated open state" in p for p in judge({"entries": [entry_]}, sites).invalid), opened
 
 
 # ------------------------------------------------------------------------------------------------------------------ the false friend
@@ -324,7 +324,7 @@ def test_run_gives_status_0_on_the_ledger_and_1_on_a_new_call(repo, tmp_path, ca
     (repo / "dom" / "New.cpp").write_text(SYSTEM, encoding="utf-8")
     assert births.run(births.Source(repo), ["network/doh"], path) == 1
     out = capsys.readouterr().out
-    assert "NEW      dom/New.cpp" in out and "NEW 1" in out and "RED" in out
+    assert "FAIL dom/New.cpp:3: NEW: dom/New.cpp:3 Probe::Fetch" in out and "--skeleton" in out and "NEW 1" in out and "RED" in out
     json.loads(path.read_text(encoding="utf-8"))
 
 
@@ -364,3 +364,49 @@ def test_the_check_of_the_series_reads_the_ledger():
 def inspect_source(fn):
     import inspect
     return inspect.getsource(fn)
+
+
+# ------------------------------------------------------------------------------------------------------------------------ the tag is derived (repo-06, repo-07)
+def test_the_ledger_stores_no_tag_and_the_tag_is_the_one_of_upstream_json():
+    root = Path(__file__).resolve().parents[2]
+    stored = json.loads((root / "tools" / "birth-ledger.json").read_text(encoding="utf-8"))
+    assert "tag" not in stored
+    assert births.ledger_tag() == json.loads((root / "UPSTREAM.json").read_text(encoding="utf-8"))["mozilla_tag"]
+    assert births.ledger_problems(stored) == []
+
+
+def test_a_stored_tag_is_red_and_a_save_never_writes_it(tmp_path):
+    ledger, _ = ledger_of((FILE, CARRIES))
+    stale = dict(ledger, tag="FIREFOX_1_0_RELEASE")
+    problems = births.ledger_problems(stale)
+    assert len(problems) == 1 and "UPSTREAM.json" in problems[0] and "Fix: delete the `tag` line" in problems[0]
+    path = tmp_path / "ledger.json"
+    births.save_ledger(stale, path)
+    assert "tag" not in json.loads(path.read_text(encoding="utf-8"))
+
+
+def test_births_still_runs_without_a_stored_tag(repo, tmp_path, capsys):
+    ledger, _ = ledger_of((FILE, CARRIES))
+    path = tmp_path / "ledger.json"
+    births.save_ledger(ledger, path)
+    assert "tag" not in json.loads(path.read_text(encoding="utf-8"))
+    assert births.run(births.Source(repo), ["network/doh"], path) == 0
+    assert births.ledger_tag() in capsys.readouterr().out
+
+
+# ------------------------------------------------------------------------------------------------------------------------ the failures name their fix (repo-04)
+def test_new_changed_gone_and_open_lines_name_the_option_that_fixes_them(capsys):
+    ledger, sites = ledger_of((FILE, CARRIES), ("dom/base/Other.cpp", SYSTEM))
+    changed_text = CARRIES.replace("aURI, aDoc,", "aURI, nsContentUtils::GetSystemPrincipal(),")
+    opened = {"entries": [entry(s, carries="no", verdict="fix", reason="a request a page causes leaves in context 0",
+                                open={"since": "2026-11-13", "item": "the hash completer", "owner": "pm"})
+                          for s in sites if s.file == "dom/base/Other.cpp"]}
+    report = judge(ledger, births.scan_text(FILE, changed_text) + births.scan_text("dom/new/New.cpp", CARRIES.replace("aURI, aDoc,", "aURI, aDoc, 1,")))
+    births.print_report(report, [])
+    report = judge(opened, [s for s in sites if s.file == "dom/base/Other.cpp"])
+    births.print_report(report, [])
+    out = capsys.readouterr().out
+    for word, flag in (("CHANGED", "--accept-changed"), ("GONE", "--prune"), ("NEW", "--skeleton"), ("OPEN", "known hole")):
+        lines = [l for l in out.splitlines() if l.startswith("FAIL ") and (": %s" % word) in l]
+        assert lines, word
+        assert all(flag in l and "Fix: " in l and "Rule: docs/decisions/port-03-births-ledger.md" in l for l in lines), (word, lines)

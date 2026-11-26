@@ -8,6 +8,7 @@ the shapes that do not.
     python -m pytest tools/tests/test_folders.py
 """
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -26,7 +27,7 @@ TAG = "FIREFOX_159_0_RELEASE"
 BUG = "https://bugzilla.mozilla.org/show_bug.cgi?id=1234567"
 PRODUCT = {"relation": "product"}
 DEFECT = {"relation": "defect", "upstream": "not-filed"}
-RULE = "rule: docs/decisions/series-02-every-folder-states-its-relation-to-mozilla.md"
+RULE = "docs/decisions/series-02-every-folder-states-its-relation-to-mozilla.md"
 REAL = Path(__file__).resolve().parents[2]
 
 
@@ -56,8 +57,10 @@ def one(tmp_path, value, **kw):
 
 def said(problem):
     """Each problem says where, what, fix and rule, in that order."""
-    where_what, fix, rule = problem.split("\n")
-    assert fix.startswith("fix: ") and rule == RULE and "FOLDER.json" in where_what and ": " in where_what
+    found = re.fullmatch(r"FAIL (.+?)\. Fix: (.+)\. Rule: (.+)", problem, re.S)
+    assert found, problem
+    where_what, fix, rule = found.groups()
+    assert fix.strip() and rule == RULE and "FOLDER.json" in where_what and ": " in where_what
     return where_what
 
 
@@ -101,7 +104,7 @@ def test_a_folder_json_in_a_backport_folder_is_red(tmp_path):
     root = series(tmp_path, {"platform/backports/x": "backport"})
     (root / "platform/backports/x/FOLDER.json").write_text(json.dumps(PRODUCT), encoding="utf-8")
     found = folders.problems(root)
-    assert len(found) == 1 and "it is a backport, and its relation is derived from that file" in said(found[0]) and "fix: delete FOLDER.json" in found[0]
+    assert len(found) == 1 and "it is a backport, and its relation is derived from that file" in said(found[0]) and "Fix: delete FOLDER.json" in found[0]
 
 
 def test_an_extra_key_is_red(tmp_path):
@@ -247,7 +250,7 @@ def test_port_stops_before_it_merges_when_a_fix_is_in_the_new_tag(world, capsys)
     assert stop.value.code not in (0, None) and isinstance(stop.value.code, str), "a non-zero exit with the message"
     assert "port stopped before it merged anything: 1 folder(s) say Mozilla ships their fix in FIREFOX_160_0_RELEASE or before" in message
     assert "  fingerprint/a: fixed_in FIREFOX_160_0_RELEASE" in message and "platform/b" not in message
-    assert "next: python tools/engine.py port --to FIREFOX_160_0_RELEASE --source <source>" in message and "export" in message and RULE in message
+    assert "next: python tools/engine.py port --to FIREFOX_160_0_RELEASE --source <source>" in message and "export" in message and RULE.replace("rule:", "Rule:") in message
     assert subprocess.run(["git", "-C", str(world), "rev-parse", "-q", "--verify", "refs/heads/port/x"], capture_output=True).returncode != 0, "nothing merged"
     assert capsys.readouterr().out == "", "it stopped, it did not print and go on"
 
@@ -295,12 +298,15 @@ def test_export_never_writes_or_deletes_a_folder_json(world, tmp_path, monkeypat
     inventory.write_text(json.dumps([{"file": "mozilla.txt", "feature": "x", "category": "hook", "hookable": "yes"}]), encoding="utf-8")
     upstream = tmp_path / "UPSTREAM.json"
     upstream.write_text(json.dumps({"mozilla_tag": "TAG", "source_branch": "series"}), encoding="utf-8")
+    for name in ("BUDGET", "REMOVED_BUDGET"):      # export writes the entry of a file patched for the first time: into a copy
+        (tmp_path / (name + ".json")).write_text("{}", encoding="utf-8")
+        monkeypatch.setattr(engine, name, tmp_path / (name + ".json"))
     monkeypatch.setattr(engine, "INVENTORY", inventory)
     monkeypatch.setattr(engine, "UPSTREAM", upstream)
     monkeypatch.setattr(engine, "WORKFLOWS_SERIES", tmp_path / "wf-series")
     monkeypatch.setattr(engine, "WORKFLOWS_ROOT", tmp_path / "wf-root")
     monkeypatch.setattr(layout, "feature_folder", lambda feature: "fingerprint/a")
-    monkeypatch.setattr(layout, "own_file_folder", lambda path: "fingerprint/a" if path.startswith("dom/") else "platform/b")
+    monkeypatch.setattr(layout, "own_file_folder", lambda path, held, declared=None: "fingerprint/a" if path.startswith("dom/") else "platform/b")
     monkeypatch.setattr(layout, "GROUP_ORDER", ["platform", "fingerprint", "port"])
     engine.export(world, "TAG", "series")
     for name, data in keep.items():
@@ -311,8 +317,16 @@ def test_export_never_writes_or_deletes_a_folder_json(world, tmp_path, monkeypat
     (world / "net.txt").write_text("x\n", encoding="utf-8")
     run(world, "add", "net.txt")
     run(world, "commit", "-qm", "net")
-    monkeypatch.setattr(layout, "own_file_folder", lambda path: "fingerprint/n" if path == "net.txt" else
+    monkeypatch.setattr(layout, "own_file_folder", lambda path, held, declared=None: "fingerprint/n" if path == "net.txt" else
                         ("fingerprint/a" if path.startswith("dom/") else "platform/b"))
     engine.export(world, "TAG", "more")
     assert (root / "fingerprint" / "n" / "MANIFEST.json").is_file() and not (root / "fingerprint" / "n" / "FOLDER.json").exists()
     assert sorted(p.relative_to(root).as_posix() for p in root.rglob("FOLDER.json")) == ["fingerprint/a/FOLDER.json", "platform/b/FOLDER.json"]   # rglob has no order: NTFS gives the sorted one, ext4 does not
+
+
+def test_the_command_prints_each_problem_as_one_fail_line_of_four_parts(tmp_path, capsys):
+    root = series(tmp_path, {"fingerprint/a": None})
+    assert folders.main([str(root)]) == 1
+    lines = capsys.readouterr().out.splitlines()
+    assert len(lines) == 1 and lines[0].startswith("FAIL fingerprint/a/FOLDER.json: ") and lines[0].count("FAIL ") == 1
+    assert said(lines[0]) and " Fix: " in lines[0] and lines[0].endswith("Rule: " + RULE)

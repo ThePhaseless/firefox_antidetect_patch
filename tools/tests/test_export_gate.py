@@ -21,7 +21,7 @@ import export_gate  # noqa: E402
 def test_the_export_of_the_command_line_goes_through_the_gate_before_it_writes():
     text = (Path(engine.__file__)).read_text(encoding="utf-8")
     branch = text[text.index('if a.command == "export":'):text.index("return verify(")]
-    assert "export_gate.gate(" in branch and "export_into(scratch, a.source, base, head)" in branch, \
+    assert "export_gate.gate(" in branch and "export_into(scratch, a.source, base, head, declared)" in branch, \
         "engine.py export must hand the gate the write into its scratch tree"
     assert branch.index("export_gate.gate(") < branch.index("export_into("), "the write is an argument of the gate"
     assert "export(a.source" not in branch, "no way to the write that does not go through the gate"
@@ -52,7 +52,9 @@ def test_a_failing_node_test_is_named(monkeypatch, tmp_path):
         stderr = ""
 
     monkeypatch.setattr(export_gate.subprocess, "run", lambda *a, **k: Done())
-    assert export_gate.run_node_tests(tmp_path, "node") == ["the flag has a bit of its own"]
+    got = export_gate.run_node_tests(tmp_path, "node")
+    assert len(got) == 1 and got[0].startswith("FAIL ") and "a node test is red: the flag has a bit of its own" in got[0], got
+    assert "Fix: " in got[0] and "Rule: docs/decisions/series-01-export-is-the-only-writer.md" in got[0]
 
 
 def test_a_tree_that_is_not_whole_is_refused(monkeypatch, tmp_path):

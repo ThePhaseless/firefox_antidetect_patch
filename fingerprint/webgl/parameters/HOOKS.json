@@ -9,34 +9,6 @@
  },
  {
   "file": "dom/canvas/ClientWebGLContext.cpp",
-  "function": "",
-  "kind": "add",
-  "form": "registration",
-  "line": "#include \"StealthWebGLReadback.h\"  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
-  "test": "wrapper:tests/test_webgl_noise_active.py::test_readpixels_of_a_partial_rectangle_projects_only_what_was_written"
- },
- {
-  "file": "dom/canvas/ClientWebGLContext.cpp",
-  "function": "UniquePtr<uint8_t[]> ClientWebGLContext::GetImageBuffer(",
-  "kind": "add",
-  "form": "anchor",
-  "line": "  StealthWebGLProjectReaderSnapshot(*this, snapshot, any);  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
-  "test": "wrapper:tests/test_canvas_reads_as_drawn.py::test_a_non_premultiplied_webgl_canvas_reads_the_same_through_todataurl_and_toblob",
-  "anchor": "Mozilla's `if (!snapshot) return ...;` after `RefPtr<gfx::SourceSurface> snapshot = GetSurfaceSnapshot(&any);`",
-  "why": "replaces the surface Mozilla just obtained by the noise-projected one before Mozilla reads its data; `snapshot` is a local and `any` (the alpha type) is an out-parameter that the same GetSurfaceSnapshot call fills, so the initializer cannot be wrapped without passing `any`"
- },
- {
-  "file": "dom/canvas/ClientWebGLContext.cpp",
-  "function": "ClientWebGLContext::GetInputStream(",
-  "kind": "add",
-  "form": "anchor",
-  "line": "  StealthWebGLProjectReaderSnapshot(*this, snapshot, any);  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
-  "test": "wrapper:tests/test_canvas_reads_as_drawn.py::test_a_non_premultiplied_webgl_canvas_reads_the_same_through_todataurl_and_toblob",
-  "anchor": "Mozilla's `if (!snapshot) return ...;` after `RefPtr<gfx::SourceSurface> snapshot = GetSurfaceSnapshot(&any);`",
-  "why": "replaces the surface Mozilla just obtained by the noise-projected one before Mozilla reads its data; `snapshot` is a local and `any` (the alpha type) is an out-parameter that the same GetSurfaceSnapshot call fills, so the initializer cannot be wrapped without passing `any`"
- },
- {
-  "file": "dom/canvas/ClientWebGLContext.cpp",
   "function": "void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,",
   "kind": "add",
   "form": "guard",
@@ -62,44 +34,6 @@
   "test": "wrapper:tests/test_webgl_declared_parameters_e2e.py::test_declared_shader_precision_replaces_the_hosts_and_a_bad_pair_still_errors",
   "anchor": "the lost-context check `if (!notLost) { return nullptr; }` of ClientWebGLContext::GetShaderPrecisionFormat",
   "why": "G49: the baseline hook answered before Mozilla reads the precisions the host reported (`*notLost->info.shaderPrecisions`); a wrap of MaybeFind would read them and then replace; the guard must sit before that read, after the lost check"
- },
- {
-  "file": "dom/canvas/ClientWebGLContext.cpp",
-  "function": "void ClientWebGLContext::ReadPixels(GLint x, GLint y, GLsizei width,",
-  "kind": "add",
-  "form": "anchor",
-  "line": "  StealthWebGLReadback::ProjectReadPixelsPbo(*this, desc, offset);  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
-  "test": "wrapper:tests/test_webgl_noise_active.py::test_readpixels_into_a_pixel_pack_buffer_reads_as_into_an_array",
-  "anchor": "Run<RPROC(ReadPixelsPbo)>(desc, static_cast<uint64_t>(offset));",
-  "why": "G30: it needs the read to have been sent and `desc`, which Mozilla builds from the validated parameters and the pack state; a post-step of a wrapper would run after the validation returns and would have to validate again; it is the last line of the function, the one exception of rule 5"
- },
- {
-  "file": "dom/canvas/ClientWebGLContext.cpp",
-  "function": "void ClientWebGLContext::ReadPixels(GLint x, GLint y, GLsizei width,",
-  "kind": "rewrite",
-  "form": "wrap-call",
-  "line": "    bool succeeded = StealthDoReadPixels(this, desc, *range);  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
-  "removed": "    bool succeeded = DoReadPixels(desc, *range);",
-  "test": "wrapper:tests/test_webgl_noise_active.py::test_readpixels_of_a_partial_rectangle_projects_only_what_was_written"
- },
- {
-  "file": "dom/canvas/ClientWebGLContext.cpp",
-  "function": "bool ClientWebGLContext::DoReadPixels(const webgl::ReadPixelsDesc& desc,",
-  "kind": "add",
-  "form": "anchor",
-  "line": "  StealthWebGLReadback::NoteReadPixels(*this, subrect, byteStride);  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
-  "test": "wrapper:tests/test_webgl_noise_active.py::test_readpixels_of_a_partial_rectangle_projects_only_what_was_written",
-  "anchor": "the loop `for (const auto i : IntegerRange(subrect.height))` that copies the rows into the destination",
-  "why": "G5: subrect and byteStride are locals of Mozilla's body that the projection needs after the call returns; they go into the private field mStealthReadPixelsResult, and the signature of DoReadPixels is Mozilla's again; no zeroing before the call is needed on the readPixels(array) road: the field is written at the only `return true` and taken only after a success, on the same thread, with no event-loop turn in between"
- },
- {
-  "file": "dom/canvas/ClientWebGLContext.cpp",
-  "function": "ClientWebGLContext::DoReadPixelsAsync() {",
-  "kind": "rewrite",
-  "form": "wrap-expression",
-  "line": "        promise->Resolve(StealthWebGLProjectAsyncSnapshot(*self, std::move(sourceSurface)), __func__);  // STEALTH-HOOK(fingerprint/canvas/noise-projection)",
-  "removed": "        promise->Resolve(std::move(sourceSurface), __func__);",
-  "test": "wrapper:tests/test_webgl_noise_active.py::test_a_capturestream_frame_reads_as_todataurl"
  },
  {
   "file": "dom/canvas/WebGLContextExtensions.cpp",
@@ -242,11 +176,11 @@
   "test": "gtest:StealthWebGLParams.DeclaredShaderPrecisionObjectIsHeldByItsReferences"
  },
  {
-  "file": "dom/canvas/gtest/moz.build",
+  "file": "dom/canvas/moz.build",
   "function": "UNIFIED_SOURCES += [",
   "kind": "add",
   "form": "registration",
-  "line": "UNIFIED_SOURCES += [\"TestStealthCanvasPageSnapshot.cpp\"]  # STEALTH-HOOK(fingerprint/canvas/text-metrics)",
-  "test": "gtest:StealthCanvasPageSnapshot.TheSnapshotOfTheContextIsNotTakenWhenItHasAnElement"
+  "line": "UNIFIED_SOURCES += [\"StealthWebGLParams.cpp\"]  # STEALTH-HOOK(fingerprint/webgl/parameters)",
+  "test": "wrapper:tests/test_a_declared_webgl_extension_survives_its_use_e2e.py::test_every_declared_extension_can_be_called_and_the_page_still_answers"
  }
 ]

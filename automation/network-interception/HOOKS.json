@@ -56,5 +56,13 @@
   "form": "member",
   "line": "  bool mInterceptAfterServiceWorkerResets{false};  // STEALTH-HOOK(automation/network-interception)",
   "test": "wrapper:tests/test_service_worker_controller_e2e.py::test_a_reloaded_page_is_controlled_by_its_service_worker"
+ },
+ {
+  "file": "netwerk/protocol/http/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"StealthInterception.cpp\"]  # STEALTH-HOOK(automation/network-interception)",
+  "test": "gtest:StealthHttp3Socks.ProxyAllowsHttp3"
  }
 ]

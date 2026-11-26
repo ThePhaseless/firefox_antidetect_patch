@@ -16,6 +16,17 @@
   "toolkit/components/geolocation/test/gtest/TestStealthGeolocation.cpp": "100644",
   "toolkit/components/geolocation/test/gtest/moz.build": "100644"
  },
+ "sha256": {
+  "juggler/tests/geolocation_network_url_is_empty_by_default.test.mjs": "88ad714fa8c339bcebabfe5f2a1e4b48febeae28cc0dcb8af2448de4f466ed61",
+  "juggler/tests/geolocation_no_wifi_scan.test.mjs": "70426cb845553683a64d837612697c367e86aa107d7ffa5e64eb397b0c6ad641",
+  "juggler/tests/geolocation_override_timestamp_is_delivery_time.test.mjs": "ebaf5945afd02f69bf8411d58835547a39e777f419943702e43366e9466353d4",
+  "juggler/tests/geolocation_system_switch_declared_on.test.mjs": "56c55a521153b2d86802a428af74b67dc4bf3baa10371b39ba58c3f3cb030aaa",
+  "juggler/tests/geolocation_windows_provider_never_selected.test.mjs": "4de78f6f2c112c2ccf383de04d0d372ef09a7c5d057cdfa980222b387d340477",
+  "toolkit/components/geolocation/StealthGeolocation.cpp": "ef0e44339e10ea6a18c0ed91b5d414cf39f1fb0ee1279ca14d576cfb94830f41",
+  "toolkit/components/geolocation/StealthGeolocation.h": "a060dd04c245fc06d8bfd79309953f0ee2e3dcd55c3fa421b8989f1c80ff4616",
+  "toolkit/components/geolocation/test/gtest/TestStealthGeolocation.cpp": "c5c8b299252ca8c21ea4d6179c278b46fdeb59a79cce99ae6e48986cc5ca3a48",
+  "toolkit/components/geolocation/test/gtest/moz.build": "693aa4218a0b97dfa8ad00bdeb9501aaf9d6b545325f526ab28c3b2d619ec50d"
+ },
  "inventory": [
   {
    "file": "dom/geolocation/GeolocationSystemWin.cpp",
@@ -31,11 +42,6 @@
    "inline_logic_lines": 3,
    "hookable": "already-hook",
    "anchor": "GeolocationSystemWin: GetGeolocationPermissionBehavior",
-   "evidence": [
-    "+#include \"mozilla/StealthGeolocation.h\"  // STEALTH-HOOK(fingerprint/geolocation/no-host-provider)",
-    "+  // STEALTH-HOOK(fingerprint/geolocation/no-host-provider): the OS location switch is declared on; the OS is not asked.",
-    "+  if (StealthSystemLocationDeclaredOn()) {"
-   ],
    "notes": "The OS location switch is declared on and never read (StealthSystemLocationDeclaredOn): an early return before the AppCapability read.",
    "verifier": {
     "changed": [],
@@ -56,11 +62,6 @@
    "inline_logic_lines": 3,
    "hookable": "already-hook",
    "anchor": "PermissionObserver: the geolocation permission monitor",
-   "evidence": [
-    "+#include \"mozilla/StealthGeolocation.h\"  // STEALTH-HOOK(fingerprint/geolocation/no-host-provider)",
-    "+  if (aName == PermissionName::Geolocation &&",
-    "+      StealthSystemLocationDeclaredOn()) {  // STEALTH-HOOK(fingerprint/geolocation/no-host-provider): declared on, never changes"
-   ],
    "notes": "The permission monitor of the OS is never started for geolocation: a condition and an include; the rule lives in StealthGeolocation.",
    "verifier": {
     "changed": [],
@@ -81,11 +82,6 @@
    "inline_logic_lines": 3,
    "hookable": "movable",
    "anchor": "GeolocationService::Init",
-   "evidence": [
-    "+#include \"mozilla/StealthGeolocation.h\"  // STEALTH-HOOK(fingerprint/geolocation/no-host-provider)",
-    "+  // STEALTH-HOOK(fingerprint/geolocation/no-host-provider): the provider is the network one, never a host one.",
-    "+  if (StealthSelectGeolocationProvider(mProvider)) {"
-   ],
    "notes": "No host location provider is created: an early return with a call to our file; the Windows block stays intact beside it.",
    "verifier": {
     "changed": [],
@@ -106,11 +102,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "moz.build after the closing bracket",
-   "evidence": [
-    "+EXPORTS.mozilla += [\"StealthGeolocation.h\"]  # STEALTH-HOOK(fingerprint/geolocation/no-host-provider)",
-    "+UNIFIED_SOURCES += [\"StealthGeolocation.cpp\"]  # STEALTH-HOOK(fingerprint/geolocation/no-host-provider)",
-    "+TEST_DIRS += [\"test/gtest\"]  # STEALTH-HOOK(fingerprint/geolocation/no-host-provider)"
-   ],
    "notes": "Compiles StealthGeolocation.cpp and registers the gtest directory.",
    "verifier": {
     "changed": [],

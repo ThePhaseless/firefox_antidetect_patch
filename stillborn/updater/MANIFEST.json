@@ -9,6 +9,10 @@
   "juggler/tests/updater_refuses_what_follows_the_check.test.mjs": "100644",
   "toolkit/mozapps/update/StealthUpdate.sys.mjs": "100644"
  },
+ "sha256": {
+  "juggler/tests/updater_refuses_what_follows_the_check.test.mjs": "5d65082127c3cbc549939ebbbd3c3374e4b9437a30a33a5f616896f3d1261b5a",
+  "toolkit/mozapps/update/StealthUpdate.sys.mjs": "4c81ae0bb8b2f44d9016b1a60d643c5a09edd6544e86e1e82234373c64e2f7b1"
+ },
  "inventory": [
   {
    "file": "browser/branding/unofficial/pref/firefox-branding.js",
@@ -28,7 +32,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "app.update.interval, promptWaitTime, url.manual, url.details, checkInstallTime.days, badgeWaitTime lines",
-   "evidence": [],
    "notes": "The unofficial branding we build with carries Nightly-like update timings; each line holds the official branding's release value, so the update check runs on the retail's cadence (no extra check at startup for a build older than 2 days).",
    "verifier": {
     "changed": [],
@@ -46,7 +49,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "module imports; BackgroundUpdate._registerBackgroundUpdateTask head",
-   "evidence": [],
    "notes": "The import and refusesHostTask(): Mozilla's checks and the prefs it records run as written, only the Windows scheduled task is not created.",
    "verifier": {
     "changed": [],
@@ -64,7 +66,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "module imports; CheckerService #updateCheck after #parseUpdates; UpdateService #downloadUpdate head",
-   "evidence": [],
    "notes": "Three hooks: the import of our StealthUpdate.sys.mjs, StealthNoneOffered() right after Mozilla parses the server's answer (every consumer then takes the no-update path), refusesDownload() at the one door of every download (backstop).",
    "verifier": {
     "changed": [],
@@ -82,7 +83,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "after EXTRA_JS_MODULES list",
-   "evidence": [],
    "notes": "Hook registering our StealthUpdate.sys.mjs.",
    "verifier": {
     "changed": [],

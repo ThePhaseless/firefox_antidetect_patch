@@ -4,5 +4,9 @@
   "browser/config/stealth_playwright_range.txt": "100644",
   "browser/config/upstream_source.txt": "100644"
  },
+ "sha256": {
+  "browser/config/stealth_playwright_range.txt": "49af6e7de65bef8fca260ba8da53dd9db1d992bfeb818369fb96fadd51160350",
+  "browser/config/upstream_source.txt": "44f1d7b192ca8de05bcd6072f26e714a27093f1c1df19db8d19088ca516ac4d0"
+ },
  "inventory": []
 }

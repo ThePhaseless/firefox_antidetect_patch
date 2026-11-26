@@ -2,6 +2,8 @@
 
 For whoever does the next move, an engineer or an LLM agent. No script does it: each conflict is a decision about what Mozilla changed and where our line belongs now. This file gives the order of work, the commands, and what each kind of break means.
 
+Start with `python tools/engine.py` (no argument): it prints the state of the series, every command with one line, and `next:`, the command to run now. Every command that stops ends with `next: <the exact command>`.
+
 `OLD` is `mozilla_tag` in `UPSTREAM.json`, `NEW` the target tag (the commands below read them as shell variables, `OLD=FIREFOX_...`). `<source>` is the source repository (`--source`, or the environment variable `FIREFOX_SOURCE`). Commands run in the root of this repository. `<R>` is the number of the engine release: the last published `firefox-<R-1>` plus one. It counts our releases, not Firefox versions.
 
 Rules behind it: [port-01](decisions/port-01-one-run.md), [port-02](decisions/port-02-stable-retail-of-the-target.md), [port-03](decisions/port-03-births-ledger.md), [hook-02](decisions/hook-02-shape-and-contract.md), [backport-01](decisions/backport-01-upstream-code-as-is.md), [port-04](decisions/port-04-backport-as-commits.md), [port-07](decisions/port-07-quiet-anchors.md), [series-02](decisions/series-02-every-folder-states-its-relation-to-mozilla.md), [ci-01](decisions/ci-01-builds-from-main-or-latitude-branches.md). The hook forms are in [STRUCTURE.md](STRUCTURE.md).
@@ -49,7 +51,8 @@ python tools/engine.py port --to $NEW --source <source>
 - It prints `CONFLICT <folder>: <files>` per conflict and a total: `N folders moved from OLD to NEW, N clean, N with conflicts (N files)`.
 - A backport of a Mozilla commit whose change the tag already holds is printed as `FAIL <folder>: the tag NEW already contains the backport of <file> (commit <sha>): take the backport out of the series`. Take it out in step 4.
 - Before it merges anything it stops, with a non-zero exit, when a folder's `FOLDER.json` has a `fixed_in` at or before `NEW`: Mozilla ships that fix, so the folder goes or moves. The message names each folder and ends with the command to run again. Review each one first (its `upstream` is the bug): drop the folder (remove its change on the source branch; `export` removes the folder with its `FOLDER.json`) or rebase it onto Mozilla's fix and change or delete its `fixed_in`; then run `port` again.
-- It ends with the births of the new tag against `tools/birth-ledger.json` (step 7). Exit code 1 for a conflict, a backport already in the tag, or a red birth scan.
+- It writes `mozilla_tag` (`NEW`) and `source_branch` (the branch it made) in `UPSTREAM.json` itself, once the branch exists, whether or not there are conflicts: it knows both, so no step types them. `export` writes `exported_from` and `exported_tree`. A port run again after this finds `NEW` as `mozilla_tag` and stops: name the old tag with `--base <OLD>` and pass `--force` to rebuild the branch.
+- It ends with the births of the new tag against `tools/birth-ledger.json` (step 7). Exit code 1 for a conflict, a backport already in the tag, or a red birth scan; it then ends with `next:` (the export, once the branch is resolved).
 
 ## 4. Resolve, on `port/<NEW>`
 
@@ -82,11 +85,11 @@ Never grow a hook to make it fit: the extra lines go into the folder's own files
 
 ## 5. Export and prove
 
-In `UPSTREAM.json`, by hand: `mozilla_tag` to `NEW`, `source_branch` to the branch of step 4. Do this first: `export` takes the tag as its base and refuses a head that does not descend from it. Then:
+`UPSTREAM.json` already says `NEW` and the branch of step 3: `port` wrote them, and `export` takes the tag as its base and refuses a head that does not descend from it. Then:
 
 ```
-python tools/engine.py export --source <source> --head port/$NEW
-python tools/engine.py verify --source <source> --head port/$NEW
+python tools/engine.py export --source <source>
+python tools/engine.py verify --source <source>
 python tools/churn.py --source <source> --write
 python tools/engine.py range-diff --source <tags-repo> --old-series origin/main --fetch --write
 python tools/engine.py hook-debt
@@ -100,7 +103,7 @@ python -m pytest -q tools/tests
 - `range-diff --write` writes `ports/range-diff.txt`, the one file that says what the port did to every folder: `git range-diff` of main's layers on main's tag against this series' layers on `NEW`, its first line `OLD..NEW`. Run it after `export` (each series must give the tree its `UPSTREAM.json` declares). `<tags-repo>` is a directory of its own that `--fetch` makes a partial clone of Mozilla's repository in (the two tags one commit deep, and the content of the files the two series patch: tens of megabytes, no tree), or `<source>` when it already has both tags (then without `--fetch`). Read it before the pull request: a `!` is a layer whose patch changed (the diff of the patches is under it), `<` and `>` a layer that went or came. CI regenerates it on a port pull request (job `range-diff`) and is red when it is missing, stale or for another pair of tags.
 - `churn.py --write` recomputes `tools/churn.json` for `mozilla_tag` (now `NEW`): the churn of every hunk of the new series over the 8 releases before it, and the commit of each of the 9 tags. `<source>` needs the 9 tags (`FIREFOX_<N-8>_0_RELEASE` to `NEW`); a missing one is named with the `git fetch --depth 1` that adds it, and a tag that is not the commit already recorded for it is refused. Commit the file. Then place every moved hook at the quietest anchor its form allows, `churn.py --write` again, and read the band: a hunk in it (`BAND_MIN_CHURN`) needs `quiet_anchor_why` in its `HOOKS.json` entry ([port-07](decisions/port-07-quiet-anchors.md)). Expect every `deferred` reason of the old port to be red (rule C18, `check`): move the hook there, or replace it with an `only-place` reason.
 - A hook whose text changed lost its hand fields. `check` asks for them: fill `test` (and `anchor` and `why` for an anchor) in the `HOOKS.json` of the folder, and the `Test:` line of its `FEATURE.md`. `python tools/engine.py hooks-list` rewrites every `HOOKS.json` from the `hooks.patch` files alone.
-- `tools/inventory.json` records, for each Mozilla file, how many lines of ours it has, how many of Mozilla's it removes and how many hunks. `check` names each record that differs from the new `hooks.patch`: rewrite the numbers by hand.
+- `tools/inventory.json` records, for each Mozilla file, how many lines of ours it has, how many of Mozilla's it removes and how many hunks. `export` writes the numbers of every record from the new `hooks.patch`; `check` refuses a record that differs and names `export`.
 - `hook-debt` drops the entries that are resolved and never adds one; a violation that is not in `tools/hook-debt.json` is a failure. `shrink-budget` lowers the budgets to what the patches carry. A budget above `origin/main`'s needs a row in `tools/hook-budget-raises.json`: you do not raise one in a move.
 - `check --against <NEW>` also tries each backport of a Mozilla commit against the tag and fails if the tag has it, and replays the commits of each vendored backport on the revision the tag vendors and fails if the folder's vendored part (`hooks.patch`, checksum lines, new files in `src/`) is not that replay. `check` reads `origin/main` for the budgets and fetches it once if it is missing.
 
@@ -110,7 +113,7 @@ python -m pytest -q tools/tests
 python tools/prebuild.py --source <source> --head port/$NEW
 ```
 
-It answers in seconds, from git objects, with no checkout and no compiler, what a failed build says an hour later. `--tag` defaults to `mozilla_tag`, so run it after step 5. One line per problem: `FAIL <where>: <what>; <how to fix>`, or `WARN <where>: cannot tell: <what>` where the text does not decide (a WARN does not change the exit code). Exit code 1 if any FAIL.
+It answers in seconds, from git objects, with no checkout and no compiler, what a failed build says an hour later. `--tag` defaults to `mozilla_tag`, so run it after step 5. One line per problem: `FAIL <where>: <what>; <how to fix>`, or `WARN <where>: cannot tell: <what>` where the text does not decide, or `NOTE <where>: cannot tell: <what>` where checks 10 and 11 cannot see a case (neither changes the exit code). Exit code 1 if any FAIL.
 
 | Check | What it proves |
 |---|---|
@@ -119,6 +122,9 @@ It answers in seconds, from git objects, with no checkout and no compiler, what 
 | 3 Mozilla tokens | The Mozilla lines the series rewrites or removes are the ones the recorded forms allow |
 | 6 our files | Every source of ours is compiled or shipped by a build file; no two share a name. `--tree <full checkout>` also runs that tree's build-file check |
 | 7 gtest filter | Every gtest suite of ours is in the default `gtest_filter` of `release.yml` |
+| 9 binding headers | Every `mozilla/dom/<X>Binding.h` that a file of ours or a hook line includes is generated by a `.webidl` file of the tree; the fix names the header of the webidl that declares the interface |
+| 10 this from a const member | A hook line inside a const member function does not pass `this` to a function of ours whose parameter is a non-const pointer or reference; a case the text does not show is a NOTE naming the hook |
+| 11 refcounted on the stack | A file or test of ours does not build a refcounted class (`NS_INLINE_DECL_REFCOUNTING`, `NS_DECL_ISUPPORTS`, a private or protected destructor) on the stack: `RefPtr<T> x = new T(...)` or `MakeRefPtr<T>(...)` |
 
 Checks 4, 5 and 8 (`--base`) compare the head with a branch on the same tag, the form of a rework between two exports. Across two tags they would list everything Mozilla changed, so leave `--base` out. Fix a FAIL in our own files; the hook stays one line.
 
@@ -138,7 +144,7 @@ python tools/births.py --repo <source> --rev port/$NEW
 | `GONE` | A ledger entry with no site | `--prune` |
 | `INVALID` | An entry that breaks the grammar, or a `hooked` verdict whose hook is gone | Fix the entry or restore the hook |
 
-Set `tag` in the ledger to `NEW`. Exit 0 is clean, 1 is a problem, 2 means only open items (`fix`) remain. `port` ran it on a branch that still had conflict markers, so run it now.
+The `tag` of the ledger is derived by `births.py` from `mozilla_tag` of `UPSTREAM.json`; no step types it. Exit 0 is clean, 1 is a problem, 2 means only open items (`fix`) remain. `port` ran it on a branch that still had conflict markers, so run it now.
 
 `checks.yml` runs `births.py` (job `rebuilds`) on pull requests, on pushes to `main` and on every candidate. The ledger must be green before the series pull request is opened, or the pull request is red.
 
@@ -186,7 +192,6 @@ The series is the retail of the new version. Each of these is a value measured o
 | Popup position | `fingerprint/screen-window/popup-position/FEATURE.md` | `screenX` and `screenY` of a popup opened with no position, at three display scales |
 | Window frame | `fingerprint/screen-window/geometry/FEATURE.md` (the frame is declared by the core) | `outerWidth - innerWidth` and the content origin of a popup and of a maximized window on the retail |
 | Media decode and encode answers, WebRTC codecs, system colours | the core's data | `decodingInfo` for the codecs the core declares, and the system colour keywords, on the retail |
-| `tag` of the birth ledger | `tools/birth-ledger.json` | Set by hand (step 7) |
 
 ## 11. Full candidate, release, merge
 

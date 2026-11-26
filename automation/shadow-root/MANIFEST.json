@@ -7,6 +7,9 @@
  "added": {
   "dom/base/StealthShadowRoot.h": "100644"
  },
+ "sha256": {
+  "dom/base/StealthShadowRoot.h": "d71a4d0810cf65318f19b8efe50019146e0d4ed21504b1ae942c1c8b13fc9307"
+ },
  "inventory": [
   {
    "file": "dom/base/Element.cpp",
@@ -21,11 +24,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "Element::GetShadowRootForBindings",
-   "evidence": [
-    "-ShadowRoot* Element::GetShadowRootForBindings() const {",
-    "+  if (!BasePrincipal::Cast(aSubject).Is<ExpandedPrincipal>()) {",
-    "+  if (shadowRoot->IsUAWidget()) {"
-   ],
    "notes": "Hook (4 lines): GetShadowRootForBindings takes the subject principal and, for a null or closed root, returns StealthClosedShadowRootForBindings (dom/base/StealthShadowRoot.h, inline): content gets null as upstream; the automation sandbox (ExpandedPrincipal) gets an author closed root when the engine is active (zoom.stealth.fpp.hw_seed), never a UA widget.",
    "verifier": {
     "changed": [
@@ -45,10 +43,6 @@
    "inline_logic_lines": 1,
    "hookable": "already-hook",
    "anchor": "Element::GetShadowRootForBindings (declaration)",
-   "evidence": [
-    "-  ShadowRoot* GetShadowRootForBindings() const;",
-    "+  ShadowRoot* GetShadowRootForBindings(nsIPrincipal& aSubject) const;"
-   ],
    "notes": "Declaration only. Caller is the generated binding: dom/webidl/Element.webidl:298 declares shadowRoot with [NeedsSubjectPrincipal, BinaryName=\"shadowRootForBindings\"], so the generated code passes the subject principal (earlier doubt refuted, the build does not break).",
    "verifier": {
     "changed": [
@@ -68,10 +62,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "partial interface Element, readonly attribute shadowRoot",
-   "evidence": [
-    "-  [BinaryName=\"shadowRootForBindings\"]",
-    "+  [NeedsSubjectPrincipal, BinaryName=\"shadowRootForBindings\"]"
-   ],
    "notes": "Adds NeedsSubjectPrincipal so the native getter receives the caller's principal. [verified: Element.h:1800 and Element.cpp:1410-1480: content callers get null for closed roots (a non-ExpandedPrincipal returns nullptr), UA widgets are refused, and only the sandbox/automation principal gets the closed root, gated by mozilla::gfx::StealthEngineActive().] The page-visible answer is unchanged by design. Changing the annotation regenerates bindings. The native-side logic lives in Element.cpp (not in this group).",
    "verifier": {
     "changed": [

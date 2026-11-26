@@ -1,5 +1,4 @@
 {
- "tag": "FIREFOX_159_0_RELEASE",
  "scanner": 1,
  "chrome_js_http": {"browser/actors": 7, "browser/base": 7, "browser/components": 68, "browser/extensions": 2, "dom/imptests": 1, "dom/manifest": 3, "dom/media": 1, "dom/system": 1, "dom/webauthn": 1, "intl/icu_capi": 1, "netwerk/protocol": 1, "security/manager": 1, "services/automation": 1, "services/common": 5, "services/settings": 15, "services/sync": 7, "taskcluster/docker": 3, "toolkit/actors": 3, "toolkit/components": 110, "toolkit/content": 3, "toolkit/crashreporter": 3, "toolkit/modules": 8, "toolkit/mozapps": 10, "toolkit/themes": 1},
  "entries": [

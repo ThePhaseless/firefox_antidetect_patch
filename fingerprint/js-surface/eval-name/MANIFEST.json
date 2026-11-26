@@ -3,6 +3,7 @@
   "js/src/debugger/Frame.cpp"
  ],
  "added": {},
+ "sha256": {},
  "inventory": [
   {
    "file": "js/src/debugger/Frame.cpp",
@@ -15,10 +16,6 @@
    "inline_logic_lines": 2,
    "hookable": "already-hook",
    "anchor": "EvaluateInEnv",
-   "evidence": [
-    "-      evalOptions.filename() ? evalOptions.filename() : \"debugger eval code\";",
-    "+      .setIntroductionType(\"eval\")"
-   ],
    "notes": "Changes the default filename and introduction type of debugger-evaluated code, which a page can read through Error.stack and script introduction data. A filename given by the caller still wins. A grep of js/src/debugger finds no other 'debugger eval' string literal; the other hits are comments.",
    "verifier": {
     "changed": [],

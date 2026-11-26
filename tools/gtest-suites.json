@@ -1,0 +1,312 @@
+[
+ {
+  "suite": "Intl_Locale_StealthSystemLocales",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthAudioNoise",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthBranding",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthBundleHooks",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthBundledCollection",
+  "windows_only": true,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthCallerObject",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthCanvasPageSnapshot",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthCanvasProjection",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthCanvasUtils",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthDebugger",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthDeclaredNetwork",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthDocumentLanguage",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthDragGesture",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthFcBundleFonts",
+  "windows_only": false,
+  "linux_only": true
+ },
+ {
+  "suite": "StealthFcFontList",
+  "windows_only": false,
+  "linux_only": true
+ },
+ {
+  "suite": "StealthFontList",
+  "windows_only": true,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthFontListHooks",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthFontMetrics",
+  "windows_only": false,
+  "linux_only": true
+ },
+ {
+  "suite": "StealthFullscreen",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthGLMultisample",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthGfxFeatureStatus",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthGlyphCoverage",
+  "windows_only": false,
+  "linux_only": true
+ },
+ {
+  "suite": "StealthHttp3Socks",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthIceResolverContext",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthInputEventBirth",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthJugglerCoalesce",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthJugglerMouseAck",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthKeyBirthScope",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthMediaDeclaration",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthMediaEnumeration",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthMouseEventCopy",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthMouseEventIPC",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthNrSocketBirth",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthNsProxyInfoKinds",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthOwnBinaries",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthPcProxyConfig",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthPcUdpProxyKinds",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthPrefSanitize",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthQuotaEstimate",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthSessionUdpProxy",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthSocksUdpLayer",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthStackFrames",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthStartupCache",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthSurfaceFlags",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthTcpProxyRoad",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthTextQuality",
+  "windows_only": true,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthTimezone",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthUdpProxyBirth",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthWebGLParams",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthWebGPUAdapter",
+  "windows_only": true,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthWebGPUBundledVulkan",
+  "windows_only": false,
+  "linux_only": true
+ },
+ {
+  "suite": "StealthWebGPUDeclaration",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthWebGPUExternalTexture",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthWebGPUInstanceEnv",
+  "windows_only": true,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthWindowGeometry",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "StealthWindowInputDesktop",
+  "windows_only": true,
+  "linux_only": false
+ },
+ {
+  "suite": "TestStealthLinkClickAfter",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "TestStealthLoadInfo",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "TestStealthLookupLoadInfo",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "TestStealthSessionResolver",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "TestStealthSocksCredentials",
+  "windows_only": false,
+  "linux_only": false
+ },
+ {
+  "suite": "TestStealthTRRContext",
+  "windows_only": false,
+  "linux_only": false
+ }
+]

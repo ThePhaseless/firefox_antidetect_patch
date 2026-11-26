@@ -8,6 +8,10 @@
   "startupcache/StealthStartupCache.h": "100644",
   "startupcache/test/TestStealthStartupCache.cpp": "100644"
  },
+ "sha256": {
+  "startupcache/StealthStartupCache.h": "26387ef24a5087a57bb8a5a8478d5f62f3414287397023148b429691ca833c2d",
+  "startupcache/test/TestStealthStartupCache.cpp": "08d5c96cdf1a378405a07051cba5dfd5bc4cacd55ac23d8c65e786c8eb3b46bf"
+ },
  "inventory": [
   {
    "file": "startupcache/StartupCache.cpp",
@@ -20,7 +24,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "StartupCache::MaybeWriteOffMainThread",
-   "evidence": [],
    "notes": "Fix of a 157 priority inversion (commit 044fdc985f): StartupCache writes no longer take nsAutoLowPriorityIO, whose THREAD_MODE_BACKGROUND_BEGIN starved the writer while it held mTableLock and so the main thread in GetBuffer() (7-27 s stalls with eleven browsers). 151 had no lowered priority here."
   },
   {
@@ -34,7 +37,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "hook added by the 2026-11 hook rework (registration of our own file)",
-   "evidence": [],
    "notes": "Hook registering our own code (minimal record added by the final-line integration).",
    "verifier": {
     "changed": [],
@@ -52,7 +54,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "hook added by the 2026-11 hook rework (registration of our own file)",
-   "evidence": [],
    "notes": "Hook registering our own code (minimal record added by the final-line integration).",
    "verifier": {
     "changed": [],

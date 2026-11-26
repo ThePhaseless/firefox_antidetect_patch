@@ -1,18 +1,24 @@
 """The engine as a patch series: export it from a Firefox tree, rebuild a tree from it.
 
+    python tools/engine.py           the front door (also --help): the state of the series, every command, and "next:", the command to run now
+
+Every command that stops (non-zero exit) ends with `next: <the exact command to run>`.
+
     python tools/engine.py status    did the source move since the last export?
     python tools/engine.py export    write the series from the source tree
     python tools/engine.py verify    rebuild the tree from the series, compare
     python tools/engine.py check     the series' own rules, offline (also in CI)
     python tools/engine.py hooks-list   write every folder's HOOKS.json from its hooks.patch (the export does it too)
+    python tools/engine.py gtest-list [--write]   tools/gtest-suites.json: the gtest suites the hooks name (the export writes it too)
     python tools/engine.py hook-debt    drop the entries of tools/hook-debt.json that no longer occur
                                         (--init writes the list from scratch, --summary only counts it)
     python tools/engine.py apply --head <branch>   the series as a branch: tag + one commit per folder
     python tools/engine.py materialize --into <dir> CI: fetch the tag, apply, check out the tree
     python tools/engine.py drift --to <tag>   our patched Mozilla files that Mozilla changed
     python tools/engine.py port --to <tag>    every folder merged three-way onto the new tag,
-                                              all conflicts in one run, branch port/<tag>, then the
-                                              birth points of the new tag against the ledger
+                                              all conflicts in one run, branch port/<tag>, UPSTREAM.json
+                                              written (mozilla_tag, source_branch), then the birth points
+                                              of the new tag against the ledger
     python tools/engine.py prebuild --head <branch> [--base <branch>]   what a failed build would tell an hour later, from git objects,
                                               in seconds (tools/prebuild.py)
     python tools/engine.py births --tree <dir>   every place the tree makes a network request, against
@@ -21,20 +27,26 @@
                                               the layers of the old series on its tag against the new series on its
                                               tag, in ports/range-diff.txt, on a partial clone (tools/range_diff.py)
 
-The Mozilla tag, the source branch and the commit last exported are in UPSTREAM.json;
---base / --head override them. The source repository has no default: the commands that read
+The Mozilla tag, the source branch and the commit last exported are in UPSTREAM.json: `port` writes
+mozilla_tag and source_branch (the tag it moved to, the branch it made), `export` writes exported_from
+and exported_tree; nobody types them. --base / --head override them. The source repository has no default: the commands that read
 it (status, apply, export, verify, drift, port, check --against) take --source <path> or the
 environment variable FIREFOX_SOURCE, and stop with a message when neither is given.
 
 export   writes one folder per feature (tools/layout.py says which):
            hooks.patch    our changes to Mozilla's files, as a git diff against the tag
            src/<path>     the files we add to the tree, byte for byte
-           MANIFEST.json  what the folder owns (regenerated on every export)
+           MANIFEST.json  what the folder owns (regenerated on every export): `modified`, `added` (path -> mode), `sha256` (path -> the
+                          hash of the file under src/), `inventory` (the records of the modified files)
            FEATURE.md     the feature's description, created once and then edited by hand
            HOOKS.json     the folder's hooks, one entry per hook (tools/hooks_list.py); the hand fields
                           (test, anchor, why) of the committed file are kept
          SERIES, the order the folders are applied in, and UPSTREAM.json's
          "exported_from". A folder that no longer owns anything is removed.
+         It also writes what it can compute (repo-06): the `added`, `removed` and `hunks` of every record of
+         tools/inventory.json from the hooks.patch (the hand fields stay), the entry of tools/hook-budget.json and tools/removed-budget.json
+         of a Mozilla file patched for the first time, at the counted value, and tools/gtest-suites.json. The owner of a file of ours is the
+         folder that holds it under src/; a new file that no folder holds is placed once with `--own <path>=<folder>`.
 
 verify   rebuilds the tree from the series on top of the tag, in a throwaway git index
          (no checkout of Firefox, works in a bare repository), and compares it with the
@@ -77,9 +89,10 @@ check    needs no Firefox: SERIES lists exactly the folders that exist, every fo
          record, the sha256 of every commit file and the absence of any path outside the series are checked
          offline; with --against <tag> the vendored part of hooks.patch, its checksum lines and the new files
          must equal the replay of the commits on the revision the tag vendors (tools/backport_replay.py).
-         Every STEALTH-HOOK(<folder>) tag, in a hooks.patch and in the
-         evidence of an inventory record, names a folder of SERIES, and the added, removed and hunk
-         counts of each inventory record are those of its file in the hooks.patch. A C++ file of ours has no control character (a carriage return inside a
+         Every STEALTH-HOOK(<folder>) tag in a hooks.patch names a folder of SERIES, and the added, removed and hunk
+         counts of each inventory record are those of its file in the hooks.patch (`export` writes them; a hand edit fails
+         and the message names `export`). An inventory record has no `evidence` field: the lines are the hooks.patch itself (repo-07). The MANIFEST of a folder has the sha256 of every file under its src/, and each file has those bytes.
+         tools/gtest-suites.json is what `gtest-list --write` writes. A C++ file of ours has no control character (a carriage return inside a
          string literal ended the literal and broke the build of a test) and no byte outside ASCII inside a
          string or character literal: write them as escapes. No file of ours has a carriage return: not under
          <folder>/src/ (a binary file, with a NUL byte, apart) and not in a line a hooks.patch adds to a Mozilla
@@ -93,6 +106,7 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -105,9 +119,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import backport_replay  # noqa: E402
 import births  # noqa: E402
 import folders  # noqa: E402
+import gtest_list  # noqa: E402
 import hook_contract  # noqa: E402
 import hooks_list  # noqa: E402
 import layout  # noqa: E402
+from failure import fail  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 INVENTORY = ROOT / "tools" / "inventory.json"
@@ -115,7 +131,6 @@ UPSTREAM = ROOT / "UPSTREAM.json"
 BUDGET = ROOT / "tools" / "hook-budget.json"
 REMOVED_BUDGET = ROOT / "tools" / "removed-budget.json"
 HOOK_DEBT = ROOT / "tools" / "hook-debt.json"
-REALIGN = ROOT / "tools" / "budget-realign-69.json"
 # Declared raises of a hook budget above main's (a hook that is a wanted growth, decided by the pm):
 # the register only grows, and a branch raises a budget only with the row it adds (budget_raise_problems).
 RAISES = ROOT / "tools" / "hook-budget-raises.json"
@@ -125,6 +140,40 @@ RAISES = ROOT / "tools" / "hook-budget-raises.json"
 WORKFLOWS_SERIES = ROOT / "platform" / "ci" / "src" / ".github" / "workflows"
 WORKFLOWS_ROOT = ROOT / ".github" / "workflows"
 ROOT_ONLY_WORKFLOWS = {"series.yml", "noreply-identity.yml"}
+
+# The decisions that own the checks of this file (repo-04: every failure names one).
+R_SERIES = "series-01-export-is-the-only-writer"
+R_FOLDERS = "series-02-every-folder-states-its-relation-to-mozilla"
+R_PORT = "port-01-one-run"
+R_BIRTHS = "port-03-births-ledger"
+R_VENDORED = "port-04-backport-as-commits"
+R_BACKPORT = "backport-01-upstream-code-as-is"
+R_HOOK = "hook-02-shape-and-contract"
+R_BUDGET = "hook-03-budgets-and-debt-only-go-down"
+R_ONE_FACT = "repo-07-one-fact-one-place"
+R_BUILD = "ci-01-builds-from-main-or-latitude-branches"
+
+
+
+def command(*parts: str) -> str:
+    """The exact command line a `next:` names: `python tools/engine.py <parts>`. The source repository is always written
+    `<source>` (the path is the one the reader gave with --source or FIREFOX_SOURCE)."""
+    return " ".join(["python tools/engine.py"] + [shlex.quote(p) if p and not re.fullmatch(r"[\w./:@=<>+-]+", p) else p for p in parts])
+
+
+def halt(failure, next_command: str) -> str:
+    """What a command that stops prints (repo-05): the failure, then `next: <the exact command to run>`."""
+    return "%s\nnext: %s" % (failure, next_command)
+
+
+def stop_if_not_marked(error: SystemExit, next_command: str) -> SystemExit:
+    """The SystemExit of a stop that names no next step yet gets one (a message built by a helper that does not know the command)."""
+    code = error.code
+    # Only a message that is already a failure gets the line: every SystemExit with text in these tools is raised as str(fail(...)) or
+    # halt(fail(...)), with its own rule (the scan of tools/tests/test_failure_messages.py finds any other); this adds `next:`, no message.
+    if isinstance(code, str) and "\nnext: " not in code:
+        return SystemExit("%s\nnext: %s" % (code, next_command))
+    return error
 
 
 def git(source: Path, *args: str, env=None, input_bytes=None) -> bytes:
@@ -145,9 +194,7 @@ def series_folders() -> list:
 
 
 def existing_folders() -> list:
-    return sorted(str(p.parent.relative_to(ROOT)).replace("\\", "/")
-                  for p in ROOT.glob("*/**/MANIFEST.json")
-                  if p.relative_to(ROOT).parts[0] in layout.GROUP_ORDER and "src" not in p.relative_to(ROOT).parts)
+    return layout.folders_on_disk(ROOT)
 
 
 def changed_files(source: Path, base: str, head: str):
@@ -163,20 +210,41 @@ def changed_files(source: Path, base: str, head: str):
     return result
 
 
-def owners(source: Path, base: str, head: str):
-    """folder -> {"modified": [paths], "added": [(path, mode)]}"""
+def owners(source: Path, base: str, head: str, declared: dict | None = None):
+    """folder -> {"modified": [paths], "added": [(path, mode)]}. A file of ours belongs to the folder that holds it under src/
+    (layout.own_file_folder); `declared` (`export --own`) places the files that no folder holds yet."""
     records = {r["file"]: r for r in json.loads(INVENTORY.read_text(encoding="utf-8"))}
     plan = defaultdict(lambda: {"modified": [], "added": []})
+    held = layout.src_owners(ROOT)[0]
+    unowned = []
+    again = command("export", "--source", "<source>", "--head", head)
     for status, mode, path in changed_files(source, base, head):
-        if status in ("M", "D"):   # D: a Mozilla file we delete is ours to own like any change
-            if path not in records:
-                raise SystemExit("modified file %s is not in the inventory: add its record to %s "
-                                 "(feature, category, anchor, hookable, notes)" % (path, INVENTORY.name))
-            plan[layout.feature_folder(records[path]["feature"])]["modified"].append(path)
-        elif status == "A":
-            plan[layout.own_file_folder(path)]["added"].append((path, mode))
-        else:
-            raise SystemExit("status %s for %s is not handled yet" % (status, path))
+        try:
+            if status in ("M", "D"):   # D: a Mozilla file we delete is ours to own like any change
+                if path not in records:
+                    raise SystemExit(halt(fail(
+                        "tools/inventory.json", "the modified file %s is not in the inventory" % path,
+                        "add its record to %s (feature, category, anchor, hookable, notes), then run the export again; export writes its counts" % INVENTORY.name,
+                        R_SERIES), again))
+                plan[layout.feature_folder(records[path]["feature"])]["modified"].append(path)
+            elif status == "A":
+                plan[layout.own_file_folder(path, held, declared)]["added"].append((path, mode))
+            else:
+                raise SystemExit(halt(fail(
+                    "git diff %s %s" % (base, head), "status %s for %s is not one export handles (M, D and A are)" % (status, path),
+                    "make the change on the source branch an addition, a modification or a deletion of a file, then run the export again",
+                    R_SERIES), again))
+        except KeyError as unowned_file:       # layout.py: a feature with no folder, a file of ours that no folder holds
+            if status != "A":
+                raise SystemExit(halt(unowned_file.args[0], again)) from None
+            unowned.append(path)
+    if unowned:
+        raise SystemExit(halt(fail(
+            "python tools/engine.py export", "no folder owns our new %s: %s (under no folder's src/ yet)"
+            % ("file" if len(unowned) == 1 else "files", ", ".join(unowned)),
+            "name the folder of each once with --own <path or dir/>=<folder> (a folder of SERIES, or a new one under %s); "
+            "the export writes the file under that folder's src/ and it is owned from then on" % "/".join(layout.GROUP_ORDER), R_SERIES),
+            command("export", "--source", "<source>", "--head", head, *[part for p in unowned for part in ("--own", "%s=<folder>" % p)])))
     return plan, records
 
 
@@ -185,17 +253,41 @@ def require_descends(source: Path, base: str, head: str) -> None:
     export Mozilla's own changes as ours."""
     if subprocess.run(["git", "-C", str(source), "merge-base", "--is-ancestor", base, head],
                       capture_output=True).returncode:
-        raise SystemExit("%s does not descend from %s: the series is the difference from the tag, "
-                         "so the branch must be built on it (tools/engine.py apply)" % (head, base))
+        raise SystemExit(halt(fail(
+            "%s in the source repository" % head, "%s does not descend from %s: the series is the difference from the tag" % (head, base),
+            "build the branch on the tag: `%s` makes it from the series" % command("apply", "--source", "<source>", "--head", head, "--force"),
+            R_SERIES), command("apply", "--source", "<source>", "--head", head, "--force")))
 
 
-def export(source: Path, base: str, head: str) -> None:
+def new_budgets(diffs: dict, records: dict) -> tuple:
+    """The budget entries a hooks.patch needs and the budgets do not have yet: (hook, removed), each {file: count}. A Mozilla file the series
+    patches for the first time gets its entry at the counted value (hook budget: our lines; removed budget: Mozilla's lines it loses, only
+    when there are some). A file with an entry keeps it (`shrink-budget` lowers it, a raise is a row in tools/hook-budget-raises.json),
+    and upstream code (category backport) has none."""
+    hook = json.loads(BUDGET.read_text(encoding="utf-8"))
+    removed = json.loads(REMOVED_BUDGET.read_text(encoding="utf-8"))
+    for path, diff in sorted(diffs.items()):
+        if records.get(path, {}).get("category") == "backport":
+            continue
+        if path not in hook:
+            hook[path] = diff["added"]
+        if diff["removed"] and path not in removed:
+            removed[path] = diff["removed"]
+    return dict(sorted(hook.items())), dict(sorted(removed.items()))
+
+
+def export(source: Path, base: str, head: str, declared: dict | None = None) -> None:
+    """Writes the series from the head. What a tool can write, a tool writes (repo-06): besides the folders, SERIES and UPSTREAM.json, it
+    writes the `added`, `removed` and `hunks` of every inventory record from its hooks.patch (the hand fields stay), the budget
+    entries of the Mozilla files patched for the first time, and the sha256 of every file under src/ in the folder's MANIFEST.json.
+    `declared` is `--own`: {path or dir/: folder} for the new files no folder holds yet."""
     require_descends(source, base, head)
-    plan, records = owners(source, base, head)
+    plan, records = owners(source, base, head, declared)
     series = sorted(plan, key=layout.folder_sort_key)
     for gone in sorted(set(existing_folders()) - set(series)):
         shutil.rmtree(ROOT / gone)
         print("removed %s: it owns nothing any more" % gone)
+    fresh, diffs = {}, {}
     for folder in series:
         out = ROOT / folder
         out.mkdir(parents=True, exist_ok=True)
@@ -208,21 +300,34 @@ def export(source: Path, base: str, head: str) -> None:
             patch.unlink()
         if (out / "src").exists():
             shutil.rmtree(out / "src")
+        sha256 = {}
         for path, mode in owned["added"]:
             target = out / "src" / path
             target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(git(source, "cat-file", "blob", "%s:%s" % (head, path)))
+            data = git(source, "cat-file", "blob", "%s:%s" % (head, path))
+            target.write_bytes(data)
+            sha256[path] = hashlib.sha256(data).hexdigest()
+        folder_diffs = _diffs_of(patch) if patch.exists() else {}
+        diffs.update(folder_diffs)
+        for path in owned["modified"]:
+            fresh[path] = computed_record(records[path], folder_diffs[path])
         manifest = {
             "modified": sorted(owned["modified"]),
             "added": {path: mode for path, mode in sorted(owned["added"])},
-            "inventory": [records[p] for p in sorted(owned["modified"])],
+            "sha256": dict(sorted(sha256.items())),
+            "inventory": [fresh[p] for p in sorted(owned["modified"])],
         }
         write_json(out / "MANIFEST.json", manifest)
         feature_md = out / "FEATURE.md"
         if not feature_md.exists():
             feature_md.write_text(describe(folder, manifest), encoding="utf-8", newline="\n")
+    write_json(INVENTORY, [fresh.get(r["file"], r) for r in json.loads(INVENTORY.read_text(encoding="utf-8"))])
+    hook_budget, removed_budget = new_budgets(diffs, records)
+    write_json(BUDGET, hook_budget)
+    write_json(REMOVED_BUDGET, removed_budget)
     (ROOT / "SERIES").write_text("\n".join(series) + "\n", encoding="utf-8", newline="\n")
     print(write_hooks_list())
+    print(write_gtest_list())
     sync_workflows()
     up = upstream()
     up["exported_from"] = git(source, "rev-parse", head).decode().strip()
@@ -250,15 +355,20 @@ def rebased(root: Path):
         vars(module).update({name: old[name] for name in moved})
 
 
-def export_into(root: Path, source: Path, base: str, head: str) -> None:
+def export_into(root: Path, source: Path, base: str, head: str, declared: dict | None = None) -> None:
     """`export` writing into the checkout at `root` (the scratch copy of the gate) instead of this one."""
     with rebased(root):
-        export(source, base, head)
+        export(source, base, head, declared)
 
 
 def write_hooks_list() -> str:
     """Every folder's HOOKS.json from its hooks.patch (the export and `hooks-list` both come here)."""
     return "HOOKS.json: " + hooks_list.summary_line(hooks_list.write_all(ROOT))
+
+
+def write_gtest_list() -> str:
+    """tools/gtest-suites.json from the HOOKS.json files and the sources (the export and `gtest-list --write` both come here)."""
+    return gtest_list.write(ROOT)
 
 
 def sync_workflows() -> None:
@@ -303,8 +413,10 @@ def apply(source: Path, base: str, branch: str, force: bool) -> str:
     exists = subprocess.run(["git", "-C", str(source), "rev-parse", "-q", "--verify", ref],
                             capture_output=True).returncode == 0
     if exists and not force:
-        raise SystemExit("%s already exists in %s: pass --force to rebuild it (its commits are lost "
-                         "unless exported first)" % (branch, source))
+        raise SystemExit(halt(fail(
+            "branch %s in %s" % (branch, source), "%s already exists" % branch,
+            "pass --force to rebuild it (its commits are lost unless exported first), or export it before you do",
+            R_SERIES), command("apply", "--source", "<source>", "--head", branch, "--force")))
     layers = build_stack(source, base)
     parent, tree = layers[-1][1], layers[-1][2]
     git(source, "update-ref", ref, parent)
@@ -327,7 +439,10 @@ def add_files(source: Path, folder: str, manifest: dict, env: dict, root: Path |
     shas = git(source, "hash-object", "-w", "--no-filters", "--stdin-paths",
                input_bytes=("\n".join(paths) + "\n").encode()).decode().split()
     if len(shas) != len(paths):
-        raise SystemExit("%s: hash-object returned %d objects for %d files" % (folder, len(shas), len(paths)))
+        raise SystemExit(halt(fail(
+            "%s/src" % folder, "git hash-object returned %d objects for %d files" % (len(shas), len(paths)),
+            "look for a file name with a newline or a file that is not readable under %s/src, then run the command again" % folder,
+            R_SERIES), command("check")))
     lines = "".join("%s %s\t%s\n" % (mode, sha, path) for (path, mode), sha in zip(added.items(), shas))
     git(source, "update-index", "--add", "--index-info", env=env, input_bytes=lines.encode())
 
@@ -358,8 +473,10 @@ def build_stack(source: Path, base: str, root: Path | None = None, missing_ok: b
                 done = subprocess.run(["git", "-C", str(source), "apply", "--cached", "--whitespace=nowarn",
                                        str(patch)], capture_output=True, env=env)
                 if done.returncode:
-                    raise SystemExit("%s does not apply on %s:\n%s"
-                                     % (folder, base, done.stderr.decode(errors="replace")))
+                    raise SystemExit(halt(fail(
+                        "%s/hooks.patch" % folder, "it does not apply on %s: %s" % (base, done.stderr.decode(errors="replace").strip()),
+                        "port the series to this tag (`%s`), or build on the tag the series was exported from (UPSTREAM.json: mozilla_tag)"
+                        % command("port", "--to", base, "--source", "<source>"), R_PORT), command("status", "--source", "<source>")))
             manifest = json.loads((root / folder / "MANIFEST.json").read_text(encoding="utf-8"))
             add_files(source, folder, manifest, env, root)
             tree = git(source, "write-tree", *(["--missing-ok"] if missing_ok else []), env=env).decode().strip()
@@ -368,7 +485,8 @@ def build_stack(source: Path, base: str, root: Path | None = None, missing_ok: b
     return layers
 
 
-def port(source: Path, old: str, new: str, branch: str, force: bool, check_births: bool = False) -> int:
+def port(source: Path, old: str, new: str, branch: str, force: bool, check_births: bool = False,
+         record_upstream: Path | None = None) -> int:
     """Moves the series from Mozilla tag `old` to tag `new` in one run, every folder
     merged three-way, and reports every conflict instead of stopping at the first.
 
@@ -378,26 +496,40 @@ def port(source: Path, old: str, new: str, branch: str, force: bool, check_birth
     A conflicted folder still gets its commit (files with conflict markers) and the
     run goes on. The result is branch `branch` in the source repository: resolve the
     markers there, commit, then export. Both tags must be in the source repository
-    (the blobs of `old` are the base of every merge)."""
+    (the blobs of `old` are the base of every merge).
+
+    With `record_upstream` (the command line gives UPSTREAM.json) the port writes what it knows into it: `mozilla_tag` is `new`
+    and `source_branch` is `branch`, so the export that follows needs no hand edit (the library call of a test does not write)."""
     for tag in (old, new):
         if subprocess.run(["git", "-C", str(source), "rev-parse", "-q", "--verify", "%s^{commit}" % tag],
                           capture_output=True).returncode:
-            raise SystemExit("%s is not in %s: fetch it first, e.g. git -C %s fetch --depth 1 %s "
-                             "refs/tags/%s:refs/tags/%s" % (tag, source, source, upstream()["mozilla_repository"], tag, tag))
+            raise SystemExit(halt(fail(
+                "tag %s in the source repository" % tag, "the tag is not in %s" % source,
+                "fetch it: git -C %s fetch --depth 1 %s refs/tags/%s:refs/tags/%s" % (source, upstream()["mozilla_repository"], tag, tag),
+                R_PORT), command("port", "--to", new, "--source", "<source>")))
+    if old == new:
+        raise SystemExit(halt(fail(
+            "UPSTREAM.json mozilla_tag", "it is already %s, the tag to port to: a port ran here before, and `port` writes the tag it moved to" % new,
+            "name the tag the series came from with --base, and --force to rebuild the branch",
+            R_PORT), command("port", "--to", new, "--source", "<source>", "--base", "<old-tag>", "--force")))
     # series-02: a folder that says Mozilla ships its fix at the new tag or before is a decision to take before anything is merged.
     stops = folders.fixed_in_stops(ROOT, new)
     if stops:
-        raise SystemExit(
-            "port stopped before it merged anything: %d folder(s) say Mozilla ships their fix in %s or before:\n%s\n"
-            "fix: decide each one in the source repository, then run the port again: drop the folder (remove its change on the source branch, "
-            "then `python tools/engine.py export`, which removes the folder with its FOLDER.json) or rebase it onto Mozilla's fix and change "
-            "or delete its fixed_in; read what Mozilla shipped before you decide (the bug is in its FOLDER.json)\n"
-            "next: python tools/engine.py port --to %s --source <source>\nrule: %s"
-            % (len(stops), new, "\n".join("  %s: fixed_in %s" % s for s in stops), new, folders.RULE))
+        raise SystemExit(halt(fail(
+            "FOLDER.json of %d folder(s)" % len(stops),
+            "port stopped before it merged anything: %d folder(s) say Mozilla ships their fix in %s or before:\n%s"
+            % (len(stops), new, "\n".join("  %s: fixed_in %s" % s for s in stops)),
+            "decide each one in the source repository, then run the port again: drop the folder (remove its change on the source branch, "
+            "then `%s`, which removes the folder with its FOLDER.json) or rebase it onto Mozilla's fix and change "
+            "or delete its fixed_in; read what Mozilla shipped before you decide (the bug is in its FOLDER.json)"
+            % command("export", "--source", "<source>"), R_FOLDERS), command("port", "--to", new, "--source", "<source>")))
     ref = "refs/heads/%s" % branch
     if subprocess.run(["git", "-C", str(source), "rev-parse", "-q", "--verify", ref],
                       capture_output=True).returncode == 0 and not force:
-        raise SystemExit("%s already exists: pass --force to rebuild it" % branch)
+        raise SystemExit(halt(fail(
+            "branch %s in %s" % (branch, source), "%s already exists" % branch,
+            "pass --force to rebuild it (its commits are lost), or --head <branch> to make another",
+            R_PORT), command("port", "--to", new, "--source", "<source>", "--head", branch, "--force")))
     stack = build_stack(source, old)
     current = git(source, "rev-parse", "%s^{commit}" % new).decode().strip()
     when = git(source, "log", "-1", "--format=%cI", current).decode().strip()
@@ -409,7 +541,10 @@ def port(source: Path, old: str, new: str, branch: str, force: bool, check_birth
                               capture_output=True)
         lines = done.stdout.decode(errors="replace").split("\n")
         if done.returncode not in (0, 1) or not lines[0].strip():
-            raise SystemExit("merge-tree failed on %s: %s" % (folder, done.stderr.decode(errors="replace")))
+            raise SystemExit(halt(fail(
+                "git merge-tree on %s" % folder, "it failed: %s" % done.stderr.decode(errors="replace").strip(),
+                "port needs git 2.40 or later (`git merge-tree --write-tree --merge-base`): update git, or read the error and repair the source repository",
+                R_PORT), command("port", "--to", new, "--source", "<source>")))
         tree, conflicts = lines[0].strip(), sorted({l for l in lines[1:] if l.strip()})
         title = folder if not conflicts else "%s (CONFLICT: %s)" % (folder, ", ".join(conflicts))
         current = git(source, "commit-tree", tree, "-p", current, "-m", title, env=env).decode().strip()
@@ -429,12 +564,14 @@ def port(source: Path, old: str, new: str, branch: str, force: bool, check_birth
         print("REPLAY %s: %s, %d commits already in the revision (python tools/backport_replay.py record writes "
               "them to BACKPORT.json)" % (name, replayed.vendors(short=True), len(replayed.dropped)))
     git(source, "update-ref", ref, current)
+    if record_upstream is not None:
+        record_port(record_upstream, new, branch)
     bad = [(f, c) for f, c in report if c]
     for folder, conflicts in bad + replay_bad:
         print("CONFLICT %s: %s" % (folder, ", ".join(conflicts)))
     already = backport_in_tag_problems(source, new)
     for problem in already:
-        print("FAIL %s" % problem)
+        print(problem)
     print("%s: %d folders moved from %s to %s, %d clean, %d with conflicts (%d files)"
           % (branch, len(report), old, new, len(report) - len(bad), len(bad), sum(len(c) for _, c in bad)))
     status = 0
@@ -447,7 +584,26 @@ def port(source: Path, old: str, new: str, branch: str, force: bool, check_birth
                                 tsv=Path(tempfile.gettempdir()) / ("births-port-%s.tsv" % new))
         else:
             print("birth points not scanned: %s is not a Firefox tree" % branch)
-    return 1 if bad or replay_bad or already or status == 1 else 0
+    stopped = bool(bad or replay_bad or already or status == 1)
+    if stopped:
+        # repo-05: the stop ends with the command that follows the work it asks for.
+        print(fail("branch %s in %s" % (branch, source),
+                   "the port is red: %d folders with conflicts, %d replays that stopped, %d backports already in the tag, births %s"
+                   % (len(bad), len(replay_bad), len(already), "red" if status == 1 else "clean"),
+                   "resolve the markers on the branch (git -C %s worktree add <dir> %s), commit there, take out each backport the tag has, "
+                   "and fix each birth with `%s`; then export" % (source, branch, command("births", "--repo", "<source>", "--rev", branch)),
+                   R_PORT))
+        print("next: %s" % command("export", "--source", "<source>"))
+    return 1 if stopped else 0
+
+
+def record_port(path: Path, new: str, branch: str) -> None:
+    """What a port knows and UPSTREAM.json says (`mozilla_tag`, `source_branch`): written by the port, never typed. The other
+    fields (`exported_from`, `exported_tree`) are the export's."""
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    data["mozilla_tag"], data["source_branch"] = new, branch
+    write_json(Path(path), data)
+    print("UPSTREAM.json: mozilla_tag %s, source_branch %s" % (new, branch))
 
 
 def drift(source: Path, old: str, new: str) -> int:
@@ -504,7 +660,9 @@ def _borrow_tag(into: Path, mirror: Path, tag: str) -> None:
         packed = (mirror / "packed-refs").read_text(encoding="utf-8") if (mirror / "packed-refs").exists() else ""
         sha = next((l.split()[0] for l in packed.splitlines() if l.endswith(" refs/tags/%s" % tag)), "")
     if not re.fullmatch(r"[0-9a-f]{40}", sha):
-        raise OSError("the node's fetch has no commit for refs/tags/%s" % tag)
+        raise OSError(fail(
+            "refs/tags/%s in the node's mirror" % tag, "the node's fetch has no commit for it",
+            "nothing to do: the leg fetches the tag from GitHub itself (a mirror that is always empty is a node to look at)", R_BUILD))
     alternates = into / ".git" / "objects" / "info" / "alternates"
     alternates.parent.mkdir(parents=True, exist_ok=True)
     alternates.write_text(str((mirror / "objects").resolve()) + "\n", encoding="utf-8")
@@ -644,8 +802,10 @@ def materialize(into: Path, branch: str = "engine", shared: Path | None = None) 
         applied = time.monotonic()
     expected = up.get("exported_tree")
     if expected and tree != expected:
-        raise SystemExit("the series applied to %s gives tree %s, UPSTREAM.json declares %s"
-                         % (tag, tree, expected))
+        raise SystemExit(halt(fail(
+            "UPSTREAM.json exported_tree", "the series applied to %s gives tree %s, UPSTREAM.json declares %s" % (tag, tree, expected),
+            "export the series again from the source branch (the series or UPSTREAM.json was edited by hand, or the tag moved)", R_SERIES),
+            command("export", "--source", "<source>")))
     # The working tree follows the machine's git config (core.autocrlf), exactly as the
     # actions/checkout this replaces did: the Windows legs build what they built before.
     git(into, "checkout", "-q", "-f", branch)
@@ -658,8 +818,8 @@ def materialize(into: Path, branch: str = "engine", shared: Path | None = None) 
     return head
 
 
-def verify(source: Path, base: str, head: str) -> int:
-    require_descends(source, base, head)
+def rebuilt_tree(source: Path, base: str) -> str:
+    """The tree the series makes on `base`, in a throwaway index (verify and the front door both ask)."""
     with tempfile.TemporaryDirectory() as tmp:
         env = dict(os.environ, GIT_INDEX_FILE=str(Path(tmp) / "index"))
         git(source, "read-tree", base, env=env)
@@ -669,95 +829,144 @@ def verify(source: Path, base: str, head: str) -> int:
                 git(source, "apply", "--cached", "--whitespace=nowarn", str(patch), env=env)
             manifest = json.loads((ROOT / folder / "MANIFEST.json").read_text(encoding="utf-8"))
             add_files(source, folder, manifest, env)
-        built = git(source, "write-tree", env=env).decode().strip()
+        return git(source, "write-tree", env=env).decode().strip()
+
+
+def verify(source: Path, base: str, head: str) -> int:
+    require_descends(source, base, head)
+    built = rebuilt_tree(source, base)
     expected = git(source, "rev-parse", "%s^{tree}" % head).decode().strip()
     if built == expected:
         print("identical: the series rebuilds %s exactly (tree %s)" % (head, built))
         return 0
     diff = git(source, "diff", "--stat", expected, built).decode()
     print("DIFFERENT: rebuilt tree %s, %s is %s\n%s" % (built, head, expected, diff))
+    print(fail("the series against %s" % head, "the series rebuilds tree %s, the head is tree %s" % (built, expected),
+               "the series is written by export only: export it again from the head (a hand edit of the series is erased by it)", R_SERIES))
+    print("next: %s" % command("export", "--source", "<source>", "--head", head))
     return 1
 
 
 PATCH_FILE = re.compile(r"^diff --git a/(\S+) b/")
 
 
-def _patch_lines(patch: Path, sign: str) -> dict:
-    # Counted only inside hunks, so the ---/+++ header is never a line, and a line
-    # that itself starts with -- or ++ is.
-    counts, current, in_hunk = {}, None, False
-    for line in patch.read_text(encoding="utf-8", errors="replace").splitlines():
+def file_diffs(patch_text: str) -> dict:
+    """Mozilla file -> {"added", "removed", "hunks"} of its diff in a hooks.patch. Counted only inside hunks, so the ---/+++
+    header is never a line, and a line that itself starts with -- or ++ is."""
+    out, current, in_hunk = {}, None, False
+    for line in patch_text.splitlines():
         m = PATCH_FILE.match(line)
         if m:
             current, in_hunk = m.group(1), False
-            counts[current] = 0
-        elif line.startswith("@@"):
+            out[current] = {"added": 0, "removed": 0, "hunks": 0}
+        elif line.startswith("@@") and current:
             in_hunk = True
-        elif current and in_hunk and line.startswith(sign):
-            counts[current] += 1
-    return counts
+            out[current]["hunks"] += 1
+        elif current and in_hunk and line[:1] in ("+", "-"):
+            out[current]["added" if line[0] == "+" else "removed"] += 1
+    return out
+
+
+def _diffs_of(patch: Path) -> dict:
+    return file_diffs(patch.read_text(encoding="utf-8", errors="replace"))
 
 
 def added_lines(patch: Path) -> dict:
     """Mozilla file -> lines we add to it, read from a hooks.patch."""
-    return _patch_lines(patch, "+")
+    return {path: d["added"] for path, d in _diffs_of(patch).items()}
 
 
 def removed_lines(patch: Path) -> dict:
     """Mozilla file -> lines of Mozilla's we remove or rewrite, read from a hooks.patch."""
-    return _patch_lines(patch, "-")
+    return {path: d["removed"] for path, d in _diffs_of(patch).items()}
 
 
 def hunk_counts(patch: Path) -> dict:
     """Mozilla file -> hunks of its diff, read from a hooks.patch."""
-    counts, current = {}, None
-    for line in patch.read_text(encoding="utf-8", errors="replace").splitlines():
-        m = PATCH_FILE.match(line)
-        if m:
-            current = m.group(1)
-            counts[current] = 0
-        elif line.startswith("@@") and current:
-            counts[current] += 1
-    return counts
+    return {path: d["hunks"] for path, d in _diffs_of(patch).items()}
+
+
+RECORD_ORDER = ("file", "category", "feature", "prefs", "added", "removed", "hunks", "inline_logic_lines", "hookable", "anchor",
+                "notes", "verifier")
+
+
+def computed_record(record: dict, diff: dict) -> dict:
+    """The record with the three fields of its hooks.patch (`added`, `removed`, `hunks`) as the diff has them. The hand fields
+    (feature, category, anchor, hookable, notes, verifier, ...) are the record's own. It never has an `evidence` field: the lines are the
+    hooks.patch itself (repo-07), so one that comes in with the record is dropped. Keys are in RECORD_ORDER, the rest after them."""
+    fresh = {k: v for k, v in record.items() if k != "evidence"}
+    fresh.update(added=diff["added"], removed=diff["removed"], hunks=diff["hunks"])
+    return {**{k: fresh[k] for k in RECORD_ORDER if k in fresh}, **{k: v for k, v in fresh.items() if k not in RECORD_ORDER}}
 
 
 HOOK_TAG = re.compile(r"STEALTH-HOOK\(([^)]*)\)")
 
 
-def hook_tag_problems(folders: set, records: list, patches: dict) -> list:
+def hook_tag_problems(folders: set, patches: dict) -> list:
     """A STEALTH-HOOK(<folder>) tag names the folder that owns the hook; one that names
     nothing in SERIES (a folder deleted or renamed since) sends whoever greps it to a place
-    that is not there. Looked at: the evidence of every inventory record, and every line of
-    every hooks.patch (`patches`: folder -> text)."""
+    that is not there. Looked at: every line of every hooks.patch (`patches`: folder -> text)."""
     found = []
-    for r in records:
-        for line in r.get("evidence") or []:
-            for tag in HOOK_TAG.findall(line):
-                if tag not in folders:
-                    found.append("tools/inventory.json: the evidence of %s quotes STEALTH-HOOK(%s), and %s is not a "
-                                 "folder of SERIES: regenerate the record from the code" % (r["file"], tag, tag))
     for folder, text in sorted(patches.items()):
         for tag in sorted(set(HOOK_TAG.findall(text))):
             if tag not in folders:
-                found.append("%s/hooks.patch carries STEALTH-HOOK(%s), and %s is not a folder of SERIES: "
-                             "retag the hook in the source" % (folder, tag, tag))
+                found.append(fail(
+                    "%s/hooks.patch" % folder, "it carries STEALTH-HOOK(%s), and %s is not a folder of SERIES" % (tag, tag),
+                    "retag the hook in the source with the folder that owns it, then export", R_HOOK))
     return found
 
 
-def record_count_problems(records: list, counts: dict) -> list:
-    """Each inventory record says how many lines of ours (added), of Mozilla's (removed) and how
-    many hunks its file has: the numbers of the file in its hooks.patch (`counts`: file ->
-    (added, removed, hunks)). A record written once and never refreshed, or copied from another
-    feature, reads as truth to whoever sizes a hook from it."""
-    found = []
+def record_count_problems(records: list, diffs: dict) -> list:
+    """Each inventory record says how many lines of ours (added), of Mozilla's (removed) and how many hunks its file has: those of its
+    file in the hooks.patch (`diffs`: file -> file_diffs entry). The three fields are written by `export` (computed_record); one that
+    differs was edited by hand or not refreshed, and reads as truth to whoever sizes a hook from it. A record has no `evidence`."""
+    found = evidence_problems("tools/inventory.json", records)
     for r in records:
-        real = counts.get(r["file"])
-        if real is None:
+        diff = diffs.get(r["file"])
+        if diff is None:
             continue
+        again = command("export", "--source", "<source>")
         have = (r.get("added"), r.get("removed"), r.get("hunks"))
-        if have != tuple(real):
-            found.append("tools/inventory.json: the record of %s says added %s, removed %s, hunks %s; its hooks.patch has "
-                         "%d, %d, %d: rewrite the record from the diff against the tag" % ((r["file"],) + have + tuple(real)))
+        real = (diff["added"], diff["removed"], diff["hunks"])
+        if have != real:
+            found.append(fail(
+                "tools/inventory.json", "the record of %s says added %s, removed %s, hunks %s; its hooks.patch has %d, %d, %d"
+                % ((r["file"],) + have + real),
+                "do not edit a count: `%s` writes added, removed and hunks of every record from its hooks.patch" % again, R_SERIES))
+    return found
+
+
+def evidence_problems(where: str, records: list) -> list:
+    """repo-07: an inventory record (in tools/inventory.json or in the `inventory` of a MANIFEST.json) has no `evidence` field. The lines it
+    quoted are the lines of the hooks.patch of its folder, which is the one place that has them."""
+    return [fail("%s, the record of %s" % (where, r.get("file")), "it has an `evidence` field, a second copy of the lines its hooks.patch adds and removes",
+                 "delete the field: the lines are the hooks.patch itself (`git diff` shows them; `%s` writes the record without it)" % command("export", "--source", "<source>"),
+                 R_ONE_FACT) for r in records if "evidence" in r]
+
+
+def manifest_hash_problems(folder: str, d: Path, manifest: dict) -> list:
+    """The MANIFEST.json of a folder carries the sha256 of every file under its src/ (written by `export`): one missing, one left over for
+    a file the folder no longer has, or a file whose bytes are not the recorded ones (a hand edit of src/, a merge that took one side)."""
+    found = []
+    hashes = manifest.get("sha256")
+    again = command("export", "--source", "<source>")
+    if not isinstance(hashes, dict):
+        hashes = {}
+        if manifest["added"]:
+            found.append(fail("%s/MANIFEST.json" % folder, "it has no `sha256` map for the %d files it adds" % len(manifest["added"]),
+                              "do not write it by hand: `%s` records the sha256 of every file under src/" % again, R_SERIES))
+            return found
+    for path in sorted(set(manifest["added"]) - set(hashes)):
+        found.append(fail("%s/MANIFEST.json" % folder, "it has no sha256 for %s" % path,
+                          "do not write it by hand: `%s` records the sha256 of every file under src/" % again, R_SERIES))
+    for path in sorted(set(hashes) - set(manifest["added"])):
+        found.append(fail("%s/MANIFEST.json" % folder, "it has a sha256 for %s, which the folder does not add" % path,
+                          "do not edit the manifest: `%s` writes it" % again, R_SERIES))
+    for path in sorted(set(manifest["added"]) & set(hashes)):
+        file = d / "src" / path
+        if file.is_file() and hashlib.sha256(file.read_bytes()).hexdigest() != hashes[path]:
+            found.append(fail("%s/src/%s" % (folder, path), "its bytes are not the sha256 its MANIFEST.json records",
+                              "src/ is written by the export only: `%s` writes it again from the source (a hand edit is made in the source)" % again, R_SERIES))
     return found
 
 
@@ -818,29 +1027,36 @@ def mozilla_backport_problems(folder: str, files: list, data: dict, patch: Path)
     found = []
     missing = [k for k in ("commit", "bug", "date", "files", "drop_when") if not data.get(k)]
     if missing:
-        return ["%s/%s lacks %s" % (folder, BACKPORT, ", ".join(missing))]
+        return [fail("%s/%s" % (folder, BACKPORT), "it lacks %s" % ", ".join(missing),
+                         "add the missing fields: commit, bug, date, files, drop_when", R_BACKPORT)]
     if not re.fullmatch(r"[0-9a-f]{40}", str(data["commit"])):
-        found.append("%s/%s: commit %r is not a full sha: name the commit of %s the diff comes from"
-                     % (folder, BACKPORT, data["commit"], MOZILLA_REPO))
+        found.append(fail("%s/%s" % (folder, BACKPORT), "commit %r is not a full sha" % data["commit"],
+                              "name the commit of %s the diff comes from, as 40 hex digits" % MOZILLA_REPO, R_BACKPORT))
     ours = patch.read_bytes() if patch.exists() else b""
     for path in files:
         entry = (data["files"] if isinstance(data["files"], dict) else {}).get(path)
         if not isinstance(entry, dict) or not entry.get("diff") or not entry.get("sha256"):
-            found.append("%s/%s: files has no diff and sha256 for %s" % (folder, BACKPORT, path))
+            found.append(fail("%s/%s" % (folder, BACKPORT), "files has no diff and sha256 for %s" % path,
+                                  "add both for the file: the stored diff of the commit and its sha256", R_BACKPORT))
             continue
         stored = ROOT / folder / entry["diff"]
         if not stored.is_file():
-            found.append("%s/%s: the diff %s of %s is not in the folder" % (folder, BACKPORT, entry["diff"], path))
+            found.append(fail("%s/%s" % (folder, BACKPORT), "the diff %s of %s is not in the folder" % (entry["diff"], path),
+                                  "store the diff of the commit at that path, as Mozilla's repository has it", R_BACKPORT))
             continue
         theirs = normalized_diff(file_section(stored.read_bytes(), path))
         if not theirs:
-            found.append("%s/%s does not hold a diff of %s" % (folder, entry["diff"], path))
+            found.append(fail("%s/%s" % (folder, entry["diff"]), "it does not hold a diff of %s" % path,
+                                  "store the diff of the commit for that file: run `git show --format= %s -- %s` in a clone of %s and save its output as %s/%s"
+                                  % (data["commit"], path, MOZILLA_REPO, folder, entry["diff"]), R_BACKPORT))
         elif hashlib.sha256(theirs).hexdigest() != entry["sha256"]:
-            found.append("%s/%s is not the diff that BACKPORT.json declares for %s (sha256 differs): "
-                         "the diff of the commit is not edited" % (folder, entry["diff"], path))
+            found.append(fail("%s/%s" % (folder, entry["diff"]),
+                                  "it is not the diff that BACKPORT.json declares for %s (sha256 differs)" % path,
+                                  "restore the diff of the commit, unedited, from Mozilla's repository", R_BACKPORT))
         elif normalized_diff(file_section(ours, path)) != theirs:
-            found.append("%s/hooks.patch changes %s differently from commit %s: a backport is that diff "
-                         "byte for byte, not a diff touched by hand" % (folder, path, str(data["commit"])[:12]))
+            found.append(fail("%s/hooks.patch" % folder, "it changes %s differently from commit %s" % (path, data["commit"]),
+                                  "make the file the diff of that commit byte for byte, not a diff touched by hand: export it from the source branch",
+                                  R_BACKPORT))
     return found
 
 
@@ -853,35 +1069,40 @@ def backport_problems(folder: str, upstream_code: set, patch: Path) -> list:
         return []
     vendored = {p for p in upstream_code if p.startswith(VENDORED)}
     foreign = sorted(upstream_code - vendored)
-    outside = ["%s: %s is category backport outside vendored code (%s)" % (folder, p, ", ".join(VENDORED))
-               for p in foreign]
+    outside = [fail(folder, "%s is category backport outside vendored code (%s)" % (p, ", ".join(VENDORED)),
+                        "make it the diff of one Mozilla commit in a folder of %s<name>, or take it out of category backport" % MOZILLA_BACKPORTS,
+                        R_BACKPORT) for p in foreign]
     record = ROOT / folder / BACKPORT
     if not record.exists():
-        return outside + ["%s carries upstream code (%s) with no %s: name the upstream, the "
-                          "vendored revision and the commits" % (folder, sorted(upstream_code)[0], BACKPORT)]
+        return outside + [fail(folder, "it carries upstream code (%s) with no %s" % (sorted(upstream_code)[0], BACKPORT),
+                                   "write %s: name the upstream, the vendored revision and the commits" % BACKPORT, R_BACKPORT)]
     data = json.loads(record.read_text(encoding="utf-8"))
     found = []
     if foreign:
         if not folder.startswith(MOZILLA_BACKPORTS):
-            found += outside + ["%s carries %s as the diff of a commit of %s outside %s<name>: a backport "
-                                "of a Mozilla commit has its own folder there, beside no logic of ours"
-                                % (folder, foreign[0], MOZILLA_REPO, MOZILLA_BACKPORTS)]
+            found += outside + [fail(
+                folder, "it carries %s as the diff of a commit of %s outside %s<name>" % (foreign[0], MOZILLA_REPO, MOZILLA_BACKPORTS),
+                "move the backport of a Mozilla commit to a folder of its own in %s, beside no logic of ours" % MOZILLA_BACKPORTS, R_BACKPORT)]
         elif is_mozilla_upstream(data.get("upstream")):
             found += mozilla_backport_problems(folder, foreign, data, patch)
         else:
-            found += outside + ["%s/%s: upstream %r is not %s, the only upstream a file outside vendored "
-                                "code can be carried from" % (folder, BACKPORT, data.get("upstream"), MOZILLA_REPO)]
+            found += outside + [fail(
+                "%s/%s" % (folder, BACKPORT), "upstream %r is not %s, the only upstream a file outside vendored code can be carried from"
+                % (data.get("upstream"), MOZILLA_REPO), "set upstream to %s, or carry the file as vendored code if it is under third_party/rust/" % MOZILLA_REPO,
+                R_BACKPORT)]
     if vendored:
         missing = [k for k in ("upstream", "vendored", "commits", "drop_when") if not data.get(k)]
         if missing:
-            return found + ["%s/%s lacks %s" % (folder, BACKPORT, ", ".join(missing))]
+            return found + [fail("%s/%s" % (folder, BACKPORT), "it lacks %s" % ", ".join(missing),
+                                     "add the missing fields: upstream, vendored, commits, drop_when", R_BACKPORT)]
         # A crate vendored as a release (`vendored_crate`) has its revision in the crate's own .cargo_vcs_info.json, which the
         # hooks.patch does not touch: there `check --against <tag>` compares it with the tag's (backport_replay.folder_problems).
         if (not backport_replay.crate_spec(data)
                 and data["vendored"] not in patch.read_text(encoding="utf-8", errors="replace")):
-            found.append("%s/%s says the vendored revision is %s, which its hooks.patch does not "
-                         "patch: Mozilla vendors another one now, so drop what upstream has and "
-                         "pick the rest again" % (folder, BACKPORT, data["vendored"]))
+            found.append(fail(
+                "%s/%s" % (folder, BACKPORT), "it says the vendored revision is %s, which its hooks.patch does not patch: Mozilla vendors another one now"
+                % data["vendored"], "drop what upstream has and pick the rest again on the new revision (`%s` replays the commits)"
+                % command("port", "--to", "<tag>", "--source", "<source>"), R_VENDORED))
     return found
 
 
@@ -912,8 +1133,10 @@ def backport_in_tag_problems(source: Path, tag: str) -> list:
                 done = subprocess.run(["git", "apply", "--reverse", "--check", "backport.patch"],
                                       cwd=tmp, capture_output=True)
             if done.returncode == 0:
-                found.append("%s: the tag %s already contains the backport of %s (commit %s): take the "
-                             "backport out of the series" % (folder, tag, path, str(data.get("commit"))[:12]))
+                found.append(fail(
+                    folder, "the tag %s already contains the backport of %s (commit %s)" % (tag, path, data.get("commit")),
+                    "take the backport out of the series: restore its files to the tag's (`git checkout %s -- %s`), delete its record "
+                    "from tools/inventory.json, and export" % (tag, path), R_BACKPORT))
     return found
 
 
@@ -949,7 +1172,9 @@ def backport_replay_problems(source: Path, tag: str) -> list:
             found += backport_replay.folder_problems(backport_replay.replay(source, tag, ROOT / folder, data),
                                                      ROOT / folder, data)
         except backport_replay.Stop as stop:
-            found.append("%s: %s" % (folder, stop))
+            found.append(fail(folder, "the replay of its commits stopped: %s" % stop,
+                                  "rebase the commit that does not apply onto the revision the tag vendors, then run "
+                                  "`python tools/backport_replay.py report` until it has no conflict", R_VENDORED))
     return found
 
 
@@ -967,7 +1192,7 @@ def cxx_byte_problems(text: str) -> list:
     allowed only as the first half of a line ending), and a character outside ASCII inside a string or character
     literal (write it as an escape: the editor, the terminal and the compiler do not agree on what it is). Comments
     may say whatever they like. Returns [(line, what)]."""
-    found = []
+    hits = []
     i, n, line = 0, len(text), 1
     while i < n:
         c = text[i]
@@ -975,7 +1200,7 @@ def cxx_byte_problems(text: str) -> list:
         if two == "//":
             while i < n and text[i] != "\n":
                 if ord(text[i]) < 32 and text[i] not in "\t\r":
-                    found.append((line, "control character %r in a comment" % text[i]))
+                    hits.append((line, "control character %r in a comment" % text[i]))
                 i += 1
             continue
         if two == "/*":
@@ -985,7 +1210,7 @@ def cxx_byte_problems(text: str) -> list:
                 if ch == "\n":
                     line += 1
                 elif ord(ch) < 32 and ch not in "\t\r":
-                    found.append((line, "control character %r in a comment" % ch))
+                    hits.append((line, "control character %r in a comment" % ch))
             i = end
             continue
         raw = c == "R" and text[i + 1:i + 2] == '"' and not (i and (text[i - 1].isalnum() or text[i - 1] == "_"))
@@ -1005,24 +1230,24 @@ def cxx_byte_problems(text: str) -> list:
                     j += 2
                     continue
                 if ch == "\n":
-                    found.append((line, "a %s literal that does not end on its line (a raw control character may have ended it)"
+                    hits.append((line, "a %s literal that does not end on its line (a raw control character may have ended it)"
                                   % ("string" if quote == '"' else "character")))
                     break
                 if ord(ch) < 32 and ch != "\t":
-                    found.append((line, "control character %r inside a literal: write it as an escape" % ch))
+                    hits.append((line, "control character %r inside a literal: write it as an escape" % ch))
                 elif ord(ch) > 127:
-                    found.append((line, "character %r outside ASCII inside a literal: write it as an escape" % ch))
+                    hits.append((line, "character %r outside ASCII inside a literal: write it as an escape" % ch))
                 j += 1
             i = j + 1
             continue
         if c == "\n":
             line += 1
         elif ord(c) < 32 and c not in "\t\r":
-            found.append((line, "control character %r" % c))
+            hits.append((line, "control character %r" % c))
         elif c == "\r" and text[i + 1:i + 2] != "\n":
-            found.append((line, "a carriage return that is not part of a line ending"))
+            hits.append((line, "a carriage return that is not part of a line ending"))
         i += 1
-    return found
+    return hits
 
 
 def own_cxx_problems() -> list:
@@ -1037,10 +1262,12 @@ def own_cxx_problems() -> list:
             try:
                 text = p.read_bytes().decode("utf-8")
             except UnicodeDecodeError as err:
-                found.append("%s/src/%s is not valid UTF-8 (%s)" % (folder, p.relative_to(src).as_posix(), err))
+                found.append(fail("%s/src/%s" % (folder, p.relative_to(src).as_posix()), "it is not valid UTF-8 (%s)" % err,
+                                      "write the file as UTF-8 in the source, then export", R_SERIES))
                 continue
-            for line, what in cxx_byte_problems(text)[:3]:
-                found.append("%s/src/%s:%d: %s" % (folder, p.relative_to(src).as_posix(), line, what))
+            for line, what in cxx_byte_problems(text):
+                found.append(fail("%s/src/%s:%d" % (folder, p.relative_to(src).as_posix(), line), what,
+                                      "write the byte as an escape or remove it in the source, then export", R_SERIES))
     return found
 
 
@@ -1067,9 +1294,10 @@ def own_cr_problems() -> list:
             if b"\r" not in data or b"\0" in data:
                 continue
             name = "%s/src/%s" % (folder, rel)
-            found.append("%s has %d carriage return(s), the first on line %d: a file of ours ends its lines with LF only; "
-                         "write it with LF (open(path, \"w\", newline=\"\") and \"\\n\"), never through a text-mode "
-                         "stdout on Windows" % (name, data.count(b"\r"), _cr_line(data)))
+            found.append(fail(name, "%s has %d carriage return(s), the first on line %d: a file of ours ends its lines with LF only"
+                                  % (name, data.count(b"\r"), _cr_line(data)),
+                                  "write it with LF (open(path, \"w\", newline=\"\") and \"\\n\"), never through a text-mode "
+                                  "stdout on Windows, then export", R_SERIES))
     return found
 
 
@@ -1084,11 +1312,13 @@ def patch_cr_problems(folder: str, data: bytes) -> list:
         crlf = bool(context) and all(text.endswith(b"\r") for text in context)
         for no, kind, text in hunk:
             if kind == b"+" and b"\r" in text and not (crlf and text.endswith(b"\r") and text.count(b"\r") == 1):
-                found.append("%s/hooks.patch:%d (adds to %s): the line has a carriage return, and %s: a line of ours "
-                             "ends with LF, with CRLF only in a hunk whose context lines are CRLF (the file's own "
-                             "ending); write the patch with LF (open(path, \"w\", newline=\"\") and \"\\n\"), never "
-                             "through a text-mode stdout on Windows"
-                             % (folder, no, target, "it is not a plain CRLF line" if crlf else "the context of its hunk is not CRLF"))
+                found.append(fail(
+                    "%s/hooks.patch:%d (adds to %s)" % (folder, no, target),
+                    "the line has a carriage return, and %s: a line of ours ends with LF, with CRLF only in a hunk "
+                    "whose context lines are CRLF (the file's own ending)"
+                    % ("it is not a plain CRLF line" if crlf else "the context of its hunk is not CRLF"),
+                    "write the patch with LF (open(path, \"w\", newline=\"\") and \"\\n\"), never through a text-mode stdout on Windows, "
+                    "then export", R_SERIES))
         hunk.clear()
 
     for no, line in enumerate(data.split(b"\n"), 1):
@@ -1110,85 +1340,95 @@ def problems() -> list:
     found = []
     listed, present = series_folders(), existing_folders()
     if sorted(listed) != present:
-        found.append("SERIES and the folders differ: only in SERIES %s, only on disk %s"
-                     % (sorted(set(listed) - set(present)), sorted(set(present) - set(listed))))
+        found.append(fail("SERIES", "SERIES and the folders differ: only in SERIES %s, only on disk %s"
+                              % (sorted(set(listed) - set(present)), sorted(set(present) - set(listed))),
+                              "export the series again from the source branch: it writes SERIES and the folders together", R_SERIES))
     if listed != sorted(listed, key=layout.folder_sort_key):
-        found.append("SERIES is not in layout.GROUP_ORDER order")
+        found.append(fail("SERIES", "it is not in layout.GROUP_ORDER order",
+                              "export the series again: it writes SERIES in the order of tools/layout.py", R_SERIES))
     budget = json.loads(BUDGET.read_text(encoding="utf-8"))
     removed_budget = json.loads(REMOVED_BUDGET.read_text(encoding="utf-8"))
+    for path, first, second in layout.src_owners(ROOT)[1]:
+        found.append(fail(path, "it is under the src/ of both %s and %s" % (first, second),
+                          "a file of ours has one owner: export again with --own %s=<folder> naming the one that keeps it" % path, R_SERIES))
     seen = {}
     for folder in present:
         d = ROOT / folder
         if not (d / "FEATURE.md").exists():
-            found.append("%s has no FEATURE.md" % folder)
+            found.append(fail(folder, "it has no FEATURE.md", "write %s/FEATURE.md: what the feature does, its Test: line" % folder, R_SERIES))
         manifest = json.loads((d / "MANIFEST.json").read_text(encoding="utf-8"))
         for path in manifest["added"]:
             if not (d / "src" / path).is_file():
-                found.append("%s: MANIFEST lists %s, src/ does not have it" % (folder, path))
+                found.append(fail("%s/MANIFEST.json" % folder, "it lists %s, src/ does not have it" % path,
+                                      "export the series again: the manifest and src/ are written together", R_SERIES))
         if (d / "src").exists():
             on_disk = {str(p.relative_to(d / "src")).replace("\\", "/")
                        for p in (d / "src").rglob("*") if p.is_file()}
             for extra in sorted(on_disk - set(manifest["added"])):
-                found.append("%s: src/%s is not in its MANIFEST" % (folder, extra))
+                found.append(fail("%s/src/%s" % (folder, extra), "it is not in the MANIFEST of its folder",
+                                      "export the series again: the manifest lists every file under src/", R_SERIES))
+        found += manifest_hash_problems(folder, d, manifest)
+        found += evidence_problems("%s/MANIFEST.json" % folder, manifest.get("inventory", []))
         patch = d / "hooks.patch"
         touched = added_lines(patch) if patch.exists() else {}
         removed = removed_lines(patch) if patch.exists() else {}
         if sorted(touched) != sorted(manifest["modified"]):
-            found.append("%s: hooks.patch touches %s, MANIFEST owns %s"
-                         % (folder, sorted(touched), manifest["modified"]))
+            found.append(fail("%s/hooks.patch" % folder, "it touches %s, MANIFEST owns %s" % (sorted(touched), manifest["modified"]),
+                                  "export the series again: hooks.patch and MANIFEST.json are written together", R_SERIES))
         upstream_code = {r["file"] for r in manifest.get("inventory", []) if r["category"] == "backport"}
         found += backport_problems(folder, upstream_code, patch)
         for path, n in touched.items():
             if path in seen:
-                found.append("%s is patched by both %s and %s" % (path, seen[path], folder))
+                found.append(fail(path, "it is patched by both %s and %s" % (seen[path], folder),
+                                      "give the file one owner: move the hooks of one folder to the other in tools/layout.py (FEATURES) and export", R_SERIES))
             seen[path] = folder
             if path in upstream_code:
                 if path in budget or path in removed_budget:
-                    found.append("%s (%s) is upstream code (category backport): it has no hook or "
-                                 "removed budget, take it out of both" % (path, folder))
+                    found.append(fail("%s (%s)" % (path, folder), "it is upstream code (category backport) and has a hook or removed budget",
+                                          "take it out of tools/hook-budget.json and tools/removed-budget.json", R_BACKPORT))
                 continue
             allowed = budget.get(path)
             if allowed is None:
-                found.append("%s (%s) is a Mozilla file with no hook budget: a new hook is at most 5 "
-                             "lines; add it to tools/hook-budget.json with its real count" % (path, folder))
+                found.append(fail("%s (%s)" % (path, folder), "it is a Mozilla file with no hook budget: a new hook is at most 5 lines",
+                                      "add it to tools/hook-budget.json with its real count, at most 5", R_BUDGET))
             elif n > allowed:
-                found.append("%s (%s) carries %d of our lines, its budget is %d: move the logic "
-                             "into a file of ours and leave a hook" % (path, folder, n, allowed))
+                found.append(fail("%s (%s)" % (path, folder), "it carries %d of our lines, its budget is %d" % (n, allowed),
+                                      "move the logic into a file of ours and leave a hook (never raise the budget)", R_BUDGET))
             r, r_allowed = removed.get(path, 0), removed_budget.get(path, 0)
             if r > r_allowed:
-                found.append("%s (%s) loses or has rewritten %d of Mozilla's lines, its removed "
-                             "budget is %d: leave Mozilla's lines as they are and put the hook "
-                             "beside them" % (path, folder, r, r_allowed))
+                found.append(fail("%s (%s)" % (path, folder), "it loses or has rewritten %d of Mozilla's lines, its removed budget is %d"
+                                      % (r, r_allowed), "leave Mozilla's lines as they are and put the hook beside them", R_BUDGET))
     for path in sorted(set(budget) - set(seen)):
-        found.append("tools/hook-budget.json still lists %s, which no patch touches: remove it" % path)
+        found.append(fail("tools/hook-budget.json", "it still lists %s, which no patch touches" % path,
+                              "remove it from the file (`%s` lowers budgets, it does not remove a file)" % command("shrink-budget"), R_BUDGET))
     for path in sorted(set(removed_budget) - set(seen)):
-        found.append("tools/removed-budget.json still lists %s, which no patch touches: remove it"
-                     % path)
+        found.append(fail("tools/removed-budget.json", "it still lists %s, which no patch touches" % path,
+                              "remove it from the file (`%s` lowers budgets, it does not remove a file)" % command("shrink-budget"), R_BUDGET))
     patches = {f: (ROOT / f / "hooks.patch").read_text(encoding="utf-8", errors="replace")
                for f in present if (ROOT / f / "hooks.patch").exists()}
     records = json.loads(INVENTORY.read_text(encoding="utf-8"))
-    found += hook_tag_problems(set(listed), records, patches)
-    counts = {}
+    found += hook_tag_problems(set(listed), patches)
+    diffs = {}
     for f in present:
         patch = ROOT / f / "hooks.patch"
         if patch.exists():
-            added, removed, hunks = added_lines(patch), removed_lines(patch), hunk_counts(patch)
-            counts.update({path: (added[path], removed.get(path, 0), hunks.get(path, 0)) for path in added})
-    found += record_count_problems(records, counts)
+            diffs.update(_diffs_of(patch))
+    found += record_count_problems(records, diffs)
     found += own_cxx_problems()
     found += own_cr_problems()
     for f in present:
         if (ROOT / f / "hooks.patch").exists():
             found += patch_cr_problems(f, (ROOT / f / "hooks.patch").read_bytes())
     found += hooks_list.problems(ROOT)
+    found += gtest_list.problems(ROOT)       # repo-06: tools/gtest-suites.json is what `gtest-list --write` writes
     found += backport_record_problems()
     found += births.ledger_problems(births.load_ledger(), set(listed))
     series_wf = {p.name: p.read_bytes() for p in WORKFLOWS_SERIES.glob("*.yml")}
     root_wf = {p.name: p.read_bytes() for p in WORKFLOWS_ROOT.glob("*.yml")}
     for name in sorted(set(series_wf) | set(root_wf) - ROOT_ONLY_WORKFLOWS):
         if series_wf.get(name) != root_wf.get(name):
-            found.append(".github/workflows/%s differs from the series' copy (platform/ci/src): "
-                         "edit it in the source, then export" % name)
+            found.append(fail(".github/workflows/%s" % name, "%s differs from the series' copy (platform/ci/src/.github/workflows)" % name,
+                                  "edit the workflow in the source, then export: the root copy is written by the export", R_SERIES))
     return found
 
 
@@ -1211,7 +1451,9 @@ def ensure_main_ref() -> None:
         subprocess.run(["git", "-C", str(ROOT), "fetch", "--no-tags", "--depth=1", "origin",
                         "+refs/heads/main:" + MAIN_REF], capture_output=True)
     if not resolves():
-        raise SystemExit("cannot read origin/main: fetch it")
+        raise SystemExit(halt(fail("origin/main in this repository", "it does not resolve, and a fetch of it did not make it",
+                                   "fetch it: git fetch --no-tags --depth=1 origin +refs/heads/main:%s" % MAIN_REF, R_BUDGET),
+                              command("check")))
 
 
 def load_main_budgets() -> tuple[dict, dict]:
@@ -1219,7 +1461,9 @@ def load_main_budgets() -> tuple[dict, dict]:
     ensure_main_ref()
     texts = [main_budget_text("hook-budget.json"), main_budget_text("removed-budget.json")]
     if None in texts:
-        raise SystemExit("cannot read main's budgets: fetch origin main")
+        raise SystemExit(halt(fail("tools/hook-budget.json and tools/removed-budget.json on origin/main", "main has no such file",
+                                   "fetch origin main (it must carry both budgets): git fetch --no-tags --depth=1 origin +refs/heads/main:%s" % MAIN_REF,
+                                   R_BUDGET), command("check")))
     return json.loads(texts[0]), json.loads(texts[1])
 
 
@@ -1228,36 +1472,6 @@ def load_main_debt() -> list | None:
     ensure_main_ref()
     text = main_budget_text("hook-debt.json")
     return json.loads(text) if text is not None else None
-
-
-def load_main_realign() -> list | None:
-    """The one-time realignment list as origin/main has it (never the branch's); None while main has
-    none yet. Call after load_main_budgets, which makes sure origin/main is there."""
-    text = main_budget_text("budget-realign-69.json")
-    return json.loads(text) if text is not None else None
-
-
-def realign_limits(rows) -> dict:
-    """{(file, kind): line} of the rows of a realignment list."""
-    return {(r["file"], r["kind"]): r["line"] for r in rows or ()}
-
-
-def realign_list_problems(rows: list, main_rows: list | None) -> list:
-    """The realignment list only shrinks: against main's list, a row added or a value raised fails.
-    While main has no list yet (main_rows is None) the list is being introduced and is main's to review."""
-    if main_rows is None:
-        return []
-    found = []
-    now = realign_limits(main_rows)
-    for r in rows:
-        key = (r["file"], r["kind"])
-        if key not in now:
-            found.append("%s: a row of tools/budget-realign-69.json (%s) that main's list does not have: "
-                         "the list only shrinks" % (r["file"], r["kind"]))
-        elif r["line"] > now[key]:
-            found.append("%s: tools/budget-realign-69.json %s value %d is above main's %d: the list only "
-                         "shrinks" % (r["file"], r["kind"], r["line"], now[key]))
-    return found
 
 
 RAISE_FIELDS = ("file", "from", "to", "folder", "reason", "decided_by", "date", "test")
@@ -1288,25 +1502,27 @@ def raises_list_problems(rows: list, main_rows: list | None) -> list:
     for r in rows:
         name = r.get("file") if isinstance(r, dict) else None
         if not isinstance(r, dict) or set(r) not in (set(RAISE_FIELDS), set(RAISE_FIELDS) | {"budget"}):
-            found.append("tools/hook-budget-raises.json: a row of %s does not have exactly the fields %s (and, to raise "
-                         "the removed budget, `budget`)" % (name or "no file", ", ".join(RAISE_FIELDS)))
+            found.append(fail("tools/hook-budget-raises.json", "a row of %s does not have exactly the fields %s (and, to raise the removed budget, `budget`)"
+                                  % (name or "no file", ", ".join(RAISE_FIELDS)), "give the row exactly the fields %s, and `budget` only to raise the removed budget" % ", ".join(RAISE_FIELDS), R_BUDGET))
             continue
         if r.get("budget", "hook") not in RAISE_BUDGETS:
-            found.append("tools/hook-budget-raises.json: the row of %s has the budget %r: %s" % (name, r["budget"], " or ".join(RAISE_BUDGETS)))
+            found.append(fail("tools/hook-budget-raises.json", "the row of %s has the budget %r" % (name, r["budget"]),
+                                  "write `budget` as %s" % " or ".join(RAISE_BUDGETS), R_BUDGET))
             continue
         if not all(isinstance(r[k], str) and r[k].strip() for k in RAISE_FIELDS if k not in ("from", "to")):
-            found.append("tools/hook-budget-raises.json: the row of %s has an empty field: file, folder, reason, "
-                         "decided_by, date and test are all said" % name)
+            found.append(fail("tools/hook-budget-raises.json", "the row of %s has an empty field" % name,
+                                  "say file, folder, reason, decided_by, date and test", R_BUDGET))
         elif not re.fullmatch(r"\d{4}-\d{2}-\d{2}", r["date"]):
-            found.append("tools/hook-budget-raises.json: the row of %s has the date %r, not YYYY-MM-DD" % (name, r["date"]))
+            found.append(fail("tools/hook-budget-raises.json", "the row of %s has the date %r, not YYYY-MM-DD" % (name, r["date"]),
+                                  "write the date as YYYY-MM-DD", R_BUDGET))
         if not (type(r["from"]) is int and type(r["to"]) is int and 0 <= r["from"] < r["to"]):
-            found.append("tools/hook-budget-raises.json: the row of %s raises from %r to %r: two whole numbers, "
-                         "`to` above `from`" % (name, r["from"], r["to"]))
+            found.append(fail("tools/hook-budget-raises.json", "the row of %s raises from %r to %r" % (name, r["from"], r["to"]),
+                                  "write `from` and `to` as two whole numbers, `to` above `from`", R_BUDGET))
     keys = {raise_key(r) for r in rows}
     for m in main_rows or ():
         if raise_key(m) not in keys:
-            found.append("tools/hook-budget-raises.json: main's row of %s (%r to %r) is gone or changed: the "
-                         "register only grows" % (m.get("file"), m.get("from"), m.get("to")))
+            found.append(fail("tools/hook-budget-raises.json", "main's row of %s (%r to %r) is gone or changed" % (m.get("file"), m.get("from"), m.get("to")),
+                                  "restore the row as main has it: the register only grows", R_BUDGET))
     return found
 
 
@@ -1321,16 +1537,13 @@ def new_raise_rows(rows: list, main_rows: list | None) -> list:
 
 
 def budget_raise_problems(hook: dict, removed: dict, main_hook: dict, main_removed: dict,
-                          realign: list | None = None, raises: list | None = None) -> list:
+                          raises: list | None = None) -> list:
     """Budgets only go down: a value above main's, or a new file's hook above 5 lines, is a failure.
-    realign is MAIN's one-time realignment list: a file in it may reach its `line` value, no more; once
-    main's own budget has reached that value the row has been consumed and main's value is the limit.
     raises are the rows the branch ADDS to tools/hook-budget-raises.json (new_raise_rows): a hook budget
     of a file main patches may go above main's only with one such row, `from` main's budget and `to` the
     branch's; a row that raises nothing, or one of a file main does not patch, is a failure too. A row with
     `budget: "removed"` does the same for the removed budget: `from` main's removed budget (0 when it has none),
     `to` the branch's; one raise per file and budget."""
-    limits = realign_limits(realign)
     found = []
     declared = {}
     declared_removed = {}
@@ -1339,53 +1552,50 @@ def budget_raise_problems(hook: dict, removed: dict, main_hook: dict, main_remov
         is_removed = r.get("budget", "hook") == "removed"
         table = declared_removed if is_removed else declared
         if path in table:
-            found.append("%s: two rows in tools/hook-budget-raises.json: one raise per file, budget and branch" % path)
+            found.append(fail("tools/hook-budget-raises.json", "there are two rows for %s" % path,
+                                  "keep one raise per file, budget and branch", R_BUDGET))
             continue
         table[path] = r
         if path not in main_hook:
-            found.append("%s: a row in tools/hook-budget-raises.json for a file main does not patch: a new file "
-                         "has its 5 lines, no raise" % path)
+            found.append(fail("tools/hook-budget-raises.json", "the row of %s is for a file main does not patch: a new file has its 5 lines, no raise" % path,
+                                  "delete the row and keep the hook within 5 lines", R_BUDGET))
         elif is_removed:
             if r.get("from") != main_removed.get(path, 0) or r.get("to") != removed.get(path):
-                found.append("%s: tools/hook-budget-raises.json raises the removed budget from %r to %r, but main's is %d and "
-                             "the branch's %s: `from` is main's, `to` the new one" % (path, r.get("from"), r.get("to"),
-                                                                                    main_removed.get(path, 0), removed.get(path)))
+                found.append(fail("tools/hook-budget-raises.json", "the row of %s raises the removed budget from %r to %r, but main's is %d and the branch's %s"
+                                      % (path, r.get("from"), r.get("to"), main_removed.get(path, 0), removed.get(path)),
+                                      "set `from` to main's budget and `to` to the new one", R_BUDGET))
         elif r.get("from") != main_hook[path] or r.get("to") != hook.get(path):
-            found.append("%s: tools/hook-budget-raises.json raises from %r to %r, but main's budget is %d and the "
-                         "branch's %s: `from` is main's, `to` the new one" % (path, r.get("from"), r.get("to"),
-                                                                             main_hook[path], hook.get(path)))
+            found.append(fail("tools/hook-budget-raises.json", "the row of %s raises from %r to %r, but main's budget is %d and the branch's %s"
+                                  % (path, r.get("from"), r.get("to"), main_hook[path], hook.get(path)),
+                                  "set `from` to main's budget and `to` to the new one", R_BUDGET))
     for path, n in sorted(hook.items()):
         if path in main_hook:
             limit, what = main_hook[path], "main's %d" % main_hook[path]
         else:
             limit, what = 5, "5"
-        if (path, "hook") in limits and limits[(path, "hook")] > limit:
-            limit, what = limits[(path, "hook")], "the realigned %d" % limits[(path, "hook")]
         if n > limit and path in declared:
             continue          # declared: its row is judged above
         if n > limit:
             if path in main_hook or what != "5":
-                found.append("%s: hook budget %d is above %s: budgets only go down, move the "
-                             "logic into our files" % (path, n, what))
+                found.append(fail("%s in tools/hook-budget.json" % path, "hook budget %d is above %s" % (n, what),
+                                      "budgets only go down: move the logic into our files", R_BUDGET))
             else:
-                found.append("%s: hook budget %d for a file new to the series: a new hook is at most 5 "
-                             "lines" % (path, n))
+                found.append(fail("%s in tools/hook-budget.json" % path, "hook budget %d for a file new to the series" % n,
+                                      "a new hook is at most 5 lines: move the logic into our files", R_BUDGET))
     for path, n in sorted(removed.items()):
         if path in main_hook:
             limit, what = main_removed.get(path, 0), "main's %d" % main_removed.get(path, 0)
         else:
             limit, what = 5, "5"
-        if (path, "removed") in limits and limits[(path, "removed")] > limit:
-            limit, what = limits[(path, "removed")], "the realigned %d" % limits[(path, "removed")]
         if n > limit and path in declared_removed:
             continue          # declared: its row is judged above
         if n > limit:
             if path in main_hook or what != "5":
-                found.append("%s: removed budget %d is above %s: budgets only go down, leave "
-                             "Mozilla's lines as they are" % (path, n, what))
+                found.append(fail("%s in tools/removed-budget.json" % path, "removed budget %d is above %s" % (n, what),
+                                      "budgets only go down: leave Mozilla's lines as they are", R_BUDGET))
             else:
-                found.append("%s: removed budget %d for a file new to the series: at most 5 of Mozilla's "
-                             "lines, leave the rest as they are" % (path, n))
+                found.append(fail("%s in tools/removed-budget.json" % path, "removed budget %d for a file new to the series" % n,
+                                      "a new file may lose at most 5 of Mozilla's lines: leave the rest as they are", R_BUDGET))
     return found
 
 
@@ -1402,7 +1612,8 @@ def contract_problems(against_main: bool = False, base=None) -> tuple[list, int,
     # contract_violations: that one is judged on any series root, this one needs the series' churn file.
     violations = violations + hook_contract.churn_violations(ROOT)
     if not HOOK_DEBT.is_file():
-        return ["tools/hook-debt.json is missing: python tools/engine.py hook-debt --init"], len(hooks), len(violations)
+        return [fail("tools/hook-debt.json", "it is missing", "write it once from every violation of now: `%s`" % command("hook-debt", "--init"),
+                         R_BUDGET)], len(hooks), len(violations)
     return (hook_contract.debt_problems(violations, hook_contract.load_debt(HOOK_DEBT),
                                         load_main_debt() if against_main else None),
             len(hooks), len(violations))
@@ -1423,15 +1634,12 @@ def check(source: Path | None = None, tag: str | None = None, against_main: bool
     found += folders.problems(ROOT)       # series-02: every folder states its relation to Mozilla (tools/folders.py)
     if against_main:      # the CLI does; it needs git and origin/main, problems() and the tests' fakes do not
         main_hook, main_removed = load_main_budgets()
-        main_realign = load_main_realign()
         main_raises = load_main_raises()
         raises = json.loads(RAISES.read_text(encoding="utf-8")) if RAISES.is_file() else []
         found += raises_list_problems(raises, main_raises)
         found += budget_raise_problems(json.loads(BUDGET.read_text(encoding="utf-8")),
                                        json.loads(REMOVED_BUDGET.read_text(encoding="utf-8")),
-                                       main_hook, main_removed, main_realign, new_raise_rows(raises, main_raises))
-        found += realign_list_problems(json.loads(REALIGN.read_text(encoding="utf-8")) if REALIGN.is_file() else [],
-                                       main_realign)
+                                       main_hook, main_removed, new_raise_rows(raises, main_raises))
     base = hook_contract.git_base_reader(source, tag) if source is not None and tag else None
     contract, n_hooks, n_violations = (contract_problems(against_main, base) if base is not None
                                        else contract_problems(against_main))
@@ -1440,7 +1648,9 @@ def check(source: Path | None = None, tag: str | None = None, against_main: bool
         found += backport_in_tag_problems(source, tag)
         found += backport_replay_problems(source, tag)
     for p in found:
-        print("FAIL", p)
+        print(p)
+    if found:
+        print("next: %s" % command(*(["check", "--source", "<source>", "--against", tag] if source is not None and tag else ["check"])))
     if not found:
         total = sum(json.loads(BUDGET.read_text(encoding="utf-8")).values())
         gone = sum(json.loads(REMOVED_BUDGET.read_text(encoding="utf-8")).values())
@@ -1481,7 +1691,9 @@ def hook_debt(init: bool = False, summary: bool = False) -> int:
         print(hook_contract.debt_summary(debt))
         return 0
     if not HOOK_DEBT.is_file() and not init:
-        raise SystemExit("tools/hook-debt.json does not exist: python tools/engine.py hook-debt --init")
+        raise SystemExit(halt(fail("tools/hook-debt.json", "it does not exist",
+                                   "write it once from every violation of now: `%s`" % command("hook-debt", "--init"), R_BUDGET),
+                              command("hook-debt", "--init")))
     kept = hook_contract.update_debt(debt, violations, init)
     hook_contract.write_debt(HOOK_DEBT, kept)
     print("tools/hook-debt.json: %d entries (%d before), %d violations now"
@@ -1496,9 +1708,11 @@ def hook_locals(source: Path, tag: str) -> int:
     base = hook_contract.git_base_reader(source, tag)
     found = hook_contract.locals_violations(ROOT, base) + hook_contract.namespace_violations(ROOT, unqualified=True)
     for v in found:
-        print("FAIL %s/hooks.patch, %s: %s %s" % (v.folder, v.file, v.rule, v.detail))
+        print(hook_contract.violation_failure(v))
     if not found:
         print("ok: no hook passes a local of Mozilla's function or sits in a namespace that is not ours (read from %s)" % tag)
+    else:
+        print("next: %s" % command("export", "--source", "<source>"))
     return 1 if found else 0
 
 
@@ -1509,26 +1723,52 @@ def status(source: Path, head: str) -> int:
         print("in step: the series is %s at %s" % (head, now[:10]))
         return 0
     behind = git(source, "log", "--oneline", "%s..%s" % (up["exported_from"], head)).decode()
-    print("the source moved: %s is %s, the series was exported from %s\n%s\nrun export, then verify"
-          % (head, now[:10], up["exported_from"][:10], behind))
+    print(fail("%s in the source repository" % head,
+               "it is %s, the series was exported from %s; the source moved:\n%s" % (now, up["exported_from"], behind.rstrip()),
+               "run export, then verify", R_SERIES))
+    print("next: %s" % command("export", "--source", "<source>", "--head", head))
     return 1
 
 
 SOURCE_COMMANDS = ("status", "apply", "export", "verify", "drift", "port", "hook-locals")     # check needs it only with --against
 
+# The front door's list: every command with one line (a test requires each choice of the parser to be here).
+COMMAND_LINES = (
+    ("status", "did the source move since the last export?"),
+    ("export", "write the series from the source tree (the node tests run first)"),
+    ("verify", "rebuild the tree from the series and compare it with the source head"),
+    ("check", "the series' own rules, offline (also in CI)"),
+    ("apply", "the series as a branch of the source: the tag and one commit per folder"),
+    ("drift", "our patched Mozilla files that Mozilla changed between the tag and --to"),
+    ("port", "move the series to the tag --to: every conflict in one run, then UPSTREAM.json is written"),
+    ("hooks-list", "write every folder's HOOKS.json from its hooks.patch (the export does it too)"),
+    ("gtest-list", "the gtest suites the hooks name, in tools/gtest-suites.json (--write writes it, without it only compares; the export writes it too)"),
+    ("hook-debt", "drop the entries of tools/hook-debt.json that no longer occur (--summary only counts)"),
+    ("hook-locals", "hooks that pass a local of Mozilla's function, read from the tag in the source"),
+    ("shrink-budget", "lower the budgets to the lines the patches carry now"),
+    ("materialize", "CI: fetch the tag, apply the series, check out the tree (--into)"),
+    ("prebuild", "what a failed build would say an hour later, in seconds (tools/prebuild.py)"),
+    ("births", "every place the tree makes a network request, against the ledger (tools/births.py)"),
+    ("docs", "the sections of the docs that the tables generate (--write rewrites them, --check compares)"),
+    ("range-diff", "the layers of the old series against the new one, in ports/range-diff.txt (tools/range_diff.py)"),
+)
+COMMAND_NAMES = [name for name, _ in COMMAND_LINES]
 
-def main() -> int:
-    if len(sys.argv) > 1 and sys.argv[1] == "births":
-        return births.main(sys.argv[2:])      # its own options: --tree, --repo/--rev, --skeleton, --accept-changed, --prune, --tsv
-    if len(sys.argv) > 1 and sys.argv[1] == "prebuild":
-        import prebuild
-        return prebuild.main(sys.argv[2:])    # its own options: --head, --base, --folder, --checks, --json (tools/prebuild.py)
-    if len(sys.argv) > 1 and sys.argv[1] == "range-diff":
-        import range_diff
-        return range_diff.main(sys.argv[2:], build_stack)    # its own options: --source, --old-series, --fetch, --write, --check, --decide
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("command", choices=["status", "apply", "materialize", "export", "verify", "check",
-                                        "shrink-budget", "hook-debt", "hooks-list", "drift", "port", "births", "hook-locals", "range-diff"])
+
+class Parser(argparse.ArgumentParser):
+    """A wrong command line is a failure like any other: where, what, fix, rule, and the next command."""
+
+    def error(self, message):
+        self.exit(2, "%s\nnext: %s\n" % (fail(
+            "python tools/engine.py", "the command line is wrong: %s" % message,
+            "run it with no argument: it prints every command, one line each, and the state of the series", R_SERIES), command()))
+
+
+def build_parser() -> argparse.ArgumentParser:
+    ap = Parser(prog="python tools/engine.py", description="The engine as a patch series (the first lines of tools/engine.py say how each command works).",
+                add_help=False)
+    ap.add_argument("command", nargs="?", choices=COMMAND_NAMES, metavar="command", help="one of: " + ", ".join(COMMAND_NAMES))
+    ap.add_argument("-h", "--help", action="store_true", help="the front door: the state of the series, every command, the next one")
     ap.add_argument("--to", help="drift/port: the Mozilla tag to move to (a stable release, never a beta)")
     ap.add_argument("--into", type=Path, default=Path("."), help="materialize: the directory to make the tree")
     ap.add_argument("--shared", type=Path, default=None,
@@ -1538,23 +1778,127 @@ def main() -> int:
                     help="the Firefox source repository (or the environment variable FIREFOX_SOURCE); no default")
     ap.add_argument("--against", help="check: also try the backports of Mozilla commits against this tag, "
                                       "found in --source (a port does it by itself)")
+    ap.add_argument("--own", action="append", default=[], metavar="PATH=FOLDER",
+                    help="export: the folder of a new file of ours that no folder holds yet (PATH ends with / for every new file under it); "
+                         "a file already under a folder's src/ needs none")
+    ap.add_argument("--write", action="store_true", help="gtest-list: write tools/gtest-suites.json (without it the file is only compared)")
     ap.add_argument("--init", action="store_true", help="hook-debt: write the list from every violation of now (once)")
     ap.add_argument("--summary", action="store_true", help="hook-debt: count the list per rule and folder, write nothing")
-    ap.add_argument("--base")
-    ap.add_argument("--head", help="the source branch (apply: the branch it creates)")
-    ap.add_argument("--force", action="store_true", help="apply: rebuild an existing branch")
-    a = ap.parse_args()
+    ap.add_argument("--base", help="the Mozilla tag the series is on (default: mozilla_tag of UPSTREAM.json)")
+    ap.add_argument("--head", help="the source branch (default: source_branch of UPSTREAM.json; apply: the branch it creates; port: the branch it makes)")
+    ap.add_argument("--force", action="store_true", help="apply/port: rebuild an existing branch")
+    return ap
+
+
+def declared_owners(values: list) -> dict:
+    """`--own PATH=FOLDER` (repeated) as {path or dir/: folder}; a value that is not that shape, or names a folder outside the groups, stops."""
+    declared = {}
+    for value in values:
+        path, equals, folder = value.partition("=")
+        if not (path and equals and folder) or folder.split("/")[0] not in layout.GROUP_ORDER or folder.count("/") < 1:
+            raise SystemExit(halt(fail(
+                "python tools/engine.py export --own %s" % value, "it is not <path or dir/>=<folder>, with a folder under one of %s" % ", ".join(layout.GROUP_ORDER),
+                "write --own dom/base/StealthX.cpp=fingerprint/js-surface/stack-frames (a folder of SERIES, or a new one under a group)", R_SERIES),
+                command("export", "--source", "<source>")))
+        declared[path] = folder
+    return declared
+
+
+def head_verdict(source: Path, base: str, head: str) -> str:
+    """Would `verify` pass: the series rebuilt on the tag against the tree of the source head, said in a sentence (nothing is written)."""
+    try:
+        if subprocess.run(["git", "-C", str(source), "merge-base", "--is-ancestor", base, head], capture_output=True).returncode:
+            return "verify would stop: %s does not descend from %s" % (head, base)
+        built = rebuilt_tree(source, base)
+        expected = git(source, "rev-parse", "%s^{tree}" % head).decode().strip()
+    except (subprocess.CalledProcessError, OSError, KeyError, ValueError, json.JSONDecodeError) as exc:
+        return "verify cannot run here: %s" % (exc.stderr.decode(errors="replace").strip() if getattr(exc, "stderr", None) else exc)
+    if built == expected:
+        return "verify would pass: the series rebuilds the head exactly (tree %s)" % built[:12]
+    return "verify would fail: the series rebuilds tree %s, the head is tree %s" % (built[:12], expected[:12])
+
+
+def front_door(source: Path | None, head: str | None = None, base: str | None = None) -> int:
+    """repo-05, `python tools/engine.py` with no argument and `--help`: the state of the series, every command with one line, and the
+    most likely next command for that state."""
+    up = upstream()
+    base, head = base or up["mozilla_tag"], head or up["source_branch"]
+    print("series: mozilla_tag %s, source_branch %s, exported_from %s" % (up["mozilla_tag"], up["source_branch"], up.get("exported_from", "(never)")))
+    if source is None:
+        print("source: not given (--source <path>, or the environment variable FIREFOX_SOURCE): what moved cannot be read")
+        following = command("status", "--source", "<source>")
+    else:
+        try:
+            now = git(source, "rev-parse", "%s^{commit}" % head).decode().strip()
+        except (subprocess.CalledProcessError, OSError):
+            print("source: %s has no branch %s" % (source, head))
+            following = command("apply", "--source", "<source>", "--head", head)
+        else:
+            same = now == up.get("exported_from")
+            print("source: %s is %s, %s exported_from" % (head, now[:10], "equal to" if same else "not"))
+            verdict = head_verdict(source, base, head)
+            print("source: " + verdict)
+            following = command("check") if same and verdict.startswith("verify would pass") else command("export", "--source", "<source>", "--head", head)
+    print("commands:")
+    width = max(len(name) for name in COMMAND_NAMES)
+    for name, line in COMMAND_LINES:
+        print("  %s  %s" % (name.ljust(width), line))
+    print()
+    print(build_parser().format_help().rstrip())
+    print()
+    print("next: %s" % following)
+    return 0
+
+
+def entry() -> int:
+    """The command line: `main()` with every stop ending in `next:` (repo-05)."""
+    again = command(*sys.argv[1:])
+    try:
+        return main()
+    except SystemExit as stopped:
+        raise stop_if_not_marked(stopped, again) from None
+    except subprocess.CalledProcessError as exc:
+        raise SystemExit(halt(fail(
+            "git %s" % " ".join(str(x) for x in exc.cmd[1:]),
+            "it exited %s: %s" % (exc.returncode, (exc.stderr or b"").decode(errors="replace").strip() or "no message"),
+            "run `%s` by hand to see git's message, then by case: `not a git repository` means --source (or FIREFOX_SOURCE) is not the Firefox repository: "
+            "pass the folder that holds its .git; `unknown revision` or `bad object` means the branch or tag is missing: run `git -C <source> fetch --tags origin`, "
+            "or pass --head with a branch it has; `index.lock` exists means an earlier git run left it: delete that file once no git process is running; "
+            "then run the command again" % " ".join(str(x) for x in exc.cmd),
+            R_SERIES), again)) from None
+
+
+def main() -> int:
+    if sys.argv[1:2] == ["docs"]: return hook_contract.docs_main(ROOT, sys.argv[2:])      # --write | --check: the sections the tables generate
+    if len(sys.argv) > 1 and sys.argv[1] == "births":
+        return births.main(sys.argv[2:])      # its own options: --tree, --repo/--rev, --skeleton, --accept-changed, --prune, --tsv
+    if len(sys.argv) > 1 and sys.argv[1] == "prebuild":
+        import prebuild
+        return prebuild.main(sys.argv[2:])    # its own options: --head, --base, --folder, --checks, --json (tools/prebuild.py)
+    if len(sys.argv) > 1 and sys.argv[1] == "range-diff":
+        import range_diff
+        return range_diff.main(sys.argv[2:], build_stack)    # its own options: --source, --old-series, --fetch, --write, --check, --decide
+    a = build_parser().parse_args()
     up = upstream()
     base, head = a.base or up["mozilla_tag"], a.head or up["source_branch"]
+    if a.command is None or a.help:
+        return front_door(a.source, a.head, a.base)
     if a.command in SOURCE_COMMANDS or (a.command == "check" and a.against):
         if a.source is None:
-            raise SystemExit("%s needs the source repository: pass --source <path> or set FIREFOX_SOURCE" % a.command)
+            raise SystemExit(halt(fail(
+                "python tools/engine.py %s" % a.command, "it needs the source repository, and none is given",
+                "pass --source <path> of the Firefox repository, or set the environment variable FIREFOX_SOURCE",
+                R_SERIES), command(*([a.command] + (["--to", a.to or "<tag>"] if a.command in ("drift", "port") else []) + (["--against", a.against] if a.against else [])
+                                     + ["--source", "<source>"]))))
     if a.command in ("drift", "port"):
         if not a.to:
-            raise SystemExit("%s needs --to <Mozilla tag>" % a.command)
+            raise SystemExit(halt(fail(
+                "python tools/engine.py %s" % a.command, "it needs --to <Mozilla tag>",
+                "name the stable release tag to move to, e.g. FIREFOX_160_0_1_RELEASE (never a beta)", R_PORT),
+                command(a.command, "--to", "<tag>", "--source", "<source>")))
         if a.command == "drift":
             return drift(a.source, base, a.to)
-        return port(a.source, base, a.to, a.head if a.head else "port/%s" % a.to, a.force, check_births=True)
+        return port(a.source, base, a.to, a.head if a.head else "port/%s" % a.to, a.force, check_births=True, record_upstream=UPSTREAM)
     if a.command == "materialize":
         materialize(a.into, shared=a.shared)
         return 0
@@ -1570,6 +1914,18 @@ def main() -> int:
     if a.command == "hooks-list":
         print(write_hooks_list())
         return 0
+    if a.command == "gtest-list":
+        if a.write:
+            print(write_gtest_list())
+            return 0
+        found = gtest_list.problems(ROOT)
+        for p in found:
+            print(p)
+        if found:
+            print("next: %s" % command("gtest-list", "--write"))
+        else:
+            print("ok: " + gtest_list.FILE + " is what gtest-list --write writes")
+        return 1 if found else 0
     if a.command == "shrink-budget":
         shrink_budget()
         return 0
@@ -1579,10 +1935,11 @@ def main() -> int:
         # The tests the build job runs, on the head's tree and on the series about to be written; the checkout takes the series
         # only if they are green (tools/export_gate.py). The write is not reachable from here except through the gate.
         import export_gate
-        export_gate.gate(a.source, head, lambda scratch: export_into(scratch, a.source, base, head), ROOT)
+        declared = declared_owners(a.own)
+        export_gate.gate(a.source, head, lambda scratch: export_into(scratch, a.source, base, head, declared), ROOT)
         return 0
     return verify(a.source, base, head)
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(entry())

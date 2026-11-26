@@ -5,6 +5,9 @@
  "added": {
   "dom/media/StealthSampleRate.h": "100644"
  },
+ "sha256": {
+  "dom/media/StealthSampleRate.h": "e41adff8de44656c489c828372aaa1dfa02c0d47b9149e8afc8f1140969b221d"
+ },
  "inventory": [
   {
    "file": "dom/media/CubebUtils.cpp",
@@ -19,10 +22,6 @@
    "inline_logic_lines": 2,
    "hookable": "already-hook",
    "anchor": "PreferredSampleRate",
-   "evidence": [
-    "+    int32_t rate = mozilla::StaticPrefs::zoom_stealth_audio_sample_rate();",
-    "+    if (rate > 0) return (uint32_t)rate;"
-   ],
    "notes": "Declared sample rate checked after the sCubebForcedSampleRate test override and before the fingerprint-resistance 44100. Reads StaticPrefs directly; it could be one call into our file.",
    "verifier": {
     "changed": [

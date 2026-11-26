@@ -9,6 +9,12 @@
   "netwerk/base/StealthIPv6Literal.h": "100644",
   "netwerk/test/gtest/TestStealthIPv6Literal.cpp": "100644"
  },
+ "sha256": {
+  "juggler/tests/ipv6_literal_fails_like_a_host_with_no_ipv6_route.test.mjs": "d53cc93cc75aa266363ec770fab550790c7ceb8872071b0ec94b5ff1e16b70a2",
+  "netwerk/base/StealthIPv6Literal.cpp": "ff07a89df5cf53ad1e643a7f318878716950b64d6b42166673a65421e9d0d2c5",
+  "netwerk/base/StealthIPv6Literal.h": "3a8c0a227cb4e7395bed931f8898394dd2be8500ff1365c99d2f9290a3ba6cdf",
+  "netwerk/test/gtest/TestStealthIPv6Literal.cpp": "044221f677581e3254728901a46ef2a66e9c4dafd22a34011f9dc7cb53a32e24"
+ },
  "inventory": [
   {
    "file": "netwerk/base/nsSocketTransport2.cpp",
@@ -21,11 +27,6 @@
    "inline_logic_lines": 1,
    "hookable": "already-hook",
    "anchor": "include of StealthIPv6Literal.h; nsSocketTransport::InitiateSocket (the connect)",
-   "evidence": [
-    "+#include \"StealthIPv6Literal.h\"  // STEALTH-HOOK(network/ipv6-literal)",
-    "+  // Behind a SOCKS proxy mNetAddr is the destination, which the proxy reaches.",
-    "-  status = PR_Connect(fd, &prAddr, NS_SOCKET_CONNECT_TIMEOUT);"
-   ],
    "notes": "Every direct TCP connection passes InitiateSocket: PR_Connect becomes StealthIPv6Connect, which, with IPv6 declared off, fails a routable IPv6 destination like a host with no IPv6 route (network unreachable, nothing sent). A destination behind a SOCKS proxy is left alone: the proxy reaches it, not this host. One line of Mozilla replaced.",
    "verifier": {
     "changed": [],
@@ -43,9 +44,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "class nsSocketTransport, among the friend declarations",
-   "evidence": [
-    "+  friend struct StealthSocketTransportAccess;  // STEALTH-HOOK(network/ipv6-literal)"
-   ],
    "notes": "Lets our access struct read the transport's private connect state, so the connect hook passes the transport itself; a rename by Mozilla fails at compile time.",
    "verifier": {
     "changed": [],

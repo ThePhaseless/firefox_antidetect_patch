@@ -6,6 +6,10 @@
   "toolkit/components/windowwatcher/JugglerWindowSize.cpp": "100644",
   "toolkit/components/windowwatcher/JugglerWindowSize.h": "100644"
  },
+ "sha256": {
+  "toolkit/components/windowwatcher/JugglerWindowSize.cpp": "a16ce3eaa508f0a78965128ca103f2306f82b64759bd5ddddf560e0ecebbd6c8",
+  "toolkit/components/windowwatcher/JugglerWindowSize.h": "3c9e183641955e2267bb2ae75ffea01dd0262f76ff4612ef9b1ff3c56630f4ed"
+ },
  "inventory": [
   {
    "file": "toolkit/components/windowwatcher/moz.build",
@@ -18,7 +22,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "hook added by the 2026-10-29 move to our files",
-   "evidence": [],
    "notes": "Hook registering or calling our own code.",
    "verifier": {
     "changed": [],

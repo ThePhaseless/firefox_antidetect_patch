@@ -22,6 +22,17 @@
   "security/sandbox/linux/gtest/TestStealthBrandingPolicy.cpp": "100644",
   "security/sandbox/win/src/sandboxbroker/StealthSandboxBranding.h": "100644"
  },
+ "sha256": {
+  "chrome/test/unit/test_stealth_branding_chrome_registry.js": "63eee0c971f8c30f523571adb21400f493de7ee18d8341e49089dec26889dc7c",
+  "chrome/test/unit/xpcshell-stealth.toml": "bcf2bdf1bca2121f402552522673a499d05f864edfb0785c47e719674a343497",
+  "netwerk/protocol/res/StealthBranding.cpp": "227629a0f7b2cb9257d2e10191a157efe01431a1645e08ed3e7b8cda4656d9a2",
+  "netwerk/protocol/res/StealthBranding.h": "1b5d44b9e146159efc2ae2a2cfbda5606cb108d39a8024417c574d85cfc8845f",
+  "netwerk/protocol/res/gtest/TestStealthBranding.cpp": "1a5620e60f568dc5b396c8087f05b1100a96c7d00a799184aa70962eac0bce8a",
+  "netwerk/protocol/res/gtest/moz.build": "c8721e15602ed3d313b1ac93373d0b614ea1e0f527d5168dbcc7e33fb88adbc1",
+  "security/sandbox/linux/broker/StealthLinuxSandboxBranding.h": "96910c14ef3e18bdc0eeb3ea19932b116aee13d2dd8d61c74e65320c1a8bfe54",
+  "security/sandbox/linux/gtest/TestStealthBrandingPolicy.cpp": "e08394e0a2926f108b6461cd2407cec5c4fb31b3f689c1d8d0d3346c09b0f65d",
+  "security/sandbox/win/src/sandboxbroker/StealthSandboxBranding.h": "d17cc0dae6bac8deb154266276a8faf072814669d7ae150eaf034231245b13b1"
+ },
  "inventory": [
   {
    "file": "chrome/nsChromeRegistry.cpp",
@@ -34,10 +45,6 @@
    "inline_logic_lines": 13,
    "hookable": "movable",
    "anchor": "nsChromeRegistry::ConvertChromeURL",
-   "evidence": [
-    "-  return NS_NewURI(aResult, path, nullptr, baseURI);",
-    "+  rv = mozilla::net::StealthBrandingRedirect(declared);"
-   ],
    "notes": "The resolved chrome:// URI is passed through the declared-branding redirect. zoom.stealth.branding.archive is read indirectly: StealthBrandingRedirect (netwerk/protocol/res/StealthBranding.cpp:99) reads StaticPrefs::zoom_stealth_branding_archive at StealthBranding.cpp:42 (CONFIRMED); no pref appears in the added lines here. The ~13 logic lines (resolve, compare, redirect, rebuild) should move behind one helper call. Page reachability: the StaticPrefList.yaml comment for zoom.stealth.branding.archive says a page reads chrome://branding/content/, which supports category spoof (not independently tested). The rv used here is declared at the top of ConvertChromeURL ('nsresult rv;' in chrome/nsChromeRegistry.cpp), so the first-pass doubt is REFUTED.",
    "verifier": {
     "changed": [
@@ -60,9 +67,6 @@
    "inline_logic_lines": 1,
    "hookable": "already-hook",
    "anchor": "nsChromeRegistryChrome::ManifestContent",
-   "evidence": [
-    "+  mozilla::net::StealthBrandingRegisterPackage(packageName, entry->baseURI);"
-   ],
    "notes": "Records each package's base directory for the redirect in nsChromeRegistry.cpp. The callee is in StealthBranding.h (not in this list).",
    "verifier": {
     "changed": [
@@ -82,9 +86,6 @@
    "inline_logic_lines": 2,
    "hookable": "already-hook",
    "anchor": "nsChromeRegistryContent::RegisterPackage",
-   "evidence": [
-    "+    mozilla::net::StealthBrandingRegisterPackage(aPackage.package, content);"
-   ],
    "notes": "Content-process counterpart of the registration above; skipped when content is null.",
    "verifier": {
     "changed": [
@@ -106,9 +107,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "after the XPCSHELL_TESTS_MANIFESTS list (unit_ipc/xpcshell.toml)",
-   "evidence": [
-    "+XPCSHELL_TESTS_MANIFESTS += [\"unit/xpcshell-stealth.toml\"]  # STEALTH-HOOK(fingerprint/js-surface/branding)"
-   ],
    "notes": "Registers the xpcshell test that the chrome registry serves the declared branding jar, on the packaged binary.",
    "verifier": {
     "changed": [],
@@ -126,11 +124,6 @@
    "inline_logic_lines": 4,
    "hookable": "already-hook",
    "anchor": "SubstitutingProtocolHandler::ResolveURI",
-   "evidence": [
-    "+    return StealthBrandingRedirect(result);",
-    "+  rv = StealthBrandingRedirect(result);",
-    "-    return NS_OK;"
-   ],
    "notes": "Two hooks: the special-case branch and the normal resolution path, so resource://usercontext-content/branding/ reads the declared archive too (same redirect as chrome://branding/content/ in chrome/nsChromeRegistry.cpp:281). Category is spoof, not other: netwerk/protocol/res/StealthBranding.h states a page can read branding files through both URL schemes (contentaccessible) and the contents tell a build from retail; the redirect changes what the page reads. The included mozilla/net/StealthBranding.h is ours (exists in netwerk/protocol/res). The pref zoom.stealth.branding.archive is read inside StealthBranding.cpp, not in this diff.",
    "verifier": {
     "changed": [
@@ -151,9 +144,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "class SubstitutingProtocolHandler, after NS_DECL_NON_VIRTUAL_NSISUBSTITUTINGPROTOCOLHANDLER",
-   "evidence": [
-    "+  nsresult ResolveURI_Mozilla(nsIURI* aResURI, nsACString& aResult);  // STEALTH-HOOK(fingerprint/js-surface/branding)"
-   ],
    "notes": "Declaration of Mozilla's ResolveURI body under its new name (function wrap): ResolveURI itself is ours, defined in netwerk/protocol/res/StealthBranding.cpp, and redirects every successful resolution to the declared branding archive.",
    "verifier": {
     "changed": [],
@@ -171,10 +161,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "EXPORTS.mozilla.net and UNIFIED_SOURCES lists",
-   "evidence": [
-    "+    \"StealthBranding.h\",",
-    "+    \"StealthBranding.cpp\","
-   ],
    "notes": "Registers our own files, both present in netwerk/protocol/res of the source repository. No logic.",
    "verifier": {
     "changed": [],
@@ -192,10 +178,6 @@
    "inline_logic_lines": 5,
    "hookable": "already-hook",
    "anchor": "SandboxBrokerPolicyFactory::InitContentPolicy",
-   "evidence": [
-    "+  if (nsCOMPtr<nsIFile> branding =",
-    "+      policy->AddPath(rdonly, brandingPath.get());"
-   ],
    "notes": "Gives content processes READ access to the declared branding archive (StealthBrandingDeclaredArchive). The grant is silently skipped when that call returns null or GetNativePath fails. The 5 logic lines are at the already-hook limit.",
    "verifier": {
     "changed": [],
@@ -213,9 +195,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "UNIFIED_SOURCES list of the sandbox gtests",
-   "evidence": [
-    "+UNIFIED_SOURCES += [\"TestStealthBrandingPolicy.cpp\"]  # STEALTH-HOOK(fingerprint/js-surface/branding)"
-   ],
    "notes": "Registers our gtest of the content sandbox's branding read rule, after the closing bracket of Mozilla's list.",
    "verifier": {
     "changed": [],
@@ -233,11 +212,6 @@
    "inline_logic_lines": 8,
    "hookable": "movable",
    "anchor": "SandboxBroker::SetSecurityLevelForContentProcess",
-   "evidence": [
-    "+    if (nsCOMPtr<nsIFile> branding =",
-    "+        result = config->AllowFileAccess(",
-    "+          NS_ERROR(\"Failed to add the declared branding read rule.\");"
-   ],
    "notes": "Windows counterpart of the Linux broker change. Its 8-line block should move into one function in our own file (for example AddDeclaredBrandingReadRule(config)), leaving a one-line call. It reuses the existing 'result' variable of the function, which is already used throughout it.",
    "verifier": {
     "changed": [

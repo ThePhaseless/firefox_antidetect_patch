@@ -11,6 +11,11 @@
   "dom/base/StealthInputEventBirth.h": "100644",
   "dom/base/test/gtest/TestStealthInputEventBirth.cpp": "100644"
  },
+ "sha256": {
+  "dom/base/StealthInputEventBirth.cpp": "6141b2695eec76a7df1fd1ed7f3d51dfe3027533035b42c92b563e494040e016",
+  "dom/base/StealthInputEventBirth.h": "3295f1a373d6b1fed42d0933ad7af9058c3324724880fe245efdd74848833b2e",
+  "dom/base/test/gtest/TestStealthInputEventBirth.cpp": "5549ddc1dd4c228b38e395bda5be3a4049f1032503f36147c2f16f56559a07c0"
+ },
  "inventory": [
   {
    "file": "dom/base/TextInputProcessor.cpp",
@@ -23,11 +28,6 @@
    "inline_logic_lines": 0,
    "hookable": "movable",
    "anchor": "TextInputProcessor::Keydown/Keyup/CommitCompositionWith and KeydownInternal/KeyupInternal",
-   "evidence": [
-    "+#include \"StealthInputEventBirth.h\"  // STEALTH-HOOK(fingerprint/input/event-birth)",
-    "+  StealthKeyBirthScope stealthBirth(mStealthNextKeyLatencyMs);  // STEALTH-HOOK(fingerprint/input/event-birth)",
-    "+NS_IMETHODIMP TextInputProcessor::SetNextKeyLatency(double aLatencyMs) { return StealthSetNextKeyLatency(mStealthNextKeyLatencyMs, aLatencyMs, nsContentUtils::IsCallerChrome()); }  // STEALTH-HOOK(fingerprint/input/event-birth)"
-   ],
    "notes": "A key is delivered at once and born the declared latency in the past: setNextKeyLatency (chrome only) declares it for the next key; a StealthKeyBirthScope opened right after the IsCallerChrome assert of each key method takes it (and zeroes it in every case); KeydownInternal/KeyupInternal stamp keyEvent.mTimeStamp with it (StealthInputEventBirth.h). It replaces the chrome setTimeout of PageAgent, which under load moved the delivery itself.",
    "verifier": {
     "changed": [],
@@ -45,9 +45,6 @@
    "inline_logic_lines": 0,
    "hookable": "movable",
    "anchor": "class TextInputProcessor, members",
-   "evidence": [
-    "+  double mStealthNextKeyLatencyMs = 0;  // STEALTH-HOOK(fingerprint/input/event-birth)"
-   ],
    "notes": "One member: the latency declared for the next key.",
    "verifier": {
     "changed": [],
@@ -65,11 +62,6 @@
    "inline_logic_lines": 11,
    "hookable": "movable",
    "anchor": "nsContentUtils::InputEventBirth (new); nsContentUtils::SynthesizeMouseEvent",
-   "evidence": [
-    "+  TimeStamp born = TimeStamp::Now() - TimeDuration::FromMilliseconds(aLatencyMs);",
-    "+        InputEventBirth(aMouseEventData.mLatency);",
-    "+  mouseOrPointerEvent.mJugglerEventId = aMouseEventData.mJugglerEventId;"
-   ],
    "notes": "Two concerns. (1) spoof, input-event-birth: InputEventBirth moves a synthetic event's timeStamp back by the caller's latency and keeps births monotonic through the function-static sLastBorn (no lock; not verified that SynthesizeMouseEvent always runs on the main thread). The function is about 6 logic lines and can move to our file, leaving only the declaration in nsContentUtils.h. (2) juggler, juggler-event-id: copies mJugglerEventId onto the mouse event (B217); that line belongs to another feature and could be split out.",
    "verifier": {
     "changed": [],
@@ -87,7 +79,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "hook added by the 2026-10-29 move to our files",
-   "evidence": [],
    "notes": "Hook registering or calling our own code.",
    "verifier": {
     "changed": [],
@@ -105,9 +96,6 @@
    "inline_logic_lines": 0,
    "hookable": "movable",
    "anchor": "nsITextInputProcessor",
-   "evidence": [
-    "+  void setNextKeyLatency(in double aLatencyMs);  // STEALTH-HOOK(fingerprint/input/event-birth)"
-   ],
    "notes": "One method, setNextKeyLatency(double): the born-in-the-past time of the next key (the interface is chrome-only XPCOM, builtinclass, no WebIDL binding).",
    "verifier": {
     "changed": [],

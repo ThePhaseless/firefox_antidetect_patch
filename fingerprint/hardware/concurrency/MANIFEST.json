@@ -5,6 +5,9 @@
  "added": {
   "dom/workers/StealthHardwareConcurrency.h": "100644"
  },
+ "sha256": {
+  "dom/workers/StealthHardwareConcurrency.h": "d5c63295310706cdb43ce208e7b4e0ac249ac8c4def9afb208b3bdda1c451279"
+ },
  "inventory": [
   {
    "file": "dom/workers/WorkerNavigator.cpp",
@@ -19,10 +22,6 @@
    "inline_logic_lines": 2,
    "hookable": "already-hook",
    "anchor": "WorkerNavigator::HardwareConcurrency",
-   "evidence": [
-    "+    int32_t hwc = mozilla::StaticPrefs::zoom_stealth_hw_concurrency();",
-    "+    if (hwc > 0) return uint64_t(hwc);"
-   ],
    "notes": "Returns the pref when > 0, before the RuntimeService value. [verified: CONFIRMED, the main-thread counterpart Navigator::HardwareConcurrency reads the same pref at dom/base/Navigator.cpp:702.] The include is added out of alphabetical order (cosmetic).",
    "verifier": {
     "changed": [

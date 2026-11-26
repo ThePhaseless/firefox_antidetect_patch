@@ -12,14 +12,6 @@
   "function": "transport_lcppsrcs = [",
   "kind": "add",
   "form": "registration",
-  "line": "transport_lcppsrcs += [\"StealthIceResolverContext.cpp\"]  # STEALTH-HOOK(network/doh)",
-  "test": "node:juggler/tests/the_ice_name_is_resolved_in_the_context_of_the_peer_connection.test.mjs#the files are built"
- },
- {
-  "file": "dom/media/webrtc/transport/common.build",
-  "function": "transport_lcppsrcs = [",
-  "kind": "add",
-  "form": "registration",
   "line": "transport_lcppsrcs += [\"nr_stealth_network.cpp\"]  # STEALTH-HOOK(fingerprint/webrtc/declared-network)",
   "test": "gtest:StealthDeclaredNetwork.TheInterfaceListIsTheDeclarationOfTheEnvironment"
  },
@@ -192,5 +184,108 @@
   "form": "notice",
   "line": "  StealthApplyDeclaredNetwork();  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
   "test": "gtest:StealthDeclaredNetwork.NoIPv6InTheDeclarationIsNoIPv6NameLookup"
+ },
+ {
+  "file": "dom/media/webrtc/transport/ipc/WebrtcTCPSocket.cpp",
+  "function": "void WebrtcTCPSocket::OpenWithoutHttpProxy(nsIProxyInfo* aSocksProxyInfo) {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  StealthTcpSocketBorn(this, &prAddr);  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "test": "gtest:StealthTcpProxyRoad.TheSocketIsBornWithItsBindAddressAndNoOtherCondition",
+  "anchor": "the `if (NS_WARN_IF(PR_SUCCESS != PR_StringToNetAddr(mLocalAddress.get(), &prAddr))) {...}` block of WebrtcTCPSocket::OpenWithoutHttpProxy",
+  "why": "prAddr is the intermediate value Mozilla Bind uses, and the transport must be given its attributes before it is bound"
+ },
+ {
+  "file": "dom/media/webrtc/transport/nr_socket_prsock.cpp",
+  "function": "nrappkit copyright:",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"nr_stealth_network.h\"    // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "test": "gtest:StealthNrSocketBirth.ACreateThatFailsAtTheLastStepLeavesNoPortOfOursBehind"
+ },
+ {
+  "file": "dom/media/webrtc/transport/nr_socket_prsock.cpp",
+  "function": "int NrSocket::create(nr_transport_addr* addr) {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  if (StealthBindAddress(addr, &naddr)) ABORT(R_INTERNAL);  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "test": "gtest:StealthNrSocketBirth.ACreateThatFailsAtTheLastStepLeavesNoPortOfOursBehind",
+  "anchor": "if ((r = nr_transport_addr_to_praddr(addr, &naddr))) ABORT(r);",
+  "why": "naddr is the intermediate value that the family, the bind and the later GetSockName of Mozilla use"
+ },
+ {
+  "file": "dom/media/webrtc/transport/nr_socket_prsock.cpp",
+  "function": "int NrSocket::create(nr_transport_addr* addr) {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "    if (StealthBindPortNotAvailable()) ABORT(R_ALREADY);  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "test": "gtest:StealthNrSocketBirth.ACreateThatFailsAtTheLastStepLeavesNoPortOfOursBehind",
+  "anchor": "the `if (status != PR_SUCCESS) {` of the bind in NrSocket::create",
+  "why": "the condition is the NSPR error that Mozilla bind left, read before Mozilla logs and aborts"
+ },
+ {
+  "file": "dom/media/webrtc/transport/nr_socket_prsock.cpp",
+  "function": "int NrSocket::create(nr_transport_addr* addr) {",
+  "kind": "rewrite",
+  "form": "wrap-expression",
+  "line": "    if ((r = StealthDeclaredAddressKept(&my_addr_, addr, nr_praddr_to_transport_addr(&naddr, &my_addr_, addr->protocol, 1))))  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "removed": "    if ((r = nr_praddr_to_transport_addr(&naddr, &my_addr_, addr->protocol, 1)))",
+  "test": "gtest:StealthNrSocketBirth.ACreateThatFailsAtTheLastStepLeavesNoPortOfOursBehind"
+ },
+ {
+  "file": "dom/media/webrtc/transport/nr_socket_prsock.cpp",
+  "function": "int NrSocket::create(nr_transport_addr* addr) {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  if (StealthSocketAttachRefusedForTests(addr)) ABORT(R_INTERNAL);  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "test": "gtest:StealthNrSocketBirth.ACreateThatFailsAtTheLastStepLeavesNoPortOfOursBehind",
+  "anchor": "// Finally, register with the STS",
+  "why": "the position, right before the attach, is the point of the test"
+ },
+ {
+  "file": "dom/media/webrtc/transport/nr_socket_prsock.cpp",
+  "function": "int NrSocket::create(nr_transport_addr* addr) {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  StealthSocketAttached(&my_addr_, &stealth_own_port_, addr, rv);  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "test": "gtest:StealthNrSocketBirth.ACreateThatFailsAtTheLastStepLeavesNoPortOfOursBehind",
+  "anchor": "the `if (!NS_SUCCEEDED(rv)) {...}` block after stservice->AttachSocket in NrSocket::create",
+  "why": "a declared UDP host socket is registered as the last step, only after the attach worked"
+ },
+ {
+  "file": "dom/media/webrtc/transport/nr_socket_prsock.cpp",
+  "function": "int NrSocket::sendto(const void* msg, size_t len, int flags,",
+  "kind": "add",
+  "form": "unknown",
+  "line": "  to = StealthOwnPeerToKernel(&my_addr_, to);  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "test": "gtest:StealthNrSocketBirth.ACreateThatFailsAtTheLastStepLeavesNoPortOfOursBehind",
+  "anchor": "int32_t status; (the locals of NrSocket::sendto)",
+  "why": "the destination is the value Mozilla nr_transport_addr_to_praddr converts next"
+ },
+ {
+  "file": "dom/media/webrtc/transport/nr_socket_prsock.cpp",
+  "function": "int NrSocket::recvfrom(void* buf, size_t maxlen, size_t* len, int flags,",
+  "kind": "add",
+  "form": "anchor",
+  "line": "  StealthOwnPeerFromKernel(&my_addr_, from);  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "test": "gtest:StealthNrSocketBirth.ACreateThatFailsAtTheLastStepLeavesNoPortOfOursBehind",
+  "anchor": "if ((r = nr_praddr_to_transport_addr(&nfrom, from, my_addr_.protocol, 0))) ABORT(r); in NrSocket::recvfrom",
+  "why": "the source address is the value Mozilla returns to the caller, rewritten once it is converted"
+ },
+ {
+  "file": "dom/media/webrtc/transport/nr_socket_prsock.cpp",
+  "function": "void NrSocket::close() {",
+  "kind": "add",
+  "form": "notice",
+  "line": "  StealthOwnPortReleased(&my_addr_, &stealth_own_port_);  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "test": "gtest:StealthNrSocketBirth.ACreateThatFailsAtTheLastStepLeavesNoPortOfOursBehind"
+ },
+ {
+  "file": "dom/media/webrtc/transport/nr_socket_prsock.h",
+  "function": "class NrSocket : public NrSocketBase, public nsASocketHandler {",
+  "kind": "add",
+  "form": "member",
+  "line": "  uint16_t stealth_own_port_ = 0;  // STEALTH-HOOK(fingerprint/webrtc/declared-network)",
+  "test": "gtest:StealthNrSocketBirth.ACreateThatFailsAtTheLastStepLeavesNoPortOfOursBehind"
  }
 ]

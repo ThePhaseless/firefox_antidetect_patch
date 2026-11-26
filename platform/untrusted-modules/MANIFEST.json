@@ -9,6 +9,11 @@
   "toolkit/xre/dllservices/StealthOwnBinaries.h": "100644",
   "toolkit/xre/dllservices/tests/gtest/TestStealthOwnBinaries.cpp": "100644"
  },
+ "sha256": {
+  "toolkit/xre/dllservices/StealthOwnBinaries.cpp": "9e4318123395cb71a39d227408b657e5a6051a90ccd93dbf4487c8594c166c71",
+  "toolkit/xre/dllservices/StealthOwnBinaries.h": "870ee94a28b0c8e513f278c68beb9a9f98cb7c8003d57f61f41315ee65948eec",
+  "toolkit/xre/dllservices/tests/gtest/TestStealthOwnBinaries.cpp": "b62e1dbd49f3f56fe72708aebfb882265b95e4c7ad157f9e94bcb535a0ac669a"
+ },
  "inventory": [
   {
    "file": "toolkit/xre/dllservices/UntrustedModulesData.cpp",
@@ -21,7 +26,6 @@
    "inline_logic_lines": 25,
    "hookable": "movable",
    "anchor": "ModuleRecord::GetVersionAndVendorInfo; ModuleRecord::IsInDirectoryOf (new); IsOwnUnsignedBinary (new)",
-   "evidence": [],
    "notes": "Performance fix (commit 26e54ca1b1): the Untrusted Modules processor skips the Authenticode lookup for this build's own unsigned binaries (beside firefox.exe and with its version), which always fell through to the catalog search: 1.26 s of CPU per launch. Classification unchanged (FirefoxDirectory + version). IsOwnUnsignedBinary is inline logic that can move to an own file."
   },
   {
@@ -35,7 +39,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "hook added by the 2026-10-29 move to our files",
-   "evidence": [],
    "notes": "Hook registering or calling our own code.",
    "verifier": {
     "changed": [],
@@ -53,7 +56,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "UNIFIED_SOURCES",
-   "evidence": [],
    "notes": "Performance fix (commit 26e54ca1b1): the Untrusted Modules processor skips the Authenticode lookup for this build's own unsigned binaries (beside firefox.exe and with its version), which always fell through to the catalog search: 1.26 s of CPU per launch. Classification unchanged (FirefoxDirectory + version). IsOwnUnsignedBinary is inline logic that can move to an own file."
   }
  ]

@@ -14,7 +14,7 @@ a value: it is derived from BACKPORT.json, and a backport folder has no FOLDER.j
 `mozilla_tag` is red (Mozilla ships the fix); `engine.py port --to <tag>` stops for the same reason before it merges (`fixed_in_stops`).
 A FOLDER.json anywhere but directly in a SERIES folder is red.
 
-Messages say where, what, fix and rule (docs/decisions/series-02-every-folder-states-its-relation-to-mozilla.md).
+Every problem is the text of a `fail()` (repo-04): `FAIL <where>: <what>. Fix: <fix>. Rule: docs/decisions/series-02-...md`, whole, never cut.
 """
 from __future__ import annotations
 
@@ -24,10 +24,14 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from failure import fail  # noqa: E402
+
 ROOT = Path(__file__).resolve().parent.parent
 FILE = "FOLDER.json"
 BACKPORT = "BACKPORT.json"
-RULE = "docs/decisions/series-02-every-folder-states-its-relation-to-mozilla.md"
+RULE_ID = "series-02-every-folder-states-its-relation-to-mozilla"
+RULE = "docs/decisions/%s.md" % RULE_ID      # the path, for the callers that print it themselves (engine.py port)
 RELATIONS = ("product", "defect")
 KEYS = {"relation", "upstream", "fixed_in"}
 NOT_FILED = "not-filed"
@@ -37,9 +41,9 @@ SHAPES = ('{"relation": "product"}, {"relation": "defect", "upstream": "not-file
           '"https://bugzilla.mozilla.org/show_bug.cgi?id=<N>"}, and for a defect only "fixed_in": "FIREFOX_<N>_<M>_RELEASE"')
 
 
-def say(where: str, what: str, fix: str) -> str:
-    """One problem as where / what / fix / rule."""
-    return "%s: %s\nfix: %s\nrule: %s" % (where, what, fix, RULE)
+def failed(where: str, what: str, fix: str):
+    """One problem of series-02 as a Failure (where, what, fix, rule: tools/failure.py), which prints as FAIL where: what. Fix: fix. Rule: path."""
+    return fail(where, what, fix, RULE_ID)
 
 
 def release_version(tag) -> tuple | None:
@@ -73,9 +77,9 @@ def load(root, folder: str):
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
-        return None, say(where, "it is not JSON (%s)" % exc, "write one of: " + SHAPES)
+        return None, failed(where, "it is not JSON (%s)" % exc, "write one of: " + SHAPES)
     if not isinstance(data, dict):
-        return None, say(where, "it is not a JSON object", "write one of: " + SHAPES)
+        return None, failed(where, "it is not a JSON object", "write one of: " + SHAPES)
     return data, None
 
 
@@ -85,40 +89,40 @@ def shape_problems(folder: str, data: dict, tag: str | None) -> list:
     found = []
     extra = sorted(set(data) - KEYS)
     if extra:
-        found.append(say(where, "the key(s) %s are not allowed (only relation, upstream, fixed_in)" % ", ".join(map(repr, extra)),
+        found.append(failed(where, "the key(s) %s are not allowed (only relation, upstream, fixed_in)" % ", ".join(map(repr, extra)),
                          "delete them: " + SHAPES))
     relation = data.get("relation")
     if relation == "backport":
-        found.append(say(where, 'relation "backport" is written by hand',
+        found.append(failed(where, 'relation "backport" is written by hand',
                          "backport is derived from BACKPORT.json: a backport folder has a BACKPORT.json and no %s; a folder "
                          "that is not one is a product or a defect" % FILE))
         return found
     if relation not in RELATIONS:
-        found.append(say(where, "relation %r is not product or defect" % (relation,), "write one of: " + SHAPES))
+        found.append(failed(where, "relation %r is not product or defect" % (relation,), "write one of: " + SHAPES))
         return found
     if relation == "product":
         for key in ("upstream", "fixed_in"):
             if key in data:
-                found.append(say(where, 'a product has no "%s"' % key,
+                found.append(failed(where, 'a product has no "%s"' % key,
                                  'delete "%s": only a defect names what Mozilla did about it (or make the relation defect)' % key))
         return found
     if "upstream" not in data:
-        found.append(say(where, 'a defect has no "upstream"',
+        found.append(failed(where, 'a defect has no "upstream"',
                          'add "upstream": "not-filed", or the bug Mozilla has: "https://bugzilla.mozilla.org/show_bug.cgi?id=<N>"'))
     else:
         up = data["upstream"]
         if not (isinstance(up, str) and (up == NOT_FILED or BUGZILLA.fullmatch(up))):
-            found.append(say(where, "upstream %r is neither not-filed nor a Mozilla bug URL" % (up,),
+            found.append(failed(where, "upstream %r is neither not-filed nor a Mozilla bug URL" % (up,),
                              'write "not-filed" or exactly https://bugzilla.mozilla.org/show_bug.cgi?id=<N>: the file never '
                              "points outside the repository (no local path, no other URL, no text)"))
     if "fixed_in" in data:
         fixed = data["fixed_in"]
         version = release_version(fixed)
         if version is None:
-            found.append(say(where, 'fixed_in %r is not a release tag' % (fixed,),
+            found.append(failed(where, 'fixed_in %r is not a release tag' % (fixed,),
                              'write the tag that ships the fix, digits only: "FIREFOX_<N>_<M>_RELEASE" or "FIREFOX_<N>_<M>_<P>_RELEASE"'))
         elif fixed_in_stop(version, tag):
-            found.append(say(where, "fixed_in %s is at or before the series' tag %s: Mozilla ships the fix" % (fixed, tag),
+            found.append(failed(where, "fixed_in %s is at or before the series' tag %s: Mozilla ships the fix" % (fixed, tag),
                              "drop the folder (its change in the source branch, then export) or rebase it onto Mozilla's fix; "
                              "then delete or move fixed_in"))
     return found
@@ -146,13 +150,13 @@ def stray_files(root, listed: set) -> list:
     """Every FOLDER.json of the repository that is not directly in a SERIES folder (the files under a folder's src/ are Mozilla-tree
     files of ours, not a record of the folder, and are not looked at)."""
     root = Path(root)
-    found = []
+    strays = []
     for here, dirs, files in os.walk(root):
         rel = Path(here).relative_to(root).as_posix()
         dirs[:] = sorted(d for d in dirs if d != ".git" and not (d == "src" and rel in listed))
         if FILE in files and rel not in listed:
-            found.append("." if rel == "." else rel)
-    return sorted(found)
+            strays.append("." if rel == "." else rel)
+    return sorted(strays)
 
 
 def problems(root=ROOT) -> list:
@@ -164,7 +168,7 @@ def problems(root=ROOT) -> list:
     tag = mozilla_tag(root)
     found = []
     if release_version(tag) is None:
-        found.append(say("UPSTREAM.json", "mozilla_tag %r is not a release tag, so no fixed_in can be judged" % (tag,),
+        found.append(failed("UPSTREAM.json", "mozilla_tag %r is not a release tag, so no fixed_in can be judged" % (tag,),
                          "set mozilla_tag to the stable release the series is on (FIREFOX_<N>_<M>_RELEASE)"))
     for folder in listed:
         data, bad = load(root, folder)
@@ -173,15 +177,15 @@ def problems(root=ROOT) -> list:
             found.append(bad)
         elif is_backport(root, folder):
             if data is not None:
-                found.append(say(where, "this folder has a %s: it is a backport, and its relation is derived from that file" % BACKPORT,
+                found.append(failed(where, "this folder has a %s: it is a backport, and its relation is derived from that file" % BACKPORT,
                                  "delete %s" % FILE))
         elif data is None:
-            found.append(say(where, "the folder does not state its relation to Mozilla",
+            found.append(failed(where, "the folder does not state its relation to Mozilla",
                              "write it by hand, once: " + SHAPES))
         else:
             found += shape_problems(folder, data, tag)
     for stray in stray_files(root, set(listed)):
-        found.append(say("%s/%s" % (stray, FILE) if stray != "." else FILE,
+        found.append(failed("%s/%s" % (stray, FILE) if stray != "." else FILE,
                          "a %s outside a folder of SERIES" % FILE,
                          "delete it: the relation is stated by the folder that makes the change, directly in it"))
     return found
@@ -190,7 +194,7 @@ def problems(root=ROOT) -> list:
 def main(argv=None) -> int:
     found = problems(Path(argv[0]) if argv else ROOT)
     for p in found:
-        print("FAIL", p)
+        print(p)
     if not found:
         print("ok: every folder states its relation to Mozilla")
     return 1 if found else 0

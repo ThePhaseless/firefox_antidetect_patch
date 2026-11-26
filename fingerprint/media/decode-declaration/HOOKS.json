@@ -116,5 +116,13 @@
    "kind": "only-place",
    "why": "A guard is the first statement of WebrtcVideoEncoderFactory::SupportsCodec: any later line lets Mozilla's body run first, and every other line of the function is as busy."
   }
+ },
+ {
+  "file": "dom/media/gtest/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "UNIFIED_SOURCES += [\"TestStealthMediaDeclaration.cpp\"]  # STEALTH-HOOK(fingerprint/media/decode-declaration)",
+  "test": "gtest:StealthMediaDeclaration.SupportsAsyncAnswersFromTheDeclaration"
  }
 ]

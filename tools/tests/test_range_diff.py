@@ -164,7 +164,7 @@ def test_check_is_red_when_the_file_is_missing(world, mozilla, capsys):
     capsys.readouterr()
     assert run(world, mozilla, "--check") == 1
     err = capsys.readouterr().err
-    assert "ports/range-diff.txt: the file is missing" in err and "fix: python tools/engine.py range-diff" in err and "rule: docs/decisions/series-02-" in err
+    assert "ports/range-diff.txt: the file is missing" in err and "Fix: python tools/engine.py range-diff" in err and "Rule: docs/decisions/series-02-" in err
 
 
 def test_check_is_red_when_the_file_is_stale(world, mozilla, capsys):
@@ -174,7 +174,7 @@ def test_check_is_red_when_the_file_is_stale(world, mozilla, capsys):
     capsys.readouterr()
     assert run(world, mozilla, "--check") == 1
     err = capsys.readouterr().err
-    assert "the file is stale" in err and "StealthA" in err and "fix: python tools/engine.py range-diff" in err
+    assert "the file is stale" in err and "StealthA" in err and "Fix: python tools/engine.py range-diff" in err
     # and the same file is green again once it is written again
     assert run(world, mozilla, "--write") == 0 and run(world, mozilla, "--check") == 0
 
@@ -247,7 +247,7 @@ def test_a_file_the_stack_needs_that_is_not_there_is_an_error_that_names_the_fix
     capsys.readouterr()
     assert run(world, into) == 2
     err = capsys.readouterr().err
-    assert "have no content in the repository (first: dom/a.cpp)" in err and "--fetch" in err and "rule: docs/decisions/series-02-" in err
+    assert "have no content in the repository (first: dom/a.cpp)" in err and "--fetch" in err and "Rule: docs/decisions/series-02-" in err
     assert "Traceback" not in err
     assert run(world, into, "--fetch") == 0                       # the fetch for the right set repairs it
 

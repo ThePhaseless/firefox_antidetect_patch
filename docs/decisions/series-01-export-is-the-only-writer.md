@@ -4,7 +4,6 @@
 - `FEATURE.md` after its first export, and the hand fields of `HOOKS.json` (`test`, `anchor`, `why`);
 - `tools/layout.py`, `tools/inventory.json`, `tools/hook-names.json`, `tools/birth-ledger.json`;
 - `tools/hook-budget.json` and `tools/removed-budget.json`, downward only; `tools/hook-budget-raises.json`;
-- `UPSTREAM.json`: `mozilla_tag` and `source_branch`;
 - `BACKPORT.json` with the upstream diff beside it, `AGENTS.md`, `docs/`, `tools/`, `series.yml`, `noreply-identity.yml`.
 
 **Why.** A patch edited here and not in the source is erased by the next `export`, and the two trees then differ without anyone noticing. `verify` rebuilds the tree in a throwaway git index and compares it with the source head: "identical" is the proof that the series is the engine. The workflows at the root are copies of `platform/ci/src/.github/workflows/`, and `check` fails when a copy differs.

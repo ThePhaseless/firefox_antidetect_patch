@@ -141,6 +141,134 @@
   "gfx/thebes/StealthBundleFontList.mozbuild": "100644",
   "gfx/thebes/StealthDWriteFontList.cpp": "100644"
  },
+ "sha256": {
+  "browser/fonts/LEELAWUI.TTF": "ca9a670f12d0e47c20441012a22f78ab17c1b126818e0e887ef7db6ecf5e76b4",
+  "browser/fonts/LUCON.TTF": "2ca2cfde263fa420e8d39420f075ee9ac80bc0794272c53ac4571a88f8a075a6",
+  "browser/fonts/L_10646.TTF": "97226e81f19eff8c8fb191745748bab920472c005d3ec4e23d9a50a12c471d92",
+  "browser/fonts/Nirmala.ttf": "a4d3594f888ab0bf446870433dbca3485a7a860a0eb48a0fc85b567645ac0cfe",
+  "browser/fonts/SitkaSmall.ttf": "e63c51a7dbe1ea5c5e7545079388f8c6d82bdb5a507f5d415a420e03366a8541",
+  "browser/fonts/StealthFonts.mozbuild": "d185ba834b0e5d0d6028c56ed7af8cc9a44164ba4654de8c27c71697377f0298",
+  "browser/fonts/arial7_04.ttf": "05c7da5fe195e04d76bbe4f22b7829ebc142f957066449f68d59afbb2d446b33",
+  "browser/fonts/arialbd7_04.ttf": "6d0bdab8b0df09ac995061647100a8f8d4ef8cc965d0d7ebb057e5d278b0030a",
+  "browser/fonts/arialbi7_04.ttf": "9efe7ff2096181f613247508768c18aade2fcb6f8b604c10915ef833b0ae953e",
+  "browser/fonts/ariali7_04.ttf": "fd16ddcf71dfa7c3c1c9511e58e6485058d08b9d487d1ff07a8cc19f1456855a",
+  "browser/fonts/ariblk.ttf": "10df702864b1f89cb29ba0d6b97c04228338d16807e13e8d8c74b91aba5e5f23",
+  "browser/fonts/bahnschrift2_07.ttf": "eaad201da94cb323401fdb8cc760650803ddf8fd704cb9fa56317e6c69bc6fd6",
+  "browser/fonts/bundle-fonts.list": "13d4d24f2314a50931915aa61e472dd02d3ed7797d80143b02d997a7d510470f",
+  "browser/fonts/calibri6_26.ttf": "df2c69a18a462e5cbc97d04a033f3bd7cd0abfe818381641f8c2dee7b7c43dbd",
+  "browser/fonts/calibrib6_26.ttf": "5e8b2eb430f543eb304f08f44f5eb02ccbc39ffdc95400aae96f5dcd2aea73d8",
+  "browser/fonts/calibrii6_26.ttf": "21390a7e84b61224916e810fd00344ad9ad4f1d9115151a551845a4387d20b10",
+  "browser/fonts/calibriz6_26.ttf": "b699a59faad65272ee48a4d118d6bc743d4cc4ba338cb1c6347deec58aa1e1a0",
+  "browser/fonts/cambria6_99.ttc": "84e70ccc1664482f4a960442c7a166c91a1b2cf98ff88c33cb73f79403f66d7b",
+  "browser/fonts/cambriab6_98.ttf": "6685c657a7e292083e28f19bbf1a1e90509ce3e1130dbc4ed1c62ba3f9140543",
+  "browser/fonts/cambriai6_98.ttf": "6905f0ac846d1ec4326cd14a46cb7379204940aa293b098ee4c1a69723bbd165",
+  "browser/fonts/cambriaz6_98.ttf": "fa90f376ad37f308a819b341c8185f788d30a1012829278592eab45a41818d1a",
+  "browser/fonts/candara5_64.ttf": "002c1e3378d02ed7dbdb3df1c94d433413a56f3f2f3aa8315a57720ee851dc45",
+  "browser/fonts/candarab5_64.ttf": "ec0dce5170aaaf2cf485d4ba39d86fbba1dd1c76d9140cbf75a6b84b50fb20de",
+  "browser/fonts/candarai5_64.ttf": "c165dbbc35bbf1fefae865c3e6b02404c8d182074fe04e78e221bab7d35ce3f8",
+  "browser/fonts/candaraz5_64.ttf": "a873581d9f0886441bd45c5e425a734e86e063ef583b9cf8081b1aa03b871f1c",
+  "browser/fonts/comic5_15.ttf": "fc7fbc3fb456a363f1f719b0ec62ae093c78124bb6da046006ae7e217a6b8575",
+  "browser/fonts/comicbd5_15.ttf": "128fdcfdfdd358e1624c15dd1f84a4d0689e59afcdefb81f8105efb2253b9c00",
+  "browser/fonts/comici5_15.ttf": "872cdefea79e25ff1a8a814109593c23ed66ba46f5bb843815d49e1ab4e0be3c",
+  "browser/fonts/comicz5_15.ttf": "36eb300a76582b7d39f3d34834ce1255f0b9b2830fb2e81485c4b85a5ff7f03b",
+  "browser/fonts/consola7_00.ttf": "c6e6ce8119fdd47ec6a5449a08e2d2ad7f41ea03143aae193068ed9fa58eaebc",
+  "browser/fonts/consolab7_00.ttf": "8fa803e5abc7fff0c78c62cd22d07c705f3273c53312380c36ff484246ed3c1b",
+  "browser/fonts/consolai7_00.ttf": "81e2a95d3c49468029c07e58f71a5f0ca4cfcb617eaf6bd77576fb03aa430bb2",
+  "browser/fonts/consolaz7_00.ttf": "1df27cbcc8a9fb7f843bc24e257b78e8ff93de70e8c1ad2caab8379e7d6a1eab",
+  "browser/fonts/constan5_93.ttf": "495577bf8ef74deab6ecc2e7acf63cd966184148f9bc2044a1068cd58501577e",
+  "browser/fonts/constanb5_93.ttf": "b6c66a1858370fe575629e19d53c05350738bf5105e18ceac07fe9efc9cd008d",
+  "browser/fonts/constani5_93.ttf": "2314a03c53506fa79525bc479ea4be9c036d1ebd86a1ffb5837ca5b43ff51f07",
+  "browser/fonts/constanz5_93.ttf": "9311aadcbd919746f50d222fa0215fb44266d6993221c14a196f0725fdae464f",
+  "browser/fonts/corbel6_01.ttf": "a183b77b655df66793639af7874828fb50f748dc4af57ae40f758156f7f34634",
+  "browser/fonts/corbelb6_01.ttf": "fa008372f8a94945d0daef9daf0bfb9e3fba3a25fd17f2607d47ac6861bd0303",
+  "browser/fonts/corbeli6_01.ttf": "9be778c9ed418770f6b5a02064d9c0b47a8fdea1137618f0bec9ac4072430a45",
+  "browser/fonts/corbelz6_01.ttf": "588f090ae3a6d31370457312683d14ee3a5bfbdaaa0a070b7c80225b55b23e78",
+  "browser/fonts/cour6_94.ttf": "6aab1f79264ccda1e7129dba62dbe3750b10eaa27408a327dadb808724e62c84",
+  "browser/fonts/courbd6_94.ttf": "e376f24c9f27eb7370b25aa366d78da731834a1aea651858801c9a14e8906943",
+  "browser/fonts/courbi6_94.ttf": "ac3b362cf998eb33475655e12ab7cb2f6a35d1f2eff6f76af00ebb6f81c53ee7",
+  "browser/fonts/couri6_94.ttf": "546406ddbb3e3f6b876a5e8a5dee62ac090d1448662e98d8844b22393813dd13",
+  "browser/fonts/ebrima5_19.ttf": "1dcd304f0ba642dbc3c3f3ccb70c24e9fad7ada2e2d5d0061c7cacab86e8df92",
+  "browser/fonts/ebrimabd5_19.ttf": "a7bc75937950d0f217f79313631d81f5b92459c414a4099d6ea3c0c0262a716b",
+  "browser/fonts/framd5_02.ttf": "bac844bd41f847cf138737026d41c983387a1065535c32e78aa22c48708b52ad",
+  "browser/fonts/framdit5_01.ttf": "df59f9ea915957b22a389d68580bf40dc5bd05822cc65b5fdcc188c706a694e7",
+  "browser/fonts/gabriola5_93.ttf": "ddd852f9e43a5e81af62a3f6654324ba7553d7d66101ab848abc1bd2d626ac4b",
+  "browser/fonts/gadugi1_13.ttf": "0ec2bdbfc2ba99d9fb05b6f7c511e7ab8b7c055e2d644570ad777455d6e9796d",
+  "browser/fonts/gadugib1_13.ttf": "c96226cba7f50e94b534a5f8ade6a54f48a03be7c73360524eda5cbce4de34b6",
+  "browser/fonts/georgia5_59.ttf": "38dffcaf1fac89492f7c56c600a14daf36ae42f7c21985cd4134ae113124a58f",
+  "browser/fonts/georgiab5_59.ttf": "72a6cd94fab6c179392075d3fb361e269cdddfad41bb7ab385fa22a37e49a900",
+  "browser/fonts/georgiai5_59.ttf": "d3e4bad27651d120ac8f2cea42cf4b4f077264fb243f66b3caffcfd35465f49b",
+  "browser/fonts/georgiaz5_59.ttf": "3f9e512f82eaf6f1b7869b82013fb79f6eaf1a41e75a0e7b96f31f35b1022ae4",
+  "browser/fonts/himalaya5_23.ttf": "fdec3a7efacd57913d3c14111837908ccbabea5b0b44ec62527eb73acf743afb",
+  "browser/fonts/impact5_11.ttf": "d8bbdb72e3f930157824b2e59677d3a912d4512c14a948e6656a2e3fb0c935ad",
+  "browser/fonts/inkfree2_00.ttf": "c8ab96bc49ec1dc36936b5973fc143ca222c1a33ab27b87071a3bbc44d34ca9a",
+  "browser/fonts/javatext1_10.ttf": "df8d94382f73e6d2197b60653c3d55c28ab5cf127a82e65b8af4ed1b52fdc412",
+  "browser/fonts/leelauib5_06.ttf": "c958f6d6c78a2234ba45a415a8288ab8e0b1aa17d59fc129c9814c5762bd3a20",
+  "browser/fonts/leelawui5_06.ttf": "f0d4f22c972e2f1df32bc5125408891abb5ba418b0fd4f4118085170e16fa822",
+  "browser/fonts/malgun.ttf": "7a183cf1c6c56b9609fcc16eda8b5229fbc11758a21e669ec00343239b02192f",
+  "browser/fonts/marlett5_01.ttf": "b7397adf2dcc24ca790348a3c26deb2122b45e5728fd25fc588de4cf5a75b469",
+  "browser/fonts/micross7_03.ttf": "9621f0043b451d266255ac6229e729d476b76dd908635924f0bcdc4bb6719de1",
+  "browser/fonts/mingliub.ttc": "8f8afdb3ec7047118f6dc51b29d395e697ee6770d0afd0cd407457e2ad6e93cb",
+  "browser/fonts/mmrtext1_21.ttf": "289bfc7da2a20102b0e00bc86d939cc1e3a41b2492bf61f87acdc49a493cb748",
+  "browser/fonts/mmrtextb1_21.ttf": "8b20b869b1fb1ab26b8e7b90e28a34a575a097c41662a9f17cd9875e2688eaa3",
+  "browser/fonts/monbaiti5_54.ttf": "b77cc080c4ad47f519c8317410b0346618ddd80c536acfd37879e29ba6b4eb93",
+  "browser/fonts/msgothic5_32.ttc": "4bde3e6392b96910fb59094c6c1a4dbfae18fee78d0bf13dc30616837c4f95db",
+  "browser/fonts/msjh6_15.ttc": "1fd5fc7046e0eea753988ee06d1a5a731df68475614e2174fbba9b4800f392ac",
+  "browser/fonts/msyh6_31.ttc": "d79c55e68b1131eea0cc1c47be4f572d964f28c682e143db2ad09c1e4cb07a3f",
+  "browser/fonts/msyi6_00.ttf": "80aef1c25135b945e9de7d09e6445c386405eb2e0ea7032d4cd00a2fe3eef0ae",
+  "browser/fonts/mvboli6_85.ttf": "5dfd7a4c708caeefae42cdb9540946de042beeb8c069dfde0dbc14c2fa0705ae",
+  "browser/fonts/ntailu5_99.ttf": "de0b632015447f28c2db41c8e07c745cedb05ead5dbc2e73f19da14d2e5f2151",
+  "browser/fonts/ntailub5_99.ttf": "cfc2acbf9ae0205a0a258e564bdbf5466a4e49a95281a1d2e72690f149ec837b",
+  "browser/fonts/pala5_03.ttf": "e47d594e2e2bc31b28f87b6f66483d32f925843ceb002f919c7a403aca48813d",
+  "browser/fonts/palab5_03.ttf": "8e14668bbae03f78ed668dbe3261218881960dcd9fb80ad6c1d1dfb4226a57c3",
+  "browser/fonts/palabi5_03.ttf": "d0e722b91ffd5391cc2e7d6e976f274d5aee9fe0b8d0fedfffe093763e695cde",
+  "browser/fonts/palai5_03.ttf": "99f0af2d1941707fecda23da38bafbed5144a73a3720d773c05b9d4c445920ed",
+  "browser/fonts/phagspa6_00.ttf": "538949482d964e9f353a3a8d860bb3eda93b46b830f3b677e4f53eb2ff3a6e7d",
+  "browser/fonts/phagspab6_00.ttf": "03e4e45bb8ebb6d055a5584166cc26712bf7e746ea29cb6e548341361d31dc85",
+  "browser/fonts/segmdl21_86.ttf": "a2efc8b8e51fbd031a7142a1ade8866fa904c0c349511abc579ee53f8a926f31",
+  "browser/fonts/segoeicons1_44.ttf": "d4a0e1eb6b7101ce78c8ab33573085057123d2d2a790aaf5245bc62b764d4060",
+  "browser/fonts/segoepr5_04.ttf": "91046862e08fbade0bdd648e81c4efbe6a963947f8b6e32b64a28fe39073c468",
+  "browser/fonts/segoeprb5_04.ttf": "3cced0162ddb9e5f1e63ee1b36fd6e581c090318dce1a0af01b77f5ea9952c80",
+  "browser/fonts/segoesc5_03.ttf": "b24aa49a4bcb99a0ffc60cad77f00941e4b121153d8b0a519c03719d9be6004e",
+  "browser/fonts/segoescb5_03.ttf": "6cd482205e1390b32a2b6327e1e5039424e346172c187074eac12006bc51935e",
+  "browser/fonts/segoeui5_67.ttf": "73db31e13ef5151beb6a5272cff4c6de6ae2f0bbc3688f4046e5e63593f9953a",
+  "browser/fonts/segoeuib5_67.ttf": "34ed88e3895e0d6b17c862014b6ba4fc0113ec007453de3edf72619150cf4d2c",
+  "browser/fonts/segoeuii5_66.ttf": "9bdc0241dc3a37ee8b23468ec14d875bd9b94939a3cfefb635d02718a7c2f00f",
+  "browser/fonts/segoeuil.ttf": "866557576dfc772395301b581eccef4c0daf1dbb75f9667f26784b260bce7da1",
+  "browser/fonts/segoeuisl.ttf": "3432de66f335c7e3058154f7cbb13ef051195653a544b49b1992267e558b33ef",
+  "browser/fonts/segoeuiz5_66.ttf": "4ce2a8f4ceb2058b01e073fab23991dcfdba76b9266283496b56484d8984c289",
+  "browser/fonts/seguiemj1_60.ttf": "f07cbd7886f4a1a5255a1bdf4ca5ea29db3be3357414003a92bec5d1c3165578",
+  "browser/fonts/seguihis1_09.ttf": "a162ceeaf701b55d11c542daf1c39c52bfaf686496505bff2eb75ca24814c136",
+  "browser/fonts/seguisym6_24.ttf": "a4a35dcc62cd30e1a6c97b695ecef83e59d2b149e3af834f6a49f11851d56b37",
+  "browser/fonts/seguivar2_03.ttf": "27ca1ab4bd5ad3b0404ee6a9a03b143408dbd7e5a4c9e4b2054639c03fc0f682",
+  "browser/fonts/simsun.ttc": "1526ac24375f51f6eb73bc2d3f8072dbe4a80a3a65217677c9d9a84f67dab2ab",
+  "browser/fonts/simsunb5_08.ttf": "2a476ca00b5fbbbc12a4c5335634722b11a495ed87429284325701f1e36b596a",
+  "browser/fonts/sylfaen5_08.ttf": "ac278d932d59558a76817e98051b1dae53867aa81ad83e5198b1b4c4b8066a08",
+  "browser/fonts/symbol5_01.ttf": "bbf1192965e5266fbf23370416337d2861fc1e8bd349def93f2994ba67382fc3",
+  "browser/fonts/tahoma7_04.ttf": "dbccddcd68ffa5f9e4d2b9f8ca2507145e0c1f02f8f03298cb1f6281fe3ad12e",
+  "browser/fonts/tahomabd7_04.ttf": "13187d9b4746c442e0b0050809038fc78a23607c812baf612c07246e1ecbb8de",
+  "browser/fonts/taile6_00.ttf": "f5151d081f6afea4c26464e0cd5e695f57a99209cfeea2f483c3108684660eb6",
+  "browser/fonts/taileb6_00.ttf": "1878842d8dbdf8489794af0bace95a956db270dfa506ddcaabf94fa827b769ac",
+  "browser/fonts/times7_11.ttf": "fbb57cdb0079137adc0e478913ca134dfee02aa2ef443738ec5e839bf97a1f7f",
+  "browser/fonts/timesbd7_11.ttf": "e94ff9111656f17bd81e9f822f1e234edcd370bcbacfdebf998b8938f525ac77",
+  "browser/fonts/timesbi7_11.ttf": "8d2c8d8d25d9fc529d08558c42effa771617914a455603881e212a26e2f2ddcd",
+  "browser/fonts/timesi7_11.ttf": "c2c134968be4259aaa78845d3aca5e91c4a0bd10d98e4d2e48ac3c12f3c63b89",
+  "browser/fonts/trebuc5_15.ttf": "fe3e8bdd64c1c9f3b9cf5189d06510c80d72cec28e03d04bffc560f77eec58d1",
+  "browser/fonts/trebucbd5_15.ttf": "dfcc306777a594d2815368547dd897e2ac82aff8073e55d9e682569939e49b81",
+  "browser/fonts/trebucbi5_15.ttf": "87942234ab0cc4400088648bef8d1f7afc4c44e676c7ed6b32ca31462c18307d",
+  "browser/fonts/trebucit5_15.ttf": "9c9dc0cd0fd6b1a06e8f406d04bb15a88aaf20328d3e166c12d6bc7994b781d2",
+  "browser/fonts/verdana5_33.ttf": "6a8481fe107ee547893c018b13dba291c2020bec3de5da6525d9ac09f6bc2105",
+  "browser/fonts/verdanab5_33.ttf": "f3245f5f38f61bd1ceefb0f1338a5b88a21e6220832c2f43a38bbc7e1547c36f",
+  "browser/fonts/verdanai5_33.ttf": "14f2ebcdaa1b77e5993a8533662e4bd3ebfe2c5771b6daafd8ccb39b2ad588b9",
+  "browser/fonts/verdanaz5_33.ttf": "d71f81c83ec63eaa32d36d5df7be1d9e71d3ea9150f47cebda2924923cbbf18a",
+  "browser/fonts/webdings5_01.ttf": "67461fabd8329d0d8ad62689cac642b34fac81c754ff9077ad211160ec62282d",
+  "browser/fonts/wingding5_01.ttf": "9bcd6064e3b52fa30a347edd6e82506e2ec8b1602930b423c629a82c10468a5b",
+  "browser/fonts/yugothm1_95.ttc": "cb2021bbfe40b21ec564848b8d702125661594e1b4f1eb2e77fd8a98b485cf19",
+  "gfx/tests/gtest/TestStealthBundleHooks.h": "23c1254d760c7c3c03f2aad36d854f29cf46aac6eaa19f93599de0578a5dd40e",
+  "gfx/thebes/StealthBundleFontList.cpp": "2ed7a578d010b7d904fcc40517d5bac3c80b43c825f34da3786f6dc71bcce12e",
+  "gfx/thebes/StealthBundleFontList.h": "6eb62069f42b234abca0b06d19d575dbc2ce31084f0396bd8ba4dbe0cb22089d",
+  "gfx/thebes/StealthBundleFontList.mozbuild": "bda2204a49ccf8a2405ef99f3d6453f95601b3bfc9bbdfb5009843adbbbfa754",
+  "gfx/thebes/StealthDWriteFontList.cpp": "2552ed1bfe6160bc9c042f19df06a011acc7e9a304992048fe9d933f67fce2c6"
+ },
  "inventory": [
   {
    "file": "browser/fonts/moz.build",
@@ -153,10 +281,6 @@
    "inline_logic_lines": 1,
    "hookable": "already-hook",
    "anchor": "(top level of browser/fonts/moz.build)",
-   "evidence": [
-    "-if CONFIG[\"MOZ_WIDGET_TOOLKIT\"] in (\"windows\", \"gtk\"):",
-    "+if CONFIG[\"MOZ_WIDGET_TOOLKIT\"] in (\"windows\", \"gtk\", \"cocoa\"):"
-   ],
    "notes": "One include() of our StealthFonts.mozbuild, which lists the bundled font files.",
    "verifier": {
     "changed": [],
@@ -174,10 +298,6 @@
    "inline_logic_lines": 5,
    "hookable": "already-hook",
    "anchor": "UnscaledFontDWrite::GetFontDescriptor",
-   "evidence": [
-    "+  if (!mPercorsoDichiarato.empty()) {",
-    "+    aCb(reinterpret_cast<const uint8_t*>(mPercorsoDichiarato.c_str()),"
-   ],
    "notes": "Returns the declared file path (UTF-16 with NUL terminator, same convention as the Mozilla file-name path) when one was passed to the constructor. Otherwise it falls through to Mozilla's own `if (!mFont) return false;` guard, which is left unchanged. The comment reports 65.9 MB sent to WebRender as bytes instead of a path ([B154]). Category is other, not spoof: the change alters what gfx passes to WebRender, not a value a page can read.",
    "verifier": {
     "changed": [],
@@ -195,10 +315,6 @@
    "inline_logic_lines": 4,
    "hookable": "already-hook",
    "anchor": "UnscaledFontDWrite constructor and member list (class UnscaledFontDWrite final : public UnscaledFont)",
-   "evidence": [
-    "-      : mFontFace(aFontFace), mFont(aFont) {}",
-    "+                     const std::wstring& aFilePath = std::wstring())"
-   ],
    "notes": "Adds an optional aFilePath argument with an empty default, so existing callers keep the upstream behaviour. Adds member mPercorsoDichiarato (std::wstring, ours) and the <string> include. Comment cross-references [B154].",
    "verifier": {
     "changed": [],
@@ -216,11 +332,6 @@
    "inline_logic_lines": 2,
    "hookable": "already-hook",
    "anchor": "class FontData (Borrowed constructor, destructor, member mBorrowed)",
-   "evidence": [
-    "+  FontData(const uint8_t* aData, uint32_t aLength, Borrowed)",
-    "+    if (!mBorrowed) {  // STEALTH-HOOK(fingerprint/fonts/bundle)",
-    "+  bool const mBorrowed = false;  // STEALTH-HOOK(fingerprint/fonts/bundle)"
-   ],
    "notes": "Category is other rather than spoof: it lends the bundled font bytes (owned by StealthBundleFontList) to each face instead of copying the file per face, and no page-observable value changes. A borrowed FontData does not free its bytes; they must outlive every face, which holds only because the bundle cache is immortal (StealthBundleFontList leaks the list on purpose). Moved here from FTUserFontData in gfx/2d/2D.h and its CloneFace in gfx/2d/Factory.cpp on 2026-10-29: Firefox 159 removes FTUserFontData, while FontData.h is unchanged from 157 to 159.",
    "verifier": {
     "changed": [],
@@ -238,10 +349,6 @@
    "inline_logic_lines": 2,
    "hookable": "already-hook",
    "anchor": "gfxDWriteFontEntry (class members mBundleFaceIndex and mBundleFilePath)",
-   "evidence": [
-    "+  uint16_t mBundleFaceIndex = 0;",
-    "+  std::wstring mBundleFilePath;"
-   ],
    "notes": "Two members: mBundleFaceIndex (feature font-ttc-face-index, index inside a .ttc) and mBundleFilePath (feature font-bundle-file-path, the path given to WebRender). Only the path member is in this file's primary feature. Adds the <string> include.",
    "verifier": {
     "changed": [],
@@ -259,10 +366,6 @@
    "inline_logic_lines": 2,
    "hookable": "already-hook",
    "anchor": "gfxFontconfigFontEntry::gfxFontconfigFontEntry (explicit constructor for data fonts)",
-   "evidence": [
-    "+                                  const char* aFile = nullptr, int aIndex = 0);",
-    "-                                  RefPtr<mozilla::gfx::SharedFTFace>&& aFace);"
-   ],
    "notes": "Adds defaulted aFile and aIndex arguments, so upstream data-font callers compile unchanged. The bundle path passes both. Comment cross-references [B154].",
    "verifier": {
     "changed": [],
@@ -280,10 +383,6 @@
    "inline_logic_lines": 3,
    "hookable": "already-hook",
    "anchor": "gfxFontEntry::AutoHBFace (conversion operator); gfxFontEntry (class, new ShouldPublishCharacterMap declaration)",
-   "evidence": [
-    "-    operator hb_face_t*() const { return mFace; }",
-    "+    operator hb_face_t*() const&& = delete;"
-   ],
    "notes": "Primary feature hb-face-lifetime: the conversion operator is ref-qualified (const&, and const&& deleted), so binding the result of GetHBFace() to a raw pointer becomes a compile error. This fixes a dangling pointer in the stealth GetDesignFont (gfxHarfBuzzShaper.cpp), not a Firefox upstream problem; the comment reports crashes before the fix. Also adds the ShouldPublishCharacterMap declaration (feature font-cmap-publish). The change alters the type of a Mozilla class, so it is not a hook; keep it inline or upstream the fix. Verifier: the dangling-pointer fix is confirmed in the tree (gfxHarfBuzzShaper.cpp:791 uses const auto face(...)); every other GetHBFace() caller found in gfx/ binds an lvalue (gfxFont.cpp:1394,2810,2849,5197; gfxFontEntry.cpp:257,795,852,927; gfxHarfBuzzShaper.cpp:1373; FontPaletteCache.cpp:25), so the deleted const&& conversion does not break them.",
    "verifier": {
     "changed": [
@@ -303,11 +402,6 @@
    "inline_logic_lines": 22,
    "hookable": "movable",
    "anchor": "gfxFontUtils::FindSfntOffset (new static); gfxFontUtils::FindTableDirEntry; gfxFontUtils::GetTableFromFontData",
-   "evidence": [
-    "+  if (sfnt->sfntVersion == 0x74746366u) {  // 'ttcf'",
-    "-  const SFNTHeader* header = reinterpret_cast<const SFNTHeader*>(aFontData);",
-    "+  const TableDirEntry* dir = FindTableDirEntry(aFontData, aTableTag, aFaceIndex);"
-   ],
    "notes": "Generic .ttc support: table lookup and table blob now resolve through the requested face's offset inside the collection. Before this change the lookup read the file header only, so only the first face could be read. The default aFaceIndex = 0 keeps old callers unchanged. Not stealth-specific in principle; it is needed for the bundle's .ttc files. Movable: FindSfntOffset can move to our own file.",
    "verifier": {
     "changed": [],
@@ -325,9 +419,6 @@
    "inline_logic_lines": 5,
    "hookable": "already-hook",
    "anchor": "gfxFontUtils (static declarations FindSfntOffset, FindTableDirEntry, GetTableFromFontData)",
-   "evidence": [
-    "+  static const void* FindSfntOffset(const void* aFontData, uint32_t aFaceIndex);"
-   ],
    "notes": "Declarations match gfxFontUtils.cpp. aFaceIndex defaults to 0 on the two existing functions.",
    "verifier": {
     "changed": [],
@@ -345,10 +436,6 @@
    "inline_logic_lines": 6,
    "hookable": "movable",
    "anchor": "gfxPlatformGtk::GetCommonFallbackFonts",
-   "evidence": [
-    "+  aFontList.AppendElement(\"Segoe UI Symbol\");",
-    "+  aFontList.AppendElement(\"Arial\");"
-   ],
    "notes": "Puts the Windows persona fallback names first (Segoe UI Emoji when colour is preferred, then Arial, Segoe UI, Segoe UI Symbol, Cambria Math), before the upstream Linux names, which are not in the bundle. The order is stated in the comment as a measured requirement. Since CommonFontFallback now takes names from the manifest first, this list is only reached when the manifest returns nothing. Movable: the names can move to StealthBundleFontList.",
    "verifier": {
     "changed": [],
@@ -366,10 +453,6 @@
    "inline_logic_lines": 1,
    "hookable": "already-hook",
    "anchor": "gfxFontGroup::FindFallbackFaceForChar",
-   "evidence": [
-    "-  if (!aFamily->IsFullyInitialized() &&",
-    "+  if (!aFamily->IsFullyInitialized() && pfl->MayDeferCmapLoading()) {"
-   ],
    "notes": "The async-fallback condition is replaced by pfl->MayDeferCmapLoading(), the same predicate GlobalFontFallback uses. Comment: this site was missing the bundle-only condition before. Feature gfx.font_rendering.fallback.async is read through that predicate.",
    "verifier": {
     "changed": [],
@@ -387,9 +470,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "four include lines after include(\"/ipc/chromium/chromium-config.mozbuild\")",
-   "evidence": [
-    "+include(\"StealthBundleFontList.mozbuild\")  # STEALTH-HOOK(fingerprint/fonts/bundle)"
-   ],
    "notes": "One include line per folder of ours (declaration-gate, fonts/bundle, fonts/font-list, fonts/metrics); each StealthX.mozbuild lists that folder's EXPORTS and non-unified SOURCES. Until 2026-10-29 the files were listed in four places of this moz.build, one of them a SOURCES block between two UNIFIED_SOURCES blocks that Firefox 159 merges. The lists mozbuild reads are identical on Windows, Linux and macOS.",
    "verifier": {
     "changed": [],

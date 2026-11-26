@@ -9,6 +9,12 @@
   "STEALTH_README.md": "100644",
   "release-out/.gitignore": "100644"
  },
+ "sha256": {
+  "STEALTH_BRANCH_README.md": "8d5f24f26527f40d73baa1f1cea7d4499d6a818d4f41a9bbcd7df8ecbb347011",
+  "STEALTH_CLAUDE.md": "1c9a25fa1a1189f002970d55d75185e23e4c161fa6c0a0cd26448a4598ee6edd",
+  "STEALTH_README.md": "9ab9719bc3abed46f9910b68fad13df1716562420ea01e8979aea8155ca5c282",
+  "release-out/.gitignore": "240a3e0d37d2e86b614063f5347eb02d4f99ca6c254de6b82871ff8d95532a7d"
+ },
  "inventory": [
   {
    "file": "CLAUDE.md",
@@ -21,9 +27,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "(top-level document)",
-   "evidence": [
-    "+@STEALTH_CLAUDE.md <!-- STEALTH-HOOK(platform/repo) -->"
-   ],
    "notes": "Registration hook: one import line of our STEALTH_CLAUDE.md (the instructions for agents working in this tree) above Mozilla's `@AGENTS.md` import, which stays as it is. The line carries the STEALTH-HOOK marker. The instructions themselves live in our own file, not in CLAUDE.md.",
    "verifier": {
     "changed": [
@@ -44,10 +47,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "(top-level document)",
-   "evidence": [
-    "+This build issues a single HTTPS GET to a public asset on",
-    "+Current release: **firefox-18**, built from Firefox 151.0. Branch **`stealth/151`** is"
-   ],
    "notes": "Public disclosure of the anonymous launch counter (one GET per browser start, see BrowserGlue.sys.mjs and firefox.js). Inconsistency claim CONFIRMED: README.md:63 names the asset under one repository, browser/app/profile/firefox.js:3869 defaults the pref to a second one, browser/components/BrowserGlue.sys.mjs:426 falls back to a third (that fallback is dead because firefox.js:3869 always defines the pref). Staleness claim CONFIRMED: README.md:17 says firefox-18 / Firefox 151.0 / branch stealth/151, while the tree is Firefox 157 on stealth/157 (CLAUDE.md). README also says the ping fires at final-ui-startup: consistent with BrowserGlue.sys.mjs:203-204 (case final-ui-startup calls _beforeUIStartup). The disclosure text is about OUR own network request, not about Firefox telemetry.",
    "verifier": {
     "changed": [

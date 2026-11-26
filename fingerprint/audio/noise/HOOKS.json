@@ -8,22 +8,6 @@
   "test": "gtest:StealthAudioNoise.AnalyserMatchesReferenceBitForBit"
  },
  {
-  "file": "dom/media/gtest/moz.build",
-  "function": "UNIFIED_SOURCES += [",
-  "kind": "add",
-  "form": "registration",
-  "line": "UNIFIED_SOURCES += [\"TestStealthMediaDeclaration.cpp\"]  # STEALTH-HOOK(fingerprint/media/decode-declaration)",
-  "test": "gtest:StealthMediaDeclaration.SupportsAsyncAnswersFromTheDeclaration"
- },
- {
-  "file": "dom/media/gtest/moz.build",
-  "function": "UNIFIED_SOURCES += [",
-  "kind": "add",
-  "form": "registration",
-  "line": "UNIFIED_SOURCES += [\"TestStealthMediaEnumeration.cpp\"]  # STEALTH-HOOK(fingerprint/media/enumeration)",
-  "test": "gtest:StealthMediaEnumeration.WithADeclarationTheCallbackRunsLaterWithTheSameValue"
- },
- {
   "file": "dom/media/webaudio/AnalyserNode.cpp",
   "function": "",
   "kind": "add",

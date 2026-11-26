@@ -10,6 +10,10 @@
   "layout/base/StealthSurfaceFlags.h": "100644",
   "layout/base/gtest/TestStealthSurfaceFlags.cpp": "100644"
  },
+ "sha256": {
+  "layout/base/StealthSurfaceFlags.h": "73b2e5d7cc7c4c5105619645a90f3e8c5972f4f6671d1d001b39993236ce39fa",
+  "layout/base/gtest/TestStealthSurfaceFlags.cpp": "167864808e721df769c16c0236bdb7b8db500bc686bd83630a7c23c6b3a3edbd"
+ },
  "inventory": [
   {
    "file": "layout/base/nsLayoutUtils.cpp",
@@ -22,10 +26,6 @@
    "inline_logic_lines": 2,
    "hookable": "already-hook",
    "anchor": "nsLayoutUtils::SurfaceFromElement(HTMLCanvasElement*, uint32_t, RefPtr<DrawTarget>&)",
-   "evidence": [
-    "+      (aSurfaceFlags & SFE_AS_DRAWN)",
-    "+          ? aElement->GetSurfaceSnapshotAsDrawn(pAlphaType, aTarget)"
-   ],
    "notes": "Callers with SFE_AS_DRAWN get GetSurfaceSnapshotAsDrawn (no canvas noise); all others keep GetSurfaceSnapshot. The dependency CHECKED: HTMLCanvasElement::GetSurfaceSnapshotAsDrawn is declared at dom/html/HTMLCanvasElement.h:242 and defined at dom/html/HTMLCanvasElement.cpp:1566, both in the modified list.",
    "verifier": {
     "changed": [
@@ -46,9 +46,6 @@
    "inline_logic_lines": 0,
    "hookable": "already-hook",
    "anchor": "class nsLayoutUtils, after the SurfaceFromElement(HTMLCanvasElement*, ...) declaration",
-   "evidence": [
-    "+  template <class ElementT> static mozilla::SurfaceFromElementResult StealthSurfaceFromElementAsDrawn(ElementT* aElement);  // STEALTH-HOOK(fingerprint/canvas/as-drawn)"
-   ],
    "notes": "Declares the template through which the two readers that show a canvas ask for its snapshot as drawn; the definition is in our own file.",
    "verifier": {
     "changed": [],
@@ -66,10 +63,6 @@
    "inline_logic_lines": 2,
    "hookable": "already-hook",
    "anchor": "nsImageRenderer::PrepareImage",
-   "evidence": [
-    "-    mImageElementSurface = nsLayoutUtils::SurfaceFromElement(paintElement);",
-    "+        paintElement, nsLayoutUtils::SFE_AS_DRAWN);"
-   ],
    "notes": "-moz-element painting takes the as-drawn path, so the element is shown without canvas noise, like on screen. Category spoof because what it renders is what a page sees.",
    "verifier": {
     "changed": [
@@ -89,10 +82,6 @@
    "inline_logic_lines": 1,
    "hookable": "already-hook",
    "anchor": "nsBaseDragSession::DrawDragForImage (hunk header line 1139)",
-   "evidence": [
-    "-    *aSurface = aCanvas->GetSurfaceSnapshot();",
-    "+    *aSurface = aCanvas->GetSurfaceSnapshotAsDrawn();"
-   ],
    "notes": "Not spoof: GetSurfaceSnapshot applies CanvasUtils::StealthProjectSnapshot noise for WebGL/WebGPU contexts (dom/canvas/OffscreenCanvasDisplayHelper.cpp:459-478) and GetSurfaceSnapshotAsDrawn (line 481) skips it, so the drag image / taskbar preview show the real pixels; a page cannot read either. Companion of the canvas-noise feature, no page-visible effect.",
    "verifier": {
     "changed": [
@@ -112,10 +101,6 @@
    "inline_logic_lines": 1,
    "hookable": "already-hook",
    "anchor": "TaskbarPreviewCallback::Done (hunk header line 332)",
-   "evidence": [
-    "-  RefPtr<gfx::SourceSurface> source = canvas->GetSurfaceSnapshot();",
-    "+  RefPtr<gfx::SourceSurface> source = canvas->GetSurfaceSnapshotAsDrawn();"
-   ],
    "notes": "Not spoof: GetSurfaceSnapshot applies CanvasUtils::StealthProjectSnapshot noise for WebGL/WebGPU contexts (dom/canvas/OffscreenCanvasDisplayHelper.cpp:459-478) and GetSurfaceSnapshotAsDrawn (line 481) skips it, so the drag image / taskbar preview show the real pixels; a page cannot read either. Companion of the canvas-noise feature, no page-visible effect.",
    "verifier": {
     "changed": [

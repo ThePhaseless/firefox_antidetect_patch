@@ -6,7 +6,7 @@ Where each kind of change goes. The engine is Firefox as a patch series on a Moz
 
 | Layer | What it is | Where | Registered in |
 |---|---|---|---|
-| Our own files | `Stealth*` code and its tests, stored byte for byte | `<folder>/src/<tree path>` | `layout.OWN_FILES` (first match wins) |
+| Our own files | `Stealth*` code and its tests, stored byte for byte | `<folder>/src/<tree path>` | Nothing: the folder that holds `<folder>/src/<path>` owns it; a new file is placed once with `export --own` |
 | Hooks | One-line changes to Mozilla files, each with `STEALTH-HOOK(<folder>)` on the line | `<folder>/hooks.patch` | `tools/inventory.json` (one record per Mozilla file) and `layout.FEATURES` |
 | Backports | Upstream code carried until the tag has it | `platform/backports/<name>/` (a Mozilla commit, or the upstream commits of a vendored crate that no feature of ours needs); vendored code under `third_party/rust/` in the folder that needs it | `BACKPORT.json` in the folder |
 
@@ -24,7 +24,7 @@ A folder holds `hooks.patch`, `src/`, `MANIFEST.json`, `FEATURE.md`, `HOOKS.json
 | A Mozilla commit carried ahead | `platform/backports/<name>/` |
 | A fix tied to one Firefox version, with its reason to expire | `port/<name>` |
 
-The groups are the order the series is applied in (`layout.GROUP_ORDER`). A new Mozilla file we modify needs an inventory record and a `layout.FEATURES` entry; a new file of ours needs a `layout.OWN_FILES` pattern. `export` stops until both exist.
+The groups are the order the series is applied in (`layout.GROUP_ORDER`). A new Mozilla file we modify needs an inventory record and a `layout.FEATURES` entry; a new file of ours that no folder holds under `src/` yet is placed once, `export --own <path or dir/>=<folder>`, and the folder that holds it owns it from then on. `export` stops until both exist.
 
 ## Which rung
 
@@ -42,26 +42,66 @@ Rules: [hook-01](decisions/hook-01-own-code-first.md), [hook-02](decisions/hook-
 
 ## Hook forms
 
-The value of `form` in `HOOKS.json`. Any other shape is a contract violation.
+The value of `form` in `HOOKS.json`. Any other shape is a contract violation. The table is written from `FORMS_TABLE` in `tools/hook_contract.py` by `python tools/engine.py docs --write`.
 
+<!-- generated:hook-forms begin: written by `python tools/engine.py docs --write` from tools/hook_contract.py; do not edit -->
 | Form | Where | Looks like |
 |---|---|---|
-| `guard` | First statement of a function | `if (StealthX(this, aArg, &rv)) return rv;` |
+| `guard` | First statement of a function | `if (StealthX(this, aArg, &rv)) return rv;`; with a value to return (G15) the guard returns it |
 | `notice` | First statement of a function | `StealthX(this, aArg);` |
-| `wrap-expression` | The line where the value is born | Mozilla's expression, unchanged, inside our call: `return StealthX(<expression>);` |
-| `wrap-function` | The signature line | Mozilla's `Foo` becomes `Foo_Mozilla`; our `Foo` calls it and treats the result |
-| `wrap-call` | The line of a call | The called `Foo` becomes `StealthFoo`, same arguments; or one argument of ours is added |
-| `declared-value` | The line that gives a default | The value on Mozilla's line is replaced |
-| `registration` | Includes, build files, declarative files | `#include "StealthX.h"` in a block of ours after Mozilla's; `VAR += ["StealthX.cpp"]` after the closing `]` of a `moz.build`; one line in `.ipdl`, `.webidl`, `components.conf`, `jar.mn` |
+| `wrap-expression` | The line where the value is born | Mozilla's expression, unchanged, inside our call (the whole expression, or a sub-expression of the line, with our extra leading arguments such as `this, `): `return StealthX(<expression>);`; over several lines (G53) one line of ours opens the call with the marker on it, Mozilla's lines between stay unchanged, and the closing line is Mozilla's plus our `)` and the marker |
+| `wrap-function` | The signature line | Mozilla's `Foo` becomes `Foo_Mozilla` (G1) or another suffix such as `FooAsDrawn`; our `Foo` calls it and treats the result, and the one-line declarations and the internal calls take the same new name (G2); or the called function is replaced and exactly one plain argument of ours is added (G29, G9) |
+| `wrap-call` | The line of a call | The called identifier `Foo` becomes `StealthFoo`, same arguments (G29); or one argument of ours, a Stealth call, is added to a call of Mozilla's line (G9) |
+| `declared-value` | The line that gives a default | The value on Mozilla's line is replaced: a literal in place of a literal, or one STEALTH_ macro in place of one literal or one macro of Mozilla's |
+| `registration` | Includes, build files, declarative files | `#include "StealthX.h"` in a block of ours after Mozilla's; `VAR += ["StealthX.cpp"]` after the closing `]` of a `moz.build`; one line in `.ipdl`, `.webidl`, `components.conf`, `jar.mn`; a forward declaration `class X;` or a file-scope declaration of a function of ours (G40) |
 | `member` | A Mozilla class | One declaration after an existing member, never the last in the block |
-| `shadow` | Top of a function | `const auto GetX = StealthGetX;` |
-| `anchor` | Right after a named Mozilla statement | `StealthX(this, &locale);` or `if (StealthX(this)) return rv;` |
+| `shadow` | Top of a function | `const auto GetX = StealthGetX;` (G21: our value under a Mozilla name) |
+| `anchor` | Right after a named Mozilla statement, mid-function (last resort) | `StealthX(this, &locale);` or `if (StealthX(this)) return rv;`; as the last line of a block or of a JS module (G30, G33) it carries its `anchor` and `why` in HOOKS.json |
+<!-- generated:hook-forms end -->
 
-The numbered rules C1-C11 are in [hook-02](decisions/hook-02-shape-and-contract.md); `tools/hook_contract.py` enforces them.
+## Hook rules
+
+Every rule of the contract is one entry of `RULES` in `tools/hook_contract.py`, with its broken state, its fix and the decision it belongs to; the decision's file holds it. This table says which decision holds which rules.
+
+<!-- generated:hook-rules begin: written by `python tools/engine.py docs --write` from tools/hook_contract.py; do not edit -->
+| Decision | Rules |
+|---|---|
+| [hook-02](decisions/hook-02-shape-and-contract.md) | C1, C2, C3, C4, C5, C6, C7, C8, C9, C10, C16, C17, C19 |
+| [hook-05](decisions/hook-05-no-values-in-mozilla-numbered-spaces.md) | C11 |
+| [port-06](decisions/port-06-hooks-only-add.md) | C12, C13, C14, C15 |
+| [port-07](decisions/port-07-quiet-anchors.md) | C18 |
+| [hook-04](decisions/hook-04-one-test-per-hook.md) | T1, T2, T3 |
+<!-- generated:hook-rules end -->
+
+## Message codes
+
+A message of the hook tools may name a G code: a case the code accepts. Each one is explained here and nowhere else (`EXPLAIN` in `tools/hook_contract.py`).
+
+<!-- generated:message-codes begin: written by `python tools/engine.py docs --write` from tools/hook_contract.py; do not edit -->
+| Code | Meaning |
+|---|---|
+| G1 | A function signature or a macro of Mozilla's is renamed on one line, `Foo` to `Foo_Mozilla` or to another suffix (wrap-function). |
+| G2 | The one-line declarations and the internal calls of a renamed `Foo` are rewritten to the same new name as part of the same wrap. |
+| G9 | One plain argument of ours, a Stealth call, is added to a call on Mozilla's line (wrap-call, wrap-function). |
+| G15 | A guard with a value: `if (StealthX(this, aArg, &rv)) return rv;`, the guard returns the value our function computed. |
+| G19 | No two files of ours share a basename: among the C, C++, JavaScript and Rust files of ours (but lib.rs, mod.rs, main.rs and build.rs), two with the same name in any folders fail prebuild, as soon as one of them is in scope. |
+| G20 | A test must also be run by a round: the candidate workflow's gtest filter, a node job, a python step or a cargo step runs it (rule T3). |
+| G21 | A shadow: `const auto GetX = StealthGetX;` at the top of a function gives Mozilla's name our value. |
+| G23 | An anchor on the last statement of a block, declared with its `anchor` and `why`, is not a C9. |
+| G29 | A call wrap: the called identifier `Foo` of Mozilla's line becomes `StealthFoo` with the same arguments; the qualifier may change only when the new last component is Stealth-named. |
+| G30 | An anchor may be the last line of a block; it carries its `anchor` and `why` in HOOKS.json (rule T2). |
+| G33 | An anchor may be the last line of a JS module; it carries its `anchor` and `why` in HOOKS.json (rule T2). |
+| G35 | A declared exception: a HOOKS.json entry with the hand fields `exception` (the reason) and `pm: "approvato"` is a rewritten line no form can express; its violations of C1..C11, T1, T2 and T3 are left out and counted. |
+| G40 | A forward declaration `class X;` or a file-scope declaration of a function of ours is a registration. |
+| G41 | tools/hook-names.json lists the functions that existed when rule C10 came; a hook may call them without the Stealth prefix, and a new function takes a Stealth name. |
+| G50 | In a preprocessed pref file or a JSON file, where a trailing comment is impossible, a marker comment alone on the line before a directive is the marker of the directive: one hook. |
+| G51 | Per Mozilla file, the lines the head removes or rewrites (the `-` lines of the diff against the tag) are not more than the base's, unless a HOOKS.json entry of the file carries `replaces` (one rewritten line standing for several hooks); prebuild check 8. |
+| G53 | A wrap-expression over several lines: one line of ours opens the call (marker on it), Mozilla's lines between stay unchanged, the closing line is Mozilla's plus our `)` and the marker. |
+<!-- generated:message-codes end -->
 
 ## HOOKS.json
 
-One per folder without `BACKPORT.json`, beside `hooks.patch`, one entry per hook. `check` fails when it differs from what the series generates: a hook lost in a merge does not pass silently.
+One per folder without `BACKPORT.json`, beside `hooks.patch`, one entry per hook. The entry of a hook whose `STEALTH-HOOK(<folder>)` names another folder than the one whose `hooks.patch` holds it is in the HOOKS.json of the folder the marker names (rule C19; `hooks-list` writes it there). `check` fails when it differs from what the series generates: a hook lost in a merge does not pass silently.
 
 | Fields | Written by | Meaning |
 |---|---|---|
@@ -115,8 +155,9 @@ Rule: [hook-03](decisions/hook-03-budgets-and-debt-only-go-down.md).
 | File | What it is |
 |---|---|
 | `tools/engine.py` | The commands: `export`, `verify`, `check`, `port` and the rest |
-| `tools/layout.py` | `GROUP_ORDER`; `FEATURES`: inventory feature name to folder; `OWN_FILES`: path pattern of a file of ours to folder |
-| `tools/inventory.json` | One record per Mozilla file we modify: file, category, feature, prefs, added / removed / hunk counts, anchor, notes. `check` compares the counts with `hooks.patch` |
+| `tools/layout.py` | `GROUP_ORDER`; `FEATURES`: inventory feature name to folder; the owner of a file of ours, read from the `src/` trees (no table) |
+| `tools/inventory.json` | One record per Mozilla file we modify: file, category, feature, prefs, anchor, notes (by hand); added / removed / hunk counts (written by `export` from `hooks.patch`; `check` refuses a different value, and an `evidence` field: the lines are `hooks.patch` itself) |
+| `tools/gtest-suites.json` | The gtest suites the `HOOKS.json` files name, sorted, each marked windows-only or linux-only where its tests are built on one platform; written by `gtest-list --write` |
 | `tools/hook_contract.py`, `tools/hooks_list.py` | The contract and the `HOOKS.json` generator |
 | `tools/folders.py`, `tools/range_diff.py` | The `FOLDER.json` check; the range-diff of a port |
 | `tools/prebuild.py`, `tools/births.py` | Static checks before a build; the birth-point scan |
@@ -126,7 +167,10 @@ Rule: [hook-03](decisions/hook-03-budgets-and-debt-only-go-down.md).
 
 | File | Written by |
 |---|---|
-| `<folder>/hooks.patch`, `<folder>/src/`, `<folder>/MANIFEST.json` | `export` |
+| `<folder>/hooks.patch`, `<folder>/src/`, `<folder>/MANIFEST.json` (with the `sha256` of every file under `src/`) | `export` |
+| `tools/inventory.json`: `added`, `removed`, `hunks` of each record | `export` (from `hooks.patch`) |
+| `tools/hook-budget.json`, `tools/removed-budget.json`: the entry of a Mozilla file patched for the first time | `export`, at the counted value |
+| `tools/gtest-suites.json` | `gtest-list --write`, and `export` |
 | A folder that owns nothing any more | `export` removes it |
 | `SERIES` | `export` |
 | `UPSTREAM.json`: `exported_from`, `exported_tree` | `export` |
@@ -137,8 +181,8 @@ Rule: [hook-03](decisions/hook-03-budgets-and-debt-only-go-down.md).
 | `<folder>/FOLDER.json` | By hand (a folder without a `BACKPORT.json`); `export` never writes or edits it |
 | `ports/range-diff.txt` | `range-diff --write`, at every port |
 | `<folder>/BACKPORT.json` and the upstream diff beside it | By hand |
-| `UPSTREAM.json`: `mozilla_tag`, `source_branch` | By hand |
-| `tools/layout.py`, `tools/inventory.json`, `tools/hook-budget-raises.json`, `tools/hook-names.json`, `tools/birth-ledger.json` | By hand |
+| `UPSTREAM.json`: `mozilla_tag`, `source_branch` | `port`: it writes both once its branch exists |
+| `tools/layout.py`, `tools/inventory.json` (feature, category, anchor, hookable, notes, verifier), `tools/hook-budget-raises.json`, `tools/hook-names.json`, `tools/birth-ledger.json` | By hand |
 | `tools/hook-budget.json`, `tools/removed-budget.json` | By hand, downward; `shrink-budget` |
 | `tools/hook-debt.json` | `hook-debt` only |
 | `.github/workflows/series.yml`, `.github/workflows/noreply-identity.yml` | By hand |
@@ -149,7 +193,7 @@ Rule: [hook-03](decisions/hook-03-budgets-and-debt-only-go-down.md).
 1. In the source repository, on the source branch: the change, its test, the commit.
 2. Here: `export`. It first runs the node tests and the tree's python tests on the head's tree; then it writes the series into a scratch copy of the checkout, runs `engine.py check` and `tools/tests` (`-n auto`) on that copy, and only if all is green replaces the series of the checkout with it. A red leaves the checkout untouched.
 3. `verify`: it must say `identical`.
-4. `hook-debt` drops the resolved debt; `shrink-budget` after logic moved; a Mozilla file new to the series needs its row in `tools/hook-budget.json` (at most 5 lines).
+4. `hook-debt` drops the resolved debt; `shrink-budget` after logic moved; a Mozilla file new to the series gets its row in `tools/hook-budget.json` from `export` (at most 5 lines: more is a failure of `check`).
 5. A folder `export` made anew has no `FOLDER.json`: write it (`product`, or `defect` with its `upstream`). Fill the hand fields of the touched `HOOKS.json` (`test`; `anchor` and `why` for an anchor) and the `Test:` line of `FEATURE.md`.
 6. `check`, and `python -m pytest -q tools/tests`.
 7. Commit here with the same title as the source commit.

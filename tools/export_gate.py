@@ -20,7 +20,7 @@ tests the build job runs and refuses to write anything into the checkout if one 
           byte, uncommitted edits included, so the scratch tree is what the checkout is now, not what HEAD was;
        b. the export writes the series into the scratch tree (the callable `write` that engine.py gives: the same `export`, with the
           paths of engine.py moved to the scratch root);
-       c. in the scratch tree: `python tools/engine.py check` (as the command line does) and
+       c. in the scratch tree: `tools/engine.py check` (as the command line does) and
           `python -m pytest -q -n auto tools/tests` (pytest-xdist). The tests find their root from their own file, so they read
           the scratch tree, never the checkout;
        d. only if all are green the checkout takes the result (replace_series): every file the export wrote or changed is copied,
@@ -39,29 +39,29 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 from typing import Callable
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from failure import fail  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 # The decision that owns the gate: the export is the one writer, and it writes nothing while a test is red (series-01).
 RULE = "series-01-export-is-the-only-writer"
 
 
-def fail(where: str, what: str, fix: str, rule: str) -> str:
-    """One stop, in the four fields a failure of the series says: where it is, what is wrong, the fix, the rule that says so."""
-    return "FAIL %s: %s. Fix: %s. Rule: docs/decisions/%s.md" % (where, what, fix, rule)
-
-
-def stop(where: str, what: str, fix: str, next_step: str) -> SystemExit:
-    """The exit of a refused export: the failure, then the line that says what to run next."""
-    return SystemExit(fail(where, "export refused: " + what, fix, RULE) + "\nnext: " + next_step)
+def _with_next(failure, next_step: str) -> str:
+    """repo-05: a stop ends with `next: <the exact command to run>`."""
+    return "%s\nnext: %s" % (failure, next_step)
 
 
 def gate_tree() -> Path:
     value = os.environ.get("ENGINE_NODE_GATE_TREE")
     if not value:
-        raise SystemExit("export refused: the whole tree for the node tests is not named: set ENGINE_NODE_GATE_TREE to the path of "
-                         "a worktree of the source repository (it is made there the first time)")
+        raise SystemExit(str(fail(
+            "environment variable ENGINE_NODE_GATE_TREE", "export refused: the whole tree for the node tests is not named",
+            "set ENGINE_NODE_GATE_TREE to the path of a worktree of the source repository (it is made there the first time)", RULE)))
     return Path(value)
 
 
@@ -69,14 +69,21 @@ def node_binary() -> str:
     for candidate in (os.environ.get("ENGINE_NODE"), shutil.which("node")):
         if candidate and Path(candidate).is_file():
             return str(candidate)
-    raise SystemExit("export refused: there is no Node on this machine (ENGINE_NODE, or node on the PATH), so the Juggler's "
-                     "node tests cannot run, and the build job would be the first to run them")
+    raise SystemExit(str(fail(
+        "node on this machine", "export refused: there is no Node (ENGINE_NODE, or node on the PATH), so the Juggler's node tests "
+        "cannot run, and the build job would be the first to run them",
+        "install Node, or set ENGINE_NODE to its path", RULE)))
 
 
 def git(*args: str, cwd: Path | None = None) -> str:
     done = subprocess.run(["git", "-c", "core.longpaths=true", *args], cwd=cwd, capture_output=True, text=True)
     if done.returncode:
-        raise SystemExit("export refused: git %s failed: %s" % (" ".join(args[:3]), done.stderr.strip()[-400:]))
+        raise SystemExit(str(fail(
+            "git %s" % " ".join(args), "export refused: git failed: %s" % done.stderr.strip(),
+            "run `git %s` by hand (in %s) to see git's message, then by case: `not a git repository` means --source (or FIREFOX_SOURCE) is not the Firefox "
+            "repository: pass the folder that holds its .git; `unknown revision` or `bad object` means the commit or branch to export is missing: run "
+            "`git -C <source> fetch`, or pass --head with a branch it has; a path error naming the gate tree means ENGINE_NODE_GATE_TREE points at a "
+            "folder that does not exist: set it to an existing tree or unset it" % (" ".join(args), cwd or "the current folder"), RULE)))
     return done.stdout.strip()
 
 
@@ -90,25 +97,31 @@ def prepare_tree(source: Path, head: str, tree: Path | None = None) -> Path:
     elif git("-C", str(tree), "rev-parse", "HEAD") != sha:
         git("-C", str(tree), "checkout", "--detach", "--force", sha)
     if git("-C", str(tree), "rev-parse", "HEAD") != sha:
-        raise SystemExit("export refused: %s is not at %s" % (tree, sha))
+        raise SystemExit(str(fail(
+            str(tree), "export refused: it is not at %s" % sha,
+            "remove the worktree (git -C <source> worktree remove --force %s) and run the export again" % tree, RULE)))
     if not (tree / "juggler" / "tests").is_dir() or not (tree / "netwerk" / "base").is_dir():
-        raise SystemExit("export refused: %s is not a whole tree (no juggler/tests or netwerk/base): remove it and run again" % tree)
+        raise SystemExit(str(fail(
+            str(tree), "export refused: it is not a whole tree (no juggler/tests or netwerk/base)",
+            "remove it (git -C <source> worktree remove --force %s) and run the export again: it is made whole the first time" % tree, RULE)))
     return tree
 
 
 def _failures(output: str) -> list:
-    return [line.split(" - ", 1)[-1].strip()[:150] for line in output.splitlines() if line.startswith("not ok ")]
+    return [line.split(" - ", 1)[-1].strip() for line in output.splitlines() if line.startswith("not ok ")]
 
 
 def run_node_tests(tree: Path, node: str) -> list:
     files = sorted(glob.glob(str(tree / "juggler" / "tests" / "*.test.mjs")))
     if not files:
-        return ["no juggler/tests/*.test.mjs in %s" % tree]
+        return [fail("%s/juggler/tests" % tree, "there is no *.test.mjs file",
+                         "restore the tests in the source branch: the export runs the Juggler's node tests and a gate with none is not a pass", RULE)]
     done = subprocess.run([node, "--test", "--test-reporter=tap", *files], cwd=tree, capture_output=True, text=True, encoding="utf-8", errors="replace")
     summary = [line for line in done.stdout.splitlines() if line.startswith(("# tests", "# pass", "# fail"))]
     print("export gate: node tests: " + ", ".join(s[2:] for s in summary))
     if done.returncode:
-        return _failures(done.stdout) or ["node exited %d: %s" % (done.returncode, done.stderr.strip()[-300:])]
+        return [fail("juggler/tests (node --test)", "a node test is red: %s" % reason, "fix the test or the code in the source branch, then run the export again", RULE)
+                for reason in (_failures(done.stdout) or ["node exited %d: %s" % (done.returncode, done.stderr.strip())])]
     return []
 
 
@@ -117,7 +130,8 @@ def run_tree_python_tests(tree: Path) -> list:
     for script in sorted(glob.glob(str(tree / "modules" / "libpref" / "test" / "test_stealth_*.py"))):
         done = subprocess.run([sys.executable, script], cwd=tree, capture_output=True, text=True, encoding="utf-8", errors="replace")
         if done.returncode:
-            problems.append("%s: %s" % (Path(script).name, (done.stdout + done.stderr).strip()[-300:]))
+            problems.append(fail("modules/libpref/test/%s" % Path(script).name, "a python test of the tree is red: %s" % (done.stdout + done.stderr).strip(),
+                                     "fix the test or the code in the source branch, then run the export again", RULE))
     print("export gate: %d python tests of the tree" % len(glob.glob(str(tree / "modules" / "libpref" / "test" / "test_stealth_*.py"))))
     return problems
 
@@ -196,20 +210,82 @@ def _run(command: list, cwd: Path) -> subprocess.CompletedProcess:
 
 
 def run_series_check(tree: Path) -> list:
-    """`python tools/engine.py check` of the scratch tree, as the command line runs it."""
+    """`tools/engine.py check` of the scratch tree, as the command line runs it."""
     done = _run([sys.executable, "tools/engine.py", "check"], tree)
     print("export gate: engine.py check: " + (done.stdout.strip().splitlines() or ["no output"])[0])
-    return ["engine.py check: " + (done.stdout + done.stderr).strip()[-800:]] if done.returncode else []
+    if done.returncode:
+        return [fail("engine.py check", "the series the export wrote breaks a rule: %s" % (done.stdout + done.stderr).strip()[-800:],
+                     "fix the tool or the source so that what export writes passes check", RULE)]
+    return []
 
 
 def run_series_tests(tree: Path) -> list:
     """The series' own tests, `python -m pytest -q -n auto tools/tests`, in the scratch tree: their root is the scratch tree."""
     if importlib.util.find_spec("xdist") is None:
-        raise stop("python module xdist", "pytest-xdist is not installed, so tools/tests cannot run in parallel here",
-                   "install it with `python -m pip install pytest-xdist`", "run the export again")
+        raise SystemExit(_with_next(fail(
+            "python module xdist", "export refused: pytest-xdist is not installed, so tools/tests cannot run in parallel here",
+            "install it with `python -m pip install pytest-xdist`", RULE), "run the export again"))
     done = _run([sys.executable, "-m", "pytest", "-q", "-n", "auto", "-p", "no:cacheprovider", "tools/tests"], tree)
     print("export gate: tools/tests: " + (done.stdout.strip().splitlines() or ["no output"])[-1])
-    return ["tools/tests: " + (done.stdout + done.stderr).strip()[-1500:]] if done.returncode else []
+    if done.returncode:
+        return [fail("tools/tests", "a test of the series is red: %s" % (done.stdout + done.stderr).strip()[-1500:],
+                     "run `python -m pytest -q tools/tests`, fix what is red, then run the export again", RULE)]
+    return []
+
+
+# The CI scripts' own tests (platform/ci/src/scripts, run by the job `tree` of checks.yml on the materialized tree) that hold what the export writes into
+# platform/ci and into .github/workflows: the jobs of checks.yml and release.yml by name, and what a pull request starts. PR 79 added a job to checks.yml and
+# only the tree job, an hour after the push, said that the two lists naming the jobs did not. Run on the scratch tree, when the export touched a CI file;
+# the whole of scripts/ci/test_ci.py needs Linux (symlinks, sched_setaffinity, bash), these modules run anywhere and take under a second.
+CI_SCRIPT_MODULES = ("test_release_checks", "test_release_builder")
+CI_PATHS = ("platform/ci/", ".github/")
+CI_RUNNER = (
+    "import sys\n"
+    "sys.path[:0] = ['scripts/ci', 'scripts']\n"
+    "bad = 0\n"
+    "for name in sys.argv[1:]:\n"
+    "    cases = __import__(name).cases()\n"
+    "    for case, ok in cases:\n"
+    "        if not ok:\n"
+    "            bad += 1\n"
+    "            print('RED ' + name + ': ' + case)\n"
+    "    print('%s: %d cases' % (name, len(cases)))\n"
+    "sys.exit(1 if bad else 0)\n")
+
+
+def run_ci_script_tests(tree: Path, written: list, removed: list) -> list:
+    """The cases of CI_SCRIPT_MODULES on the scratch tree: a tree as the job `tree` makes it (scripts/ and .github/ of platform/ci/src at its root, the
+    series in .series), built in a scratch directory. Not run when the export touched no file of platform/ci or .github, or the tree has no platform/ci/src."""
+    touched = [p for p in list(written) + list(removed) if p.startswith(CI_PATHS)]
+    src = tree / "platform" / "ci" / "src"
+    if not touched or not (src / "scripts").is_dir():
+        print("export gate: CI scripts' tests: no file of platform/ci or .github written, not run")
+        return []
+    home = Path(tempfile.mkdtemp(prefix="ci-scripts-"))
+    started = time.time()
+    try:
+        for part in ("scripts", ".github"):
+            if (src / part).is_dir():
+                shutil.copytree(src / part, home / part, ignore=shutil.ignore_patterns("__pycache__"))
+        series = home / ".series"
+        for part in (".github", "tools"):
+            if (tree / part).is_dir():
+                shutil.copytree(tree / part, series / part, ignore=shutil.ignore_patterns("__pycache__", "tests"))
+        for part in ("UPSTREAM.json", "SERIES"):
+            if (tree / part).is_file():
+                series.mkdir(exist_ok=True)
+                shutil.copyfile(tree / part, series / part)
+        done = _run([sys.executable, "-c", CI_RUNNER, *CI_SCRIPT_MODULES], home)
+    finally:
+        shutil.rmtree(home, ignore_errors=True)
+    print("export gate: CI scripts' tests (%s): %s in %.1f s" % (", ".join(CI_SCRIPT_MODULES), (done.stdout.strip().splitlines() or ["no output"])[-1], time.time() - started))
+    if done.returncode:
+        found = [line[len("RED "):] for line in done.stdout.splitlines() if line.startswith("RED ")]
+        return [fail("scripts/ci (the CI scripts' tests, %d file(s) of platform/ci or .github written)" % len(touched),
+                     "a case is red: %s" % (case if found else (done.stdout + done.stderr).strip()[-800:]),
+                     "fix the case or the file it holds (a job added to checks.yml is named in test_release_checks.py and test_release_builder.py), "
+                     "in the source, then run the export again", RULE) for case in (found or [""])]
+    return []
 
 
 def run_engine_tree_tests(source: Path, head: str) -> list:
@@ -224,11 +300,15 @@ def gate(source: Path, head: str, write: Callable[[Path], None], root: Path = RO
     """The whole export: the engine tree's tests, then `write(scratch)` writes the series into a scratch copy of the checkout, the
     copy is checked and tested, and only if all is green does the checkout take what was written. Exits (SystemExit) on a red, with
     the checkout untouched."""
-    problems = run_engine_tree_tests(source, head)
+    again = "python tools/engine.py export --source <source> --head %s" % head
+    try:
+        problems = run_engine_tree_tests(source, head)
+    except SystemExit as stopped:        # the tree or Node is missing: the stop of gate_tree()/node_binary(), then the way on (repo-05)
+        raise SystemExit(_with_next(stopped.code, again)) from None
     if problems:
-        raise stop("the source tree of %s" % head[:12], "red before the build job would have found it:\n  " + "\n  ".join(problems),
-                   "fix the test in the source and commit it (the head is then another)",
-                   "run `python tools/engine.py export` again; nothing was written")
+        raise SystemExit(_with_next(fail(
+            "the source tree of %s" % head[:12], "export refused: red before the build job would have found it:\n  " + "\n  ".join(str(p) for p in problems),
+            "fix the test in the source and commit it (the head is then another)", RULE), again))
     tree = scratch_series(root)
     try:
         before = _walk(tree)
@@ -236,12 +316,13 @@ def gate(source: Path, head: str, write: Callable[[Path], None], root: Path = RO
         written, removed = series_delta(tree, root, before)
         # the scratch tree has its own index: the tests that read `git ls-files` see the files the export wrote
         git("-C", str(tree), "add", "-A")
-        problems = run_series_check(tree) + run_series_tests(tree)
+        problems = run_series_check(tree) + run_series_tests(tree) + run_ci_script_tests(tree, written, removed)
         if problems:
-            raise stop("the series the export wrote (%d files written, %d removed)" % (len(written), len(removed)),
-                       "red on the series it would write:\n  " + "\n  ".join(problems),
-                       "fix the tool or the source so that what export writes passes check and tools/tests",
-                       "run `python tools/engine.py export` again; the checkout %s was not touched" % root)
+            raise SystemExit(_with_next(fail(
+                "the series the export wrote (%d files written, %d removed)" % (len(written), len(removed)),
+                "export refused: red on the series it would write:\n  " + "\n  ".join(str(p) for p in problems),
+                "fix the tool or the source so that what export writes passes check and tools/tests", RULE),
+                again))
         replace_series(tree, root, written, removed)
         print("export gate: green on the series written; the checkout took %d files and dropped %d" % (len(written), len(removed)))
     finally:

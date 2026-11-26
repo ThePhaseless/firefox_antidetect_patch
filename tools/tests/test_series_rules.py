@@ -219,9 +219,7 @@ def test_a_prefixed_character_literal_is_a_literal_not_a_digit_separator():
 
 
 # A STEALTH-HOOK tag names a folder of SERIES. The hook of nsSOCKSIOLayer.cpp that warms the
-# pool was tagged network/socks while network/proxy-udp owns it, and the evidence of the hook
-# of netwerk/socket/moz.build quoted network/socks-udp-h3, a folder deleted since (review of
-# the UDP line, 2026-11-11).
+# pool was tagged network/socks while network/proxy-udp owns it (review of the UDP line, 2026-11-11).
 SOCKS_LAYER = "netwerk/socket/nsSOCKSIOLayer.cpp"
 
 
@@ -229,45 +227,54 @@ def _record(file):
     return next(r for r in json.loads(engine.INVENTORY.read_text(encoding="utf-8")) if r["file"] == file)
 
 
+def _patch_text(file):
+    """The text of the hooks.patch of the folder that owns `file` (the one place that has its lines)."""
+    for f in engine.existing_folders():
+        patch = engine.ROOT / f / "hooks.patch"
+        if patch.exists() and ("diff --git a/%s b/" % file) in patch.read_text(encoding="utf-8", errors="replace"):
+            return patch.read_text(encoding="utf-8", errors="replace")
+    raise AssertionError(file)
+
+
 def test_the_tags_of_the_series_as_committed_are_all_folders():
-    records = json.loads(engine.INVENTORY.read_text(encoding="utf-8"))
     patches = {f: (engine.ROOT / f / "hooks.patch").read_text(encoding="utf-8", errors="replace")
                for f in engine.existing_folders() if (engine.ROOT / f / "hooks.patch").exists()}
-    assert engine.hook_tag_problems(set(engine.series_folders()), records, patches) == []
+    assert engine.hook_tag_problems(set(engine.series_folders()), patches) == []
 
 
-def test_an_evidence_tag_of_a_folder_that_does_not_exist_fails():
-    record = dict(_record("netwerk/socket/moz.build"))
-    record["evidence"] = [e.replace("network/proxy-udp", "network/socks-udp-h3") for e in record["evidence"]]
-    assert any("network/socks-udp-h3" in e for e in record["evidence"])
-    found = engine.hook_tag_problems(set(engine.series_folders()), [record], {})
-    assert any("netwerk/socket/moz.build" in p and "network/socks-udp-h3" in p and "not a folder of SERIES" in p
-               for p in found), found
-
-
-def test_the_evidence_of_the_socks_layer_hook_names_the_folder_that_owns_it():
-    record = _record(SOCKS_LAYER)
-    assert engine.hook_tag_problems(set(engine.series_folders()), [record], {}) == []
-    assert any("STEALTH-HOOK(network/proxy-udp)" in e for e in record["evidence"])
+def test_the_hook_of_the_socks_layer_names_the_folder_that_owns_it():
+    text = _patch_text(SOCKS_LAYER)
+    assert "STEALTH-HOOK(network/proxy-udp)" in text
+    assert engine.hook_tag_problems(set(engine.series_folders()), {"network/proxy-udp": text}) == []
 
 
 def test_a_hook_of_a_patch_tagged_with_a_folder_that_does_not_exist_fails():
     patch = "+  nsSOCKSUDPIOLayerWarm(proxy);  // STEALTH-HOOK(network/socks-udp-h3)\n"
-    found = engine.hook_tag_problems(set(engine.series_folders()), [], {"network/proxy-udp": patch})
+    found = engine.hook_tag_problems(set(engine.series_folders()), {"network/proxy-udp": patch})
     assert any("network/proxy-udp/hooks.patch" in p and "network/socks-udp-h3" in p for p in found), found
-    assert engine.hook_tag_problems(set(engine.series_folders()), [],
+    assert engine.hook_tag_problems(set(engine.series_folders()),
                                     {"network/proxy-udp": patch.replace("socks-udp-h3", "proxy-udp")}) == []
 
 
-def test_the_check_reads_the_tags_of_the_inventory(tmp_path, monkeypatch):
+def test_the_check_refuses_an_evidence_field_in_the_inventory(tmp_path, monkeypatch):
+    # repo-07: the lines are the hooks.patch itself; a record that quotes them again is red, where = the record, fix = delete it
     records = json.loads(engine.INVENTORY.read_text(encoding="utf-8"))
     for r in records:
         if r["file"] == SOCKS_LAYER:
-            r["evidence"] = [e.replace("network/proxy-udp", "network/socks-udp-h3") for e in r["evidence"]]
+            r["evidence"] = ["+  nsSOCKSUDPIOLayerWarm(proxy);  // STEALTH-HOOK(network/proxy-udp)"]
     path = tmp_path / "inventory.json"
     path.write_text(json.dumps(records), encoding="utf-8")
     monkeypatch.setattr(engine, "INVENTORY", path)
-    assert any(SOCKS_LAYER in p and "socks-udp-h3" in p for p in engine.problems())
+    found = [p for p in engine.problems() if "evidence" in p]
+    assert len(found) == 1, found
+    assert SOCKS_LAYER in found[0] and "delete the field" in found[0] and "Rule: docs/decisions/repo-07-one-fact-one-place.md" in found[0], found
+
+
+def test_the_committed_series_has_no_evidence_field_anywhere():
+    assert not [r["file"] for r in json.loads(engine.INVENTORY.read_text(encoding="utf-8")) if "evidence" in r]
+    for f in engine.existing_folders():
+        manifest = json.loads((engine.ROOT / f / "MANIFEST.json").read_text(encoding="utf-8"))
+        assert not [r["file"] for r in manifest.get("inventory", []) if "evidence" in r], f
 
 
 # The counts of an inventory record are the ones of its file in the hooks.patch. The record of
@@ -282,8 +289,7 @@ def _counts():
     for f in engine.existing_folders():
         patch = engine.ROOT / f / "hooks.patch"
         if patch.exists():
-            a, r, h = engine.added_lines(patch), engine.removed_lines(patch), engine.hunk_counts(patch)
-            out.update({p: (a[p], r.get(p, 0), h.get(p, 0)) for p in a})
+            out.update(engine._diffs_of(patch))
     return out
 
 
@@ -295,15 +301,15 @@ def test_every_record_as_committed_has_the_counts_of_its_patch():
 def test_the_record_of_the_accept_language_hook_is_its_own():
     record = _record(HTTP_HANDLER)
     assert (record["added"], record["removed"], record["hunks"]) == (3, 1, 2)
-    assert any("PrepareAcceptLanguages" in e for e in record["evidence"])
-    assert not any("ParentalControls" in e for e in record["evidence"])
+    text = _patch_text(HTTP_HANDLER)
+    assert "PrepareAcceptLanguages" in text and "ParentalControls" not in text
 
 
 def test_a_record_with_the_counts_of_another_feature_fails():
     record = dict(_record(HTTP_HANDLER), added=18, hunks=6)
     found = engine.record_count_problems([record], _counts())
     assert any(HTTP_HANDLER in p and "says added 18, removed 1, hunks 6" in p and "has 3, 1, 2" in p
-               for p in found), found
+               and "python tools/engine.py export" in p for p in found), found
 
 
 def test_the_check_reads_the_counts_of_the_inventory(tmp_path, monkeypatch):
