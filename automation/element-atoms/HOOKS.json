@@ -6,5 +6,15 @@
   "form": "unknown",
   "line": "export const ATOM_SOURCES = ATOMS;  // STEALTH-HOOK(automation/element-atoms)",
   "test": "wrapper:tests/test_page_element_atoms_run_in_a_sandbox_e2e.py::test_the_atoms_run_in_a_sandbox_and_tell_a_visible_element_from_a_hidden_one"
+ },
+ {
+  "file": "remote/marionette/atom.sys.mjs",
+  "function": "function executeInContent(name, element, window) {",
+  "kind": "add",
+  "form": "anchor",
+  "line": "ChromeUtils.importESModule(\"resource://gre/modules/juggler/StealthAtoms.sys.mjs\").stealthRegisterAtoms(ATOMS);  // STEALTH-HOOK(automation/element-atoms)",
+  "test": "node:juggler/tests/element_atoms_reach_juggler_by_the_last_line_of_their_module.test.mjs#the table comes back as the same object, after the module that registers it has been evaluated",
+  "anchor": "the last line of the module, after the functions that follow the table (`const ATOMS = {...}`, atom.getVisibleText, executeInContent)",
+  "why": "the table ATOMS is a const of the module's own scope: nothing outside the module can read it and Mozilla exports no name for it, so the registration is a statement of the module itself, after the declaration it reads. It is the last line so that what Mozilla appends goes above it and the module is completely evaluated when StealthAtoms.sys.mjs hands the table back; a guard or a wrap of a function cannot reach a module-level constant, and an export (the old line) was one more name in Mozilla's module (G33)"
  }
 ]

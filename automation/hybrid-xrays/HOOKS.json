@@ -203,5 +203,50 @@
   "form": "registration",
   "line": "SOURCES += [\"StealthHybridXray.cpp\"]  # STEALTH-HOOK(automation/hybrid-xrays)",
   "test": "wrapper:tests/test_the_callers_code_is_not_counted_e2e.py::test_what_the_page_added_is_the_pages"
+ },
+ {
+  "file": "js/xpconnect/src/Sandbox.cpp",
+  "function": "nsresult xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp,",
+  "kind": "add",
+  "form": "anchor",
+  "line": "    mozilla::StealthSetHybridXrays(priv, options);  // STEALTH-HOOK(automation/hybrid-xrays)",
+  "test": "wrapper:tests/test_the_callers_code_is_not_counted_e2e.py::test_the_token_field_is_found_without_the_page_counting",
+  "anchor": "the closing line of the branch of the if (ExistingCompartment) {...} else {...} block that sets the compartment flags",
+  "why": "the two lines are one per branch of Mozilla's if (the reused branch checks, the new one writes); they are not merged into one line after the if (G18)"
+ },
+ {
+  "file": "js/xpconnect/src/Sandbox.cpp",
+  "function": "bool SandboxOptions::Parse() {",
+  "kind": "rewrite",
+  "form": "wrap-expression",
+  "line": "            StealthParseHybridXrays(ParseBoolean(\"wantXrays\", &wantXrays)) &&  // STEALTH-HOOK(automation/hybrid-xrays)",
+  "removed": "            ParseBoolean(\"wantXrays\", &wantXrays) &&",
+  "test": "xpcshell:js/xpconnect/tests/unit/test_stealth_hybrid_xrays_options.js#run_test"
+ },
+ {
+  "file": "js/xpconnect/src/xpcprivate.h",
+  "function": "class MOZ_STACK_CLASS SandboxOptions : public OptionsBase {",
+  "kind": "add",
+  "form": "member",
+  "line": "  bool StealthParseHybridXrays(bool aParsed);  // STEALTH-HOOK(automation/hybrid-xrays)",
+  "test": "xpcshell:js/xpconnect/tests/unit/test_stealth_hybrid_xrays_options.js#run_test"
+ },
+ {
+  "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
+  "function": "static void DEBUG_CheckUnwrapSafety(HandleObject obj,",
+  "kind": "rewrite",
+  "form": "wrap-expression",
+  "line": "          !mozilla::StealthRealmWantsXrays(target, targetCompartmentPrivate->wantXrays) &&  // STEALTH-HOOK(automation/hybrid-xrays)",
+  "removed": "          !targetCompartmentPrivate->wantXrays &&",
+  "test": "wrapper:tests/test_the_callers_code_is_not_counted_e2e.py::test_what_the_page_added_is_the_pages"
+ },
+ {
+  "file": "js/xpconnect/wrappers/WrapperFactory.cpp",
+  "function": "JSObject* WrapperFactory::Rewrap(JSContext* cx, HandleObject existing,",
+  "kind": "rewrite",
+  "form": "wrap-expression",
+  "line": "  else if (mozilla::StealthNotCallerObject(originSubsumesTarget == targetSubsumesOrigin) &&  // STEALTH-HOOK(automation/hybrid-xrays)",
+  "removed": "  else if (originSubsumesTarget == targetSubsumesOrigin &&",
+  "test": "gtest:StealthCallerObject.TheWebObjectCaseStepsAsideForAWaitingDecisionWithoutTakingIt"
  }
 ]

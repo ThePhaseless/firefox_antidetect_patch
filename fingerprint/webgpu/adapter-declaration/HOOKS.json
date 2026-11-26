@@ -190,5 +190,13 @@
   "line": "  value: true  # STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
   "removed": "  value: false",
   "test": "wrapper:tests/test_webgpu_external_texture_e2e.py::test_importexternaltexture_exists_on_every_os_e2e"
+ },
+ {
+  "file": "dom/webgpu/Adapter.cpp",
+  "function": "struct FeatureImplementationStatus {",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthAdaptLimitKey.inc.h\"  // STEALTH-HOOK(fingerprint/webgpu/adapter-declaration)",
+  "test": "wrapper:tests/test_webgpu_adapter_is_declared_e2e.py::test_the_page_sees_the_declared_adapter_e2e"
  }
 ]

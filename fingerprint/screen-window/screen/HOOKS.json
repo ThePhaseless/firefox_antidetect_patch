@@ -47,5 +47,14 @@
   "line": "  if (!StealthRfpOrEngineActive(mDocument->ShouldResistFingerprinting(RFPTarget::WindowOuterSize)) ||  // STEALTH-HOOK(fingerprint/screen-window/screen)",
   "removed": "  if (!mDocument->ShouldResistFingerprinting(RFPTarget::WindowOuterSize) ||",
   "test": "wrapper:tests/test_fingerprint_surface.py::test_the_inner_size_of_the_top_is_synced_with_the_engine_active_and_not_without"
+ },
+ {
+  "file": "layout/base/nsPresContext.cpp",
+  "function": "void nsPresContext::UpdateInnerSizeSpoofedForRFP() {",
+  "kind": "rewrite",
+  "form": "wrap-expression",
+  "line": "      StealthInnerSizeWithWindowState(this, CSSIntSize{(int)size.width, (int)size.height}));  // STEALTH-HOOK(fingerprint/screen-window/screen)",
+  "removed": "      CSSIntSize{(int)size.width, (int)size.height});",
+  "test": "wrapper:tests/test_a_restored_window_reads_the_retail_frame_after_set_viewport_size_e2e.py::test_a_restored_window_reads_the_retail_frame_after_set_viewport_size[1920x1080-dpr1.0]"
  }
 ]

@@ -552,5 +552,23 @@
   "test": "py:modules/libpref/test/test_stealth_ice_prefs_locked.py::test_the_only_call_is_right_after_the_user_prefs_are_loaded",
   "anchor": "mDirProvider.InitializeUserPrefs();",
   "why": "the order after the load of the user prefs is the point: the lock has to see the user values"
+ },
+ {
+  "file": "dom/media/webrtc/transport/nr_socket_proxy_config.cpp",
+  "function": "",
+  "kind": "add",
+  "form": "member",
+  "line": "  RefPtr<net::PcUdpProxy> mStealthUdpProxy;  // STEALTH-HOOK(network/proxy-udp)",
+  "test": "gtest:StealthPcUdpProxyKinds.ASocks5ProxyMeasuredCoherentIsTheRoadOfTheUdpWithItsCredentials",
+  "anchor": "net::WebrtcProxyConfig mProxyConfig; (the first member of the class Private)",
+  "why": "the last member of the aggregate Private: Private is initialized as `Private({aProxyConfig})`, which gives the first member its value, so our member must follow mProxyConfig and takes its default; there is no other place in the class"
+ },
+ {
+  "file": "dom/media/webrtc/transport/nr_socket_proxy_config.cpp",
+  "function": "const net::WebrtcProxyConfig& NrSocketProxyConfig::GetConfig() const {",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthNrSocketProxyConfig.inc.h\"  // STEALTH-HOOK(network/proxy-udp)",
+  "test": "gtest:StealthNrSocketBirth.TheControlASocketOfAPeerConnectionWithNoProxyIsHeardDirect"
  }
 ]

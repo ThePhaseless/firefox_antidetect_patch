@@ -498,5 +498,30 @@
   "form": "unknown",
   "line": "DEFINES[\"MOZ_PROXY_BYPASS_PROTECTION\"] = True  # STEALTH-HOOK(network/doh)",
   "test": "node:juggler/tests/the_profile_lock_looks_up_no_host_name.test.mjs#the lookup of the host name in the symlink lock is compiled out for the directory by the define of its moz.build, and the only reader of the symbol is that block"
+ },
+ {
+  "file": "netwerk/base/TRRLoadInfo.cpp",
+  "function": "already_AddRefed<nsILoadInfo> TRRLoadInfo::Clone() const {",
+  "kind": "rewrite",
+  "form": "wrap-expression",
+  "line": "      StealthTRRCloneContext(this, new TRRLoadInfo(mResultPrincipalURI, mInternalContentPolicyType));  // STEALTH-HOOK(network/doh)",
+  "removed": "      new TRRLoadInfo(mResultPrincipalURI, mInternalContentPolicyType);",
+  "test": "gtest:TestStealthTRRContext.TheCloneOfATRRLoadInfoKeepsTheContext"
+ },
+ {
+  "file": "toolkit/components/url-classifier/nsUrlClassifierDBService.cpp",
+  "function": "NS_IMPL_ISUPPORTS(nsUrlClassifierHashCompleterBase,",
+  "kind": "add",
+  "form": "registration",
+  "line": "#include \"StealthHashCompleterContext.inc.h\"  // STEALTH-HOOK(network/doh)",
+  "test": "gtest:TestStealthTRRContext.TheLookupContextGetterGivesTheContextAndRefusesNull"
+ },
+ {
+  "file": "toolkit/profile/moz.build",
+  "function": "UNIFIED_SOURCES += [",
+  "kind": "add",
+  "form": "registration",
+  "line": "include(\"StealthProfile.mozbuild\")  # STEALTH-HOOK(network/doh)",
+  "test": "node:juggler/tests/the_profile_lock_looks_up_no_host_name.test.mjs#the lookup of the host name in the symlink lock is compiled out for the directory by the define of its moz.build, and the only reader of the symbol is that block"
  }
 ]
