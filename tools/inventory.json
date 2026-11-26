@@ -4219,7 +4219,6 @@
   "inline_logic_lines": 0,
   "hookable": "hard",
   "anchor": "the hashes of the files the backport changes",
-  "evidence": [],
   "notes": "Cargo verifies vendored crates against these hashes; each changed file of the crate has its new sha256, written by tools/regen_checksums.py.",
   "verifier": {
    "changed": [],
@@ -4237,7 +4236,6 @@
   "inline_logic_lines": 0,
   "hookable": "hard",
   "anchor": "flush_init, the global function that starts the dispatcher",
-  "evidence": [],
   "notes": "flush_init takes the final task (bug 2072668, mozilla/glean PR 3727): Mozilla bug 2072668 (mozilla/glean PR 3727, 2874dc1ef164, 2026-10-30), carried before the glean-core Mozilla vendors has it.",
   "verifier": {
    "changed": [],
@@ -4255,7 +4253,6 @@
   "inline_logic_lines": 0,
   "hookable": "hard",
   "anchor": "DispatchGuard::flush_init and the test module",
-  "evidence": [],
   "notes": "flush_init queues the final task behind the pre-init tasks, even when the pre-init buffer is full, and the test that holds it (flush_init_runs_final_task_after_full_preinit_buffer): Mozilla bug 2072668 (mozilla/glean PR 3727, 2874dc1ef164, 2026-10-30), carried before the glean-core Mozilla vendors has it: the race between Glean's init thread and shutdown(). Upstream code, not ours: no budget; BACKPORT.json of its folder lists the commits and the replay writes this file.",
   "verifier": {
    "changed": [],
@@ -4273,7 +4270,6 @@
   "inline_logic_lines": 0,
   "hookable": "hard",
   "anchor": "initialize_inner after the pre-init flush, and record_dir_info_and_submit_health_ping",
-  "evidence": [],
   "notes": "The overflow metric and the pre_init health ping are recorded in the final pre-init task on the dispatcher, which shutdown() waits for, instead of on the init thread after the flush: Mozilla bug 2072668 (mozilla/glean PR 3727, 2874dc1ef164, 2026-10-30), carried before the glean-core Mozilla vendors has it: the race between Glean's init thread and shutdown(). Upstream code, not ours: no budget; BACKPORT.json of its folder lists the commits and the replay writes this file.",
   "verifier": {
    "changed": [],
