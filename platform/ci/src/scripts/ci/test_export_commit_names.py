@@ -2,9 +2,11 @@
 
     python -m pytest scripts/ci/test_export_commit_names.py
 
-Run by scripts/ci/test_ci.py through cases(), like the other modules of this folder.
+Run by scripts/ci/test_ci.py through cases(), like the other modules of this folder. The classes of the paths (mixed, pure, own) are the series' own
+(tools/export_paths.py, found beside the script: in the series itself, or in `.series` of a source tree).
 """
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -78,18 +80,45 @@ def test_an_export_commit_that_touches_a_series_own_path_is_red():
     assert code == 1 and "docs/a.md" in out, out
 
 
-def test_manifest_json_and_hooks_patch_at_any_depth_are_exported():
-    for path in ("MANIFEST.json", "automation/juggler/MANIFEST.json", "a/b/c/hooks.patch", "hooks.patch"):
-        assert export_commit_names.is_exported(path), path
+def test_hooks_patch_at_any_depth_is_pure_and_manifest_and_hooks_json_are_mixed():
+    for path in ("automation/juggler/hooks.patch", "a/b/c/hooks.patch", "hooks.patch"):
+        assert export_commit_names.is_exported(path) and export_commit_names.kind(path) == "pure", path
         assert one("export: m", path)[0] == 0, path
         assert one("m", path)[0] == 1, path
+    for path in ("MANIFEST.json", "automation/juggler/MANIFEST.json", "network/doh/HOOKS.json", "platform/ci/FEATURE.md"):
+        assert export_commit_names.is_exported(path) and export_commit_names.kind(path) == "mixed", path
+        assert one("export: m", path)[0] == 0, path
+        assert one("m", path)[0] == 0, path
 
 
-def test_the_exported_paths_are_src_under_a_folder_and_nothing_else():
-    for path in ("automation/juggler/src/x.js", "platform/ci/src/scripts/ci/a.py", "a/src/b", "a/b/src/c/d"):
+def test_a_hand_commit_that_touches_only_a_manifest_is_green():
+    """The hand text of an inventory record (a commit that touched only a MANIFEST.json was refused before the classes)."""
+    code, out = one("inventory: the record of x.h", "fingerprint/screen-window/geometry/MANIFEST.json")
+    assert code == 0 and out.strip() == "OK 1 commits", out
+
+
+def test_an_export_commit_that_writes_a_hooks_json_is_green():
+    """The export writes HOOKS.json with the hooks.patch (an export: commit that touched HOOKS.json was refused before the classes)."""
+    code, out = one("export: the forms", "network/doh/hooks.patch", "network/doh/HOOKS.json", "network/doh/MANIFEST.json", "network/doh/src/a.cpp")
+    assert code == 0 and out.strip() == "OK 1 commits", out
+    code, out = one("the forms, by hand", "network/doh/hooks.patch", "network/doh/HOOKS.json")
+    assert code == 0, "pure and mixed together are not (A): nothing says it is an export"
+
+
+def test_the_exported_paths_are_src_under_a_folder_and_the_rest_of_what_the_export_writes():
+    for path in ("automation/juggler/src/x.js", "platform/ci/src/scripts/ci/a.py", "a/src/b", "a/b/src/c/d", "SERIES", "UPSTREAM.json", "tools/gtest-suites.json",
+                 "tools/hook-budget.json", "tools/removed-budget.json", ".github/workflows/checks.yml"):
         assert export_commit_names.is_exported(path), path
-    for path in ("tools/engine.py", "docs/a.md", ".github/workflows/checks.yml", "SERIES", "UPSTREAM.json", "src/a.py", "a/src", "a/srcs/b", "a/MANIFEST.jsonl"):
+    for path in ("tools/engine.py", "tools/hook-budget-raises.json", "docs/a.md", "src/a.py", "a/src", "a/srcs/b", "a/MANIFEST.jsonl",
+                 ".github/workflows/series.yml", ".github/workflows/noreply-identity.yml"):
         assert not export_commit_names.is_exported(path), path
+
+
+def test_a_commit_touching_only_the_root_files_the_export_writes_is_red_without_export():
+    for path in ("SERIES", "UPSTREAM.json", "tools/gtest-suites.json", "tools/hook-budget.json", ".github/workflows/release.yml"):
+        code, out = one("tweak", path)
+        assert code == 1 and path in out, (path, out)
+        assert one("export: tweak", path)[0] == 0, path
 
 
 def test_a_commit_touching_src_and_tools_without_export_is_green():
@@ -99,6 +128,8 @@ def test_a_commit_touching_src_and_tools_without_export_is_green():
 
 def test_a_commit_touching_only_series_own_paths_without_export_is_green():
     code, out = one("docs", "docs/a.md")
+    assert code == 0, out
+    code, out = one("the raises", "tools/hook-budget-raises.json")
     assert code == 0, out
 
 
@@ -144,6 +175,18 @@ def test_an_unreadable_range_or_repository_exits_two():
         assert run_script(os.path.join(root, "missing"), "a..b").returncode == 2
         done = subprocess.run([sys.executable, str(SCRIPT)], capture_output=True, text=True, encoding="utf-8")
         assert done.returncode == 2
+
+
+def test_the_classes_are_the_series_own_and_a_script_that_cannot_read_them_stops_with_two():
+    classes = export_commit_names.CLASSES
+    assert classes.__name__ == "export_paths" and classes.kind("network/doh/HOOKS.json") == "mixed" and classes.kind("tools/engine.py") == "own"
+    with tempfile.TemporaryDirectory() as root:
+        lone = Path(root) / "export_commit_names.py"
+        shutil.copy(SCRIPT, lone)
+        os.makedirs(os.path.join(root, "repo"))
+        repo = make_repo(os.path.join(root, "repo"))   # a repository with no series beside the script
+        done = subprocess.run([sys.executable, str(lone), "--repo", str(repo), "--range", "HEAD~1..HEAD"], capture_output=True, text=True, encoding="utf-8")
+        assert done.returncode == 2 and "export_paths.py" in done.stderr and "OK" not in done.stdout, (done.returncode, done.stderr)
 
 
 def cases() -> list:

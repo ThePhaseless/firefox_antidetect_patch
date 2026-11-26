@@ -28,7 +28,7 @@ from pathlib import Path
 GLEAN_TEST = "dispatcher::test::flush_init_runs_final_task_after_full_preinit_buffer"
 OURS = {
     "render_backend::stealth_shared_fonts::tests::": 5,
-    "stealth_tests::": 1,
+    "stealth_tests::": 2,
     GLEAN_TEST: 1,
 }
 #: The libtest filters that select exactly those modules (a substring of the full path), WebRender's run (`cargo test -p webrender --lib`).

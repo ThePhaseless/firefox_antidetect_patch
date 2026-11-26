@@ -277,8 +277,8 @@ def _cases() -> list:
                 and "platform/ci/src/scripts/ci/export_commit_names.py" in rule_run and "--repo ." in rule_run and '--range "$range"' in rule_run
                 and not any("export_commit_names.py" in str(job.get("steps")) for name, job in called["jobs"].items() if name != "noreply-identity")))
     sparse = str(noreply_steps[0]["with"]["sparse-checkout"]).split()
-    out.append(("export rule: the sparse checkout of the series holds the script beside .github, in the same style, and still no tree",
-                sparse == ["/.github/", "/platform/ci/src/scripts/ci/export_commit_names.py"] and noreply_steps[0]["with"]["filter"] == "tree:0"
+    out.append(("export rule: the sparse checkout of the series holds the script and its classes (tools/export_paths.py) beside .github, in the same style, and still no tree",
+                sparse == ["/.github/", "/platform/ci/src/scripts/ci/export_commit_names.py", "/tools/export_paths.py"] and noreply_steps[0]["with"]["filter"] == "tree:0"
                 and noreply_steps[0]["with"]["fetch-depth"] == 0))
     out.append(("export rule: a pull request judges base..head, a push before..after (HEAD~1..HEAD when before is all zeros), a schedule or a dispatch what the ref adds to the default branch",
                 '$BASE_SHA..$HEAD_SHA' in rule_run and '$BEFORE..$AFTER' in rule_run and "0000000000000000000000000000000000000000" in rule_run

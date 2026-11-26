@@ -537,8 +537,8 @@ def cargo_cases(gate: dict) -> list:
     # mdns_service: src/stealth_tests.rs is a file of ours (declared in lib.rs by `#[cfg(test)] mod stealth_tests;`), so its floor is held to its count of #[test] too.
     # Where the tree does not have the file (a tree without hooks/fingerprint__webrtc__declared-network) there is nothing to count here, and the job is red (`0 passed`).
     ms = ROOT / "dom" / "media" / "webrtc" / "transport" / "mdns_service" / "src"
-    two = "#[test]\nfn a() {}\n#[test]\nfn b() {}\n"
-    add("cargo: a stealth_tests.rs with a second #[test] does not match the floor (the count check below is red on it)", two.count("#[test]") != floor[mdns])
+    three = "#[test]\nfn a() {}\n#[test]\nfn b() {}\n#[test]\nfn c() {}\n"
+    add("cargo: a stealth_tests.rs with a test more than the floor does not match it (the count check below is red on it)", three.count("#[test]") != floor[mdns])
     if (ms / "stealth_tests.rs").exists():
         body = (ms / "stealth_tests.rs").read_text(encoding="utf-8")
         add("cargo: the floor of %s is the number of #[test] in mdns_service/src/stealth_tests.rs (%d)" % (mdns, floor[mdns]), body.count("#[test]") == floor[mdns])
