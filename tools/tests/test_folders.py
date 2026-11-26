@@ -315,4 +315,4 @@ def test_export_never_writes_or_deletes_a_folder_json(world, tmp_path, monkeypat
                         ("fingerprint/a" if path.startswith("dom/") else "platform/b"))
     engine.export(world, "TAG", "more")
     assert (root / "fingerprint" / "n" / "MANIFEST.json").is_file() and not (root / "fingerprint" / "n" / "FOLDER.json").exists()
-    assert [p.relative_to(root).as_posix() for p in root.rglob("FOLDER.json")] == ["fingerprint/a/FOLDER.json", "platform/b/FOLDER.json"]
+    assert sorted(p.relative_to(root).as_posix() for p in root.rglob("FOLDER.json")) == ["fingerprint/a/FOLDER.json", "platform/b/FOLDER.json"]   # rglob has no order: NTFS gives the sorted one, ext4 does not
