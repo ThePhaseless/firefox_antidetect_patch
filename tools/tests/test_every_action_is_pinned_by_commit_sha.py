@@ -64,7 +64,7 @@ def test_a_sha_with_its_version_and_a_local_workflow_are_accepted():
 VENDORED = Path(__file__).resolve().parent / "pinned"
 REUSABLE = {
     # uses (without @)                                  -> (commit our caller pins,                  git blob id of the file there,              vendored copy)
-    "oss-invisible/core/.github/workflows/noreply-identity.yml": ("db3b67efd8d52924ecfe4c69e6daa33cdac58e8c", "3c3066500c32869347087e08ef69c6bc72c7f858",
+    "oss-invisible/core/.github/workflows/noreply-identity.yml": ("1baf9479b288a2563010945ca9233c8b1db91202", "0fb97825b60feae542d90f593c9921b598a55e0c",
                                                                   "core-noreply-identity.yml"),
 }
 
