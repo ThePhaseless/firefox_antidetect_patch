@@ -6208,6 +6208,147 @@
    ]
   },
   {
+   "key": "H|platform/backports/glean-init-shutdown-race|third_party/rust/glean-core/.cargo-checksum.json||e4344c051ea9",
+   "folder": "platform/backports/glean-init-shutdown-race",
+   "file": "third_party/rust/glean-core/.cargo-checksum.json",
+   "hunk": 1,
+   "churn": 4,
+   "which": [
+    "152",
+    "154",
+    "158",
+    "159"
+   ]
+  },
+  {
+   "key": "H|platform/backports/glean-init-shutdown-race|third_party/rust/glean-core/src/dispatcher/global.rs|pub fn block_on_queue_timeout(timeout: Duration) -> Result<(), RecvTimeoutError>|94ae33f1d64c",
+   "folder": "platform/backports/glean-init-shutdown-race",
+   "file": "third_party/rust/glean-core/src/dispatcher/global.rs",
+   "hunk": 1,
+   "churn": 0,
+   "which": []
+  },
+  {
+   "key": "H|platform/backports/glean-init-shutdown-race|third_party/rust/glean-core/src/dispatcher/global.rs|mod test {|fa9f852dcd90",
+   "folder": "platform/backports/glean-init-shutdown-race",
+   "file": "third_party/rust/glean-core/src/dispatcher/global.rs",
+   "hunk": 2,
+   "churn": 0,
+   "which": []
+  },
+  {
+   "key": "H|platform/backports/glean-init-shutdown-race|third_party/rust/glean-core/src/dispatcher/global.rs|mod test {|fa9f852dcd90#2",
+   "folder": "platform/backports/glean-init-shutdown-race",
+   "file": "third_party/rust/glean-core/src/dispatcher/global.rs",
+   "hunk": 3,
+   "churn": 0,
+   "which": []
+  },
+  {
+   "key": "H|platform/backports/glean-init-shutdown-race|third_party/rust/glean-core/src/dispatcher/mod.rs||5365fbb2a84f",
+   "folder": "platform/backports/glean-init-shutdown-race",
+   "file": "third_party/rust/glean-core/src/dispatcher/mod.rs",
+   "hunk": 1,
+   "churn": 0,
+   "which": []
+  },
+  {
+   "key": "H|platform/backports/glean-init-shutdown-race|third_party/rust/glean-core/src/dispatcher/mod.rs|impl DispatchGuard {|7d1b1c152e7b",
+   "folder": "platform/backports/glean-init-shutdown-race",
+   "file": "third_party/rust/glean-core/src/dispatcher/mod.rs",
+   "hunk": 2,
+   "churn": 0,
+   "which": []
+  },
+  {
+   "key": "H|platform/backports/glean-init-shutdown-race|third_party/rust/glean-core/src/dispatcher/mod.rs|impl DispatchGuard {|16814d5f3785",
+   "folder": "platform/backports/glean-init-shutdown-race",
+   "file": "third_party/rust/glean-core/src/dispatcher/mod.rs",
+   "hunk": 3,
+   "churn": 0,
+   "which": []
+  },
+  {
+   "key": "H|platform/backports/glean-init-shutdown-race|third_party/rust/glean-core/src/dispatcher/mod.rs|impl DispatchGuard {|351514bfc6c7",
+   "folder": "platform/backports/glean-init-shutdown-race",
+   "file": "third_party/rust/glean-core/src/dispatcher/mod.rs",
+   "hunk": 4,
+   "churn": 0,
+   "which": []
+  },
+  {
+   "key": "H|platform/backports/glean-init-shutdown-race|third_party/rust/glean-core/src/dispatcher/mod.rs|mod test {|4e2333ae1706",
+   "folder": "platform/backports/glean-init-shutdown-race",
+   "file": "third_party/rust/glean-core/src/dispatcher/mod.rs",
+   "hunk": 5,
+   "churn": 0,
+   "which": []
+  },
+  {
+   "key": "H|platform/backports/glean-init-shutdown-race|third_party/rust/glean-core/src/dispatcher/mod.rs|mod test {|4e2333ae1706#2",
+   "folder": "platform/backports/glean-init-shutdown-race",
+   "file": "third_party/rust/glean-core/src/dispatcher/mod.rs",
+   "hunk": 6,
+   "churn": 0,
+   "which": []
+  },
+  {
+   "key": "H|platform/backports/glean-init-shutdown-race|third_party/rust/glean-core/src/dispatcher/mod.rs|mod test {|a77b991a6f7c",
+   "folder": "platform/backports/glean-init-shutdown-race",
+   "file": "third_party/rust/glean-core/src/dispatcher/mod.rs",
+   "hunk": 7,
+   "churn": 0,
+   "which": []
+  },
+  {
+   "key": "H|platform/backports/glean-init-shutdown-race|third_party/rust/glean-core/src/dispatcher/mod.rs|mod test {|a77b991a6f7c#2",
+   "folder": "platform/backports/glean-init-shutdown-race",
+   "file": "third_party/rust/glean-core/src/dispatcher/mod.rs",
+   "hunk": 8,
+   "churn": 0,
+   "which": []
+  },
+  {
+   "key": "H|platform/backports/glean-init-shutdown-race|third_party/rust/glean-core/src/dispatcher/mod.rs|mod test {|a77b991a6f7c#3",
+   "folder": "platform/backports/glean-init-shutdown-race",
+   "file": "third_party/rust/glean-core/src/dispatcher/mod.rs",
+   "hunk": 9,
+   "churn": 0,
+   "which": []
+  },
+  {
+   "key": "H|platform/backports/glean-init-shutdown-race|third_party/rust/glean-core/src/dispatcher/mod.rs|mod test {|e68809cac3ad",
+   "folder": "platform/backports/glean-init-shutdown-race",
+   "file": "third_party/rust/glean-core/src/dispatcher/mod.rs",
+   "hunk": 10,
+   "churn": 0,
+   "which": []
+  },
+  {
+   "key": "H|platform/backports/glean-init-shutdown-race|third_party/rust/glean-core/src/dispatcher/mod.rs|mod test {|a77b991a6f7c#4",
+   "folder": "platform/backports/glean-init-shutdown-race",
+   "file": "third_party/rust/glean-core/src/dispatcher/mod.rs",
+   "hunk": 11,
+   "churn": 0,
+   "which": []
+  },
+  {
+   "key": "H|platform/backports/glean-init-shutdown-race|third_party/rust/glean-core/src/lib.rs|fn initialize_inner(|e916c5541e05",
+   "folder": "platform/backports/glean-init-shutdown-race",
+   "file": "third_party/rust/glean-core/src/lib.rs",
+   "hunk": 1,
+   "churn": 0,
+   "which": []
+  },
+  {
+   "key": "H|platform/backports/glean-init-shutdown-race|third_party/rust/glean-core/src/lib.rs|fn collect_directory_info(path: &Path) -> Option<serde_json::Value> {|1797df2ee3bf",
+   "folder": "platform/backports/glean-init-shutdown-race",
+   "file": "third_party/rust/glean-core/src/lib.rs",
+   "hunk": 2,
+   "churn": 0,
+   "which": []
+  },
+  {
    "key": "H|platform/build-tools|python/mozbuild/mozbuild/backend/recursivemake.py|from ..util import FileAvoidWrite, ensureParentDir, pairwise|e6fe0385e2dc",
    "folder": "platform/build-tools",
    "file": "python/mozbuild/mozbuild/backend/recursivemake.py",
