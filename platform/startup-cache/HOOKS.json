@@ -14,7 +14,11 @@
   "form": "wrap-expression",
   "line": "        if (StealthWritesMayLowerIOPriority(aUseLowPriorityIO)) {  // STEALTH-HOOK(platform/startup-cache)",
   "removed": "        if (aUseLowPriorityIO) {",
-  "test": "gtest:StealthStartupCache.AWriteNeverLowersItsIOPriority"
+  "test": "gtest:StealthStartupCache.AWriteNeverLowersItsIOPriority",
+  "quiet_anchor_why": {
+   "kind": "only-place",
+   "why": "The value is born on this line: the hook wraps the condition that decides whether the write lowers its I/O priority, and no other line of the lambda decides it."
+  }
  },
  {
   "file": "startupcache/moz.build",

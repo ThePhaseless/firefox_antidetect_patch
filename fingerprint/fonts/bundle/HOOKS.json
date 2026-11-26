@@ -94,7 +94,11 @@
   "kind": "add",
   "form": "member",
   "line": "  uint16_t mBundleFaceIndex = 0;  // STEALTH-HOOK(fingerprint/fonts/bundle)",
-  "test": "wrapper:tests/test_a_screenshot_draws_the_text_of_the_bundled_fonts_as_the_content_does_e2e.py::test_the_text_of_a_bundled_family_is_drawn_by_the_screenshot_as_the_content_drew_it"
+  "test": "wrapper:tests/test_a_screenshot_draws_the_text_of_the_bundled_fonts_as_the_content_does_e2e.py::test_the_text_of_a_bundled_family_is_drawn_by_the_screenshot_as_the_content_drew_it",
+  "quiet_anchor_why": {
+   "kind": "deferred",
+   "quieter": "gfx/thebes/gfxDWriteFontList.h:bool mHasVariations;"
+  }
  },
  {
   "file": "gfx/thebes/gfxDWriteFontList.h",
@@ -102,7 +106,11 @@
   "kind": "add",
   "form": "member",
   "line": "  std::wstring mBundleFilePath;  // STEALTH-HOOK(fingerprint/fonts/bundle)",
-  "test": "wrapper:tests/test_a_screenshot_draws_the_text_of_the_bundled_fonts_as_the_content_does_e2e.py::test_the_text_of_a_bundled_family_is_drawn_by_the_screenshot_as_the_content_drew_it"
+  "test": "wrapper:tests/test_a_screenshot_draws_the_text_of_the_bundled_fonts_as_the_content_does_e2e.py::test_the_text_of_a_bundled_family_is_drawn_by_the_screenshot_as_the_content_drew_it",
+  "quiet_anchor_why": {
+   "kind": "deferred",
+   "quieter": "gfx/thebes/gfxDWriteFontList.h:bool mHasVariationsInitialized;"
+  }
  },
  {
   "file": "gfx/thebes/gfxDWriteFontList.h",

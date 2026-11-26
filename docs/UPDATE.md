@@ -4,7 +4,7 @@ For whoever does the next move, an engineer or an LLM agent. No script does it: 
 
 `OLD` is `mozilla_tag` in `UPSTREAM.json`, `NEW` the target tag (the commands below read them as shell variables, `OLD=FIREFOX_...`). `<source>` is the source repository (`--source`, or the environment variable `FIREFOX_SOURCE`). Commands run in the root of this repository. `<R>` is the number of the engine release: the last published `firefox-<R-1>` plus one. It counts our releases, not Firefox versions.
 
-Rules behind it: [port-01](decisions/port-01-one-run.md), [port-02](decisions/port-02-stable-retail-of-the-target.md), [port-03](decisions/port-03-births-ledger.md), [hook-02](decisions/hook-02-shape-and-contract.md), [backport-01](decisions/backport-01-upstream-code-as-is.md), [port-04](decisions/port-04-backport-as-commits.md), [ci-01](decisions/ci-01-builds-from-main-or-latitude-branches.md). The hook forms are in [STRUCTURE.md](STRUCTURE.md).
+Rules behind it: [port-01](decisions/port-01-one-run.md), [port-02](decisions/port-02-stable-retail-of-the-target.md), [port-03](decisions/port-03-births-ledger.md), [hook-02](decisions/hook-02-shape-and-contract.md), [backport-01](decisions/backport-01-upstream-code-as-is.md), [port-04](decisions/port-04-backport-as-commits.md), [port-07](decisions/port-07-quiet-anchors.md), [ci-01](decisions/ci-01-builds-from-main-or-latitude-branches.md). The hook forms are in [STRUCTURE.md](STRUCTURE.md).
 
 ## What can break, and what tells you
 
@@ -75,6 +75,8 @@ Resolve each file listed as a conflict, `git add`, commit on the branch. A folde
 | A backport of a Mozilla commit the tag already has | Restore its files to the tag's (`git checkout <NEW> -- <file>`) so the branch no longer changes them, and delete its record from `tools/inventory.json`. `export` removes the folder |
 | A numbered space (flag bits, enums, IDL constants) now uses a value of ours | Move our constant in our own file to a value Mozilla leaves free, and keep its test ([hook-05](decisions/hook-05-no-values-in-mozilla-numbered-spaces.md)) |
 
+Where a hook moves, or a new one is placed, take the anchor with the least churn among the places its form allows (rule [port-07](decisions/port-07-quiet-anchors.md)): `churn.py --write` in step 5 gives the churn of every hunk, and the ones in the band need a reason.
+
 Never grow a hook to make it fit: the extra lines go into the folder's own files. Never copy Mozilla's new lines into our files: a copy stops following Mozilla, and nothing conflicts the next time. Never raise a budget.
 
 ## 5. Export and prove
@@ -84,6 +86,7 @@ In `UPSTREAM.json`, by hand: `mozilla_tag` to `NEW`, `source_branch` to the bran
 ```
 python tools/engine.py export --source <source> --head port/$NEW
 python tools/engine.py verify --source <source> --head port/$NEW
+python tools/churn.py --source <source> --write
 python tools/engine.py hook-debt
 python tools/engine.py shrink-budget
 python tools/engine.py check --source <source> --against $NEW
@@ -92,6 +95,7 @@ python -m pytest -q tools/tests
 
 - `export` first runs, on the whole tree of the head, the Juggler node tests and the python tests of our files in the tree (`tools/export_gate.py`; it needs Node, `ENGINE_NODE` if it is not on the path, and `ENGINE_NODE_GATE_TREE` set to the path of a worktree of the source repository, made there the first time, a quarter of an hour). Then it writes every folder, `SERIES`, the `HOOKS.json` files, the workflow copies and `exported_from` and `exported_tree` into a scratch copy of the checkout (uncommitted edits included) and runs `engine.py check` and `tools/tests` there, so a tools change whose tests need what export writes is tested on that, not on the old series. Only if all is green does the checkout take every file written and drop every file removed; on a red nothing of the checkout changes and the stop names the red. Fix the test in the source or the tool and run it again.
 - `verify` must print `identical`.
+- `churn.py --write` recomputes `tools/churn.json` for `mozilla_tag` (now `NEW`): the churn of every hunk of the new series over the 8 releases before it, and the commit of each of the 9 tags. `<source>` needs the 9 tags (`FIREFOX_<N-8>_0_RELEASE` to `NEW`); a missing one is named with the `git fetch --depth 1` that adds it, and a tag that is not the commit already recorded for it is refused. Commit the file. Then place every moved hook at the quietest anchor its form allows, `churn.py --write` again, and read the band: a hunk in it (`BAND_MIN_CHURN`) needs `quiet_anchor_why` in its `HOOKS.json` entry ([port-07](decisions/port-07-quiet-anchors.md)). Expect every `deferred` reason of the old port to be red (rule C18, `check`): move the hook there, or replace it with an `only-place` reason.
 - A hook whose text changed lost its hand fields. `check` asks for them: fill `test` (and `anchor` and `why` for an anchor) in the `HOOKS.json` of the folder, and the `Test:` line of its `FEATURE.md`. `python tools/engine.py hooks-list` rewrites every `HOOKS.json` from the `hooks.patch` files alone.
 - `tools/inventory.json` records, for each Mozilla file, how many lines of ours it has, how many of Mozilla's it removes and how many hunks. `check` names each record that differs from the new `hooks.patch`: rewrite the numbers by hand.
 - `hook-debt` drops the entries that are resolved and never adds one; a violation that is not in `tools/hook-debt.json` is a failure. `shrink-budget` lowers the budgets to what the patches carry. A budget above `origin/main`'s needs a row in `tools/hook-budget-raises.json`: you do not raise one in a move.

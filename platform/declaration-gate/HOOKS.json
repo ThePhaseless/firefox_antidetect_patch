@@ -39,7 +39,11 @@
   "kind": "add",
   "form": "registration",
   "line": "#include \"StealthGfxFeatureStatus.h\"  // STEALTH-HOOK(platform/declaration-gate)",
-  "test": "gtest:StealthGfxFeatureStatus.EveryLiveFeatureAnswersFromTheDeclaration"
+  "test": "gtest:StealthGfxFeatureStatus.EveryLiveFeatureAnswersFromTheDeclaration",
+  "quiet_anchor_why": {
+   "kind": "only-place",
+   "why": "An include of ours sits in a block of its own after Mozilla's include block. Every other file-scope place before `namespace mozilla::widget {` has churn of 2 or more (the macro definitions below the block are as busy); the places with less churn are inside Mozilla's include block (C8), and after the namespace opener the header's declarations would land in the wrong scope."
+  }
  },
  {
   "file": "widget/gtk/GfxInfo.cpp",

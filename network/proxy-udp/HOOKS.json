@@ -371,7 +371,11 @@
   "kind": "add",
   "form": "member",
   "line": "  nsCOMPtr<nsIProxyInfo> mSocksProxy;  // STEALTH-HOOK(network/proxy-udp)",
-  "test": "gtest:StealthHttp3Socks.SocksProxyOfUdpSocketFailed"
+  "test": "gtest:StealthHttp3Socks.SocksProxyOfUdpSocketFailed",
+  "quiet_anchor_why": {
+   "kind": "deferred",
+   "quieter": "netwerk/base/nsUDPSocket.h:uint64_t mByteReadCount{0};"
+  }
  },
  {
   "file": "netwerk/ipc/PSocketProcess.ipdl",
@@ -639,7 +643,11 @@
   "kind": "add",
   "form": "registration",
   "line": "#include \"StealthHttp3Socks.h\"  // STEALTH-HOOK(network/proxy-udp)",
-  "test": "gtest:StealthHttp3Socks.SocksProxyIsHttp3Capable"
+  "test": "gtest:StealthHttp3Socks.SocksProxyIsHttp3Capable",
+  "quiet_anchor_why": {
+   "kind": "deferred",
+   "quieter": "netwerk/protocol/http/HttpBaseChannel.cpp:(\"%s: %p \" msg, __func__, this, ##__VA_ARGS__))"
+  }
  },
  {
   "file": "netwerk/protocol/http/HttpBaseChannel.cpp",
@@ -656,7 +664,11 @@
   "kind": "add",
   "form": "registration",
   "line": "#include \"StealthHttp3Socks.h\"  // STEALTH-HOOK(network/proxy-udp)",
-  "test": "gtest:StealthHttp3Socks.SocksProxyOfUdpSocketFailed"
+  "test": "gtest:StealthHttp3Socks.SocksProxyOfUdpSocketFailed",
+  "quiet_anchor_why": {
+   "kind": "only-place",
+   "why": "The form puts our include in a block after Mozilla's include block, before `namespace mozilla {`. The quiet places (churn 0) are above that block, where the form does not allow an include of ours, or inside it (C8); below it the include would land inside the namespace."
+  }
  },
  {
   "file": "netwerk/protocol/http/HttpConnectionUDP.cpp",

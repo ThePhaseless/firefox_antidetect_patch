@@ -38,6 +38,8 @@ CHECK_COMMANDS = {
     "rebuilds": ["engine.py materialize --into source", "tools/births.py --tree source", "tools/backport_replay.py check --source source",
                  "tests/test_pref_types.py", "tests/test_prefs_surface.py", "tests/test_juggler_contract.py", "tests/test_juggler_protocol_mirror.py",
                  "tests/test_webgl_extensions_follow_the_engine.py"],
+    # port-07: tools/churn.json is what the series and the Mozilla tags give now (the tags of its own: no tree)
+    "churn": ["tools/churn.py --cache-key", 'churn-tags.git" --fetch', 'churn-tags.git" --check', "tools/tests/test_churn.py"],
     # the core the wrapper pins, resolved once for the wheelhouse and the checkout of rebuilds (ci-05)
     "core-ref": ["release_plan.py --resolve-core-ref"],
     # series.yml's `noreply-identity`

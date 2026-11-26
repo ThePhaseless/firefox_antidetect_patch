@@ -22,7 +22,11 @@
   "form": "wrap-expression",
   "line": "  return *aIsPopupRequested ? mozilla::JugglerPopupChromeFlags(aFeatures, nsIWebBrowserChrome::CHROME_MINIMAL_POPUP)  // STEALTH-HOOK(automation/window-size)",
   "removed": "  return *aIsPopupRequested ? nsIWebBrowserChrome::CHROME_MINIMAL_POPUP",
-  "test": "node:juggler/tests/explicit_size_flag_is_free.test.mjs#the C++ and the JS side use the same bit"
+  "test": "node:juggler/tests/explicit_size_flag_is_free.test.mjs#the C++ and the JS side use the same bit",
+  "quiet_anchor_why": {
+   "kind": "only-place",
+   "why": "The value is born on this line: the hook rewrites Mozilla's return expression, so there is no other place where it can change what the function returns."
+  }
  },
  {
   "file": "toolkit/components/windowwatcher/nsWindowWatcher.cpp",

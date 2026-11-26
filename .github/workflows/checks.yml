@@ -8,6 +8,9 @@
 #
 #   rules             the series' own rules: tools/tests (hence the workflow rule tests) and `engine.py check` (folders, manifests, hook
 #                     contract, budgets against main's, workflow copies).
+#   churn             port-07 (docs/decisions/port-07-quiet-anchors.md): tools/churn.json is what the series gives now. No tree: the Mozilla tags of the
+#                     last eight releases and the base, one commit deep and with only the files the series patches, in a repository of their own (a small cache of this job), each checked against the
+#                     commit tools/churn.json records; `churn.py --check`, and the real-series test of tools/tests/test_churn.py.
 #   rebuilds          the Mozilla tag + the series = the tree declared in UPSTREAM.json (`engine.py materialize` stops when it is another
 #                     tree: this is the CI form of `engine.py verify`, which needs the source repository), the birth points against the ledger, and
 #                     the core's checks that read the engine's source.
@@ -16,6 +19,8 @@
 #                     asset names, the declared upstream source, our sources and build files, Juggler's tests without a browser, the wrapper's
 #                     list of required suites against gate.yml, and the junit of the python and node tests for the hook tests judge.
 # `rebuilds` and `tree` each materialize the tree (about 7 to 10 minutes of a GitHub runner, no later start: they run in parallel).
+# `churn` is a job of its own, parallel to them, and not a step of `rebuilds`: it needs no materialized tree (nine one-commit-deep tags are not the
+# tree the series is applied to), and a step there would wait behind the 7 to 10 minutes of `rebuilds`.
 # THE PYTHON PACKAGES of these jobs are not read from the index by them (ci-03): the jobs `py-deps-tools` and `py-deps-core` (py-deps.yml) resolve a lock
 # once per runner image, Python and lock and keep the wheelhouse in a cache entry; `rules`, `rebuilds` and `tree` download it and install from it,
 # offline, by name (--no-index --find-links --require-hashes). The core `rebuilds` checks is resolved once, by `core-ref`, and handed to both the wheelhouse
@@ -114,6 +119,68 @@ jobs:
         run: python -m pytest -q tools/tests
       - name: The series' rules (folders, manifests, hook budgets, workflow copies)
         run: python tools/engine.py check
+
+  # port-07: tools/churn.json (the churn of every hunk over the eight releases before the base) is what the series and the tags give now, and the real
+  # series gives the numbers of the first measurement. It reads the tags, not the tree, and of the tags only what the walk reads: the commit and the
+  # trees of the nine tags (the base and the eight before it), one commit deep and without file content (`--filter=blob:none`), and the content of the
+  # files the series patches (every file of every hooks.patch, and every file tools/churn.json lists), by the shas the trees give: a partial clone,
+  # tens of megabytes where nine whole tags are 1.6 GB. It lives in a bare repository of its own that `actions/cache` keeps (a larger entry would
+  # evict the rest of the repository's cache). The key is made by `churn.py --cache-key` from the commits tools/churn.json records and the set of
+  # files: never the names of the tags, and a new hook file is another key. Every tag is checked against its recorded commit (a cache entry too: `--fetch`
+  # requires the commit it recorded, and fetches nothing that is already there). A moved tag or another repository is red here, before a number is
+  # read; so is a file of the series whose content the repository does not have (it is never read as absent, and never as a churn of 0).
+  # TIMING (to be measured on the pull request, cold and warm, and the numbers written here). Measured on a development PC over a slow link, cold:
+  # 72 s and 78 MB (the nine tags 4 s each after the first, 13 s, then 1505 files in 27 s). Estimate on a runner: cold cache, the wheelhouse and Python
+  # 40 s, the fetch about 45 s, the check 15 s and the tests 60 s, about 2.5 minutes in all; warm cache, 40 s of wheelhouse, 5 s to restore the entry,
+  # the check and the tests 75 s, about 2 minutes. The job runs beside `rules` and `rebuilds`, never behind them, so a cold cache keeps the round
+  # within 8 minutes. A red that needs no binary shows within the first 3 minutes: from `rules` (`engine.py check` runs rule C18 offline, from the
+  # committed file) and, for this job's own reds (a stale file, a moved tag, a missing file), at the end of the fetch, about 1.5 minutes.
+  churn:
+    needs: py-deps-tools
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+      - name: The wheelhouse of the run's py-deps-tools job
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: py-deps-tools-checks-linux
+          path: ${{ runner.temp }}/py-deps
+      - name: The packages, from the wheelhouse alone (no index)
+        run: python -m pip install --quiet --no-index --find-links "$RUNNER_TEMP/py-deps" --require-hashes -r "$RUNNER_TEMP/py-deps/lock.txt"
+      - name: The key of the commits tools/churn.json records
+        id: tags
+        shell: bash
+        run: echo "key=churn-tags-$(python tools/churn.py --cache-key)" | tee -a "$GITHUB_OUTPUT"
+      - name: The tags of this key
+        id: restore
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/churn-tags.git
+          key: ${{ steps.tags.outputs.key }}
+      - name: The tags that are not there, one commit deep from Mozilla's repository, each against the commit tools/churn.json records
+        shell: bash
+        run: python tools/churn.py --source "$RUNNER_TEMP/churn-tags.git" --fetch
+      - name: Keep the tags
+        if: steps.restore.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/churn-tags.git
+          key: ${{ steps.tags.outputs.key }}
+      - name: tools/churn.json is what the series gives now (byte for byte)
+        shell: bash
+        run: python tools/churn.py --source "$RUNNER_TEMP/churn-tags.git" --check
+      # The real series at the base: three hunks against the first measurement, and the committed file. CHURN_REQUIRE_TAGS: no tags is a failure here,
+      # not the skip of the plain `pytest -q tools/tests` of `rules`, which has no tags.
+      - name: The real series, against the first measurement
+        shell: bash
+        env:
+          CHURN_TAGS_REPO: ${{ runner.temp }}/churn-tags.git
+          CHURN_REQUIRE_TAGS: "1"
+        run: python -m pytest -q -rs -p no:cacheprovider tools/tests/test_churn.py
 
   rebuilds:
     needs: [core-ref, py-deps-core]

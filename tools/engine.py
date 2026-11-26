@@ -1373,6 +1373,9 @@ def contract_problems(against_main: bool = False, base=None) -> tuple[list, int,
     if base is not None:
         violations = ([v for v in violations if v.rule not in ("C16", "C17")] + hook_contract.locals_violations(ROOT, base)
                       + hook_contract.namespace_violations(ROOT, unqualified=True))
+    # port-07 (C18): where Mozilla is quiet; offline (tools/churn.json and UPSTREAM.json), never debt. Its own function, not part of
+    # contract_violations: that one is judged on any series root, this one needs the series' churn file.
+    violations = violations + hook_contract.churn_violations(ROOT)
     if not HOOK_DEBT.is_file():
         return ["tools/hook-debt.json is missing: python tools/engine.py hook-debt --init"], len(hooks), len(violations)
     return (hook_contract.debt_problems(violations, hook_contract.load_debt(HOOK_DEBT),

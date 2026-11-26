@@ -5,7 +5,11 @@
   "kind": "add",
   "form": "registration",
   "line": "TEST_DIRS += [\"tests/gtest\"]  # STEALTH-HOOK(platform/hidden-desktop)",
-  "test": "gtest:StealthWindowInputDesktop.OnlyAWindowOfThisProcessOnAnotherDesktopIsOff"
+  "test": "gtest:StealthWindowInputDesktop.OnlyAWindowOfThisProcessOnAnotherDesktopIsOff",
+  "quiet_anchor_why": {
+   "kind": "deferred",
+   "quieter": "dom/media/webrtc/moz.build:]"
+  }
  },
  {
   "file": "third_party/libwebrtc/modules/desktop_capture/cropping_window_capturer_win.cc",

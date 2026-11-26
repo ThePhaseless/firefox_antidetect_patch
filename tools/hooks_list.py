@@ -20,6 +20,9 @@ An entry, in this order of keys:
     exception (G35, only when the pm granted it) why no form can express this rewritten line
     reason_kind (port-06, with `exception` on a rewrite) the kind of the reason: expression | declaration | macro | skip
               (tools/hook_contract.py C12..C15 judge a rewrite by it; the exception text says why)
+    quiet_anchor_why  (port-07, a hook whose hunk is in the churn band of tools/churn.py) why no quieter anchor serves:
+              {"kind": "only-place", "why": "<words>"} or {"kind": "deferred", "quieter": "<mozilla file>:<anchor text>"}
+              (`deferred` only while tools/churn.json is for the series' tag); rule C18 of tools/hook_contract.py judges it
     untestable  (only when the pm granted it) why the hook has no test: `test` stays '' and rule T1 does not apply
     pm        exactly "approvato": the pm granted the exception (G35) or the untestable. `exception` and `pm` make a
               declared exception: the hook is left out of contract_violations (its C-rules C1..C11, T1, T2, T3; not C12..C15,
@@ -81,7 +84,7 @@ from pathlib import Path
 
 import hook_contract as hc
 
-HAND_FIELDS = ("test", "anchor", "why", "exception", "reason_kind", "untestable", "pm")
+HAND_FIELDS = ("test", "anchor", "why", "exception", "reason_kind", "untestable", "pm", "quiet_anchor_why")
 PM_APPROVED = "approvato"
 WORKFLOWS = "platform/ci/src/.github/workflows"
 CANDIDATE_WORKFLOW = "release.yml"
@@ -148,6 +151,8 @@ def _with_hand_fields(e: dict, old: dict | None) -> dict:
     for k in ("exception", "reason_kind", "untestable", "pm"):          # the pm's decisions (G35): only where they were written
         if k in old:
             out[k] = old[k]
+    if "quiet_anchor_why" in old:        # port-07: why no quieter anchor serves (a hook in the churn band); the shape is C18's to judge
+        out["quiet_anchor_why"] = old["quiet_anchor_why"]
     return out
 
 

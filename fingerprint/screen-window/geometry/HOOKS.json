@@ -163,7 +163,11 @@
   "kind": "add",
   "form": "registration",
   "line": "UNIFIED_SOURCES += [\"TestStealthFullscreen.cpp\"]  # STEALTH-HOOK(fingerprint/screen-window/geometry)",
-  "test": "gtest:StealthFullscreen.TheDeclaredScreenAtTheDeclaredScale"
+  "test": "gtest:StealthFullscreen.TheDeclaredScreenAtTheDeclaredScale",
+  "quiet_anchor_why": {
+   "kind": "only-place",
+   "why": "A moz.build registration goes directly after the closing `]` of the UNIFIED_SOURCES list it registers in, and that list is the churning one: Mozilla edits that list and the lines around it in releases 152 and 158. The other places (after an unrelated list, or at the end of the file) are not the list the line registers in."
+  }
  },
  {
   "file": "widget/windows/moz.build",

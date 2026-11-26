@@ -238,6 +238,7 @@ def test_check_refuses_a_new_violation_and_a_stale_entry(tmp_path, monkeypatch, 
     debt = hc.update_debt([], real, init=True)
     path = tmp_path / "hook-debt.json"
     monkeypatch.setattr(engine, "HOOK_DEBT", path)
+    monkeypatch.setattr(hc, "churn_violations", lambda root: [])      # C18 (port-07) is never debt and has its own tests (test_quiet_anchors.py)
     monkeypatch.setattr(hc, "contract_violations", lambda root: real + [extra])
     hc.write_debt(path, debt)                           # one violation not listed
     assert engine.check() == 1

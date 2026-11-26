@@ -289,8 +289,18 @@ def group_cache_sharing(doc, jobs, build, steps) -> list:
                 and 'key=lavapipe-${{ matrix.leg }}-' in steps.get("WebGPU's Vulkan driver (linux-x86_64) - its inputs", {}).get("run", "")))
     out.append(("cache: no build leg on GitHub's runners, so none reads an entry the node writes: no executable of the node's runs there",
                 not [l.leg for l in legs.LEGS if not l.node]))
-    all_files = "\n".join(p.read_text(encoding="utf-8") for p in WORKFLOWS.glob("*.yml") if p.name not in ("release.yml", "linux-deps.yml", "py-deps.yml"))
+    all_files = "\n".join(p.read_text(encoding="utf-8") for p in WORKFLOWS.glob("*.yml")
+                          if p.name not in ("release.yml", "linux-deps.yml", "py-deps.yml", "checks.yml"))
     out.append(("cache: and no other workflow restores a cache at all, but linux-deps.yml and py-deps.yml (the resolvers, keyed by the image they resolved on: ci-03)", "actions/cache" not in all_files))
+    # checks.yml keeps one cache, of the job `churn` (port-07): the Mozilla release tags, one commit deep, in a bare repository of their own, keyed
+    # churn-tags-<the commits tools/churn.json records>. Nothing the node writes is read there and nothing it writes reaches the node.
+    checks_jobs = load((WORKFLOWS / "checks.yml").read_text(encoding="utf-8"))["jobs"]
+    cache_steps = {name: [st for st in j.get("steps", []) if "actions/cache" in str(st.get("uses", ""))] for name, j in checks_jobs.items()}
+    key_step = [st for st in checks_jobs["churn"]["steps"] if st.get("id") == "tags"]
+    out.append(("cache: checks.yml restores and saves one cache, the tags of the job `churn` (churn-tags-<commits>, a bare repository of their own), and no other job of it has one",
+                [n for n, c in cache_steps.items() if c] == ["churn"] and len(cache_steps["churn"]) == 2
+                and all("churn-tags.git" in str(st["with"]["path"]) for st in cache_steps["churn"])
+                and len(key_step) == 1 and "key=churn-tags-" in key_step[0]["run"]))
     # linux-deps.yml keeps Ubuntu's .deb files of the Linux jobs (republish 45297517213: a mirror at 102 kB/s): written and read by its one job, on GitHub's
     # ubuntu-24.04, under keys of its own (linux-deps-<image>-<list>), so nothing the node writes is read there and nothing it writes reaches the node.
     deps_doc = load((WORKFLOWS / "linux-deps.yml").read_text(encoding="utf-8"))
@@ -407,7 +417,7 @@ def group_pull_requests(doc, jobs, build, steps) -> list:
                 and jobs_of_pull_requests({"x.yml": {"on": ["pull_request"], "jobs": {"c": {"uses": "o/r/.github/workflows/y.yml@main"}}}}) == ["x.yml:c:o/r/.github/workflows/y.yml@main"]))
     out.append(("pull requests: the jobs of checks.yml, called by series.yml, are held to it, and so is release.yml's call of it (a candidate: no pull request starts release.yml)",
                 "checks.yml" in live and live["series.yml"]["jobs"]["checks"]["uses"] == "./.github/workflows/checks.yml"
-                and set(live["checks.yml"]["jobs"]) == {"py-deps-tools", "core-ref", "py-deps-core", "rules", "rebuilds", "noreply-identity", "tree"}
+                and set(live["checks.yml"]["jobs"]) == {"py-deps-tools", "core-ref", "py-deps-core", "rules", "churn", "rebuilds", "noreply-identity", "tree"}
                 and all(HOSTED.match(j["runs-on"]) for j in live["checks.yml"]["jobs"].values() if "uses" not in j)
                 and all(j["uses"] == "./.github/workflows/py-deps.yml" and "runners" not in j["with"] for j in live["checks.yml"]["jobs"].values() if "uses" in j)
                 and triggers(live["checks.yml"]) == {"workflow_call"}))

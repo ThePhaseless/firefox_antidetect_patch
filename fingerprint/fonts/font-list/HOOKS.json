@@ -5,7 +5,11 @@
   "kind": "add",
   "form": "registration",
   "line": "#include \"StealthFontListHooks.h\"  // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": "gtest:StealthFontListHooks.PublishCharacterMap"
+  "test": "gtest:StealthFontListHooks.PublishCharacterMap",
+  "quiet_anchor_why": {
+   "kind": "deferred",
+   "quieter": "gfx/thebes/gfxDWriteFontList.cpp:#undef StandardFonts"
+  }
  },
  {
   "file": "gfx/thebes/gfxDWriteFontList.cpp",
@@ -160,7 +164,11 @@
   "kind": "add",
   "form": "guard",
   "line": "  if (bool rv; StealthFaceDataHasTable(this, aTableTag, &rv)) return rv;  // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": "gtest:StealthFcBundleFonts.FaceDataTableFallsThroughForAFaceWithAFile"
+  "test": "gtest:StealthFcBundleFonts.FaceDataTableFallsThroughForAFaceWithAFile",
+  "quiet_anchor_why": {
+   "kind": "only-place",
+   "why": "A guard is the first statement of gfxFontconfigFontEntry::HasFontTableInternal: any later line lets Mozilla's body run first, and every other line of the function is as busy."
+  }
  },
  {
   "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
@@ -168,7 +176,11 @@
   "kind": "add",
   "form": "guard",
   "line": "  if (hb_blob_t* rv; StealthFaceDataTable(this, aTableTag, &rv)) return rv;  // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": "gtest:StealthFcBundleFonts.FaceDataTableFallsThroughForAFaceWithAFile"
+  "test": "gtest:StealthFcBundleFonts.FaceDataTableFallsThroughForAFaceWithAFile",
+  "quiet_anchor_why": {
+   "kind": "only-place",
+   "why": "A guard is the first statement of gfxFontconfigFontEntry::GetFontTableInternal: any later line lets Mozilla's body run first, and every other line of the function is as busy."
+  }
  },
  {
   "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
@@ -246,7 +258,11 @@
   "kind": "add",
   "form": "guard",
   "line": "  if (gfxPlatformFontList::StealthBundleOnly()) return StealthCreateBundleFontEntry(this, aFace, aFamily);  // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": "wrapper:tests/test_screenshot_of_text_returns_linux_e2e.py::test_a_screenshot_of_a_page_with_text_returns"
+  "test": "wrapper:tests/test_screenshot_of_text_returns_linux_e2e.py::test_a_screenshot_of_a_page_with_text_returns",
+  "quiet_anchor_why": {
+   "kind": "only-place",
+   "why": "A guard is the first statement of gfxFcPlatformFontList::CreateFontEntry(fontlist::Face*, const fontlist::Family*): any later line lets Mozilla's body run first, and every other line of the function is as busy."
+  }
  },
  {
   "file": "gfx/thebes/gfxFcPlatformFontList.cpp",
@@ -271,7 +287,11 @@
   "kind": "add",
   "form": "registration",
   "line": "#include \"StealthFontListHooks.h\"  // STEALTH-HOOK(fingerprint/fonts/font-list)",
-  "test": "gtest:StealthFontListHooks.PublishCharacterMap"
+  "test": "gtest:StealthFontListHooks.PublishCharacterMap",
+  "quiet_anchor_why": {
+   "kind": "only-place",
+   "why": "An include of ours sits in a block of its own after Mozilla's include block. The quieter places (churn 0 to 1) all come after `using namespace mozilla;`; there our header, and what it pulls in that this file has not parsed yet, would be read under a using-directive, which can change name lookup, so the same result is not shown, and before that line the places are inside the include block (C8)."
+  }
  },
  {
   "file": "gfx/thebes/gfxPlatformFontList.cpp",

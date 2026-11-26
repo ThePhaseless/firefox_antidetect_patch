@@ -5,7 +5,11 @@
   "kind": "add",
   "form": "registration",
   "line": "#include \"StealthMediaDeclaration.h\"  // STEALTH-HOOK(fingerprint/media/decode-declaration)",
-  "test": "gtest:StealthMediaDeclaration.DecodingInfoOfAFileAnswersFromTheDeclaration"
+  "test": "gtest:StealthMediaDeclaration.DecodingInfoOfAFileAnswersFromTheDeclaration",
+  "quiet_anchor_why": {
+   "kind": "only-place",
+   "why": "An include of ours sits in a block of its own after Mozilla's include block. The only file-scope place after that block is the blank line before `namespace mozilla::dom {`; every quieter place is inside Mozilla's include block (C8) or inside the namespace, where our header's declarations would land in the wrong scope."
+  }
  },
  {
   "file": "dom/media/mediacapabilities/MediaCapabilities.cpp",
@@ -13,7 +17,11 @@
   "kind": "add",
   "form": "shadow",
   "line": "  const auto GetNumberOfProcessors = StealthDeclaredNumberOfProcessors;  // STEALTH-HOOK(fingerprint/media/decode-declaration)",
-  "test": "gtest:StealthMediaDeclaration.WebrtcAv1EncodeSmoothFollowsTheDeclaredCores"
+  "test": "gtest:StealthMediaDeclaration.WebrtcAv1EncodeSmoothFollowsTheDeclaredCores",
+  "quiet_anchor_why": {
+   "kind": "only-place",
+   "why": "A shadow sits at the top of its function so that the name is ours for the whole body; the one quieter place (after the validity check of the dimensions, churn 1) is mid-function, outside the place the form allows."
+  }
  },
  {
   "file": "dom/media/mediacapabilities/MediaCapabilities.cpp",
@@ -103,6 +111,10 @@
   "kind": "add",
   "form": "guard",
   "line": "  if (auto declared = StealthDeclaredWebrtcEncodeSupport(aConfig)) return declared;  // STEALTH-HOOK(fingerprint/media/decode-declaration)",
-  "test": "gtest:StealthMediaDeclaration.EncodeSupportAnswersFromTheDeclaration"
+  "test": "gtest:StealthMediaDeclaration.EncodeSupportAnswersFromTheDeclaration",
+  "quiet_anchor_why": {
+   "kind": "only-place",
+   "why": "A guard is the first statement of WebrtcVideoEncoderFactory::SupportsCodec: any later line lets Mozilla's body run first, and every other line of the function is as busy."
+  }
  }
 ]
