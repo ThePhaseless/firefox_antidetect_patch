@@ -158,7 +158,7 @@ def test_a_red_on_the_series_it_writes_leaves_the_checkout_byte_identical(world,
     with pytest.raises(SystemExit) as stopped:
         run_gate(world)
     message = str(stopped.value)
-    assert "FAIL tools/tests: " in message and "red on what export writes" in message, message
+    assert "FAIL tools/tests: " in message and "tools/tests/test_a_second_one.py::test_red_even_on_the_series_written" in message, message
     assert "\nnext: " in message and "Rule: docs/decisions/series-01-export-is-the-only-writer.md" in message, message
     assert snapshot(series) == before and not (series / FOLDER / "MANIFEST.json").exists()
     assert git(series, "status", "--porcelain", "--ignored").replace("__pycache__/", "") == status.replace("__pycache__/", "")

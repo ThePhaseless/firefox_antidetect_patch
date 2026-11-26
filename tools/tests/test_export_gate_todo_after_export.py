@@ -277,7 +277,7 @@ def test_a_test_beside_the_one_that_restates_churn_is_red_when_it_fails(world):
     with pytest.raises(SystemExit) as stopped:
         run_gate(world)
     message = str(stopped.value)
-    assert "FAIL tools/tests: " in message and "not about churn" in message and "\nnext: " in message, message
+    assert "FAIL tools/tests: " in message and "tools/tests/test_another.py::test_red" in message and "\nnext: " in message, message
     assert snapshot(series) == before
 
 
