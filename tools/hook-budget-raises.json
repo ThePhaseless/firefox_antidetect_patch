@@ -230,7 +230,7 @@
   "to": 1,
   "folder": "fingerprint/webrtc/declared-network",
   "reason": "the join loop of the mDNS responder is wrapped in one call (stealth_note_first): the rewritten line of Mozilla's replaces the local that noted the first interface",
-  "decided_by": "part 2 of the unknown forms; the pm reads this raise with the combined export",
+  "decided_by": "pm, 26/11, read with the combined export",
   "date": "2026-11-26",
   "test": "cargo:mdns_service::stealth_tests::stealth_the_first_interface_of_the_list_is_the_one_set_after_the_loop",
   "budget": "removed"
@@ -241,7 +241,7 @@
   "to": 2,
   "folder": "automation/hybrid-xrays",
   "reason": "Mozilla's read of wantXrays in the Parse chain is wrapped in StealthParseHybridXrays (the rewritten line of Mozilla's replaces the line that read hybridXrays inside the chain)",
-  "decided_by": "part 2 of the unknown forms; the pm reads this raise with the combined export",
+  "decided_by": "pm, 26/11, read with the combined export",
   "date": "2026-11-26",
   "test": "xpcshell:js/xpconnect/tests/unit/test_stealth_hybrid_xrays_options.js#run_test",
   "budget": "removed"
