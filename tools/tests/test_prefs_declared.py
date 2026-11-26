@@ -23,10 +23,14 @@ CI = ROOT / "platform" / "ci" / "src" / "scripts" / "ci"
 
 
 def judge():
+    """xpcshell_run.py of the series, loaded without writing bytecode: a __pycache__ under a folder's src/ is a file the manifest does not list."""
     spec = importlib.util.spec_from_file_location("xpcshell_run", CI / "xpcshell_run.py")
     module = importlib.util.module_from_spec(spec)
-    sys.path.insert(0, str(CI))
-    spec.loader.exec_module(module)
+    before, sys.dont_write_bytecode = sys.dont_write_bytecode, True
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        sys.dont_write_bytecode = before
     return module
 
 
