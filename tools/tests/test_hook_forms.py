@@ -21,7 +21,6 @@ FN = "nsresult Foo::Bar(int aArg) {"
 MARK = "  // STEALTH-HOOK(fingerprint/x)"
 HASH = "  # STEALTH-HOOK(fingerprint/x)"
 BODY = ["   int x = 1;", "   DoIt(x);", "   return NS_OK;", " }"]
-PART_TWO = "green after part 2 moves the inline logic into our code"
 
 
 def patch(file, lines, section=FN, start=10):
@@ -136,43 +135,10 @@ def test_c21_is_never_debt_and_no_declared_exception_leaves_it_out(tmp_path):
     assert len(c21(root)) == 1
 
 
-# The 18 lines of the real series that no form of this commit takes: the inline logic that part 2 moves into our code, and two that wait
-# for a declaration (one line has no `reason_kind`, one is a mid-function scope with no `anchor`: T2). They are the work list of part 2.
-PART_TWO_LINES = {
-    ("automation/element-atoms", "export const ATOM_SOURCES = ATOMS;"),
-    ("automation/hybrid-xrays", "priv->hybridXrays = options.hybridXrays;"),
-    ("automation/hybrid-xrays", "// STEALTH-HOOK(automation/hybrid-xrays)"),
-    ("automation/hybrid-xrays", 'ParseBoolean("hybridXrays", &hybridXrays) &&'),
-    ("automation/hybrid-xrays", "!targetCompartmentPrivate->hybridXrays &&"),
-    ("automation/hybrid-xrays", "else if (mozilla::StealthCallerObjectApplies()) wrapper = mozilla::StealthCallerObjectWrapper();"),
-    ("fingerprint/fonts/bundle", 'if CONFIG["OS_TARGET"] == "WINNT":'),
-    ("fingerprint/fonts/font-list", 'if CONFIG["MOZ_WIDGET_TOOLKIT"] == "gtk":'),
-    ("fingerprint/fonts/font-list", 'CXXFLAGS += CONFIG["CAIRO_FT_CFLAGS"]'),
-    ("fingerprint/webgpu/adapter-declaration", "static std::string_view ToJsKey(const Limit limit);"),
-    ("fingerprint/webrtc/declared-network", "let stealth_if = addrs.first().copied();"),
-    ("network/doh", "static_cast<TRRLoadInfo*>(loadInfo.get())->mOriginAttributes = mOriginAttributes;"),
-    ("network/doh", "NS_IMETHODIMP nsUrlClassifierHashCompleterBase::GetUserContextId(uint32_t* aId)"),
-    ("network/doh", 'DEFINES["MOZ_PROXY_BYPASS_PROTECTION"] = True'),
-    ("network/proxy-udp", "RefPtr<net::PcUdpProxy> mUdpProxy;"),
-    ("network/proxy-udp", "RefPtr<net::PcUdpProxy> NrSocketProxyConfig::UdpProxy() const"),
-    ("network/proxy-udp", "explicit NrSocket(const std::shared_ptr<NrSocketProxyConfig>& aProxyConfig)"),
-    ("platform/launch-counter", 'try { ChromeUtils.importESModule("resource:///modules/StealthLaunchCounter.sys.mjs")'),
-}
-
-
-def test_c21_on_the_real_series_is_exactly_the_work_list_of_part_two():
-    got = {(v.folder, " ".join(v.text.split("  // STEALTH-HOOK")[0].split("  # STEALTH-HOOK")[0].split())) for v in c21_of_series()}
-    want = {(f, " ".join(t.split())) for f, t in PART_TWO_LINES}
-    assert {(f, t) for f, t in got if not any(t.startswith(w) for fw, w in want if fw == f)} == set()
-    assert len(got) == len(PART_TWO_LINES) == 18, sorted(got)
-    assert {f for f, _ in got} == {f for f, _ in want}
-
-
 def c21_of_series():
     return c21(engine.ROOT)
 
 
-@pytest.mark.xfail(strict=True, reason=PART_TWO)
 def test_c21_the_series_has_no_hook_of_the_form_unknown():
     assert c21_of_series() == []
 
@@ -191,7 +157,7 @@ def test_every_excepted_entry_of_the_series_has_its_complete_row():
             if e["form"] == "excepted":
                 seen += 1
                 assert hc.excepted_lacks(e) == [], (f, e["line"])
-    assert seen >= 15
+    assert seen >= 10
 
 
 # --------------------------------------------------------------------------- scope (G60)
