@@ -307,3 +307,20 @@ def test_the_record_is_told_by_its_field_and_its_key_and_not_by_the_sentence():
         assert export_gate.tolerated(export_gate.fail(where, "its `anchor` is empty: " + sentence, "write it", "repo-07-one-fact-one-place"), news)
         assert export_gate.tolerated(export_gate.fail(other, "its `anchor` is empty: " + sentence, "write it", "repo-07-one-fact-one-place"), news) is None
     assert export_gate.tolerated(export_gate.fail(where, "its `prefs` is empty: whatever", "write it", "repo-07-one-fact-one-place"), news) is None
+
+
+# ------------------------------------------------------------------------------------------------ a backport hunk with no churn row
+def test_a_backport_hunk_the_export_created_with_no_row_is_a_todo_and_one_it_did_not_is_red(tmp_path):
+    """C18 sees the hunks of a backport folder too (test_c18_covers_the_hunks_of_a_backport.py): the failure it prints is read by the
+    gate as written. The hunk the export created becomes a `TODO after export` line (churn.py --write closes it); the same failure for a
+    hunk the checkout already had stays red."""
+    from test_c18_covers_the_hunks_of_a_backport import BACKPORT, with_backport
+    root = with_backport(tmp_path, rows_for_it=False)
+    (violation,) = hook_contract.churn_violations(root)
+    failure = export_gate.parse_failure(str(violation.failure))
+    assert failure is not None, "check's line for a backport hunk is rebuilt by the gate's reader"
+    path = violation.file
+    todo = export_gate.tolerated(failure, export_gate.News(set(), {(BACKPORT, path, 1)}, set()))
+    assert todo and todo.startswith("TODO after export: %s: C18: the hook `" % path) and "has no churn row in tools/churn.json" in todo, todo
+    assert "Fix: %s" % export_gate.CHURN_FIX in todo
+    assert export_gate.tolerated(failure, export_gate.News(set(), set(), set())) is None, "a hunk the export did not touch stays red"
