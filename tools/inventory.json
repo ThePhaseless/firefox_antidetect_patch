@@ -1218,7 +1218,7 @@
   "inline_logic_lines": 0,
   "hookable": "already-hook",
   "anchor": "EXPORTS += [...] and UNIFIED_SOURCES += [...] in dom/media/moz.build",
-  "notes": "",
+  "notes": "Exports StealthMediaDeclaration.h in the EXPORTS list and builds StealthMediaDeclaration.cpp in UNIFIED_SOURCES: what a page learns about decoding comes from the declaration (zoom.stealth.media.decode_support), not from the machine.",
   "verifier": {
    "changed": [],
    "why": "Checked against the diff; no change needed."
