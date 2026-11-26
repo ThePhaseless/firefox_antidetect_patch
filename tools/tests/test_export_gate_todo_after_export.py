@@ -324,3 +324,19 @@ def test_a_backport_hunk_the_export_created_with_no_row_is_a_todo_and_one_it_did
     assert todo and todo.startswith("TODO after export: %s: C18: the hook `" % path) and "has no churn row in tools/churn.json" in todo, todo
     assert "Fix: %s" % export_gate.CHURN_FIX in todo
     assert export_gate.tolerated(failure, export_gate.News(set(), set(), set())) is None, "a hunk the export did not touch stays red"
+
+
+# ------------------------------------------------------------------------------------------------ no cut in what names what failed
+def test_every_red_test_is_named_whole_in_the_gate_message_whatever_the_length_of_the_run(world):
+    """PR 81 (Linux): the gate cut the inner pytest output to its last 1500 characters, and the names of the red tests fell out of the message.
+    Forty red tests, each with a long failure, are all in it by their whole id."""
+    series, source, head = world
+    names = ["test_red_%02d_a_name_long_enough_to_fill_a_line_of_the_summary" % i for i in range(40)]
+    (series / "tools" / "tests" / "test_many_red.py").write_text(
+        "".join("def %s():\n    assert False, 'x' * 3000\n" % name for name in names), encoding="utf-8")
+    with pytest.raises(SystemExit) as stopped:
+        run_gate(world)
+    message = str(stopped.value)
+    missing = [name for name in names if "tools/tests/test_many_red.py::" + name not in message]
+    assert not missing, "%d of 40 red tests are not named in the message: %s" % (len(missing), missing[:3])
+    assert "\nnext: " in message, message

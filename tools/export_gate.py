@@ -347,7 +347,7 @@ def run_series_check(tree: Path, news: News | None = None) -> tuple:
                 "engine.py check", "it printed a line that is not the rendering of a failure of the series: %s" % line,
                 "run python tools/engine.py check on the series and fix what it says, then run the export again", RULE))
     if done.stderr.strip() or (not problems and not todo):
-        problems.append(fail("engine.py check", "the check of the series written is red and does not end in failure lines: %s" % (done.stdout + done.stderr).strip()[-1500:],
+        problems.append(fail("engine.py check", "the check of the series written is red and does not end in failure lines: %s" % (done.stdout + done.stderr).strip(),
                              "run python tools/engine.py check on the series, fix what is red, then run the export again", RULE))
     return problems, todo
 
@@ -357,6 +357,7 @@ def run_series_check(tree: Path, news: News | None = None) -> tuple:
 RESTATES_CHURN = {"tools/tests/test_quiet_anchors.py::test_every_hook_of_the_series_has_its_churn":
                   ("it is red for the same hunks as check's C18 (no churn row)", CHURN_FIX)}
 FAILED_TEST = re.compile(r"^FAILED (\S+)", re.MULTILINE)
+NAMED_RED = re.compile(r"^(?:FAILED|ERROR) (\S+)", re.MULTILINE)
 SUMMARY_FAILED = re.compile(r"\b(\d+) (failed|error)")
 
 
@@ -379,8 +380,11 @@ def run_series_tests(tree: Path, tolerate: dict | None = None, todo: list | None
             if todo is not None:
                 todo.append("TODO after export: %s: %s. Fix: %s" % (test, tolerate[test][0], tolerate[test][1]))
         return []
-    return [fail("tools/tests", "a test of the series is red: %s" % (done.stdout + done.stderr).strip()[-1500:],
-                 "run `python -m pytest -q tools/tests`, fix what is red, then run the export again", RULE)]
+    # Every test that is red, by its whole id (pytest's short summary has a line for each): the message never cuts what names what failed,
+    # and a long failure repr cannot push a name out of it. Only when the run names none (it crashed, it collected nothing) the whole output is the message.
+    named = list(dict.fromkeys(NAMED_RED.findall(done.stdout)))
+    what = "a test of the series is red: %s" % (", ".join(named) if named else "the run names no test: " + (done.stdout + done.stderr).strip())
+    return [fail("tools/tests", what, "run `python -m pytest -q tools/tests` to see why, fix what is red, then run the export again", RULE)]
 
 
 # The CI scripts' own tests (platform/ci/src/scripts, run by the job `tree` of checks.yml on the materialized tree) that hold what the export writes into
@@ -432,7 +436,7 @@ def run_ci_script_tests(tree: Path, written: list, removed: list) -> list:
     if done.returncode:
         found = [line[len("RED "):] for line in done.stdout.splitlines() if line.startswith("RED ")]
         return [fail("scripts/ci (the CI scripts' tests, %d file(s) of platform/ci or .github written)" % len(touched),
-                     "a case is red: %s" % (case if found else (done.stdout + done.stderr).strip()[-800:]),
+                     "a case is red: %s" % (case if found else (done.stdout + done.stderr).strip()),
                      "fix the case or the file it holds (a job added to checks.yml is named in test_release_checks.py and test_release_builder.py), "
                      "in the source, then run the export again", RULE) for case in (found or [""])]
     return []
