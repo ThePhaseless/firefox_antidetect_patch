@@ -47,8 +47,9 @@ def test_a_backport_hunk_without_a_row_is_red(tmp_path):
     root = with_backport(tmp_path, rows_for_it=False)
     (v,) = hc.churn_violations(root)
     assert v.rule == "C18" and (v.folder, v.file) == (BACKPORT, "third_party/rust/c/src/lib.rs")
-    assert "hunk 1" in v.detail and "no churn row in tools/churn.json" in v.detail and "churn.py" in v.detail
-    assert "docs/decisions/port-07-quiet-anchors.md" in v.detail
+    text = str(v.failure) if getattr(v, "failure", None) is not None else v.detail       # the failure carries the fix and the rule (repo-04)
+    assert "hunk 1" in text and "no churn row in tools/churn.json" in text and "churn.py" in text
+    assert "docs/decisions/port-07-quiet-anchors.md" in text
 
 
 def test_a_backport_hunk_with_its_row_is_green(tmp_path):
