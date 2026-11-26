@@ -171,6 +171,8 @@ Rule: [hook-03](decisions/hook-03-budgets-and-debt-only-go-down.md).
 | `<folder>/MANIFEST.json`, `inventory` | One record per Mozilla file the folder holds lines of (the folder is the one the record's feature maps to; there is no other copy and no `tools/inventory.json`, which `check` refuses): file, category, feature, prefs, anchor, notes (by hand; `check` refuses an empty anchor or notes, and a hookable that is not already-hook, movable or hard); added / removed / hunk counts of the folder's part of the file (written by `export` from the folder's `hooks.patch`, which also derives a record a new (file, folder) needs, with empty anchor and notes; `check` refuses a different value, and an `evidence` field: the lines are `hooks.patch` itself) |
 | `tools/gtest-suites.json` | The gtest suites the `HOOKS.json` files name, sorted, each marked windows-only or linux-only where its tests are built on one platform; written by `gtest-list --write` |
 | `tools/hook_contract.py`, `tools/hooks_list.py` | The contract and the `HOOKS.json` generator |
+| `tools/export_paths.py` | The paths `export` writes in three classes (pure, mixed, own), which the rule «export commits are named `export:`» reads (`scripts/ci/export_commit_names.py`) |
+| `tools/prefs-declared.json` | The preference changes a release declares against the latest published engine: rows `name, branch, type, value, reason, decided_by`, each read by the pm in its pull request. The prefs job (`xpcshell.yml`, `xpcshell_run.py prefs-compare --declared`) applies them to the published baseline and still allows zero differences; a row the candidate does not hold, and a row the baseline already holds (stale: remove it at the release that published it), are red |
 | `tools/folders.py`, `tools/range_diff.py` | The `FOLDER.json` check; the range-diff of a port |
 | `tools/prebuild.py`, `tools/births.py` | Static checks before a build; the birth-point scan |
 | `tools/tests/` | The tests of the series itself |
@@ -195,7 +197,7 @@ Rule: [hook-03](decisions/hook-03-budgets-and-debt-only-go-down.md).
 | `<folder>/BACKPORT.json` and the upstream diff beside it | By hand |
 | `UPSTREAM.json`: `mozilla_tag`, `source_branch` | `port`: it writes both once its branch exists |
 | `<folder>/MANIFEST.json`, `inventory`: feature, category, prefs, anchor, hookable, notes, verifier (`export` keeps them; a modified file with no record needs one written before the export) | By hand |
-| `tools/layout.py`, `tools/hook-budget-raises.json`, `tools/hook-names.json`, `tools/birth-ledger.json` | By hand |
+| `tools/layout.py`, `tools/hook-budget-raises.json`, `tools/hook-names.json`, `tools/birth-ledger.json`, `tools/prefs-declared.json` | By hand |
 | `tools/hook-budget.json`, `tools/removed-budget.json` | By hand, downward; `shrink-budget` |
 | `tools/hook-debt.json` | `hook-debt` only |
 | `.github/workflows/series.yml`, `.github/workflows/noreply-identity.yml` | By hand |
