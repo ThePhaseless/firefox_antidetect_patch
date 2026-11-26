@@ -36,6 +36,19 @@
  },
  "inventory": [
   {
+   "file": "docshell/base/BrowsingContext.h",
+   "category": "spoof",
+   "feature": "window-geometry",
+   "prefs": [],
+   "added": 1,
+   "removed": 0,
+   "hunks": 1,
+   "inline_logic_lines": 0,
+   "hookable": "already-hook",
+   "anchor": "MOZ_EACH_BC_FIELD list (the FIELD of InnerSizeSpoofedForRFP; the new FIELD follows it)",
+   "notes": "One FIELD, StealthWindowState (uint64_t, top only, CanSet::Unrestricted), the main window's restored state: restored or not, outer size in device pixels, UI density. It is synced to every process on the top BrowsingContext with the same policy as Mozilla's InnerSizeSpoofedForRFP, and set from the same place (nsPresContext::UpdateInnerSizeSpoofedForRFP, in the process that owns the top document). outerWidth/outerHeight, screenX/Y, mozInnerScreenX/Y and the screenX - clientX of every event are derived from it."
+  },
+  {
    "file": "dom/base/nsGlobalWindowOuter.cpp",
    "category": "spoof",
    "feature": "window-geometry",
