@@ -44,7 +44,7 @@ index 0000000000..9990d872e1
 +    StringRef MCPU = llvm::sys::getHostCPUName();
 + #endif
 diff --git a/scripts/ci/lavapipe_build.py b/scripts/ci/lavapipe_build.py
-index 27b8230d95..9e3373a283 100644
+index 27b8230d95..14d2c9fc58 100644
 --- a/scripts/ci/lavapipe_build.py
 +++ b/scripts/ci/lavapipe_build.py
 @@ -40,6 +40,7 @@ import hashlib
@@ -71,8 +71,8 @@ index 27b8230d95..9e3373a283 100644
 +             "ld-linux-aarch64.so.1" if ARM64 else "ld-linux-x86-64.so.2"}
  # Firefox's own floors for x86_64 (python/mozbuild/mozbuild/action/check_binary.py).
  FLOORS = {"GLIBC": (2, 17), "GLIBCXX": (3, 4, 19), "CXXABI": (1, 3, 7), "GCC": (4, 8)}
-+if ARM64:  # and for arm64, from the same file
-+    FLOORS = {"GLIBC": (2, 28), "GLIBCXX": (3, 4, 22), "CXXABI": (1, 3, 10), "GCC": (4, 8)}
++# And for arm64, from the same file.
++FLOORS_ARM64 = {"GLIBC": (2, 28), "GLIBCXX": (3, 4, 22), "CXXABI": (1, 3, 10), "GCC": (4, 8)}
  
  LLVM_CMAKE = [
 -    "-G", "Ninja", "-DCMAKE_BUILD_TYPE=Release", "-DLLVM_TARGETS_TO_BUILD=X86",
@@ -80,7 +80,32 @@ index 27b8230d95..9e3373a283 100644
      "-DLLVM_ENABLE_PROJECTS=", "-DLLVM_ENABLE_RUNTIMES=", "-DBUILD_SHARED_LIBS=OFF",
      "-DLLVM_BUILD_LLVM_DYLIB=OFF", "-DLLVM_LINK_LLVM_DYLIB=OFF", "-DLLVM_ENABLE_PIC=ON",
      "-DLLVM_INCLUDE_TESTS=OFF", "-DLLVM_INCLUDE_EXAMPLES=OFF", "-DLLVM_INCLUDE_BENCHMARKS=OFF",
-@@ -244,7 +250,7 @@ def build(out: Path, clang: Path, sysroot: Path, jobs: int, run=subprocess.run,
+@@ -142,13 +148,14 @@ def check_binary(dynamic: str, symbols: str) -> list:
+     # Imports above Firefox's floors, named, as check_binary.py checks them:
+     # undefined symbols only.
+     above = {}
++    floors = FLOORS_ARM64 if ARM64 else FLOORS
+     for line in symbols.splitlines():
+         cols = line.split()
+         if len(cols) < 8 or cols[6] != "UND" or "@" not in cols[7]:
+             continue
+         name, _, version = cols[7].partition("@")
+         version = version.lstrip("@")
+-        for prefix, floor in FLOORS.items():
++        for prefix, floor in floors.items():
+             number = version[len(prefix) + 1:]
+             if (version.startswith(prefix + "_") and re.fullmatch(r"[0-9]+(\.[0-9]+)*", number)
+                     and version_tuple(number) > floor):
+@@ -156,7 +163,7 @@ def check_binary(dynamic: str, symbols: str) -> list:
+     for version in sorted(above):
+         prefix = version.partition("_")[0]
+         found.append("needs %s (%s), above Firefox's floor %s"
+-                     % (version, ", ".join(sorted(above[version])), ".".join(map(str, FLOORS[prefix]))))
++                     % (version, ", ".join(sorted(above[version])), ".".join(map(str, floors[prefix]))))
+     return found
+ 
+ 
+@@ -244,7 +251,7 @@ def build(out: Path, clang: Path, sysroot: Path, jobs: int, run=subprocess.run,
      env = dict(os.environ, SOURCE_DATE_EPOCH="1767225600")
      # Nothing of the runner's: pkg-config sees the sysroot only.
      env["PKG_CONFIG_LIBDIR"] = ":".join(str(sysroot / d) for d in (
@@ -89,7 +114,7 @@ index 27b8230d95..9e3373a283 100644
      env["PKG_CONFIG_SYSROOT_DIR"] = str(sysroot)
      for var in [v for v in env if v.startswith(("LP_", "GALLIUM_", "GALLIVM_", "MESA_", "VK_"))]:
          env.pop(var)
-@@ -331,7 +337,7 @@ def build(out: Path, clang: Path, sysroot: Path, jobs: int, run=subprocess.run,
+@@ -331,7 +338,7 @@ def build(out: Path, clang: Path, sysroot: Path, jobs: int, run=subprocess.run,
  def main(argv=None) -> int:
      ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
      ap.add_argument("--clang", type=Path, default=Path.home() / ".mozbuild" / "clang")
@@ -113,3 +138,15 @@ index 22ae75ff7b..cd8f0dc4be 100644
    [ -f obj-rel/dist/bin/lavapipe/libvulkan_lvp.so ] || { echo "ERROR: no lavapipe in obj-rel/dist/bin"; exit 1; }
    mkdir -p "$STAGING/lavapipe"
    cp -a obj-rel/dist/bin/lavapipe/libvulkan_lvp.so obj-rel/dist/bin/lavapipe/VERSION.json "$STAGING/lavapipe/"
+diff --git a/scripts/ci/test_ci.py b/scripts/ci/test_ci.py
+index c74c648326..d895f79690 100644
+--- a/scripts/ci/test_ci.py
++++ b/scripts/ci/test_ci.py
+@@ -563,6 +563,7 @@ def main() -> int:
+                       and len(pins["mesa"]["sha256"]) == 64 and len(pins["llvm"]["commit"]) == 40
+                       and len(sorted((HERE / "lavapipe").glob("*.patch"))) >= 4))
+         import lavapipe_build
++        lavapipe_build.ARM64 = False  # the samples below are x86_64's, whatever machine runs this
+         rtti_off = "-DLLVM_ENABLE_RTTI=OFF" in lavapipe_build.LLVM_CMAKE
+         cases.append(("webgpu: LLVM and Mesa agree on RTTI (meson refuses a mismatch, run 41330839671)",
+                       rtti_off and "-Dcpp_rtti=false" in lavapipe_build.MESON_OPTIONS
