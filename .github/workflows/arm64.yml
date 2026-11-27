@@ -102,9 +102,126 @@ jobs:
             echo "matrix=$MATRIX"
           } | tee -a "$GITHUB_OUTPUT"
 
+  # WebGPU's Vulkan driver for linux-arm64 (scripts/ci/lavapipe_build.py), as upstream's
+  # linux-x86_64 leg builds its own. A job of its own, before the build: LLVM and Mesa cold
+  # beside a cold build on a hosted runner's 4 cores would pass the build job's limit. It
+  # configures only to get the clang and sysroot the build bootstraps.
+  lavapipe:
+    name: lavapipe-${{ matrix.leg }}
+    needs: [plan]
+    if: needs.plan.outputs.arm64_run_id == ''
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 350
+    permissions: { contents: read }
+    env:
+      CI_LEG: ${{ matrix.leg }}
+      CARGO_HOME: /home/runner/.cargo
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - name: The runner at the start
+        run: |
+          { nproc; free -g; df -h; } | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: apt - network timeouts and retries
+        if: runner.environment == 'github-hosted'
+        run: |
+          printf '%s\n' 'Acquire::http::Timeout "60";' 'Acquire::https::Timeout "60";' 'Acquire::Retries "5";' \
+            | sudo tee /etc/apt/apt.conf.d/80-ci-network >/dev/null
+      - name: Free disk
+        if: runner.environment == 'github-hosted'
+        run: |
+          # The build job's cleanup, without its swap: the tree, the toolchain, LLVM and Mesa.
+          sudo rm -rf \
+            /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/lib/android \
+            /usr/local/share/boost /usr/share/swift /usr/local/share/powershell \
+            /usr/local/lib/node_modules /opt/microsoft \
+            "${AGENT_TOOLSDIRECTORY:-/opt/hostedtoolcache}" 2>/dev/null || true
+          sudo docker image prune --all --force 2>/dev/null || true
+          df -h / | tail -1
+      - name: Python for the series tool
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with: { python-version: '3.12' }
+      - name: The series (this repository, this commit)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with: { path: .series, fetch-depth: 1 }
+      - name: The source tree, the Mozilla tag with our series applied (tools/engine.py)
+        shell: bash
+        env:
+          GIT_CONFIG_COUNT: '2'
+          GIT_CONFIG_KEY_0: core.splitIndex
+          GIT_CONFIG_VALUE_0: 'true'
+          GIT_CONFIG_KEY_1: checkout.workers
+          GIT_CONFIG_VALUE_1: '0'
+        run: python .series/tools/engine.py materialize --into .
+      - name: The fork's overlay
+        run: bash .series/arm64/apply.sh .
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with: { python-version: '3.11' }
+      - name: Install Linux build tools
+        if: runner.environment == 'github-hosted'
+        timeout-minutes: 20
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y util-linux binutils ${{ matrix.extra_pkgs }}
+          # lavapipe's, the list scripts/ci/node_bootstrap.sh gives upstream's node
+          sudo apt-get install -y cmake ninja-build bison flex patchelf glslang-tools pkg-config
+      - name: Rust, the retail's release for this tree
+        run: |
+          RUST="$(python3 scripts/upstream_toolchain.py --leg ${{ matrix.leg }} rust-version)"
+          rustup toolchain install "$RUST" --profile minimal --target ${{ matrix.rust_target }}
+          rustup default "$RUST"
+          rustc --version
+      - name: The CI's .mozconfig, in layers
+        run: python3 scripts/ci mozconfig --leg "$CI_LEG" --compile-cache off
+      - name: The toolchain the build bootstraps (clang and sysroot)
+        timeout-minutes: 60
+        run: |
+          ./mach configure
+          ls ~/.mozbuild
+          ~/.mozbuild/clang/bin/clang --version
+          test -d ~/.mozbuild/sysroot-aarch64-linux-gnu
+      - name: WebGPU's Vulkan driver - its inputs
+        id: lavapipe-key
+        run: echo "key=lavapipe-${{ matrix.leg }}-$(python3 scripts/ci/lavapipe_build.py --key --clang "$HOME/.mozbuild/clang")" | tee -a "$GITHUB_OUTPUT"
+      - name: WebGPU's Vulkan driver - built before
+        id: lavapipe-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/lavapipe
+          key: ${{ steps.lavapipe-key.outputs.key }}
+      - name: WebGPU's Vulkan driver - build
+        # A library restored under its key is used as it is (lavapipe_build.py's cached()).
+        run: |
+          python3 scripts/ci/lavapipe_build.py --out "$HOME/.cache/lavapipe" \
+            --clang "$HOME/.mozbuild/clang" --sysroot "$HOME/.mozbuild/sysroot-aarch64-linux-gnu" --jobs 4
+          cat "$HOME/.cache/lavapipe/VERSION.json"
+          readelf -d "$HOME/.cache/lavapipe/libvulkan_lvp.so" | grep -E 'NEEDED|SONAME'
+      # From any branch: the key is the library's inputs, and the entry is small.
+      - name: WebGPU's Vulkan driver - keep it
+        if: steps.lavapipe-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/lavapipe
+          key: ${{ steps.lavapipe-key.outputs.key }}
+      - name: Upload the driver
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: lavapipe-${{ matrix.leg }}
+          path: |
+            ~/.cache/lavapipe/libvulkan_lvp.so
+            ~/.cache/lavapipe/VERSION.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: The runner at the end
+        if: always()
+        run: |
+          { free -g; df -h /; } | tee -a "$GITHUB_STEP_SUMMARY"
+
   build:
     name: build-${{ matrix.leg }}
-    needs: [plan]
+    needs: [plan, lavapipe]
     if: needs.plan.outputs.arm64_run_id == ''
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 350
@@ -486,6 +603,14 @@ jobs:
       - name: Compile cache - cold or warm, from its hits
         if: always() && needs.plan.outputs.compile_cache == 'gha' && steps.build.outcome != 'skipped'
         run: python3 scripts/ci/cache_rules.py heat --leg "$CI_LEG" --stats sccache-stats.txt | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: WebGPU's Vulkan driver, from the lavapipe job
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: lavapipe-${{ matrix.leg }}
+          path: obj-rel/dist/bin/lavapipe
+      - name: WebGPU's Vulkan driver - what is shipped
+        run: cat obj-rel/dist/bin/lavapipe/VERSION.json
 
       - name: Package + validate
         env:
