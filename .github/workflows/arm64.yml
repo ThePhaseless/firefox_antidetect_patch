@@ -684,9 +684,12 @@ jobs:
       TAG: ${{ needs.plan.outputs.tag }}
       SEAL_TAG: ${{ needs.plan.outputs.seal_tag }}
     steps:
-      - name: The series (for scripts/make_seal.py and the Playwright range, as materialize copies them)
+      - name: The series (this repository, this commit)
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with: { path: .series, fetch-depth: 1 }
+      - name: The source tree in _src, the Mozilla tag with our series applied (for scripts/make_seal.py)
+        shell: bash
+        run: python3 .series/tools/engine.py materialize --into _src
       - name: Set up Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with: { python-version: '3.11' }
@@ -721,9 +724,9 @@ jobs:
           set -euo pipefail
           mkdir dl
           cp up/*-linux-x86_64.tar.gz up/*-win-x86_64.zip run/firefox-159.0-stealth-linux-arm64.tar.gz dl/
-          python3 .series/platform/ci/src/scripts/make_seal.py --tag "$SEAL_TAG" --assets dl \
+          python3 _src/scripts/make_seal.py --tag "$SEAL_TAG" --assets dl \
             --source-commit-file up/source-commit.txt --series-commit-file up/series-commit.txt \
-            --playwright-range .series/platform/release/src/browser/config/stealth_playwright_range.txt \
+            --playwright-range _src/browser/config/stealth_playwright_range.txt \
             -o seal.json
           cat seal.json
           python3 -I - <<'PY'
