@@ -63,7 +63,8 @@ REMOVED_BUDGET = ROOT / "tools" / "removed-budget.json"
 # requires the two identical. series.yml is the root's own.
 WORKFLOWS_SERIES = ROOT / "platform" / "ci" / "src" / ".github" / "workflows"
 WORKFLOWS_ROOT = ROOT / ".github" / "workflows"
-ROOT_ONLY_WORKFLOWS = {"series.yml", "arm64.yml", "arm64-gate.yml", "arm64-fft-harness.yml"}
+ROOT_ONLY_WORKFLOWS = {"series.yml", "arm64.yml", "arm64-gate.yml", "arm64-fft-harness.yml",
+                       "arm64-lavapipe-harness.yml", "arm64-guard.yml"}
 
 
 def git(source: Path, *args: str, env=None, input_bytes=None) -> bytes:

@@ -45,7 +45,8 @@ CC="${CC:-$(command -v clang || command -v gcc)}"
 obj="$(mktemp -d)"
 trap 'rm -rf "$obj"' EXIT
 
-# Mozilla compiles every C file with -ffp-contract=off (the build-config artifact shows it).
+# Mozilla compiles every C file with -ffp-contract=off (FP_CONTRACT in
+# python/mozbuild/mozbuild/frontend/context.py, for every moz.build directory).
 cflags=(-O2 -ffp-contract=off -ffunction-sections -fdata-sections -w -DHAVE_AV_CONFIG_H -DXP_UNIX
   -DHAVE_64BIT_BUILD -I"$ff" -include "$ff/libavutil_visibility.h")
 srcs=("$av"/{tx,tx_float,tx_double,tx_int32,cpu,mem,bprint,mathematics}.c)

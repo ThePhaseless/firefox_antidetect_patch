@@ -16,7 +16,9 @@ Scope
 The license above (0BSD) covers only this fork's own work:
 
 - the files the fork adds: arm64/, .github/workflows/arm64.yml,
-  .github/workflows/arm64-fft-harness.yml, README.md and this LICENSE;
+  .github/workflows/arm64-fft-harness.yml,
+  .github/workflows/arm64-lavapipe-harness.yml,
+  .github/workflows/arm64-guard.yml, README.md and this LICENSE;
 - the fork's own additions to .github/workflows/arm64-gate.yml and
   tools/engine.py;
 - the fork's own lines in the patches under arm64/patches/ that change

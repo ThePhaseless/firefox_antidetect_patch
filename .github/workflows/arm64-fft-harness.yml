@@ -7,7 +7,8 @@ name: arm64-fft-harness
 on:
   push:
     branches: [arm64-audio]
-    paths: ['arm64/harness/**', 'arm64/patches/0004-*']
+    paths: ['arm64/harness/fft/**', 'arm64/patches/0004-*']
+  workflow_call:
   workflow_dispatch:
 
 permissions: { contents: read }

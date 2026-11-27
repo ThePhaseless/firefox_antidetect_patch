@@ -64,8 +64,11 @@ jobs:
         run: python3 .series/tools/engine.py materialize --into .
       - name: The fork's overlay
         run: bash .series/arm64/apply.sh .
-      - name: The legs
-        run: python3 scripts/ci/test_ci.py
+      - name: The legs, the toolchain table and the series
+        run: |
+          python3 scripts/ci/test_ci.py
+          python3 scripts/test_upstream_toolchain.py
+          python3 .series/tools/engine.py check
       - name: Plan
         id: plan
         shell: bash
@@ -82,24 +85,36 @@ jobs:
           if [ "$KIND" = release ] && [ -z "$RELEASE_TAG" ]; then
             echo "ERROR: kind=release needs a release_tag"; exit 1
           fi
+          SEAL_TAG=firefox-58
+          if [ "$KIND" = release ] && [ "$GITHUB_REF" != refs/heads/arm64 ]; then
+            echo "ERROR: kind=release publishes from the arm64 branch only, not $GITHUB_REF"; exit 1
+          fi
+          if [ "$KIND" = release ] && [ "$RELEASE_TAG" != "$SEAL_TAG-arm64" ]; then
+            echo "ERROR: the release of $SEAL_TAG's engine is $SEAL_TAG-arm64, not '$RELEASE_TAG'"; exit 1
+          fi
           if [ "$KIND" = release ] && [ -n "$ARM64_RUN_ID" ]; then
             echo "ERROR: kind=release publishes this run's own build: arm64_run_id must be empty"; exit 1
           fi
           if ! [[ "$ARM64_RUN_ID" =~ ^[0-9]*$ ]]; then
             echo "ERROR: arm64_run_id is a run id, got '$ARM64_RUN_ID'"; exit 1
           fi
+          # The arm64 BuildID is upstream's x86 one, so the content-keyed engine dir names match.
+          BUILD_DATE="$(curl -fsSL --retry 3 --retry-all-errors \
+            "https://github.com/oss-invisible/firefox_antidetect_patch/releases/download/$SEAL_TAG/seal.json" \
+            | jq -r '[.assets[] | select(.platform == "linux" and .arch == "x86_64") | .build_id] | if length == 1 then .[0] else empty end')"
+          [[ "$BUILD_DATE" =~ ^[0-9]{14}$ ]] || { echo "ERROR: no linux-x86_64 build_id in upstream's $SEAL_TAG seal"; exit 1; }
           MATRIX="$(python3 scripts/ci matrix | jq -c '{include: [.include[] | select(.leg=="linux-arm64")]}')"
           jq -e '.include | length == 1' <<<"$MATRIX" >/dev/null || { echo "ERROR: no linux-arm64 leg in the matrix"; exit 1; }
           {
             echo "kind=$KIND"
             echo "tag=$RELEASE_TAG"
-            echo "seal_tag=firefox-58"
+            echo "seal_tag=$SEAL_TAG"
             echo "compile_cache=${COMPILE_CACHE:-gha}"
             echo "gtests=false"
             echo "gtest_filter="
             echo "core_ref=${CORE_REF:-v58.56.0}"
             echo "wrapper_ref=${WRAPPER_REF:-v0.47.1}"
-            echo "build_date=20261108115355"
+            echo "build_date=$BUILD_DATE"
             echo "arm64_run_id=$ARM64_RUN_ID"
             echo "matrix=$MATRIX"
           } | tee -a "$GITHUB_OUTPUT"
@@ -612,7 +627,10 @@ jobs:
           name: lavapipe-${{ matrix.leg }}
           path: obj-rel/dist/bin/lavapipe
       - name: WebGPU's Vulkan driver - what is shipped
-        run: cat obj-rel/dist/bin/lavapipe/VERSION.json
+        run: |
+          # The artifact drops the mode; upstream's x86 archive ships the library 0755.
+          chmod 0755 obj-rel/dist/bin/lavapipe/libvulkan_lvp.so
+          cat obj-rel/dist/bin/lavapipe/VERSION.json
 
       - name: Package + validate
         env:
@@ -659,6 +677,43 @@ jobs:
         run: |
           { nproc; free -g; df -h; } | tee -a "$GITHUB_STEP_SUMMARY"
 
+  # The lavapipe library this run built, against upstream's x86 one: compute and render bytes.
+  lavapipe-harness:
+    needs: [plan, lavapipe]
+    if: needs.plan.outputs.arm64_run_id == ''
+    permissions: { contents: read, actions: read }
+    uses: ./.github/workflows/arm64-lavapipe-harness.yml
+    with:
+      upstream_tag: ${{ needs.plan.outputs.seal_tag }}
+      arm64_run_id: ${{ github.run_id }}
+
+  # ffvpx's FFT from this commit's tree on both architectures (0004).
+  fft-harness:
+    needs: [plan]
+    if: needs.plan.outputs.arm64_run_id == ''
+    permissions: { contents: read }
+    uses: ./.github/workflows/arm64-fft-harness.yml
+
+  # upstream release.yml's cache-trim, on the arm64 leg: legs.py with 0001 applied.
+  cache-trim:
+    needs: [plan, build]
+    if: always() && needs.build.result != 'skipped' && github.ref == 'refs/heads/arm64'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions: { actions: write, contents: read }
+    steps:
+      - name: The series (this repository, this commit)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with: { path: .series, fetch-depth: 1 }
+      - name: Delete this ref's older entries of the legs this run saved
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp -r .series/platform/ci/src _ci
+          (cd _ci && git apply ../.series/arm64/patches/0001-ci-linux-arm64-leg.patch)
+          python3 _ci/scripts/ci/cache_rules.py trim \
+            --run "$GITHUB_RUN_ID" --attempt "$GITHUB_RUN_ATTEMPT" --ref "$GITHUB_REF"
+
   gate:
     needs: [plan, build]
     if: always() && needs.plan.result == 'success' && (needs.build.result == 'success' || (needs.build.result == 'skipped' && needs.plan.outputs.arm64_run_id != ''))
@@ -674,7 +729,7 @@ jobs:
   # firefox-58 seal plus the arm64 entry. Only after the gate, the host gate and the leaf
   # diff are green.
   publish:
-    needs: [plan, build, gate]
+    needs: [plan, build, gate, lavapipe-harness, fft-harness]
     if: needs.plan.outputs.kind == 'release'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -714,9 +769,11 @@ jobs:
       - name: Every file of this run is there, and the build is of upstream's source commit
         run: |
           set -euo pipefail
-          for f in firefox-159.0-stealth-linux-arm64.tar.gz source-commit.txt fork-commit.txt host-gate.txt exceptions.diff leaf-diff.txt; do
+          for f in firefox-159.0-stealth-linux-arm64.tar.gz source-commit.txt fork-commit.txt host-gate.txt leaf-diff.txt; do
             [ -s "run/$f" ] || { echo "ERROR: run/$f missing or empty"; exit 1; }
           done
+          # Empty when the wrapper's exceptions.json already lists linux-arm64 (arm64-gate.yml).
+          [ -f run/exceptions.diff ] || { echo "ERROR: run/exceptions.diff missing"; exit 1; }
           [ "$(cat run/fork-commit.txt)" = "$GITHUB_SHA" ] || { echo "ERROR: fork-commit.txt is not this run's commit"; exit 1; }
           cmp run/source-commit.txt up/source-commit.txt
       - name: The seal, by upstream's make_seal.py, and equal to upstream's but for the arm64 entry
@@ -741,6 +798,9 @@ jobs:
               sys.exit("seal: differs from upstream's beyond the arm64 entry")
           if (entry["platform"], entry["arch"]) != ("linux", "arm64"):
               sys.exit("seal: the arm64 entry is %r" % entry)
+          x86 = [a for a in theirs["assets"].values() if (a["platform"], a["arch"]) == ("linux", "x86_64")]
+          if len(x86) != 1 or entry["build_id"] != x86[0]["build_id"]:
+              sys.exit("seal: arm64 build_id %s is not linux-x86_64's %r" % (entry["build_id"], [a["build_id"] for a in x86]))
           print("seal: upstream's %s seal plus %s" % (theirs["tag"], arm))
           PY
       - name: Publish the release
@@ -749,9 +809,18 @@ jobs:
           mkdir rel
           cp run/firefox-159.0-stealth-linux-arm64.tar.gz run/fork-commit.txt run/source-commit.txt \
             run/host-gate.txt run/leaf-diff.txt run/exceptions.diff up/series-commit.txt seal.json rel/
+          # The jobs' logs expire with the run; the release keeps them.
+          for job in host-gate leaf-diff; do
+            id="$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs" \
+              --jq ".jobs[] | select(.name == \"gate / $job\") | .id")"
+            [ -n "$id" ] || { echo "ERROR: no job 'gate / $job' in this run"; exit 1; }
+            curl -fsSL --retry 3 -H "Authorization: Bearer $GH_TOKEN" \
+              "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/jobs/$id/logs" -o "rel/$job.log"
+            [ -s "rel/$job.log" ] || { echo "ERROR: the $job job's log is empty"; exit 1; }
+          done
           (cd rel && sha256sum -- * > checksums.txt && cat checksums.txt)
           RUN_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
-          printf 'linux-arm64 engine for upstream tag %s (oss-invisible/firefox_antidetect_patch), built and gated in %s.\nSee README.md for what it covers.\n' \
-            "$SEAL_TAG" "$RUN_URL" > notes.md
+          printf 'linux-arm64 engine for upstream tag %s (oss-invisible/firefox_antidetect_patch), built and gated in %s.\nBuilt from upstream source commit %s (source_commit in seal.json) with arm64/patches at fork commit %s.\nSee README.md for what it covers.\n' \
+            "$SEAL_TAG" "$RUN_URL" "$(cat run/source-commit.txt)" "$GITHUB_SHA" > notes.md
           gh release create "$TAG" -R "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
             --title "$TAG" --notes-file notes.md rel/*
