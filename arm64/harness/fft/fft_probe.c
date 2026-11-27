@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: 0BSD
 // Runs ffvpx's av_tx the way dom/media/webaudio/FFTBlock.h does (AV_TX_FLOAT_RDFT, forward
-// and inverse, stride 2*sizeof(float), flags 0) for every power of two from 32 to 32768 and
-// writes the output bits to <out>/<variant>/<dir>-<n>-<signal>.bin. stdout carries the CPU
-// flags and the transform tree libavutil picked, per variant, length and direction.
+// and inverse, stride 2*sizeof(float), flags 0) for every power of two from 4 to 262144
+// (WebAudio uses 32 to 32768; the rest is the codelets' whole range), and as an in-place
+// complex FFT (AV_TX_FLOAT_FFT with AV_TX_INPLACE), which is how the pre-shuffled codelets
+// get picked. Writes the output bits to <out>/<variant>/<kind>-<dir>-<n>-<signal>.bin.
+// stdout carries the CPU flags and the transform tree libavutil picked.
 //   fft_probe <out> [variant ...]
 #include <stdarg.h>
 #include <stdint.h>
@@ -74,36 +76,44 @@ static int run(const char *out, const struct variant *v, int host) {
   printf("variant %s flags 0x%x (host 0x%x)\n", v->name, av_get_cpu_flags(), host);
   snprintf(path, sizeof(path), "%s/%s", out, v->name);
   mkdir(path, 0777);
-  for (int n = 32; n <= 32768; n *= 2) {
-    for (int inv = 0; inv < 2; inv++) {
-      AVTXContext *ctx = NULL;
-      av_tx_fn fn = NULL;
-      float scale = 1.0f;
-      printf("%s %s n=%d\n", v->name, inv ? "inverse" : "forward", n);
-      if (av_tx_init(&ctx, &fn, AV_TX_FLOAT_RDFT, inv, n, &scale, 0)) {
-        fprintf(stderr, "av_tx_init failed: %s n=%d inv=%d\n", v->name, n, inv);
-        return 1;
-      }
-      for (int sig = 0; sig < 2; sig++) {
-        // 64-byte aligned like AlignedTArray's buffers (the x86 codelets use aligned stores)
-        size_t bytes = sizeof(float) * (n + 64);
-        float *in = aligned_alloc(64, bytes), *dst = aligned_alloc(64, bytes);
-        size_t outn = inv ? n : n + 2;  // floats: n samples, or n/2+1 complex bins
-        FILE *f;
-        if (!in || !dst) return 1;
-        memset(dst, 0, bytes);
-        fill(in, n, inv, sig);
-        fn(ctx, dst, in, 2 * sizeof(float));
-        snprintf(path, sizeof(path), "%s/%s/%s-%05d-%s.bin", out, v->name, inv ? "inverse" : "forward", n,
-                 sig ? "saw" : "noise");
-        if (!(f = fopen(path, "wb")) || fwrite(dst, sizeof(float), outn, f) != outn || fclose(f)) {
-          perror(path);
+  for (int kind = 0; kind < 2; kind++) {  // 0: FFTBlock's RDFT, 1: in-place complex FFT
+    // the in-place map costs O(n^2) to build: 8192 still reaches every pre-shuffled codelet
+    for (int n = 4; n <= (kind ? 8192 : 262144); n *= 2) {
+      for (int inv = 0; inv < 2; inv++) {
+        AVTXContext *ctx = NULL;
+        av_tx_fn fn = NULL;
+        float scale = 1.0f;
+        const char *k = kind ? "fft" : "rdft", *d = inv ? "inverse" : "forward";
+        printf("%s %s %s n=%d\n", v->name, k, d, n);
+        if (av_tx_init(&ctx, &fn, kind ? AV_TX_FLOAT_FFT : AV_TX_FLOAT_RDFT, inv, kind ? n / 2 : n, &scale,
+                       kind ? AV_TX_INPLACE : 0)) {
+          fprintf(stderr, "av_tx_init failed: %s %s n=%d inv=%d\n", v->name, k, n, inv);
           return 1;
         }
-        free(in);
-        free(dst);
+        for (int sig = 0; sig < 2 - kind; sig++) {
+          // 64-byte aligned like AlignedTArray's buffers (the x86 codelets use aligned stores)
+          size_t bytes = sizeof(float) * (n + 64);
+          float *in = aligned_alloc(64, bytes), *dst = aligned_alloc(64, bytes);
+          // floats out: n samples, n/2+1 complex bins, or the n/2 complex values of the FFT
+          size_t outn = kind || inv ? n : n + 2;
+          FILE *f;
+          if (!in || !dst) return 1;
+          memset(dst, 0, bytes);
+          fill(in, n, kind ? 0 : inv, sig);
+          if (kind)
+            fn(ctx, in, in, 2 * sizeof(float));
+          else
+            fn(ctx, dst, in, 2 * sizeof(float));
+          snprintf(path, sizeof(path), "%s/%s/%s-%s-%06d-%s.bin", out, v->name, k, d, n, sig ? "saw" : "noise");
+          if (!(f = fopen(path, "wb")) || fwrite(kind ? in : dst, sizeof(float), outn, f) != outn || fclose(f)) {
+            perror(path);
+            return 1;
+          }
+          free(in);
+          free(dst);
+        }
+        av_tx_uninit(&ctx);
       }
-      av_tx_uninit(&ctx);
     }
   }
   return 0;
