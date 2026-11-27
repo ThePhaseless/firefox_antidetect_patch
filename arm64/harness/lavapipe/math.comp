@@ -1,0 +1,52 @@
+#version 450
+// SPDX-License-Identifier: 0BSD
+// Float arithmetic on runtime inputs (never constants, which NIR folds the same on every
+// host): one row of K results per input vec4, as bits.
+layout(local_size_x = 64) in;
+layout(std430, set = 0, binding = 0) readonly buffer In { vec4 v[]; } inb;
+layout(std430, set = 0, binding = 1) writeonly buffer Out { uint o[]; } outb;
+const uint K = 64;
+uint row, k;
+void put(float x) { outb.o[row * K + k] = floatBitsToUint(x); k++; }
+void putu(uint x) { outb.o[row * K + k] = x; k++; }
+void main() {
+  row = gl_GlobalInvocationID.x; k = 0;
+  vec4 v = inb.v[row];
+  float a = v.x, b = v.y, c = v.z, d = v.w;
+  put(a * b + c);
+  put(fma(a, b, c));
+  put(a * b - c * d);
+  put(mix(a, b, fract(c)));
+  put(sin(a)); put(cos(a)); put(tan(b));
+  put(exp(clamp(a, -80.0, 80.0))); put(exp2(clamp(b, -120.0, 120.0)));
+  put(log(abs(a) + 1e-30)); put(log2(abs(b) + 1e-30));
+  put(pow(abs(a) + 1e-3, clamp(b, -8.0, 8.0)));
+  put(sqrt(abs(c))); put(inversesqrt(abs(d) + 1e-20));
+  put(a / b); put(1.0 / c);
+  put(atan(a, b)); put(atan(c));
+  put(asin(clamp(a, -1.0, 1.0))); put(acos(clamp(b, -1.0, 1.0)));
+  put(sinh(clamp(a, -40.0, 40.0))); put(cosh(clamp(b, -40.0, 40.0))); put(tanh(c));
+  put(dot(v, v.wzyx)); put(dot(v.xy, v.zw));
+  put(length(v.xyz)); put(distance(v.xy, v.zw));
+  vec3 n = normalize(v.xyz + vec3(1e-3)); put(n.x); put(n.y); put(n.z);
+  put(smoothstep(a, a + abs(b) + 1e-3, c));
+  put(fract(a)); put(mod(a, b));
+  put(floor(a)); put(ceil(b)); put(round(c)); put(roundEven(d)); put(trunc(a));
+  putu(packHalf2x16(vec2(a, b)));
+  putu(packUnorm4x8(fract(v)));
+  putu(packSnorm2x16(clamp(vec2(c, d), -1.0, 1.0)));
+  put(unpackHalf2x16(floatBitsToUint(a)).x);
+  put(min(a, b)); put(max(c, d)); put(clamp(a, c, c + abs(d)));
+  putu(uint(int(clamp(a * 1000.0, -2e9, 2e9))));
+  putu(uint(clamp(abs(b) * 1000.0, 0.0, 4e9)));
+  int e; float m = frexp(b, e); put(m); putu(uint(e));
+  put(ldexp(c, int(clamp(d, -20.0, 20.0))));
+  vec3 cr = cross(v.xyz, v.yzw); put(cr.x); put(cr.z);
+  mat4 M = mat4(v, v.yzwx, v.zwxy, v.wxyz * 0.5);
+  vec4 mv = M * vec4(c, d, a, b); put(mv.x); put(mv.y); put(mv.w);
+  vec3 r = refract(n, normalize(v.yzw + vec3(1e-3)), 0.66); put(r.y);
+  vec3 rf = reflect(n, normalize(v.wzx + vec3(1e-3))); put(rf.z);
+  put(degrees(a) + radians(b));
+  put(step(a, b) * c + d);
+  put(sin(a * 100.0) * cos(b * 0.01) + c);
+}

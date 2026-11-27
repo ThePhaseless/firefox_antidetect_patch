@@ -1,0 +1,93 @@
+# SPDX-License-Identifier: 0BSD
+# The lavapipe harness (arm64/harness/lavapipe): compute and render bytes from the
+# linux-arm64 lavapipe library against upstream's own linux-x86_64 one, each run natively
+# on its architecture. The compare job fails unless every output byte is equal.
+name: arm64-lavapipe-harness
+
+on:
+  workflow_call:
+    inputs:
+      upstream_tag: { type: string, required: true }
+      arm64_run_id: { type: string, required: true }
+  workflow_dispatch:
+    inputs:
+      upstream_tag:
+        description: "upstream's release whose linux-x86_64 archive holds the x86 library"
+        default: 'firefox-58'
+      arm64_run_id:
+        description: 'a run of arm64.yml whose lavapipe-linux-arm64 artifact to test; empty: the arm64 archive of the fork release arm64_release'
+        default: ''
+      arm64_release:
+        default: 'firefox-58-arm64'
+
+permissions: { contents: read, actions: read }
+
+jobs:
+  probe:
+    name: probe-${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x86_64, runner: ubuntu-24.04 }
+          - { arch: aarch64, runner: ubuntu-24.04-arm }
+    env:
+      GH_TOKEN: ${{ github.token }}
+      UPSTREAM_TAG: ${{ inputs.upstream_tag }}
+      ARM64_RELEASE: ${{ inputs.arm64_release }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with: { fetch-depth: 1 }
+      - name: glslang and the Vulkan headers
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends glslang-tools libvulkan-dev
+      - name: The x86 library, from upstream's archive
+        if: matrix.arch == 'x86_64'
+        run: |
+          set -euo pipefail
+          mkdir lib
+          gh release download "$UPSTREAM_TAG" -R oss-invisible/firefox_antidetect_patch -p '*-linux-x86_64.tar.gz' -O - \
+            | tar xzf - -C lib --strip-components=2 ./lavapipe/libvulkan_lvp.so ./lavapipe/VERSION.json
+      - name: The arm64 library, from the given run
+        if: matrix.arch == 'aarch64' && inputs.arm64_run_id != ''
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: lavapipe-linux-arm64
+          path: lib
+          run-id: ${{ inputs.arm64_run_id }}
+          github-token: ${{ github.token }}
+      - name: The arm64 library, from the fork release
+        if: matrix.arch == 'aarch64' && inputs.arm64_run_id == ''
+        run: |
+          set -euo pipefail
+          mkdir lib
+          gh release download "$ARM64_RELEASE" -R "$GITHUB_REPOSITORY" -p '*-linux-arm64.tar.gz' -O - \
+            | tar xzf - -C lib --strip-components=2 ./lavapipe/libvulkan_lvp.so ./lavapipe/VERSION.json
+      - name: Runner CPU
+        run: lscpu | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Run the probe
+        run: |
+          cat lib/VERSION.json
+          bash arm64/harness/lavapipe/run.sh lib/libvulkan_lvp.so "$RUNNER_TEMP/lvp-${{ matrix.arch }}"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: lvp-${{ matrix.arch }}
+          path: ${{ runner.temp }}/lvp-${{ matrix.arch }}
+          retention-days: 14
+          if-no-files-found: error
+
+  compare:
+    needs: probe
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with: { fetch-depth: 1 }
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with: { pattern: 'lvp-*', path: lvp }
+      - name: aarch64 against x86_64
+        run: |
+          set -o pipefail
+          grep -h '^library\|^machine' lvp/lvp-*/probe.txt | tee -a "$GITHUB_STEP_SUMMARY"
+          bash arm64/harness/lavapipe/run.sh --compare lvp/lvp-x86_64 lvp/lvp-aarch64 | tee -a "$GITHUB_STEP_SUMMARY"
