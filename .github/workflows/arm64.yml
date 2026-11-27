@@ -8,6 +8,8 @@ name: arm64
 on:
   push:
     branches: [arm64, 'arm64-*']
+    # A commit that changes no file outside these starts no run (an empty commit neither):
+    # dispatch the workflow instead.
     paths-ignore: ['**.md', 'LICENSE', 'arm64/harness/**']
   workflow_dispatch:
     inputs:
