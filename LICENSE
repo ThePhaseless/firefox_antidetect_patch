@@ -1,0 +1,33 @@
+Copyright (C) 2026 ThePhaseless
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
+OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+PERFORMANCE OF THIS SOFTWARE.
+
+Scope
+
+The license above (0BSD) covers only this fork's own work:
+
+- the files the fork adds: arm64/, .github/workflows/arm64.yml,
+  .github/workflows/arm64-fft-harness.yml, README.md and this LICENSE;
+- the fork's own additions to .github/workflows/arm64-gate.yml and
+  tools/engine.py;
+- the fork's own lines in the patches under arm64/patches/ that change
+  upstream's scripts.
+
+It does not cover anything else:
+
+- A patch hunk to a third-party file keeps that file's license: MPL-2.0 for
+  Mozilla files, BSD-3-Clause for Skia (gfx/skia), LGPL-2.1-or-later for ffvpx
+  (media/ffvpx, including the new tx_float_x86eq.c, a port of ffvpx code) and
+  MIT for Mesa (the lavapipe patch).
+- Upstream's own files (oss-invisible/firefox_antidetect_patch), and the parts
+  of the fork's workflows copied from them, are not relicensed. They stay
+  under whatever terms upstream gives them.
