@@ -28,7 +28,7 @@ Release run: [46020164607](https://github.com/ThePhaseless/firefox_antidetect_pa
 
 Those two jobs' output from the release run ships with the release: [host-gate.txt](https://github.com/ThePhaseless/firefox_antidetect_patch/releases/download/firefox-58-arm64/host-gate.txt), [leaf-diff.txt](https://github.com/ThePhaseless/firefox_antidetect_patch/releases/download/firefox-58-arm64/leaf-diff.txt) and [exceptions.diff](https://github.com/ThePhaseless/firefox_antidetect_patch/releases/download/firefox-58-arm64/exceptions.diff).
 
-The proof uses the versions Byparr pins: wrapper `invisible-playwright v0.47.1` and core `invisible-core v58.56.0`. Newer wrappers add an A/B check between the two Linux legs, so a different wrapper ref needs a new proof.
+The proof uses the versions Byparr pins: wrapper `invisible-playwright v0.47.1` and core `invisible-core v58.56.0`. Newer wrappers read `ab.` keys and add a same-OS check to the compare, so a different wrapper ref needs a new proof.
 
 ### The one change to exceptions.json
 
@@ -46,13 +46,12 @@ Upstream's `exceptions.json` has one entry that excuses `control.webgl1` and `co
  }
 ```
 
-That is the only change. No entry is added for arm64 alone, and no other key is excused for it. The leaf diff still compares the two WebGL keys between the Linux legs and reports them: in the release run both are equal on all 6 visits.
+That is the only change. No entry is added for arm64 alone, and no other key is excused for arm64 alone. The leaf diff still compares the two WebGL keys between the Linux legs and reports them: in the release run both are equal on all 6 visits.
 
 ### Keys the gate does not hold to equality
 
-The leaf diff follows what the gate excuses on every leg, so these keys are listed with their state but never fail:
+The leaf diff drops `diag.*` keys (diagnostics, not fingerprint output) as the gate does. It follows what the gate excuses on every leg, so these keys are listed with their state but never fail:
 
-- `diag.*` keys, which the gate drops (diagnostics, not fingerprint output);
 - the wrapper's `noise` and `network` entries, both empty in v0.47.1;
 - the wrapper's `measurement` entry, `surface.document.hasFocus` (a runtime focus state). In the release run it is equal on all 6 visits.
 
@@ -67,7 +66,7 @@ The gate and the leaf diff measure only what their scenes draw and read. The for
 - JIT timing.
 - Decoded audio bits (`decodeAudioData`): x86 decodes with AVX2 inverse-MDCT assembly that has no aarch64 port.
 - The six blend modes that go through x86's approximate `RCPPS` reciprocal: `color-dodge`, `color-burn`, `hue`, `saturation`, `color` and `luminosity`. They are not in the gate's scenes, and x86 itself gives different bytes for them on Intel and AMD.
-- Only one arm CPU model was tested: Neoverse-N2, GitHub's `ubuntu-24.04-arm` runner. The x86 gate ran on AMD EPYC 7763.
+- Only one arm CPU model was tested: Neoverse-N2, GitHub's `ubuntu-24.04-arm` runner. The x86 gate legs (Linux and Windows) ran on AMD EPYC 7763.
 - Android, macOS and Windows on aarch64 are not built.
 
 ## Using the engine
