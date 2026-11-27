@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: 0BSD
 // Runs math.comp and the scene (scene.vert, scene.frag) on the lavapipe library given on
 // the command line, loaded directly as Firefox loads it (no loader), and writes the bytes
-// they produce to <out dir>: compute.bin, scene-f32.bin (RGBA32F) and scene-u8.bin (RGBA8).
+// they produce to <out dir>: compute.bin, scene-f32.bin (RGBA32F), scene-u8.bin (RGBA8) and
+// scene-u32.bin (RGBA32UI, float bits).
 // Every input is made from integers here, so both architectures feed the same bits.
 //   lvp_probe <libvulkan_lvp.so> <dir with the .spv files> <out dir>
 #define VK_NO_PROTOTYPES
@@ -164,11 +165,12 @@ static void run_scene(void) {
   for (size_t i = 0; i < t8bytes; i++) ((uint8_t *)stage)[i] = (uint8_t)(hash(1000000 + i) >> 56);
   float *t32 = (float *)((char *)stage + t8bytes);
   for (uint32_t i = 0; i < T32 * T32 * 4; i++) t32[i] = num(2000000 + i);
-  VkImageView v8, v32, vf, vu;
+  VkImageView v8, v32, vf, vu, vx;
   VkImage i8 = image(VK_FORMAT_R8G8B8A8_UNORM, T8, T8, mips, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, &v8);
   VkImage i32 = image(VK_FORMAT_R32G32B32A32_SFLOAT, T32, T32, 1, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, &v32);
   VkImage rf = image(VK_FORMAT_R32G32B32A32_SFLOAT, W, H, 1, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, &vf);
   VkImage ru = image(VK_FORMAT_R8G8B8A8_UNORM, W, H, 1, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, &vu);
+  VkImage rx = image(VK_FORMAT_R32G32B32A32_UINT, W, H, 1, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, &vx);
   VkSamplerCreateInfo sci = {VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO, 0, 0, VK_FILTER_LINEAR, VK_FILTER_LINEAR,
     VK_SAMPLER_MIPMAP_MODE_LINEAR, VK_SAMPLER_ADDRESS_MODE_REPEAT, VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT,
     VK_SAMPLER_ADDRESS_MODE_REPEAT, 0.25f, VK_FALSE, 1.0f, VK_FALSE, VK_COMPARE_OP_NEVER, 0.0f, 16.0f};
@@ -186,8 +188,9 @@ static void run_scene(void) {
     o[4] = x * 2.7f - 0.3f; o[5] = y * 1.9f + 0.1f;
     for (int c = 0; c < 4; c++) o[6 + c] = unit(3300 + i * 4 + c);
   }
-  struct { float m[16], k[4]; } pc = {
-    {0.97f, 0.11f, 0, 0, -0.08f, 1.03f, 0, 0, 0, 0, 1, 0, 0.02f, -0.03f, 0, 1}, {1.13f, 0.07f, 3.7f, 0.31f}};
+  struct { float m[16], k[4]; uint32_t z[4]; } pc = {
+    {0.97f, 0.11f, 0, 0, -0.08f, 1.03f, 0, 0, 0, 0, 1, 0, 0.02f, -0.03f, 0, 1}, {1.13f, 0.07f, 3.7f, 0.31f},
+    {0x00012345u, 0x80054321u, 0, 0}};  // two subnormals
 
   VkDescriptorSetLayoutBinding lb[2] = {{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT},
                                         {1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT}};
@@ -211,10 +214,11 @@ static void run_scene(void) {
   VkPipelineMultisampleStateCreateInfo ms = {VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO, 0, 0, VK_SAMPLE_COUNT_1_BIT};
   VkPipelineColorBlendAttachmentState ba = {VK_TRUE, VK_BLEND_FACTOR_SRC_ALPHA, VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, VK_BLEND_OP_ADD,
     VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, VK_BLEND_OP_ADD, 0xf};
-  VkPipelineColorBlendAttachmentState bas[2] = {ba, ba};
-  VkPipelineColorBlendStateCreateInfo cbs = {VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO, 0, 0, VK_FALSE, 0, 2, bas};
-  VkFormat fmts[2] = {VK_FORMAT_R32G32B32A32_SFLOAT, VK_FORMAT_R8G8B8A8_UNORM};
-  VkPipelineRenderingCreateInfo rci = {VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO, 0, 0, 2, fmts};
+  VkPipelineColorBlendAttachmentState bas[3] = {ba, ba, {VK_FALSE}};
+  bas[2].colorWriteMask = 0xf;
+  VkPipelineColorBlendStateCreateInfo cbs = {VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO, 0, 0, VK_FALSE, 0, 3, bas};
+  VkFormat fmts[3] = {VK_FORMAT_R32G32B32A32_SFLOAT, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R32G32B32A32_UINT};
+  VkPipelineRenderingCreateInfo rci = {VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO, 0, 0, 3, fmts};
   VkGraphicsPipelineCreateInfo gpi = {VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO, &rci, 0, 2, st, &vi, &ia, 0, &vs, &rs, &ms, 0, &cbs, 0, pl};
   VkPipeline p; CK(CreateGraphicsPipelines(dev, VK_NULL_HANDLE, 1, &gpi, 0, &p));
   VkDescriptorPoolSize ps = {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2};
@@ -227,7 +231,7 @@ static void run_scene(void) {
   UpdateDescriptorSets(dev, 1, &w, 0, 0);
 
   void *rmap;
-  VkBuffer rb = buffer(W * H * 16 + W * H * 4, VK_BUFFER_USAGE_TRANSFER_DST_BIT, &rmap);
+  VkBuffer rb = buffer(W * H * 36, VK_BUFFER_USAGE_TRANSFER_DST_BIT, &rmap);
   VkCommandBuffer cb = begin();
   barrier(cb, i8, mips, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
   barrier(cb, i32, 1, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
@@ -243,12 +247,15 @@ static void run_scene(void) {
   barrier(cb, i32, 1, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
   barrier(cb, rf, 1, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
   barrier(cb, ru, 1, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-  VkRenderingAttachmentInfo att[2] = {
+  barrier(cb, rx, 1, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+  VkRenderingAttachmentInfo att[3] = {
     {VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO, 0, vf, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 0, 0, 0,
      VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE, {.color.float32 = {0.1f, 0.2f, 0.3f, 0.4f}}},
     {VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO, 0, vu, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 0, 0, 0,
-     VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE, {.color.float32 = {0.6f, 0.3f, 0.1f, 0.9f}}}};
-  VkRenderingInfo ri = {VK_STRUCTURE_TYPE_RENDERING_INFO, 0, 0, {{0, 0}, {W, H}}, 1, 0, 2, att};
+     VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE, {.color.float32 = {0.6f, 0.3f, 0.1f, 0.9f}}},
+    {VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO, 0, vx, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 0, 0, 0,
+     VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE, {.color.uint32 = {1, 2, 3, 4}}}};
+  VkRenderingInfo ri = {VK_STRUCTURE_TYPE_RENDERING_INFO, 0, 0, {{0, 0}, {W, H}}, 1, 0, 3, att};
   CmdBeginRendering(cb, &ri);
   CmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, p);
   CmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pl, 0, 1, &ds, 0, 0);
@@ -258,13 +265,17 @@ static void run_scene(void) {
   CmdEndRendering(cb);
   barrier(cb, rf, 1, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
   barrier(cb, ru, 1, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+  barrier(cb, rx, 1, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
   VkBufferImageCopy cf = {0, 0, 0, {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1}, {0, 0, 0}, {W, H, 1}};
   VkBufferImageCopy cu = {W * H * 16, 0, 0, {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1}, {0, 0, 0}, {W, H, 1}};
   CmdCopyImageToBuffer(cb, rf, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, rb, 1, &cf);
   CmdCopyImageToBuffer(cb, ru, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, rb, 1, &cu);
+  VkBufferImageCopy cx = {W * H * 20, 0, 0, {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1}, {0, 0, 0}, {W, H, 1}};
+  CmdCopyImageToBuffer(cb, rx, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, rb, 1, &cx);
   submit(cb);
   save("scene-f32.bin", rmap, W * H * 16);
   save("scene-u8.bin", (char *)rmap + W * H * 16, W * H * 4);
+  save("scene-u32.bin", (char *)rmap + W * H * 20, W * H * 16);
   // A scene that drew nothing would compare equal and prove nothing.
   uint32_t clear; float cv = 0.1f; memcpy(&clear, &cv, 4);
   int drawn = 0;
