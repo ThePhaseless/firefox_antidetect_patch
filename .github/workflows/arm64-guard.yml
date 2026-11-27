@@ -1,0 +1,58 @@
+# SPDX-License-Identifier: 0BSD
+# Upstream's workflows stay in the tree byte for byte (tools/engine.py check), and GitHub can
+# disable a workflow only once it is registered, which takes its first run. This one disables
+# every workflow that is not the fork's own (.github/workflows/arm64*.yml) and cancels their
+# queued and running runs: when one of upstream's starts, after release.yml's Monday 03:00 UTC
+# slot, and on dispatch.
+name: arm64-guard
+
+on:
+  workflow_run:
+    # Every workflow name upstream has on main and on firefox-58.
+    workflows: [cargo-tests, checks, gate, gate-only, hook-tests-judge, latitude-sweeper, linux-deps,
+      noreply-identity, package-ab, publish, py-deps, release, republish, series, theta-sweeper,
+      verify-assets, verify-hidden-desktop, xpcshell]
+    types: [requested]
+  schedule:
+    - cron: '20 3 * * 1'
+    - cron: '50 4 * * 1'
+  workflow_dispatch:
+
+permissions: { actions: write }
+
+concurrency: { group: arm64-guard, cancel-in-progress: false }
+
+jobs:
+  guard:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Disable every workflow but the fork's, and cancel their runs
+        run: |
+          set -euo pipefail
+          own='^\.github/workflows/arm64[^/]*\.ya?ml'
+          gh api --paginate "repos/$GITHUB_REPOSITORY/actions/workflows" --jq '.workflows[] | [.id, .state, .path] | @tsv' |
+          while IFS=$'\t' read -r id state path; do
+            if [[ "$path" =~ $own ]] || [[ "$path" != .github/workflows/* ]]; then
+              echo "kept      $state $path"
+            elif [ "$state" = active ]; then
+              gh api -X PUT "repos/$GITHUB_REPOSITORY/actions/workflows/$id/disable"
+              echo "disabled  $path"
+            else
+              echo "already   $state $path"
+            fi
+          done
+          for st in requested waiting pending queued in_progress; do
+            gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs?status=$st&per_page=100" \
+              --jq '.workflow_runs[] | [.id, .path] | @tsv'
+          done | sort -u |
+          while IFS=$'\t' read -r id path; do
+            if [[ "$path" =~ $own ]] || [[ "$path" != .github/workflows/* ]]; then continue; fi
+            if gh api -X POST "repos/$GITHUB_REPOSITORY/actions/runs/$id/cancel" >/dev/null; then
+              echo "cancelled run $id ($path)"
+            else
+              echo "::warning::could not cancel run $id ($path)"
+            fi
+          done
