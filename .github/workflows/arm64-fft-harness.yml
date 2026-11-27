@@ -1,0 +1,63 @@
+# SPDX-License-Identifier: 0BSD
+# The FFT harness: ffvpx's av_tx, built from the overlaid tree the way Firefox builds it on
+# each architecture, run with FFTBlock's arguments (arm64/harness/fft). The compare job fails
+# unless the aarch64 build's output bits equal the x86 asm's.
+name: arm64-fft-harness
+
+on:
+  push:
+    branches: [arm64-audio]
+    paths: ['arm64/harness/**', 'arm64/patches/0004-*']
+  workflow_dispatch:
+
+permissions: { contents: read }
+
+jobs:
+  probe:
+    name: probe-${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x86_64, runner: ubuntu-24.04 }
+          - { arch: aarch64, runner: ubuntu-24.04-arm }
+    steps:
+      - name: The series (this repository, this commit)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with: { path: .series, fetch-depth: 1 }
+      - name: The source tree, the Mozilla tag with our series applied (tools/engine.py)
+        run: python3 .series/tools/engine.py materialize --into .
+      - name: The fork's overlay
+        run: bash .series/arm64/apply.sh .
+      - name: Runner CPU
+        run: lscpu | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: nasm (x86 only, as Firefox's ffvpx build uses)
+        if: matrix.arch == 'x86_64'
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends nasm
+      - name: Build and run the probe
+        run: |
+          bash .series/arm64/harness/fft/build.sh . "$RUNNER_TEMP/fft-${{ matrix.arch }}"
+          grep -E '^(machine|variant)|clang|GLIBC' "$RUNNER_TEMP/fft-${{ matrix.arch }}/probe.txt" | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Upload the outputs
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: fft-${{ matrix.arch }}
+          path: ${{ runner.temp }}/fft-${{ matrix.arch }}
+          retention-days: 14
+          if-no-files-found: error
+
+  compare:
+    needs: probe
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with: { fetch-depth: 1 }
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with: { pattern: 'fft-*', path: fft }
+      - name: aarch64 against the x86 asm
+        run: |
+          set -o pipefail
+          bash arm64/harness/fft/build.sh --compare fft/fft-x86_64 fft/fft-aarch64 | tee -a "$GITHUB_STEP_SUMMARY"
