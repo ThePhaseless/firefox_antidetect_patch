@@ -107,7 +107,7 @@ FROM engine-${TARGETARCH} AS app
 
 - `ARM64_ARCHIVE_SHA256` is the `sha256` of the arm64 entry in the seal. Both values come from the release's `checksums.txt`; a new fork release means updating both.
 - The base stage has curl and coreutils but no python3, so both files are checked with `sha256sum -c`.
-- Extract straight into `firefox-58_159.0_20261108115355`, not into the legacy `firefox-58` name. The core adopts a legacy tree by renaming it to the content-keyed name with `os.replace`. When the tree was written in an earlier image layer, overlayfs refuses that rename (EXDEV), the core stamps the legacy directory instead, and `ensure_binary()` reads the stamp only from the content-keyed one. Every start then adopts again, and as uid 1000 writing the stamp into the root-owned directory fails with `PermissionError`.
+- Extract straight into `firefox-58_159.0_20261108115355`. A legacy `firefox-58` tree written in an earlier image layer cannot be renamed to that name on overlayfs (EXDEV), so the core stamps the wrong directory, adopts again at every start, and fails with `PermissionError` as uid 1000.
 - The engine sits in `/opt/invisible/engine`, outside `/cache`, so a volume or tmpfs over `/cache` cannot hide it. `/cache` keeps only machine state (geoip, fonts) and its existing `chmod -R a+rwX`.
 - Both variables stay set at runtime. Without `INVISIBLE_SEAL_FILE` the core refuses arm64 as a retired leg.
 - The `devcontainer` stage is left as it is. It runs `invisible_playwright fetch` without the seal file, so on arm64 it fails as it does today.
