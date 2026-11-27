@@ -669,3 +669,86 @@ jobs:
       arm64_run_id: ${{ needs.plan.outputs.arm64_run_id || github.run_id }}
       wrapper_ref: ${{ needs.plan.outputs.wrapper_ref }}
       core_ref: ${{ needs.plan.outputs.core_ref }}
+
+  # kind=release: the fork release, this run's arm64 archive with a seal that is upstream's
+  # firefox-58 seal plus the arm64 entry. Only after the gate, the host gate and the leaf
+  # diff are green.
+  publish:
+    needs: [plan, build, gate]
+    if: needs.plan.outputs.kind == 'release'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions: { contents: write, actions: read }
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ needs.plan.outputs.tag }}
+      SEAL_TAG: ${{ needs.plan.outputs.seal_tag }}
+    steps:
+      - name: The series (for scripts/make_seal.py and the Playwright range, as materialize copies them)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with: { path: .series, fetch-depth: 1 }
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with: { python-version: '3.11' }
+      - name: This run's asset-linux-arm64
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with: { name: asset-linux-arm64, path: run }
+      - name: This run's commits-linux-arm64
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with: { name: commits-linux-arm64, path: run }
+      - name: This run's host-gate-report
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with: { name: host-gate-report, path: run }
+      - name: This run's leaf-diff-report
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with: { name: leaf-diff-report, path: run }
+      - name: Upstream's release of the tag
+        run: |
+          gh release download "$SEAL_TAG" -R oss-invisible/firefox_antidetect_patch -D up \
+            -p seal.json -p source-commit.txt -p series-commit.txt \
+            -p '*-linux-x86_64.tar.gz' -p '*-win-x86_64.zip'
+          ls -la run up
+      - name: Every file of this run is there, and the build is of upstream's source commit
+        run: |
+          set -euo pipefail
+          for f in firefox-159.0-stealth-linux-arm64.tar.gz source-commit.txt fork-commit.txt host-gate.txt exceptions.diff leaf-diff.txt; do
+            [ -s "run/$f" ] || { echo "ERROR: run/$f missing or empty"; exit 1; }
+          done
+          [ "$(cat run/fork-commit.txt)" = "$GITHUB_SHA" ] || { echo "ERROR: fork-commit.txt is not this run's commit"; exit 1; }
+          cmp run/source-commit.txt up/source-commit.txt
+      - name: The seal, by upstream's make_seal.py, and equal to upstream's but for the arm64 entry
+        run: |
+          set -euo pipefail
+          mkdir dl
+          cp up/*-linux-x86_64.tar.gz up/*-win-x86_64.zip run/firefox-159.0-stealth-linux-arm64.tar.gz dl/
+          python3 .series/platform/ci/src/scripts/make_seal.py --tag "$SEAL_TAG" --assets dl \
+            --source-commit-file up/source-commit.txt --series-commit-file up/series-commit.txt \
+            --playwright-range .series/platform/release/src/browser/config/stealth_playwright_range.txt \
+            -o seal.json
+          cat seal.json
+          python3 -I - <<'PY'
+          import json, sys
+          ours, theirs = (json.load(open(p)) for p in ("seal.json", "up/seal.json"))
+          arm = "firefox-159.0-stealth-linux-arm64.tar.gz"
+          extra = sorted(set(ours["assets"]) - set(theirs["assets"]))
+          if extra != [arm]:
+              sys.exit("seal: extra assets %r, expected only %s" % (extra, arm))
+          entry = ours["assets"].pop(arm)
+          if json.dumps(ours, sort_keys=True) != json.dumps(theirs, sort_keys=True):
+              sys.exit("seal: differs from upstream's beyond the arm64 entry")
+          if (entry["platform"], entry["arch"]) != ("linux", "arm64"):
+              sys.exit("seal: the arm64 entry is %r" % entry)
+          print("seal: upstream's %s seal plus %s" % (theirs["tag"], arm))
+          PY
+      - name: Publish the release
+        run: |
+          set -euo pipefail
+          mkdir rel
+          cp run/firefox-159.0-stealth-linux-arm64.tar.gz run/fork-commit.txt run/source-commit.txt \
+            run/host-gate.txt run/leaf-diff.txt run/exceptions.diff up/series-commit.txt seal.json rel/
+          (cd rel && sha256sum -- * > checksums.txt && cat checksums.txt)
+          RUN_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          printf 'linux-arm64 engine for upstream tag %s (oss-invisible/firefox_antidetect_patch), built and gated in %s.\nSee README.md for what it covers.\n' \
+            "$SEAL_TAG" "$RUN_URL" > notes.md
+          gh release create "$TAG" -R "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "$TAG" --notes-file notes.md rel/*
