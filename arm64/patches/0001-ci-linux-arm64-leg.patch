@@ -1,0 +1,221 @@
+diff --git a/scripts/ci/legs.py b/scripts/ci/legs.py
+index 9eb6a8d726..60d054a13d 100644
+--- a/scripts/ci/legs.py
++++ b/scripts/ci/legs.py
+@@ -1,7 +1,7 @@
+-"""The two legs, as data: Linux and Windows, x86_64, both on the build node.
++"""The three legs, as data: Linux and Windows x86_64 on the build node, linux-arm64 on GitHub's runner.
+ 
+-linux-arm64 is gone from firefox-56 on (Federico, 2026-11-04): no arm64 archive is
+-built or published. The seal still reads an arm64 name, for the old tags that have one.
++linux-arm64 is gone upstream from firefox-56 on (Federico, 2026-11-04). This fork
++builds it on GitHub's arm64 runner (arm64/ at the fork's root); the seal reads its name.
+ 
+ Every leg runs the same steps; what differs is here and nowhere else. The
+ asset names are derived from browser/config/version_display.txt, the version
+@@ -30,7 +30,7 @@ class Leg:
+     # ubuntu-24.04 declares it, or configure stops with "Don't know how to
+     # translate x86_64-pc-linux-gnu for rustc" (the image's C compiler reports
+     # that name). win-x86_64 cross-compiles from that runner, so it needs it
+-    # too.
++    # too; ubuntu-24.04-arm reports aarch64, which translates by itself.
+     host: str = ""
+     target: str = ""
+     extra_pkgs: str = ""
+@@ -47,6 +47,8 @@ class Leg:
+ LEGS = (
+     Leg("linux-x86_64", "", "linux", "x86_64-unknown-linux-gnu",
+         host="x86_64-unknown-linux-gnu", node=True),
++    # The node is x86, so this one compiles on GitHub's runners.
++    Leg("linux-arm64", "ubuntu-24.04-arm", "linux", "aarch64-unknown-linux-gnu"),
+     Leg("win-x86_64", "", "win", "x86_64-pc-windows-msvc",
+         host="x86_64-unknown-linux-gnu", target="x86_64-pc-windows-msvc",
+         extra_pkgs="msitools p7zip-full zip libc6-i386 lib32gcc-s1 lib32stdc++6", node=True),
+diff --git a/scripts/ci/test_ci.py b/scripts/ci/test_ci.py
+index b4443f0cba..c74c648326 100644
+--- a/scripts/ci/test_ci.py
++++ b/scripts/ci/test_ci.py
+@@ -59,7 +59,7 @@ ac_add_options --disable-debug-symbols
+ 
+ 
+ def fake_pgo(leg, out):
+-    lto = {"win-x86_64": "full,cross", "linux-x86_64": "full,cross"}[leg]
++    lto = {"win-x86_64": "full,cross", "linux-x86_64": "full,cross", "linux-arm64": "cross"}[leg]
+     return ["ac_add_options --enable-profile-use=cross",
+             "ac_add_options --with-pgo-profile-path=%s/merged.profdata" % out,
+             "ac_add_options --with-pgo-jarlog=%s/en-US.log" % out,
+@@ -75,6 +75,7 @@ def expected(leg, cache):
+     lines += fake_pgo(leg, "pgo")
+     lines += ["export CFLAGS=-Wno-backend-plugin", "export CXXFLAGS=-Wno-backend-plugin"]
+     lines += {"linux-x86_64": ["ac_add_options --host=x86_64-unknown-linux-gnu"],
++              "linux-arm64": [],
+               "win-x86_64": ["ac_add_options --target=x86_64-pc-windows-msvc",
+                              "ac_add_options --host=x86_64-unknown-linux-gnu",
+                              "ac_add_options --with-redist"]}[leg]
+@@ -153,16 +154,18 @@ def main() -> int:
+     names = {l.leg: l.asset("157.0.1") for l in legs.LEGS}
+     cases.append(("asset names as the release has always published them", names == {
+         "linux-x86_64": "firefox-157.0.1-stealth-linux-x86_64.tar.gz",
++        "linux-arm64": "firefox-157.0.1-stealth-linux-arm64.tar.gz",
+         "win-x86_64": "firefox-157.0.1-stealth-win-x86_64.zip"}))
+-    # Federico, 2026-11-04: no linux-arm64 from firefox-56 on, and always both legs.
+-    cases.append(("two legs, Linux and Windows x86_64, both on the node, no arm64",
+-                  [l.leg for l in legs.LEGS] == ["linux-x86_64", "win-x86_64"] and all(l.node and not l.runner for l in legs.LEGS)))
++    # Upstream has no linux-arm64 from firefox-56 on; this fork builds it on GitHub's arm64 runner.
++    cases.append(("three legs: Linux and Windows x86_64 on the node, linux-arm64 on GitHub's arm64 runner",
++                  {l.leg: (l.node, l.runner) for l in legs.LEGS}
++                  == {"linux-x86_64": (True, ""), "linux-arm64": (False, "ubuntu-24.04-arm"), "win-x86_64": (True, "")}))
+     inc = json.loads(legs.matrix("157.0.1"))["include"]
+     need = {"leg", "runner", "family", "host", "target", "rust_target", "extra_pkgs", "asset"}
+     cases.append(("the matrix carries every field release.yml reads",
+-                  len(inc) == 2 and all(need <= set(e) for e in inc)))
++                  len(inc) == 3 and all(need <= set(e) for e in inc)))
+ 
+-    for leg in ("linux-x86_64", "win-x86_64"):
++    for leg in ("linux-x86_64", "linux-arm64", "win-x86_64"):
+         for cache in ("gha", "off"):
+             got = mozconfig.active(compose(leg, cache))
+             cases.append(("the decided flags, %s, compile_cache=%s" % (leg, cache), got == expected(leg, cache)))
+diff --git a/scripts/ci/test_release_builder.py b/scripts/ci/test_release_builder.py
+index f0f5dd2e01..6286830af7 100644
+--- a/scripts/ci/test_release_builder.py
++++ b/scripts/ci/test_release_builder.py
+@@ -2,8 +2,8 @@
+ """Who compiles what in release.yml, read from the file itself.
+ 
+ The x86_64 legs compile on a build node and nowhere else: no input chooses, no
+-expression falls back, no leg names a hosted runner. No linux-arm64 from firefox-56 on
+-(Federico, 2026-11-04): two legs, always both. Gates and tests stay on GitHub's runners. And the
++expression falls back, no leg names a hosted runner. linux-arm64 (this fork's, upstream has
++none from firefox-56 on) stays on GitHub's runners, because the node is x86. Gates and tests stay on GitHub's runners. And the
+ guards around that: secrets behind an environment, labels of one run and one leg, no
+ workflow on our branches that a pull request starts reaching them, no cache entry the
+ node writes and GitHub's runners read.
+@@ -177,6 +177,12 @@ def printed_names(source: str) -> list:
+     return found
+ 
+ 
++def same_entry(a: str, b: str) -> bool:
++    """Whether a key or prefix can reach an entry of the other: up to the first expression."""
++    a, b = a.split("*")[0], b.split("*")[0]
++    return a.startswith(b) or b.startswith(a)
++
++
+ def group_no_fallback(doc, jobs, build, steps) -> list:
+     out = []
+     inputs = doc[True]["workflow_dispatch"]["inputs"]
+@@ -185,9 +191,9 @@ def group_no_fallback(doc, jobs, build, steps) -> list:
+     text = WORKFLOW.read_text(encoding="utf-8")
+     out.append(("no fallback: nothing in the workflow reads one", "outputs.builder" not in text and "inputs.builder" not in text and "--builder" not in text))
+     out.append(("no fallback: an x86_64 leg names no runner at all, so there is nothing for it to fall back to",
+-                {l.leg: l.runner for l in legs.LEGS} == {"linux-x86_64": "", "win-x86_64": ""}))
+-    out.append(("no fallback: both legs on the node, no arm64, and the matrix tells the job",
+-                {l.leg: l.node for l in legs.LEGS} == {"linux-x86_64": True, "win-x86_64": True}
++                {l.leg: l.runner for l in legs.LEGS} == {"linux-x86_64": "", "linux-arm64": "ubuntu-24.04-arm", "win-x86_64": ""}))
++    out.append(("no fallback: x86_64 is on the node, arm64 is not, and the matrix tells the job",
++                {l.leg: l.node for l in legs.LEGS} == {"linux-x86_64": True, "linux-arm64": False, "win-x86_64": True}
+                 and all("node" in e for e in json.loads(legs.matrix("1.0"))["include"])))
+     out.append(("no fallback: the legs' runs-on has one way to a hosted runner: the matrix's own, which the x86_64 legs do not have, and it ends empty",
+                 build.get("runs-on") == RUNS_ON))
+@@ -200,9 +206,10 @@ def group_no_fallback(doc, jobs, build, steps) -> list:
+         for attempt in ("1", "2"):
+             results[(leg.leg, attempt)] = leg.runner or (attempt == "1" and "%s-%s" % (prefix, leg.leg)) or ""
+     out.append(("no fallback: an x86_64 leg gets the label its runner was registered with, or nothing on a rerun, never a hosted runner",
+-                all(not HOSTED.match(v) for v in results.values())
++                all(not HOSTED.match(v) for (leg, _), v in results.items() if leg != "linux-arm64")
+                 and all(results[(leg, "1")] == latitude_node.leg_label("5", "1", leg) for leg in latitude_node.node_legs())
+-                and results[("win-x86_64", "2")] == "" and results[("linux-x86_64", "2")] == ""))
++                and results[("win-x86_64", "2")] == "" and results[("linux-x86_64", "2")] == ""
++                and results[("linux-arm64", "2")] == "ubuntu-24.04-arm"))
+     out.append(("runs-on: reads no output of a matrix job, which overwrite each other: nothing in the workflow does",
+                 "needs.node.outputs" not in text and "outputs" not in jobs["node"]
+                 and jobs["plan"]["outputs"].get("attempt") == "${{ github.run_attempt }}"))
+@@ -229,18 +236,20 @@ def group_no_fallback(doc, jobs, build, steps) -> list:
+ 
+ 
+ def group_cache_sharing(doc, jobs, build, steps) -> list:
+-    """Finding 4: is anything the node writes read on GitHub's runners? No build leg runs
+-    there since linux-arm64 left (firefox-56), and no other workflow restores a cache."""
++    """Finding 4: is anything the node writes read by the hosted arm64 leg?"""
+     out = []
++    arm = next(l for l in legs.LEGS if not l.node)
++    arm_keys = cache_keys(doc, arm, "ARM64", False)
+     node_keys = set()
+     for leg in legs.LEGS:
+-        node_keys |= cache_keys(doc, leg, "X64", True)
+-    out.append(("cache: the node legs have their keys", len(node_keys) >= 4))
++        if leg.node:
++            node_keys |= cache_keys(doc, leg, "X64", True)
++    out.append(("cache: both sides have keys to compare", len(arm_keys) >= 2 and len(node_keys) >= 4))
+     out.append(("cache: the keys a step computes start with their kind and their leg",
+                 'key=toolchains-${{ matrix.leg }}-' in steps.get("Toolchains - their versions", {}).get("run", "")
+                 and 'key=lavapipe-${{ matrix.leg }}-' in steps.get("WebGPU's Vulkan driver (linux-x86_64) - its inputs", {}).get("run", "")))
+-    out.append(("cache: no build leg on GitHub's runners, so none reads an entry the node writes: no executable of the node's runs there",
+-                not [l.leg for l in legs.LEGS if not l.node]))
++    clash = [(a, n) for a in arm_keys for n in node_keys if same_entry(a, n)]
++    out.append(("cache: the arm64 leg, on GitHub's runners, reads and writes no entry the node reads or writes: no executable of the node's runs there (%s)" % clash, not clash))
+     all_files = "\n".join(p.read_text(encoding="utf-8") for p in WORKFLOWS.glob("*.yml") if p.name != "release.yml")
+     out.append(("cache: and no other workflow restores a cache at all", "actions/cache" not in all_files))
+     lavapipe = steps.get("WebGPU's Vulkan driver (linux-x86_64) - built before", {})
+@@ -259,7 +268,8 @@ def group_cache_sharing(doc, jobs, build, steps) -> list:
+                 and "cache_rules.py worth" in steps.get("Compile cache - is this leg's upload worth it", {}).get("run", "")))
+     binary = steps.get("Compile cache - the sccache binary, if built before", {})
+     out.append(("cache: the node's sccache binary is its own entry: glibc 2.35 cannot run one built on 24.04",
+-                any(k.startswith("sccache-bin-") and "-node" in k for k in node_keys)))
++                any(k.startswith("sccache-bin-") and "-node" in k for k in node_keys)
++                and any(k.startswith("sccache-bin-") and "-node" not in k for k in arm_keys)))
+     text = WORKFLOW.read_text(encoding="utf-8")
+     out.append(("cache: the comment on sccache's key says what its source does", "sccache's version\n          # enters their key" not in text.replace("\r\n", "\n")
+                 and "neither sccache's version nor" in text))
+diff --git a/scripts/test_upstream_toolchain.py b/scripts/test_upstream_toolchain.py
+index 25f1536251..79a227489c 100644
+--- a/scripts/test_upstream_toolchain.py
++++ b/scripts/test_upstream_toolchain.py
+@@ -10,7 +10,7 @@
+   known-good (and 8-10: Taskcluster busy is asked again, a 404 is not)
+     6. the Rust release of the toolchain the retail build fetched;
+     7. the profile unpacked, and the mozconfig lines with the retail's LTO mode
+-       (full on both legs; no linux-arm64 from firefox-56 on).
++       (full on x86_64, thin on arm64).
+ 
+ Run it directly: `python3 scripts/test_upstream_toolchain.py`.
+ """
+@@ -126,13 +126,15 @@ def main() -> int:
+         ]
+         lines = u.pgo("win-x86_64", out, fake(), SOURCE)
+         linux = u.pgo("linux-x86_64", out, fake(), SOURCE)
++        arm = u.pgo("linux-arm64", out, fake(), SOURCE)
+         cases.append(("the profile unpacked, with the retail's LTO mode",
+                       (out / "merged.profdata").read_bytes() == b"PROF"
+                       and (out / "en-US.log").read_bytes() == b"LOG"
+                       and lines[-1] == "ac_add_options --enable-lto=full,cross"
+-                      and linux[-1] == "ac_add_options --enable-lto=full,cross"))
+-        cases.append(("no linux-arm64 leg from firefox-56 on: nothing to ask the retail for",
+-                      sorted(u.PLATFORMS) == ["linux-x86_64", "win-x86_64"] and sorted(u.LTO) == sorted(u.PLATFORMS)))
++                      and linux[-1] == "ac_add_options --enable-lto=full,cross"
++                      and arm[-1] == "ac_add_options --enable-lto=cross"))
++        cases.append(("every leg has a retail platform and an LTO mode, linux-arm64 (this fork) included",
++                      sorted(u.PLATFORMS) == ["linux-arm64", "linux-x86_64", "win-x86_64"] and sorted(u.LTO) == sorted(u.PLATFORMS)))
+     failures = 0
+     for name, ok in cases:
+         print(("ok    " if ok else "FAIL  ") + name)
+diff --git a/scripts/upstream_toolchain.py b/scripts/upstream_toolchain.py
+index ce708ebd6e..5b5862288c 100644
+--- a/scripts/upstream_toolchain.py
++++ b/scripts/upstream_toolchain.py
+@@ -43,13 +43,13 @@ UPSTREAM_SOURCE = ROOT / "browser" / "config" / "upstream_source.txt"
+ TC = "https://firefox-ci-tc.services.mozilla.com/api"
+ 
+ #: release.yml's legs -> Mozilla's build platform names.
+-PLATFORMS = {"win-x86_64": "win64", "linux-x86_64": "linux64"}
++PLATFORMS = {"win-x86_64": "win64", "linux-x86_64": "linux64", "linux-arm64": "linux64-aarch64"}
+ 
+ #: What Mozilla's own CI builds with LTO: lto-pgo.configure turns MOZ_LTO=cross
+ #: into FULL LTO when PGO and MOZ_AUTOMATION are on and the target is x86_64
+ #: Windows or Linux, and into thin LTO otherwise. We do not set MOZ_AUTOMATION
+ #: (it changes far more than LTO), so the mode the retail got is asked for.
+-LTO = {"win-x86_64": "full,cross", "linux-x86_64": "full,cross"}
++LTO = {"win-x86_64": "full,cross", "linux-x86_64": "full,cross", "linux-arm64": "cross"}
+ 
+ 
+ class UpstreamError(Exception):

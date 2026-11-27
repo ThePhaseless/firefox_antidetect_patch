@@ -1,0 +1,4 @@
+[
+  {"keys": ["control.webgl1", "control.webgl2"],
+   "why": "host Mesa llvmpipe on both Linux legs, same reason as the wrapper's shared known defect"}
+]

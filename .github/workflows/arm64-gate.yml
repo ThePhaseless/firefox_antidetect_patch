@@ -1,0 +1,463 @@
+# SPDX-License-Identifier: 0BSD (the fork's additions; the steps copied from firefox-58's gate.yml stay upstream's)
+# The fork's gate: upstream's gate.yml at firefox-58 on three legs, upstream's published x86
+# archives of the tag beside the fork's linux-arm64 one, then upstream's host gate and a
+# leaf diff of linux-arm64 against linux-x86_64 (arm64/tools/leaf_diff.py).
+name: arm64-gate
+
+on:
+  workflow_call:
+    inputs:
+      upstream_tag:
+        description: upstream's release whose x86 archives are the reference; also the local seal's tag
+        type: string
+        required: true
+      arm64_run_id:
+        description: the run whose asset-linux-arm64 to gate; empty takes the tag's own arm64 archive, if it has one
+        type: string
+        default: ''
+      wrapper_ref:
+        type: string
+        default: 'v0.47.1'
+      core_ref:
+        type: string
+        default: 'v58.56.0'
+  workflow_dispatch:
+    inputs:
+      upstream_tag:
+        required: true
+        default: 'firefox-58'
+      arm64_run_id:
+        description: an arm64.yml candidate run under 7 days old; empty takes the tag's own arm64 archive, if it has one
+        default: ''
+      wrapper_ref:
+        default: 'v0.47.1'
+      core_ref:
+        default: 'v58.56.0'
+
+permissions: { contents: read, actions: read }
+
+jobs:
+  assets:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ inputs.upstream_tag }}
+    outputs:
+      matrix: ${{ steps.rows.outputs.matrix }}
+      arm64: ${{ steps.rows.outputs.arm64 }}
+    steps:
+      - name: Upstream's x86 archives of the tag
+        run: |
+          gh release download "$TAG" -R oss-invisible/firefox_antidetect_patch \
+            -p '*-linux-x86_64.tar.gz' -p '*-win-x86_64.zip' -D x86
+          ls -la x86
+      - name: Upload asset-linux-x86_64
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: asset-linux-x86_64
+          path: x86/*-linux-x86_64.tar.gz
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload asset-win-x86_64
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: asset-win-x86_64
+          path: x86/*-win-x86_64.zip
+          if-no-files-found: error
+          retention-days: 7
+      - name: The legs, and where the arm64 archive comes from
+        id: rows
+        env:
+          ARM64_RUN_ID: ${{ inputs.arm64_run_id }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          NAMES="$(gh release view "$TAG" -R oss-invisible/firefox_antidetect_patch --json assets --jq '.assets[].name')"
+          if [ -n "$ARM64_RUN_ID" ]; then
+            ARM64=true ARM64_RUN="$ARM64_RUN_ID"
+            echo "arm64: asset-linux-arm64 of run $ARM64_RUN_ID"
+          elif grep -q -- '-linux-arm64\.tar\.gz$' <<<"$NAMES"; then
+            gh release download "$TAG" -R oss-invisible/firefox_antidetect_patch -p '*-linux-arm64.tar.gz' -D arm
+            ARM64=true ARM64_RUN="$RUN_ID" FROM_RELEASE=true
+            echo "arm64: the tag's own archive, $(ls arm)"
+          else
+            ARM64=false ARM64_RUN=""
+            echo "arm64: none, the x86 legs alone"
+          fi
+          MATRIX="$(jq -cn --arg run "$RUN_ID" --arg arm "$ARM64_RUN" --argjson arm64 "$ARM64" '{include: ([
+            {leg: "linux-x86_64", runner: "ubuntu-24.04", kind: "linux", extra: "--full", run_id: $run},
+            {leg: "win-x86_64", runner: "windows-latest", kind: "win", extra: "--click", run_id: $run}
+          ] + (if $arm64 then [{leg: "linux-arm64", runner: "ubuntu-24.04-arm", kind: "linux", extra: "--click", run_id: $arm}] else [] end))}')"
+          {
+            echo "matrix=$MATRIX"
+            echo "arm64=$ARM64"
+            echo "from_release=${FROM_RELEASE:-false}"
+          } | tee -a "$GITHUB_OUTPUT"
+      - name: Upload asset-linux-arm64 (the tag's own)
+        if: steps.rows.outputs.from_release == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: asset-linux-arm64
+          path: arm/*-linux-arm64.tar.gz
+          if-no-files-found: error
+          retention-days: 7
+
+  gate:
+    name: gate-${{ matrix.leg }}
+    needs: assets
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.assets.outputs.matrix) }}
+    steps:
+      - name: Runner CPU
+        shell: bash
+        env:
+          LEG: ${{ matrix.leg }}
+        run: |
+          if [ "$RUNNER_OS" = Windows ]; then
+            {
+              echo "$LEG cpu: $(powershell -NoProfile -Command '(Get-CimInstance Win32_Processor).Name')"
+              echo "$LEG IsProcessorFeaturePresent(40, 41): $(python -c 'import ctypes;k=ctypes.windll.kernel32;print(k.IsProcessorFeaturePresent(40),k.IsProcessorFeaturePresent(41))')"
+            } | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          lscpu
+          FLAGS=" $(lscpu | sed -n 's/^Flags: *//p') "
+          {
+            echo "$LEG cpu: $(lscpu | sed -n 's/^Model name: *//p' | head -1)"
+            echo "$LEG flags: ${FLAGS# }"
+            case "$FLAGS" in *" avx512f "*) echo "$LEG avx512f: yes";; *) echo "$LEG avx512f: no";; esac
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ "$LEG" = linux-x86_64 ]; then
+            for f in avx2 fma; do
+              case "$FLAGS" in *" $f "*) ;; *) echo "ERROR: the linux-x86_64 reference runner has no $f"; exit 1;; esac
+            done
+          fi
+      - name: Checkout wrapper (for scripts/ci_drive_gate.py)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          repository: feder-cr/invisible_playwright
+          # ⛔ NOT hardcoded to main. The gate validates the BINARY, and the
+          # wrapper is only the instrument it is driven with: unfinished work
+          # on the wrapper's main must not be able to block a binary release.
+          # Default stays main, because main is what gets published next and is
+          # therefore the honest pairing - this is an escape hatch, not a
+          # change of policy.
+          #
+          # ⛔ AND THIS IS NOT THE SAME QUESTION AS THE CORE, which is
+          # installed from git@main a few steps below and must STAY that way:
+          # during a release the published core is one step behind BY
+          # CONSTRUCTION, because its version derives from a seal that cannot
+          # exist until this binary is built. Pinning the core to the index
+          # tests a pairing no user ever gets, and it bit on firefox-20.
+          ref: ${{ inputs.wrapper_ref }}
+          fetch-depth: 1
+      - name: Download asset
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: asset-${{ matrix.leg }}
+          path: art
+          # another run's artifacts need the token; this run's do not
+          run-id: ${{ matrix.run_id }}
+          github-token: ${{ matrix.run_id != github.run_id && github.token || '' }}
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with: { python-version: '3.11' }
+      - name: Install Playwright driver (no bundled browser — we override executable_path)
+        # Pin from a SINGLE source (scripts/playwright_pin.txt) so release.yml and
+        # verify-assets.yml can't drift to different versions. The drive gate then
+        # ENFORCES playwright↔juggler compatibility: an incompatible pin fails the
+        # launch/drive (TargetClosedError / protocol error) and nothing publishes.
+        # Bump the pin file in lockstep when the juggler is re-synced from upstream.
+        shell: bash
+        run: python -m pip install --quiet "playwright==$(cat scripts/playwright_pin.txt)"
+      - name: Linux system deps for headless firefox
+        if: matrix.kind == 'linux'
+        run: sudo "$(which python)" -m playwright install-deps firefox
+      - name: Extract + locate firefox binary
+        shell: bash
+        run: |
+          set -e
+          mkdir -p ff
+          # The one archive of this leg, whatever version it carries: the name is
+          # derived from the tree at build time (scripts/ci/legs.py), not here.
+          set -- art/firefox-*-stealth-${{ matrix.leg }}.*
+          [ "$#" -eq 1 ] && [ -e "$1" ] || { echo "ERROR: expected one firefox-*-stealth-${{ matrix.leg }} archive in art/, found: $*"; exit 1; }
+          A="$1"
+          case "${{ matrix.kind }}" in
+            win)   python -c "import zipfile; zipfile.ZipFile('$A').extractall('ff')"; EXE="ff/firefox.exe";;
+            linux) tar xzf "$A" -C ff; EXE="ff/firefox";;
+          esac
+          [ -e "$EXE" ] || { echo "ERROR: firefox binary not found at $EXE"; exit 1; }
+          chmod +x "$EXE" 2>/dev/null || true
+          echo "FF_EXE=$EXE" >> "$GITHUB_ENV"
+          echo "located: $EXE"
+      - name: DRIVE GATE — Playwright launch via juggler + real page (+ interaction on --full)
+        shell: bash
+        run: python scripts/ci_drive_gate.py "$FF_EXE" ${{ matrix.extra }}
+
+      # HIDDEN-DESKTOP + WEBGL-MASKING GUARDS - run the wrapper's e2e checks
+      # against THIS leg's freshly-built artifact, on its native runner. The
+      # wrapper's headless=True is headed+hidden: on Windows the browser is
+      # created on a hidden Win32 desktop (since 2026-09-20; until then the
+      # binary cloaked its own window with DWMWA_CLOAK, and this step kept its
+      # name so old runs stay findable), on Linux it gets its own Xvfb. Linux
+      # (Xvfb + llvmpipe) and Windows (WARP) give a software WebGL context on
+      # the GPU-less hosts, so the WebGL-dependent assertions run there.
+      # test_hidden_desktop asserts, on Windows, that a headless=True session
+      # leaves NO Firefox window on the interactive desktop and has one on its
+      # own, after a control arm found a headed window where it belongs, AND
+      # that it still renders; Linux self-skips (Xvfb is the e2e.yml path).
+      # The webgl guard catches a regression of the gamma readPixels noise back to
+      # the scanner-maskable ±1 spike form (covered on Linux + Windows).
+      # ⛔ THE CORE COMES FROM GIT, NOT FROM THE INDEX, and this is not a
+      # convenience. `pip install ".[dev]"` installs the WRAPPER, which pins
+      # invisible-core exactly, so pip resolves the PUBLISHED core - and during a
+      # release the published core is always one step behind by construction: its
+      # own version is derived from the seal, so it cannot exist until this binary
+      # has been built and the seal rolled onto it.
+      #
+      # That means the pairing this gate used to test - new binary, previous
+      # published core - IS ONE NO USER EVER GETS. A user installing core 19.14.0
+      # downloads the firefox-19 binary, because that is what its seal pins. The
+      # gate was validating an impossible combination.
+      #
+      # MEASURED on firefox-20, which is where it finally bit: the binary requires
+      # zoom.stealth.text.freetype_hintstyle AND freetype_antialias, the published
+      # core emits neither, and StealthDeclarationGate refuses. Not at startup -
+      # a direct headless launch is fine, which is why the first diagnosis went
+      # the wrong way - but on ctx.new_page(), where the browser dies with
+      # exitCode 0x80000003 (a deliberate MOZ_CRASH) and Playwright reports
+      # TargetClosedError. All five legs failed identically in about a minute,
+      # which is the shape of a setup fault and not of five product defects.
+      # Bisected with extra_prefs: either declaration alone is not enough, both
+      # together revive it, and the shader-language pref is not involved.
+      #
+      # THE CORE GOES IN FIRST, FROM GIT, AND THE WRAPPER AFTER IT. The core's
+      # version is derived from the seal, not bumped per commit, so git and the
+      # index can both call themselves 19.14.0: installed first, the git core
+      # satisfies the wrapper's exact pin and pip keeps it - same version string,
+      # the code under test.
+      #
+      # It used to go the other way (wrapper first, then the core force-
+      # reinstalled with --no-deps), which assumed the version does not move
+      # during a release. firefox-47 broke that: the juggler moved to
+      # modules/juggler, so the core that ships with the binary is a NEW core
+      # (47.x) and the published one (46.x) cannot even find the juggler. With
+      # the old order the wrapper of main kept its 46 pin, the import-time
+      # enforce_core_pin repaired the core back to 46, and every leg failed on a
+      # binary that was fine.
+      #
+      # ⛔ AND THE CORE-FIRST ORDER FAILED TOO, IN THE WRONG PLACE AND SILENTLY
+      # (firefox-51, run 39398286614). It needed a wrapper_ref whose pin names
+      # the version core_ref builds, and during a release that version exists
+      # only on a transition seal: core_ref built 51.48.0, the wrapper of main
+      # pinned 50.48.0, pip put the published core back, and this step PRINTED
+      # "core under test: 50.48.0" and went on. The engine refused the launch on
+      # the two declarations 50.48.0 does not emit (edge_tolerance,
+      # system_quality), and a release build's MOZ_CRASH prints nothing: three
+      # legs red with "the browser exited during startup ... printed:
+      # (nothing)", which reads as a broken binary. A wrapper branch pinned to
+      # 51.48.0 was tried and is not the fix: its own suite runs against the
+      # transition seal, which has no assets, and goes red for that.
+      #
+      # SO THE GATE RUNS EXACTLY core_ref, WHATEVER THE WRAPPER PINS. The wrapper
+      # goes in first, for its dependencies; core_ref is force-installed over it
+      # from git, with its own dependencies; and the import-time repair that
+      # broke firefox-47 is switched off for the whole step with the core's own
+      # switches, INVISIBLE_CORE_AUTOFIX=off (no repair) and INVISIBLE_CORE_PIN=
+      # allow (the pin mismatch warns instead of refusing the import). Then the
+      # core under test is ASSERTED before any browser starts: the git install of
+      # exactly core_ref (direct_url.json, which pip writes for a VCS install and
+      # an index install does not have), read AFTER importing the wrapper, so a
+      # repair that came back any other way is caught here and named.
+      # Measured locally on firefox-51's engine: without the two switches the
+      # repair reinstalls 50.48.0 and the assertion stops the step with that
+      # cause; with them the core stays 51.48.0 and the browser launches and
+      # evaluates with no prefs passed by hand.
+      #
+      # core_ref also goes in BEFORE the wrapper. A wrapper_ref pinned to the
+      # version core_ref builds - how the next engine's candidates run, before
+      # that core is published - has a pin only core_ref can satisfy: installed
+      # first, it is the installed version and pip takes nothing from the index
+      # (run 41231675778: "No matching distribution found for
+      # invisible-core==54.50.0" on every leg). A pin to another, published
+      # version is fetched as before, and the force-reinstall puts core_ref back.
+      - name: Cloak + WebGL-masking guards (headed)
+        shell: bash
+        env:
+          CORE_REF: ${{ inputs.core_ref }}
+          SEAL_TAG: ${{ inputs.upstream_tag }}
+        run: |
+          export INVISIBLE_CORE_AUTOFIX=off INVISIBLE_CORE_PIN=allow
+          CORE_GIT="git+https://github.com/feder-cr/invisible_core@$CORE_REF"
+          python -m pip install --quiet "$CORE_GIT"
+          python -m pip install --quiet ".[dev]"
+          python -m pip install --quiet --force-reinstall "$CORE_GIT"
+          python - <<'PY'
+          import json, os, re, subprocess, sys
+          from importlib.metadata import distribution, version
+          ref = os.environ["CORE_REF"]
+          if re.fullmatch(r"[0-9a-f]{40}", ref):
+              want = ref
+          else:
+              rows = [line.split() for line in subprocess.run(
+                  ["git", "ls-remote", "https://github.com/feder-cr/invisible_core", ref, ref + "^{}"],
+                  capture_output=True, text=True, check=True).stdout.splitlines() if line.strip()]
+              peeled = [s for s, r in rows if r.endswith("^{}")]  # an annotated tag: its commit, not the tag object
+              want = (peeled or [s for s, _ in rows] or [""])[0]
+          import invisible_playwright  # noqa: F401 - the import-time pin repair runs here, as under pytest
+          raw = distribution("invisible-core").read_text("direct_url.json")
+          got = (json.loads(raw).get("vcs_info") or {}).get("commit_id") if raw else None
+          print("core under test: %s from %s" % (version("invisible-core"), got or "the index"))
+          if not want or got != want:
+              sys.exit("THE CORE UNDER TEST IS NOT core_ref: installed %s from %s, core_ref %r is %s. "
+                       "Something put another core over the git install (an install after it, or the wrapper's "
+                       "import-time repair with INVISIBLE_CORE_AUTOFIX not off), and with the published core "
+                       "the engine refuses the launch on the declarations that core does not emit."
+                       % (version("invisible-core"), got or "the index", ref,
+                          want or "not a full sha nor a ref of invisible_core"))
+          PY
+          python -m invisible_core seal --binary "$FF_EXE" \
+            --tag "$SEAL_TAG" \
+            -o gate.seal.json
+          INVISIBLE_SEAL_FILE="$PWD/gate.seal.json" INVPW_BINARY_PATH="$FF_EXE" python -m pytest \
+            tests/test_hidden_desktop.py \
+            "tests/test_fingerprint_surface.py::test_webgl_readpixels_no_masking_signature" \
+            -m e2e -o addopts='' -q
+
+      # HOST GATE, this leg's half: everything the page in the wrapper's
+      # scripts/host_gate reads, at three seeds and two DPRs, with core_ref and
+      # the seal the guards above ran under. The comparison - every leg against
+      # the Windows one, and what does not depend on the identity against retail
+      # Firefox for Windows - is the host-gate job below, which needs all legs.
+      # It replaced the font gate's question (is the font list the persona's?)
+      # with the general one (is anything the host's?). The font gate stayed
+      # until this ran green on a release (firefox-55, run 41754346016), then went.
+      - name: HOST GATE - what a page reads on this leg
+        shell: bash
+        run: |
+          export INVISIBLE_CORE_AUTOFIX=off INVISIBLE_CORE_PIN=allow
+          INVISIBLE_SEAL_FILE="$PWD/gate.seal.json" \
+            python scripts/ci_host_gate.py dump "$FF_EXE" --leg ${{ matrix.leg }} --out host-dump
+      - name: HOST GATE - keep this leg's dump
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: host-dump-${{ matrix.leg }}
+          path: host-dump
+          retention-days: 14
+
+  host-gate:
+    name: host-gate
+    needs: [assets, gate]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout wrapper (for scripts/ci_host_gate.py and its reference)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          repository: feder-cr/invisible_playwright
+          ref: ${{ inputs.wrapper_ref }}
+          fetch-depth: 1
+      - name: Every leg's dump
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: host-dump-*
+          merge-multiple: true
+          path: host-dump
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with: { python-version: '3.11' }
+      - name: The one exceptions change, linux-arm64 on the shared WebGL entry
+        if: needs.assets.outputs.arm64 == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -I - <<'PY'
+          import json, sys
+          from pathlib import Path
+          path = Path("scripts/host_gate/exceptions.json")
+          raw = path.read_bytes()
+          text = raw.decode("utf-8")
+          old = json.loads(text)
+          webgl = ["control.webgl1", "control.webgl2"]
+          hits = [i for i, e in enumerate(old.get("known_defects", [])) if e.get("keys") == webgl]
+          if len(hits) != 1:
+              sys.exit("exceptions.json: %d known_defects entries with keys %s, expected one" % (len(hits), webgl))
+          legs = old["known_defects"][hits[0]].get("legs")
+          if legs == ["linux-x86_64", "linux-arm64"]:
+              print("exceptions.json: the WebGL entry already lists linux-arm64, no change")
+              sys.exit(0)
+          if legs != ["linux-x86_64"]:
+              sys.exit("exceptions.json: the WebGL entry's legs are %r, expected ['linux-x86_64']" % (legs,))
+          was, now = '"legs": ["linux-x86_64"]', '"legs": ["linux-x86_64", "linux-arm64"]'
+          if text.count(was) != 1:
+              sys.exit("exceptions.json: %r occurs %d times, expected once" % (was, text.count(was)))
+          edited = text.replace(was, now)
+          expect = json.loads(text)
+          expect["known_defects"][hits[0]]["legs"] = ["linux-x86_64", "linux-arm64"]
+          if json.loads(edited) != expect:
+              sys.exit("exceptions.json: the edit changed more than the WebGL entry's legs")
+          path.write_bytes(edited.encode("utf-8"))
+          print("exceptions.json: linux-arm64 added to the WebGL entry's legs")
+          PY
+          NUMSTAT="$(git diff --numstat)"
+          if [ -n "$NUMSTAT" ] && [ "$NUMSTAT" != "$(printf '1\t1\tscripts/host_gate/exceptions.json')" ]; then
+            echo "ERROR: the exceptions change is not one line of scripts/host_gate/exceptions.json:"; echo "$NUMSTAT"; exit 1
+          fi
+          git diff > exceptions.diff
+          { echo '### exceptions.diff'; echo '```diff'; cat exceptions.diff; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - name: HOST GATE - the same on every host, retail's where the identity does not decide
+        shell: bash
+        run: |
+          set -o pipefail
+          python scripts/ci_host_gate.py compare host-dump 2>&1 | tee host-gate.txt
+      - name: Keep the host gate's report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: host-gate-report
+          path: |
+            host-gate.txt
+            exceptions.diff
+
+  leaf-diff:
+    name: leaf-diff
+    needs: [assets, gate]
+    if: always() && needs.assets.outputs.arm64 == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout wrapper (its reader and its exceptions.json, unmodified)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          repository: feder-cr/invisible_playwright
+          ref: ${{ inputs.wrapper_ref }}
+          fetch-depth: 1
+      - name: This repository (arm64/tools)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with: { path: .fork, fetch-depth: 1 }
+      - name: Every leg's dump
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: host-dump-*
+          merge-multiple: true
+          path: host-dump
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with: { python-version: '3.11' }
+      - name: LEAF DIFF - linux-arm64 against linux-x86_64
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 .fork/arm64/tools/leaf_diff.py --wrapper . --dumps host-dump \
+            --allow .fork/arm64/tools/leaf_diff_allow.json 2>&1 | tee leaf-diff.txt
+      - name: Keep the leaf diff
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: leaf-diff-report
+          path: leaf-diff.txt
