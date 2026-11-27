@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: 0BSD (the fork's additions; the steps copied from firefox-58's gate.yml stay upstream's)
 # The fork's gate: upstream's gate.yml at firefox-58 on three legs, upstream's published x86
 # archives of the tag beside the fork's linux-arm64 one, then upstream's host gate and a
-# leaf diff of linux-arm64 against linux-x86_64 (arm64/tools/leaf_diff.py).
+# leaf diff of linux-arm64 against linux-x86_64 (arm64/tools/leaf_diff.py). Dispatch it on its own
+# for the control run (no arm64) or to gate an earlier candidate run.
 name: arm64-gate
 
 on:
