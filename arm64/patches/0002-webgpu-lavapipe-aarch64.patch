@@ -1,14 +1,65 @@
 diff --git a/scripts/ci/lavapipe/0009-gallivm-aarch64-fixed-profile.patch b/scripts/ci/lavapipe/0009-gallivm-aarch64-fixed-profile.patch
 new file mode 100644
-index 0000000000..5125029b7c
+index 0000000000..e4f280dfaa
 --- /dev/null
 +++ b/scripts/ci/lavapipe/0009-gallivm-aarch64-fixed-profile.patch
-@@ -0,0 +1,61 @@
+@@ -0,0 +1,124 @@
 +diff --git a/src/gallium/auxiliary/gallivm/lp_bld_arit.c b/src/gallium/auxiliary/gallivm/lp_bld_arit.c
-+index 357204e..68da424 100644
++index 357204e..fb4af59 100644
 +--- a/src/gallium/auxiliary/gallivm/lp_bld_arit.c
 ++++ b/src/gallium/auxiliary/gallivm/lp_bld_arit.c
-+@@ -228,10 +228,17 @@ lp_build_fmuladd(LLVMBuilderRef builder,
++@@ -82,6 +82,38 @@
++ #define LOG_POLY_DEGREE 4
++ 
++ 
+++#if DETECT_ARCH_AARCH64
+++/* Firefox's bundled lavapipe: x86-64's minps and maxps run under DAZ, read a
+++ * subnormal operand as a zero of its sign and return that zero. A select on
+++ * AArch64 returns the subnormal itself, so the operands are flushed first. */
+++static LLVMValueRef
+++lp_build_daz(struct lp_build_context *bld, LLVMValueRef a)
+++{
+++   LLVMBuilderRef builder = bld->gallivm->builder;
+++   struct lp_type itype = lp_int_type(bld->type);
+++   bool wide = bld->type.width == 64;
+++   LLVMValueRef ia = LLVMBuildBitCast(builder, a, lp_build_int_vec_type(bld->gallivm, bld->type), "");
+++   LLVMValueRef exp = LLVMBuildAnd(builder, ia, lp_build_const_int_vec(bld->gallivm, itype,
+++                                   wide ? 0x7ff0000000000000ll : 0x7f800000ll), "");
+++   LLVMValueRef sub = LLVMBuildICmp(builder, LLVMIntEQ, exp, lp_build_const_int_vec(bld->gallivm, itype, 0), "");
+++   LLVMValueRef sign = LLVMBuildAnd(builder, ia, lp_build_const_int_vec(bld->gallivm, itype,
+++                                    wide ? (long long)0x8000000000000000ull : 0x80000000ll), "");
+++   return LLVMBuildBitCast(builder, LLVMBuildSelect(builder, sub, sign, ia, ""), bld->vec_type, "");
+++}
+++
+++/* minps (less) or maxps (greater) as x86-64 computes them, NaN handling included. */
+++static LLVMValueRef
+++lp_build_minmax_x86(struct lp_build_context *bld, LLVMValueRef a, LLVMValueRef b,
+++                    enum pipe_compare_func func, enum gallivm_nan_behavior nan_behavior)
+++{
+++   LLVMValueRef a0 = lp_build_daz(bld, a), b0 = lp_build_daz(bld, b);
+++   LLVMValueRef res = lp_build_select(bld, lp_build_cmp_ordered(bld, func, a0, b0), a0, b0);
+++   if (nan_behavior == GALLIVM_NAN_RETURN_OTHER)
+++      return lp_build_select(bld, lp_build_isnan(bld, b), a, res);
+++   return res;
+++}
+++#endif
+++
++ /**
++  * Generate min(a, b)
++  * No checks for special case values of a or b = 1 or 0 are done.
++@@ -104,6 +136,11 @@ lp_build_min_simple(struct lp_build_context *bld,
++ 
++    /* TODO: optimize the constant case */
++ 
+++#if DETECT_ARCH_AARCH64
+++   if (type.floating && (type.width == 32 || type.width == 64))
+++      return lp_build_minmax_x86(bld, a, b, PIPE_FUNC_LESS, nan_behavior);
+++#endif
+++
++    if (type.floating && util_get_cpu_caps()->has_sse) {
++       if (type.width == 32) {
++          if (type.length == 1) {
++@@ -228,10 +265,17 @@ lp_build_fmuladd(LLVMBuilderRef builder,
 +    assert(type == LLVMTypeOf(b));
 +    assert(type == LLVMTypeOf(c));
 + 
@@ -26,6 +77,18 @@ index 0000000000..5125029b7c
 + }
 + 
 + 
++@@ -257,6 +301,11 @@ lp_build_max_simple(struct lp_build_context *bld,
++ 
++    /* TODO: optimize the constant case */
++ 
+++#if DETECT_ARCH_AARCH64
+++   if (type.floating && (type.width == 32 || type.width == 64))
+++      return lp_build_minmax_x86(bld, a, b, PIPE_FUNC_GREATER, nan_behavior);
+++#endif
+++
++    if (type.floating && util_get_cpu_caps()->has_sse) {
++       if (type.width == 32) {
++          if (type.length == 1) {
 +diff --git a/src/gallium/auxiliary/gallivm/lp_bld_init_orc.cpp b/src/gallium/auxiliary/gallivm/lp_bld_init_orc.cpp
 +index 62b462d..4471e4b 100644
 +--- a/src/gallium/auxiliary/gallivm/lp_bld_init_orc.cpp
