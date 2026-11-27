@@ -2,8 +2,10 @@
 // Runs ffvpx's av_tx the way dom/media/webaudio/FFTBlock.h does (AV_TX_FLOAT_RDFT, forward
 // and inverse, stride 2*sizeof(float), flags 0) for every power of two from 4 to 262144
 // (WebAudio uses 32 to 32768; the rest is the codelets' whole range), and as an in-place
-// complex FFT (AV_TX_FLOAT_FFT with AV_TX_INPLACE), which is how the pre-shuffled codelets
-// get picked. Writes the output bits to <out>/<variant>/<kind>-<dir>-<n>-<signal>.bin.
+// complex FFT (AV_TX_FLOAT_FFT with AV_TX_INPLACE) of 2 to 32 points, the lengths whose
+// codelets work in place. From 128 points x86's pre-shuffled fft_sr_ns crashes on that
+// call, so there is nothing to compare. Writes the output bits to
+// <out>/<variant>/<kind>-<dir>-<n>-<signal>.bin.
 // stdout carries the CPU flags and the transform tree libavutil picked.
 //   fft_probe <out> [variant ...]
 #include <stdarg.h>
@@ -77,8 +79,7 @@ static int run(const char *out, const struct variant *v, int host) {
   snprintf(path, sizeof(path), "%s/%s", out, v->name);
   mkdir(path, 0777);
   for (int kind = 0; kind < 2; kind++) {  // 0: FFTBlock's RDFT, 1: in-place complex FFT
-    // the in-place map costs O(n^2) to build: 8192 still reaches every pre-shuffled codelet
-    for (int n = 4; n <= (kind ? 8192 : 262144); n *= 2) {
+    for (int n = 4; n <= (kind ? 64 : 262144); n *= 2) {
       for (int inv = 0; inv < 2; inv++) {
         AVTXContext *ctx = NULL;
         av_tx_fn fn = NULL;
@@ -121,6 +122,7 @@ static int run(const char *out, const struct variant *v, int host) {
 
 int main(int argc, char **argv) {
   int host = av_get_cpu_flags(), seen = 0;
+  setvbuf(stdout, NULL, _IONBF, 0);  // a crash must not swallow the lines before it
   if (argc < 2) {
     fprintf(stderr, "usage: fft_probe <out> [variant ...]\n");
     return 2;

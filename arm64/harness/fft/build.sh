@@ -72,7 +72,7 @@ for s in "${srcs[@]}"; do
 done
 "$CC" "${cflags[@]}" "$here/fft_probe.c" "$obj"/*.o -Wl,--gc-sections -lm -lpthread -o "$obj/fft_probe"
 
-{ echo "machine $(uname -m)"; "$CC" --version | head -1; ldd --version | head -1; } > "$out/probe.txt"
+{ echo "machine $(uname -m)"; "$CC" --version | sed -n 1p; ldd --version | sed -n 1p; } > "$out/probe.txt"
 variants=()
 [ "${3:-}" = --c-only ] && variants=(c)
 "$obj/fft_probe" "$out" "${variants[@]}" >> "$out/probe.txt"

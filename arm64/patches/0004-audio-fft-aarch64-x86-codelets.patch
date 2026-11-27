@@ -13,29 +13,28 @@ index 5094c525ca..6ddfd55232 100644
  
  if CONFIG['OS_ARCH'] == 'WINNT':
 diff --git a/media/ffvpx/libavutil/aarch64/tx_float_init.c b/media/ffvpx/libavutil/aarch64/tx_float_init.c
-index 8300472c4c..a5b88f06a4 100644
+index 8300472c4c..42f812bbc5 100644
 --- a/media/ffvpx/libavutil/aarch64/tx_float_init.c
 +++ b/media/ffvpx/libavutil/aarch64/tx_float_init.c
-@@ -26,12 +26,12 @@ TX_DECL_FN(fft4_fwd,  neon)
+@@ -24,13 +24,13 @@
+ TX_DECL_FN(fft2,      neon)
+ TX_DECL_FN(fft4_fwd,  neon)
  TX_DECL_FN(fft4_inv,  neon)
- TX_DECL_FN(fft8,      neon)
+-TX_DECL_FN(fft8,      neon)
++TX_DECL_FN(fft8,      x86eq)
  TX_DECL_FN(fft8_ns,   neon)
 -TX_DECL_FN(fft16,     neon)
--TX_DECL_FN(fft16_ns,  neon)
--TX_DECL_FN(fft32,     neon)
--TX_DECL_FN(fft32_ns,  neon)
--TX_DECL_FN(fft_sr,    neon)
--TX_DECL_FN(fft_sr_ns, neon)
 +TX_DECL_FN(fft16,     x86eq)
-+TX_DECL_FN(fft16_ns,  x86eq)
+ TX_DECL_FN(fft16_ns,  neon)
+-TX_DECL_FN(fft32,     neon)
 +TX_DECL_FN(fft32,     x86eq)
-+TX_DECL_FN(fft32_ns,  x86eq)
+ TX_DECL_FN(fft32_ns,  neon)
+-TX_DECL_FN(fft_sr,    neon)
 +TX_DECL_FN(fft_sr,    x86eq)
-+TX_DECL_FN(fft_sr_ns, x86eq)
+ TX_DECL_FN(fft_sr_ns, neon)
  
  static av_cold int neon_init(AVTXContext *s, const FFTXCodelet *cd,
-                              uint64_t flags, FFTXCodeletOptions *opts,
-@@ -44,6 +44,14 @@ static av_cold int neon_init(AVTXContext *s, const FFTXCodelet *cd,
+@@ -44,20 +44,28 @@ static av_cold int neon_init(AVTXContext *s, const FFTXCodelet *cd,
          return ff_tx_gen_split_radix_parity_revtab(s, len, inv, opts, 8, 0);
  }
  
@@ -50,36 +49,35 @@ index 8300472c4c..a5b88f06a4 100644
  const FFTXCodelet * const ff_tx_codelet_list_float_aarch64[] = {
      TX_DEF(fft2,      FFT,  2,  2, 2, 0, 128, NULL,      neon, NEON, AV_TX_INPLACE, 0),
      TX_DEF(fft2,      FFT,  2,  2, 2, 0, 192, neon_init, neon, NEON, AV_TX_INPLACE | FF_TX_PRESHUFFLE, 0),
-@@ -52,13 +60,13 @@ const FFTXCodelet * const ff_tx_codelet_list_float_aarch64[] = {
+     TX_DEF(fft4_fwd,  FFT,  4,  4, 2, 0, 128, NULL,      neon, NEON, AV_TX_INPLACE | FF_TX_FORWARD_ONLY, 0),
+     TX_DEF(fft4_fwd,  FFT,  4,  4, 2, 0, 192, neon_init, neon, NEON, AV_TX_INPLACE | FF_TX_PRESHUFFLE, 0),
      TX_DEF(fft4_inv,  FFT,  4,  4, 2, 0, 128, NULL,      neon, NEON, AV_TX_INPLACE | FF_TX_INVERSE_ONLY, 0),
-     TX_DEF(fft8,      FFT,  8,  8, 2, 0, 128, neon_init, neon, NEON, AV_TX_INPLACE, 0),
+-    TX_DEF(fft8,      FFT,  8,  8, 2, 0, 128, neon_init, neon, NEON, AV_TX_INPLACE, 0),
++    TX_DEF(fft8,      FFT,  8,  8, 2, 0, 128, neon_init, x86eq, NEON, AV_TX_INPLACE, 0),
      TX_DEF(fft8_ns,   FFT,  8,  8, 2, 0, 192, neon_init, neon, NEON, AV_TX_INPLACE | FF_TX_PRESHUFFLE, 0),
 -    TX_DEF(fft16,     FFT, 16, 16, 2, 0, 128, neon_init, neon, NEON, AV_TX_INPLACE, 0),
--    TX_DEF(fft16_ns,  FFT, 16, 16, 2, 0, 192, neon_init, neon, NEON, AV_TX_INPLACE | FF_TX_PRESHUFFLE, 0),
++    TX_DEF(fft16,     FFT, 16, 16, 2, 0, 128, x86eq_init, x86eq, NEON, AV_TX_INPLACE, 0),
+     TX_DEF(fft16_ns,  FFT, 16, 16, 2, 0, 192, neon_init, neon, NEON, AV_TX_INPLACE | FF_TX_PRESHUFFLE, 0),
 -    TX_DEF(fft32,     FFT, 32, 32, 2, 0, 128, neon_init, neon, NEON, AV_TX_INPLACE, 0),
--    TX_DEF(fft32_ns,  FFT, 32, 32, 2, 0, 192, neon_init, neon, NEON, AV_TX_INPLACE | FF_TX_PRESHUFFLE, 0),
-+    TX_DEF(fft16,     FFT, 16, 16, 2, 0, 288, x86eq_init, x86eq, NEON, AV_TX_INPLACE, 0),
-+    TX_DEF(fft16_ns,  FFT, 16, 16, 2, 0, 352, x86eq_init, x86eq, NEON, AV_TX_INPLACE | FF_TX_PRESHUFFLE, 0),
-+    TX_DEF(fft32,     FFT, 32, 32, 2, 0, 288, x86eq_init, x86eq, NEON, AV_TX_INPLACE, 0),
-+    TX_DEF(fft32_ns,  FFT, 32, 32, 2, 0, 352, x86eq_init, x86eq, NEON, AV_TX_INPLACE | FF_TX_PRESHUFFLE, 0),
++    TX_DEF(fft32,     FFT, 32, 32, 2, 0, 128, x86eq_init, x86eq, NEON, AV_TX_INPLACE, 0),
+     TX_DEF(fft32_ns,  FFT, 32, 32, 2, 0, 192, neon_init, neon, NEON, AV_TX_INPLACE | FF_TX_PRESHUFFLE, 0),
  
 -    TX_DEF(fft_sr,    FFT, 64, 131072, 2, 0, 128, neon_init, neon, NEON, 0, 0),
--    TX_DEF(fft_sr_ns, FFT, 64, 131072, 2, 0, 192, neon_init, neon, NEON, AV_TX_INPLACE | FF_TX_PRESHUFFLE, 0),
-+    TX_DEF(fft_sr,    FFT, 64, 131072, 2, 0, 288, x86eq_init, x86eq, NEON, 0, 0),
-+    TX_DEF(fft_sr_ns, FFT, 64, 131072, 2, 0, 352, x86eq_init, x86eq, NEON, AV_TX_INPLACE | FF_TX_PRESHUFFLE, 0),
++    TX_DEF(fft_sr,    FFT, 64, 131072, 2, 0, 128, x86eq_init, x86eq, NEON, 0, 0),
+     TX_DEF(fft_sr_ns, FFT, 64, 131072, 2, 0, 192, neon_init, neon, NEON, AV_TX_INPLACE | FF_TX_PRESHUFFLE, 0),
  
      NULL,
- };
 diff --git a/media/ffvpx/libavutil/aarch64/tx_float_x86eq.c b/media/ffvpx/libavutil/aarch64/tx_float_x86eq.c
 new file mode 100644
-index 0000000000..e5ededd98d
+index 0000000000..0ff2603300
 --- /dev/null
 +++ b/media/ffvpx/libavutil/aarch64/tx_float_x86eq.c
-@@ -0,0 +1,477 @@
+@@ -0,0 +1,486 @@
 +/*
-+ * The x86 FMA3/AVX2 split-radix float FFT codelets of libavutil/x86/tx_float.asm
-+ * (Copyright (c) Lynne), in C: the same operations on the same operands, fused
-+ * only where the assembly fuses, so the output bits equal x86-64's.
++ * The x86 AVX 8-point and FMA3/AVX2 split-radix float FFT codelets of
++ * libavutil/x86/tx_float.asm (Copyright (c) Lynne), in C: the same operations
++ * on the same operands, fused only where the assembly fuses, so the output
++ * bits equal x86-64's.
 + *
 + * This file is part of FFmpeg.
 + *
@@ -199,12 +197,12 @@ index 0000000000..e5ededd98d
 +#define MASK_PMMPPMMP 0x66
 +#define MASK_PMPMPMPM 0xaa
 +
-+/* LOAD64_LUT: four complex values through the lookup table, or in order */
-+static inline V load(const TXComplex *in, const int *lut, int off)
++/* LOAD64_LUT */
++static inline V load(const TXComplex *in, const int *lut)
 +{
 +    V r;
 +    for (int i = 0; i < 4; i++) {
-+        const TXComplex z = in[lut ? lut[off + i] : off + i];
++        const TXComplex z = in[lut[i]];
 +        r.f[2*i]     = z.re;
 +        r.f[2*i + 1] = z.im;
 +    }
@@ -394,13 +392,31 @@ index 0000000000..e5ededd98d
 +    *m5 = add(*m5, m17);
 +}
 +
++/* FFT8_AVX_FN */
++static void fft8_kernel(TXComplex *out, const TXComplex *in, const int *lut)
++{
++    V m0 = load(in, lut);
++    V m1 = load(in, lut + 4);
++    V m2;
++
++    fft8_avx(&m0, &m1);
++
++    m2 = unpcklpd(m0, m1);
++    m0 = unpckhpd(m0, m1);
++
++    store(out + 0, m2, 0);
++    store(out + 2, m0, 0);
++    store(out + 4, m2, 1);
++    store(out + 6, m0, 1);
++}
++
 +/* FFT16_FN */
 +static void fft16_kernel(TXComplex *out, const TXComplex *in, const int *lut)
 +{
-+    V m0 = load(in, lut, 0);
-+    V m1 = load(in, lut, 4);
-+    V m2 = load(in, lut, 8);
-+    V m3 = load(in, lut, 12);
++    V m0 = load(in, lut);
++    V m1 = load(in, lut + 4);
++    V m2 = load(in, lut + 8);
++    V m3 = load(in, lut + 12);
 +    V m4, m5;
 +
 +    fft16(&m0, &m1, &m2, &m3);
@@ -424,17 +440,17 @@ index 0000000000..e5ededd98d
 +static void fft32_kernel(TXComplex *out, const TXComplex *in, const int *lut)
 +{
 +    V m0, m1, m2, m3, m8, m9, m10, m11;
-+    V m4 = load(in, lut, 16);
-+    V m5 = load(in, lut, 20);
-+    V m6 = load(in, lut, 24);
-+    V m7 = load(in, lut, 28);
++    V m4 = load(in, lut + 16);
++    V m5 = load(in, lut + 20);
++    V m6 = load(in, lut + 24);
++    V m7 = load(in, lut + 28);
 +
 +    fft8(&m4, &m5, &m6, &m7);
 +
-+    m0 = load(in, lut, 0);
-+    m1 = load(in, lut, 4);
-+    m2 = load(in, lut, 8);
-+    m3 = load(in, lut, 12);
++    m0 = load(in, lut);
++    m1 = load(in, lut + 4);
++    m2 = load(in, lut + 8);
++    m3 = load(in, lut + 12);
 +
 +    EACH m8.f[i] = ff_tx_tab_32_float[i];
 +    EACH m9.f[i] = ff_tx_tab_32_float[1 + (i ^ 4)]; /* vperm2f128 ..., 0x23 */
@@ -517,11 +533,16 @@ index 0000000000..e5ededd98d
 +    }
 +
 +    pos  = split_radix(out, in, lut, n >> 1);
-+    pos += split_radix(out + pos, lut ? in : in + pos, lut ? lut + pos : NULL, n >> 2);
-+    pos += split_radix(out + pos, lut ? in : in + pos, lut ? lut + pos : NULL, n >> 2);
++    pos += split_radix(out + pos, in, lut + pos, n >> 2);
++    pos += split_radix(out + pos, in, lut + pos, n >> 2);
 +
 +    combine(out, tabs[av_log2(n) - 6], n);
 +    return pos;
++}
++
++void ff_tx_fft8_float_x86eq(AVTXContext *s, void *out, void *in, ptrdiff_t stride)
++{
++    fft8_kernel(out, in, s->map);
 +}
 +
 +void ff_tx_fft16_float_x86eq(AVTXContext *s, void *out, void *in, ptrdiff_t stride)
@@ -529,27 +550,12 @@ index 0000000000..e5ededd98d
 +    fft16_kernel(out, in, s->map);
 +}
 +
-+void ff_tx_fft16_ns_float_x86eq(AVTXContext *s, void *out, void *in, ptrdiff_t stride)
-+{
-+    fft16_kernel(out, in, NULL);
-+}
-+
 +void ff_tx_fft32_float_x86eq(AVTXContext *s, void *out, void *in, ptrdiff_t stride)
 +{
 +    fft32_kernel(out, in, s->map);
 +}
 +
-+void ff_tx_fft32_ns_float_x86eq(AVTXContext *s, void *out, void *in, ptrdiff_t stride)
-+{
-+    fft32_kernel(out, in, NULL);
-+}
-+
 +void ff_tx_fft_sr_float_x86eq(AVTXContext *s, void *out, void *in, ptrdiff_t stride)
 +{
 +    split_radix(out, in, s->map, s->len);
-+}
-+
-+void ff_tx_fft_sr_ns_float_x86eq(AVTXContext *s, void *out, void *in, ptrdiff_t stride)
-+{
-+    split_radix(out, in, NULL, s->len);
 +}
