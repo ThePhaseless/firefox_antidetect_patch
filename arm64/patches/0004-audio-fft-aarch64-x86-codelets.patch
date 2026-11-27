@@ -1,0 +1,561 @@
+diff --git a/media/ffvpx/libavutil/aarch64/moz.build b/media/ffvpx/libavutil/aarch64/moz.build
+index 5094c525ca..6ddfd55232 100644
+--- a/media/ffvpx/libavutil/aarch64/moz.build
++++ b/media/ffvpx/libavutil/aarch64/moz.build
+@@ -7,7 +7,8 @@ SOURCES += [
+     'float_dsp_init.c',
+     'float_dsp_neon.S',
+     'tx_float_init.c',
+-    'tx_float_neon.S'
++    'tx_float_neon.S',
++    'tx_float_x86eq.c'
+ ]
+ 
+ if CONFIG['OS_ARCH'] == 'WINNT':
+diff --git a/media/ffvpx/libavutil/aarch64/tx_float_init.c b/media/ffvpx/libavutil/aarch64/tx_float_init.c
+index 8300472c4c..42f812bbc5 100644
+--- a/media/ffvpx/libavutil/aarch64/tx_float_init.c
++++ b/media/ffvpx/libavutil/aarch64/tx_float_init.c
+@@ -24,13 +24,13 @@
+ TX_DECL_FN(fft2,      neon)
+ TX_DECL_FN(fft4_fwd,  neon)
+ TX_DECL_FN(fft4_inv,  neon)
+-TX_DECL_FN(fft8,      neon)
++TX_DECL_FN(fft8,      x86eq)
+ TX_DECL_FN(fft8_ns,   neon)
+-TX_DECL_FN(fft16,     neon)
++TX_DECL_FN(fft16,     x86eq)
+ TX_DECL_FN(fft16_ns,  neon)
+-TX_DECL_FN(fft32,     neon)
++TX_DECL_FN(fft32,     x86eq)
+ TX_DECL_FN(fft32_ns,  neon)
+-TX_DECL_FN(fft_sr,    neon)
++TX_DECL_FN(fft_sr,    x86eq)
+ TX_DECL_FN(fft_sr_ns, neon)
+ 
+ static av_cold int neon_init(AVTXContext *s, const FFTXCodelet *cd,
+@@ -44,20 +44,28 @@ static av_cold int neon_init(AVTXContext *s, const FFTXCodelet *cd,
+         return ff_tx_gen_split_radix_parity_revtab(s, len, inv, opts, 8, 0);
+ }
+ 
++static av_cold int x86eq_init(AVTXContext *s, const FFTXCodelet *cd,
++                              uint64_t flags, FFTXCodeletOptions *opts,
++                              int len, int inv, const void *scale)
++{
++    ff_tx_init_tabs_float(len);
++    return ff_tx_gen_split_radix_parity_revtab(s, len, inv, opts, 8, 2);
++}
++
+ const FFTXCodelet * const ff_tx_codelet_list_float_aarch64[] = {
+     TX_DEF(fft2,      FFT,  2,  2, 2, 0, 128, NULL,      neon, NEON, AV_TX_INPLACE, 0),
+     TX_DEF(fft2,      FFT,  2,  2, 2, 0, 192, neon_init, neon, NEON, AV_TX_INPLACE | FF_TX_PRESHUFFLE, 0),
+     TX_DEF(fft4_fwd,  FFT,  4,  4, 2, 0, 128, NULL,      neon, NEON, AV_TX_INPLACE | FF_TX_FORWARD_ONLY, 0),
+     TX_DEF(fft4_fwd,  FFT,  4,  4, 2, 0, 192, neon_init, neon, NEON, AV_TX_INPLACE | FF_TX_PRESHUFFLE, 0),
+     TX_DEF(fft4_inv,  FFT,  4,  4, 2, 0, 128, NULL,      neon, NEON, AV_TX_INPLACE | FF_TX_INVERSE_ONLY, 0),
+-    TX_DEF(fft8,      FFT,  8,  8, 2, 0, 128, neon_init, neon, NEON, AV_TX_INPLACE, 0),
++    TX_DEF(fft8,      FFT,  8,  8, 2, 0, 128, neon_init, x86eq, NEON, AV_TX_INPLACE, 0),
+     TX_DEF(fft8_ns,   FFT,  8,  8, 2, 0, 192, neon_init, neon, NEON, AV_TX_INPLACE | FF_TX_PRESHUFFLE, 0),
+-    TX_DEF(fft16,     FFT, 16, 16, 2, 0, 128, neon_init, neon, NEON, AV_TX_INPLACE, 0),
++    TX_DEF(fft16,     FFT, 16, 16, 2, 0, 128, x86eq_init, x86eq, NEON, AV_TX_INPLACE, 0),
+     TX_DEF(fft16_ns,  FFT, 16, 16, 2, 0, 192, neon_init, neon, NEON, AV_TX_INPLACE | FF_TX_PRESHUFFLE, 0),
+-    TX_DEF(fft32,     FFT, 32, 32, 2, 0, 128, neon_init, neon, NEON, AV_TX_INPLACE, 0),
++    TX_DEF(fft32,     FFT, 32, 32, 2, 0, 128, x86eq_init, x86eq, NEON, AV_TX_INPLACE, 0),
+     TX_DEF(fft32_ns,  FFT, 32, 32, 2, 0, 192, neon_init, neon, NEON, AV_TX_INPLACE | FF_TX_PRESHUFFLE, 0),
+ 
+-    TX_DEF(fft_sr,    FFT, 64, 131072, 2, 0, 128, neon_init, neon, NEON, 0, 0),
++    TX_DEF(fft_sr,    FFT, 64, 131072, 2, 0, 128, x86eq_init, x86eq, NEON, 0, 0),
+     TX_DEF(fft_sr_ns, FFT, 64, 131072, 2, 0, 192, neon_init, neon, NEON, AV_TX_INPLACE | FF_TX_PRESHUFFLE, 0),
+ 
+     NULL,
+diff --git a/media/ffvpx/libavutil/aarch64/tx_float_x86eq.c b/media/ffvpx/libavutil/aarch64/tx_float_x86eq.c
+new file mode 100644
+index 0000000000..0ff2603300
+--- /dev/null
++++ b/media/ffvpx/libavutil/aarch64/tx_float_x86eq.c
+@@ -0,0 +1,486 @@
++/*
++ * The x86 AVX 8-point and FMA3/AVX2 split-radix float FFT codelets of
++ * libavutil/x86/tx_float.asm (Copyright (c) Lynne), in C: the same operations
++ * on the same operands, fused only where the assembly fuses, so the output
++ * bits equal x86-64's.
++ *
++ * This file is part of FFmpeg.
++ *
++ * FFmpeg is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2.1 of the License, or (at your option) any later version.
++ *
++ * FFmpeg is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with FFmpeg; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
++ */
++
++#define TX_FLOAT
++#include "libavutil/tx_priv.h"
++
++#pragma STDC FP_CONTRACT OFF
++
++#define TABS(T) T(64) T(128) T(256) T(512) T(1024) T(2048) T(4096) T(8192) \
++                T(16384) T(32768) T(65536) T(131072)
++extern float ff_tx_tab_32_float[];
++#define T(n) extern float ff_tx_tab_##n##_float[];
++TABS(T)
++#undef T
++
++/* A ymm register; each helper is one AVX instruction */
++typedef struct V { float f[8]; } V;
++
++#define EACH for (int i = 0; i < 8; i++)
++
++static inline V add(V a, V b) { V r; EACH r.f[i] = a.f[i] + b.f[i]; return r; }
++static inline V sub(V a, V b) { V r; EACH r.f[i] = a.f[i] - b.f[i]; return r; }
++static inline V mul(V a, V b) { V r; EACH r.f[i] = a.f[i] * b.f[i]; return r; }
++/* xorps with a sign mask: bit i of m flips lane i */
++static inline V neg(V a, unsigned m) { EACH if (m >> i & 1) a.f[i] = -a.f[i]; return a; }
++static inline V addsub(V a, V b)
++{
++    V r;
++    EACH r.f[i] = i & 1 ? a.f[i] + b.f[i] : a.f[i] - b.f[i];
++    return r;
++}
++static inline V fmadd(V a, V b, V c)
++{
++    V r;
++    EACH r.f[i] = __builtin_fmaf(a.f[i], b.f[i], c.f[i]);
++    return r;
++}
++static inline V fmaddsub(V a, V b, V c)
++{
++    V r;
++    EACH r.f[i] = __builtin_fmaf(a.f[i], b.f[i], i & 1 ? c.f[i] : -c.f[i]);
++    return r;
++}
++static inline V fmsubadd(V a, V b, V c)
++{
++    V r;
++    EACH r.f[i] = __builtin_fmaf(a.f[i], b.f[i], i & 1 ? -c.f[i] : c.f[i]);
++    return r;
++}
++/* shufps with x86inc's qDCBA immediate: per half, a[A], a[B], b[C], b[D] */
++static inline V shuf(V a, V b, int d, int c, int bb, int aa)
++{
++    V r;
++    for (int h = 0; h < 8; h += 4) {
++        r.f[h + 0] = a.f[h + aa];
++        r.f[h + 1] = a.f[h + bb];
++        r.f[h + 2] = b.f[h + c];
++        r.f[h + 3] = b.f[h + d];
++    }
++    return r;
++}
++static inline V permil(V a, const int *p)
++{
++    V r;
++    EACH r.f[i] = a.f[(i & 4) + p[i]];
++    return r;
++}
++static inline V movsldup(V a) { return shuf(a, a, 2, 2, 0, 0); }
++static inline V movshdup(V a) { return shuf(a, a, 3, 3, 1, 1); }
++static inline V unpcklpd(V a, V b) { return shuf(a, b, 1, 0, 1, 0); }
++static inline V unpckhpd(V a, V b) { return shuf(a, b, 3, 2, 3, 2); }
++/* vperm2f128: each half of the result is half lo/hi (0..3) of a:b */
++static inline V perm2(V a, V b, int lo, int hi)
++{
++    V r;
++    for (int i = 0; i < 4; i++) {
++        r.f[i]     = (lo & 2 ? b : a).f[(lo & 1) * 4 + i];
++        r.f[4 + i] = (hi & 2 ? b : a).f[(hi & 1) * 4 + i];
++    }
++    return r;
++}
++
++#define SQ 0.707106781186547524401f
++#define C1 0.92387950420379638671875f
++#define C3 0.3826834261417388916015625f
++
++static const V d8_mult_odd   = {{ SQ, -SQ, -SQ, SQ, SQ, -SQ, -SQ, SQ }};
++static const V s8_mult_odd   = {{ 1, 1, -1, 1, -SQ, -SQ, SQ, SQ }};
++static const int s8_perm_even[8] = { 1, 3, 0, 2, 1, 3, 2, 0 };
++static const int s8_perm_odd1[8] = { 3, 3, 1, 1, 1, 1, 3, 3 };
++static const int s8_perm_odd2[8] = { 1, 2, 0, 3, 1, 0, 0, 1 };
++static const V s16_mult_even = {{ 1, 1, SQ, SQ, 1, -1, SQ, -SQ }};
++static const V s16_mult_odd1 = {{ C1, C1, C3, C3, C1, -C1, C3, -C3 }};
++static const V s16_mult_odd2 = {{ C3, -C3, C1, -C1, -C3, -C3, -C1, -C1 }};
++static const int s16_perm[8] = { 0, 1, 2, 3, 1, 0, 3, 2 };
++
++/* The sign masks, lane 0 in bit 0 */
++#define MASK_MMMMPPPM 0x8f
++#define MASK_PPMPMMPM 0xb4
++#define MASK_MPPMMPMP 0x59
++#define MASK_MPMPPMPM 0xa5
++#define MASK_PMMPPMMP 0x66
++#define MASK_PMPMPMPM 0xaa
++
++/* LOAD64_LUT */
++static inline V load(const TXComplex *in, const int *lut)
++{
++    V r;
++    for (int i = 0; i < 4; i++) {
++        const TXComplex z = in[lut[i]];
++        r.f[2*i]     = z.re;
++        r.f[2*i + 1] = z.im;
++    }
++    return r;
++}
++
++/* vextractf128 to out: half h of a, two complex values */
++static inline void store(TXComplex *out, V a, int h)
++{
++    out[0] = (TXComplex){ a.f[4*h + 0], a.f[4*h + 1] };
++    out[1] = (TXComplex){ a.f[4*h + 2], a.f[4*h + 3] };
++}
++
++/* %macro FFT4 */
++static inline void fft4(V *e, V *o)
++{
++    V t = sub(*e, *o);
++    *e = add(*e, *o);
++
++    *o = shuf(*e, t, 1, 0, 1, 0);
++    *e = shuf(*e, t, 2, 3, 3, 2);
++
++    t  = sub(*o, *e);
++    *o = add(*o, *e);
++
++    *e = shuf(*o, t, 1, 0, 1, 0);
++
++    *o = shuf(*o, t, 2, 3, 3, 2);
++    *o = shuf(*o, *o, 1, 3, 2, 0);
++}
++
++/* %macro FFT8 */
++static inline void fft8(V *m1, V *m2, V *m3, V *m4)
++{
++    V m5 = add(*m1, *m3);
++    V m6 = add(*m2, *m4);
++
++    *m1 = sub(*m1, *m3);
++    *m2 = sub(*m2, *m4);
++
++    *m4 = shuf(*m1, *m1, 2, 3, 2, 3);
++    *m3 = shuf(m5, m6, 3, 0, 3, 2);
++
++    *m1 = shuf(*m1, *m1, 1, 0, 1, 0);
++    m5  = shuf(m5, m6, 1, 2, 1, 0);
++
++    *m4 = neg(*m4, MASK_PMMPPMMP);
++    m6  = add(m5, *m3);
++
++    *m2 = mul(*m2, d8_mult_odd);
++    m5  = sub(m5, *m3);
++
++    *m3 = add(*m1, *m4);
++    *m1 = unpcklpd(m6, m5);
++
++    *m4 = shuf(*m2, *m2, 2, 3, 0, 1);
++    m6  = shuf(m6, m5, 2, 3, 3, 2);
++
++    *m2 = addsub(*m2, *m4);
++    m5  = shuf(*m2, *m2, 0, 1, 2, 3);
++    m5  = addsub(m5, *m2);
++
++    *m2 = sub(*m1, m6);
++    *m4 = sub(*m3, m5);
++
++    *m1 = add(*m1, m6);
++    *m3 = add(*m3, m5);
++}
++
++/* %macro FFT8_AVX */
++static inline void fft8_avx(V *m1, V *m2)
++{
++    V m3 = sub(*m1, *m2), m4;
++    *m1 = add(*m1, *m2);
++
++    *m2 = permil(m3, s8_perm_odd1);
++    m4  = shuf(*m1, *m1, 3, 3, 2, 2);
++
++    m3  = movsldup(m3);
++    *m1 = shuf(*m1, *m1, 1, 1, 0, 0);
++
++    m3  = addsub(m3, *m2);
++    *m1 = addsub(*m1, m4);
++
++    m3  = mul(m3, s8_mult_odd);
++    *m1 = permil(*m1, s8_perm_even);
++
++    *m2 = shuf(m3, m3, 2, 3, 3, 2);
++    m4  = neg(*m1, MASK_MMMMPPPM);
++
++    m3  = permil(m3, s8_perm_odd2);
++    *m1 = perm2(*m1, m4, 3, 0);
++
++    *m2 = addsub(*m2, m3);
++    *m1 = sub(*m1, m4);
++
++    *m2 = perm2(*m2, *m2, 1, 1);
++    m3  = perm2(m3, m3, 0, 0);
++
++    *m2 = neg(*m2, MASK_PPMPMMPM);
++    *m2 = add(m3, *m2);
++}
++
++/* %macro FFT16, the fma3 branch */
++static inline void fft16(V *m1, V *m2, V *m3, V *m4)
++{
++    V m5 = {{ 0 }}, m6;
++
++    fft4(m3, m4);
++    fft8_avx(m1, m2);
++
++    m6  = shuf(*m4, *m4, 2, 3, 0, 1);
++    m5  = shuf(m5, *m3, 2, 3, 0, 1);
++
++    *m4 = mul(*m4, s16_mult_odd1);
++    m5  = neg(m5, MASK_MPPMMPMP);
++    m6  = fmadd(m6, s16_mult_odd2, *m4);
++    m5  = add(*m3, m5);
++    m5  = mul(m5, s16_mult_even);
++
++    *m4 = neg(m6, MASK_MPMPPMPM);
++    *m3 = neg(m5, MASK_MPMPPMPM);
++
++    *m4 = perm2(*m4, *m4, 1, 0);
++    *m3 = perm2(*m3, *m3, 1, 0);
++
++    m6  = add(m6, *m4);
++    m5  = add(m5, *m3);
++
++    m6  = permil(m6, s16_perm);
++    m5  = permil(m5, s16_perm);
++
++    *m4 = sub(*m2, m6);
++    *m3 = add(*m2, m6);
++
++    *m2 = sub(*m1, m5);
++    *m1 = add(*m1, m5);
++}
++
++/* %macro SPLIT_RADIX_COMBINE 1 (ymm), the fma3 branch */
++static inline void combine32(V *m2, V *m3, V *m4, V *m5,
++                             V *m6, V *m7, V *m8, V *m9, V m10, V m11)
++{
++    V m14 = perm2(*m6, *m7, 0, 2);
++    V m16 = perm2(*m9, *m8, 0, 2);
++    V m15 = perm2(*m6, *m7, 1, 3);
++    V m17 = perm2(*m9, *m8, 1, 3);
++
++    V m12 = shuf(m10, m10, 2, 2, 0, 0);
++    V m13 = shuf(m11, m11, 1, 1, 3, 3);
++    m10   = movshdup(m10);
++    m11   = shuf(m11, m11, 0, 0, 2, 2);
++
++    *m6 = shuf(m14, m14, 2, 3, 0, 1);
++    *m8 = shuf(m16, m16, 2, 3, 0, 1);
++    *m7 = shuf(m15, m15, 2, 3, 0, 1);
++    *m9 = shuf(m17, m17, 2, 3, 0, 1);
++
++    m14 = mul(m14, m13);
++    m16 = mul(m16, m11);
++    m15 = mul(m15, m13);
++    m17 = mul(m17, m11);
++
++    *m6 = fmaddsub(*m6, m12, m14);
++    *m8 = fmaddsub(*m8, m10, m16);
++    *m7 = fmsubadd(*m7, m12, m15);
++    *m9 = fmsubadd(*m9, m10, m17);
++
++    m14 = add(*m6, *m7);
++    m16 = add(*m8, *m9);
++    m15 = sub(*m6, *m7);
++    m17 = sub(*m8, *m9);
++
++    m14 = shuf(m14, m14, 2, 3, 0, 1);
++    m16 = shuf(m16, m16, 2, 3, 0, 1);
++    m15 = neg(m15, MASK_PMPMPMPM);
++    m17 = neg(m17, MASK_PMPMPMPM);
++
++    *m6 = sub(*m2, m14);
++    *m8 = sub(*m4, m16);
++    *m7 = sub(*m3, m15);
++    *m9 = sub(*m5, m17);
++
++    *m2 = add(*m2, m14);
++    *m4 = add(*m4, m16);
++    *m3 = add(*m3, m15);
++    *m5 = add(*m5, m17);
++}
++
++/* FFT8_AVX_FN */
++static void fft8_kernel(TXComplex *out, const TXComplex *in, const int *lut)
++{
++    V m0 = load(in, lut);
++    V m1 = load(in, lut + 4);
++    V m2;
++
++    fft8_avx(&m0, &m1);
++
++    m2 = unpcklpd(m0, m1);
++    m0 = unpckhpd(m0, m1);
++
++    store(out + 0, m2, 0);
++    store(out + 2, m0, 0);
++    store(out + 4, m2, 1);
++    store(out + 6, m0, 1);
++}
++
++/* FFT16_FN */
++static void fft16_kernel(TXComplex *out, const TXComplex *in, const int *lut)
++{
++    V m0 = load(in, lut);
++    V m1 = load(in, lut + 4);
++    V m2 = load(in, lut + 8);
++    V m3 = load(in, lut + 12);
++    V m4, m5;
++
++    fft16(&m0, &m1, &m2, &m3);
++
++    m5 = unpcklpd(m1, m3);
++    m4 = unpcklpd(m0, m2);
++    m1 = unpckhpd(m1, m3);
++    m0 = unpckhpd(m0, m2);
++
++    store(out +  0, m4, 0);
++    store(out +  2, m0, 0);
++    store(out +  4, m4, 1);
++    store(out +  6, m0, 1);
++    store(out +  8, m5, 0);
++    store(out + 10, m1, 0);
++    store(out + 12, m5, 1);
++    store(out + 14, m1, 1);
++}
++
++/* FFT32_FN */
++static void fft32_kernel(TXComplex *out, const TXComplex *in, const int *lut)
++{
++    V m0, m1, m2, m3, m8, m9, m10, m11;
++    V m4 = load(in, lut + 16);
++    V m5 = load(in, lut + 20);
++    V m6 = load(in, lut + 24);
++    V m7 = load(in, lut + 28);
++
++    fft8(&m4, &m5, &m6, &m7);
++
++    m0 = load(in, lut);
++    m1 = load(in, lut + 4);
++    m2 = load(in, lut + 8);
++    m3 = load(in, lut + 12);
++
++    EACH m8.f[i] = ff_tx_tab_32_float[i];
++    EACH m9.f[i] = ff_tx_tab_32_float[1 + (i ^ 4)]; /* vperm2f128 ..., 0x23 */
++
++    fft16(&m0, &m1, &m2, &m3);
++
++    combine32(&m0, &m1, &m2, &m3, &m4, &m5, &m6, &m7, m8, m9);
++
++    m9  = unpcklpd(m1, m3);
++    m10 = unpcklpd(m5, m7);
++    m8  = unpcklpd(m0, m2);
++    m11 = unpcklpd(m4, m6);
++    m1  = unpckhpd(m1, m3);
++    m5  = unpckhpd(m5, m7);
++    m0  = unpckhpd(m0, m2);
++    m4  = unpckhpd(m4, m6);
++
++    store(out +  0, m8,  0);
++    store(out +  2, m0,  0);
++    store(out +  4, m8,  1);
++    store(out +  6, m0,  1);
++    store(out +  8, m9,  0);
++    store(out + 10, m1,  0);
++    store(out + 12, m9,  1);
++    store(out + 14, m1,  1);
++
++    store(out + 16, m11, 0);
++    store(out + 18, m4,  0);
++    store(out + 20, m11, 1);
++    store(out + 22, m4,  1);
++    store(out + 24, m10, 0);
++    store(out + 26, m5,  0);
++    store(out + 28, m10, 1);
++    store(out + 30, m5,  1);
++}
++
++/* SPLIT_RADIX_COMBINE, _HALF and _LITE on the output in natural order, the fma3 branch */
++static void combine(TXComplex *z, const float *tab, int n)
++{
++    const int q = n >> 2;
++
++    for (int k = 0; k < q; k++) {
++        TXComplex *a0 = z + k, *a1 = a0 + q, *a2 = a1 + q, *a3 = a2 + q;
++        const float c = tab[k], w = tab[q - k];
++        const float w0 = __builtin_fmaf(a2->im, c, -(a2->re * w));
++        const float w1 = __builtin_fmaf(a2->re, c,   a2->im * w);
++        const float j0 = __builtin_fmaf(a3->im, c,   a3->re * w);
++        const float j1 = __builtin_fmaf(a3->re, c, -(a3->im * w));
++        const float tr = w1 + j1, ti = w0 + j0;
++        const float ur = w0 - j0, ui = -(w1 - j1);
++
++        a2->re = a0->re - tr;
++        a2->im = a0->im - ti;
++        a3->re = a1->re - ur;
++        a3->im = a1->im - ui;
++        a0->re = a0->re + tr;
++        a0->im = a0->im + ti;
++        a1->re = a1->re + ur;
++        a1->im = a1->im + ui;
++    }
++}
++
++/* FFT_SPLIT_RADIX_FN; returns how many input values it consumed */
++static int split_radix(TXComplex *out, const TXComplex *in, const int *lut, int n)
++{
++    static const float *const tabs[] = {
++#define T(n) ff_tx_tab_##n##_float,
++        TABS(T)
++#undef T
++    };
++    int pos;
++
++    if (n == 16) {
++        fft16_kernel(out, in, lut);
++        return n;
++    }
++    if (n == 32) {
++        fft32_kernel(out, in, lut);
++        return n;
++    }
++
++    pos  = split_radix(out, in, lut, n >> 1);
++    pos += split_radix(out + pos, in, lut + pos, n >> 2);
++    pos += split_radix(out + pos, in, lut + pos, n >> 2);
++
++    combine(out, tabs[av_log2(n) - 6], n);
++    return pos;
++}
++
++void ff_tx_fft8_float_x86eq(AVTXContext *s, void *out, void *in, ptrdiff_t stride)
++{
++    fft8_kernel(out, in, s->map);
++}
++
++void ff_tx_fft16_float_x86eq(AVTXContext *s, void *out, void *in, ptrdiff_t stride)
++{
++    fft16_kernel(out, in, s->map);
++}
++
++void ff_tx_fft32_float_x86eq(AVTXContext *s, void *out, void *in, ptrdiff_t stride)
++{
++    fft32_kernel(out, in, s->map);
++}
++
++void ff_tx_fft_sr_float_x86eq(AVTXContext *s, void *out, void *in, ptrdiff_t stride)
++{
++    split_radix(out, in, s->map, s->len);
++}
