@@ -77,7 +77,7 @@ The core's packaged seal has no linux-arm64 asset and lists arm64 as retired aft
 "firefox-159.0-stealth-linux-arm64.tar.gz": {"arch": "arm64", "build_id": "20261108115355", "entry_rel": "firefox", "omni_sha256": "e745190aead37a0dbb6e9c5aa59be1136871ced7935d706bec7be221a76316c4", "platform": "linux", "sha256": "fc7f83ef1054b200487855cccc3dd390b9a2f8a11677c5e17aaae46a696ebaae", "size": 267696886}
 ```
 
-The core downloads only from upstream's release URL, so the engine has to be in place before it looks. Point `INVISIBLE_PLAYWRIGHT_ENGINE_DIR` at a directory holding the extracted archive under `firefox-58/`, and `INVISIBLE_SEAL_FILE` at the seal. The first `invisible_playwright fetch` adopts the tree (it needs write access to the engine directory once) and no download happens. After that, a user without write access gets stamp hits. Each process prints `invisible-core: substituted seal in effect: …` once on stderr.
+The core downloads only from upstream's release URL, so the engine has to be in place before it looks. Point `INVISIBLE_PLAYWRIGHT_ENGINE_DIR` at a directory holding the extracted archive under `firefox-58_159.0_20261108115355/` (the core's content-keyed name, `<tag>_<upstream_version>_<build_id>` from the seal), and `INVISIBLE_SEAL_FILE` at the seal. The archive has `./firefox` and `./application.ini` at its root. The first `invisible_playwright fetch` adopts the tree and writes its stamp, `.invisible-seal.json`, into it (it needs write access to that directory once), and no download happens. After that, a user without write access gets stamp hits. Each process prints `invisible-core: substituted seal in effect: …` once on stderr.
 
 ### Byparr
 
@@ -91,12 +91,12 @@ ARG ARM64_SEAL_SHA256=54212351d31d5faaa2501b22c1aaabf8337f57d727bb499dd39a35808a
 ARG ARM64_ARCHIVE_SHA256=fc7f83ef1054b200487855cccc3dd390b9a2f8a11677c5e17aaae46a696ebaae
 ENV INVISIBLE_SEAL_FILE=/opt/invisible/seal.json \
     INVISIBLE_PLAYWRIGHT_ENGINE_DIR=/opt/invisible/engine
-RUN mkdir -p /opt/invisible/engine/firefox-58 \
+RUN mkdir -p /opt/invisible/engine/firefox-58_159.0_20261108115355 \
  && curl -fsSL -o /opt/invisible/seal.json https://github.com/ThePhaseless/firefox_antidetect_patch/releases/download/firefox-58-arm64/seal.json \
  && echo "$ARM64_SEAL_SHA256  /opt/invisible/seal.json" | sha256sum -c - \
  && curl -fsSL -o /tmp/ff.tgz https://github.com/ThePhaseless/firefox_antidetect_patch/releases/download/firefox-58-arm64/firefox-159.0-stealth-linux-arm64.tar.gz \
  && echo "$ARM64_ARCHIVE_SHA256  /tmp/ff.tgz" | sha256sum -c - \
- && tar xzf /tmp/ff.tgz -C /opt/invisible/engine/firefox-58 \
+ && tar xzf /tmp/ff.tgz -C /opt/invisible/engine/firefox-58_159.0_20261108115355 \
  && rm /tmp/ff.tgz
 
 # TARGETARCH is predefined in the global scope, so FROM can use it
@@ -107,11 +107,12 @@ FROM engine-${TARGETARCH} AS app
 
 - `ARM64_ARCHIVE_SHA256` is the `sha256` of the arm64 entry in the seal. Both values come from the release's `checksums.txt`; a new fork release means updating both.
 - The base stage has curl and coreutils but no python3, so both files are checked with `sha256sum -c`.
+- Extract straight into `firefox-58_159.0_20261108115355`, not into the legacy `firefox-58` name. The core adopts a legacy tree by renaming it to the content-keyed name with `os.replace`. When the tree was written in an earlier image layer, overlayfs refuses that rename (EXDEV), the core stamps the legacy directory instead, and `ensure_binary()` reads the stamp only from the content-keyed one. Every start then adopts again, and as uid 1000 writing the stamp into the root-owned directory fails with `PermissionError`.
 - The engine sits in `/opt/invisible/engine`, outside `/cache`, so a volume or tmpfs over `/cache` cannot hide it. `/cache` keeps only machine state (geoip, fonts) and its existing `chmod -R a+rwX`.
 - Both variables stay set at runtime. Without `INVISIBLE_SEAL_FILE` the core refuses arm64 as a retired leg.
 - The `devcontainer` stage is left as it is. It runs `invisible_playwright fetch` without the seal file, so on arm64 it fails as it does today.
 
-The adoption was checked in Docker on an aarch64 host against the release URLs: in `python:3.13-slim` with `invisible-core 58.56.0` and `invisible-playwright 0.47.1`, both files passed `sha256sum -c`, the first `fetch` as root printed `adopted the engine already cached at /opt/invisible/engine/firefox-58_159.0_20261108115355 ... no download needed`, and after `/cache` was emptied, uid 1000 got the same path from `fetch` and `ensure_binary()` with `/opt/invisible` still root-owned.
+The adoption was checked on an aarch64 host with a multi-stage build of this recipe on `python:3.13-slim` (`invisible-core 58.56.0`, `invisible-playwright 0.47.1`), downloading from the release URLs. Both files passed `sha256sum -c`. The root-time `fetch` in the app stage printed `adopted the engine already cached at /opt/invisible/engine/firefox-58_159.0_20261108115355 ... no download needed`. In the built image, uid 1000 then got the same path from `fetch` and `ensure_binary()` with `/opt/invisible` root-owned and no write.
 
 ## License
 
