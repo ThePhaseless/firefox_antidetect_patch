@@ -1,9 +1,31 @@
 diff --git a/scripts/ci/lavapipe/0009-gallivm-aarch64-fixed-profile.patch b/scripts/ci/lavapipe/0009-gallivm-aarch64-fixed-profile.patch
 new file mode 100644
-index 0000000000..9990d872e1
+index 0000000000..5125029b7c
 --- /dev/null
 +++ b/scripts/ci/lavapipe/0009-gallivm-aarch64-fixed-profile.patch
-@@ -0,0 +1,39 @@
+@@ -0,0 +1,61 @@
++diff --git a/src/gallium/auxiliary/gallivm/lp_bld_arit.c b/src/gallium/auxiliary/gallivm/lp_bld_arit.c
++index 357204e..68da424 100644
++--- a/src/gallium/auxiliary/gallivm/lp_bld_arit.c
+++++ b/src/gallium/auxiliary/gallivm/lp_bld_arit.c
++@@ -228,10 +228,17 @@ lp_build_fmuladd(LLVMBuilderRef builder,
++    assert(type == LLVMTypeOf(b));
++    assert(type == LLVMTypeOf(c));
++ 
+++#if DETECT_ARCH_AARCH64
+++   /* Firefox's bundled lavapipe: AArch64 lowers llvm.fmuladd to a fused
+++    * multiply-add, x86-64 without FMA to a multiply and an add. The
+++    * multiply and the add, unfused, give the bytes x86-64 gives. */
+++   return LLVMBuildFAdd(builder, LLVMBuildFMul(builder, a, b, ""), c, "");
+++#else
++    char intrinsic[32];
++    lp_format_intrinsic(intrinsic, sizeof intrinsic, "llvm.fmuladd", type);
++    LLVMValueRef args[] = { a, b, c };
++    return lp_build_intrinsic(builder, intrinsic, type, args, 3, 0);
+++#endif
++ }
++ 
++ 
 +diff --git a/src/gallium/auxiliary/gallivm/lp_bld_init_orc.cpp b/src/gallium/auxiliary/gallivm/lp_bld_init_orc.cpp
 +index 62b462d..4471e4b 100644
 +--- a/src/gallium/auxiliary/gallivm/lp_bld_init_orc.cpp
@@ -44,7 +66,7 @@ index 0000000000..9990d872e1
 +    StringRef MCPU = llvm::sys::getHostCPUName();
 + #endif
 diff --git a/scripts/ci/lavapipe_build.py b/scripts/ci/lavapipe_build.py
-index 27b8230d95..14d2c9fc58 100644
+index 27b8230d95..1841e75c78 100644
 --- a/scripts/ci/lavapipe_build.py
 +++ b/scripts/ci/lavapipe_build.py
 @@ -40,6 +40,7 @@ import hashlib
@@ -114,7 +136,18 @@ index 27b8230d95..14d2c9fc58 100644
      env["PKG_CONFIG_SYSROOT_DIR"] = str(sysroot)
      for var in [v for v in env if v.startswith(("LP_", "GALLIUM_", "GALLIVM_", "MESA_", "VK_"))]:
          env.pop(var)
-@@ -331,7 +338,7 @@ def build(out: Path, clang: Path, sysroot: Path, jobs: int, run=subprocess.run,
+@@ -290,6 +297,10 @@ def build(out: Path, clang: Path, sysroot: Path, jobs: int, run=subprocess.run,
+             run(["git", "apply", str(patch)], check=True, cwd=mesa)
+         native = tmp / "native.ini"
+         flags = ["--sysroot=%s" % sysroot, "-ffile-prefix-map=%s=." % tmp]
++        # clang contracts a*b+c into one fused instruction where the target has one: on
++        # aarch64, not on the x86-64 baseline. Mesa's own C (format packing, setup) unfused.
++        if ARM64:
++            flags.append("-ffp-contract=off")
+         native.write_text("\n".join([
+             "[binaries]",
+             "c = %s" % meson_list([cc] + flags),
+@@ -331,7 +342,7 @@ def build(out: Path, clang: Path, sysroot: Path, jobs: int, run=subprocess.run,
  def main(argv=None) -> int:
      ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
      ap.add_argument("--clang", type=Path, default=Path.home() / ".mozbuild" / "clang")
