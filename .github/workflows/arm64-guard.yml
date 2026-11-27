@@ -25,27 +25,36 @@ jobs:
       GH_TOKEN: ${{ github.token }}
     steps:
       - name: Disable every workflow but the fork's, and cancel their runs
+        # A failed API call is a warning, never a red run: the next run tries again.
         run: |
-          set -euo pipefail
+          set -uo pipefail
           own='^\.github/workflows/arm64[^/]*\.ya?ml'
-          gh api --paginate "repos/$GITHUB_REPOSITORY/actions/workflows" --jq '.workflows[] | [.id, .state, .path] | @tsv' |
+          api() { for _ in 1 2 3; do gh api "$@" && return 0; sleep 10; done; return 1; }
+          upstream() { ! [[ "$1" =~ $own ]] && [[ "$1" == .github/workflows/* ]]; }
+          if ! workflows="$(api --paginate "repos/$GITHUB_REPOSITORY/actions/workflows" --jq '.workflows[] | [.id, .state, .path] | @tsv')"; then
+            echo "::warning::could not list the workflows"; exit 0
+          fi
           while IFS=$'\t' read -r id state path; do
-            if [[ "$path" =~ $own ]] || [[ "$path" != .github/workflows/* ]]; then
+            if ! upstream "$path"; then
               echo "kept      $state $path"
-            elif [ "$state" = active ]; then
-              gh api -X PUT "repos/$GITHUB_REPOSITORY/actions/workflows/$id/disable"
+            elif [ "$state" != active ]; then
+              echo "already   $state $path"
+            elif api -X PUT "repos/$GITHUB_REPOSITORY/actions/workflows/$id/disable"; then
               echo "disabled  $path"
             else
-              echo "already   $state $path"
+              echo "::warning::could not disable $path"
             fi
-          done
+          done <<<"$workflows"
+          runs=""
           for st in requested waiting pending queued in_progress; do
-            gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs?status=$st&per_page=100" \
-              --jq '.workflow_runs[] | [.id, .path] | @tsv'
-          done | sort -u |
-          while IFS=$'\t' read -r id path; do
-            if [[ "$path" =~ $own ]] || [[ "$path" != .github/workflows/* ]]; then continue; fi
-            if gh api -X POST "repos/$GITHUB_REPOSITORY/actions/runs/$id/cancel" >/dev/null; then
+            if ! found="$(api --paginate "repos/$GITHUB_REPOSITORY/actions/runs?status=$st&per_page=100" --jq '.workflow_runs[] | [.id, .path] | @tsv')"; then
+              echo "::warning::could not list the $st runs"; continue
+            fi
+            runs+="$found"$'\n'
+          done
+          sort -u <<<"$runs" | while IFS=$'\t' read -r id path; do
+            if [ -z "$id" ] || ! upstream "$path"; then continue; fi
+            if api -X POST "repos/$GITHUB_REPOSITORY/actions/runs/$id/cancel" >/dev/null; then
               echo "cancelled run $id ($path)"
             else
               echo "::warning::could not cancel run $id ($path)"

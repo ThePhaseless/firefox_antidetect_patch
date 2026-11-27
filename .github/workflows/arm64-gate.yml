@@ -439,6 +439,7 @@ jobs:
           ref: ${{ inputs.wrapper_ref }}
           fetch-depth: 1
       - name: The candidate's commit
+        if: inputs.arm64_run_id != ''
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: commits-linux-arm64
@@ -446,11 +447,12 @@ jobs:
           run-id: ${{ inputs.arm64_run_id }}
           github-token: ${{ github.token }}
       - name: Which commit
+        if: inputs.arm64_run_id != ''
         id: fork
         run: echo "sha=$(cat commits/fork-commit.txt)" | tee -a "$GITHUB_OUTPUT"
       - name: This repository at the candidate's commit (arm64/tools)
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with: { path: .fork, ref: '${{ steps.fork.outputs.sha }}', fetch-depth: 1 }
+        with: { path: .fork, ref: '${{ steps.fork.outputs.sha || github.sha }}', fetch-depth: 1 }
       - name: Every leg's dump
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:

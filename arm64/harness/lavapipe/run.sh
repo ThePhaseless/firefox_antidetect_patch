@@ -65,7 +65,7 @@ trap 'rm -rf "$obj"' EXIT
 for s in math.comp scene.vert scene.frag; do
   glslangValidator -V --quiet -o "$obj/$s.spv" "$here/$s"
 done
-cc -O1 -o "$obj/lvp_probe" "$here/lvp_probe.c" -ldl
+cc -O1 -ffp-contract=off -o "$obj/lvp_probe" "$here/lvp_probe.c" -ldl
 "$obj/lvp_probe" "$lib" "$obj" "$out" | tee "$obj/run.txt"
 {
   echo "machine $(uname -m)"

@@ -10,7 +10,7 @@ on:
     branches: [arm64, 'arm64-*']
     # A commit that changes no file outside these starts no run (an empty commit neither):
     # dispatch the workflow instead.
-    paths-ignore: ['**.md', 'LICENSE', 'arm64/harness/**']
+    paths-ignore: ['**.md', 'LICENSE']
   workflow_dispatch:
     inputs:
       kind:
@@ -811,8 +811,9 @@ jobs:
             run/host-gate.txt run/leaf-diff.txt run/exceptions.diff up/series-commit.txt seal.json rel/
           # The jobs' logs expire with the run; the release keeps them.
           for job in host-gate leaf-diff; do
-            id="$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs" \
-              --jq ".jobs[] | select(.name == \"gate / $job\") | .id")"
+            # filter=all: on a rerun of publish alone, the gate's jobs belong to an earlier attempt.
+            id="$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs?filter=all" \
+              --jq ".jobs[] | select(.name == \"gate / $job\") | [.run_attempt, .id] | @tsv" | sort -n | tail -1 | cut -f2)"
             [ -n "$id" ] || { echo "ERROR: no job 'gate / $job' in this run"; exit 1; }
             curl -fsSL --retry 3 -H "Authorization: Bearer $GH_TOKEN" \
               "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/jobs/$id/logs" -o "rel/$job.log"
