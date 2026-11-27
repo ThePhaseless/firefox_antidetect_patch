@@ -1,0 +1,48 @@
+diff --git a/gfx/skia/skia/src/opts/SkBitmapProcState_opts.h b/gfx/skia/skia/src/opts/SkBitmapProcState_opts.h
+index 407563eae4..0eaf21fb0f 100644
+--- a/gfx/skia/skia/src/opts/SkBitmapProcState_opts.h
++++ b/gfx/skia/skia/src/opts/SkBitmapProcState_opts.h
+@@ -541,7 +541,7 @@ static void decode_packed_coordinates_and_weight(U32 packed, Out* v0, Out* v1, O
+ 
+ #endif
+ 
+-#if defined(SK_ARM_HAS_NEON)
++#if defined(SK_ARM_HAS_NEON) && !defined(SK_CPU_ARM64)
+     /*not static*/ inline
+     void S32_alpha_D32_filter_DXDY(const SkBitmapProcState& s,
+                                    const uint32_t* xy, int count, SkPMColor* colors) {
+diff --git a/gfx/skia/skia/src/opts/SkBlitRow_opts.h b/gfx/skia/skia/src/opts/SkBlitRow_opts.h
+index 54de40498a..024d2d436d 100644
+--- a/gfx/skia/skia/src/opts/SkBlitRow_opts.h
++++ b/gfx/skia/skia/src/opts/SkBlitRow_opts.h
+@@ -186,7 +186,7 @@ inline void blit_row_s32a_opaque(SkPMColor* dst, const SkPMColor* src, int len,
+     }
+ #endif
+ 
+-#if defined(SK_ARM_HAS_NEON)
++#if defined(SK_ARM_HAS_NEON) && !defined(SK_CPU_ARM64)
+     while (len >= 8) {
+         vst4_u8((uint8_t*)dst, SkPMSrcOver_neon8(vld4_u8((const uint8_t*)dst),
+                                                  vld4_u8((const uint8_t*)src)));
+diff --git a/gfx/skia/skia/src/opts/SkRasterPipeline_opts.h b/gfx/skia/skia/src/opts/SkRasterPipeline_opts.h
+index 9a0edd9594..27e0331ccf 100644
+--- a/gfx/skia/skia/src/opts/SkRasterPipeline_opts.h
++++ b/gfx/skia/skia/src/opts/SkRasterPipeline_opts.h
+@@ -5472,7 +5472,7 @@ static void start_pipeline(size_t x0,     size_t y0,
+  * as [3]), and uses [3] elsewhere.
+  */
+ SI U16 div255(U16 v) {
+-#if defined(SKRP_CPU_NEON)
++#if defined(SKRP_CPU_NEON) && !defined(SK_CPU_ARM64)
+     // With NEON we can compute [2] just as fast as [3], so let's be correct.
+     // First we compute v + ((v+128)>>8), then one more round of (...+128)>>8 to finish up:
+     return vrshrq_n_u16(vrsraq_n_u16(v, v, 8), 8);
+@@ -5486,7 +5486,7 @@ SI U16 div255(U16 v) {
+  * div255_accurate guarantees the right answer on all platforms, at the expense of performance.
+  */
+ SI U16 div255_accurate(U16 v) {
+-#if defined(SKRP_CPU_NEON)
++#if defined(SKRP_CPU_NEON) && !defined(SK_CPU_ARM64)
+     // Our NEON implementation of div255 is already correct for all inputs:
+     return div255(v);
+ #else
