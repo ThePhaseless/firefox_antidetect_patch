@@ -2,20 +2,15 @@
 # Upstream's workflows stay in the tree byte for byte (tools/engine.py check), and GitHub can
 # disable a workflow only once it is registered, which takes its first run. This one disables
 # every workflow that is not the fork's own (.github/workflows/arm64*.yml) and cancels their
-# queued and running runs: when one of upstream's starts, after release.yml's Monday 03:00 UTC
-# slot, and on dispatch.
+# queued and running runs: every 20 minutes after release.yml's Monday 03:00 UTC slot, once a
+# day for the runs a push to main starts, and on dispatch. No workflow_run trigger: upstream's
+# test_release_builder.py allows pull-request events on series.yml only.
 name: arm64-guard
 
 on:
-  workflow_run:
-    # Every workflow name upstream has on main and on firefox-58.
-    workflows: [cargo-tests, checks, gate, gate-only, hook-tests-judge, latitude-sweeper, linux-deps,
-      noreply-identity, package-ab, publish, py-deps, release, republish, series, theta-sweeper,
-      verify-assets, verify-hidden-desktop, xpcshell]
-    types: [requested]
   schedule:
-    - cron: '20 3 * * 1'
-    - cron: '50 4 * * 1'
+    - cron: '*/20 3-6 * * 1'
+    - cron: '40 7 * * *'
   workflow_dispatch:
 
 permissions: { actions: write }
